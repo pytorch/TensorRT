@@ -31,6 +31,8 @@ def test_resnet18(ir):
         "pass_through_build_failures": True,
         "optimization_level": 1,
         "min_block_size": 8,
+        "cache_built_engines": False,
+        "reuse_cached_engines": False,
     }
 
     trt_mod = torchtrt.compile(model, **compile_spec)
@@ -61,6 +63,8 @@ def test_mobilenet_v2(ir):
         "pass_through_build_failures": True,
         "optimization_level": 1,
         "min_block_size": 8,
+        "cache_built_engines": False,
+        "reuse_cached_engines": False,
     }
 
     trt_mod = torchtrt.compile(model, **compile_spec)
@@ -91,6 +95,8 @@ def test_efficientnet_b0(ir):
         "pass_through_build_failures": True,
         "optimization_level": 1,
         "min_block_size": 8,
+        "cache_built_engines": False,
+        "reuse_cached_engines": False,
     }
 
     trt_mod = torchtrt.compile(model, **compile_spec)
@@ -130,6 +136,8 @@ def test_bert_base_uncased(ir):
         "truncate_double": True,
         "ir": ir,
         "min_block_size": 10,
+        "cache_built_engines": False,
+        "reuse_cached_engines": False,
     }
     trt_mod = torchtrt.compile(model, **compile_spec)
     model_outputs = model(input, input2)
@@ -168,6 +176,8 @@ def test_resnet18_half(ir):
         "pass_through_build_failures": True,
         "optimization_level": 1,
         "min_block_size": 8,
+        "cache_built_engines": False,
+        "reuse_cached_engines": False,
     }
 
     trt_mod = torchtrt.compile(model, **compile_spec)
@@ -223,6 +233,8 @@ def test_base_fp8(ir):
                 enabled_precisions={torch.float8_e4m3fn},
                 min_block_size=1,
                 debug=True,
+                cache_built_engines=False,
+                reuse_cached_engines=False,
             )
             outputs_trt = trt_model(input_tensor)
             assert torch.allclose(output_pyt, outputs_trt, rtol=1e-3, atol=1e-2)
@@ -272,6 +284,8 @@ def test_base_int8(ir):
                 enabled_precisions={torch.int8},
                 min_block_size=1,
                 debug=True,
+                cache_built_engines=False,
+                reuse_cached_engines=False,
             )
             outputs_trt = trt_model(input_tensor)
             assert torch.allclose(output_pyt, outputs_trt, rtol=1e-3, atol=1e-2)

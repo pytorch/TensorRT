@@ -63,6 +63,8 @@ def test_custom_model():
         "optimization_level": 1,
         "min_block_size": 1,
         "ir": "dynamo",
+        "cache_built_engines": False,
+        "reuse_cached_engines": False,
     }
 
     exp_program = torch.export.export(model, args=tuple(args), kwargs=kwargs)
@@ -122,6 +124,8 @@ def test_custom_model_with_dynamo_trace():
         "optimization_level": 1,
         "min_block_size": 1,
         "ir": "dynamo",
+        "cache_built_engines": False,
+        "reuse_cached_engines": False,
     }
 
     exp_program = torchtrt.dynamo.trace(model, **compile_spec)
@@ -190,6 +194,8 @@ def test_custom_model_with_dynamo_trace_dynamic():
         "optimization_level": 1,
         "min_block_size": 1,
         "ir": "dynamo",
+        "cache_built_engines": False,
+        "reuse_cached_engines": False,
     }
 
     exp_program = torchtrt.dynamo.trace(model, **compile_spec)
@@ -271,6 +277,8 @@ def test_custom_model_with_dynamo_trace_kwarg_dynamic():
         "optimization_level": 1,
         "min_block_size": 1,
         "ir": "dynamo",
+        "cache_built_engines": False,
+        "reuse_cached_engines": False,
     }
 
     exp_program = torchtrt.dynamo.trace(model, **compile_spec)
@@ -358,6 +366,8 @@ def test_custom_model_with_dynamo_trace_kwarg_dynamic():
         "optimization_level": 1,
         "min_block_size": 1,
         "ir": "dynamo",
+        "cache_built_engines": False,
+        "reuse_cached_engines": False,
     }
 
     exp_program = torchtrt.dynamo.trace(model, **compile_spec)
@@ -444,6 +454,8 @@ def test_custom_model_with_dynamo_trace_kwarg_list_dynamic():
         "optimization_level": 1,
         "min_block_size": 1,
         "ir": "dynamo",
+        "cache_built_engines": False,
+        "reuse_cached_engines": False,
     }
 
     exp_program = torchtrt.dynamo.trace(model, **compile_spec)
@@ -505,6 +517,8 @@ def test_custom_model_compile_engine():
         "optimization_level": 1,
         "min_block_size": 1,
         "ir": "dynamo",
+        "cache_built_engines": False,
+        "reuse_cached_engines": False,
     }
 
     exp_program = torch.export.export(model, args=tuple(args), kwargs=kwargs)

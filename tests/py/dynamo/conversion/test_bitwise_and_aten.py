@@ -141,7 +141,12 @@ class TestBitwiseAndConverter(DispatchTestCase):
             mod, inputs, dynamic_shapes=({1: dyn_dim}, {0: dyn_dim})
         )
         trt_mod = torch_tensorrt.dynamo.compile(
-            fx_mod, inputs=inputs, enable_precisions={torch.bool}, min_block_size=1
+            fx_mod,
+            inputs=inputs,
+            enable_precisions={torch.bool},
+            min_block_size=1,
+            cache_built_engines=False,
+            reuse_cached_engines=False,
         )
         with torch.no_grad():
             cuda_inputs = []

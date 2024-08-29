@@ -21,6 +21,8 @@ class MyEngineCache(BaseEngineCache):
         engine_cache_dir: str,
     ) -> None:
         self.engine_cache_dir = engine_cache_dir
+        if not os.path.exists(self.engine_cache_dir):
+            os.makedirs(self.engine_cache_dir, exist_ok=True)
 
     def save(
         self,
@@ -99,18 +101,18 @@ class TestEngineCache(TestCase):
         cos_sim = cosine_similarity(results[0], results[1])
         assertions.assertTrue(
             cos_sim > COSINE_THRESHOLD,
-            msg=f"test_dynamo_compile_with_default_disk_engine_cache: results[0] doesn't match with results[1]. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
+            msg=f"results[0] doesn't match with results[1]. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
         )
 
         cos_sim = cosine_similarity(results[1], results[2])
         assertions.assertTrue(
             cos_sim > COSINE_THRESHOLD,
-            msg=f"test_dynamo_compile_with_default_disk_engine_cache: results[1] doesn't match with results[2]. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
+            msg=f"results[1] doesn't match with results[2]. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
         )
 
         assertions.assertTrue(
             times[0] > times[2],
-            msg=f"test_dynamo_compile_with_default_disk_engine_cache: Engine caching didn't speed up the compilation. Time taken without engine caching: {times[0]} ms, time taken with engine caching: {times[2]} ms",
+            msg=f"Engine caching didn't speed up the compilation. Time taken without engine caching: {times[0]} ms, time taken with engine caching: {times[2]} ms",
         )
 
     def test_dynamo_compile_with_custom_engine_cache(self):
@@ -167,18 +169,18 @@ class TestEngineCache(TestCase):
         cos_sim = cosine_similarity(results[0], results[1])
         assertions.assertTrue(
             cos_sim > COSINE_THRESHOLD,
-            msg=f"test_dynamo_compile_with_custom_engine_cache: results[0] doesn't match with results[1]. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
+            msg=f"results[0] doesn't match with results[1]. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
         )
 
         cos_sim = cosine_similarity(results[1], results[2])
         assertions.assertTrue(
             cos_sim > COSINE_THRESHOLD,
-            msg=f"test_dynamo_compile_with_custom_engine_cache: results[1] doesn't match with results[2]. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
+            msg=f"results[1] doesn't match with results[2]. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
         )
 
         assertions.assertTrue(
             times[0] > times[2],
-            msg=f"test_dynamo_compile_with_custom_engine_cache: Engine caching didn't speed up the compilation. Time taken without engine caching: {times[0]} ms, time taken with engine caching: {times[2]} ms",
+            msg=f"Engine caching didn't speed up the compilation. Time taken without engine caching: {times[0]} ms, time taken with engine caching: {times[2]} ms",
         )
 
     def test_torch_compile_with_default_disk_engine_cache(self):
@@ -231,18 +233,18 @@ class TestEngineCache(TestCase):
         cos_sim = cosine_similarity(results[0], results[1])
         assertions.assertTrue(
             cos_sim > COSINE_THRESHOLD,
-            msg=f"test_torch_compile_with_default_disk_engine_cache: results[0] doesn't match with results[1]. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
+            msg=f"results[0] doesn't match with results[1]. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
         )
 
         cos_sim = cosine_similarity(results[1], results[2])
         assertions.assertTrue(
             cos_sim > COSINE_THRESHOLD,
-            msg=f"test_torch_compile_with_default_disk_engine_cache: results[1] doesn't match with results[2]. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
+            msg=f"results[1] doesn't match with results[2]. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
         )
 
         assertions.assertTrue(
             times[0] > times[2],
-            msg=f"test_torch_compile_with_default_disk_engine_cache: Engine caching didn't speed up the compilation. Time taken without engine caching: {times[0]} ms, time taken with engine caching: {times[2]} ms",
+            msg=f"Engine caching didn't speed up the compilation. Time taken without engine caching: {times[0]} ms, time taken with engine caching: {times[2]} ms",
         )
 
     def test_torch_compile_with_custom_engine_cache(self):
@@ -295,16 +297,16 @@ class TestEngineCache(TestCase):
         cos_sim = cosine_similarity(results[0], results[1])
         assertions.assertTrue(
             cos_sim > COSINE_THRESHOLD,
-            msg=f"test_torch_compile_with_custom_engine_cache: results[0] doesn't match with results[1]. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
+            msg=f"results[0] doesn't match with results[1]. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
         )
 
         cos_sim = cosine_similarity(results[1], results[2])
         assertions.assertTrue(
             cos_sim > COSINE_THRESHOLD,
-            msg=f"test_torch_compile_with_custom_engine_cache: results[1] doesn't match with results[2]. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
+            msg=f"results[1] doesn't match with results[2]. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
         )
 
         assertions.assertTrue(
             times[0] > times[2],
-            msg=f"test_torch_compile_with_custom_engine_cache: Engine caching didn't speed up the compilation. Time taken without engine caching: {times[0]} ms, time taken with engine caching: {times[2]} ms",
+            msg=f"Engine caching didn't speed up the compilation. Time taken without engine caching: {times[0]} ms, time taken with engine caching: {times[2]} ms",
         )
