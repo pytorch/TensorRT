@@ -4,7 +4,7 @@ import logging
 from contextlib import nullcontext
 from functools import wraps
 from tempfile import tempdir
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
 import tensorrt as trt
 import torch
@@ -24,14 +24,14 @@ from torch_tensorrt.runtime._utils import (
 logger = logging.getLogger(__name__)
 
 
-def recreate_context_decorator(method):
+def recreate_context_decorator(method: Callable[..., Any]) -> Callable[..., Any]:
     """
     A decorator that destroys a context before a method execution and
     creates it after the method execution within the same class instance.
     """
 
     @wraps(method)
-    def wrapper(self, *args, **kwargs):
+    def wrapper(self: object, *args: Any, **kwargs: Any) -> Any:
         self.reset_context()
         result = method(self, *args, **kwargs)
         self.init_context()
@@ -82,6 +82,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                 )
 
         """
+        self.context: Any
         super(PythonTorchTensorRTModule, self).__init__()
         self._register_state_dict_hook(PythonTorchTensorRTModule._on_state_dict)
 
@@ -127,29 +128,29 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         if self.serialized_engine is not None and not self.settings.lazy_engine_init:
             self.setup_engine()
 
-    def init_context(self):
+    def init_context(self) -> None:
         assert self.engine, "Context is used before setting up the engine"
         if self.context is None:
             self.context = self.engine.create_execution_context()
 
-    def reset_context(self):
+    def reset_context(self) -> None:
         if self.context is not None:
             del self.context
             self.context = None
 
-    def get_streamable_weights_size(self):
+    def get_streamable_weights_size(self) -> Any:
         return self.engine.streamable_weights_size
 
-    def get_weight_streaming_budget(self):
+    def get_weight_streaming_budget(self) -> Any:
         return self.engine.weight_streaming_budget_v2
 
     @recreate_context_decorator
-    def set_weight_streaming_budget(self, budget_bytes):
+    def set_weight_streaming_budget(self, budget_bytes: int) -> int:
         return self._set_weight_streaming_budget(budget_bytes)
 
-    def _set_weight_streaming_budget(self, budget_bytes):
+    def _set_weight_streaming_budget(self, budget_bytes: int) -> int:
         # Disable weight streaming for invalid budget size
-        if budget_bytes <= 0:
+        if budget_bytes < 0:
             budget_bytes = self.get_streamable_weights_size()
 
         self.engine.weight_streaming_budget_v2 = budget_bytes
@@ -161,7 +162,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
 
         return budget_bytes
 
-    def set_automatic_streaming_budget(self):
+    def set_automatic_streaming_budget(self) -> int:
         budget_bytes = self.engine.get_weight_streaming_automatic_budget()
         return self._set_weight_streaming_budget(budget_bytes)
 
