@@ -156,6 +156,13 @@ def layer_norm(
     axes = get_axes_for_reduce_op(dims)
     weight = get_trt_tensor(ctx, weight, f"{name}_weight")
     bias = get_trt_tensor(ctx, bias, f"{name}_bias")
+    # Cast weight and bias to have same dtype as input
+    weight = cast_trt_tensor(
+        ctx, weight, input.dtype, f"{name}_weight_cast", target, source_ir
+    )
+    bias = cast_trt_tensor(
+        ctx, bias, input.dtype, f"{name}_bias_cast", target, source_ir
+    )
     if tuple(input.shape) != tuple(weight.shape):
         weight = impl.slice.expand(
             ctx, target, source_ir, f"{name}_expand_weight", weight, input.shape

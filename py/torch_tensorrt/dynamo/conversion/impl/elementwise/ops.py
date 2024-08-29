@@ -546,12 +546,13 @@ def pow(
     lhs_val: Union[TRTTensor, int, float],
     rhs_val: Union[TRTTensor, int, float],
 ) -> TRTTensor:
-    if isinstance(lhs_val, TRTTensor) and isinstance(rhs_val, TRTTensor):
-        lhs_val, rhs_val = cast_int_int_div_trt_tensor(ctx, lhs_val, rhs_val, name)
-
-    return convert_binary_elementwise(
+    # POW operation supports only float32 and int8 inputs
+    lhs_val = get_trt_tensor(ctx, lhs_val, name + "_lhs_val", trt.float32)
+    rhs_val = get_trt_tensor(ctx, rhs_val, name + "_rhs_val", trt.float32)
+    out = convert_binary_elementwise(
         ctx, target, source_ir, name, trt.ElementWiseOperation.POW, lhs_val, rhs_val
     )
+    return out
 
 
 def floor_divide(
