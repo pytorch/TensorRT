@@ -953,7 +953,7 @@ def aten_ops_cumsum(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.tile.default)
+@dynamo_tensorrt_converter(torch.ops.aten.tile.default, supports_dynamic_shapes=True)
 @enforce_tensor_types(
     {
         0: (TRTTensor,),

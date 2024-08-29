@@ -42,6 +42,8 @@ def test_base_full_compile(ir):
         ],
         "ir": ir,
         "min_block_size": 1,
+        "cache_built_engines": False,
+        "reuse_cached_engines": False,
     }
 
     exp_program = torchtrt.dynamo.trace(model, **compile_spec)
@@ -94,6 +96,8 @@ def test_base_full_compile_multiple_outputs(ir):
         ],
         "ir": ir,
         "min_block_size": 1,
+        "cache_built_engines": False,
+        "reuse_cached_engines": False,
     }
 
     exp_program = torchtrt.dynamo.trace(model, **compile_spec)
@@ -150,6 +154,8 @@ def test_no_compile(ir):
             )
         ],
         "ir": ir,
+        "cache_built_engines": False,
+        "reuse_cached_engines": False,
     }
 
     exp_program = torchtrt.dynamo.trace(model, **compile_spec)
@@ -209,6 +215,8 @@ def test_hybrid_relu_fallback(ir):
         "ir": ir,
         "min_block_size": 1,
         "torch_executed_ops": {"torch.ops.aten.relu.default"},
+        "cache_built_engines": False,
+        "reuse_cached_engines": False,
     }
 
     exp_program = torchtrt.dynamo.trace(model, **compile_spec)
@@ -250,6 +258,8 @@ def test_resnet18(ir):
         ],
         "ir": ir,
         "min_block_size": 1,
+        "cache_built_engines": False,
+        "reuse_cached_engines": False,
     }
 
     exp_program = torchtrt.dynamo.trace(model, **compile_spec)
@@ -293,6 +303,8 @@ def test_resnet18_dynamic(ir):
         ],
         "ir": ir,
         "min_block_size": 1,
+        "cache_built_engines": False,
+        "reuse_cached_engines": False,
     }
 
     exp_program = torchtrt.dynamo.trace(model, **compile_spec)
@@ -340,6 +352,8 @@ def test_hybrid_conv_fallback(ir):
         "ir": ir,
         "min_block_size": 1,
         "torch_executed_ops": {"torch.ops.aten.convolution.default"},
+        "cache_built_engines": False,
+        "reuse_cached_engines": False,
     }
 
     exp_program = torchtrt.dynamo.trace(model, **compile_spec)
@@ -388,7 +402,14 @@ def test_save_load_ts(ir):
     model = MyModule().eval().cuda()
     input = torch.randn((1, 3, 224, 224)).to("cuda")
 
-    trt_gm = torchtrt.compile(model, ir=ir, inputs=[input], min_block_size=1)
+    trt_gm = torchtrt.compile(
+        model,
+        ir=ir,
+        inputs=[input],
+        min_block_size=1,
+        cache_built_engines=False,
+        reuse_cached_engines=False,
+    )
     assertions.assertTrue(
         isinstance(trt_gm, torch.fx.GraphModule),
         msg=f"test_save_load_ts output type does not match with torch.fx.GraphModule",
