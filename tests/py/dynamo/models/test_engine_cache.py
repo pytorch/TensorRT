@@ -184,9 +184,6 @@ class TestEngineCache(TestCase):
             msg=f"Engine caching didn't speed up the compilation. Time taken without engine caching: {times[0]} ms, time taken with engine caching: {times[2]} ms",
         )
 
-    @pytest.mark.skip(
-        reason="The test needs a fix for refit, which is reported in https://github.com/pytorch/TensorRT/issues/3126"
-    )
     def test_torch_compile_with_default_disk_engine_cache(self):
         # Custom Engine Cache
         model = models.resnet18(pretrained=True).eval().to("cuda")
@@ -251,9 +248,6 @@ class TestEngineCache(TestCase):
             msg=f"Engine caching didn't speed up the compilation. Time taken without engine caching: {times[0]} ms, time taken with engine caching: {times[2]} ms",
         )
 
-    @pytest.mark.skip(
-        reason="The test needs a fix for refit, which is reported in https://github.com/pytorch/TensorRT/issues/3126"
-    )
     def test_torch_compile_with_custom_engine_cache(self):
         # Custom Engine Cache
         model = models.resnet18(pretrained=True).eval().to("cuda")

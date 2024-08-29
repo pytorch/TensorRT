@@ -40,7 +40,7 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     get_node_name,
     get_trt_tensor,
 )
-from torch_tensorrt.dynamo.utils import DYNAMIC_DIM, to_torch_device
+from torch_tensorrt.dynamo.utils import DYNAMIC_DIM, get_model_device, to_torch_device
 from torch_tensorrt.fx.observer import Observer
 from torch_tensorrt.logging import TRT_LOGGER
 
@@ -434,9 +434,8 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         """
         _LOGGER.info("Building weight name mapping...")
         # Stage 1: Name mapping
-        sd = self.module.state_dict()
         torch_device = to_torch_device(self.compilation_settings.device)
-        gm_is_on_cuda = list(sd.values())[0].device.type == "cuda"
+        gm_is_on_cuda = get_model_device(self.module).type == "cuda"
         if not gm_is_on_cuda:
             # If the model original position is on CPU, move it GPU
             sd = {
