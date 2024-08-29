@@ -45,7 +45,6 @@ def replace_max_pool_with_indices(
                 maxpool_fused.meta = node.meta
                 # The metadata for this node should exclude the indices metadata
                 maxpool_fused.meta["val"] = maxpool_fused.meta["val"][0]
-
             logger.debug(
                 f"Replacing all uses of nodes {node}, {getitem_node} with fused maxpool node {maxpool_fused} "
                 f"is the only user of placeholder {node} and was inserted by the compiler."

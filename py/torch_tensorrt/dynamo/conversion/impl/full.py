@@ -66,10 +66,9 @@ def full(
     output = impl.elementwise.mul(ctx, target, source_ir, name + "_mul", output, 0)
     # https://stackoverflow.com/questions/37888620/comparing-boolean-and-int-using-isinstance
     if type(fill_value) in (int, float):
-        if isinstance(fill_value, float):
-            output = cast_trt_tensor(
-                ctx, output, trt.float32, name + "_casted", target, source_ir
-            )
+        output = cast_trt_tensor(
+            ctx, output, output_dtype, name + "_casted", target, source_ir
+        )
         output = impl.elementwise.add(
             ctx, target, source_ir, name + "_add", output, fill_value
         )

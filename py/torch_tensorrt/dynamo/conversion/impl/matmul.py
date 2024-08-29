@@ -24,6 +24,7 @@ def matrix_multiply(
     input_matrix_op: trt.MatrixOperation = trt.MatrixOperation.NONE,
     other_matrix_op: trt.MatrixOperation = trt.MatrixOperation.NONE,
 ) -> TRTTensor:
+
     if not isinstance(input, trt.ITensor):
         input = get_trt_tensor(ctx, input, f"{name}_input")
     if not isinstance(other, trt.ITensor):

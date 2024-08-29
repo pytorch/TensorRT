@@ -16,7 +16,7 @@ from torch_tensorrt.dynamo.conversion._TRTInterpreter import (
     TRTInterpreterResult,
 )
 from torch_tensorrt.dynamo.runtime import PythonTorchTensorRTModule, TorchTensorRTModule
-from torch_tensorrt.dynamo.utils import get_torch_inputs
+from torch_tensorrt.dynamo.utils import get_model_device, get_torch_inputs
 
 logger = logging.getLogger(__name__)
 
@@ -29,15 +29,21 @@ def infer_module_output_dtypes(
     truncate_double: bool = False,
 ) -> List[dtype]:
     """
-    inputs can be either arg_inputs or flattened input list. If it is flattened list, kwarg_inputs
-    should be None, as it is already included in the flattened input.
+    This function performs model inference to determine the output dtypes
+    and truncates them accordingly. inputs can be either arg_inputs or flattened input list.
+    If it is flattened list, kwarg_inputs should be None, as it is already included in the flattened input.
     """
+    # TODO: We can also determine output dtypes from the module.graph based on node metadata.
+    # However, our converter tests use fx.symbolic_trace which sometimes does not provide metadata,
+    # so we stick to the model inference approach currently.
     with unset_fake_temporarily():
+        # Get the device on which the model exists
+        # For large models, this can be done on CPU to save GPU memory allocation for TRT.
+        device = get_model_device(module)
         torch_inputs = get_torch_inputs(inputs, device)
         if kwarg_inputs is None:
             kwarg_inputs = {}
         torch_kwarg_inputs = get_torch_inputs(kwarg_inputs, device)
-        module = module.to(device.to(torch.device))
         module_outputs = module(*torch_inputs, **torch_kwarg_inputs)
         if not isinstance(module_outputs, (list, tuple)):
             module_outputs = [module_outputs]
@@ -106,6 +112,7 @@ def interpret_module_to_result(
         output_dtypes=output_dtypes,
         compilation_settings=settings,
     )
+
     interpreter_result = interpreter.run()
     return interpreter_result
 

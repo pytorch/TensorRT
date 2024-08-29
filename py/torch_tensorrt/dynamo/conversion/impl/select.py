@@ -96,10 +96,9 @@ def index(
             tensor_indices.append(ind)
 
     if not tensor_indices:
-        identity_layer = ctx.net.add_identity(input)
-        identity_layer.set_output_type(0, trt.int32)
-        set_layer_name(identity_layer, target, name + "_index_identity", source_ir)
-        return identity_layer.get_output(0)
+        cast_layer = ctx.net.add_cast(input, trt.int32)
+        set_layer_name(cast_layer, target, name + "_index_casted", source_ir)
+        return cast_layer.get_output(0)
     elif len(tensor_indices) == 1:
         indices_tensor = get_trt_tensor(
             ctx, tensor_indices[0], name + "_parameter_to_fp32_tensor"
