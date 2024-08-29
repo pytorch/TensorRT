@@ -1,16 +1,17 @@
 import logging
+from typing import Any
 
 from torch_tensorrt.dynamo.runtime import PythonTorchTensorRTModule, TorchTensorRTModule
 
 logger = logging.getLogger(__name__)
 
 
-class _WeightStreamingContext(object):
+class _WeightStreamingContextManager(object):
     """
     Helper class used to setup weight streaming budget
     """
 
-    def __init__(self, module) -> None:
+    def __init__(self, module: PythonTorchTensorRTModule | TorchTensorRTModule) -> None:
         rt_mods = []
         for name, rt_mod in module.named_children():
             if "_run_on_acc" in name and isinstance(
@@ -21,25 +22,35 @@ class _WeightStreamingContext(object):
             mod.get_streamable_weights_size() for _, mod in rt_mods
         ]
         self.rt_mods = rt_mods
+        total_device_budget = sum(self.streamable_budget)
+        # device_budget is -1 if there is no trt module
+        device_budget = -1 if total_device_budget == 0 else total_device_budget
+        super().__setattr__("device_budget", device_budget)
+        super().__setattr__("total_device_budget", total_device_budget)
 
-    def disable_weight_streaming(self):
+    def __enter__(self) -> "_WeightStreamingContextManager":
+        return self
+
+    def __exit__(self, *args: Any) -> None:
         for i, (name, rt_mod) in enumerate(self.rt_mods):
             rt_mod.set_weight_streaming_budget(self.streamable_budget[i])
             logger.debug(
                 f"Disable weight streaming by setting size {self.streamable_budget[i]} for {name}"
             )
 
-    def get_streamable_weight_bytes(self):
-        return sum(self.streamable_budget)
+    def __setattr__(self, name: str, value: Any) -> None:
+        if name == "device_budget":
+            value = self.set_streamable_weight_bytes(value)
+        super().__setattr__(name, value)
 
-    def set_streamable_weight_bytes(self, budget_bytes):
+    def set_streamable_weight_bytes(self, budget_bytes: int) -> int:
         ws_budget_bytes = 0
-        total_bytes = self.get_streamable_weight_bytes()
+        total_bytes = self.total_device_budget
         if total_bytes == 0:
             logger.error(
                 "streamable bytes are zero. Was module complied with enable_weight_streaming=True option?"
             )
-            return 0
+            return -1
         elif total_bytes <= budget_bytes:
             logger.error(
                 f"Requested budget is equal or greater than streamable bytes: {total_bytes}"
@@ -57,5 +68,7 @@ class _WeightStreamingContext(object):
         return ws_budget_bytes
 
 
-def weight_streaming_context(module) -> _WeightStreamingContext:
-    return _WeightStreamingContext(module)
+def weight_streaming(
+    module: PythonTorchTensorRTModule | TorchTensorRTModule,
+) -> _WeightStreamingContextManager:
+    return _WeightStreamingContextManager(module)
