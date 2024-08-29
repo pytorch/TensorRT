@@ -18,6 +18,7 @@ from typing import (
 )
 
 import numpy as np
+import tensorrt as trt
 import torch
 import torch.fx
 from torch.fx.node import _get_qualified_name
@@ -26,6 +27,7 @@ from torch.utils._python_dispatch import _disable_current_modes
 from torch_tensorrt._enums import dtype
 from torch_tensorrt._Input import Input
 from torch_tensorrt.dynamo import _defaults
+from torch_tensorrt.dynamo._engine_caching import BaseEngineCache
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
 from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
@@ -38,11 +40,10 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     get_node_name,
     get_trt_tensor,
 )
-from torch_tensorrt.dynamo.utils import DYNAMIC_DIM, to_torch_device
+from torch_tensorrt.dynamo.utils import DYNAMIC_DIM, get_model_device, to_torch_device
 from torch_tensorrt.fx.observer import Observer
 from torch_tensorrt.logging import TRT_LOGGER
 
-import tensorrt as trt
 from packaging import version
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
@@ -71,6 +72,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         logger_level: trt.ILogger.Severity = trt.ILogger.Severity.WARNING,
         output_dtypes: Optional[Sequence[dtype]] = None,
         compilation_settings: CompilationSettings = CompilationSettings(),
+        engine_cache: Optional[BaseEngineCache] = None,
     ):
         super().__init__(module)
 
@@ -125,6 +127,9 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         # Mapping of constants to shapes and dtypes
         self.const_mapping: Dict[str, Tuple[Sequence[int], str]] = {}
         self.weight_name_map: Optional[dict[str, Any]] = None
+
+        # Engine cache for storing and reusing TRT engines
+        self.engine_cache = engine_cache
 
     def validate_conversion(self) -> Set[str]:
         missing_converters: Set[str] = set()
@@ -323,6 +328,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         This is called after a TensorRT engine is built. Save the timing cache
         """
         timing_cache = builder_config.get_timing_cache()
+        os.makedirs(os.path.dirname(timing_cache_path), exist_ok=True)
         with open(timing_cache_path, "wb") as timing_cache_file:
             timing_cache_file.write(memoryview(timing_cache.serialize()))
 
@@ -428,9 +434,8 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         """
         _LOGGER.info("Building weight name mapping...")
         # Stage 1: Name mapping
-        sd = self.module.state_dict()
         torch_device = to_torch_device(self.compilation_settings.device)
-        gm_is_on_cuda = list(sd.values())[0].device.type == "cuda"
+        gm_is_on_cuda = get_model_device(self.module).type == "cuda"
         if not gm_is_on_cuda:
             # If the model original position is on CPU, move it GPU
             sd = {
@@ -516,15 +521,71 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         Args:
             strict_type_constraints: Usually we should set it to False unless we want to control the precision of certain layer for numeric reasons.
             algorithm_selector: set up algorithm selection for certain layer
+            tactic_sources: set up tactic sources for certain layer
         Return:
             TRTInterpreterResult
         """
+        # self.engine_cache could be None if:
+        # 1) engine_cache is not passed in when calling this function like convert_exported_program_to_serialized_trt_engine etc., or
+        # 2) both cache_built_engines and reuse_cached_engines are False
+        if self.engine_cache is not None:
+            if (
+                self.compilation_settings.cache_built_engines
+                or self.compilation_settings.reuse_cached_engines
+            ):
+                hash_val = self.engine_cache.get_hash(self.module)
+
+            if self.compilation_settings.reuse_cached_engines:
+                # query the cached TRT engine
+                blob = self.engine_cache.load(hash_val)
+                if blob is not None:  # hit the cache
+                    serialized_engine, input_names, output_names, weight_name_map = (
+                        self.engine_cache.unpack(blob)
+                    )
+                    self._input_names = input_names
+                    self._output_names = output_names
+                    self.weight_name_map = weight_name_map
+                    _LOGGER.info(
+                        "Found the cached engine that corresponds to this graph. It is directly loaded."
+                    )
+
+                    runtime = trt.Runtime(TRT_LOGGER)
+                    engine = runtime.deserialize_cuda_engine(serialized_engine)
+
+                    from torch_tensorrt.dynamo._refit import (
+                        _refit_single_trt_engine_with_gm,
+                    )
+
+                    # TODO: Fast refit is problematic for now. It will fail if the engine has batch_norm layers.
+                    # We set weight_name_map=None to use slow refit anyway for now. Will fix it in the future.
+                    _refit_single_trt_engine_with_gm(
+                        new_gm=self.module,
+                        old_engine=engine,
+                        input_list=self.input_specs,
+                        settings=self.compilation_settings,
+                        weight_name_map=None,
+                    )
+
+                    serialized_engine = engine.serialize()
+
+                    with io.BytesIO() as engine_bytes:
+                        engine_bytes.write(serialized_engine)
+                        engine_str = engine_bytes.getvalue()
+
+                    return TRTInterpreterResult(
+                        engine_str,
+                        self._input_names,
+                        self._output_names,
+                        self.weight_name_map,
+                    )
+
         self._construct_trt_network_def()
 
         if self.compilation_settings.make_refitable:
             self._save_weight_mapping()
 
         build_engine_start_time = datetime.now()
+        _LOGGER.info("Not found cached TRT engines. Start building engine.")
 
         builder_config = self._populate_trt_builder_config(
             strict_type_constraints, algorithm_selector, tactic_sources
@@ -547,6 +608,17 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         self._save_timing_cache(
             builder_config, self.compilation_settings.timing_cache_path
         )
+        if (
+            self.engine_cache is not None
+            and self.compilation_settings.cache_built_engines
+        ):
+            blob = self.engine_cache.pack(
+                serialized_engine,
+                self._input_names,
+                self._output_names,
+                self.weight_name_map,
+            )
+            self.engine_cache.save(hash_val, blob)
 
         with io.BytesIO() as engine_bytes:
             engine_bytes.write(serialized_engine)

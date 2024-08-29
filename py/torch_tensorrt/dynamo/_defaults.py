@@ -31,8 +31,15 @@ REQUIRE_FULL_COMPILATION = False
 DRYRUN = False
 HARDWARE_COMPATIBLE = False
 SUPPORTED_KERNEL_PRECISIONS = {dtype.f32, dtype.f16, dtype.bf16, dtype.i8, dtype.f8}
-TIMING_CACHE_PATH = os.path.join(tempfile.gettempdir(), "timing_cache.bin")
+TIMING_CACHE_PATH = os.path.join(
+    tempfile.gettempdir(), "torch_tensorrt_engine_cache", "timing_cache.bin"
+)
 LAZY_ENGINE_INIT = False
+CACHE_BUILT_ENGINES = True
+REUSE_CACHED_ENGINES = True
+ENGINE_CACHE_DIR = os.path.join(tempfile.gettempdir(), "torch_tensorrt_engine_cache")
+ENGINE_CACHE_SIZE = 1073741824
+CUSTOM_ENGINE_CACHE = None
 
 
 def default_device() -> Device:
