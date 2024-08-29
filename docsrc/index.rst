@@ -44,13 +44,10 @@ User Guide
    :hidden:
 
    user_guide/torch_tensorrt_explained
-   user_guide/getting_started
    user_guide/dynamic_shapes
    user_guide/saving_models
    user_guide/runtime
    user_guide/using_dla
-   tutorials/_rendered_examples/dynamo/torch_compile_advanced_usage
-   tutorials/_rendered_examples/dynamo/vgg16_fp8_ptq
 
 Dynamo Frontend
 ----------------
@@ -117,7 +114,7 @@ Tutorials
    tutorials/_rendered_examples/dynamo/custom_kernel_plugins
    tutorials/_rendered_examples/distributed_inference/data_parallel_gpt2
    tutorials/_rendered_examples/distributed_inference/data_parallel_stable_diffusion
-   tutorials/_rendered_examples/dynamo/vgg16_fp8_ptq
+   tutorials/_rendered_examples/dynamo/vgg16_ptq
    tutorials/_rendered_examples/dynamo/mutable_torchtrt_module_example
 
 Python API Documentation
