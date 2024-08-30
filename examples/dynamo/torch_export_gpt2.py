@@ -57,11 +57,11 @@ with torch_tensorrt.logging.debug():
     trt_model = torch_tensorrt.dynamo.compile(
         gpt2_ep,
         inputs=[input_ids],
-        enabled_precisions={torch.float16},
+        enabled_precisions={torch.float32},
         truncate_double=True,
         device=DEVICE,
         disable_tf32=True,
-        use_strong_types=False,
+        use_strong_types=True,
         use_fp32_acc=True,
     )
 

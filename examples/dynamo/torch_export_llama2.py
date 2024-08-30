@@ -54,6 +54,8 @@ trt_model = torch_tensorrt.dynamo.compile(
     truncate_double=True,
     device=DEVICE,
     disable_tf32=True,
+    use_strong_types=True,
+    use_fp32_acc=True,
 )
 
 # Auto-regressive generation loop for greedy decoding using TensorRT model
