@@ -319,6 +319,7 @@ def aten_ops_embedding_bag(
     )
 
 
+@dynamo_tensorrt_converter(operator.mod, supports_dynamic_shapes=True)
 @dynamo_tensorrt_converter(torch.ops.aten.fmod.Scalar, supports_dynamic_shapes=True)
 @dynamo_tensorrt_converter(torch.ops.aten.fmod.Tensor, supports_dynamic_shapes=True)
 def aten_ops_fmod(
@@ -952,7 +953,7 @@ def aten_ops_cumsum(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.tile.default)
+@dynamo_tensorrt_converter(torch.ops.aten.tile.default, supports_dynamic_shapes=True)
 @enforce_tensor_types(
     {
         0: (TRTTensor,),
@@ -2023,6 +2024,7 @@ def aten_ops_div(
         )
 
 
+@dynamo_tensorrt_converter(operator.pow, supports_dynamic_shapes=True)
 @dynamo_tensorrt_converter(
     torch.ops.aten.pow.Tensor_Tensor, supports_dynamic_shapes=True
 )
@@ -3106,8 +3108,13 @@ def upsample_compute_output_size(
     input_size: torch.Size,
     output_size: Optional[Sequence[int]],
     scale_factors: Optional[Sequence[float]],
-) -> Sequence[int]:
+) -> Optional[Sequence[int]]:
     spatial_dimensions = len(input_size) - 2
+
+    if output_size is None and scale_factors is None:
+        raise AssertionError(
+            "Must specify exactly one of output_size and scale_factors"
+        )
 
     if output_size is not None:
         torch._check(
@@ -3115,7 +3122,6 @@ def upsample_compute_output_size(
             lambda: "Must specify exactly one of output_size and scale_factors",
         )
         torch._check(len(output_size) == spatial_dimensions)
-        return output_size
 
     if scale_factors is not None:
         torch._check(
@@ -3126,11 +3132,8 @@ def upsample_compute_output_size(
         output_size = []
         for i, s in enumerate(scale_factors):
             output_size.append(int(input_size[i + 2] * s))
-        return output_size
 
-    torch._check(
-        False, lambda: "Must specify exactly one of output_size and scale_factors"
-    )
+    return output_size
 
 
 @torch.ops.aten.upsample_nearest1d.vec.py_impl(

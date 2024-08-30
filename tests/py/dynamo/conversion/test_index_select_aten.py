@@ -109,7 +109,12 @@ class TestIndexSelectConverter(DispatchTestCase):
 
         fx_mod = torch.export.export(mod, inputs, dynamic_shapes=dynamic_shapes)
         trt_mod = torch_tensorrt.dynamo.compile(
-            fx_mod, inputs=inputs, enable_precisions=torch.float32, min_block_size=1
+            fx_mod,
+            inputs=inputs,
+            enable_precisions=torch.float32,
+            min_block_size=1,
+            cache_built_engines=False,
+            reuse_cached_engines=False,
         )
         # use different shape of inputs for inference:
         inputs = (source_tensor_1, indice_tensor)

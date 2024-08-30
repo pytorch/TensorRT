@@ -20,18 +20,18 @@ class PerSubgraphData:
     Args:
         subgraph_name (str): Name of the subgraph in the GraphModule
         subgraph_op_count (int): Number of operations in the subgraph
-        subgraph_input_shapes (Any): Shapes of input Tensors of the subgraph
-        subgraph_input_dtypes (Any): Input data types of the subgraph
-        subgraph_output_shapes (Any): Shapes of output Tensors of the subgraph
-        subgraph_output_dtypes (Any): Output data types of the subgraph
+        input_shapes (Any): Shapes of input Tensors of the subgraph
+        input_dtypes (Any): Input data types of the subgraph
+        output_shapes (Any): Shapes of output Tensors of the subgraph
+        output_dtypes (Any): Output data types of the subgraph
     """
 
     subgraph_name: str = ""
     subgraph_op_count: int = 0
-    subgraph_input_shapes: Any = field(default_factory=list)
-    subgraph_input_dtypes: Any = field(default_factory=list)
-    subgraph_output_shapes: Any = field(default_factory=list)
-    subgraph_output_dtypes: Any = field(default_factory=list)
+    input_shapes: Any = field(default_factory=list)
+    input_dtypes: Any = field(default_factory=list)
+    output_shapes: Any = field(default_factory=list)
+    output_dtypes: Any = field(default_factory=list)
 
 
 @dataclass
@@ -41,10 +41,10 @@ class DryRunTracker:
     Args:
         total_ops_in_graph (int): Total number of operators in graph
         supported_ops_in_graph (int): Number of supported operators in graph
-        graph_input_shapes (Any): Shapes of input Tensors of the graph
-        graph_input_dtypes (Any): Input data types of the graph
-        graph_output_shapes (Any): Shapes of output Tensors of the graph
-        graph_output_dtypes (Any): Output data types of the graph
+        input_shapes (Any): Shapes of input Tensors of the graph
+        input_dtypes (Any): Input data types of the graph
+        output_shapes (Any): Shapes of output Tensors of the graph
+        output_dtypes (Any): Output data types of the graph
         per_subgraph_data (List[PerSubgraphData]): Per-subgraph data, see above class
         tensorrt_graph_count (int): Number of TensorRT engines to be generated
         compilation_settings (CompilationSettings): User Compilation Settings
@@ -54,10 +54,10 @@ class DryRunTracker:
 
     total_ops_in_graph: int = 0
     supported_ops_in_graph: int = 0
-    graph_input_shapes: Any = field(default_factory=list)
-    graph_input_dtypes: Any = field(default_factory=list)
-    graph_output_shapes: Any = field(default_factory=list)
-    graph_output_dtypes: Any = field(default_factory=list)
+    input_shapes: Any = field(default_factory=list)
+    input_dtypes: Any = field(default_factory=list)
+    output_shapes: Any = field(default_factory=list)
+    output_dtypes: Any = field(default_factory=list)
     per_subgraph_data: List[PerSubgraphData] = field(default_factory=list)
     tensorrt_graph_count: int = 0
     compilation_settings: CompilationSettings = field(
@@ -111,7 +111,7 @@ def dryrun_stats_display(
     formatted_stats += " " * 2 + "Graph Structure:\n\n"
     formatted_stats += (
         " " * 3
-        + f"Inputs: {input_formatter(dryrun_tracker.graph_input_shapes, dryrun_tracker.graph_input_dtypes)}\n"
+        + f"Inputs: {input_formatter(dryrun_tracker.input_shapes, dryrun_tracker.input_dtypes)}\n"
     )
 
     for i, trt_subgraph_data in enumerate(dryrun_tracker.per_subgraph_data):
@@ -122,7 +122,7 @@ def dryrun_stats_display(
         )
         formatted_stats += (
             " " * 5
-            + f"Engine Inputs: {input_formatter(trt_subgraph_data.subgraph_input_shapes, trt_subgraph_data.subgraph_input_dtypes)}\n"
+            + f"Engine Inputs: {input_formatter(trt_subgraph_data.input_shapes, trt_subgraph_data.input_dtypes)}\n"
         )
         formatted_stats += (
             " " * 5
@@ -130,13 +130,13 @@ def dryrun_stats_display(
         )
         formatted_stats += (
             " " * 5
-            + f"Engine Outputs: {input_formatter(trt_subgraph_data.subgraph_output_shapes, trt_subgraph_data.subgraph_output_dtypes)}\n"
+            + f"Engine Outputs: {input_formatter(trt_subgraph_data.output_shapes, trt_subgraph_data.output_dtypes)}\n"
         )
 
     formatted_stats += " " * 4 + "...\n"
     formatted_stats += (
         " " * 3
-        + f"Outputs: {input_formatter(dryrun_tracker.graph_output_shapes, dryrun_tracker.graph_output_dtypes)}\n"
+        + f"Outputs: {input_formatter(dryrun_tracker.output_shapes, dryrun_tracker.output_dtypes)}\n"
     )
 
     # Print aggregate statistics about the graph structure, including recommended "min_block_size" options
@@ -225,11 +225,20 @@ def input_formatter(shapes: Any, dtypes: Any) -> str:
 
     def input_formatter_helper(shapes: Any, dtypes: Any) -> str:
         """Helper for input formatter"""
-        # Base case - single shape, single dtype
-        if isinstance(shapes, tuple) and all(isinstance(elt, int) for elt in shapes):
-            return f"Tensor: {shapes}@{str(dtypes)[6:]}, "
+        # Base case 1 - single static/dynamic shape, single dtype
+        if isinstance(shapes, tuple) and all(
+            isinstance(elt, (int, tuple)) for elt in shapes
+        ):
+            input_shape_string = "Tensor: ("
+            for elt in shapes:
+                if isinstance(elt, tuple):
+                    input_shape_string += f"(min={elt[0]}, max={elt[1]}), "
+                else:
+                    input_shape_string += f"{elt}, "
+            input_shape_string = input_shape_string[:-2] + ")" + f"@{str(dtypes)[6:]}, "
+            return input_shape_string
 
-        # Base case - dynamic shape, single dtype
+        # Base case 2 - dynamic shape, single dtype
         elif (
             isinstance(shapes, dict)
             and len(shapes) == 3

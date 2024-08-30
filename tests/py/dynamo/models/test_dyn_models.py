@@ -11,9 +11,6 @@ from torch_tensorrt.dynamo.utils import COSINE_THRESHOLD, cosine_similarity
 assertions = unittest.TestCase()
 
 
-@unittest.skip(
-    "Skipping this test for now due to constraint violation error: https://github.com/pytorch/TensorRT/issues/2794"
-)
 @pytest.mark.unit
 def test_base_dynamic(ir):
     """
@@ -39,6 +36,8 @@ def test_base_dynamic(ir):
         "ir": ir,
         "pass_through_build_failures": True,
         "min_block_size": 1,
+        "cache_built_engines": False,
+        "reuse_cached_engines": False,
     }
     if ir == "torch_compile":
         input_bs4 = torch.randn((4, 3, 224, 224)).to("cuda")
@@ -66,9 +65,6 @@ def test_base_dynamic(ir):
     )
 
 
-@unittest.skip(
-    "Skipping this test for now due to constraint violation error: https://github.com/pytorch/TensorRT/issues/2794"
-)
 @pytest.mark.unit
 def test_base_dynamic_fallback(ir):
     """
@@ -96,6 +92,8 @@ def test_base_dynamic_fallback(ir):
         "pass_through_build_failures": True,
         "torch_executed_ops": {"torch.ops.aten.abs.default"},
         "min_block_size": 1,
+        "cache_built_engines": False,
+        "reuse_cached_engines": False,
     }
 
     if ir == "torch_compile":
@@ -147,6 +145,8 @@ def test_view(ir):
         "ir": ir,
         "pass_through_build_failures": True,
         "min_block_size": 1,
+        "cache_built_engines": False,
+        "reuse_cached_engines": False,
     }
 
     if ir == "torch_compile":
@@ -190,6 +190,8 @@ def test_resnet_dynamic(ir):
         "ir": ir,
         "pass_through_build_failures": True,
         "min_block_size": 1,
+        "cache_built_engines": False,
+        "reuse_cached_engines": False,
     }
 
     if ir == "torch_compile":
@@ -252,6 +254,8 @@ def test_view(ir):
         "pass_through_build_failures": True,
         "optimization_level": 1,
         "min_block_size": 1,
+        "cache_built_engines": False,
+        "reuse_cached_engines": False,
     }
 
     trt_mod = torchtrt.compile(model, **compile_spec)
@@ -284,6 +288,8 @@ def test_linear(ir):
         "enabled_precisions": {torch.float},
         "ir": ir,
         "min_block_size": 1,
+        "cache_built_engines": False,
+        "reuse_cached_engines": False,
     }
     inputs_bs2 = torch.randn(2, 2, 10).to("cuda")
     if ir == "torch_compile":
@@ -338,6 +344,8 @@ def test_dynamic_with_fallback_shape_tensor_pass_through(ir):
         "pass_through_build_failures": True,
         "min_block_size": 1,
         "torch_executed_ops": {"torch.ops.aten.add.Tensor"},
+        "cache_built_engines": False,
+        "reuse_cached_engines": False,
     }
 
     # Compile the model

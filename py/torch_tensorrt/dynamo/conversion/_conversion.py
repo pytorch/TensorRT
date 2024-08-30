@@ -10,13 +10,14 @@ from torch_tensorrt._Device import Device
 from torch_tensorrt._enums import dtype
 from torch_tensorrt._features import ENABLED_FEATURES
 from torch_tensorrt._Input import Input
+from torch_tensorrt.dynamo._engine_caching import BaseEngineCache
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.conversion._TRTInterpreter import (
     TRTInterpreter,
     TRTInterpreterResult,
 )
 from torch_tensorrt.dynamo.runtime import PythonTorchTensorRTModule, TorchTensorRTModule
-from torch_tensorrt.dynamo.utils import get_torch_inputs
+from torch_tensorrt.dynamo.utils import get_model_device, get_torch_inputs
 
 logger = logging.getLogger(__name__)
 
@@ -29,15 +30,21 @@ def infer_module_output_dtypes(
     truncate_double: bool = False,
 ) -> List[dtype]:
     """
-    inputs can be either arg_inputs or flattened input list. If it is flattened list, kwarg_inputs
-    should be None, as it is already included in the flattened input.
+    This function performs model inference to determine the output dtypes
+    and truncates them accordingly. inputs can be either arg_inputs or flattened input list.
+    If it is flattened list, kwarg_inputs should be None, as it is already included in the flattened input.
     """
+    # TODO: We can also determine output dtypes from the module.graph based on node metadata.
+    # However, our converter tests use fx.symbolic_trace which sometimes does not provide metadata,
+    # so we stick to the model inference approach currently.
     with unset_fake_temporarily():
+        # Get the device on which the model exists
+        # For large models, this can be done on CPU to save GPU memory allocation for TRT.
+        device = get_model_device(module)
         torch_inputs = get_torch_inputs(inputs, device)
         if kwarg_inputs is None:
             kwarg_inputs = {}
         torch_kwarg_inputs = get_torch_inputs(kwarg_inputs, device)
-        module = module.to(device.to(torch.device))
         module_outputs = module(*torch_inputs, **torch_kwarg_inputs)
         if not isinstance(module_outputs, (list, tuple)):
             module_outputs = [module_outputs]
@@ -70,6 +77,7 @@ def interpret_module_to_result(
     settings: CompilationSettings = CompilationSettings(),
     arg_inputs: Optional[Sequence[Input]] = None,
     kwarg_inputs: Optional[dict[str, Any]] = None,
+    engine_cache: Optional[BaseEngineCache] = None,
 ) -> TRTInterpreterResult:
     """Interpret an FX module to a TRTInterpreterResult
     Args:
@@ -79,6 +87,7 @@ def interpret_module_to_result(
         arg_inputs: Sequence of Tensors representing inputs to the module.
         kwarg_inputs: A dictionary of Tensors representing inputs to the module.
         settings: Compilation settings
+        engine_cache: Engine cache instance
     Returns:
         TRTInterpreterResult
     """
@@ -105,7 +114,9 @@ def interpret_module_to_result(
         logger_level=(trt.Logger.VERBOSE if settings.debug else trt.Logger.WARNING),
         output_dtypes=output_dtypes,
         compilation_settings=settings,
+        engine_cache=engine_cache,
     )
+
     interpreter_result = interpreter.run()
     return interpreter_result
 
@@ -115,6 +126,7 @@ def convert_module(
     inputs: Sequence[Input],
     settings: CompilationSettings = CompilationSettings(),
     name: str = "",
+    engine_cache: Optional[BaseEngineCache] = None,
 ) -> PythonTorchTensorRTModule | TorchTensorRTModule:
     """Convert an FX module to a TRT module
     Args:
@@ -122,35 +134,13 @@ def convert_module(
         inputs: Sequence of Tensors representing inputs to the module
         settings: Compilation settings
         name: TRT engine name
+        engine_cache: Engine cache instance
     Returns:
         PythonTorchTensorRTModule or TorchTensorRTModule
     """
-    interpreter_result = interpret_module_to_result(module, inputs, settings)
-    # Test fast refit:
-    from torch_tensorrt.dynamo._refit import _refit_single_trt_engine_with_gm
-    from torch_tensorrt.logging import TRT_LOGGER
-
-    weight_name_map: Any = None
-    # Do the test refit with cached map if make_refitable is enabled
-    if settings.make_refitable:
-        runtime = trt.Runtime(TRT_LOGGER)
-        refit_test_engine = runtime.deserialize_cuda_engine(
-            interpreter_result.serialized_engine
-        )
-        try:
-            _refit_single_trt_engine_with_gm(
-                new_gm=module,
-                old_engine=refit_test_engine,
-                input_list=inputs,
-                settings=settings,
-                weight_name_map=interpreter_result.weight_name_map,
-            )
-            weight_name_map = interpreter_result.weight_name_map
-        except AssertionError:
-            logger.warning("Fast refit test failed. Removing the weight map caching.")
-
-        del refit_test_engine
-        torch.cuda.empty_cache()
+    interpreter_result = interpret_module_to_result(
+        module, inputs, settings, engine_cache=engine_cache
+    )
 
     rt_cls = PythonTorchTensorRTModule
 
@@ -174,5 +164,5 @@ def convert_module(
         output_binding_names=list(interpreter_result.output_names),
         name=name,
         settings=settings,
-        weight_name_map=weight_name_map,
+        weight_name_map=interpreter_result.weight_name_map,
     )

@@ -3,15 +3,17 @@ from __future__ import annotations
 import logging
 from dataclasses import fields, replace
 from enum import Enum
-from typing import Any, Callable, Dict, Optional, Sequence, Union
+from typing import Any, Callable, Dict, Optional, Sequence, Tuple, Union
 
 import numpy as np
 import tensorrt as trt
 import torch
+from torch._subclasses.fake_tensor import FakeTensor
 from torch_tensorrt._Device import Device
 from torch_tensorrt._enums import dtype
 from torch_tensorrt._Input import Input
 from torch_tensorrt.dynamo import _defaults
+from torch_tensorrt.dynamo._engine_caching import BaseEngineCache
 from torch_tensorrt.dynamo._settings import CompilationSettings
 
 from packaging import version
@@ -129,46 +131,70 @@ def input_is_dynamic(inputs: Sequence[Union[Input, torch.Tensor]]) -> bool:
     )
 
 
+def get_torch_tensor(
+    input: Input,
+    device: torch.device,
+    mode: str = "",
+) -> Union[int, torch.Tensor]:
+    if input.is_shape_tensor:
+        # TODO: All the shape tensors we've encountered so far are plain integers.
+        # Validate this assumption on more models.
+        return input.shape["opt_shape"][0]
+
+    if len(mode) > 0:
+        return input.example_tensor(mode).to(device)
+    else:
+        return input.torch_tensor.to(device)
+
+
 def get_torch_inputs(
     inputs: Sequence[Input] | Dict[Any, Any],
     device: Union[Device, torch.device, str],
     mode: str = "",
-) -> Sequence[torch.tensor] | Dict[Any, Any]:
+) -> Sequence[torch.Tensor] | Dict[str, torch.Tensor]:
     """
     Return the torch_tensor from the Input object. If mode is set, this implies
     user is using dynamic shaped inputs and return the corresponding input based
     on the mode requested.
     """
     device = to_torch_device(device)
-    if mode:
-        if isinstance(inputs, dict):
-            result = {}
-            for k, v in inputs.items():
-                if isinstance(v, (list, tuple, dict)):
-                    result[k] = get_torch_inputs(v, device)
-                else:
-                    result[k] = v.example_tensor(mode).to(device)
-            return result
-        else:
-            return [
-                input.example_tensor(mode).to(device)
-                for input in inputs
-                if isinstance(input, Input)
-            ]
 
     if isinstance(inputs, dict):
         result = {}
         for k, v in inputs.items():
             if isinstance(v, (list, tuple, dict)):
                 result[k] = get_torch_inputs(v, device)
-            else:
-                result[k] = v.torch_tensor.to(device)
-        return result
+            elif isinstance(v, Input):
+                result[k] = get_torch_tensor(v, device, mode)
     else:
-        return [
-            input.torch_tensor.to(device) if isinstance(input, Input) else input
-            for input in inputs
-        ]
+        result = []
+        for input in inputs:
+            if isinstance(input, Input):
+                result.append(get_torch_tensor(input, device, mode))
+            elif isinstance(input, torch.Tensor):
+                result.append(input.to(device))
+            else:
+                raise AssertionError(f"Input type {type(input)} is not a valid type")
+
+    return result
+
+
+def get_model_device(module: torch.fx.GraphModule) -> Union[Device, torch.device, str]:
+    """
+    Returns the device on which the module parameters exist.
+    """
+    device = None
+    for parameter in list(module.parameters()):
+        if isinstance(parameter, (torch.nn.parameter.Parameter, torch.Tensor)):
+            device = parameter.device
+            break
+
+    if device is None:
+        device = torch.device("cpu")
+        logger.warning(
+            "Could not detect the device on which the model exists. Assuming the model is on CPU"
+        )
+    return device
 
 
 def set_log_level(parent_logger: Any, level: Any) -> None:
@@ -273,6 +299,118 @@ def parse_complex_tensor_structs(
         )
 
 
+def contains_sym_int(tensor: torch.Tensor) -> bool:
+    """
+    Returns true if the given tensor has symbolic shape.
+    """
+    return any(isinstance(dim, torch.SymInt) for dim in tensor)
+
+
+def extract_var_range_info(symbolic_integer: torch.SymInt) -> Dict[str, Any]:
+    """
+    This function returns the min, max, opt values of a symbolic integer.
+    """
+    node = symbolic_integer.node
+    expr = node.expr
+    shape_env = node.shape_env
+    # An expr can be a independent SymInt node (eg: s0 or s1) or a composition of them eg: (48*s0 or s0*s1).
+    # In the case of expr which has symbolic computation, bound_sympy evaluates them.
+    # https://pytorch.org/docs/stable/generated/torch.fx.experimental.symbolic_shapes.ShapeEnv.html#torch.fx.experimental.symbolic_shapes.ShapeEnv.bound_sympy
+    # expr.xreplace replaces the symbolic variables with their current values and computes the expression.
+    var_range = shape_env.var_to_range.get(expr, None) or shape_env.bound_sympy(expr)
+    var_val = shape_env.var_to_val.get(expr, None) or expr.xreplace(
+        shape_env.var_to_val
+    )
+    assert var_range, var_val
+    min_val, max_val, opt_val = int(var_range.lower), int(var_range.upper), int(var_val)
+    # Torchdynamo 0/1 specialization outlier
+    min_val = 1 if min_val == 2 else min_val
+    min_max_opt = {}
+    min_max_opt["min"] = min_val
+    min_max_opt["max"] = max_val
+    min_max_opt["opt"] = opt_val
+
+    return min_max_opt
+
+
+def unwrap_tensor_shape(
+    tensor: Union[torch.Tensor, FakeTensor, torch.SymInt]
+) -> Sequence[Any]:
+    """
+    This is a helper function used to print/return the shape of the tensor.
+    For regular torch.tensor's, it returns the static shape.
+    For symbolic tensors, eg:(1, s0, 4), this function returns [1, [min, max], 4]. The min
+    and max correspond to the lower and upper values of s0 symbolic dimension.
+    """
+    tensor_shape = []
+    # for dimension in tensor.shape:
+    if isinstance(tensor, int):
+        tensor_shape.append(tensor)
+    elif isinstance(tensor, torch.SymInt):
+        min_max_opt = extract_var_range_info(tensor)
+        tensor_shape.append((min_max_opt["min"], min_max_opt["max"]))
+    elif isinstance(tensor, (torch.Tensor, FakeTensor)):
+        for dimension in tensor.shape:
+            tensor_shape.extend(unwrap_tensor_shape(dimension))
+
+    return tuple(tensor_shape)
+
+
+def unwrap_tensor_dtype(tensor: Union[torch.Tensor, FakeTensor, torch.SymInt]) -> Any:
+    """
+    Returns the dtype of torch.tensor or FakeTensor. For symbolic integers, we return int64
+    """
+    if isinstance(tensor, (torch.Tensor, FakeTensor)):
+        return tensor.dtype
+    elif isinstance(tensor, torch.SymInt):
+        return torch.int64
+    else:
+        raise ValueError(f"Found invalid tensor type {type(tensor)}")
+
+
+def get_graph_io_attrs(
+    io_nodes: Sequence[torch.fx.Node], attr_type: str
+) -> Sequence[Any]:
+    """
+    Returns a list of attributes (shapes or dtypes) of the I/O nodes
+    """
+    assert attr_type in ["shape", "dtype"]
+    attr_fn = unwrap_tensor_shape if attr_type == "shape" else unwrap_tensor_dtype
+    graph_io_attrs = []
+    for node in io_nodes:
+        if "val" in node.meta:
+            metadata = node.meta["val"]
+            if isinstance(metadata, (tuple, list)):
+                for tensor in metadata:
+                    graph_io_attrs.append(attr_fn(tensor))
+            else:
+                graph_io_attrs.append(attr_fn(metadata))
+
+    return graph_io_attrs
+
+
+def parse_graph_io(module: torch.fx.GraphModule, dryrun_tracker: Any) -> None:
+    """
+    Parse the graph I/O shape/dtype info for the whole graph and store in the dryrun tracker
+    """
+    # Parse inputs of the graph
+    input_nodes = [node for node in module.graph.nodes if node.op == "placeholder"]
+    input_shapes = get_graph_io_attrs(input_nodes, "shape")
+    input_dtypes = get_graph_io_attrs(input_nodes, "dtype")
+    dryrun_tracker.input_shapes = input_shapes
+    dryrun_tracker.input_dtypes = input_dtypes
+
+    # Parse outputs of the graph
+    mark_output_nodes = [node for node in module.graph.nodes if node.op == "output"]
+    output_nodes = []
+    for node in mark_output_nodes:
+        output_nodes.extend(node.all_input_nodes)
+    output_shapes = get_graph_io_attrs(output_nodes, "shape")
+    output_dtypes = get_graph_io_attrs(output_nodes, "dtype")
+    dryrun_tracker.output_shapes = output_shapes
+    dryrun_tracker.output_dtypes = output_dtypes
+
+
 def to_torch_device(device: Optional[Union[Device, torch.device, str]]) -> torch.device:
     """Cast a device-type to torch.device
 
@@ -301,7 +439,9 @@ def to_torch_tensorrt_device(
     return Device._from(device)
 
 
-def parse_dynamo_kwargs(kwargs: Any) -> CompilationSettings:
+def parse_dynamo_kwargs(
+    kwargs: Any,
+) -> Tuple[CompilationSettings, Optional[BaseEngineCache]]:
     """Parses the kwargs field of a Dynamo backend
 
     Args:
@@ -358,9 +498,30 @@ def parse_dynamo_kwargs(kwargs: Any) -> CompilationSettings:
         )
         settings.require_full_compilation = False
 
+    # If cache_built_engines and reuse_cached_engines are True but custom_engine_cache is not provided,
+    # then create a default disk engine cache
+    engine_cache = None
+    if kwargs.get("cache_built_engines") or kwargs.get("reuse_cached_engines"):
+        assert kwargs.get(
+            "make_refitable"
+        ), "Engine caching requires make_refitable to be set to True"
+
+        if kwargs.get("custom_engine_cache") is not None:
+            engine_cache = kwargs.get("custom_engine_cache")
+        else:
+            from torch_tensorrt.dynamo._engine_caching import DiskEngineCache
+
+            engine_cache_dir = kwargs.get(
+                "engine_cache_dir", _defaults.ENGINE_CACHE_DIR
+            )
+            engine_cache_size = kwargs.get(
+                "engine_cache_size", _defaults.ENGINE_CACHE_SIZE
+            )
+            engine_cache = DiskEngineCache(engine_cache_dir, engine_cache_size)
+
     logger.info("Compilation Settings: %s\n", settings)
 
-    return settings
+    return settings, engine_cache
 
 
 def req_torch_version(min_torch_version: str = "2.dev") -> Callable[..., Any]:
