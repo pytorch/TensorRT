@@ -138,20 +138,20 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
             del self.context
             self.context = None
 
-    def get_streamable_weights_size(self) -> Any:
+    def get_min_required_device_budget(self) -> Any:
         return self.engine.streamable_weights_size
 
     def get_weight_streaming_budget(self) -> Any:
         return self.engine.weight_streaming_budget_v2
 
     @recreate_context_decorator
-    def set_weight_streaming_budget(self, budget_bytes: int) -> int:
-        return self._set_weight_streaming_budget(budget_bytes)
+    def set_device_memory_budget(self, budget_bytes: int) -> int:
+        return self._set_device_memory_budget(budget_bytes)
 
-    def _set_weight_streaming_budget(self, budget_bytes: int) -> int:
+    def _set_device_memory_budget(self, budget_bytes: int) -> int:
         # Disable weight streaming for invalid budget size
         if budget_bytes < 0:
-            budget_bytes = self.get_streamable_weights_size()
+            budget_bytes = self.get_min_required_device_budget()
 
         self.engine.weight_streaming_budget_v2 = budget_bytes
         if self.get_weight_streaming_budget() != budget_bytes:
@@ -164,7 +164,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
 
     def set_automatic_streaming_budget(self) -> int:
         budget_bytes = self.engine.get_weight_streaming_automatic_budget()
-        return self._set_weight_streaming_budget(budget_bytes)
+        return self._set_device_memory_budget(budget_bytes)
 
     def setup_engine(self) -> None:
         assert (
