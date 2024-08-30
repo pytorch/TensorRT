@@ -128,7 +128,7 @@ def compile(
         assume_dynamic_shape_support (bool): Setting this to true enables the converters work for both dynamic and static shapes. Default: False
         sparse_weights (bool): Enable sparsity for convolution and fully connected layers.
         enabled_precision (Set(Union(torch.dtype, torch_tensorrt.dtype))): The set of datatypes that TensorRT can use when selecting kernels
-        refit (bool): Enable refitting
+        make_refitable (bool): Enable refitting. Flag refit is deprecated.
         debug (bool): Enable debuggable engine
         capability (torch_tensorrt.EngineCapability): Restrict kernel selection to safe gpu kernels or safe dla kernels
         num_avg_timing_iters (int): Number of averaging timing iterations used to select kernels
