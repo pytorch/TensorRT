@@ -199,9 +199,9 @@ def slice_scatter_decomposition(
         step = 1
 
     # Ensure start, end, and step are all integers
-    assert isinstance(start, int), "start must be an integer"
-    assert isinstance(end, int), "end must be an integer"
-    assert isinstance(step, int), "step must be an integer"
+    assert isinstance(start, (int, torch.SymInt)), "start must be an integer"
+    assert isinstance(end, (int, torch.SymInt)), "end must be an integer"
+    assert isinstance(step, (int, torch.SymInt)), "step must be an integer"
 
     src_dim = src_tensor.shape
     # step == 0 is not a valid torch case
