@@ -50,7 +50,9 @@ def get_padded_shape_tensors(
         pad_before = get_trt_tensor(ctx, pad[i * 2], f"{name}_pad_before_{i}")
         pad_after = get_trt_tensor(ctx, pad[i * 2 + 1], f"{name}_pad_after_{i}")
 
-        pad_sum = impl.elementwise.add(ctx, target, source_ir, f"{name}_pad_sum_{i}", pad_before, pad_after)
+        pad_sum = impl.elementwise.add(
+            ctx, target, source_ir, f"{name}_pad_sum_{i}", pad_before, pad_after
+        )
         dim_shape = ctx.net.add_slice(
             input_shape_tensor,
             start=(dim_index,),
@@ -61,7 +63,9 @@ def get_padded_shape_tensors(
         new_dim_shape = impl.elementwise.add(
             ctx, target, source_ir, f"{name}_shape_dim_{i}", dim_shape, pad_sum
         )
-        start_list[dim_index] = impl.elementwise.sub(ctx, target, source_ir, f"{name}_pad_before_neg_{i}", 0, pad_before)
+        start_list[dim_index] = impl.elementwise.sub(
+            ctx, target, source_ir, f"{name}_pad_before_neg_{i}", 0, pad_before
+        )
 
         slices = []
         for j in range(rank):
@@ -77,11 +81,23 @@ def get_padded_shape_tensors(
                     ).get_output(0)
                 )
         padded_shape_tensor = impl.cat.cat(
-            ctx, target, source_ir, f"{name}_cat_dim_{i}", slices, 0, cast_dtype=np.int32
+            ctx,
+            target,
+            source_ir,
+            f"{name}_cat_dim_{i}",
+            slices,
+            0,
+            cast_dtype=padded_shape_tensor.dtype,
         )
 
     start_indices_tensor = impl.cat.cat(
-        ctx, target, source_ir, f"{name}_start_indices_tensor", start_list, 0, cast_dtype=np.int32
+        ctx,
+        target,
+        source_ir,
+        f"{name}_start_indices_tensor",
+        start_list,
+        0,
+        cast_dtype=padded_shape_tensor.dtype,
     )
 
     return start_indices_tensor, padded_shape_tensor
