@@ -19,7 +19,7 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     get_positive_dim,
     is_only_operator_on_placeholder,
 )
-from torch_tensorrt.fx.types import TRTTensor
+from torch_tensorrt.dynamo.types import TRTTensor
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -545,6 +545,24 @@ def aten_ops_hard_sigmoid(
         args[0],
         alpha=args_bounds_check(args, 1, 1 / 6),
         beta=args_bounds_check(args, 2, 1 / 2),
+    )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.gelu.default, supports_dynamic_shapes=True)
+def aten_ops_gelu(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.activation.gelu(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        kwargs.get("approximate", "none"),
     )
 
 
