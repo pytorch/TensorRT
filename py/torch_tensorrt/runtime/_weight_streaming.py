@@ -19,7 +19,7 @@ class _WeightStreamingContextManager(object):
             ):
                 rt_mods.append((name, rt_mod))
         self.streamable_budget = [
-            mod.get_streamable_weights_size() for _, mod in rt_mods
+            mod.get_min_required_device_budget() for _, mod in rt_mods
         ]
         self.rt_mods = rt_mods
         total_device_budget = sum(self.streamable_budget)
@@ -33,7 +33,7 @@ class _WeightStreamingContextManager(object):
 
     def __exit__(self, *args: Any) -> None:
         for i, (name, rt_mod) in enumerate(self.rt_mods):
-            rt_mod.set_weight_streaming_budget(self.streamable_budget[i])
+            rt_mod.set_device_memory_budget(self.streamable_budget[i])
             logger.debug(
                 f"Disable weight streaming by setting size {self.streamable_budget[i]} for {name}"
             )
@@ -63,7 +63,7 @@ class _WeightStreamingContextManager(object):
             for streamable_bytes in self.streamable_budget
         ]
         for i, (name, rt_mod) in enumerate(self.rt_mods):
-            ws_budget_bytes += rt_mod.set_weight_streaming_budget(normalized_size[i])
+            ws_budget_bytes += rt_mod.set_device_memory_budget(normalized_size[i])
             logger.debug(f"Set weight streaming size {normalized_size[i]} for {name}")
         return ws_budget_bytes
 
