@@ -71,9 +71,9 @@ struct TRTEngine : torch::CustomClassHolder {
   std::string get_engine_layer_info();
   void dump_engine_layer_info_to_file(const std::string& path);
   void dump_engine_layer_info();
-  int64_t get_weight_streaming_budget_v2();
-  bool set_weight_streaming_budget_v2(int64_t budget);
-  int64_t get_streamable_weights_size();
+  int64_t get_device_memory_budget();
+  bool set_device_memory_budget(int64_t budget);
+  int64_t get_min_required_device_budget();
   int64_t get_weight_streaming_automatic_budget();
   void init_context();
   void reset_context();
