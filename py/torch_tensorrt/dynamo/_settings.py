@@ -27,7 +27,6 @@ from torch_tensorrt.dynamo._defaults import (
     REQUIRE_FULL_COMPILATION,
     REUSE_CACHED_ENGINES,
     SPARSE_WEIGHTS,
-    WEIGHT_STREAMING,
     TIMING_CACHE_PATH,
     TRUNCATE_DOUBLE,
     USE_EXPLICIT_TYPING,
@@ -35,6 +34,7 @@ from torch_tensorrt.dynamo._defaults import (
     USE_FP32_ACC,
     USE_PYTHON_RUNTIME,
     VERSION_COMPATIBLE,
+    WEIGHT_STREAMING,
     WORKSPACE_SIZE,
     default_device,
 )
@@ -83,7 +83,7 @@ class CompilationSettings:
         reuse_cached_engines (bool): Whether to load the compiled TRT engines from storage
         use_strong_typing (bool): This flag enables strong typing in TensorRT compilation which respects the precisions set in the Pytorch model. This is useful when users have mixed precision graphs.
         use_fp32_acc (bool): This option inserts cast to FP32 nodes around matmul layers and TensorRT ensures the accumulation of matmul happens in FP32. Use this only when FP16 precision is configured in enabled_precisions.
-        enable_weight_streaming (bool): Enable weight streaming. This enforces stronly typed network
+        enable_weight_streaming (bool): Enable weight streaming.
     """
 
     enabled_precisions: Set[dtype] = field(default_factory=lambda: ENABLED_PRECISIONS)
