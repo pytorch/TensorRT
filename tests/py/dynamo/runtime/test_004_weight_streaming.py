@@ -4,7 +4,7 @@ from parameterized import parameterized
 from torch.testing._internal.common_utils import TestCase, run_tests
 from torch_tensorrt.dynamo.runtime import PythonTorchTensorRTModule, TorchTensorRTModule
 
-INPUT_SIZE = (64, 128)
+INPUT_SIZE = (64, 100)
 
 
 # Helper to get current weight streaming budet in runtime module
@@ -22,13 +22,17 @@ def get_current_weight_streaming_bytes(runtime_module):
 class SampleModel(torch.nn.Module):
     def __init__(self):
         super().__init__()
+        self.layer1 = torch.nn.Linear(100, 128)
+        self.layer2 = torch.nn.Linear(32, 64)
         self.mat1 = torch.randn((128, 32)).cuda()
-        self.mat2 = torch.randn((32, 512)).cuda()
         self.relu = torch.nn.ReLU()
+        self.mat2 = torch.randn((64, 512)).cuda()
 
     def forward(self, x):
-        out = torch.matmul(x, self.mat1)
+        out = self.layer1(x)
+        out = torch.matmul(out, self.mat1)
         out = self.relu((out + 2.0) * 0.05)
+        out = self.layer2(out)
         out = torch.matmul(out, self.mat2)
         return out
 
@@ -51,6 +55,8 @@ class TestWeightStreamingPython(TestCase):
             inputs=input,
             ir="dynamo",
             min_block_size=1,
+            cache_built_engines=False,
+            reuse_cached_engines=False,
             debug=True,
             use_python_runtime=use_python_runtime,
             enable_weight_streaming=True,
@@ -87,6 +93,8 @@ class TestWeightStreamingPython(TestCase):
             fx_graph,
             inputs=input,
             ir="dynamo",
+            cache_built_engines=False,
+            reuse_cached_engines=False,
             min_block_size=1,
             debug=True,
             use_python_runtime=use_python_runtime,
@@ -148,6 +156,8 @@ class TestWeightStreamingPython(TestCase):
             inputs=input,
             ir="dynamo",
             min_block_size=1,
+            cache_built_engines=False,
+            reuse_cached_engines=False,
             debug=True,
             use_python_runtime=use_python_runtime,
             enable_weight_streaming=True,
@@ -191,6 +201,8 @@ class TestWeightStreamingPython(TestCase):
             ir="dynamo",
             min_block_size=1,
             # debug=True,
+            cache_built_engines=False,
+            reuse_cached_engines=False,
             torch_executed_ops={"torch.ops.aten.mul.Tensor"},
             use_python_runtime=use_python_runtime,
             enable_weight_streaming=True,
