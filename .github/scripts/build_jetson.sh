@@ -80,7 +80,7 @@ export TORCH_INSTALL_PATH=$(python -c "import torch, os; print(os.path.dirname(t
 export SITE_PACKAGE_PATH=${TORCH_INSTALL_PATH::-6}
 # replace the WORKSPACE file with jetpack one
 cat WORKSPACE > WORKSPACE.orig
-cat toolchains/jp_workspaces/WORKSPACE.jp60 | ensubst > WORKSPACE
+cat toolchains/jp_workspaces/WORKSPACE.jp60 | envsubst > WORKSPACE
 
 # build on jetpack
 python setup.py  --use-cxx11-abi  install --user

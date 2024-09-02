@@ -80,7 +80,13 @@ new_local_repository(
 # Development Dependencies (optional - comment out on aarch64)
 #########################################################################
 
-pip_install(
+load("@rules_python//python:pip.bzl", "pip_parse")
+
+pip_parse(
     name = "devtools_deps",
     requirements = "//:requirements-dev.txt",
 )
+
+load("@devtools_deps//:requirements.bzl", "install_deps")
+
+install_deps()
