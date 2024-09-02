@@ -36,6 +36,15 @@ platform(
 )
 
 platform(
+    name = "jetpack_6.0",
+    constraint_values = [
+        "@platforms//os:linux",
+        "@platforms//cpu:aarch64",
+        "@//toolchains/jetpack:4.6",
+    ],
+)
+
+platform(
     name = "ci_rhel_x86_64_linux",
     constraint_values = [
         "@platforms//os:linux",

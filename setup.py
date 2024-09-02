@@ -152,12 +152,14 @@ if platform.uname().processor == "aarch64":
             JETPACK_VERSION = "4.6"
         elif version == "5.0":
             JETPACK_VERSION = "5.0"
+        elif version == "6.0":
+            JETPACK_VERSION = "6.0"
 
     if not JETPACK_VERSION:
         warnings.warn(
-            "Assuming jetpack version to be 5.0, if not use the --jetpack-version option"
+            "Assuming jetpack version to be 6.0, if not use the --jetpack-version option"
         )
-        JETPACK_VERSION = "5.0"
+        JETPACK_VERSION = "6.0"
 
     if not CXX11_ABI:
         warnings.warn(
@@ -209,12 +211,15 @@ def build_libtorchtrt_pre_cxx11_abi(
     elif JETPACK_VERSION == "5.0":
         cmd.append("--platforms=//toolchains:jetpack_5.0")
         print("Jetpack version: 5.0")
+    elif JETPACK_VERSION == "6.0":
+        cmd.append("--platforms=//toolchains:jetpack_6.0")
+        print("Jetpack version: 6.0")
 
     if CI_BUILD:
         cmd.append("--platforms=//toolchains:ci_rhel_x86_64_linux")
         print("CI based build")
 
-    print("building libtorchtrt")
+    print(f"building libtorchtrt {cmd=}")
     status_code = subprocess.run(cmd).returncode
 
     if status_code != 0:
