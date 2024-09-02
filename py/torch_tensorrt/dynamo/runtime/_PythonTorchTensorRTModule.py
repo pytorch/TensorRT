@@ -124,6 +124,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         self.engine = None
         self.weight_name_map = weight_name_map
         self.target_platform = Platform.current_platform()
+        self.min_required_device_budget = 0
 
         if self.serialized_engine is not None and not self.settings.lazy_engine_init:
             self.setup_engine()
@@ -138,7 +139,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
             del self.context
             self.context = None
 
-    def get_min_required_device_budget(self) -> Any:
+    def get_streamable_weights_size(self) -> Any:
         return self.engine.streamable_weights_size
 
     def get_weight_streaming_budget(self) -> Any:
@@ -151,8 +152,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
     def _set_device_memory_budget(self, budget_bytes: int) -> int:
         # Disable weight streaming for invalid budget size
         if budget_bytes < 0:
-            budget_bytes = self.get_min_required_device_budget()
-
+            budget_bytes = self.engine.streamable_weights_size
         self.engine.weight_streaming_budget_v2 = budget_bytes
         if self.get_weight_streaming_budget() != budget_bytes:
             logger.error(f"Failed to set weight streaming budget to {budget_bytes}")
@@ -162,8 +162,15 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
 
         return budget_bytes
 
-    def set_automatic_streaming_budget(self) -> int:
+    def set_default_streaming_budget(self) -> int:
+        # Scratch memory size may change based on the current weight streaming budget
+        # Required memory for full streaming is used to minimum weight budget
+        self.engine.weight_streaming_budget_v2 = 0
+        self.min_required_device_budget = (
+            self.engine.weight_streaming_scratch_memory_size
+        )
         budget_bytes = self.engine.get_weight_streaming_automatic_budget()
+        # Set automatic weight streaming budget as default when context is created
         return self._set_device_memory_budget(budget_bytes)
 
     def setup_engine(self) -> None:
@@ -175,7 +182,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         runtime = trt.Runtime(TRT_LOGGER)
         self.engine = runtime.deserialize_cuda_engine(self.serialized_engine)
         if self.settings.enable_weight_streaming:
-            self.set_automatic_streaming_budget()
+            self.set_default_streaming_budget()
         self.context = self.engine.create_execution_context()
 
         assert self.engine.num_io_tensors == (
