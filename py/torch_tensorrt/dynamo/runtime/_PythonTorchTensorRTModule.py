@@ -2,9 +2,8 @@ from __future__ import annotations
 
 import logging
 from contextlib import nullcontext
-from functools import wraps
 from tempfile import tempdir
-from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import tensorrt as trt
 import torch
@@ -13,6 +12,9 @@ from torch.nn import Module
 from torch_tensorrt._Device import Device
 from torch_tensorrt._enums import Platform, dtype
 from torch_tensorrt.dynamo._settings import CompilationSettings
+from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (
+    recreate_context_decorator,
+)
 from torch_tensorrt.dynamo.utils import DYNAMIC_DIM
 from torch_tensorrt.logging import TRT_LOGGER
 from torch_tensorrt.runtime._utils import (
@@ -22,22 +24,6 @@ from torch_tensorrt.runtime._utils import (
 )
 
 logger = logging.getLogger(__name__)
-
-
-def recreate_context_decorator(method: Callable[..., Any]) -> Callable[..., Any]:
-    """
-    A decorator that destroys a context before a method execution and
-    creates it after the method execution within the same class instance.
-    """
-
-    @wraps(method)
-    def wrapper(self: object, *args: Any, **kwargs: Any) -> Any:
-        self.reset_context()
-        result = method(self, *args, **kwargs)
-        self.init_context()
-        return result
-
-    return wrapper
 
 
 class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
@@ -142,8 +128,14 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
     def get_streamable_weights_size(self) -> Any:
         return self.engine.streamable_weights_size
 
+    def get_min_required_device_budget(self) -> Any:
+        return self.min_required_device_budget
+
     def get_weight_streaming_budget(self) -> Any:
         return self.engine.weight_streaming_budget_v2
+
+    def get_automatic_weight_streaming_budget(self) -> Any:
+        return self.engine.get_weight_streaming_automatic_budget()
 
     @recreate_context_decorator
     def set_device_memory_budget(self, budget_bytes: int) -> int:
@@ -152,7 +144,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
     def _set_device_memory_budget(self, budget_bytes: int) -> int:
         # Disable weight streaming for invalid budget size
         if budget_bytes < 0:
-            budget_bytes = self.engine.streamable_weights_size
+            budget_bytes = self.get_streamable_weights_size()
         self.engine.weight_streaming_budget_v2 = budget_bytes
         if self.get_weight_streaming_budget() != budget_bytes:
             logger.error(f"Failed to set weight streaming budget to {budget_bytes}")
@@ -169,7 +161,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         self.min_required_device_budget = (
             self.engine.weight_streaming_scratch_memory_size
         )
-        budget_bytes = self.engine.get_weight_streaming_automatic_budget()
+        budget_bytes = self.get_automatic_weight_streaming_budget()
         # Set automatic weight streaming budget as default when context is created
         return self._set_device_memory_budget(budget_bytes)
 
