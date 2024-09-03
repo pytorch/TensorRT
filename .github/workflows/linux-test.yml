@@ -112,7 +112,7 @@ jobs:
           repository: ${{ inputs.repository  }}
           script: ${{ inputs.pre-script }}
       - name: Download artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4.1.7
         with:
           name: ${{ env.ARTIFACT_NAME }}
           path: /opt/torch-tensorrt-builds/
