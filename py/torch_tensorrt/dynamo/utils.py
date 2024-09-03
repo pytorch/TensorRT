@@ -347,7 +347,7 @@ def unwrap_tensor_shape(
     if isinstance(tensor, int):
         tensor_shape.append(tensor)
     elif isinstance(tensor, torch.SymInt):
-        min_max_opt: Dict[str, int] = extract_var_range_info(tensor)
+        min_max_opt = extract_var_range_info(tensor)
         tensor_shape.append((min_max_opt["min"], min_max_opt["max"]))
     elif isinstance(tensor, (torch.Tensor, FakeTensor)):
         for dimension in tensor.shape:
