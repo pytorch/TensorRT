@@ -192,11 +192,17 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
     def reset_context(self) -> None:
         self.engine.reset_context()
 
+    def get_streamable_weights_size(self) -> Any:
+        return self.engine.streamable_weights_size
+
     def get_min_required_device_budget(self) -> Any:
         return self.engine.min_required_device_budget
 
     def get_weight_streaming_budget(self) -> Any:
         return self.engine.device_memory_budget
+
+    def get_automatic_weight_streaming_budget(self) -> Any:
+        return self.engine.weight_streaming_automatic_budget
 
     @recreate_context_decorator
     def set_device_memory_budget(self, budget_bytes: int) -> int:
@@ -205,20 +211,15 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
     def _set_device_memory_budget(self, budget_bytes: int) -> int:
         # Disable weight streaming for invalid budget size
         if budget_bytes < 0:
-            budget_bytes = self.get_min_required_device_budget()
-
+            budget_bytes = self.get_streamable_weights_size()
         self.engine.device_memory_budget = budget_bytes
         if self.get_weight_streaming_budget() != budget_bytes:
             logger.error(f"Failed to set weight streaming budget to {budget_bytes}")
             budget_bytes = self.get_weight_streaming_budget()
-        if self.engine.min_required_device_budget == budget_bytes:
+        if self.get_min_required_device_budget() == budget_bytes:
             logger.warning("Weight streaming is disabled")
 
         return budget_bytes
-
-    def set_automatic_streaming_budget(self) -> int:
-        budget_bytes = self.engine.get_weight_streaming_automatic_budget()
-        return self._set_device_memory_budget(budget_bytes)
 
     def setup_engine(self) -> None:
         """
