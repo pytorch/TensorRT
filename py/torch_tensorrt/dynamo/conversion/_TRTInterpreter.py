@@ -18,7 +18,6 @@ from typing import (
 )
 
 import numpy as np
-import tensorrt as trt
 import torch
 import torch.fx
 from torch.fx.node import _get_qualified_name
@@ -27,7 +26,7 @@ from torch.utils._python_dispatch import _disable_current_modes
 from torch_tensorrt._enums import dtype
 from torch_tensorrt._Input import Input
 from torch_tensorrt.dynamo import _defaults
-from torch_tensorrt.dynamo._engine_caching import BaseEngineCache
+from torch_tensorrt.dynamo._engine_cache import BaseEngineCache
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
 from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
@@ -44,6 +43,7 @@ from torch_tensorrt.dynamo.utils import DYNAMIC_DIM, get_model_device, to_torch_
 from torch_tensorrt.fx.observer import Observer
 from torch_tensorrt.logging import TRT_LOGGER
 
+import tensorrt as trt
 from packaging import version
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)

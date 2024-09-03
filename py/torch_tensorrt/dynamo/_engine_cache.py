@@ -144,6 +144,10 @@ class DiskEngineCache(BaseEngineCache):
         if engine_cache_dir not in DiskEngineCache.dir2hash2size_map:
             DiskEngineCache.dir2hash2size_map[engine_cache_dir] = {}
 
+        _LOGGER.info(
+            f"Disk engine cache initialized (cache directory:{self.engine_cache_dir}, max size: {self.total_engine_cache_size})"
+        )
+
     def has_available_cache_size(self, needed_size: int) -> bool:
         """Check if the cache has available space for saving object
 
@@ -184,7 +188,7 @@ class DiskEngineCache(BaseEngineCache):
                             engine_hash, 0
                         )
                     )
-                    _LOGGER.info(
+                    _LOGGER.debug(
                         f"Removed the engine cache at {engine_path}, available cache size: {self.available_engine_cache_size} bytes."
                     )
                 except Exception as e:
@@ -228,7 +232,7 @@ class DiskEngineCache(BaseEngineCache):
             try:
                 with open(blob_path, "wb") as f:
                     f.write(blob)
-                _LOGGER.info(f"The blob was saved to {blob_path}")
+                _LOGGER.debug(f"The engine added to cache, saved to {blob_path}")
             except Exception as e:
                 del DiskEngineCache.dir2hash2size_map[self.engine_cache_dir][hash]
                 self.available_engine_cache_size += blob_size
@@ -247,5 +251,6 @@ class DiskEngineCache(BaseEngineCache):
             if os.path.exists(blob_path):
                 with open(blob_path, "rb") as f:
                     blob = f.read()
+                _LOGGER.debug(f"Engine found in cache, loaded from {blob_path}")
                 return blob
         return None
