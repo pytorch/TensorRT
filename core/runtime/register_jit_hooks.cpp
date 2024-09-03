@@ -90,8 +90,9 @@ static auto TORCHTRT_UNUSED TRTEngineTSRegistrtion =
             "device_memory_budget",
             &TRTEngine::get_device_memory_budget,
             &TRTEngine::set_device_memory_budget)
+        .def_property("streamable_weights_size", &TRTEngine::get_streamable_weights_size)
         .def_property("min_required_device_budget", &TRTEngine::get_min_required_device_budget)
-        .def("get_weight_streaming_automatic_budget", &TRTEngine::get_weight_streaming_automatic_budget)
+        .def_property("weight_streaming_automatic_budget", &TRTEngine::get_weight_streaming_automatic_budget)
         .def("init_context", &TRTEngine::init_context)
         .def("reset_context", &TRTEngine::reset_context)
         .def_pickle(
