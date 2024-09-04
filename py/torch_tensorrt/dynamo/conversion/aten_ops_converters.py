@@ -692,9 +692,7 @@ def aten_ops_softmax(
 
 @dynamo_tensorrt_converter(
     torch.ops.aten.split.Tensor,
-    capability_validator=(
-        has_static_shapes_in_args([0]) and has_static_shapes_in_args([1])
-    ),
+    capability_validator=has_static_shapes_in_args([1]),
     supports_dynamic_shapes=True,
 )
 @dynamo_tensorrt_converter(
@@ -902,30 +900,6 @@ def aten_ops_slice(
         args_bounds_check(args, 2, replacement=None),
         args_bounds_check(args, 3, replacement=None),
         args_bounds_check(args, 4, replacement=1),
-    )
-
-
-@dynamo_tensorrt_converter(torch.ops.aten.chunk.default)
-@enforce_tensor_types(
-    {
-        0: (TRTTensor,),
-    }
-)
-def aten_ops_chunk(
-    ctx: ConversionContext,
-    target: Target,
-    args: Tuple[Argument, ...],
-    kwargs: Dict[str, Argument],
-    name: str,
-) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    return impl.slice.chunk(
-        ctx,
-        target,
-        SourceIR.ATEN,
-        name,
-        args[0],
-        args[1],
-        args_bounds_check(args, 2, 0),
     )
 
 

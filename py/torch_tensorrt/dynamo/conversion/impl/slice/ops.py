@@ -324,61 +324,6 @@ def expand(
     return layer.get_output(0)
 
 
-def chunk(
-    ctx: ConversionContext,
-    target: Target,
-    source_ir: Optional[SourceIR],
-    name: str,
-    input: TRTTensor,
-    chunks: int,
-    dim: int,
-) -> TRTTensor:
-    if chunks <= 0:
-        raise RuntimeError(
-            f"chunk expects `chunks` to be greater than 0, got: {chunks}"
-        )
-
-    shape = input.shape
-    dim = get_positive_dim(dim, len(shape))
-
-    if dim >= len(shape):
-        raise RuntimeError(
-            f"chunk expects `dim` to be less than the length of input shape, got: {dim}"
-        )
-
-    dynamic_shape = has_dynamic_shape(input.shape)
-    if dynamic_shape > 0:
-        # Check whether slice target dim is dynamic shape dim
-        assert input.shape[dim] != -1, "Can't chunk on dynamic shape dimension!"
-
-    size_dim = shape[dim]
-    chunk_size = math.ceil(size_dim / chunks)
-    result = []
-    start = 0
-    end = min(start + chunk_size, size_dim)
-    cnt = 0
-
-    while start < end:
-        result.append(
-            slice_op(
-                ctx,
-                target,
-                source_ir,
-                f"{name}_slice_{cnt}",
-                input,
-                dim,
-                start,
-                end,
-                1,
-            )
-        )
-        start = end
-        end = min(start + chunk_size, size_dim)
-        cnt += 1
-
-    return result
-
-
 def cumsum(
     ctx: ConversionContext,
     target: Target,

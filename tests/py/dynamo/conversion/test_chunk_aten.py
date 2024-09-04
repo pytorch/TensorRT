@@ -85,8 +85,10 @@ class TestChunkConverter(DispatchTestCase):
 
 
 #######################Dynamic cases#######################
-#The tests are skipped for now. Will be addressed once https://github.com/pytorch/pytorch/issues/134663 is addressed
-@unittest.skip("Pending aten.split converter. Currently tested by E2E")
+# The tests are skipped for now. Will be addressed once https://github.com/pytorch/pytorch/issues/134663 is addressed
+@unittest.skip(
+    "Pending aten.split dynamic input torch.export guard bug. Issue- https://github.com/pytorch/pytorch/issues/134663"
+)
 class TestChunkDynamicConverter(DispatchTestCase):
     @parameterized.expand(
         [
