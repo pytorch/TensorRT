@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt.dynamo._settings &mdash; Torch-TensorRT v2.5.0.dev0+b3a8cdd documentation</title>
+  <title>torch_tensorrt.dynamo._settings &mdash; Torch-TensorRT v2.5.0.dev0+8759736 documentation</title>
   
 
   
@@ -272,7 +272,7 @@
               
               
                 <div class="version">
-                  v2.5.0.dev0+b3a8cdd
+                  v2.5.0.dev0+8759736
                 </div>
               
             
@@ -313,6 +313,8 @@
 <li class="toctree-l1"><a class="reference internal" href="../../../user_guide/runtime.html">Deploying Torch-TensorRT Programs</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../user_guide/using_dla.html">DLA</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/torch_compile_advanced_usage.html">Torch Compile Advanced Usage</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/engine_caching_example.html">Engine Caching</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/refit_engine_example.html">Refitting Torch-TensorRT Programs with New Weights</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Dynamo Frontend</span></p>
 <ul>
@@ -459,6 +461,7 @@
 <span class="kn">from</span> <span class="nn">torch_tensorrt._enums</span> <span class="kn">import</span> <span class="n">EngineCapability</span><span class="p">,</span> <span class="n">dtype</span>
 <span class="kn">from</span> <span class="nn">torch_tensorrt.dynamo._defaults</span> <span class="kn">import</span> <span class="p">(</span>
     <span class="n">ASSUME_DYNAMIC_SHAPE_SUPPORT</span><span class="p">,</span>
+    <span class="n">CACHE_BUILT_ENGINES</span><span class="p">,</span>
     <span class="n">DEBUG</span><span class="p">,</span>
     <span class="n">DISABLE_TF32</span><span class="p">,</span>
     <span class="n">DLA_GLOBAL_DRAM_SIZE</span><span class="p">,</span>
@@ -477,6 +480,7 @@
     <span class="n">OPTIMIZATION_LEVEL</span><span class="p">,</span>
     <span class="n">PASS_THROUGH_BUILD_FAILURES</span><span class="p">,</span>
     <span class="n">REQUIRE_FULL_COMPILATION</span><span class="p">,</span>
+    <span class="n">REUSE_CACHED_ENGINES</span><span class="p">,</span>
     <span class="n">SPARSE_WEIGHTS</span><span class="p">,</span>
     <span class="n">TIMING_CACHE_PATH</span><span class="p">,</span>
     <span class="n">TRUNCATE_DOUBLE</span><span class="p">,</span>
@@ -527,6 +531,8 @@
 <span class="sd">            output to a file if a string path is specified</span>
 <span class="sd">        hardware_compatible (bool): Build the TensorRT engines compatible with GPU architectures other than that of the GPU on which the engine was built (currently works for NVIDIA Ampere and newer)</span>
 <span class="sd">        timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation</span>
+<span class="sd">        cache_built_engines (bool): Whether to save the compiled TRT engines to storage</span>
+<span class="sd">        reuse_cached_engines (bool): Whether to load the compiled TRT engines from storage</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">enabled_precisions</span><span class="p">:</span> <span class="n">Set</span><span class="p">[</span><span class="n">dtype</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="k">lambda</span><span class="p">:</span> <span class="n">ENABLED_PRECISIONS</span><span class="p">)</span>
@@ -558,7 +564,9 @@
     <span class="n">dryrun</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">bool</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="n">DRYRUN</span>
     <span class="n">hardware_compatible</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">HARDWARE_COMPATIBLE</span>
     <span class="n">timing_cache_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">TIMING_CACHE_PATH</span>
-    <span class="n">lazy_engine_init</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">LAZY_ENGINE_INIT</span></div>
+    <span class="n">lazy_engine_init</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">LAZY_ENGINE_INIT</span>
+    <span class="n">cache_built_engines</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">CACHE_BUILT_ENGINES</span>
+    <span class="n">reuse_cached_engines</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">REUSE_CACHED_ENGINES</span></div>
 </pre></div>
 
              </article>
