@@ -1158,7 +1158,6 @@ class TestLowering(TestCase):
                 {
                     torch.ops.aten.add.Tensor,
                     torch.ops.aten.scatter.src,
-                    torch.ops.aten.full_like.default,
                 },
                 torch.zeros(3, 5, dtype=torch.int32).cuda(),
                 "sum",
@@ -1171,7 +1170,6 @@ class TestLowering(TestCase):
                 {
                     torch.ops.aten.add.Tensor,
                     torch.ops.aten.scatter.src,
-                    torch.ops.aten.full_like.default,
                 },
                 torch.zeros(3, 5, dtype=torch.int32).cuda(),
                 "sum",
@@ -1189,7 +1187,6 @@ class TestLowering(TestCase):
                 {
                     torch.ops.aten.add.Tensor,
                     torch.ops.aten.scatter.src,
-                    torch.ops.aten.full_like.default,
                 },
                 torch.zeros(3, 5, 6, dtype=torch.int32).cuda(),
                 "sum",
@@ -1203,7 +1200,6 @@ class TestLowering(TestCase):
                 {
                     torch.ops.aten.mul.Tensor,
                     torch.ops.aten.scatter.src,
-                    torch.ops.aten.full_like.default,
                 },
                 torch.ones(3, 5, dtype=torch.int32).cuda(),
                 "prod",
@@ -1216,7 +1212,6 @@ class TestLowering(TestCase):
                 {
                     torch.ops.aten.mul.Tensor,
                     torch.ops.aten.scatter.src,
-                    torch.ops.aten.full_like.default,
                 },
                 torch.ones(3, 5, dtype=torch.int32).cuda(),
                 "prod",
@@ -1229,7 +1224,6 @@ class TestLowering(TestCase):
                 {
                     torch.ops.aten.mul.Tensor,
                     torch.ops.aten.scatter.src,
-                    torch.ops.aten.full_like.default,
                 },
                 torch.ones(3, 5, dtype=torch.int32).cuda(),
                 "prod",
@@ -1242,7 +1236,6 @@ class TestLowering(TestCase):
                 {
                     torch.ops.aten.mul.Tensor,
                     torch.ops.aten.scatter.src,
-                    torch.ops.aten.full_like.default,
                 },
                 torch.ones(3, 5, dtype=torch.int32).cuda(),
                 "prod",
@@ -1260,7 +1253,6 @@ class TestLowering(TestCase):
                 {
                     torch.ops.aten.mul.Tensor,
                     torch.ops.aten.scatter.src,
-                    torch.ops.aten.full_like.default,
                 },
                 torch.ones(3, 5, 6, dtype=torch.int32).cuda(),
                 "prod",
@@ -1300,7 +1292,6 @@ class TestLowering(TestCase):
                     torch.ops.aten.add.Tensor,
                     torch.ops.aten.div.Tensor_mode,
                     torch.ops.aten.scatter.src,
-                    torch.ops.aten.full_like.default,
                 },
                 torch.zeros(3, 5, dtype=torch.int32).cuda(),
                 "mean",
@@ -1314,7 +1305,6 @@ class TestLowering(TestCase):
                     torch.ops.aten.add.Tensor,
                     torch.ops.aten.div.Tensor_mode,
                     torch.ops.aten.scatter.src,
-                    torch.ops.aten.full_like.default,
                 },
                 torch.zeros(3, 5, dtype=torch.int32).cuda(),
                 "mean",
@@ -1333,7 +1323,6 @@ class TestLowering(TestCase):
                     torch.ops.aten.add.Tensor,
                     torch.ops.aten.div.Tensor_mode,
                     torch.ops.aten.scatter.src,
-                    torch.ops.aten.full_like.default,
                 },
                 torch.zeros(3, 5, 6, dtype=torch.int32).cuda(),
                 "mean",
