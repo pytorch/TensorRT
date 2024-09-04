@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Refit TenorRT Graph Module with Torch-TensorRT &mdash; Torch-TensorRT v2.5.0.dev0+b3a8cdd documentation</title>
+  <title>Refitting Torch-TensorRT Programs with New Weights &mdash; Torch-TensorRT v2.5.0.dev0+8759736 documentation</title>
   
 
   
@@ -39,6 +39,8 @@
   <link rel="stylesheet" href="../../../_static/css/custom.css" type="text/css" />
     <link rel="index" title="Index" href="../../../genindex.html" />
     <link rel="search" title="Search" href="../../../search.html" />
+    <link rel="next" title="TensorRT Backend for torch.compile" href="../../../dynamo/torch_compile.html" />
+    <link rel="prev" title="Engine Caching" href="engine_caching_example.html" />
   <!-- Google Tag Manager -->
     <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
     new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
@@ -273,7 +275,7 @@
               
               
                 <div class="version">
-                  v2.5.0.dev0+b3a8cdd
+                  v2.5.0.dev0+8759736
                 </div>
               
             
@@ -307,13 +309,15 @@
 <li class="toctree-l1"><a class="reference internal" href="../../../getting_started/quick_start.html">Quick Start</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">User Guide</span></p>
-<ul>
+<ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="../../../user_guide/torch_tensorrt_explained.html">Torch-TensorRT Explained</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../user_guide/dynamic_shapes.html">Dynamic shapes with Torch-TensorRT</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../user_guide/saving_models.html">Saving models compiled with Torch-TensorRT</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../user_guide/runtime.html">Deploying Torch-TensorRT Programs</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../user_guide/using_dla.html">DLA</a></li>
 <li class="toctree-l1"><a class="reference internal" href="torch_compile_advanced_usage.html">Torch Compile Advanced Usage</a></li>
+<li class="toctree-l1"><a class="reference internal" href="engine_caching_example.html">Engine Caching</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Refitting Torch-TensorRT Programs with New Weights</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Dynamo Frontend</span></p>
 <ul>
@@ -417,7 +421,7 @@
       </li>
 
         
-      <li>Refit  TenorRT Graph Module with Torch-TensorRT</li>
+      <li>Refitting Torch-TensorRT Programs with New Weights</li>
     
     
       <li class="pytorch-breadcrumbs-aside">
@@ -458,16 +462,26 @@
 <p><a class="reference internal" href="#sphx-glr-download-tutorials-rendered-examples-dynamo-refit-engine-example-py"><span class="std std-ref">Go to the end</span></a>
 to download the full example code</p>
 </div>
-<section class="sphx-glr-example-title" id="refit-tenorrt-graph-module-with-torch-tensorrt">
-<span id="refit-engine-example"></span><span id="sphx-glr-tutorials-rendered-examples-dynamo-refit-engine-example-py"></span><h1>Refit  TenorRT Graph Module with Torch-TensorRT<a class="headerlink" href="#refit-tenorrt-graph-module-with-torch-tensorrt" title="Permalink to this heading">¶</a></h1>
-<p>We are going to demonstrate how a compiled TensorRT Graph Module can be refitted with updated weights.</p>
-<p>In many cases, we frequently update the weights of models, such as applying various LoRA to Stable Diffusion or constant A/B testing of AI products.
-That poses challenges for TensorRT inference optimizations, as compiling the TensorRT engines takes significant time, making repetitive compilation highly inefficient.
-Torch-TensorRT supports refitting TensorRT graph modules without re-compiling the engine, considerably accelerating the workflow.</p>
-<p>In this tutorial, we are going to walk through
-1. Compiling a PyTorch model to a TensorRT Graph Module
-2. Save and load a graph module
-3. Refit the graph module</p>
+<section class="sphx-glr-example-title" id="refitting-torch-tensorrt-programs-with-new-weights">
+<span id="refit-engine-example"></span><span id="sphx-glr-tutorials-rendered-examples-dynamo-refit-engine-example-py"></span><h1>Refitting Torch-TensorRT Programs with New Weights<a class="headerlink" href="#refitting-torch-tensorrt-programs-with-new-weights" title="Permalink to this heading">¶</a></h1>
+<p>Compilation is an expensive operation as it involves many graph transformations, translations
+and optimizations applied on the model. In cases were the weights of a model might be updated
+occasionally (e.g. inserting LoRA adapters), the large cost of recompilation can make it infeasible
+to use TensorRT if the compiled program needed to be built from scratch each time. Torch-TensorRT
+provides a PyTorch native mechanism to update the weights of a compiled TensorRT program without
+recompiling from scratch through weight refitting.</p>
+<p>In this tutorial, we are going to walk through</p>
+<blockquote>
+<div><ol class="arabic simple">
+<li><p>Compiling a PyTorch model to a TensorRT Graph Module</p></li>
+<li><p>Save and load a graph module</p></li>
+<li><p>Refit the graph module</p></li>
+</ol>
+</div></blockquote>
+<p>This tutorial focuses mostly on the AOT workflow where it is most likely that a user might need to
+manually refit a module. In the JIT workflow, weight changes trigger recompilation. As the engine
+has previously been built, with an engine cache enabled, Torch-TensorRT can automatically recognize
+a previously built engine, trigger refit and short cut recompilation on behalf of the user (see: <a class="reference internal" href="engine_caching_example.html#engine-caching-example"><span class="std std-ref">Engine Caching</span></a>).</p>
 <section id="standard-workflow">
 <h2>Standard Workflow<a class="headerlink" href="#standard-workflow" title="Permalink to this heading">¶</a></h2>
 <section id="imports-and-model-definition">
@@ -484,9 +498,15 @@ Torch-TensorRT supports refitting TensorRT graph modules without re-compiling th
 </pre></div>
 </div>
 </section>
-<section id="compile-the-module-for-the-first-time-and-save-it">
-<h3>Compile the module for the first time and save it.<a class="headerlink" href="#compile-the-module-for-the-first-time-and-save-it" title="Permalink to this heading">¶</a></h3>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">model</span> <span class="o">=</span> <span class="n">models</span><span class="o">.</span><span class="n">resnet18</span><span class="p">(</span><span class="n">pretrained</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">&quot;cuda&quot;</span><span class="p">)</span>
+</section>
+<section id="make-a-refitable-compilation-program">
+<h2>Make a Refitable Compilation Program<a class="headerlink" href="#make-a-refitable-compilation-program" title="Permalink to this heading">¶</a></h2>
+<p>The inital step is to compile a module and save it as with a normal. Note that there is an
+additional parameter <cite>make_refitable</cite> that is set to <cite>True</cite>. This parameter is used to
+indicate that the engine being built should support weight refitting later. Engines built without
+these setttings will not be able to be refit.</p>
+<p>In this case we are going to compile a ResNet18 model with randomly initialized weights and save it.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">model</span> <span class="o">=</span> <span class="n">models</span><span class="o">.</span><span class="n">resnet18</span><span class="p">(</span><span class="n">pretrained</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">&quot;cuda&quot;</span><span class="p">)</span>
 <span class="n">exp_program</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">export</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">inputs</span><span class="p">))</span>
 <span class="n">enabled_precisions</span> <span class="o">=</span> <span class="p">{</span><span class="n">torch</span><span class="o">.</span><span class="n">float</span><span class="p">}</span>
 <span class="n">debug</span> <span class="o">=</span> <span class="kc">False</span>
@@ -506,15 +526,18 @@ Torch-TensorRT supports refitting TensorRT graph modules without re-compiling th
 <span class="p">)</span>  <span class="c1"># Output is a torch.fx.GraphModule</span>
 
 <span class="c1"># Save the graph module as an exported program</span>
-<span class="c1"># This is only supported when use_python_runtime = False</span>
 <span class="n">torch_trt</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">trt_gm</span><span class="p">,</span> <span class="s2">&quot;./compiled.ep&quot;</span><span class="p">,</span> <span class="n">inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">)</span>
 </pre></div>
 </div>
 </section>
-<section id="refit-the-module-with-update-model-weights">
-<h3>Refit the module with update model weights<a class="headerlink" href="#refit-the-module-with-update-model-weights" title="Permalink to this heading">¶</a></h3>
+<section id="refit-the-program-with-pretrained-weights">
+<h2>Refit the Program with Pretrained Weights<a class="headerlink" href="#refit-the-program-with-pretrained-weights" title="Permalink to this heading">¶</a></h2>
+<p>Random weights are not useful for inference. But now instead of recompiling the model, we can
+refit the model with the pretrained weights. This is done by setting up another PyTorch module
+with the target weights and exporting it as an ExportedProgram. Then the <code class="docutils literal notranslate"><span class="pre">refit_module_weights</span></code>
+function is used to update the weights of the compiled module with the new weights.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Create and compile the updated model</span>
-<span class="n">model2</span> <span class="o">=</span> <span class="n">models</span><span class="o">.</span><span class="n">resnet18</span><span class="p">(</span><span class="n">pretrained</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">&quot;cuda&quot;</span><span class="p">)</span>
+<span class="n">model2</span> <span class="o">=</span> <span class="n">models</span><span class="o">.</span><span class="n">resnet18</span><span class="p">(</span><span class="n">pretrained</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">&quot;cuda&quot;</span><span class="p">)</span>
 <span class="n">exp_program2</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">export</span><span class="p">(</span><span class="n">model2</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">inputs</span><span class="p">))</span>
 
 
@@ -538,13 +561,28 @@ Torch-TensorRT supports refitting TensorRT graph modules without re-compiling th
 </pre></div>
 </div>
 </section>
+<section id="advanced-usage">
+<h2>Advanced Usage<a class="headerlink" href="#advanced-usage" title="Permalink to this heading">¶</a></h2>
+<p>There are a number of settings you can use to control the refit process</p>
+<section id="weight-map-cache">
+<h3>Weight Map Cache<a class="headerlink" href="#weight-map-cache" title="Permalink to this heading">¶</a></h3>
+<p>Weight refitting works by matching the weights of the compiled module with the new weights from
+the user supplied ExportedProgram. Since 1:1 name matching from PyTorch to TensorRT is hard to accomplish,
+the only gaurenteed way to match weights at <em>refit-time</em> is to pass the new ExportedProgram through the
+early phases of the compilation process to generate near identical weight names. This can be expensive
+and is not always necessary.</p>
+<p>To avoid this, <strong>At initial compile</strong>, Torch-TensorRt will attempt to cache a direct mapping from PyTorch
+weights to TensorRT weights. This cache is stored in the compiled module as metadata and can be used
+to speed up refit. If the cache is not present, the refit system will fallback to rebuilding the mapping at
+refit-time. Use of this cache is controlled by the <code class="docutils literal notranslate"><span class="pre">use_weight_map_cache</span></code> parameter.</p>
+<p>Since the cache uses a heuristic based system for matching PyTorch and TensorRT weights, you may want to verify the refitting. This can be done by setting
+<code class="docutils literal notranslate"><span class="pre">verify_output</span></code> to True and providing sample <code class="docutils literal notranslate"><span class="pre">arg_inputs</span></code> and <code class="docutils literal notranslate"><span class="pre">kwarg_inputs</span></code>. When this is done, the refit
+system will run the refitted module and the user supplied module on the same inputs and compare the outputs.</p>
 </section>
-<section id="alternative-workflow-using-python-runtime">
-<h2>Alternative Workflow using Python Runtime<a class="headerlink" href="#alternative-workflow-using-python-runtime" title="Permalink to this heading">¶</a></h2>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Currently python runtime does not support engine serialization. So the refitting will be done in the same runtime.</span>
-<span class="c1"># This usecase is more useful when you need to switch different weights in the same runtime, such as using Stable Diffusion.</span>
-</pre></div>
-</div>
+<section id="in-place-refit">
+<h3>In-Place Refit<a class="headerlink" href="#in-place-refit" title="Permalink to this heading">¶</a></h3>
+<p><code class="docutils literal notranslate"><span class="pre">in_place</span></code> allows the user to refit the module in place. This is useful when the user wants to update the weights
+of the compiled module without creating a new module.</p>
 <p class="sphx-glr-timing"><strong>Total running time of the script:</strong> ( 0 minutes  0.000 seconds)</p>
 <div class="sphx-glr-footer sphx-glr-footer-example docutils container" id="sphx-glr-download-tutorials-rendered-examples-dynamo-refit-engine-example-py">
 <div class="sphx-glr-download sphx-glr-download-python docutils container">
@@ -557,12 +595,22 @@ Torch-TensorRT supports refitting TensorRT graph modules without re-compiling th
 <p class="sphx-glr-signature"><a class="reference external" href="https://sphinx-gallery.github.io">Gallery generated by Sphinx-Gallery</a></p>
 </section>
 </section>
+</section>
 
 
              </article>
              
             </div>
             <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="../../../dynamo/torch_compile.html" class="btn btn-neutral float-right" title="TensorRT Backend for torch.compile" accesskey="n" rel="next">Next <img src="../../../_static/images/chevron-right-orange.svg" class="next-page"></a>
+      
+      
+        <a href="engine_caching_example.html" class="btn btn-neutral" title="Engine Caching" accesskey="p" rel="prev"><img src="../../../_static/images/chevron-right-orange.svg" class="previous-page"> Previous</a>
+      
+    </div>
   
 
   
@@ -592,14 +640,18 @@ Torch-TensorRT supports refitting TensorRT graph modules without re-compiling th
           <div class="pytorch-right-menu" id="pytorch-right-menu">
             <div class="pytorch-side-scroll" id="pytorch-side-scroll-right">
               <ul>
-<li><a class="reference internal" href="#">Refit  TenorRT Graph Module with Torch-TensorRT</a><ul>
+<li><a class="reference internal" href="#">Refitting Torch-TensorRT Programs with New Weights</a><ul>
 <li><a class="reference internal" href="#standard-workflow">Standard Workflow</a><ul>
 <li><a class="reference internal" href="#imports-and-model-definition">Imports and model definition</a></li>
-<li><a class="reference internal" href="#compile-the-module-for-the-first-time-and-save-it">Compile the module for the first time and save it.</a></li>
-<li><a class="reference internal" href="#refit-the-module-with-update-model-weights">Refit the module with update model weights</a></li>
 </ul>
 </li>
-<li><a class="reference internal" href="#alternative-workflow-using-python-runtime">Alternative Workflow using Python Runtime</a></li>
+<li><a class="reference internal" href="#make-a-refitable-compilation-program">Make a Refitable Compilation Program</a></li>
+<li><a class="reference internal" href="#refit-the-program-with-pretrained-weights">Refit the Program with Pretrained Weights</a></li>
+<li><a class="reference internal" href="#advanced-usage">Advanced Usage</a><ul>
+<li><a class="reference internal" href="#weight-map-cache">Weight Map Cache</a></li>
+<li><a class="reference internal" href="#in-place-refit">In-Place Refit</a></li>
+</ul>
+</li>
 </ul>
 </li>
 </ul>

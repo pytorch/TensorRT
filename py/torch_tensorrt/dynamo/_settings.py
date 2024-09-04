@@ -6,6 +6,7 @@ from torch_tensorrt._Device import Device
 from torch_tensorrt._enums import EngineCapability, dtype
 from torch_tensorrt.dynamo._defaults import (
     ASSUME_DYNAMIC_SHAPE_SUPPORT,
+    CACHE_BUILT_ENGINES,
     DEBUG,
     DISABLE_TF32,
     DLA_GLOBAL_DRAM_SIZE,
@@ -24,6 +25,7 @@ from torch_tensorrt.dynamo._defaults import (
     OPTIMIZATION_LEVEL,
     PASS_THROUGH_BUILD_FAILURES,
     REQUIRE_FULL_COMPILATION,
+    REUSE_CACHED_ENGINES,
     SPARSE_WEIGHTS,
     TIMING_CACHE_PATH,
     TRUNCATE_DOUBLE,
@@ -74,6 +76,8 @@ class CompilationSettings:
             output to a file if a string path is specified
         hardware_compatible (bool): Build the TensorRT engines compatible with GPU architectures other than that of the GPU on which the engine was built (currently works for NVIDIA Ampere and newer)
         timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation
+        cache_built_engines (bool): Whether to save the compiled TRT engines to storage
+        reuse_cached_engines (bool): Whether to load the compiled TRT engines from storage
     """
 
     enabled_precisions: Set[dtype] = field(default_factory=lambda: ENABLED_PRECISIONS)
@@ -106,3 +110,5 @@ class CompilationSettings:
     hardware_compatible: bool = HARDWARE_COMPATIBLE
     timing_cache_path: str = TIMING_CACHE_PATH
     lazy_engine_init: bool = LAZY_ENGINE_INIT
+    cache_built_engines: bool = CACHE_BUILT_ENGINES
+    reuse_cached_engines: bool = REUSE_CACHED_ENGINES

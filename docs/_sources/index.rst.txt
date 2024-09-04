@@ -51,6 +51,8 @@ User Guide
    user_guide/using_dla
    tutorials/_rendered_examples/dynamo/torch_compile_advanced_usage
    tutorials/_rendered_examples/dynamo/vgg16_fp8_ptq
+   tutorials/_rendered_examples/dynamo/engine_caching_example
+   tutorials/_rendered_examples/dynamo/refit_engine_example
 
 Dynamo Frontend
 ----------------

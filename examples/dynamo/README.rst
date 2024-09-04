@@ -15,3 +15,5 @@ a number of ways you can leverage this backend to accelerate inference.
 * :ref:`refit_engine_example`: Refitting a compiled TensorRT Graph Module with updated weights
 * :ref:`mutable_torchtrt_module_example`: Compile, use, and modify TensorRT Graph Module with MutableTorchTensorRTModule
 * :ref:`vgg16_fp8_ptq`: Compiling a VGG16 model with FP8 and PTQ using ``torch.compile``
+* :ref:`engine_caching_example`: Utilizing engine caching to speed up compilation times
+* :ref:`engine_caching_bert_example`: Demonstrating engine caching on BERT

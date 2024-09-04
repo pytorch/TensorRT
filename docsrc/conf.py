@@ -93,6 +93,7 @@ html_css_files = [
 sphinx_gallery_conf = {
     "examples_dirs": "../examples",
     "gallery_dirs": "tutorials/_rendered_examples/",
+    "ignore_pattern": "utils.py",
 }
 
 # Setup the breathe extension

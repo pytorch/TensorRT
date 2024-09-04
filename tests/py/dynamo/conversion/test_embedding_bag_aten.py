@@ -484,7 +484,12 @@ class TestEmbeddingBagConverter(DispatchTestCase):
             dynamic_shapes["per_sample_weights"] = {}
         fx_mod = torch.export.export(mod, inputs, dynamic_shapes=dynamic_shapes)
         trt_mod = torch_tensorrt.dynamo.compile(
-            fx_mod, inputs=inputs, enable_precisions=torch.float32, min_block_size=1
+            fx_mod,
+            inputs=inputs,
+            enable_precisions=torch.float32,
+            min_block_size=1,
+            cache_built_engines=False,
+            reuse_cached_engines=False,
         )
         # use the inputs with different shape to inference:
         if per_sample_weights is None:
