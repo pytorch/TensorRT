@@ -18,7 +18,7 @@ from torch_tensorrt.dynamo._DryRunTracker import (
     dryrun_stats_display,
     parse_non_trt_nodes,
 )
-from torch_tensorrt.dynamo._engine_caching import BaseEngineCache, DiskEngineCache
+from torch_tensorrt.dynamo._engine_cache import BaseEngineCache, DiskEngineCache
 from torch_tensorrt.dynamo.conversion import (
     CompilationSettings,
     UnsupportedOperatorException,
@@ -85,8 +85,8 @@ def compile(
     lazy_engine_init: bool = _defaults.LAZY_ENGINE_INIT,
     cache_built_engines: bool = _defaults.CACHE_BUILT_ENGINES,
     reuse_cached_engines: bool = _defaults.REUSE_CACHED_ENGINES,
-    engine_cache_dir: Optional[str] = _defaults.ENGINE_CACHE_DIR,
-    engine_cache_size: Optional[int] = _defaults.ENGINE_CACHE_SIZE,
+    engine_cache_dir: str = _defaults.ENGINE_CACHE_DIR,
+    engine_cache_size: int = _defaults.ENGINE_CACHE_SIZE,
     custom_engine_cache: Optional[BaseEngineCache] = _defaults.CUSTOM_ENGINE_CACHE,
     **kwargs: Any,
 ) -> torch.fx.GraphModule:
