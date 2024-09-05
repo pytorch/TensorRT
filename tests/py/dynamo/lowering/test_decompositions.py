@@ -1129,6 +1129,61 @@ class TestLowering(TestCase):
             f"Scatter_add TRT outputs don't match with the original model.",
         )
 
+    def test_lowering_log_softmax(self):
+        class TestModule(torch.nn.Module):
+            def forward(self, x):
+                return torch.ops.aten._log_softmax.default(x, 1, False)
+
+        # Operations expected to be removed in the traced graph after decompositions
+        expected_ops = {torch.ops.aten._softmax.default, torch.ops.aten.log.default}
+        unexpected_ops = {torch.ops.aten._log_softmax.default}
+
+        inputs = [torch.randn(1, 3).cuda()]
+
+        fx_graph = torch.fx.symbolic_trace(TestModule())
+        unexpected_ops_seen, expected_ops_unseen = lower_graph_testing(
+            fx_graph,
+            inputs,
+            expected_ops=expected_ops,
+            unexpected_ops=unexpected_ops,
+            min_block_size=1,
+        )
+
+        self.assertEqual(
+            len(unexpected_ops_seen),
+            0,
+            f"The following unexpected ops were encountered: {unexpected_ops_seen}",
+        )
+
+        self.assertEqual(
+            len(expected_ops_unseen),
+            0,
+            f"The following expected ops were not encountered: {expected_ops_unseen}",
+        )
+
+        torch._dynamo.reset()
+
+        # Validate that the results between Torch and Torch-TRT are similar
+        optimized_model = torch_tensorrt.compile(
+            fx_graph,
+            "torch_compile",
+            inputs,
+            min_block_size=1,
+            pass_through_build_failures=True,
+        )
+        optimized_model_results = optimized_model(*inputs).detach().cpu()
+        torch_model_results = fx_graph(*inputs).detach().cpu()
+
+        max_diff = float(
+            torch.max(torch.abs(optimized_model_results - torch_model_results))
+        )
+        self.assertAlmostEqual(
+            max_diff,
+            0,
+            DECIMALS_OF_AGREEMENT,
+            f"Log_softmax TRT outputs don't match with the original model.",
+        )
+
 
 if __name__ == "__main__":
     run_tests()

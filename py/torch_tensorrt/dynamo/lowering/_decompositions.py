@@ -287,6 +287,15 @@ def scatter_add_decomposition(
     return scatter_add_tensor
 
 
+@register_torch_trt_decomposition(aten._log_softmax, registry=TORCH_TRT_DECOMPOSITIONS)
+def log_softmax_decomposition(
+    x: torch.Tensor,
+    dim: int,
+    half_to_float: bool,
+) -> torch.Tensor:
+    return torch.log(torch.softmax(x, dim))
+
+
 def get_decompositions(
     enable_experimental_decompositions: bool = False,
 ) -> Dict[OpOverload, Callable[[Any], Any]]:
