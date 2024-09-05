@@ -35,6 +35,8 @@ a number of ways you can leverage this backend to accelerate inference.
 * :ref:`refit_engine_example`: Refitting a compiled TensorRT Graph Module with updated weights
 * :ref:`mutable_torchtrt_module_example`: Compile, use, and modify TensorRT Graph Module with MutableTorchTensorRTModule
 * :ref:`vgg16_fp8_ptq`: Compiling a VGG16 model with FP8 and PTQ using ``torch.compile``
+* :ref:`engine_caching_example`: Utilizing engine caching to speed up compilation times
+* :ref:`engine_caching_bert_example`: Demonstrating engine caching on BERT
 
 
 
@@ -79,6 +81,23 @@ a number of ways you can leverage this backend to accelerate inference.
 
 .. raw:: html
 
+    <div class="sphx-glr-thumbcontainer" tooltip="Compilation is an expensive operation as it involves many graph transformations, translations a...">
+
+.. only:: html
+
+  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_refit_engine_example_thumb.png
+    :alt:
+
+  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_refit_engine_example.py`
+
+.. raw:: html
+
+      <div class="sphx-glr-thumbnail-title">Refitting Torch-TensorRT Programs with New Weights</div>
+    </div>
+
+
+.. raw:: html
+
     <div class="sphx-glr-thumbcontainer" tooltip="This interactive script is intended as a sample of the Torch-TensorRT workflow with torch.compi...">
 
 .. only:: html
@@ -96,18 +115,18 @@ a number of ways you can leverage this backend to accelerate inference.
 
 .. raw:: html
 
-    <div class="sphx-glr-thumbcontainer" tooltip="We are going to demonstrate how a compiled TensorRT Graph Module can be refitted with updated w...">
+    <div class="sphx-glr-thumbcontainer" tooltip="This interactive script is intended as a sample of the Torch-TensorRT workflow with dynamo back...">
 
 .. only:: html
 
-  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_refit_engine_example_thumb.png
+  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_torch_export_gpt2_thumb.png
     :alt:
 
-  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_refit_engine_example.py`
+  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_torch_export_gpt2.py`
 
 .. raw:: html
 
-      <div class="sphx-glr-thumbnail-title">Refit  TenorRT Graph Module with Torch-TensorRT</div>
+      <div class="sphx-glr-thumbnail-title">Compiling GPT2 using the Torch-TensorRT with dynamo backend</div>
     </div>
 
 
@@ -125,6 +144,40 @@ a number of ways you can leverage this backend to accelerate inference.
 .. raw:: html
 
       <div class="sphx-glr-thumbnail-title">Torch Compile Advanced Usage</div>
+    </div>
+
+
+.. raw:: html
+
+    <div class="sphx-glr-thumbcontainer" tooltip="This interactive script is intended as a sample of the Torch-TensorRT workflow with dynamo back...">
+
+.. only:: html
+
+  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_torch_export_llama2_thumb.png
+    :alt:
+
+  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_torch_export_llama2.py`
+
+.. raw:: html
+
+      <div class="sphx-glr-thumbnail-title">Compiling Llama2 using the Torch-TensorRT with dynamo backend</div>
+    </div>
+
+
+.. raw:: html
+
+    <div class="sphx-glr-thumbcontainer" tooltip="Small caching example on BERT.">
+
+.. only:: html
+
+  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_engine_caching_bert_example_thumb.png
+    :alt:
+
+  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_engine_caching_bert_example.py`
+
+.. raw:: html
+
+      <div class="sphx-glr-thumbnail-title">Engine Caching (BERT)</div>
     </div>
 
 
@@ -176,6 +229,23 @@ a number of ways you can leverage this backend to accelerate inference.
 .. raw:: html
 
       <div class="sphx-glr-thumbnail-title">Deploy Quantized Models using Torch-TensorRT</div>
+    </div>
+
+
+.. raw:: html
+
+    <div class="sphx-glr-thumbcontainer" tooltip="As model sizes increase, the cost of compilation will as well. With AOT methods like torch.dyna...">
+
+.. only:: html
+
+  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_engine_caching_example_thumb.png
+    :alt:
+
+  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_engine_caching_example.py`
+
+.. raw:: html
+
+      <div class="sphx-glr-thumbnail-title">Engine Caching</div>
     </div>
 
 

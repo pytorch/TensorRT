@@ -3,19 +3,19 @@ from __future__ import annotations
 import logging
 from dataclasses import fields, replace
 from enum import Enum
-from typing import Any, Callable, Dict, Optional, Sequence, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 import numpy as np
-import tensorrt as trt
 import torch
 from torch._subclasses.fake_tensor import FakeTensor
 from torch_tensorrt._Device import Device
 from torch_tensorrt._enums import dtype
 from torch_tensorrt._Input import Input
 from torch_tensorrt.dynamo import _defaults
-from torch_tensorrt.dynamo._engine_caching import BaseEngineCache
+from torch_tensorrt.dynamo._engine_cache import BaseEngineCache
 from torch_tensorrt.dynamo._settings import CompilationSettings
 
+import tensorrt as trt
 from packaging import version
 
 from .types import TRTDataType
@@ -148,10 +148,10 @@ def get_torch_tensor(
 
 
 def get_torch_inputs(
-    inputs: Sequence[Input] | Dict[Any, Any],
+    inputs: Sequence[Input] | Dict[str, Any],
     device: Union[Device, torch.device, str],
     mode: str = "",
-) -> Sequence[torch.Tensor] | Dict[str, torch.Tensor]:
+) -> Sequence[Union[int, torch.Tensor]] | Dict[str, Union[int, torch.Tensor]]:
     """
     Return the torch_tensor from the Input object. If mode is set, this implies
     user is using dynamic shaped inputs and return the corresponding input based
@@ -160,26 +160,26 @@ def get_torch_inputs(
     device = to_torch_device(device)
 
     if isinstance(inputs, dict):
-        result = {}
+        result_dict: Dict[str, Union[int, torch.Tensor]] = {}
         for k, v in inputs.items():
             if isinstance(v, (list, tuple, dict)):
-                result[k] = get_torch_inputs(v, device)
+                result_dict[k] = get_torch_inputs(v, device)
             elif isinstance(v, Input):
-                result[k] = get_torch_tensor(v, device, mode)
+                result_dict[k] = get_torch_tensor(v, device, mode)
+        return result_dict
     else:
-        result = []
+        result_list: List[Union[int, torch.Tensor]] = []
         for input in inputs:
             if isinstance(input, Input):
-                result.append(get_torch_tensor(input, device, mode))
+                result_list.append(get_torch_tensor(input, device, mode))
             elif isinstance(input, torch.Tensor):
-                result.append(input.to(device))
+                result_list.append(input.to(device))
             else:
                 raise AssertionError(f"Input type {type(input)} is not a valid type")
+        return result_list
 
-    return result
 
-
-def get_model_device(module: torch.fx.GraphModule) -> Union[Device, torch.device, str]:
+def get_model_device(module: torch.fx.GraphModule) -> torch.device:
     """
     Returns the device on which the module parameters exist.
     """
@@ -306,7 +306,7 @@ def contains_sym_int(tensor: torch.Tensor) -> bool:
     return any(isinstance(dim, torch.SymInt) for dim in tensor)
 
 
-def extract_var_range_info(symbolic_integer: torch.SymInt) -> Dict[str, Any]:
+def extract_var_range_info(symbolic_integer: torch.SymInt) -> Dict[str, int]:
     """
     This function returns the min, max, opt values of a symbolic integer.
     """
@@ -335,14 +335,14 @@ def extract_var_range_info(symbolic_integer: torch.SymInt) -> Dict[str, Any]:
 
 def unwrap_tensor_shape(
     tensor: Union[torch.Tensor, FakeTensor, torch.SymInt]
-) -> Sequence[Any]:
+) -> Sequence[Union[int, Tuple[int, int]]]:
     """
     This is a helper function used to print/return the shape of the tensor.
     For regular torch.tensor's, it returns the static shape.
     For symbolic tensors, eg:(1, s0, 4), this function returns [1, [min, max], 4]. The min
     and max correspond to the lower and upper values of s0 symbolic dimension.
     """
-    tensor_shape = []
+    tensor_shape: List[Union[int, Tuple[int, int]]] = []
     # for dimension in tensor.shape:
     if isinstance(tensor, int):
         tensor_shape.append(tensor)
@@ -509,7 +509,7 @@ def parse_dynamo_kwargs(
         if kwargs.get("custom_engine_cache") is not None:
             engine_cache = kwargs.get("custom_engine_cache")
         else:
-            from torch_tensorrt.dynamo._engine_caching import DiskEngineCache
+            from torch_tensorrt.dynamo._engine_cache import DiskEngineCache
 
             engine_cache_dir = kwargs.get(
                 "engine_cache_dir", _defaults.ENGINE_CACHE_DIR

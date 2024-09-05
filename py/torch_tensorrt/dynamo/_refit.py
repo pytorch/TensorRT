@@ -6,7 +6,6 @@ import logging
 from typing import Any, List, Optional, Sequence, Tuple
 
 import numpy as np
-import tensorrt as trt
 import torch
 from torch.export import ExportedProgram
 from torch_tensorrt._enums import dtype
@@ -35,12 +34,15 @@ from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (
 )
 from torch_tensorrt.dynamo.utils import (
     check_module_output,
+    get_model_device,
     get_torch_inputs,
     set_log_level,
     to_torch_device,
     to_torch_tensorrt_device,
 )
 from torch_tensorrt.logging import TRT_LOGGER
+
+import tensorrt as trt
 
 logger = logging.getLogger(__name__)
 
@@ -146,7 +148,7 @@ def _refit_single_trt_engine_with_gm(
     """
 
     refitted = set()
-    torch_device = list(new_gm.state_dict().values())[0].device.type
+    torch_device = get_model_device(new_gm)
     refitter = trt.Refitter(old_engine, TRT_LOGGER)
     weight_list = refitter.get_all_weights()
 
