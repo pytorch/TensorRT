@@ -293,7 +293,9 @@ def log_softmax_decomposition(
     dim: int,
     half_to_float: bool,
 ) -> torch.Tensor:
-    return torch.log(torch.softmax(x, dim))
+    return torch.log(
+        torch.softmax(x, dim, dtype=torch.float if half_to_float else None)
+    )
 
 
 def get_decompositions(

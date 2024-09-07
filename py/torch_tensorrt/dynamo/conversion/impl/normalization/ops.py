@@ -426,30 +426,13 @@ def softmax(
     source_ir: Optional[SourceIR],
     name: str,
     input: TRTTensor,
-    dim: Optional[Any] = None,
+    dim: int,
+    half_to_float: bool,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    input_ranks = len(input.shape)
+    dim = get_positive_dim(dim, len(input.shape))
 
-    if not isinstance(input, TRTTensor):
-        raise RuntimeError(
-            f"softmax received input {input} that is not part "
-            "of the TensorRT region!"
-        )
-
-    # Used to get dim when dim is None. Copied from PyTorch softmax implementation.
-    def get_softmax_dim(ndim: int) -> int:
-        if ndim == 0 or ndim == 1 or ndim == 3:
-            ret = 0
-        else:
-            ret = 1
-        return ret
-
-    if dim is None:
-        dim = get_softmax_dim(input_ranks)
-    else:
-        dim = cast(int, dim)
-
-    dim = get_positive_dim(dim, input_ranks)
+    if half_to_float:
+        input = cast_trt_tensor(ctx, input, torch.float, name, target, source_ir)
 
     layer = ctx.net.add_softmax(input)
     layer.axes = 1 << dim

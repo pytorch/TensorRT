@@ -1129,16 +1129,23 @@ class TestLowering(TestCase):
             f"Scatter_add TRT outputs don't match with the original model.",
         )
 
-    def test_lowering_log_softmax(self):
+    @parameterized.expand(
+        [
+            (torch.float, False),
+            (torch.half, False),
+            (torch.half, True),
+        ]
+    )
+    def test_lowering_log_softmax(self, dtype, half_to_float):
         class TestModule(torch.nn.Module):
             def forward(self, x):
-                return torch.ops.aten._log_softmax.default(x, 1, False)
+                return torch.ops.aten._log_softmax.default(x, 1, half_to_float)
 
         # Operations expected to be removed in the traced graph after decompositions
         expected_ops = {torch.ops.aten._softmax.default, torch.ops.aten.log.default}
         unexpected_ops = {torch.ops.aten._log_softmax.default}
 
-        inputs = [torch.randn(1, 3).cuda()]
+        inputs = [torch.randn(1, 3, 5, 7, dtype=dtype, device="cuda")]
 
         fx_graph = torch.fx.symbolic_trace(TestModule())
         unexpected_ops_seen, expected_ops_unseen = lower_graph_testing(
