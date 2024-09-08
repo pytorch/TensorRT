@@ -10,6 +10,7 @@ from torch_tensorrt import _enums
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
 from torch_tensorrt.dynamo.conversion.converter_utils import (
+    broadcast,
     broadcast_to_same_shape,
     cast_trt_tensor,
     get_trt_tensor,
