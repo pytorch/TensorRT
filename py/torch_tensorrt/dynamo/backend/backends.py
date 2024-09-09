@@ -87,11 +87,11 @@ def _pretraced_backend(
 
             # Remove detach nodes
             remove_detach(gm)
-
+            # breakpoint()
             # Invoke AOTAutograd to translate operators to aten
             gm = aot_export_joint_simple(
                 gm,
-                torch_inputs,
+                sample_inputs,
                 trace_joint=False,
                 decompositions=get_decompositions(
                     settings.enable_experimental_decompositions
