@@ -1,7 +1,9 @@
 # type: ignore
 import unittest
 
-import modelopt
+import importlib
+
+from packaging.version import Version
 import pytest
 import timm
 import torch
@@ -195,8 +197,13 @@ def test_resnet18_half(ir):
     torch.cuda.get_device_properties(torch.cuda.current_device()).major < 9,
     "FP8 compilation in Torch-TRT is not supported on cards older than Hopper",
 )
+@unittest.skipIf(
+    not importlib.util.find_spec("modelopt"), reason="ModelOpt is necessary to run this test"
+)
 @pytest.mark.unit
 def test_base_fp8(ir):
+    import modelopt
+
     class SimpleNetwork(torch.nn.Module):
         def __init__(self):
             super(SimpleNetwork, self).__init__()
@@ -239,13 +246,14 @@ def test_base_fp8(ir):
             outputs_trt = trt_model(input_tensor)
             assert torch.allclose(output_pyt, outputs_trt, rtol=1e-3, atol=1e-2)
 
-
 @unittest.skipIf(
-    modelopt.__version__ < "0.16.1",
-    "Int8 quantization is supported in modelopt since 0.16.1 or later",
+    not importlib.util.find_spec("modelopt") or Version(importlib.metadata.version("modelopt")) < Version("0.16.1"),
+    "modelopt 0.16.1 or later is required Int8 quantization is supported in modelopt since 0.16.1 or later",
 )
 @pytest.mark.unit
 def test_base_int8(ir):
+    import modelopt
+
     class SimpleNetwork(torch.nn.Module):
         def __init__(self):
             super(SimpleNetwork, self).__init__()

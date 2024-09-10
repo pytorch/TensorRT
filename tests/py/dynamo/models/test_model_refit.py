@@ -57,7 +57,7 @@ def test_mapping():
         enabled_precisions=enabled_precisions,
         debug=debug,
         min_block_size=min_block_size,
-        make_refitable=True,
+        make_refittable=True,
     )
     settings = trt_gm._run_on_acc_0.settings
     runtime = trt.Runtime(TRT_LOGGER)
@@ -109,7 +109,7 @@ def test_refit_one_engine_with_weightmap():
         enabled_precisions=enabled_precisions,
         debug=debug,
         min_block_size=min_block_size,
-        make_refitable=True,
+        make_refittable=True,
     )
 
     new_trt_gm = refit_module_weights(
@@ -159,7 +159,7 @@ def test_refit_one_engine_no_map_with_weightmap():
         enabled_precisions=enabled_precisions,
         debug=debug,
         min_block_size=min_block_size,
-        make_refitable=True,
+        make_refittable=True,
     )
 
     trt_gm._run_on_acc_0.weight_name_map = None
@@ -210,7 +210,7 @@ def test_refit_one_engine_with_wrong_weightmap():
         enabled_precisions=enabled_precisions,
         debug=debug,
         min_block_size=min_block_size,
-        make_refitable=True,
+        make_refittable=True,
     )
     # Manually Deleted all batch norm layer. This suppose to fail the fast refit
     trt_gm._run_on_acc_0.weight_name_map = {
@@ -267,7 +267,7 @@ def test_refit_one_engine_bert_with_weightmap():
         enabled_precisions=enabled_precisions,
         debug=debug,
         min_block_size=min_block_size,
-        make_refitable=True,
+        make_refittable=True,
     )
 
     new_trt_gm = refit_module_weights(
@@ -320,7 +320,7 @@ def test_refit_one_engine_inline_runtime__with_weightmap():
         enabled_precisions=enabled_precisions,
         debug=debug,
         min_block_size=min_block_size,
-        make_refitable=True,
+        make_refittable=True,
     )
     torchtrt.save(trt_gm, trt_ep_path, inputs=inputs)
     trt_gm = torch.export.load(trt_ep_path)
@@ -366,7 +366,7 @@ def test_refit_one_engine_python_runtime_with_weightmap():
         enabled_precisions=enabled_precisions,
         debug=debug,
         min_block_size=min_block_size,
-        make_refitable=True,
+        make_refittable=True,
     )
 
     new_trt_gm = refit_module_weights(
@@ -428,7 +428,7 @@ def test_refit_multiple_engine_with_weightmap():
     exp_program = torch.export.export(model, tuple(inputs))
     exp_program2 = torch.export.export(model2, tuple(inputs))
 
-    torch_executed_ops = {torch.ops.aten.convolution.default}
+    torch_executed_ops = {"torch.ops.aten.convolution.default"}
     trt_gm = torchtrt.dynamo.compile(
         exp_program,
         tuple(inputs),
@@ -436,7 +436,7 @@ def test_refit_multiple_engine_with_weightmap():
         enabled_precisions=enabled_precisions,
         debug=debug,
         min_block_size=min_block_size,
-        make_refitable=True,
+        make_refittable=True,
         torch_executed_ops=torch_executed_ops,
     )
 
@@ -486,7 +486,7 @@ def test_refit_one_engine_without_weightmap():
         enabled_precisions=enabled_precisions,
         debug=debug,
         min_block_size=min_block_size,
-        make_refitable=True,
+        make_refittable=True,
     )
 
     new_trt_gm = refit_module_weights(
@@ -537,7 +537,7 @@ def test_refit_one_engine_bert_without_weightmap():
         enabled_precisions=enabled_precisions,
         debug=debug,
         min_block_size=min_block_size,
-        make_refitable=True,
+        make_refittable=True,
     )
 
     new_trt_gm = refit_module_weights(
@@ -590,7 +590,7 @@ def test_refit_one_engine_inline_runtime_without_weightmap():
         enabled_precisions=enabled_precisions,
         debug=debug,
         min_block_size=min_block_size,
-        make_refitable=True,
+        make_refittable=True,
     )
     torchtrt.save(trt_gm, trt_ep_path, inputs=inputs)
     trt_gm = torch.export.load(trt_ep_path)
@@ -636,7 +636,7 @@ def test_refit_one_engine_python_runtime_without_weightmap():
         enabled_precisions=enabled_precisions,
         debug=debug,
         min_block_size=min_block_size,
-        make_refitable=True,
+        make_refittable=True,
     )
 
     new_trt_gm = refit_module_weights(
@@ -698,7 +698,7 @@ def test_refit_multiple_engine_without_weightmap():
     exp_program = torch.export.export(model, tuple(inputs))
     exp_program2 = torch.export.export(model2, tuple(inputs))
 
-    torch_executed_ops = {torch.ops.aten.convolution.default}
+    torch_executed_ops = {"torch.ops.aten.convolution.default"}
     trt_gm = torchtrt.dynamo.compile(
         exp_program,
         tuple(inputs),
@@ -706,7 +706,7 @@ def test_refit_multiple_engine_without_weightmap():
         enabled_precisions=enabled_precisions,
         debug=debug,
         min_block_size=min_block_size,
-        make_refitable=True,
+        make_refittable=True,
         torch_executed_ops=torch_executed_ops,
     )
 
