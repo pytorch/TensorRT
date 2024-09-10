@@ -18,6 +18,7 @@ from typing import (
 )
 
 import numpy as np
+import tensorrt as trt
 import torch
 import torch.fx
 from torch.fx.node import _get_qualified_name
@@ -43,7 +44,6 @@ from torch_tensorrt.dynamo.utils import DYNAMIC_DIM, get_model_device, to_torch_
 from torch_tensorrt.fx.observer import Observer
 from torch_tensorrt.logging import TRT_LOGGER
 
-import tensorrt as trt
 from packaging import version
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
@@ -757,7 +757,6 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             from torch_tensorrt.dynamo.conversion.converter_utils import to_numpy
 
             frozen_attr = self.fetch_attr(target)
-
             if isinstance(frozen_attr, torch.nn.Parameter):
                 constant_tensor = frozen_attr.data
             else:

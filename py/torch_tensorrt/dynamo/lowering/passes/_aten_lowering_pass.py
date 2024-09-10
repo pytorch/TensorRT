@@ -5,6 +5,7 @@ import torch
 
 from .constant_folding import constant_fold
 from .fuse_prims_broadcast import fuse_prims_broadcast
+from .inline_conditionals import inline_conditionals
 from .lower_linear import lower_linear
 from .lower_scaled_dot_product_attention import lower_scaled_dot_product_attention
 from .pass_manager import DynamoPassManager
@@ -28,6 +29,7 @@ ATEN_POST_LOWERING_PASSES = DynamoPassManager.build_from_passlist(
         replace_full_like_with_full,
         view_to_reshape,
         remove_assert_scalar,
+        inline_conditionals,
     ]
 )
 

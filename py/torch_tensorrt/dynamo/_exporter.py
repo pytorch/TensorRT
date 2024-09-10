@@ -203,6 +203,65 @@ def get_duplicate_nodes(
     return submodule_duplicate_inputs, gm_duplicate_inputs
 
 
+def inline_submodule(
+    gm: torch.fx.GraphModule,
+    submodule: torch.fx.GraphModule,
+    gm_node_to_replace: torch.fx.Node,
+) -> None:
+    """
+    Inline a submodule within the parent graph (gm).
+    """
+    with gm.graph.inserting_before(gm_node_to_replace):
+        # Get inputs of submodule node which are most likely outputs of a previous TRT node
+        # or a placeholder of the main graph
+        submodule_inputs = gm_node_to_replace.args
+
+        submodule_duplicate_inputs, gm_duplicate_inputs = get_duplicate_nodes(
+            gm, submodule
+        )
+        assert len(submodule_duplicate_inputs) == len(gm_duplicate_inputs)
+        # Avoid creating new copies of duplicate inputs by creating a mapping
+        val_map = {}
+        for i in range(len(submodule_duplicate_inputs)):
+            val_map[submodule_duplicate_inputs[i]] = gm_duplicate_inputs[i]
+
+        # Copy all nodes in the submodule into gm and
+        # store the output node of this submodule which is now present in gm
+        submodule_output = gm.graph.graph_copy(submodule.graph, val_map)
+
+        # Get their references (since we copied) in the parent graph (gm)
+        if len(submodule_duplicate_inputs) == 0:
+            submodule_placeholder_input_names = [
+                node.name for node in submodule.graph.nodes if node.op == "placeholder"
+            ]
+            gm_added_placeholder_inputs = [
+                node
+                for node in gm.graph.nodes
+                if node.name in submodule_placeholder_input_names
+            ]
+
+            assert len(submodule_inputs) == len(gm_added_placeholder_inputs)
+
+            # Replace the added placeholder inputs with original inputs to this submodule node
+            for idx in range(len(gm_added_placeholder_inputs)):
+                gm_added_placeholder_inputs[idx].replace_all_uses_with(
+                    submodule_inputs[idx]
+                )
+
+            # Erase the placeholder input nodes in the gm
+            for idx in range(len(gm_added_placeholder_inputs)):
+                gm.graph.erase_node(gm_added_placeholder_inputs[idx])
+
+        # Replace the pytorch submodule node (call_module) with the inlined subgraph output
+        gm_node_to_replace.replace_all_uses_with(submodule_output)
+
+        # copy the attributes of the submodule into gm (graph_copy doesn't do this)
+        copy_submodule_attributes(gm, submodule, gm_node_to_replace.name)
+
+    # Erase the pytorch submodule (call_module) node
+    gm.graph.erase_node(gm_node_to_replace)
+
+
 def inline_torch_modules(gm: torch.fx.GraphModule) -> torch.fx.GraphModule:
     """
     Inline a submodule within the parent graph (gm). All `call_module` nodes
@@ -212,60 +271,13 @@ def inline_torch_modules(gm: torch.fx.GraphModule) -> torch.fx.GraphModule:
     gm.graph.eliminate_dead_code()
     gm.graph.lint()
 
-    for gm_node in gm.graph.nodes:
-        if gm_node.op == "call_module" and "_run_on_gpu" in gm_node.name:
-            submodule = getattr(gm, gm_node.name)
-            with gm.graph.inserting_before(gm_node):
-                # Get inputs of submodule node which are most likely outputs of a previous TRT node
-                # or a placeholder of the main graph
-                submodule_inputs = gm_node.args
-
-                submodule_duplicate_inputs, gm_duplicate_inputs = get_duplicate_nodes(
-                    gm, submodule
-                )
-                assert len(submodule_duplicate_inputs) == len(gm_duplicate_inputs)
-                # Avoid creating new copies of duplicate inputs by creating a mapping
-                val_map = {}
-                for i in range(len(submodule_duplicate_inputs)):
-                    val_map[submodule_duplicate_inputs[i]] = gm_duplicate_inputs[i]
-
-                # Copy all nodes in the submodule into gm and
-                # store the output node of this submodule which is now present in gm
-                submodule_output = gm.graph.graph_copy(submodule.graph, val_map)
-
-                # Get their references (since we copied) in the parent graph (gm)
-                if len(submodule_duplicate_inputs) == 0:
-                    submodule_placeholder_input_names = [
-                        node.name
-                        for node in submodule.graph.nodes
-                        if node.op == "placeholder"
-                    ]
-                    gm_added_placeholder_inputs = [
-                        node
-                        for node in gm.graph.nodes
-                        if node.name in submodule_placeholder_input_names
-                    ]
-
-                    assert len(submodule_inputs) == len(gm_added_placeholder_inputs)
-
-                    # Replace the added placeholder inputs with original inputs to this submodule node
-                    for idx in range(len(gm_added_placeholder_inputs)):
-                        gm_added_placeholder_inputs[idx].replace_all_uses_with(
-                            submodule_inputs[idx]
-                        )
-
-                    # Erase the placeholder input nodes in the gm
-                    for idx in range(len(gm_added_placeholder_inputs)):
-                        gm.graph.erase_node(gm_added_placeholder_inputs[idx])
-
-                # Replace the pytorch submodule node (call_module) with the inlined subgraph output
-                gm_node.replace_all_uses_with(submodule_output)
-
-                # copy the attributes of the submodule into gm (graph_copy doesn't do this)
-                copy_submodule_attributes(gm, submodule, gm_node.name)
-
-            # Erase the pytorch submodule (call_module) node
-            gm.graph.erase_node(gm_node)
+    for gm_node_to_replace in gm.graph.nodes:
+        if (
+            gm_node_to_replace.op == "call_module"
+            and "_run_on_gpu" in gm_node_to_replace.name
+        ):
+            submodule = getattr(gm, gm_node_to_replace.name)
+            inline_submodule(gm, submodule, gm_node_to_replace)
 
     return gm
 

@@ -2357,6 +2357,7 @@ def aten_ops_ne(
     )
 
 
+@dynamo_tensorrt_converter(operator.gt, supports_dynamic_shapes=True)
 @dynamo_tensorrt_converter(torch.ops.aten.gt.Tensor, supports_dynamic_shapes=True)
 @dynamo_tensorrt_converter(torch.ops.aten.gt.Scalar, supports_dynamic_shapes=True)
 @enforce_tensor_types(
@@ -3536,6 +3537,32 @@ def aten_ops_copy(
         src,
         src.dtype,
         force_layer=True,
+    )
+
+
+@dynamo_tensorrt_converter(torch.ops.higher_order.cond, supports_dynamic_shapes=True)
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+        1: (TRTTensor,),
+        2: (TRTTensor,),
+    }
+)
+def aten_ops_higher_order_cond(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.condition.select(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[1],
+        args[2],
+        args[0],
     )
 
 
