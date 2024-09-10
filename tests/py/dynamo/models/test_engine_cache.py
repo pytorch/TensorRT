@@ -10,7 +10,7 @@ import torch_tensorrt as torch_trt
 import torchvision.models as models
 from torch.testing._internal.common_utils import TestCase
 from torch_tensorrt.dynamo._defaults import ENGINE_CACHE_DIR
-from torch_tensorrt.dynamo._engine_caching import BaseEngineCache
+from torch_tensorrt.dynamo._engine_cache import BaseEngineCache
 from torch_tensorrt.dynamo.utils import COSINE_THRESHOLD, cosine_similarity
 
 assertions = unittest.TestCase()

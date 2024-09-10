@@ -19,7 +19,7 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     get_positive_dim,
     is_only_operator_on_placeholder,
 )
-from torch_tensorrt.fx.types import TRTTensor
+from torch_tensorrt.dynamo.types import TRTTensor
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -548,6 +548,24 @@ def aten_ops_hard_sigmoid(
     )
 
 
+@dynamo_tensorrt_converter(torch.ops.aten.gelu.default, supports_dynamic_shapes=True)
+def aten_ops_gelu(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.activation.gelu(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        kwargs.get("approximate", "none"),
+    )
+
+
 @dynamo_tensorrt_converter(torch.ops.aten.matmul, supports_dynamic_shapes=True)
 @dynamo_tensorrt_converter(torch.ops.aten.dot.default, supports_dynamic_shapes=True)
 @dynamo_tensorrt_converter(torch.ops.aten.mm.default, supports_dynamic_shapes=True)
@@ -903,30 +921,6 @@ def aten_ops_slice(
         args_bounds_check(args, 2, replacement=None),
         args_bounds_check(args, 3, replacement=None),
         args_bounds_check(args, 4, replacement=1),
-    )
-
-
-@dynamo_tensorrt_converter(torch.ops.aten.chunk.default)
-@enforce_tensor_types(
-    {
-        0: (TRTTensor,),
-    }
-)
-def aten_ops_chunk(
-    ctx: ConversionContext,
-    target: Target,
-    args: Tuple[Argument, ...],
-    kwargs: Dict[str, Argument],
-    name: str,
-) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    return impl.slice.chunk(
-        ctx,
-        target,
-        SourceIR.ATEN,
-        name,
-        args[0],
-        args[1],
-        args_bounds_check(args, 2, 0),
     )
 
 
