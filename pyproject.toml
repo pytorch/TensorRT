@@ -65,7 +65,7 @@ dependencies = [
 dynamic = ["version"]
 
 [project.optional-dependencies]
-torchvision = ["torchvision >=0.20.dev,<0.21.0"]
+torchvision = ["torchvision>=0.19.1,<0.20.0"]
 quantization = ["nvidia-modelopt[all]>=0.15.1"]
 monitoring-tools = ["rich >= 13.7.1"]
 jupyter = ["rich[jupyter] >= 13.7.1"]
