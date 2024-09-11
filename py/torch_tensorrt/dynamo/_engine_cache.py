@@ -75,7 +75,6 @@ class BaseEngineCache(ABC):
             engine_specs_data = pickletools.optimize(engine_specs_data)
         engine_specs_hash = sha256_hash(engine_specs_data)
 
-        # TODO: Super first idea I had hash combination solution @Evan please iterate on this
         hash_val: str = graph_hash_val + input_specs_hash + engine_specs_hash
 
         return hash_val
@@ -95,6 +94,8 @@ class BaseEngineCache(ABC):
             serialized_engine (bytes): serialized TRT engine
             input_names (List[str]): input names of TRT engine
             output_names (List[str]): output names of TRT engine
+            input_specs (Sequence[Input]): input specs of TRT engine
+            compilation_settings (CompilationSettings): compilation settings of TRT engine
             weight_name_map (Optional[Dict[Any, Any]]): weight name map for refitting
 
         Returns:
@@ -121,7 +122,7 @@ class BaseEngineCache(ABC):
             packed_obj (bytes): packed blob
 
         Returns:
-            Tuple[bytes, List[str], List[str], CompilationSettings, Optional[Dict[str, Any]]]: serialized engine, input names, output names, CompilationSettings, weight name map
+            Tuple[bytes, List[str], List[str], Sequence[Input], CompilationSettings, Optional[Dict[str, Any]]]: serialized engine, input names, output names, input specs, CompilationSettings, weight name map
         """
         unpacked = pickle.loads(packed_obj)
         return (
@@ -283,11 +284,7 @@ class DiskEngineCache(BaseEngineCache):
         else:
             LRU()
 
-    def save(
-        self,
-        hash: str,
-        blob: bytes,
-    ) -> None:
+    def save(self, hash: str, blob: bytes, *args: Any, **kwargs: Any) -> None:
         blob_size = len(blob)
         if blob_size > self.total_engine_cache_size:
             _LOGGER.warning(
@@ -324,7 +321,7 @@ class DiskEngineCache(BaseEngineCache):
                 f"The size {blob_size} is still larger than the available cache size {self.available_engine_cache_size}."
             )
 
-    def load(self, hash: str) -> Optional[bytes]:
+    def load(self, hash: str, *args: Any, **kwargs: Any) -> Optional[bytes]:
         directory = os.path.join(self.engine_cache_dir, hash)
         if os.path.exists(directory):
             blob_path = os.path.join(directory, "blob.bin")

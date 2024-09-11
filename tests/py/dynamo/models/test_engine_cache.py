@@ -9,7 +9,7 @@ import torch
 import torch_tensorrt as torch_trt
 import torchvision.models as models
 from torch.testing._internal.common_utils import TestCase
-from torch_tensorrt.dynamo._defaults import ENGINE_CACHE_DIR
+from torch_tensorrt.dynamo._defaults import TIMING_CACHE_PATH
 from torch_tensorrt.dynamo._engine_cache import BaseEngineCache
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.utils import COSINE_THRESHOLD, cosine_similarity
@@ -160,9 +160,9 @@ class TestHashFunction(TestCase):
         )
         input_specs2 = (
             torch_trt.Input(
-                min_shape=(1, 3, 300, 300),
-                opt_shape=(100, 3, 300, 300),
-                max_shape=(200, 3, 300, 300),
+                min_shape=(1, 3, 224, 224),
+                opt_shape=(100, 3, 224, 224),
+                max_shape=(200, 3, 224, 224),
             ),
         )
         settings2 = CompilationSettings(
@@ -192,6 +192,10 @@ class TestEngineCache(TestCase):
         if os.path.exists(engine_cache_dir):
             shutil.rmtree(engine_cache_dir)
 
+        def remove_timing_cache(path=TIMING_CACHE_PATH):
+            if os.path.exists(path):
+                os.remove(path)
+
         # The 1st iteration is to measure the compilation time without engine caching
         # The 2nd and 3rd iterations are to measure the compilation time with engine caching.
         # Since the 2nd iteration needs to compile and save the engine, it will be slower than the 1st iteration.
@@ -202,6 +206,8 @@ class TestEngineCache(TestCase):
         start = torch.cuda.Event(enable_timing=True)
         end = torch.cuda.Event(enable_timing=True)
         for i in range(3):
+            remove_timing_cache()
+            torch._dynamo.reset()
             if i == 0:
                 cache_built_engines = False
                 reuse_cached_engines = False
@@ -351,6 +357,10 @@ class TestEngineCache(TestCase):
         if os.path.exists(engine_cache_dir):
             shutil.rmtree(engine_cache_dir)
 
+        def remove_timing_cache(path=TIMING_CACHE_PATH):
+            if os.path.exists(path):
+                os.remove(path)
+
         # The 1st iteration is to measure the compilation time without engine caching
         # The 2nd and 3rd iterations are to measure the compilation time with engine caching.
         # Since the 2nd iteration needs to compile and save the engine, it will be slower than the 1st iteration.
@@ -361,7 +371,9 @@ class TestEngineCache(TestCase):
         start = torch.cuda.Event(enable_timing=True)
         end = torch.cuda.Event(enable_timing=True)
         for i in range(3):
-            # remove timing cache and reset dynamo for engine caching messurement
+            # remove timing cache and reset dynamo for engine caching measurement
+            remove_timing_cache()
+            torch._dynamo.reset()
             if i == 0:
                 cache_built_engines = False
                 reuse_cached_engines = False

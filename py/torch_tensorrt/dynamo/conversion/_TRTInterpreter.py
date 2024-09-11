@@ -557,7 +557,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                     )
                     assert (
                         setting_compatiblity
-                    ), f"Attempted to refit a prebuilt engine with incompatible settings: {incompattible_settings}, (old_settings: {engine_compilation_settings}, new_settings: {self.compilation_settings})"
+                    ), f"Attempted to refit a cached engine with incompatible settings: {incompattible_settings}, (old_settings: {engine_compilation_settings}, new_settings: {self.compilation_settings})"
 
                     for i, e in enumerate(
                         [
@@ -567,7 +567,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                     ):
                         assert (
                             e
-                        ), f"Found that cached engine was built for a different input size (input: {i}, cached size: {cached_engine_input_specs[i]}, new size: {self.input_specs[i]}"
+                        ), f"Attempted to refit a cached engine built for a different input size (input: {i}, cached size: {cached_engine_input_specs[i]}, new size: {self.input_specs[i]}"
 
                     _LOGGER.info(
                         "Found the cached engine that corresponds to this graph. It is directly loaded."
