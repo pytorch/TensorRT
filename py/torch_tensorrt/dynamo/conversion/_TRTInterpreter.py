@@ -545,7 +545,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                         serialized_engine,
                         self._input_names,
                         self._output_names,
-                        engine_input_specs,
+                        cached_engine_input_specs,
                         engine_compilation_settings,
                         self.weight_name_map,
                     ) = cached_data
@@ -558,6 +558,16 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                     assert (
                         setting_compatiblity
                     ), f"Attempted to refit a prebuilt engine with incompatible settings: {incompattible_settings}, (old_settings: {engine_compilation_settings}, new_settings: {self.compilation_settings})"
+
+                    for i, e in enumerate(
+                        [
+                            Input.equivalent_spec(c, i)
+                            for c, i in zip(cached_engine_input_specs, self.input_specs)
+                        ]
+                    ):
+                        assert (
+                            e
+                        ), f"Found that cached engine was built for a different input size (input: {i}, cached size: {cached_engine_input_specs[i]}, new size: {self.input_specs[i]}"
 
                     _LOGGER.info(
                         "Found the cached engine that corresponds to this graph. It is directly loaded."
