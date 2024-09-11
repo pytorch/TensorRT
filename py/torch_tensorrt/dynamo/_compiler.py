@@ -60,7 +60,7 @@ def compile(
         Set[Union[torch.dtype, dtype]], Tuple[Union[torch.dtype, dtype]]
     ] = _defaults.ENABLED_PRECISIONS,
     engine_capability: EngineCapability = _defaults.ENGINE_CAPABILITY,
-    make_refitable: bool = _defaults.MAKE_REFITABLE,
+    make_refittable: bool = _defaults.MAKE_REFITTABLE,
     debug: bool = _defaults.DEBUG,
     num_avg_timing_iters: int = _defaults.NUM_AVG_TIMING_ITERS,
     workspace_size: int = _defaults.WORKSPACE_SIZE,
@@ -180,14 +180,14 @@ def compile(
 
     if "refit" in kwargs.keys():
         warnings.warn(
-            "Refit is deprecated. Please use make_refitable=True if you want to enable refitting of the engine.",
+            "Refit is deprecated. Please use make_refittable=True if you want to enable refitting of the engine.",
             DeprecationWarning,
             stacklevel=2,
         )
-        if make_refitable:
-            raise ValueError("Use flag make_refitable only. Flag refit is deprecated.")
+        if make_refittable:
+            raise ValueError("Use flag make_refittable only. Flag refit is deprecated.")
         else:
-            make_refitable = kwargs["refit"]
+            make_refittable = kwargs["refit"]
 
     engine_capability = EngineCapability._from(engine_capability)
 
@@ -238,8 +238,8 @@ def compile(
     engine_cache = None
     if cache_built_engines or reuse_cached_engines:
         assert (
-            make_refitable
-        ), "Engine caching requires make_refitable to be set to True"
+            make_refittable
+        ), "Engine caching requires make_refittable to be set to True"
         engine_cache = (
             custom_engine_cache
             if custom_engine_cache is not None
@@ -270,7 +270,7 @@ def compile(
         "require_full_compilation": require_full_compilation,
         "disable_tf32": disable_tf32,
         "sparse_weights": sparse_weights,
-        "make_refitable": make_refitable,
+        "make_refittable": make_refittable,
         "engine_capability": engine_capability,
         "dla_sram_size": dla_sram_size,
         "dla_local_dram_size": dla_local_dram_size,
@@ -513,7 +513,7 @@ def convert_exported_program_to_serialized_trt_engine(
     require_full_compilation: bool = _defaults.REQUIRE_FULL_COMPILATION,
     disable_tf32: bool = _defaults.DISABLE_TF32,
     sparse_weights: bool = _defaults.SPARSE_WEIGHTS,
-    make_refitable: bool = _defaults.MAKE_REFITABLE,
+    make_refittable: bool = _defaults.MAKE_refittable,
     engine_capability: EngineCapability = _defaults.ENGINE_CAPABILITY,
     num_avg_timing_iters: int = _defaults.NUM_AVG_TIMING_ITERS,
     dla_sram_size: int = _defaults.DLA_SRAM_SIZE,
@@ -600,7 +600,7 @@ def convert_exported_program_to_serialized_trt_engine(
             )
     if "refit" in kwargs.keys():
         warnings.warn(
-            "Refit is deprecated. Please use make_refitable=True if you want to enable refitting of the engine.",
+            "Refit is deprecated. Please use make_refittable=True if you want to enable refitting of the engine.",
             DeprecationWarning,
             stacklevel=2,
         )
@@ -646,7 +646,7 @@ def convert_exported_program_to_serialized_trt_engine(
         "require_full_compilation": require_full_compilation,
         "disable_tf32": disable_tf32,
         "sparse_weights": sparse_weights,
-        "make_refitable": make_refitable,
+        "make_refittable": make_refittable,
         "engine_capability": engine_capability,
         "num_avg_timing_iters": num_avg_timing_iters,
         "dla_sram_size": dla_sram_size,

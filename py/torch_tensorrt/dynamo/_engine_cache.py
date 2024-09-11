@@ -1,16 +1,33 @@
 import copy
+import io
 import logging
 import os
 import pickle
+import pickletools
 import shutil
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional, Tuple, cast
 
 import torch
-from torch._inductor.codecache import FxGraphCachePickler
+from sympy.polys.matrices.dense import Sequence
+from torch._inductor.codecache import FxGraphCachePickler, sha256_hash
 from torch.fx.experimental.proxy_tensor import unset_fake_temporarily
+from torch_tensorrt._Input import Input
+from torch_tensorrt.dynamo._settings import (
+    _SETTINGS_TO_BE_ENGINE_INVARIANT,
+    CompilationSettings,
+)
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
+
+UnpackedCacheHit = Tuple[
+    bytes,
+    List[str],
+    List[str],
+    Sequence[Input],
+    CompilationSettings,
+    Optional[Dict[str, Any]],
+]
 
 
 class BaseEngineCache(ABC):
@@ -24,7 +41,11 @@ class BaseEngineCache(ABC):
         pass
 
     @staticmethod
-    def get_hash(gm: torch.fx.GraphModule) -> str:
+    def get_hash(
+        gm: torch.fx.GraphModule,
+        input_specs: Sequence[Input],
+        settings: CompilationSettings,
+    ) -> str:
         """Get the hash value of the GraphModule
 
         Args:
@@ -39,7 +60,24 @@ class BaseEngineCache(ABC):
             for name, param in new_gm.named_parameters():
                 param.data.zero_()
 
-            hash_val = cast(str, FxGraphCachePickler.get_hash(new_gm))
+            graph_hash_val = cast(str, FxGraphCachePickler.get_hash(new_gm))
+
+        input_spec_strs = [str(i) for i in input_specs]
+        with io.BytesIO() as stream:
+            input_specs_data = pickle.dumps(input_spec_strs)
+            input_specs_data = pickletools.optimize(input_specs_data)
+        input_specs_hash = sha256_hash(input_specs_data)
+
+        invariant_engine_specs = [
+            str(getattr(settings, field)) for field in _SETTINGS_TO_BE_ENGINE_INVARIANT
+        ]
+        with io.BytesIO() as stream:
+            engine_specs_data = pickle.dumps(invariant_engine_specs)
+            engine_specs_data = pickletools.optimize(engine_specs_data)
+        engine_specs_hash = sha256_hash(engine_specs_data)
+
+        # TODO: Super first idea I had hash combination solution @Evan please iterate on this
+        hash_val: str = graph_hash_val + input_specs_hash + engine_specs_hash
 
         return hash_val
 
@@ -48,6 +86,8 @@ class BaseEngineCache(ABC):
         serialized_engine: bytes,
         input_names: List[str],
         output_names: List[str],
+        input_specs: Tuple[Input],
+        compilation_settings: CompilationSettings,
         weight_name_map: Optional[Dict[Any, Any]],
     ) -> bytes:
         """Pack serialized engine, input names, output names, and weight map into a single blob
@@ -61,34 +101,79 @@ class BaseEngineCache(ABC):
         Returns:
             bytes: packed blob
         """
+
+        settings = copy.deepcopy(compilation_settings)
+        settings.torch_executed_ops = {
+            f"torch.ops.{op.__str__()}" for op in settings.torch_executed_ops
+        }
+
         return pickle.dumps(
             {
                 "serialized_engine": bytes(serialized_engine),
                 "input_names": input_names,
                 "output_names": output_names,
+                "input_specs": input_specs,
+                "compilation_settings": settings,
                 "weight_name_map": weight_name_map,
             }
         )
 
     @staticmethod
-    def unpack(
-        packed_obj: bytes,
-    ) -> Tuple[bytes, List[str], List[str], Optional[Dict[Any, Any]]]:
+    def unpack(packed_obj: bytes) -> UnpackedCacheHit:
         """Unpack packed blob into serialized engine, input names, output names, and weight map
 
         Args:
             packed_obj (bytes): packed blob
 
         Returns:
-            Tuple[bytes, List[str], List[str], Optional[Dict[str, Any]]]: serialized engine, input names, output names, weight name map
+            Tuple[bytes, List[str], List[str], CompilationSettings, Optional[Dict[str, Any]]]: serialized engine, input names, output names, CompilationSettings, weight name map
         """
         unpacked = pickle.loads(packed_obj)
         return (
             unpacked["serialized_engine"],
             unpacked["input_names"],
             unpacked["output_names"],
+            unpacked["input_specs"],
+            unpacked["compilation_settings"],
             unpacked["weight_name_map"],
         )
+
+    def insert(
+        self, hash: str, entry: UnpackedCacheHit, *args: Any, **kwargs: Any
+    ) -> None:
+        """
+        Insert a cache entry into the engine cache.
+
+        Args:
+            hash (str): The hash value of the GraphModule.
+            entry (Tuple[bytes, List[str], List[str], CompilationSettings, Optional[Dict[Any, Any]]]): The cache entry to be inserted.
+            *args: Variable length argument list passed to ``save``.
+            **kwargs: Arbitrary keyword arguments passed to ``save``.
+
+        Returns:
+            None
+        """
+        packed_cache_info = BaseEngineCache.pack(*entry)
+        return self.save(hash, packed_cache_info, *args, **kwargs)
+
+    def check(self, hash: str, *args: Any, **kwargs: Any) -> Optional[UnpackedCacheHit]:
+        """
+        Check if a cache entry exists for the given hash.
+
+        Args:
+            hash (str): The hash value of the GraphModule.
+            *args: Variable length argument list passed to ``load``.
+            **kwargs: Arbitrary keyword arguments passed to ``load``.
+
+        Returns:
+            Optional[Tuple[bytes, List[str], List[str], CompilationSettings, Optional[Dict[Any, Any]]]]: The unpacked cache entry if found, None otherwise.
+        """
+        packed_cache_info = self.load(hash, *args, **kwargs)
+
+        if packed_cache_info:
+            return BaseEngineCache.unpack(packed_cache_info)
+        else:
+            return None
 
     @abstractmethod
     def save(self, hash: str, blob: bytes, *args: Any, **kwargs: Any) -> None:

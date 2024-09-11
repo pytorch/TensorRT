@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Collection, Optional, Set, Union
+from typing import Collection, Optional, Set, Tuple, Union
 
 from torch.fx.node import Target
 from torch_tensorrt._Device import Device
@@ -18,7 +18,7 @@ from torch_tensorrt.dynamo._defaults import (
     ENGINE_CAPABILITY,
     HARDWARE_COMPATIBLE,
     LAZY_ENGINE_INIT,
-    MAKE_REFITABLE,
+    MAKE_REFITTABLE,
     MAX_AUX_STREAMS,
     MIN_BLOCK_SIZE,
     NUM_AVG_TIMING_ITERS,
@@ -98,7 +98,7 @@ class CompilationSettings:
     disable_tf32: bool = DISABLE_TF32
     assume_dynamic_shape_support: bool = ASSUME_DYNAMIC_SHAPE_SUPPORT
     sparse_weights: bool = SPARSE_WEIGHTS
-    make_refitable: bool = MAKE_REFITABLE
+    make_refittable: bool = MAKE_REFITTABLE
     engine_capability: EngineCapability = field(
         default_factory=lambda: ENGINE_CAPABILITY
     )
@@ -112,3 +112,31 @@ class CompilationSettings:
     lazy_engine_init: bool = LAZY_ENGINE_INIT
     cache_built_engines: bool = CACHE_BUILT_ENGINES
     reuse_cached_engines: bool = REUSE_CACHED_ENGINES
+
+
+_SETTINGS_TO_BE_ENGINE_INVARIANT = (
+    "enabled_precisions",
+    "max_aux_streams",
+    "version_compatible",
+    "optimization_level",
+    "disable_tf32",
+    "sparse_weights",
+    "make_refittable",
+    "engine_capability",
+    "hardware_compatible",
+)
+
+
+def settings_are_compatible(
+    set_a: CompilationSettings, set_b: CompilationSettings
+) -> Tuple[bool, Set[str]]:
+    incompatible_settings: Set[str] = set()
+
+    for f in _SETTINGS_TO_BE_ENGINE_INVARIANT:
+        if getattr(set_a, f) != getattr(set_b, f):
+            incompatible_settings.add(f)
+
+    if len(incompatible_settings) == 0:
+        return True, set()
+    else:
+        return False, incompatible_settings
