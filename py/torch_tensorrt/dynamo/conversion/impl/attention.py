@@ -151,7 +151,7 @@ def scaled_dot_product_attention(
         )
 
     softmax = impl.normalization.softmax(
-        ctx, target, source_ir, name + "_softmax", scaled, -1
+        ctx, target, source_ir, name + "_softmax", scaled, -1, False
     )
     out = impl.matmul.matrix_multiply(
         ctx,
