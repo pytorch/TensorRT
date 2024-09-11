@@ -513,7 +513,7 @@ def convert_exported_program_to_serialized_trt_engine(
     require_full_compilation: bool = _defaults.REQUIRE_FULL_COMPILATION,
     disable_tf32: bool = _defaults.DISABLE_TF32,
     sparse_weights: bool = _defaults.SPARSE_WEIGHTS,
-    make_refittable: bool = _defaults.MAKE_refittable,
+    make_refittable: bool = _defaults.MAKE_REFITTABLE,
     engine_capability: EngineCapability = _defaults.ENGINE_CAPABILITY,
     num_avg_timing_iters: int = _defaults.NUM_AVG_TIMING_ITERS,
     dla_sram_size: int = _defaults.DLA_SRAM_SIZE,

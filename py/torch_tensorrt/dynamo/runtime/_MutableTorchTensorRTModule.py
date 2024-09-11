@@ -65,7 +65,7 @@ class MutableTorchTensorRTModule(object):
             Union[torch.dtype, dtype]
         ] = _defaults.ENABLED_PRECISIONS,
         engine_capability: EngineCapability = _defaults.ENGINE_CAPABILITY,
-        make_refittable: bool = _defaults.MAKE_refittable,
+        make_refittable: bool = _defaults.MAKE_REFITTABLE,
         debug: bool = _defaults.DEBUG,
         num_avg_timing_iters: int = _defaults.NUM_AVG_TIMING_ITERS,
         workspace_size: int = _defaults.WORKSPACE_SIZE,
