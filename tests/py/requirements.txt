@@ -12,3 +12,6 @@ transformers==4.40.2
 # TODO: once 0.16.1 is out, update it here
 nvidia-modelopt>=0.15.1
 --extra-index-url https://pypi.nvidia.com
+torchvision>=0.20.0.dev,<0.21.0
+--extra-index-url https://download.pytorch.org/whl/nightly/cu124
+
