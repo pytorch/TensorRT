@@ -333,6 +333,7 @@ def scatter_reduce_decomposition(
     index: torch.Tensor,
     src_tensor: torch.Tensor,
     reduce: str,
+    include_self: bool = True,
 ) -> torch.Tensor:
     scatter_loop_tensor = input_tensor
     device_input_tensor = input_tensor.device
@@ -340,7 +341,8 @@ def scatter_reduce_decomposition(
     scatter_count_tensor = torch.zeros_like(input_tensor)
     src_shape = list(src_tensor.shape)
     src_dim = src_shape[dim]
-
+    if include_self == False:
+        raise AssertionError("include_self False for scatter reduce not yet supported")
     for i in range(0, src_dim):
         src_slice = torch.select(src_tensor, dim, i)
         index_slice = torch.select(index, dim, i)
