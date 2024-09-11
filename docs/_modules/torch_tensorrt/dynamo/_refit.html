@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt.dynamo._refit &mdash; Torch-TensorRT v2.5.0.dev0+1d0916f documentation</title>
+  <title>torch_tensorrt.dynamo._refit &mdash; Torch-TensorRT v2.5.0.dev0+501a1e1 documentation</title>
   
 
   
@@ -272,7 +272,7 @@
               
               
                 <div class="version">
-                  v2.5.0.dev0+1d0916f
+                  v2.5.0.dev0+501a1e1
                 </div>
               
             
@@ -611,7 +611,7 @@
         <span class="c1"># Get the refitting mapping</span>
         <span class="n">trt_wt_location</span> <span class="o">=</span> <span class="p">(</span>
             <span class="n">trt</span><span class="o">.</span><span class="n">TensorLocation</span><span class="o">.</span><span class="n">DEVICE</span>
-            <span class="k">if</span> <span class="n">torch_device</span> <span class="o">==</span> <span class="s2">&quot;cuda&quot;</span>
+            <span class="k">if</span> <span class="n">torch_device</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="s2">&quot;cuda&quot;</span>
             <span class="k">else</span> <span class="n">trt</span><span class="o">.</span><span class="n">TensorLocation</span><span class="o">.</span><span class="n">HOST</span>
         <span class="p">)</span>
         <span class="n">mapping</span> <span class="o">=</span> <span class="n">construct_refit_mapping_from_weight_name_map</span><span class="p">(</span>
