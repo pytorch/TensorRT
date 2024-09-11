@@ -6,10 +6,9 @@ import pickle
 import pickletools
 import shutil
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional, Tuple, cast
+from typing import Any, Dict, List, Optional, Sequence, Tuple, cast
 
 import torch
-from sympy.polys.matrices.dense import Sequence
 from torch._inductor.codecache import FxGraphCachePickler, sha256_hash
 from torch.fx.experimental.proxy_tensor import unset_fake_temporarily
 from torch_tensorrt._Input import Input
@@ -86,7 +85,7 @@ class BaseEngineCache(ABC):
         serialized_engine: bytes,
         input_names: List[str],
         output_names: List[str],
-        input_specs: Tuple[Input],
+        input_specs: Sequence[Input],
         compilation_settings: CompilationSettings,
         weight_name_map: Optional[Dict[Any, Any]],
     ) -> bytes:
