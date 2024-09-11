@@ -1131,27 +1131,29 @@ class TestLowering(TestCase):
 
     @parameterized.expand(
         [
-            ############################sum###########################
+            #########################sum###########################
             (
-                "scatter_reduce_add_zero_dim_indexOne_constant",
+                "scatter_reduce_add_zero_dim_indexOne_constant_include_self_True",
                 0,
                 torch.tensor([[0, 1, 2, 0]]).cuda(),
                 torch.tensor([[1, 2, 3, 4]], dtype=torch.int32).cuda(),
                 {torch.ops.aten.add.Tensor},
                 torch.zeros(3, 5, dtype=torch.int32).cuda(),
                 "sum",
+                True,
             ),
             (
-                "scatter_reduce_add_zero_dim_indexTwo_constant",
+                "scatter_reduce_add_zero_dim_indexTwo_constant_include_self_True",
                 0,
                 torch.tensor([[0, 1, 2, 0], [1, 2, 1, 1]]).cuda(),
                 torch.tensor([[1, 2, 3, 4], [5, 6, 7, 8]], dtype=torch.int32).cuda(),
                 {torch.ops.aten.add.Tensor, torch.ops.aten.scatter.src},
                 torch.zeros(3, 5, dtype=torch.int32).cuda(),
                 "sum",
+                True,
             ),
             (
-                "scatter_reduce_add_one_dim_indexOne_constant",
+                "scatter_reduce_add_one_dim_indexOne_constant_include_self_True",
                 1,
                 torch.tensor([[0, 1, 2, 0]]).cuda(),
                 torch.tensor([[1, 2, 3, 1]], dtype=torch.int32).cuda(),
@@ -1161,9 +1163,10 @@ class TestLowering(TestCase):
                 },
                 torch.zeros(3, 5, dtype=torch.int32).cuda(),
                 "sum",
+                True,
             ),
             (
-                "scatter_reduce_add_one_dim_indexTwo_constant",
+                "scatter_reduce_add_one_dim_indexTwo_constant_include_self_True",
                 1,
                 torch.tensor([[0, 1, 2, 0], [1, 2, 1, 1]]).cuda(),
                 torch.tensor([[1, 2, 3, 1], [5, 6, 5, 5]], dtype=torch.int32).cuda(),
@@ -1173,9 +1176,10 @@ class TestLowering(TestCase):
                 },
                 torch.zeros(3, 5, dtype=torch.int32).cuda(),
                 "sum",
+                True,
             ),
             (
-                "scatter_reduce_add_one_dim_indexOne_constant_3D",
+                "scatter_reduce_add_one_dim_indexOne_constant_3D_include_self_True",
                 1,
                 torch.tensor(
                     [[[0, 1, 2, 0], [1, 2, 1, 1]], [[3, 2, 1, 2], [0, 1, 2, 0]]]
@@ -1190,10 +1194,89 @@ class TestLowering(TestCase):
                 },
                 torch.zeros(3, 5, 6, dtype=torch.int32).cuda(),
                 "sum",
+                True,
             ),
-            ###########################prod###########################
+            ######################### add include_self= False#############################
             (
-                "scatter_reduce_prod_zero_dim_indexOne_constant",
+                "scatter_reduce_add_zero_dim_indexOne_constant_include_self_False",
+                0,
+                torch.tensor([[0, 1, 2, 0]]).cuda(),
+                torch.tensor([[1, 2, 3, 4]], dtype=torch.int32).cuda(),
+                {torch.ops.aten.add.Tensor},
+                torch.zeros(3, 5, dtype=torch.int32).cuda(),
+                "sum",
+                False,
+            ),
+            (
+                "scatter_reduce_add_zero_dim_indexTwo_constant_include_self_False",
+                0,
+                torch.tensor([[0, 1, 2, 0], [1, 2, 1, 1]]).cuda(),
+                torch.tensor([[1, 2, 3, 4], [5, 6, 7, 8]], dtype=torch.int32).cuda(),
+                {torch.ops.aten.add.Tensor, torch.ops.aten.scatter.src},
+                torch.zeros(3, 5, dtype=torch.int32).cuda(),
+                "sum",
+                False,
+            ),
+            (
+                "scatter_reduce_add_one_dim_indexOne_constant_include_self_False",
+                1,
+                torch.tensor([[0, 1, 2, 0]]).cuda(),
+                torch.tensor([[1, 2, 3, 1]], dtype=torch.int32).cuda(),
+                {
+                    torch.ops.aten.add.Tensor,
+                    torch.ops.aten.scatter.src,
+                },
+                torch.zeros(3, 5, dtype=torch.int32).cuda(),
+                "sum",
+                False,
+            ),
+            (
+                "scatter_reduce_add_one_dim_indexTwo_constant_include_self_False",
+                1,
+                torch.tensor([[0, 1, 2, 0], [1, 2, 1, 1]]).cuda(),
+                torch.tensor([[1, 2, 3, 1], [5, 6, 5, 5]], dtype=torch.int32).cuda(),
+                {
+                    torch.ops.aten.add.Tensor,
+                    torch.ops.aten.scatter.src,
+                },
+                torch.zeros(3, 5, dtype=torch.int32).cuda(),
+                "sum",
+                False,
+            ),
+            (
+                "scatter_reduce_add_one_dim_indexOne_constant_3D_include_self_False",
+                1,
+                torch.tensor(
+                    [[[0, 1, 2, 0], [1, 2, 1, 1]], [[3, 2, 1, 2], [0, 1, 2, 0]]]
+                ).cuda(),
+                torch.tensor(
+                    [[[1, 2, 3, 1], [5, 6, 5, 5]], [[2, 4, 3, 2], [1, 2, 3, 1]]],
+                    dtype=torch.int32,
+                ).cuda(),
+                {
+                    torch.ops.aten.add.Tensor,
+                    torch.ops.aten.scatter.src,
+                },
+                torch.zeros(3, 5, 6, dtype=torch.int32).cuda(),
+                "sum",
+                False,
+            ),
+            (
+                "scatter_reduce_add_one_include_self_False",
+                0,
+                torch.tensor([0, 1, 0, 1]).cuda(),
+                torch.tensor([1, 2, 3, 4], dtype=torch.int32).cuda(),
+                {
+                    torch.ops.aten.add.Tensor,
+                    torch.ops.aten.scatter.src,
+                },
+                torch.tensor([1, 2, 3, 4, 6, 7], dtype=torch.int32).cuda(),
+                "sum",
+                False,
+            ),
+            ############################prod###########################
+            (
+                "scatter_reduce_prod_zero_dim_indexOne_constant_include_self_True",
                 0,
                 torch.tensor([[0, 1, 2, 0]]).cuda(),
                 torch.tensor([[1, 2, 3, 4]], dtype=torch.int32).cuda(),
@@ -1203,9 +1286,10 @@ class TestLowering(TestCase):
                 },
                 torch.ones(3, 5, dtype=torch.int32).cuda(),
                 "prod",
+                True,
             ),
             (
-                "scatter_reduce_prod_zero_dim_indexTwo_constant",
+                "scatter_reduce_prod_zero_dim_indexTwo_constant_include_self_True",
                 0,
                 torch.tensor([[0, 1, 2, 0], [1, 2, 1, 1]]).cuda(),
                 torch.tensor([[1, 2, 3, 4], [5, 6, 7, 8]], dtype=torch.int32).cuda(),
@@ -1215,9 +1299,10 @@ class TestLowering(TestCase):
                 },
                 torch.ones(3, 5, dtype=torch.int32).cuda(),
                 "prod",
+                True,
             ),
             (
-                "scatter_reduce_prod_one_dim_indexOne_constant",
+                "scatter_reduce_prod_one_dim_indexOne_constant_include_self_True",
                 1,
                 torch.tensor([[0, 1, 2, 0]]).cuda(),
                 torch.tensor([[1, 2, 3, 1]], dtype=torch.int32).cuda(),
@@ -1227,9 +1312,10 @@ class TestLowering(TestCase):
                 },
                 torch.ones(3, 5, dtype=torch.int32).cuda(),
                 "prod",
+                True,
             ),
             (
-                "scatter_reduce_prod_one_dim_indexTwo_constant",
+                "scatter_reduce_prod_one_dim_indexTwo_constant_include_self_True",
                 1,
                 torch.tensor([[0, 1, 2, 0], [1, 2, 1, 1]]).cuda(),
                 torch.tensor([[1, 2, 3, 1], [5, 6, 5, 5]], dtype=torch.int32).cuda(),
@@ -1239,9 +1325,10 @@ class TestLowering(TestCase):
                 },
                 torch.ones(3, 5, dtype=torch.int32).cuda(),
                 "prod",
+                True,
             ),
             (
-                "scatter_reduce_prod_one_dim_indexTwo_constant_3D",
+                "scatter_reduce_prod_one_dim_indexTwo_constant_3D_include_self_True",
                 1,
                 torch.tensor(
                     [[[0, 1, 2, 0], [1, 2, 1, 1]], [[3, 2, 1, 2], [0, 1, 2, 0]]]
@@ -1256,10 +1343,95 @@ class TestLowering(TestCase):
                 },
                 torch.ones(3, 5, 6, dtype=torch.int32).cuda(),
                 "prod",
+                True,
             ),
-            # #############################mean###########################
+            ########################## prod include_self= False#############################
             (
-                "scatter_reduce_mean_zero_dim_indexOne_constant",
+                "scatter_reduce_prod_zero_dim_indexOne_constant_include_self_False",
+                0,
+                torch.tensor([[0, 1, 2, 0]]).cuda(),
+                torch.tensor([[1, 2, 3, 4]], dtype=torch.int32).cuda(),
+                {
+                    torch.ops.aten.mul.Tensor,
+                    torch.ops.aten.scatter.src,
+                },
+                torch.ones(3, 5, dtype=torch.int32).cuda(),
+                "prod",
+                False,
+            ),
+            (
+                "scatter_reduce_prod_zero_dim_indexTwo_constant_include_self_False",
+                0,
+                torch.tensor([[0, 1, 2, 0], [1, 2, 1, 1]]).cuda(),
+                torch.tensor([[1, 2, 3, 4], [5, 6, 7, 8]], dtype=torch.int32).cuda(),
+                {
+                    torch.ops.aten.mul.Tensor,
+                    torch.ops.aten.scatter.src,
+                },
+                torch.ones(3, 5, dtype=torch.int32).cuda(),
+                "prod",
+                False,
+            ),
+            (
+                "scatter_reduce_prod_one_dim_indexOne_constant_include_self_False",
+                1,
+                torch.tensor([[0, 1, 2, 0]]).cuda(),
+                torch.tensor([[1, 2, 3, 1]], dtype=torch.int32).cuda(),
+                {
+                    torch.ops.aten.mul.Tensor,
+                    torch.ops.aten.scatter.src,
+                },
+                torch.ones(3, 5, dtype=torch.int32).cuda(),
+                "prod",
+                False,
+            ),
+            (
+                "scatter_reduce_prod_one_dim_indexTwo_constant_include_self_False",
+                1,
+                torch.tensor([[0, 1, 2, 0], [1, 2, 1, 1]]).cuda(),
+                torch.tensor([[1, 2, 3, 1], [5, 6, 5, 5]], dtype=torch.int32).cuda(),
+                {
+                    torch.ops.aten.mul.Tensor,
+                    torch.ops.aten.scatter.src,
+                },
+                torch.ones(3, 5, dtype=torch.int32).cuda(),
+                "prod",
+                False,
+            ),
+            (
+                "scatter_reduce_prod_one_dim_indexTwo_constant_3D_include_self_False",
+                1,
+                torch.tensor(
+                    [[[0, 1, 2, 0], [1, 2, 1, 1]], [[3, 2, 1, 2], [0, 1, 2, 0]]]
+                ).cuda(),
+                torch.tensor(
+                    [[[1, 2, 3, 1], [5, 6, 5, 5]], [[2, 4, 3, 2], [1, 2, 3, 1]]],
+                    dtype=torch.int32,
+                ).cuda(),
+                {
+                    torch.ops.aten.mul.Tensor,
+                    torch.ops.aten.scatter.src,
+                },
+                torch.ones(3, 5, 6, dtype=torch.int32).cuda(),
+                "prod",
+                False,
+            ),
+            (
+                "scatter_reduce_prod_one_include_self_False",
+                0,
+                torch.tensor([0, 1, 0, 1]).cuda(),
+                torch.tensor([1, 2, 3, 4], dtype=torch.int32).cuda(),
+                {
+                    torch.ops.aten.mul.Tensor,
+                    torch.ops.aten.scatter.src,
+                },
+                torch.tensor([1, 2, 3, 4, 6, 7], dtype=torch.int32).cuda(),
+                "prod",
+                False,
+            ),
+            ##########################mean###########################
+            (
+                "scatter_reduce_mean_zero_dim_indexOne_constant_include_self_True",
                 0,
                 torch.tensor([[0, 1, 2, 0]]).cuda(),
                 torch.tensor([[1, 2, 3, 4]], dtype=torch.int32).cuda(),
@@ -1269,9 +1441,10 @@ class TestLowering(TestCase):
                 },
                 torch.zeros(3, 5, dtype=torch.int32).cuda(),
                 "mean",
+                True,
             ),
             (
-                "scatter_reduce_mean_zero_dim_indexTwo_constant",
+                "scatter_reduce_mean_zero_dim_indexTwo_constant_include_self_True",
                 0,
                 torch.tensor([[0, 1, 2, 0], [1, 2, 1, 1]]).cuda(),
                 torch.tensor([[1, 2, 3, 4], [5, 6, 7, 8]], dtype=torch.int32).cuda(),
@@ -1282,9 +1455,10 @@ class TestLowering(TestCase):
                 },
                 torch.zeros(3, 5, dtype=torch.int32).cuda(),
                 "mean",
+                True,
             ),
             (
-                "scatter_reduce_mean_one_dim_indexOne_constant",
+                "scatter_reduce_mean_one_dim_indexOne_constant_include_self_True",
                 1,
                 torch.tensor([[0, 1, 2, 0]]).cuda(),
                 torch.tensor([[1, 2, 3, 1]], dtype=torch.int32).cuda(),
@@ -1295,9 +1469,10 @@ class TestLowering(TestCase):
                 },
                 torch.zeros(3, 5, dtype=torch.int32).cuda(),
                 "mean",
+                True,
             ),
             (
-                "scatter_reduce_mean_one_dim_indexTwo_constant",
+                "scatter_reduce_mean_one_dim_indexTwo_constant_include_self_True",
                 1,
                 torch.tensor([[0, 1, 2, 0], [1, 2, 1, 1]]).cuda(),
                 torch.tensor([[1, 2, 3, 1], [5, 6, 5, 5]], dtype=torch.int32).cuda(),
@@ -1308,9 +1483,10 @@ class TestLowering(TestCase):
                 },
                 torch.zeros(3, 5, dtype=torch.int32).cuda(),
                 "mean",
+                True,
             ),
             (
-                "scatter_reduce_mean_one_dim_indexTwo_constant_3D",
+                "scatter_reduce_mean_one_dim_indexTwo_constant_3D_include_self_True",
                 1,
                 torch.tensor(
                     [[[0, 1, 2, 0], [1, 2, 1, 1]], [[3, 2, 1, 2], [0, 1, 2, 0]]]
@@ -1326,10 +1502,86 @@ class TestLowering(TestCase):
                 },
                 torch.zeros(3, 5, 6, dtype=torch.int32).cuda(),
                 "mean",
+                True,
             ),
-            # #############################amax###########################
+            ########################## mean include_self= False#############################
             (
-                "scatter_reduce_amax_zero_dim_indexOne_constant",
+                "scatter_reduce_mean_zero_dim_indexOne_constant_include_self_False",
+                0,
+                torch.tensor([[0, 1, 2, 0]]).cuda(),
+                torch.tensor([[1, 2, 3, 4]], dtype=torch.int32).cuda(),
+                {
+                    torch.ops.aten.add.Tensor,
+                    torch.ops.aten.div.Tensor_mode,
+                },
+                torch.zeros(3, 5, dtype=torch.int32).cuda(),
+                "mean",
+                False,
+            ),
+            (
+                "scatter_reduce_mean_zero_dim_indexTwo_constant_include_self_False",
+                0,
+                torch.tensor([[0, 1, 2, 0], [1, 2, 1, 1]]).cuda(),
+                torch.tensor([[1, 2, 3, 4], [5, 6, 7, 8]], dtype=torch.int32).cuda(),
+                {
+                    torch.ops.aten.add.Tensor,
+                    torch.ops.aten.div.Tensor_mode,
+                    torch.ops.aten.scatter.src,
+                },
+                torch.zeros(3, 5, dtype=torch.int32).cuda(),
+                "mean",
+                False,
+            ),
+            (
+                "scatter_reduce_mean_one_dim_indexOne_constant_include_self_False",
+                1,
+                torch.tensor([[0, 1, 2, 0]]).cuda(),
+                torch.tensor([[1, 2, 3, 1]], dtype=torch.int32).cuda(),
+                {
+                    torch.ops.aten.add.Tensor,
+                    torch.ops.aten.div.Tensor_mode,
+                    torch.ops.aten.scatter.src,
+                },
+                torch.zeros(3, 5, dtype=torch.int32).cuda(),
+                "mean",
+                False,
+            ),
+            (
+                "scatter_reduce_mean_one_dim_indexTwo_constant_include_self_False",
+                1,
+                torch.tensor([[0, 1, 2, 0], [1, 2, 1, 1]]).cuda(),
+                torch.tensor([[1, 2, 3, 1], [5, 6, 5, 5]], dtype=torch.int32).cuda(),
+                {
+                    torch.ops.aten.add.Tensor,
+                    torch.ops.aten.div.Tensor_mode,
+                    torch.ops.aten.scatter.src,
+                },
+                torch.zeros(3, 5, dtype=torch.int32).cuda(),
+                "mean",
+                False,
+            ),
+            (
+                "scatter_reduce_mean_one_dim_indexTwo_constant_3D_include_self_False",
+                1,
+                torch.tensor(
+                    [[[0, 1, 2, 0], [1, 2, 1, 1]], [[3, 2, 1, 2], [0, 1, 2, 0]]]
+                ).cuda(),
+                torch.tensor(
+                    [[[1, 2, 3, 1], [5, 6, 5, 5]], [[2, 4, 3, 2], [1, 2, 3, 1]]],
+                    dtype=torch.int32,
+                ).cuda(),
+                {
+                    torch.ops.aten.add.Tensor,
+                    torch.ops.aten.div.Tensor_mode,
+                    torch.ops.aten.scatter.src,
+                },
+                torch.zeros(3, 5, 6, dtype=torch.int32).cuda(),
+                "mean",
+                False,
+            ),
+            #############################amax###########################
+            (
+                "scatter_reduce_amax_zero_dim_indexOne_constant_include_self_True",
                 0,
                 torch.tensor([[0, 1, 2, 0]]).cuda(),
                 torch.tensor([[1, 2, 3, 4]], dtype=torch.int32).cuda(),
@@ -1339,9 +1591,10 @@ class TestLowering(TestCase):
                 },
                 torch.zeros(3, 5, dtype=torch.int32).cuda(),
                 "amax",
+                True,
             ),
             (
-                "scatter_reduce_amax_zero_dim_indexTwo_constant",
+                "scatter_reduce_amax_zero_dim_indexTwo_constant_include_self_True",
                 0,
                 torch.tensor([[0, 1, 2, 0], [1, 2, 1, 1]]).cuda(),
                 torch.tensor([[1, 2, 3, 4], [5, 6, 7, 8]], dtype=torch.int32).cuda(),
@@ -1351,9 +1604,10 @@ class TestLowering(TestCase):
                 },
                 torch.zeros(3, 5, dtype=torch.int32).cuda(),
                 "amax",
+                True,
             ),
             (
-                "scatter_reduce_amax_one_dim_indexOne_constant",
+                "scatter_reduce_amax_one_dim_indexOne_constant_include_self_True",
                 1,
                 torch.tensor([[0, 1, 2, 0]]).cuda(),
                 torch.tensor([[1, 2, 3, 1]], dtype=torch.int32).cuda(),
@@ -1363,9 +1617,10 @@ class TestLowering(TestCase):
                 },
                 torch.zeros(3, 5, dtype=torch.int32).cuda(),
                 "amax",
+                True,
             ),
             (
-                "scatter_reduce_amax_one_dim_indexTwo_constant",
+                "scatter_reduce_amax_one_dim_indexTwo_constant_include_self_True",
                 1,
                 torch.tensor([[0, 1, 2, 0], [1, 2, 1, 1]]).cuda(),
                 torch.tensor([[1, 2, 3, 1], [5, 6, 5, 5]], dtype=torch.int32).cuda(),
@@ -1375,9 +1630,10 @@ class TestLowering(TestCase):
                 },
                 torch.zeros(3, 5, dtype=torch.int32).cuda(),
                 "amax",
+                True,
             ),
             (
-                "scatter_reduce_amax_one_dim_indexTwo_constant_3D",
+                "scatter_reduce_amax_one_dim_indexTwo_constant_3D_include_self_True",
                 1,
                 torch.tensor(
                     [[[0, 1, 2, 0], [1, 2, 1, 1]], [[3, 2, 1, 2], [0, 1, 2, 0]]]
@@ -1392,10 +1648,82 @@ class TestLowering(TestCase):
                 },
                 torch.zeros(3, 5, 6, dtype=torch.int32).cuda(),
                 "amax",
+                True,
+            ),
+            # ######################### amax include_self= False#############################
+            (
+                "scatter_reduce_amax_zero_dim_indexOne_constant_include_self_False",
+                0,
+                torch.tensor([[0, 1, 2, 0]]).cuda(),
+                torch.tensor([[1, 2, 3, 4]], dtype=torch.int32).cuda(),
+                {
+                    torch.ops.aten.maximum.default,
+                    torch.ops.aten.scatter.src,
+                },
+                torch.zeros(3, 5, dtype=torch.int32).cuda(),
+                "amax",
+                False,
+            ),
+            (
+                "scatter_reduce_amax_zero_dim_indexTwo_constant_include_self_False",
+                0,
+                torch.tensor([[0, 1, 2, 0], [1, 2, 1, 1]]).cuda(),
+                torch.tensor([[1, 2, 3, 4], [5, 6, 7, 8]], dtype=torch.int32).cuda(),
+                {
+                    torch.ops.aten.maximum.default,
+                    torch.ops.aten.scatter.src,
+                },
+                torch.zeros(3, 5, dtype=torch.int32).cuda(),
+                "amax",
+                False,
+            ),
+            (
+                "scatter_reduce_amax_one_dim_indexOne_constant_include_self_False",
+                1,
+                torch.tensor([[0, 1, 2, 0]]).cuda(),
+                torch.tensor([[1, 2, 3, 1]], dtype=torch.int32).cuda(),
+                {
+                    torch.ops.aten.maximum.default,
+                    torch.ops.aten.scatter.src,
+                },
+                torch.zeros(3, 5, dtype=torch.int32).cuda(),
+                "amax",
+                False,
+            ),
+            (
+                "scatter_reduce_amax_one_dim_indexTwo_constant_include_self_False",
+                1,
+                torch.tensor([[0, 1, 2, 0], [1, 2, 1, 1]]).cuda(),
+                torch.tensor([[1, 2, 3, 1], [5, 6, 5, 5]], dtype=torch.int32).cuda(),
+                {
+                    torch.ops.aten.maximum.default,
+                    torch.ops.aten.scatter.src,
+                },
+                torch.zeros(3, 5, dtype=torch.int32).cuda(),
+                "amax",
+                False,
+            ),
+            (
+                "scatter_reduce_amax_one_dim_indexTwo_constant_3D_include_self_False",
+                1,
+                torch.tensor(
+                    [[[0, 1, 2, 0], [1, 2, 1, 1]], [[3, 2, 1, 2], [0, 1, 2, 0]]]
+                ).cuda(),
+                torch.tensor(
+                    [[[1, 2, 3, 1], [5, 6, 5, 5]], [[2, 4, 3, 2], [1, 2, 3, 1]]],
+                    dtype=torch.int32,
+                ).cuda(),
+                {
+                    torch.ops.aten.maximum.default,
+                    torch.ops.aten.scatter.src,
+                },
+                torch.zeros(3, 5, 6, dtype=torch.int32).cuda(),
+                "amax",
+                False,
             ),
             # #############################amin###########################
             (
-                "scatter_reduce_amin_zero_dim_indexOne_constant",
+                "scatter_reduce_amin_zero_dim_indexOne_constant_include_self_True",
                 0,
                 torch.tensor([[0, 1, 2, 0]]).cuda(),
                 torch.tensor([[1, 2, 3, 4]], dtype=torch.int32).cuda(),
@@ -1405,9 +1733,10 @@ class TestLowering(TestCase):
                 },
                 torch.zeros(3, 5, dtype=torch.int32).cuda(),
                 "amin",
+                True,
             ),
             (
-                "scatter_reduce_amin_zero_dim_indexTwo_constant",
+                "scatter_reduce_amin_zero_dim_indexTwo_constant_include_self_True",
                 0,
                 torch.tensor([[0, 1, 2, 0], [1, 2, 1, 1]]).cuda(),
                 torch.tensor([[1, 2, 3, 4], [5, 6, 7, 8]], dtype=torch.int32).cuda(),
@@ -1417,9 +1746,10 @@ class TestLowering(TestCase):
                 },
                 torch.zeros(3, 5, dtype=torch.int32).cuda(),
                 "amin",
+                True,
             ),
             (
-                "scatter_reduce_amin_one_dim_indexOne_constant",
+                "scatter_reduce_amin_one_dim_indexOne_constant_include_self_True",
                 1,
                 torch.tensor([[0, 1, 2, 0]]).cuda(),
                 torch.tensor([[1, 2, 3, 1]], dtype=torch.int32).cuda(),
@@ -1429,9 +1759,10 @@ class TestLowering(TestCase):
                 },
                 torch.zeros(3, 5, dtype=torch.int32).cuda(),
                 "amin",
+                True,
             ),
             (
-                "scatter_reduce_amin_one_dim_indexTwo_constant",
+                "scatter_reduce_amin_one_dim_indexTwo_constant_include_self_True",
                 1,
                 torch.tensor([[0, 1, 2, 0], [1, 2, 1, 1]]).cuda(),
                 torch.tensor([[1, 2, 3, 1], [5, 6, 5, 5]], dtype=torch.int32).cuda(),
@@ -1441,9 +1772,10 @@ class TestLowering(TestCase):
                 },
                 torch.zeros(3, 5, dtype=torch.int32).cuda(),
                 "amin",
+                True,
             ),
             (
-                "scatter_reduce_amin_one_dim_indexTwo_constant_3D",
+                "scatter_reduce_amin_one_dim_indexTwo_constant_3D_include_self_True",
                 1,
                 torch.tensor(
                     [[[0, 1, 2, 0], [1, 2, 1, 1]], [[3, 2, 1, 2], [0, 1, 2, 0]]]
@@ -1458,11 +1790,91 @@ class TestLowering(TestCase):
                 },
                 torch.zeros(3, 5, 6, dtype=torch.int32).cuda(),
                 "amin",
+                True,
+            ),
+            # ######################### amin include_self= False#############################
+            (
+                "scatter_reduce_amin_zero_dim_indexOne_constant_include_self_False",
+                0,
+                torch.tensor([[0, 1, 2, 0]]).cuda(),
+                torch.tensor([[1, 2, 3, 4]], dtype=torch.int32).cuda(),
+                {
+                    torch.ops.aten.minimum.default,
+                    torch.ops.aten.scatter.src,
+                },
+                torch.zeros(3, 5, dtype=torch.int32).cuda(),
+                "amin",
+                False,
+            ),
+            (
+                "scatter_reduce_amin_zero_dim_indexTwo_constant_include_self_False",
+                0,
+                torch.tensor([[0, 1, 2, 0], [1, 2, 1, 1]]).cuda(),
+                torch.tensor([[1, 2, 3, 4], [5, 6, 7, 8]], dtype=torch.int32).cuda(),
+                {
+                    torch.ops.aten.minimum.default,
+                    torch.ops.aten.scatter.src,
+                },
+                torch.zeros(3, 5, dtype=torch.int32).cuda(),
+                "amin",
+                False,
+            ),
+            (
+                "scatter_reduce_amin_one_dim_indexOne_constant_include_self_False",
+                1,
+                torch.tensor([[0, 1, 2, 0]]).cuda(),
+                torch.tensor([[1, 2, 3, 1]], dtype=torch.int32).cuda(),
+                {
+                    torch.ops.aten.minimum.default,
+                    torch.ops.aten.scatter.src,
+                },
+                torch.zeros(3, 5, dtype=torch.int32).cuda(),
+                "amin",
+                False,
+            ),
+            (
+                "scatter_reduce_amin_one_dim_indexTwo_constant_include_self_False",
+                1,
+                torch.tensor([[0, 1, 2, 0], [1, 2, 1, 1]]).cuda(),
+                torch.tensor([[1, 2, 3, 1], [5, 6, 5, 5]], dtype=torch.int32).cuda(),
+                {
+                    torch.ops.aten.minimum.default,
+                    torch.ops.aten.scatter.src,
+                },
+                torch.zeros(3, 5, dtype=torch.int32).cuda(),
+                "amin",
+                False,
+            ),
+            (
+                "scatter_reduce_amin_one_dim_indexTwo_constant_3D_include_self_False",
+                1,
+                torch.tensor(
+                    [[[0, 1, 2, 0], [1, 2, 1, 1]], [[3, 2, 1, 2], [0, 1, 2, 0]]]
+                ).cuda(),
+                torch.tensor(
+                    [[[1, 2, 3, 1], [5, 6, 5, 5]], [[2, 4, 3, 2], [1, 2, 3, 1]]],
+                    dtype=torch.int32,
+                ).cuda(),
+                {
+                    torch.ops.aten.minimum.default,
+                    torch.ops.aten.scatter.src,
+                },
+                torch.zeros(3, 5, 6, dtype=torch.int32).cuda(),
+                "amin",
+                False,
             ),
         ]
     )
     def test_scatter_reduce(
-        self, _, dim, index, src, expected_ops_param, input_reduce_op, reduce_op_str
+        self,
+        _,
+        dim,
+        index,
+        src,
+        expected_ops_param,
+        input_reduce_op,
+        reduce_op_str,
+        include_self,
     ):
         class TestModule(torch.nn.Module):
             def __init__(self):
@@ -1471,7 +1883,12 @@ class TestLowering(TestCase):
             def forward(self, input):
 
                 return torch.ops.aten.scatter_reduce_.two(
-                    input, dim, index, src, reduce=reduce_op_str
+                    input,
+                    dim,
+                    index,
+                    src,
+                    reduce=reduce_op_str,
+                    include_self=include_self,
                 )
 
         # Operations expected to be included in the traced graph after decompositions
