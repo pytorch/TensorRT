@@ -156,7 +156,7 @@ def _refit_single_trt_engine_with_gm(
         # Get the refitting mapping
         trt_wt_location = (
             trt.TensorLocation.DEVICE
-            if torch_device == "cuda"
+            if torch_device.type == "cuda"
             else trt.TensorLocation.HOST
         )
         mapping = construct_refit_mapping_from_weight_name_map(
