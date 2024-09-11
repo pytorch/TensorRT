@@ -102,10 +102,6 @@ class BaseEngineCache(ABC):
         """
 
         settings = copy.deepcopy(compilation_settings)
-        settings.torch_executed_ops = {
-            f"torch.ops.{op.__str__()}" for op in settings.torch_executed_ops
-        }
-
         return pickle.dumps(
             {
                 "serialized_engine": bytes(serialized_engine),
