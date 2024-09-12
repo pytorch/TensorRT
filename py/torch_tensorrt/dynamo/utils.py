@@ -195,9 +195,7 @@ def get_model_device(module: torch.fx.GraphModule) -> torch.device:
 
     if device is None:
         device = to_torch_device(default_device())
-        logger.warning(
-            "Could not detect the device on which the model exists. Assuming the model is on CPU"
-        )
+
     return device
 
 
