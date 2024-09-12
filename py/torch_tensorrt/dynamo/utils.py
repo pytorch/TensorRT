@@ -453,7 +453,6 @@ def parse_dynamo_kwargs(
     Returns:
         CompilationSettings object with relevant kwargs
     """
-
     # Initialize an empty CompilationSettings object
     settings = CompilationSettings()
 
@@ -504,11 +503,12 @@ def parse_dynamo_kwargs(
 
     # If cache_built_engines and reuse_cached_engines are True but custom_engine_cache is not provided,
     # then create a default disk engine cache
+
     engine_cache = None
     if kwargs.get("cache_built_engines") or kwargs.get("reuse_cached_engines"):
         assert kwargs.get(
-            "make_refitable"
-        ), "Engine caching requires make_refitable to be set to True"
+            "make_refittable"
+        ), "Engine caching requires make_refittable to be set to True"
 
         if kwargs.get("custom_engine_cache") is not None:
             engine_cache = kwargs.get("custom_engine_cache")
@@ -522,6 +522,9 @@ def parse_dynamo_kwargs(
                 "engine_cache_size", _defaults.ENGINE_CACHE_SIZE
             )
             engine_cache = DiskEngineCache(engine_cache_dir, engine_cache_size)
+
+    if kwargs.get("torch_executed_ops"):
+        settings.torch_executed_ops = kwargs.get("torch_executed_ops")
 
     logger.info("Compilation Settings: %s\n", settings)
 

@@ -221,6 +221,34 @@ class Input(object):
         return self.__str__()
 
     @staticmethod
+    def equivalent_spec(a: Input, b: Input) -> bool:
+        if a.shape_mode != b.shape_mode:
+            return False
+
+        if a.shape_mode == Input._ShapeMode.DYNAMIC:
+            assert isinstance(a.shape, dict)
+            assert isinstance(b.shape, dict)
+            checks = [
+                a.shape["min_shape"] == b.shape["min_shape"],
+                a.shape["opt_shape"] == b.shape["opt_shape"],
+                a.shape["max_shape"] == b.shape["max_shape"],
+                a.dtype == b.dtype,
+                a.format == b.format,
+                a.low_tensor_domain_incl == b.low_tensor_domain_incl,
+                a.high_tensor_domain_excl == b.high_tensor_domain_excl,
+            ]
+            return all(checks)
+        else:
+            checks = [
+                a.shape == b.shape,
+                a.dtype == b.dtype,
+                a.format == b.format,
+                a.low_tensor_domain_incl == b.low_tensor_domain_incl,
+                a.high_tensor_domain_excl == b.high_tensor_domain_excl,
+            ]
+            return all(checks)
+
+    @staticmethod
     def _supported_input_size_type(input_size: Any) -> bool:
         if isinstance(input_size, torch.Size):
             return True
