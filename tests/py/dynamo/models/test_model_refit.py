@@ -729,3 +729,56 @@ def test_refit_multiple_engine_without_weightmap():
         # Clean up model env
 
     torch._dynamo.reset()
+
+
+@pytest.mark.unit
+def test_refit_cumsum_fallback():
+
+    class net(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.conv1 = nn.Conv2d(3, 12, 3, padding=1)
+            self.fc1 = nn.Linear(12 * 16 * 16, 10)
+
+        def forward(self, x):
+            x = self.conv1(x)
+            x = F.relu(x)
+            x = torch.flatten(x, 1)
+            x = torch.cumsum(self.fc1(x), 1)
+            x = x**2
+            return x
+
+    model = net().eval().to("cuda")
+    inputs = [torch.randn((1, 3, 16, 16)).to("cuda")]
+    model(*inputs)
+    exp_program = torch.export.export(model, tuple(inputs))
+    with torchtrt.logging.debug():
+        trt_gm = torchtrt.dynamo.compile(
+            exp_program,
+            tuple(inputs),
+            enabled_precisions={torch.float},
+            debug=True,
+            min_block_size=1,
+            make_refitable=True,
+        )
+
+    num_pyt_segments = len(
+        [1 for submod in list(trt_gm.named_children()) if "_run_on_gpu" in submod[0]]
+    )
+
+    # Number of pyt segments should be 1 (because of cumsum being non-refitable)
+    assertions.assertTrue(
+        num_pyt_segments == 1,
+        f"test_refit_cumsum_fallback test found {num_pyt_segments} pytorch segments but expected 1",
+    )
+
+    # Check the output
+    pyt_outputs, trt_outputs = exp_program.module()(*inputs), trt_gm(*inputs)
+    for pyt_output, trt_output in zip(pyt_outputs, trt_outputs):
+        assertions.assertTrue(
+            torch.allclose(pyt_output, trt_output, 1e-2, 1e-2),
+            "Refit Result is not correct. Refit failed",
+        )
+        # Clean up model env
+
+    torch._dynamo.reset()

@@ -320,7 +320,7 @@ def compile_module(
 
     # Set non-refitable ops as disallowed targets.
     if settings.make_refitable:
-        CONVERTERS.set_disallowed_targets(REFIT_SENSITIVE_OPS)
+        settings.torch_executed_ops.update(REFIT_SENSITIVE_OPS)
 
     # Set torch-executed ops
     CONVERTERS.set_disallowed_targets(settings.torch_executed_ops)
@@ -680,7 +680,7 @@ def convert_exported_program_to_serialized_trt_engine(
 
     # Set non-refitable ops as disallowed targets.
     if settings.make_refitable:
-        CONVERTERS.set_disallowed_targets(REFIT_SENSITIVE_OPS)
+        settings.torch_executed_ops.update(REFIT_SENSITIVE_OPS)
 
     # Set torch-executed ops
     CONVERTERS.set_disallowed_targets(settings.torch_executed_ops)
