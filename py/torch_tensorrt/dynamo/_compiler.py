@@ -88,7 +88,7 @@ def compile(
     engine_cache_dir: str = _defaults.ENGINE_CACHE_DIR,
     engine_cache_size: int = _defaults.ENGINE_CACHE_SIZE,
     custom_engine_cache: Optional[BaseEngineCache] = _defaults.CUSTOM_ENGINE_CACHE,
-    enable_weight_streaming: bool = _defaults.WEIGHT_STREAMING,
+    enable_weight_streaming: bool = _defaults.ENABLE_WEIGHT_STREAMING,
     **kwargs: Any,
 ) -> torch.fx.GraphModule:
     """Compile an ExportedProgram module for NVIDIA GPUs using TensorRT

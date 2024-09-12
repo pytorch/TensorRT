@@ -14,6 +14,7 @@ from torch_tensorrt.dynamo._defaults import (
     DLA_SRAM_SIZE,
     DRYRUN,
     ENABLE_EXPERIMENTAL_DECOMPOSITIONS,
+    ENABLE_WEIGHT_STREAMING,
     ENABLED_PRECISIONS,
     ENGINE_CAPABILITY,
     HARDWARE_COMPATIBLE,
@@ -32,7 +33,6 @@ from torch_tensorrt.dynamo._defaults import (
     USE_FAST_PARTITIONER,
     USE_PYTHON_RUNTIME,
     VERSION_COMPATIBLE,
-    WEIGHT_STREAMING,
     WORKSPACE_SIZE,
     default_device,
 )
@@ -114,7 +114,7 @@ class CompilationSettings:
     lazy_engine_init: bool = LAZY_ENGINE_INIT
     cache_built_engines: bool = CACHE_BUILT_ENGINES
     reuse_cached_engines: bool = REUSE_CACHED_ENGINES
-    enable_weight_streaming: bool = WEIGHT_STREAMING
+    enable_weight_streaming: bool = ENABLE_WEIGHT_STREAMING
 
 
 _SETTINGS_TO_BE_ENGINE_INVARIANT = (
