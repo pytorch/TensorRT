@@ -76,8 +76,6 @@ struct TRTEngine : torch::CustomClassHolder {
   int64_t get_streamable_weights_size();
   int64_t get_min_required_device_budget();
   int64_t get_weight_streaming_automatic_budget();
-  void init_context();
-  void reset_context();
   friend std::ostream& operator<<(std::ostream& os, const TRTEngine& engine);
   static const char BINDING_DELIM = '%';
 
