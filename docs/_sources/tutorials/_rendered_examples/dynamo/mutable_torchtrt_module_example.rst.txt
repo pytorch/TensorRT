@@ -61,7 +61,7 @@ Initialize the Mutable Torch TensorRT Module with settings.
     settings = {
         "use_python": False,
         "enabled_precisions": {torch.float32},
-        "make_refitable": True,
+        "make_refittable": True,
     }
 
     model = models.resnet18(pretrained=True).eval().to("cuda")
@@ -132,7 +132,7 @@ Stable Diffusion with Huggingface
             "use_python_runtime": True,
             "enabled_precisions": {torch.float16},
             "debug": True,
-            "make_refitable": True,
+            "make_refittable": True,
         }
 
         model_id = "runwayml/stable-diffusion-v1-5"
