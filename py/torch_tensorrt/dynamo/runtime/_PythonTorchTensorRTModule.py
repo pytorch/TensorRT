@@ -12,9 +12,6 @@ from torch.nn import Module
 from torch_tensorrt._Device import Device
 from torch_tensorrt._enums import Platform, dtype
 from torch_tensorrt.dynamo._settings import CompilationSettings
-from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (
-    recreate_context_decorator,
-)
 from torch_tensorrt.dynamo.utils import DYNAMIC_DIM
 from torch_tensorrt.logging import TRT_LOGGER
 from torch_tensorrt.runtime._utils import (
@@ -115,16 +112,6 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         if self.serialized_engine is not None and not self.settings.lazy_engine_init:
             self.setup_engine()
 
-    def init_context(self) -> None:
-        assert self.engine, "Context is used before setting up the engine"
-        if self.context is None:
-            self.context = self.engine.create_execution_context()
-
-    def reset_context(self) -> None:
-        if self.context is not None:
-            del self.context
-            self.context = None
-
     def get_streamable_weights_size(self) -> Any:
         return self.engine.streamable_weights_size
 
@@ -137,9 +124,13 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
     def get_automatic_weight_streaming_budget(self) -> Any:
         return self.engine.get_weight_streaming_automatic_budget()
 
-    @recreate_context_decorator
     def set_device_memory_budget(self, budget_bytes: int) -> int:
-        return self._set_device_memory_budget(budget_bytes)
+        # Recreating the context because weight streaming budget cannot be modified while there are active context.
+        if self.context is not None:
+            del self.context
+        budget_bytes = self._set_device_memory_budget(budget_bytes)
+        self.context = self.engine.create_execution_context()
+        return budget_bytes
 
     def _set_device_memory_budget(self, budget_bytes: int) -> int:
         # Disable weight streaming for invalid budget size

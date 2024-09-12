@@ -90,7 +90,7 @@ def compile(
     custom_engine_cache: Optional[BaseEngineCache] = _defaults.CUSTOM_ENGINE_CACHE,
     use_explicit_typing: bool = _defaults.USE_EXPLICIT_TYPING,
     use_fp32_acc: bool = _defaults.USE_FP32_ACC,
-    enable_weight_streaming: bool = _defaults.WEIGHT_STREAMING,
+    enable_weight_streaming: bool = _defaults.ENABLE_WEIGHT_STREAMING,
     **kwargs: Any,
 ) -> torch.fx.GraphModule:
     """Compile an ExportedProgram module for NVIDIA GPUs using TensorRT

@@ -92,12 +92,12 @@ TRTEngine::TRTEngine(
   if (get_streamable_weights_size() > 0) {
     // Scratch memory size may change based on the current weight streaming budget
     // Required memory for full streaming is used to minimum weight budget
-    set_device_memory_budget(0);
+    cuda_engine->setWeightStreamingBudgetV2(0);
     min_required_device_budget = cuda_engine->getWeightStreamingScratchMemorySize();
 
     int64_t budget_bytes = get_weight_streaming_automatic_budget();
     LOG_INFO("Set automatic weight streaming budget bytes " << budget_bytes);
-    set_device_memory_budget(budget_bytes);
+    cuda_engine->setWeightStreamingBudgetV2(budget_bytes);
   }
 
   exec_ctx = make_trt(cuda_engine->createExecutionContext());
@@ -274,7 +274,20 @@ int64_t TRTEngine::get_device_memory_budget() {
 }
 
 bool TRTEngine::set_device_memory_budget(int64_t budget) {
-  return cuda_engine->setWeightStreamingBudgetV2(budget);
+  // Recreating the context because weight streaming budget cannot be modified while there are active context.
+  if (exec_ctx.get() != nullptr) {
+    exec_ctx.reset();
+  }
+  if (profile_execution) {
+    trt_engine_profiler.reset();
+  }
+  bool result = cuda_engine->setWeightStreamingBudgetV2(budget);
+  exec_ctx = make_trt(cuda_engine->createExecutionContext());
+  TORCHTRT_CHECK((exec_ctx.get() != nullptr), "Unable to recreate TensorRT execution context");
+  if (profile_execution) {
+    enable_profiling();
+  }
+  return result;
 }
 
 // Returns 0 if BuilderFlag::kWEIGHT_STREAMING is unset during engine building.
@@ -288,26 +301,6 @@ int64_t TRTEngine::get_min_required_device_budget() {
 
 int64_t TRTEngine::get_weight_streaming_automatic_budget() {
   return cuda_engine->getWeightStreamingAutomaticBudget();
-}
-
-void TRTEngine::init_context() {
-  if (exec_ctx.get() == nullptr) {
-    exec_ctx = make_trt(cuda_engine->createExecutionContext());
-    TORCHTRT_CHECK((exec_ctx.get() != nullptr), "Unable to recreate TensorRT execution context");
-    if (profile_execution) {
-      enable_profiling();
-    }
-  }
-}
-
-void TRTEngine::reset_context() {
-  if (exec_ctx.get() != nullptr) {
-    exec_ctx.reset();
-    exec_ctx = nullptr;
-  }
-  if (profile_execution) {
-    trt_engine_profiler.reset();
-  }
 }
 
 std::string TRTEngine::to_str() const {

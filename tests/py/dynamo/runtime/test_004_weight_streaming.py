@@ -49,9 +49,9 @@ class TestWeightStreamingPython(TestCase):
             use_python_runtime=use_python_runtime,
             enable_weight_streaming=True,
         )
-        # Checking default weight streaming budget(automatic) is applied
-        with torchtrt.runtime.weight_streaming(optimized_model) as weight_streaming_ctx:
-            assert weight_streaming_ctx.device_budget > 0
+        # Checking if default weight streaming budget(automatic) is applied when compiler option was provided
+        weight_streaming_ctx = torchtrt.runtime.weight_streaming(optimized_model)
+        assert weight_streaming_ctx.device_budget > 0
 
         ref = model(*input)
         out = optimized_model(*input)

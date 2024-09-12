@@ -14,6 +14,7 @@ from torch_tensorrt.dynamo._defaults import (
     DLA_SRAM_SIZE,
     DRYRUN,
     ENABLE_EXPERIMENTAL_DECOMPOSITIONS,
+    ENABLE_WEIGHT_STREAMING,
     ENABLED_PRECISIONS,
     ENGINE_CAPABILITY,
     HARDWARE_COMPATIBLE,
@@ -34,7 +35,6 @@ from torch_tensorrt.dynamo._defaults import (
     USE_FP32_ACC,
     USE_PYTHON_RUNTIME,
     VERSION_COMPATIBLE,
-    WEIGHT_STREAMING,
     WORKSPACE_SIZE,
     default_device,
 )
@@ -120,7 +120,7 @@ class CompilationSettings:
     reuse_cached_engines: bool = REUSE_CACHED_ENGINES
     use_explicit_typing: bool = USE_EXPLICIT_TYPING
     use_fp32_acc: bool = USE_FP32_ACC
-    enable_weight_streaming: bool = WEIGHT_STREAMING
+    enable_weight_streaming: bool = ENABLE_WEIGHT_STREAMING
 
 
 _SETTINGS_TO_BE_ENGINE_INVARIANT = (
