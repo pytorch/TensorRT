@@ -6,16 +6,17 @@ from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 import numpy as np
+import tensorrt as trt
 import torch
 from torch._subclasses.fake_tensor import FakeTensor
 from torch_tensorrt._Device import Device
 from torch_tensorrt._enums import dtype
 from torch_tensorrt._Input import Input
 from torch_tensorrt.dynamo import _defaults
+from torch_tensorrt.dynamo._defaults import default_device
 from torch_tensorrt.dynamo._engine_cache import BaseEngineCache
 from torch_tensorrt.dynamo._settings import CompilationSettings
 
-import tensorrt as trt
 from packaging import version
 
 from .types import TRTDataType
@@ -186,11 +187,14 @@ def get_model_device(module: torch.fx.GraphModule) -> torch.device:
     device = None
     for parameter in list(module.parameters()):
         if isinstance(parameter, (torch.nn.parameter.Parameter, torch.Tensor)):
-            device = parameter.device
-            break
+            return parameter.device
+
+    for buffer in list(module.buffers()):
+        if isinstance(buffer, (torch.Tensor)):
+            return buffer.device
 
     if device is None:
-        device = torch.device("cpu")
+        device = to_torch_device(default_device())
         logger.warning(
             "Could not detect the device on which the model exists. Assuming the model is on CPU"
         )
