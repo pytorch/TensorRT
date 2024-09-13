@@ -9,6 +9,5 @@ pytest-xdist>=3.6.1
 pyyaml
 timm>=1.0.3
 transformers==4.40.2
-# TODO @lanlao-nvidia Renable when modelopt can be install properly to run the tests
-# "nvidia-modelopt[all]">=0.16.1,<0.17.0
+nvidia-modelopt[all]>=0.17.0
 --extra-index-url https://pypi.nvidia.com
