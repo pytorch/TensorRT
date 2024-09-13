@@ -8,7 +8,6 @@ import timm
 import torch
 import torch.nn.functional as F
 import torch_tensorrt as torchtrt
-import torchvision.models as models
 from torch import nn
 from torch_tensorrt.dynamo._compiler import (
     convert_exported_program_to_serialized_trt_engine,

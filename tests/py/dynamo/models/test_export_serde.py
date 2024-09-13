@@ -1,3 +1,4 @@
+import importlib
 import os
 import tempfile
 import unittest
@@ -5,7 +6,6 @@ import unittest
 import pytest
 import torch
 import torch_tensorrt as torchtrt
-import torchvision.models as models
 from torch_tensorrt.dynamo.utils import COSINE_THRESHOLD, cosine_similarity
 
 assertions = unittest.TestCase()
@@ -242,11 +242,14 @@ def test_hybrid_relu_fallback(ir):
         )
 
 
+@unittest.skipIf(not importlib.util.find_spec("torchvision"))
 @pytest.mark.unit
 def test_resnet18(ir):
     """
     This tests export save and load functionality on Resnet18 model
     """
+    import torchvision.models as models
+
     model = models.resnet18().eval().cuda()
     input = torch.randn((1, 3, 224, 224)).to("cuda")
 
@@ -283,11 +286,14 @@ def test_resnet18(ir):
     )
 
 
+@unittest.skipIf(not importlib.util.find_spec("torchvision"))
 @pytest.mark.unit
 def test_resnet18_dynamic(ir):
     """
     This tests export save and load functionality on Resnet18 model
     """
+    import torchvision.models as models
+
     model = models.resnet18().eval().cuda()
     input = torch.randn((1, 3, 224, 224)).to("cuda")
 

@@ -1,4 +1,5 @@
 # type: ignore
+import importlib
 import os
 import shutil
 import unittest
@@ -7,7 +8,6 @@ from typing import Optional
 import pytest
 import torch
 import torch_tensorrt as torch_trt
-import torchvision.models as models
 from torch.testing._internal.common_utils import TestCase
 from torch_tensorrt.dynamo._defaults import ENGINE_CACHE_DIR
 from torch_tensorrt.dynamo._engine_cache import BaseEngineCache
@@ -52,7 +52,11 @@ class MyEngineCache(BaseEngineCache):
 
 class TestEngineCache(TestCase):
 
+    @unittest.skipIf(not importlib.util.find_spec("torchvision"))
     def test_dynamo_compile_with_default_disk_engine_cache(self):
+
+        import torchvision.models as models
+
         model = models.resnet18(pretrained=True).eval().to("cuda")
         example_inputs = (torch.randn((100, 3, 224, 224)).to("cuda"),)
         # Mark the dim0 of inputs as dynamic
@@ -116,7 +120,11 @@ class TestEngineCache(TestCase):
             msg=f"Engine caching didn't speed up the compilation. Time taken without engine caching: {times[0]} ms, time taken with engine caching: {times[2]} ms",
         )
 
+    @unittest.skipIf(not importlib.util.find_spec("torchvision"))
     def test_dynamo_compile_with_custom_engine_cache(self):
+
+        import torchvision.models as models
+
         model = models.resnet18(pretrained=True).eval().to("cuda")
 
         engine_cache_dir = "/tmp/your_dir"
@@ -184,7 +192,11 @@ class TestEngineCache(TestCase):
             msg=f"Engine caching didn't speed up the compilation. Time taken without engine caching: {times[0]} ms, time taken with engine caching: {times[2]} ms",
         )
 
+    @unittest.skipIf(not importlib.util.find_spec("torchvision"))
     def test_torch_compile_with_default_disk_engine_cache(self):
+
+        import torchvision.models as models
+
         # Custom Engine Cache
         model = models.resnet18(pretrained=True).eval().to("cuda")
 
@@ -248,7 +260,11 @@ class TestEngineCache(TestCase):
             msg=f"Engine caching didn't speed up the compilation. Time taken without engine caching: {times[0]} ms, time taken with engine caching: {times[2]} ms",
         )
 
+    @unittest.skipIf(not importlib.util.find_spec("torchvision"))
     def test_torch_compile_with_custom_engine_cache(self):
+
+        import torchvision.models as models
+
         # Custom Engine Cache
         model = models.resnet18(pretrained=True).eval().to("cuda")
 

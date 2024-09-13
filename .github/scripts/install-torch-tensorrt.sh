@@ -12,9 +12,10 @@ TORCHVISION=$(grep "^torchvision" ${PWD}/tests/py/requirements.txt)
 pip install --pre ${TORCHVISION} --index-url ${INDEX_URL}
 
 # Install optional dependencies required for Torch-TensorRT tests
-cat ${PWD}/tests/py/requirements.txt | grep -v torchvision | grep -v https://download.pytorch.org > ${PWD}/tests/py/requirements.txt
-cat ${PWD}/tests/py/requirements.txt
-pip install --pre -r ${PWD}/tests/py/requirements.txt --use-deprecated legacy-resolver
+tempdir=$(mktemp)
+cat ${PWD}/tests/py/requirements.txt | grep -v torchvision | grep -v https://download.pytorch.org > ${tempdir}/requirements.txt
+cat ${tempdir}/requirements.txt
+pip install --pre -r ${temp}/requirements.txt --use-deprecated legacy-resolver
 
 # Install Torch-TensorRT
 if [[ ${PLATFORM} == win32 ]]; then
