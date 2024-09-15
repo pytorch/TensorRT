@@ -251,8 +251,10 @@ def test_base_fp8(ir):
 
 
 @unittest.skipIf(
-    modelopt.__version__ < "0.16.1",
-    "Int8 quantization is supported in modelopt since 0.16.1 or later",
+    not importlib.util.find_spec("modelopt")
+    or platform.system() != "Linux"
+    or modelopt.__version__ < "0.17.0",
+    "Int8 quantization is supported in modelopt since 0.17.0 or later for Linux",
 )
 @pytest.mark.unit
 def test_base_int8(ir):
