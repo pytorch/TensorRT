@@ -9,8 +9,8 @@ pytest-xdist>=3.6.1
 pyyaml
 timm>=1.0.3
 transformers==4.40.2
-# TODO: once 0.16.1 is out, update it here
-nvidia-modelopt>=0.15.1
+# TODO @lanlao-nvidia Renable when modelopt can be install properly to run the tests
+# "nvidia-modelopt[all]">=0.16.1,<0.17.0
 --extra-index-url https://pypi.nvidia.com
 torchvision>=0.20.0.dev,<0.21.0
 --extra-index-url https://download.pytorch.org/whl/nightly/cu124

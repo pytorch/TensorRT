@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Refitting Torch-TensorRT Programs with New Weights &mdash; Torch-TensorRT v2.5.0.dev0+501a1e1 documentation</title>
+  <title>Refitting Torch-TensorRT Programs with New Weights &mdash; Torch-TensorRT v2.5.0.dev0+2be2e64 documentation</title>
   
 
   
@@ -275,7 +275,7 @@
               
               
                 <div class="version">
-                  v2.5.0.dev0+501a1e1
+                  v2.5.0.dev0+2be2e64
                 </div>
               
             
@@ -499,10 +499,10 @@ a previously built engine, trigger refit and short cut recompilation on behalf o
 </div>
 </section>
 </section>
-<section id="make-a-refitable-compilation-program">
-<h2>Make a Refitable Compilation Program<a class="headerlink" href="#make-a-refitable-compilation-program" title="Permalink to this heading">¶</a></h2>
+<section id="make-a-refittable-compilation-program">
+<h2>Make a refittable Compilation Program<a class="headerlink" href="#make-a-refittable-compilation-program" title="Permalink to this heading">¶</a></h2>
 <p>The inital step is to compile a module and save it as with a normal. Note that there is an
-additional parameter <cite>make_refitable</cite> that is set to <cite>True</cite>. This parameter is used to
+additional parameter <cite>make_refittable</cite> that is set to <cite>True</cite>. This parameter is used to
 indicate that the engine being built should support weight refitting later. Engines built without
 these setttings will not be able to be refit.</p>
 <p>In this case we are going to compile a ResNet18 model with randomly initialized weights and save it.</p>
@@ -522,7 +522,7 @@ these setttings will not be able to be refit.</p>
     <span class="n">debug</span><span class="o">=</span><span class="n">debug</span><span class="p">,</span>
     <span class="n">min_block_size</span><span class="o">=</span><span class="n">min_block_size</span><span class="p">,</span>
     <span class="n">torch_executed_ops</span><span class="o">=</span><span class="n">torch_executed_ops</span><span class="p">,</span>
-    <span class="n">make_refitable</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">make_refittable</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
 <span class="p">)</span>  <span class="c1"># Output is a torch.fx.GraphModule</span>
 
 <span class="c1"># Save the graph module as an exported program</span>
@@ -645,7 +645,7 @@ of the compiled module without creating a new module.</p>
 <li><a class="reference internal" href="#imports-and-model-definition">Imports and model definition</a></li>
 </ul>
 </li>
-<li><a class="reference internal" href="#make-a-refitable-compilation-program">Make a Refitable Compilation Program</a></li>
+<li><a class="reference internal" href="#make-a-refittable-compilation-program">Make a refittable Compilation Program</a></li>
 <li><a class="reference internal" href="#refit-the-program-with-pretrained-weights">Refit the Program with Pretrained Weights</a></li>
 <li><a class="reference internal" href="#advanced-usage">Advanced Usage</a><ul>
 <li><a class="reference internal" href="#weight-map-cache">Weight Map Cache</a></li>

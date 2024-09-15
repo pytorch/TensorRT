@@ -52,7 +52,7 @@ def compile_bert(iterations=3):
             "truncate_double": True,
             "debug": False,
             "min_block_size": 1,
-            "make_refitable": True,
+            "make_refittable": True,
             "cache_built_engines": cache_built_engines,
             "reuse_cached_engines": reuse_cached_engines,
             "engine_cache_dir": "/tmp/torch_trt_bert_engine_cache",

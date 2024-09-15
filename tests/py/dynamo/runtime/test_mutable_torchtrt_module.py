@@ -52,7 +52,7 @@ def test_resnet18():
     compile_spec = {
         "use_python_runtime": False,
         "enabled_precisions": {torch.float32},
-        "make_refitable": True,
+        "make_refittable": True,
     }
 
     model = models.resnet18(pretrained=True).eval().to("cuda")
@@ -95,7 +95,7 @@ def test_save():
     compile_spec = {
         "use_python_runtime": False,
         "enabled_precisions": {torch.float32},
-        "make_refitable": True,
+        "make_refittable": True,
     }
 
     model = models.resnet18(pretrained=True).eval().to("cuda")
@@ -132,7 +132,7 @@ def test_resnet18_modify_attribute():
     compile_spec = {
         "use_python_runtime": False,
         "enabled_precisions": {torch.float32},
-        "make_refitable": True,
+        "make_refittable": True,
     }
 
     model = models.resnet18(pretrained=True).eval().to("cuda")
@@ -176,7 +176,7 @@ def test_resnet18_modify_attribute_no_refit():
     compile_spec = {
         "use_python_runtime": False,
         "enabled_precisions": {torch.float32},
-        "make_refitable": True,
+        "make_refittable": True,
     }
 
     model = models.resnet18(pretrained=True).eval().to("cuda")
@@ -255,7 +255,7 @@ def test_custom_model_with_kwarg():
         "optimization_level": 1,
         "min_block_size": 1,
         "ir": "dynamo",
-        "make_refitable": True,
+        "make_refittable": True,
     }
 
     mutable_module = torch_trt.MutableTorchTensorRTModule(model, **compile_spec)
@@ -316,7 +316,7 @@ def test_custom_model_with_inplace_init():
         "optimization_level": 1,
         "min_block_size": 1,
         "ir": "dynamo",
-        "make_refitable": True,
+        "make_refittable": True,
     }
 
     mutable_module = torch_trt.MutableTorchTensorRTModule(model, **compile_spec)
@@ -379,7 +379,7 @@ def test_custom_model_with_init_recompile():
         "optimization_level": 1,
         "min_block_size": 1,
         "ir": "dynamo",
-        "make_refitable": True,
+        "make_refittable": True,
     }
 
     mutable_module = torch_trt.MutableTorchTensorRTModule(model, **compile_spec)
@@ -448,7 +448,7 @@ def test_custom_model_with_kwarg_different_input():
         "optimization_level": 1,
         "min_block_size": 1,
         "ir": "dynamo",
-        "make_refitable": True,
+        "make_refittable": True,
     }
 
     mutable_module = torch_trt.MutableTorchTensorRTModule(model, **compile_spec)
