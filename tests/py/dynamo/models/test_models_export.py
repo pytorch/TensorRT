@@ -1,5 +1,5 @@
 # type: ignore
-import importlib
+import platform
 import unittest
 from importlib import metadata
 
@@ -250,9 +250,8 @@ def test_base_fp8(ir):
 
 
 @unittest.skipIf(
-    not importlib.util.find_spec("modelopt")
-    or Version(metadata.version("nvidia-modelopt")) < Version("0.16.1"),
-    "modelopt 0.16.1 or later is required Int8 quantization is supported in modelopt since 0.16.1 or later",
+    modelopt.__version__ < "0.16.1",
+    "Int8 quantization is supported in modelopt since 0.16.1 or later",
 )
 @pytest.mark.unit
 def test_base_int8(ir):

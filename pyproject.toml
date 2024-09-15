@@ -9,7 +9,7 @@ requires = [
     "typing-extensions>=4.7.0",
     "future>=0.18.3",
     "tensorrt-cu12==10.3.0",
-    "torch >=2.5.0.dev,<2.6.0",
+    "torch>=2.5.0,<2.6.0",
     "pybind11==2.6.2",
     "numpy",
 ]
@@ -54,7 +54,7 @@ keywords = [
     "inference",
 ]
 dependencies = [
-    "torch >=2.5.0.dev,<2.6.0",
+    "torch>=2.5.0,<2.6.0",
     "tensorrt-cu12==10.3.0",
     "tensorrt-cu12-bindings==10.3.0",
     "tensorrt-cu12-libs==10.3.0",
@@ -65,8 +65,8 @@ dependencies = [
 dynamic = ["version"]
 
 [project.optional-dependencies]
-torchvision = ["torchvision >=0.20.dev,<0.21.0"]
-quantization = ["nvidia-modelopt[all]>=0.15.1"]
+torchvision = ["torchvision>=0.20.0,<0.21.0"]
+quantization = ["nvidia-modelopt[deploy,hf,torch]~=0.17.0"]
 monitoring-tools = ["rich >= 13.7.1"]
 jupyter = ["rich[jupyter] >= 13.7.1"]
 
