@@ -1,4 +1,5 @@
 # type: ignore
+import importlib
 import platform
 import unittest
 from importlib import metadata
