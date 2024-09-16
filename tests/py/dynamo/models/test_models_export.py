@@ -251,8 +251,8 @@ def test_base_fp8(ir):
 
 
 @unittest.skipIf(
-    not importlib.util.find_spec("modelopt")
-    or platform.system() != "Linux"
+    platform.system() != "Linux"
+    or not importlib.util.find_spec("modelopt")
     or Version(metadata.version("nvidia-modelopt")) < Version("0.17.0"),
     "modelopt 0.17.0 or later is required, Int8 quantization is supported in modelopt since 0.17.0 or later for linux",
 )
