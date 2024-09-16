@@ -45,14 +45,6 @@ from torch_tensorrt.logging import TRT_LOGGER
 
 logger = logging.getLogger(__name__)
 
-# These ops are not refitable.
-REFIT_SENSITIVE_OPS = frozenset(
-    {
-        "torch.ops.aten.cumsum.default",
-        "torch.ops.aten.embedding_bag.default",
-    }
-)
-
 
 def construct_refit_mapping(
     module: torch.fx.GraphModule,
