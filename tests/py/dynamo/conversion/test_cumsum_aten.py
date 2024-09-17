@@ -24,6 +24,7 @@ class TestCumsumConverter(DispatchTestCase):
         self.run_test(
             Cumsum(),
             inputs,
+            make_refittable=False,
         )
 
     @parameterized.expand(
@@ -43,6 +44,7 @@ class TestCumsumConverter(DispatchTestCase):
         self.run_test(
             Cumsum(),
             inputs,
+            make_refittable=False,
         )
 
     @parameterized.expand(
@@ -63,6 +65,7 @@ class TestCumsumConverter(DispatchTestCase):
         self.run_test(
             Cumsum(),
             inputs,
+            make_refittable=False,
         )
 
     @parameterized.expand(
@@ -92,6 +95,7 @@ class TestCumsumConverter(DispatchTestCase):
         self.run_test_with_dynamic_shape(
             Cumsum(),
             inputs,
+            make_refittable=False,
         )
 
 
