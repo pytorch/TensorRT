@@ -238,7 +238,7 @@ def refit_module_weights(
         )
 
     # Get the settings and check the setting to be uniform
-    settings: CompilationSettings = None
+    settings: Optional[CompilationSettings] = None
     if inline_module:
 
         # Obtain the settings
@@ -253,7 +253,7 @@ def refit_module_weights(
         ]
         assert (
             encoded_metadata != ""
-        ), "The engine provided is either not refittable or was built with a version of Torch-TensorRT that is too old, please recompile using the latest version with make_refitable=True"
+        ), "The engine provided is either not refittable or was built with a version of Torch-TensorRT that is too old, please recompile using the latest version with make_refittable=True"
         settings = TorchTensorRTModule.decode_metadata(encoded_metadata)["settings"]
         # Handle torch modules
         compiled_submodules_map = dict(compiled_submodules)
@@ -268,8 +268,10 @@ def refit_module_weights(
                 continue
             settings = submodule.settings
 
+    assert settings is not None
+
     assert (
-        settings.make_refitable
+        settings.make_refittable
     ), "Refitting is not enabled. Please recompile the engine with refit=True."
 
     if settings.debug:
@@ -395,7 +397,7 @@ def refit_module_weights(
                 if isinstance(compiled_submodule, PythonTorchTensorRTModule):
                     engine = compiled_submodule.engine
                 elif isinstance(compiled_submodule, TorchTensorRTModule):
-                    engine_info = compiled_submodule.engine.__getstate__()[0]
+                    engine_info = compiled_submodule.engine.__getstate__()[0]  # type: ignore[index]
                     engine = get_engine_from_encoded_engine(
                         engine_info[ENGINE_IDX], runtime
                     )

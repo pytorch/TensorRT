@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt.dynamo._refit &mdash; Torch-TensorRT v2.5.0.dev0+a689a3b documentation</title>
+  <title>torch_tensorrt.dynamo._refit &mdash; Torch-TensorRT v2.5.0.dev0+dbc41ce documentation</title>
   
 
   
@@ -272,7 +272,7 @@
               
               
                 <div class="version">
-                  v2.5.0.dev0+a689a3b
+                  v2.5.0.dev0+dbc41ce
                 </div>
               
             
@@ -694,7 +694,7 @@
         <span class="p">)</span>
 
     <span class="c1"># Get the settings and check the setting to be uniform</span>
-    <span class="n">settings</span><span class="p">:</span> <span class="n">CompilationSettings</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">settings</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">CompilationSettings</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
     <span class="k">if</span> <span class="n">inline_module</span><span class="p">:</span>
 
         <span class="c1"># Obtain the settings</span>
@@ -709,7 +709,7 @@
         <span class="p">]</span>
         <span class="k">assert</span> <span class="p">(</span>
             <span class="n">encoded_metadata</span> <span class="o">!=</span> <span class="s2">&quot;&quot;</span>
-        <span class="p">),</span> <span class="s2">&quot;The engine provided is either not refittable or was built with a version of Torch-TensorRT that is too old, please recompile using the latest version with make_refitable=True&quot;</span>
+        <span class="p">),</span> <span class="s2">&quot;The engine provided is either not refittable or was built with a version of Torch-TensorRT that is too old, please recompile using the latest version with make_refittable=True&quot;</span>
         <span class="n">settings</span> <span class="o">=</span> <span class="n">TorchTensorRTModule</span><span class="o">.</span><span class="n">decode_metadata</span><span class="p">(</span><span class="n">encoded_metadata</span><span class="p">)[</span><span class="s2">&quot;settings&quot;</span><span class="p">]</span>
         <span class="c1"># Handle torch modules</span>
         <span class="n">compiled_submodules_map</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">compiled_submodules</span><span class="p">)</span>
@@ -724,8 +724,10 @@
                 <span class="k">continue</span>
             <span class="n">settings</span> <span class="o">=</span> <span class="n">submodule</span><span class="o">.</span><span class="n">settings</span>
 
+    <span class="k">assert</span> <span class="n">settings</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+
     <span class="k">assert</span> <span class="p">(</span>
-        <span class="n">settings</span><span class="o">.</span><span class="n">make_refitable</span>
+        <span class="n">settings</span><span class="o">.</span><span class="n">make_refittable</span>
     <span class="p">),</span> <span class="s2">&quot;Refitting is not enabled. Please recompile the engine with refit=True.&quot;</span>
 
     <span class="k">if</span> <span class="n">settings</span><span class="o">.</span><span class="n">debug</span><span class="p">:</span>
@@ -851,7 +853,7 @@
                 <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">compiled_submodule</span><span class="p">,</span> <span class="n">PythonTorchTensorRTModule</span><span class="p">):</span>
                     <span class="n">engine</span> <span class="o">=</span> <span class="n">compiled_submodule</span><span class="o">.</span><span class="n">engine</span>
                 <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">compiled_submodule</span><span class="p">,</span> <span class="n">TorchTensorRTModule</span><span class="p">):</span>
-                    <span class="n">engine_info</span> <span class="o">=</span> <span class="n">compiled_submodule</span><span class="o">.</span><span class="n">engine</span><span class="o">.</span><span class="n">__getstate__</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span>
+                    <span class="n">engine_info</span> <span class="o">=</span> <span class="n">compiled_submodule</span><span class="o">.</span><span class="n">engine</span><span class="o">.</span><span class="n">__getstate__</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span>  <span class="c1"># type: ignore[index]</span>
                     <span class="n">engine</span> <span class="o">=</span> <span class="n">get_engine_from_encoded_engine</span><span class="p">(</span>
                         <span class="n">engine_info</span><span class="p">[</span><span class="n">ENGINE_IDX</span><span class="p">],</span> <span class="n">runtime</span>
                     <span class="p">)</span>
