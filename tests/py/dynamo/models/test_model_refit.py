@@ -5,6 +5,7 @@ import unittest
 
 import numpy as np
 import pytest
+import tensorrt as trt
 import torch
 import torch.nn.functional as F
 import torch_tensorrt as torchtrt
@@ -23,8 +24,6 @@ from torch_tensorrt.dynamo.lowering import (
 )
 from torch_tensorrt.logging import TRT_LOGGER
 from transformers import BertModel
-
-import tensorrt as trt
 
 assertions = unittest.TestCase()
 
@@ -760,7 +759,7 @@ def test_refit_cumsum_fallback():
             enabled_precisions={torch.float},
             debug=True,
             min_block_size=1,
-            make_refitable=True,
+            make_refittable=True,
         )
 
     num_pyt_segments = len(

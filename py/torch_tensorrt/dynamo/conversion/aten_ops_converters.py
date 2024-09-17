@@ -273,7 +273,7 @@ def aten_ops_embedding(
 
 def embedding_bag_validator(node: Node, settings: CompilationSettings = None) -> bool:
     # Embedding bag op is not refitable
-    if settings.make_refitable:
+    if settings.make_refittable:
         return False
 
     if not one_user_validator(node):
@@ -931,7 +931,7 @@ def aten_ops_slice(
 
 def refit_validator(node: Node, settings: CompilationSettings = None) -> bool:
     # cumsum op is not refitable
-    if settings and settings.make_refitable:
+    if settings and settings.make_refittable:
         return False
     return True
 
