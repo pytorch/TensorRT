@@ -3,6 +3,7 @@ from typing import Dict, Sequence, Tuple, Union
 
 import torch
 from torch.fx.node import Argument, Target
+from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion import impl
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
@@ -15,7 +16,9 @@ _LOGGER: logging.Logger = logging.getLogger(__name__)
 
 
 # TODO: expand the scope of this converter with aten.expand implementation
-def broadcast_checker(broadcast_node: torch.fx.Node) -> bool:
+def broadcast_checker(
+    broadcast_node: torch.fx.Node, settings: CompilationSettings = None
+) -> bool:
     # The current implementation of broadcast_in_dim can only handle unsqueeze
     return all(
         broadcast_node.args[1][i] == 1

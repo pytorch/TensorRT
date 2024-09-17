@@ -314,11 +314,9 @@ def compile_module(
     dryrun_tracker = DryRunTracker()
     if sample_kwarg_inputs is None:
         sample_kwarg_inputs = {}
-    # Assume converters support dynamic shapes and disable validation
-    CONVERTERS.set_dynamic_shape_support(settings.assume_dynamic_shape_support)
 
-    # Set torch-executed ops
-    CONVERTERS.set_disallowed_targets(settings.torch_executed_ops)
+    # Configure user compilation settings to converters.
+    CONVERTERS.set_compilation_settings(settings)
 
     # Check the number of supported operations in the graph
     num_supported_ops, total_ops = partitioning.get_graph_converter_support(
@@ -670,8 +668,8 @@ def convert_exported_program_to_serialized_trt_engine(
     settings = CompilationSettings(**compilation_options)
     logger.info("Compilation Settings: %s\n", settings)
 
-    # Assume converters support dynamic shapes and disable validation
-    CONVERTERS.set_dynamic_shape_support(settings.assume_dynamic_shape_support)
+    # Configure user compilation settings to converters.
+    CONVERTERS.set_compilation_settings(settings)
 
     try:
         interpreter_result = interpret_module_to_result(
