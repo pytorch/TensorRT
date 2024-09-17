@@ -184,10 +184,6 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
 
     def encode_metadata(self, metadata: Any) -> str:
         metadata = copy.deepcopy(metadata)
-        metadata["settings"].torch_executed_ops = {
-            f"torch.ops.{op.__str__()}"
-            for op in metadata["settings"].torch_executed_ops
-        }
         dumped_metadata = pickle.dumps(metadata)
         encoded_metadata = base64.b64encode(dumped_metadata).decode("utf-8")
         return encoded_metadata
@@ -196,9 +192,6 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
     def decode_metadata(encoded_metadata: bytes) -> Any:
         dumped_metadata = base64.b64decode(encoded_metadata.encode("utf-8"))
         metadata = pickle.loads(dumped_metadata)
-        metadata["settings"].torch_executed_ops = {
-            eval(op) for op in metadata["settings"].torch_executed_ops
-        }
         return metadata
 
     def get_extra_state(self) -> SerializedTorchTensorRTModuleFmt:
@@ -240,7 +233,9 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
 
             serialized_metadata = serialized_engine_info[SERIALIZED_METADATA_IDX]
             assert isinstance(serialized_metadata, bytes)
-            self.settings = TorchTensorRTModule.decode_metadata(serialized_metadata)
+            metadata = TorchTensorRTModule.decode_metadata(serialized_metadata)
+            self.settings = metadata["settings"]
+            self.weight_name_map = metadata["weight_name_map"]
 
         else:
             self.engine = None

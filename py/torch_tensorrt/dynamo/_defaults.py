@@ -26,7 +26,7 @@ TRUNCATE_DOUBLE = False
 USE_PYTHON_RUNTIME = False
 USE_FAST_PARTITIONER = True
 ENABLE_EXPERIMENTAL_DECOMPOSITIONS = False
-MAKE_REFITABLE = False
+MAKE_REFITTABLE = False
 REQUIRE_FULL_COMPILATION = False
 DRYRUN = False
 HARDWARE_COMPATIBLE = False
@@ -35,8 +35,8 @@ TIMING_CACHE_PATH = os.path.join(
     tempfile.gettempdir(), "torch_tensorrt_engine_cache", "timing_cache.bin"
 )
 LAZY_ENGINE_INIT = False
-CACHE_BUILT_ENGINES = True
-REUSE_CACHED_ENGINES = True
+CACHE_BUILT_ENGINES = False
+REUSE_CACHED_ENGINES = False
 ENGINE_CACHE_DIR = os.path.join(tempfile.gettempdir(), "torch_tensorrt_engine_cache")
 ENGINE_CACHE_SIZE = 1073741824
 CUSTOM_ENGINE_CACHE = None

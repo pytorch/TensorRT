@@ -6,7 +6,6 @@ import logging
 from typing import Any, List, Optional, Sequence, Tuple
 
 import numpy as np
-import tensorrt as trt
 import torch
 from torch.export import ExportedProgram
 from torch_tensorrt._enums import dtype
@@ -35,12 +34,15 @@ from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (
 )
 from torch_tensorrt.dynamo.utils import (
     check_module_output,
+    get_model_device,
     get_torch_inputs,
     set_log_level,
     to_torch_device,
     to_torch_tensorrt_device,
 )
 from torch_tensorrt.logging import TRT_LOGGER
+
+import tensorrt as trt
 
 logger = logging.getLogger(__name__)
 
@@ -146,7 +148,7 @@ def _refit_single_trt_engine_with_gm(
     """
 
     refitted = set()
-    torch_device = list(new_gm.state_dict().values())[0].device.type
+    torch_device = get_model_device(new_gm)
     refitter = trt.Refitter(old_engine, TRT_LOGGER)
     weight_list = refitter.get_all_weights()
 
@@ -154,7 +156,7 @@ def _refit_single_trt_engine_with_gm(
         # Get the refitting mapping
         trt_wt_location = (
             trt.TensorLocation.DEVICE
-            if torch_device == "cuda"
+            if torch_device.type == "cuda"
             else trt.TensorLocation.HOST
         )
         mapping = construct_refit_mapping_from_weight_name_map(
@@ -237,7 +239,7 @@ def refit_module_weights(
         )
 
     # Get the settings and check the setting to be uniform
-    settings: CompilationSettings = None
+    settings: Optional[CompilationSettings] = None
     if inline_module:
 
         # Obtain the settings
@@ -252,7 +254,7 @@ def refit_module_weights(
         ]
         assert (
             encoded_metadata != ""
-        ), "The engine provided is either not refittable or was built with a version of Torch-TensorRT that is too old, please recompile using the latest version with make_refitable=True"
+        ), "The engine provided is either not refittable or was built with a version of Torch-TensorRT that is too old, please recompile using the latest version with make_refittable=True"
         settings = TorchTensorRTModule.decode_metadata(encoded_metadata)["settings"]
         # Handle torch modules
         compiled_submodules_map = dict(compiled_submodules)
@@ -267,8 +269,10 @@ def refit_module_weights(
                 continue
             settings = submodule.settings
 
+    assert settings is not None
+
     assert (
-        settings.make_refitable
+        settings.make_refittable
     ), "Refitting is not enabled. Please recompile the engine with refit=True."
 
     if settings.debug:
@@ -394,7 +398,7 @@ def refit_module_weights(
                 if isinstance(compiled_submodule, PythonTorchTensorRTModule):
                     engine = compiled_submodule.engine
                 elif isinstance(compiled_submodule, TorchTensorRTModule):
-                    engine_info = compiled_submodule.engine.__getstate__()[0]
+                    engine_info = compiled_submodule.engine.__getstate__()[0]  # type: ignore[index]
                     engine = get_engine_from_encoded_engine(
                         engine_info[ENGINE_IDX], runtime
                     )
