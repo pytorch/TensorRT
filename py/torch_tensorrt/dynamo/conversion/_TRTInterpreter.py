@@ -188,10 +188,6 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             raise RuntimeError("Current platform doesn't support fast native int8!")
 
         if self.compilation_settings.enable_cross_compile_for_windows:
-            if version.parse(trt.__version__) <= version.parse("10.2"):
-                raise RuntimeError(
-                    f"Cross compile for windows is not available in the current tensorrt version: {trt.__version__}, it can only be enabled after 10.2.0 post 1"
-                )
             if platform.system() != "Linux" or platform.architecture()[0] != "64bit":
                 raise RuntimeError(
                     f"Cross compile for windows is only supported on AMD 64bit Linux architecture, current platform: {platform.system()=}, {platform.architecture()[0]=}"
