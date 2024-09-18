@@ -36,7 +36,6 @@ Platform::Platform() : _platform{Platform::PlatformEnum::kUNKNOWN} {}
 Platform::Platform(Platform::PlatformEnum val) : _platform{val} {}
 
 Platform::Platform(const std::string& platform_str) {
-  LOG_ERROR("Platform constructor: " << platform_str);
   auto name_map = get_name_to_platform_map();
   auto it = name_map.find(platform_str);
   if (it != name_map.end()) {

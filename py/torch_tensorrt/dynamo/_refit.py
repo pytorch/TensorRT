@@ -34,7 +34,8 @@ from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (
     TorchTensorRTModule,
 )
 from torch_tensorrt.dynamo.utils import (
-    check_output,
+    check_module_output,
+    get_model_device,
     get_torch_inputs,
     set_log_level,
     to_torch_device,
@@ -115,19 +116,8 @@ def construct_refit_mapping_from_weight_name_map(
     for engine_weight_name, (sd_weight_name, np_weight_type) in weight_name_map.items():
         trt_dtype = dtype.try_from(np_weight_type).to(trt.DataType)
         torch_dtype = dtype.try_from(np_weight_type).to(torch.dtype)
-        if engine_weight_name.split(" ")[-1] in ["SCALE", "SHIFT"]:
-            # Batch Norm Layer
-            params = {}
-            for w in sd_weight_name:
-                params[w.split(".")[-1]] = state_dict[w]
-            scale = params["weight"] / torch.sqrt(params["running_var"] + 1e-7)
-            shift = params["bias"] - params["running_mean"] * scale
-            # Set scale to scale or shift to shift
-            engine_weight_map[engine_weight_name] = eval(
-                engine_weight_name.split(" ")[-1].lower()
-            )
 
-        elif sd_weight_name not in state_dict:
+        if sd_weight_name not in state_dict:
             # If weights is not in sd, we can leave it unchanged
             continue
         else:
@@ -157,16 +147,25 @@ def _refit_single_trt_engine_with_gm(
     """
 
     refitted = set()
-
+    torch_device = get_model_device(new_gm)
     refitter = trt.Refitter(old_engine, TRT_LOGGER)
     weight_list = refitter.get_all_weights()
 
     if weight_name_map:
         # Get the refitting mapping
-        trt_wt_location = trt.TensorLocation.DEVICE
+        trt_wt_location = (
+            trt.TensorLocation.DEVICE
+            if torch_device.type == "cuda"
+            else trt.TensorLocation.HOST
+        )
         mapping = construct_refit_mapping_from_weight_name_map(
             weight_name_map, new_gm.state_dict()
         )
+
+        # Debug Use
+        # correct = construct_refit_mapping(new_gm, input_list, settings)
+        # comparison = {k: (np.allclose(correct[k][0], mapping[k][0].cpu().numpy(), 1e-2, 1e-2), correct[k][0], mapping[k][0]) for k in mapping if k in correct}
+
         for layer_name in weight_list:
             if layer_name not in mapping:
                 logger.warning(f"{layer_name} is not found in weight mapping.")
@@ -235,11 +234,11 @@ def refit_module_weights(
         compiled_module = copy.deepcopy(compiled_module)
     elif inline_module:
         raise AssertionError(
-            "Exported program does not support modifying in place. Please set inplace to false and use the returned graph module."
+            "Exported program does not support modifying in place. Please set in_place to false and use the returned graph module."
         )
 
     # Get the settings and check the setting to be uniform
-    settings: CompilationSettings = None
+    settings: Optional[CompilationSettings] = None
     if inline_module:
 
         # Obtain the settings
@@ -254,7 +253,7 @@ def refit_module_weights(
         ]
         assert (
             encoded_metadata != ""
-        ), "The engine provided is either not refittable or was built with a version of Torch-TensorRT that is too old, please recompile using the latest version with make_refitable=True"
+        ), "The engine provided is either not refittable or was built with a version of Torch-TensorRT that is too old, please recompile using the latest version with make_refittable=True"
         settings = TorchTensorRTModule.decode_metadata(encoded_metadata)["settings"]
         # Handle torch modules
         compiled_submodules_map = dict(compiled_submodules)
@@ -269,8 +268,10 @@ def refit_module_weights(
                 continue
             settings = submodule.settings
 
+    assert settings is not None
+
     assert (
-        settings.make_refitable
+        settings.make_refittable
     ), "Refitting is not enabled. Please recompile the engine with refit=True."
 
     if settings.debug:
@@ -283,6 +284,7 @@ def refit_module_weights(
             arg_inputs = [arg_inputs]
         torch_inputs = get_torch_inputs(arg_inputs, device)
 
+    torch_kwarg_inputs: Any = {}
     if kwarg_inputs:
         torch_kwarg_inputs = get_torch_inputs(kwarg_inputs, device)
     runtime = trt.Runtime(TRT_LOGGER)
@@ -395,7 +397,7 @@ def refit_module_weights(
                 if isinstance(compiled_submodule, PythonTorchTensorRTModule):
                     engine = compiled_submodule.engine
                 elif isinstance(compiled_submodule, TorchTensorRTModule):
-                    engine_info = compiled_submodule.engine.__getstate__()[0]
+                    engine_info = compiled_submodule.engine.__getstate__()[0]  # type: ignore[index]
                     engine = get_engine_from_encoded_engine(
                         engine_info[ENGINE_IDX], runtime
                     )
@@ -436,6 +438,7 @@ def refit_module_weights(
                 settings=settings,
                 weight_name_map=weight_name_map,
             )
+
         except AssertionError as e:
             # If fast_refit is used and failed, we fall back to regular refit
             logger.warning(e)
@@ -463,7 +466,7 @@ def refit_module_weights(
             setattr(compiled_module, f"{name}_engine", refitted_engine)
 
     if verify_output and arg_inputs is not None:
-        if check_output(
+        if check_module_output(
             new_module=new_gm,
             refitted_module=compiled_module,
             arg_inputs=torch_inputs,
@@ -471,6 +474,19 @@ def refit_module_weights(
         ):
             logger.info("Refitting Succeed!")
         else:
+            if weight_name_map:
+                logger.warning(
+                    "Refitting with weight_name_map yielded incorrect result! The outputs do not match."
+                )
+                return refit_module_weights(
+                    compiled_module,
+                    new_weight_module,
+                    arg_inputs,
+                    kwarg_inputs,
+                    verify_output,
+                    use_weight_map_cache=False,
+                    in_place=in_place,
+                )
             logger.error("Refitting Failed! The outputs do not match.")
     else:
         logger.info("Refitting Completed! Output verification skipped.")

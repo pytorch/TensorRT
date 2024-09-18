@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt.dynamo._refit &mdash; Torch-TensorRT v2.5.0.dev0+423ee4d documentation</title>
+  <title>torch_tensorrt.dynamo._refit &mdash; Torch-TensorRT v2.5.0.dev0+1e9aefe documentation</title>
   
 
   
@@ -272,7 +272,7 @@
               
               
                 <div class="version">
-                  v2.5.0.dev0+423ee4d
+                  v2.5.0.dev0+1e9aefe
                 </div>
               
             
@@ -313,7 +313,9 @@
 <li class="toctree-l1"><a class="reference internal" href="../../../user_guide/runtime.html">Deploying Torch-TensorRT Programs</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../user_guide/using_dla.html">DLA</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/torch_compile_advanced_usage.html">Torch Compile Advanced Usage</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/vgg16_fp8_ptq.html">Deploy Quantized Models using Torch-TensorRT</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/vgg16_ptq.html">Deploy Quantized Models using Torch-TensorRT</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/engine_caching_example.html">Engine Caching</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/refit_engine_example.html">Refitting Torch-TensorRT Programs with New Weights</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Dynamo Frontend</span></p>
 <ul>
@@ -339,11 +341,9 @@
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/notebooks.html">Example notebooks</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/torch_compile_resnet_example.html">Compiling ResNet using the Torch-TensorRT <cite>torch.compile</cite> Backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/torch_compile_transformers_example.html">Compiling a Transformer using torch.compile and TensorRT</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/torch_compile_advanced_usage.html">Torch Compile Advanced Usage</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/torch_compile_stable_diffusion.html">Torch Compile Stable Diffusion</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/torch_export_cudagraphs.html">Torch Export with Cudagraphs</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/custom_kernel_plugins.html">Using Custom Kernels within TensorRT Engines with Torch-TensorRT</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/vgg16_fp8_ptq.html">Deploy Quantized Models using Torch-TensorRT</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/mutable_torchtrt_module_example.html">Mutable Torch TensorRT Module</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Python API Documentation</span></p>
@@ -489,7 +489,8 @@
     <span class="n">TorchTensorRTModule</span><span class="p">,</span>
 <span class="p">)</span>
 <span class="kn">from</span> <span class="nn">torch_tensorrt.dynamo.utils</span> <span class="kn">import</span> <span class="p">(</span>
-    <span class="n">check_output</span><span class="p">,</span>
+    <span class="n">check_module_output</span><span class="p">,</span>
+    <span class="n">get_model_device</span><span class="p">,</span>
     <span class="n">get_torch_inputs</span><span class="p">,</span>
     <span class="n">set_log_level</span><span class="p">,</span>
     <span class="n">to_torch_device</span><span class="p">,</span>
@@ -570,19 +571,8 @@
     <span class="k">for</span> <span class="n">engine_weight_name</span><span class="p">,</span> <span class="p">(</span><span class="n">sd_weight_name</span><span class="p">,</span> <span class="n">np_weight_type</span><span class="p">)</span> <span class="ow">in</span> <span class="n">weight_name_map</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
         <span class="n">trt_dtype</span> <span class="o">=</span> <span class="n">dtype</span><span class="o">.</span><span class="n">try_from</span><span class="p">(</span><span class="n">np_weight_type</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">trt</span><span class="o">.</span><span class="n">DataType</span><span class="p">)</span>
         <span class="n">torch_dtype</span> <span class="o">=</span> <span class="n">dtype</span><span class="o">.</span><span class="n">try_from</span><span class="p">(</span><span class="n">np_weight_type</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span>
-        <span class="k">if</span> <span class="n">engine_weight_name</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot; &quot;</span><span class="p">)[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;SCALE&quot;</span><span class="p">,</span> <span class="s2">&quot;SHIFT&quot;</span><span class="p">]:</span>
-            <span class="c1"># Batch Norm Layer</span>
-            <span class="n">params</span> <span class="o">=</span> <span class="p">{}</span>
-            <span class="k">for</span> <span class="n">w</span> <span class="ow">in</span> <span class="n">sd_weight_name</span><span class="p">:</span>
-                <span class="n">params</span><span class="p">[</span><span class="n">w</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;.&quot;</span><span class="p">)[</span><span class="o">-</span><span class="mi">1</span><span class="p">]]</span> <span class="o">=</span> <span class="n">state_dict</span><span class="p">[</span><span class="n">w</span><span class="p">]</span>
-            <span class="n">scale</span> <span class="o">=</span> <span class="n">params</span><span class="p">[</span><span class="s2">&quot;weight&quot;</span><span class="p">]</span> <span class="o">/</span> <span class="n">torch</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">params</span><span class="p">[</span><span class="s2">&quot;running_var&quot;</span><span class="p">]</span> <span class="o">+</span> <span class="mf">1e-7</span><span class="p">)</span>
-            <span class="n">shift</span> <span class="o">=</span> <span class="n">params</span><span class="p">[</span><span class="s2">&quot;bias&quot;</span><span class="p">]</span> <span class="o">-</span> <span class="n">params</span><span class="p">[</span><span class="s2">&quot;running_mean&quot;</span><span class="p">]</span> <span class="o">*</span> <span class="n">scale</span>
-            <span class="c1"># Set scale to scale or shift to shift</span>
-            <span class="n">engine_weight_map</span><span class="p">[</span><span class="n">engine_weight_name</span><span class="p">]</span> <span class="o">=</span> <span class="nb">eval</span><span class="p">(</span>
-                <span class="n">engine_weight_name</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot; &quot;</span><span class="p">)[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
-            <span class="p">)</span>
 
-        <span class="k">elif</span> <span class="n">sd_weight_name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">state_dict</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">sd_weight_name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">state_dict</span><span class="p">:</span>
             <span class="c1"># If weights is not in sd, we can leave it unchanged</span>
             <span class="k">continue</span>
         <span class="k">else</span><span class="p">:</span>
@@ -612,16 +602,25 @@
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">refitted</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
-
+    <span class="n">torch_device</span> <span class="o">=</span> <span class="n">get_model_device</span><span class="p">(</span><span class="n">new_gm</span><span class="p">)</span>
     <span class="n">refitter</span> <span class="o">=</span> <span class="n">trt</span><span class="o">.</span><span class="n">Refitter</span><span class="p">(</span><span class="n">old_engine</span><span class="p">,</span> <span class="n">TRT_LOGGER</span><span class="p">)</span>
     <span class="n">weight_list</span> <span class="o">=</span> <span class="n">refitter</span><span class="o">.</span><span class="n">get_all_weights</span><span class="p">()</span>
 
     <span class="k">if</span> <span class="n">weight_name_map</span><span class="p">:</span>
         <span class="c1"># Get the refitting mapping</span>
-        <span class="n">trt_wt_location</span> <span class="o">=</span> <span class="n">trt</span><span class="o">.</span><span class="n">TensorLocation</span><span class="o">.</span><span class="n">DEVICE</span>
+        <span class="n">trt_wt_location</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">trt</span><span class="o">.</span><span class="n">TensorLocation</span><span class="o">.</span><span class="n">DEVICE</span>
+            <span class="k">if</span> <span class="n">torch_device</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="s2">&quot;cuda&quot;</span>
+            <span class="k">else</span> <span class="n">trt</span><span class="o">.</span><span class="n">TensorLocation</span><span class="o">.</span><span class="n">HOST</span>
+        <span class="p">)</span>
         <span class="n">mapping</span> <span class="o">=</span> <span class="n">construct_refit_mapping_from_weight_name_map</span><span class="p">(</span>
             <span class="n">weight_name_map</span><span class="p">,</span> <span class="n">new_gm</span><span class="o">.</span><span class="n">state_dict</span><span class="p">()</span>
         <span class="p">)</span>
+
+        <span class="c1"># Debug Use</span>
+        <span class="c1"># correct = construct_refit_mapping(new_gm, input_list, settings)</span>
+        <span class="c1"># comparison = {k: (np.allclose(correct[k][0], mapping[k][0].cpu().numpy(), 1e-2, 1e-2), correct[k][0], mapping[k][0]) for k in mapping if k in correct}</span>
+
         <span class="k">for</span> <span class="n">layer_name</span> <span class="ow">in</span> <span class="n">weight_list</span><span class="p">:</span>
             <span class="k">if</span> <span class="n">layer_name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">mapping</span><span class="p">:</span>
                 <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">layer_name</span><span class="si">}</span><span class="s2"> is not found in weight mapping.&quot;</span><span class="p">)</span>
@@ -690,11 +689,11 @@
         <span class="n">compiled_module</span> <span class="o">=</span> <span class="n">copy</span><span class="o">.</span><span class="n">deepcopy</span><span class="p">(</span><span class="n">compiled_module</span><span class="p">)</span>
     <span class="k">elif</span> <span class="n">inline_module</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">AssertionError</span><span class="p">(</span>
-            <span class="s2">&quot;Exported program does not support modifying in place. Please set inplace to false and use the returned graph module.&quot;</span>
+            <span class="s2">&quot;Exported program does not support modifying in place. Please set in_place to false and use the returned graph module.&quot;</span>
         <span class="p">)</span>
 
     <span class="c1"># Get the settings and check the setting to be uniform</span>
-    <span class="n">settings</span><span class="p">:</span> <span class="n">CompilationSettings</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">settings</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">CompilationSettings</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
     <span class="k">if</span> <span class="n">inline_module</span><span class="p">:</span>
 
         <span class="c1"># Obtain the settings</span>
@@ -709,7 +708,7 @@
         <span class="p">]</span>
         <span class="k">assert</span> <span class="p">(</span>
             <span class="n">encoded_metadata</span> <span class="o">!=</span> <span class="s2">&quot;&quot;</span>
-        <span class="p">),</span> <span class="s2">&quot;The engine provided is either not refittable or was built with a version of Torch-TensorRT that is too old, please recompile using the latest version with make_refitable=True&quot;</span>
+        <span class="p">),</span> <span class="s2">&quot;The engine provided is either not refittable or was built with a version of Torch-TensorRT that is too old, please recompile using the latest version with make_refittable=True&quot;</span>
         <span class="n">settings</span> <span class="o">=</span> <span class="n">TorchTensorRTModule</span><span class="o">.</span><span class="n">decode_metadata</span><span class="p">(</span><span class="n">encoded_metadata</span><span class="p">)[</span><span class="s2">&quot;settings&quot;</span><span class="p">]</span>
         <span class="c1"># Handle torch modules</span>
         <span class="n">compiled_submodules_map</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">compiled_submodules</span><span class="p">)</span>
@@ -724,8 +723,10 @@
                 <span class="k">continue</span>
             <span class="n">settings</span> <span class="o">=</span> <span class="n">submodule</span><span class="o">.</span><span class="n">settings</span>
 
+    <span class="k">assert</span> <span class="n">settings</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+
     <span class="k">assert</span> <span class="p">(</span>
-        <span class="n">settings</span><span class="o">.</span><span class="n">make_refitable</span>
+        <span class="n">settings</span><span class="o">.</span><span class="n">make_refittable</span>
     <span class="p">),</span> <span class="s2">&quot;Refitting is not enabled. Please recompile the engine with refit=True.&quot;</span>
 
     <span class="k">if</span> <span class="n">settings</span><span class="o">.</span><span class="n">debug</span><span class="p">:</span>
@@ -738,6 +739,7 @@
             <span class="n">arg_inputs</span> <span class="o">=</span> <span class="p">[</span><span class="n">arg_inputs</span><span class="p">]</span>
         <span class="n">torch_inputs</span> <span class="o">=</span> <span class="n">get_torch_inputs</span><span class="p">(</span><span class="n">arg_inputs</span><span class="p">,</span> <span class="n">device</span><span class="p">)</span>
 
+    <span class="n">torch_kwarg_inputs</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="p">{}</span>
     <span class="k">if</span> <span class="n">kwarg_inputs</span><span class="p">:</span>
         <span class="n">torch_kwarg_inputs</span> <span class="o">=</span> <span class="n">get_torch_inputs</span><span class="p">(</span><span class="n">kwarg_inputs</span><span class="p">,</span> <span class="n">device</span><span class="p">)</span>
     <span class="n">runtime</span> <span class="o">=</span> <span class="n">trt</span><span class="o">.</span><span class="n">Runtime</span><span class="p">(</span><span class="n">TRT_LOGGER</span><span class="p">)</span>
@@ -850,7 +852,7 @@
                 <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">compiled_submodule</span><span class="p">,</span> <span class="n">PythonTorchTensorRTModule</span><span class="p">):</span>
                     <span class="n">engine</span> <span class="o">=</span> <span class="n">compiled_submodule</span><span class="o">.</span><span class="n">engine</span>
                 <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">compiled_submodule</span><span class="p">,</span> <span class="n">TorchTensorRTModule</span><span class="p">):</span>
-                    <span class="n">engine_info</span> <span class="o">=</span> <span class="n">compiled_submodule</span><span class="o">.</span><span class="n">engine</span><span class="o">.</span><span class="n">__getstate__</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span>
+                    <span class="n">engine_info</span> <span class="o">=</span> <span class="n">compiled_submodule</span><span class="o">.</span><span class="n">engine</span><span class="o">.</span><span class="n">__getstate__</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span>  <span class="c1"># type: ignore[index]</span>
                     <span class="n">engine</span> <span class="o">=</span> <span class="n">get_engine_from_encoded_engine</span><span class="p">(</span>
                         <span class="n">engine_info</span><span class="p">[</span><span class="n">ENGINE_IDX</span><span class="p">],</span> <span class="n">runtime</span>
                     <span class="p">)</span>
@@ -891,6 +893,7 @@
                 <span class="n">settings</span><span class="o">=</span><span class="n">settings</span><span class="p">,</span>
                 <span class="n">weight_name_map</span><span class="o">=</span><span class="n">weight_name_map</span><span class="p">,</span>
             <span class="p">)</span>
+
         <span class="k">except</span> <span class="ne">AssertionError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
             <span class="c1"># If fast_refit is used and failed, we fall back to regular refit</span>
             <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="n">e</span><span class="p">)</span>
@@ -918,7 +921,7 @@
             <span class="nb">setattr</span><span class="p">(</span><span class="n">compiled_module</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">_engine&quot;</span><span class="p">,</span> <span class="n">refitted_engine</span><span class="p">)</span>
 
     <span class="k">if</span> <span class="n">verify_output</span> <span class="ow">and</span> <span class="n">arg_inputs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="k">if</span> <span class="n">check_output</span><span class="p">(</span>
+        <span class="k">if</span> <span class="n">check_module_output</span><span class="p">(</span>
             <span class="n">new_module</span><span class="o">=</span><span class="n">new_gm</span><span class="p">,</span>
             <span class="n">refitted_module</span><span class="o">=</span><span class="n">compiled_module</span><span class="p">,</span>
             <span class="n">arg_inputs</span><span class="o">=</span><span class="n">torch_inputs</span><span class="p">,</span>
@@ -926,6 +929,19 @@
         <span class="p">):</span>
             <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Refitting Succeed!&quot;</span><span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">weight_name_map</span><span class="p">:</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                    <span class="s2">&quot;Refitting with weight_name_map yielded incorrect result! The outputs do not match.&quot;</span>
+                <span class="p">)</span>
+                <span class="k">return</span> <span class="n">refit_module_weights</span><span class="p">(</span>
+                    <span class="n">compiled_module</span><span class="p">,</span>
+                    <span class="n">new_weight_module</span><span class="p">,</span>
+                    <span class="n">arg_inputs</span><span class="p">,</span>
+                    <span class="n">kwarg_inputs</span><span class="p">,</span>
+                    <span class="n">verify_output</span><span class="p">,</span>
+                    <span class="n">use_weight_map_cache</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                    <span class="n">in_place</span><span class="o">=</span><span class="n">in_place</span><span class="p">,</span>
+                <span class="p">)</span>
             <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Refitting Failed! The outputs do not match.&quot;</span><span class="p">)</span>
     <span class="k">else</span><span class="p">:</span>
         <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Refitting Completed! Output verification skipped.&quot;</span><span class="p">)</span>

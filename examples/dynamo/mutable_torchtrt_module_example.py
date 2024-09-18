@@ -31,10 +31,10 @@ inputs = [torch.rand((1, 3, 224, 224)).to("cuda")]
 settings = {
     "use_python": False,
     "enabled_precisions": {torch.float32},
-    "make_refitable": True,
+    "make_refittable": True,
 }
 
-model = models.resnet18(pretrained=False).eval().to("cuda")
+model = models.resnet18(pretrained=True).eval().to("cuda")
 mutable_module = torch_trt.MutableTorchTensorRTModule(model, **settings)
 # You can use the mutable module just like the original pytorch module. The compilation happens while you first call the mutable module.
 mutable_module(*inputs)
@@ -45,7 +45,7 @@ mutable_module(*inputs)
 
 # %%
 # Making changes to mutable module can trigger refit or re-compilation. For example, loading a different state_dict and setting new weight values will trigger refit, and adding a module to the model will trigger re-compilation.
-model2 = models.resnet18(pretrained=True).eval().to("cuda")
+model2 = models.resnet18(pretrained=False).eval().to("cuda")
 mutable_module.load_state_dict(model2.state_dict())
 
 
@@ -80,7 +80,7 @@ with torch.no_grad():
         "use_python_runtime": True,
         "enabled_precisions": {torch.float16},
         "debug": True,
-        "make_refitable": True,
+        "make_refittable": True,
     }
 
     model_id = "runwayml/stable-diffusion-v1-5"

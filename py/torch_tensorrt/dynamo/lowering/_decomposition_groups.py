@@ -42,7 +42,6 @@ torch_enabled_decompositions: Set[Union[OpOverload, OpOverloadPacket]] = {
     aten.fill,
     aten.frac,
     aten._fused_moving_avg_obs_fq_helper,
-    aten.gelu,
     aten.gelu_backward,
     aten.glu_backward,
     aten.hardshrink,

@@ -12,7 +12,11 @@ from torch_tensorrt.dynamo import _defaults
 from torch_tensorrt.dynamo._compiler import compile as dynamo_compile
 from torch_tensorrt.dynamo._refit import refit_module_weights
 from torch_tensorrt.dynamo._settings import CompilationSettings
-from torch_tensorrt.dynamo.utils import to_torch_device, to_torch_tensorrt_device
+from torch_tensorrt.dynamo.utils import (
+    check_output_equal,
+    to_torch_device,
+    to_torch_tensorrt_device,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -61,7 +65,7 @@ class MutableTorchTensorRTModule(object):
             Union[torch.dtype, dtype]
         ] = _defaults.ENABLED_PRECISIONS,
         engine_capability: EngineCapability = _defaults.ENGINE_CAPABILITY,
-        make_refitable: bool = _defaults.MAKE_REFITABLE,
+        make_refittable: bool = _defaults.MAKE_REFITTABLE,
         debug: bool = _defaults.DEBUG,
         num_avg_timing_iters: int = _defaults.NUM_AVG_TIMING_ITERS,
         workspace_size: int = _defaults.WORKSPACE_SIZE,
@@ -148,8 +152,8 @@ class MutableTorchTensorRTModule(object):
         device = to_torch_tensorrt_device(device)
         enabled_precisions = {dtype._from(p) for p in enabled_precisions}
         assert (
-            make_refitable
-        ), "'make_refitable' has to be True for a MutableTorchTensorRTModule."
+            make_refittable
+        ), "'make_refittable' has to be True for a MutableTorchTensorRTModule."
         compilation_options = {
             "enabled_precisions": (
                 enabled_precisions
@@ -176,7 +180,7 @@ class MutableTorchTensorRTModule(object):
             "require_full_compilation": require_full_compilation,
             "disable_tf32": disable_tf32,
             "sparse_weights": sparse_weights,
-            "make_refitable": make_refitable,
+            "make_refittable": make_refittable,
             "engine_capability": engine_capability,
             "dla_sram_size": dla_sram_size,
             "dla_local_dram_size": dla_local_dram_size,
@@ -228,7 +232,7 @@ class MutableTorchTensorRTModule(object):
             new_result = self.original_model(*args, **kwargs)
             self.original_model.cpu()
             torch.cuda.empty_cache()
-            if MutableTorchTensorRTModule.check_output_equal(result, new_result):
+            if check_output_equal(result, new_result):
                 self.refit_state.set_state(RefitFlag.LIVE)
                 return
 
@@ -268,7 +272,12 @@ class MutableTorchTensorRTModule(object):
                 )
             )
         self.gm = refit_module_weights(
-            self.gm, self.exp_program, use_weight_map_cache=True, in_place=True
+            self.gm,
+            self.exp_program,
+            self.arg_inputs,
+            self.kwarg_inputs,
+            use_weight_map_cache=True,
+            in_place=True,
         )
 
         self.original_model.cpu()
@@ -425,46 +434,6 @@ class MutableTorchTensorRTModule(object):
                 setattr(self.original_model, name, value)
         else:
             object.__setattr__(self, name, value)
-
-    @staticmethod
-    def check_output_equal(
-        output1: Any,
-        output2: Any,
-    ) -> bool:
-        # TODO: Move this to utils when all PRs are merged. This can be used by other functions.
-        if type(output1) != type(output2):
-            logger.warning(
-                "This module does not support using output verification to skip refit. Refit will be performed \
-                           whenever the state is UNKNOWN"
-            )
-            return False
-
-        if isinstance(output1, torch.Tensor):
-            if output1.shape != output2.shape:
-                return False
-            return torch.allclose(output1, output2, 1e-2, 1e-2)  # type: ignore
-
-        elif isinstance(output1, (tuple, list)):
-            if len(output1) != len(output2):
-                return False
-            for a, b in zip(output1, output2):
-                if not MutableTorchTensorRTModule.check_output_equal(a, b):
-                    return False
-                return True
-
-        elif isinstance(output1, dict):
-            if output1.keys() != output2.keys():
-                return False
-            for a, b in zip(output1.values(), output2.values()):
-                if not MutableTorchTensorRTModule.check_output_equal(a, b):
-                    return False
-            return True
-
-        logger.warning(
-            "This module does not support using output verification to skip refit. Refit will be performed \
-                        whenever the state is UNKNOWN"
-        )
-        return False
 
     @staticmethod
     def check_inputs_equal(

@@ -4,19 +4,19 @@ import logging
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union, overload
 
 import numpy as np
+import tensorrt as trt
 import torch
 import torch_tensorrt.dynamo.conversion.impl as impl
 from torch.fx.node import Argument, Target
 from torch.fx.passes.shape_prop import TensorMetadata
 from torch_tensorrt import _enums
+from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
 from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
     ConverterRegistry,
     DynamoConverterImplSignature,
 )
-
-import tensorrt as trt
 
 from ..types import Shape, TRTDataType, TRTLayer, TRTTensor
 
@@ -112,7 +112,9 @@ def get_node_io(
     return metadata_string
 
 
-def is_only_operator_on_placeholder(node: torch.fx.Node) -> bool:
+def is_only_operator_on_placeholder(
+    node: torch.fx.Node, settings: CompilationSettings = None
+) -> bool:
     """Detects whether a call_function node is the only operator on a placeholder"""
     # Returns true if the node operates on a placeholder and is a direct output
     return (
@@ -157,10 +159,9 @@ def cast_trt_tensor(
         target_str = ConverterRegistry.qualified_name_or_str(target)
         target_name = f"{source_ir}_ops{('.' + target_str) if target_str else ''}"
 
-        identity_layer = ctx.net.add_identity(input_val)
-        identity_layer.set_output_type(0, trt_dtype)
-        identity_layer.name = f"Cast ITensor {input_val.name} from {input_val.dtype} to {trt_dtype} - [{target_name}]-[{name}]"
-        return identity_layer.get_output(0)
+        cast_layer = ctx.net.add_cast(input_val, trt_dtype)
+        cast_layer.name = f"Cast ITensor {input_val.name} from {input_val.dtype} to {trt_dtype} - [{target_name}]-[{name}]"
+        return cast_layer.get_output(0)
     else:
         return input_val
 

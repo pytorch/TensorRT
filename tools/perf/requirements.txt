@@ -2,8 +2,8 @@ numpy
 argparse
 pyyaml
 onnx
-transformers==4.38.0
+pandas
+transformers
 diffusers==0.21.4
-pandas==2.0.1
 timm==0.9.8
 

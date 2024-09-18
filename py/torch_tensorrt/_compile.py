@@ -388,7 +388,7 @@ def convert_method_to_trt_engine(
         torchtrt_kwarg_inputs = prepare_inputs(kwarg_inputs)
 
         exp_program = torch_tensorrt.dynamo.trace(
-            module, torchtrt_arg_inputs, kwarg_inputs=torchtrt_kwarg_inputs**kwargs
+            module, torchtrt_arg_inputs, kwarg_inputs=torchtrt_kwarg_inputs, **kwargs
         )
 
         return dynamo_convert_exported_program_to_serialized_trt_engine(

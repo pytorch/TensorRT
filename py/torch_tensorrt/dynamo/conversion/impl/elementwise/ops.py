@@ -1,6 +1,7 @@
 from typing import Optional, Union
 
 import numpy as np
+import tensorrt as trt
 import torch
 import torch_tensorrt.dynamo.conversion.impl as impl
 from torch.fx.node import Target
@@ -17,6 +18,7 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
 from torch_tensorrt.dynamo.conversion.impl.elementwise.base import (
     convert_binary_elementwise,
 )
+from torch_tensorrt.dynamo.conversion.impl.shape import get_shape_with_dynamic_shape
 from torch_tensorrt.dynamo.conversion.impl.unary import atan, sign
 from torch_tensorrt.dynamo.conversion.impl.unary.base import convert_unary
 from torch_tensorrt.fx.converters.converter_utils import broadcast
@@ -66,6 +68,11 @@ def trunc_div(
         name,
         prod_output,
     )
+
+    # cast the sign_output back to int32 for trunc div
+    # This is required for scatter_reduce_.two(reduce='mean' where trunc_div casts it to float32 and TRTInterpreter expects int32)
+    if (isinstance(sign_output, TRTTensor)) and (sign_output.dtype == trt.float32):
+        sign_output = cast_trt_tensor(ctx, sign_output, trt.int32, name)
 
     # Convert constant input into ITensor for UnaryOperation
     if not isinstance(input, trt.tensorrt.ITensor):
@@ -546,12 +553,13 @@ def pow(
     lhs_val: Union[TRTTensor, int, float],
     rhs_val: Union[TRTTensor, int, float],
 ) -> TRTTensor:
-    if isinstance(lhs_val, TRTTensor) and isinstance(rhs_val, TRTTensor):
-        lhs_val, rhs_val = cast_int_int_div_trt_tensor(ctx, lhs_val, rhs_val, name)
-
-    return convert_binary_elementwise(
+    # POW operation supports only float32 and int8 inputs
+    lhs_val = get_trt_tensor(ctx, lhs_val, name + "_lhs_val", trt.float32)
+    rhs_val = get_trt_tensor(ctx, rhs_val, name + "_rhs_val", trt.float32)
+    out = convert_binary_elementwise(
         ctx, target, source_ir, name, trt.ElementWiseOperation.POW, lhs_val, rhs_val
     )
+    return out
 
 
 def floor_divide(

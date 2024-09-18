@@ -324,61 +324,6 @@ def expand(
     return layer.get_output(0)
 
 
-def chunk(
-    ctx: ConversionContext,
-    target: Target,
-    source_ir: Optional[SourceIR],
-    name: str,
-    input: TRTTensor,
-    chunks: int,
-    dim: int,
-) -> TRTTensor:
-    if chunks <= 0:
-        raise RuntimeError(
-            f"chunk expects `chunks` to be greater than 0, got: {chunks}"
-        )
-
-    shape = input.shape
-    dim = get_positive_dim(dim, len(shape))
-
-    if dim >= len(shape):
-        raise RuntimeError(
-            f"chunk expects `dim` to be less than the length of input shape, got: {dim}"
-        )
-
-    dynamic_shape = has_dynamic_shape(input.shape)
-    if dynamic_shape > 0:
-        # Check whether slice target dim is dynamic shape dim
-        assert input.shape[dim] != -1, "Can't chunk on dynamic shape dimension!"
-
-    size_dim = shape[dim]
-    chunk_size = math.ceil(size_dim / chunks)
-    result = []
-    start = 0
-    end = min(start + chunk_size, size_dim)
-    cnt = 0
-
-    while start < end:
-        result.append(
-            slice_op(
-                ctx,
-                target,
-                source_ir,
-                f"{name}_slice_{cnt}",
-                input,
-                dim,
-                start,
-                end,
-                1,
-            )
-        )
-        start = end
-        end = min(start + chunk_size, size_dim)
-        cnt += 1
-
-    return result
-
-
 def cumsum(
     ctx: ConversionContext,
     target: Target,
@@ -457,6 +402,7 @@ def tile(
     dims: Sequence[int],
 ) -> TRTTensor:
     diff = len(dims) - len(input.shape)
+    has_dynamic_shape_input = has_dynamic_shape(input.shape)
     if diff > 0:
         # prepend 1 to input.shape
         new_shape = (1,) * diff + tuple(input.shape)
@@ -467,10 +413,64 @@ def tile(
         # prepend 1 to dims
         dims = (1,) * -diff + tuple(dims)
 
-    shapes = [i * j for i, j in zip(input.shape, dims)]
-    starts = [0] * len(dims)
-    strides = [1] * len(dims)
-    layer = ctx.net.add_slice(input, tuple(starts), tuple(shapes), tuple(strides))
+    starts = tuple([0] * len(dims))
+    strides = tuple([1] * len(dims))
+    # layer = ctx.net.add_slice(input, tuple(starts), tuple(shapes), tuple(strides))
+    if not (has_dynamic_shape_input):
+        shapes = [i * j for i, j in zip(input.shape, dims)]
+        layer = ctx.net.add_slice(input, tuple(starts), tuple(shapes), tuple(strides))
+    else:
+        shapes = []
+        index = 0
+        for i, j in zip(input.shape, dims):
+            if i == DYNAMIC_DIM:
+                i = get_shape(
+                    ctx, target, source_ir, name + f"_input_{index}", input, index
+                )
+            prod_shape = convert_binary_elementwise(
+                ctx,
+                target,
+                source_ir,
+                name + "_prod",
+                trt.ElementWiseOperation.PROD,
+                i,
+                j,
+            )
+            shapes.append(prod_shape)
+            index = index + 1
+        layer = ctx.net.add_slice(
+            input, start=trt.Dims(), shape=trt.Dims(), stride=trt.Dims()
+        )
+        shape_tensor = cat(
+            ctx,
+            target,
+            source_ir,
+            name + "_shape_concat",
+            tuple(shapes),
+            0,
+            cast_dtype=trt.int32,
+        )
+        start_tensor = cat(
+            ctx,
+            target,
+            source_ir,
+            name + "_start_concat",
+            starts,
+            0,
+            cast_dtype=trt.int32,
+        )
+        stride_tensor = cat(
+            ctx,
+            target,
+            source_ir,
+            name + "_stride_concat",
+            strides,
+            0,
+            cast_dtype=trt.int32,
+        )
+        layer.set_input(1, start_tensor)
+        layer.set_input(2, shape_tensor)
+        layer.set_input(3, stride_tensor)
     layer.mode = trt.SampleMode.WRAP
     set_layer_name(layer, target, name)
     return layer.get_output(0)

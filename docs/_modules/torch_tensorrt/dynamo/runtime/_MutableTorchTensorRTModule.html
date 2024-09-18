@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt.dynamo.runtime._MutableTorchTensorRTModule &mdash; Torch-TensorRT v2.5.0.dev0+423ee4d documentation</title>
+  <title>torch_tensorrt.dynamo.runtime._MutableTorchTensorRTModule &mdash; Torch-TensorRT v2.5.0.dev0+1e9aefe documentation</title>
   
 
   
@@ -272,7 +272,7 @@
               
               
                 <div class="version">
-                  v2.5.0.dev0+423ee4d
+                  v2.5.0.dev0+1e9aefe
                 </div>
               
             
@@ -313,7 +313,9 @@
 <li class="toctree-l1"><a class="reference internal" href="../../../../user_guide/runtime.html">Deploying Torch-TensorRT Programs</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../../user_guide/using_dla.html">DLA</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../../tutorials/_rendered_examples/dynamo/torch_compile_advanced_usage.html">Torch Compile Advanced Usage</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../../../tutorials/_rendered_examples/dynamo/vgg16_fp8_ptq.html">Deploy Quantized Models using Torch-TensorRT</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../tutorials/_rendered_examples/dynamo/vgg16_ptq.html">Deploy Quantized Models using Torch-TensorRT</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../tutorials/_rendered_examples/dynamo/engine_caching_example.html">Engine Caching</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../tutorials/_rendered_examples/dynamo/refit_engine_example.html">Refitting Torch-TensorRT Programs with New Weights</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Dynamo Frontend</span></p>
 <ul>
@@ -339,11 +341,9 @@
 <li class="toctree-l1"><a class="reference internal" href="../../../../tutorials/notebooks.html">Example notebooks</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../../tutorials/_rendered_examples/dynamo/torch_compile_resnet_example.html">Compiling ResNet using the Torch-TensorRT <cite>torch.compile</cite> Backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../../tutorials/_rendered_examples/dynamo/torch_compile_transformers_example.html">Compiling a Transformer using torch.compile and TensorRT</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../../../tutorials/_rendered_examples/dynamo/torch_compile_advanced_usage.html">Torch Compile Advanced Usage</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../../tutorials/_rendered_examples/dynamo/torch_compile_stable_diffusion.html">Torch Compile Stable Diffusion</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../../tutorials/_rendered_examples/dynamo/torch_export_cudagraphs.html">Torch Export with Cudagraphs</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../../tutorials/_rendered_examples/dynamo/custom_kernel_plugins.html">Using Custom Kernels within TensorRT Engines with Torch-TensorRT</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../../../tutorials/_rendered_examples/dynamo/vgg16_fp8_ptq.html">Deploy Quantized Models using Torch-TensorRT</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../../tutorials/_rendered_examples/dynamo/mutable_torchtrt_module_example.html">Mutable Torch TensorRT Module</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Python API Documentation</span></p>
@@ -467,7 +467,11 @@
 <span class="kn">from</span> <span class="nn">torch_tensorrt.dynamo._compiler</span> <span class="kn">import</span> <span class="nb">compile</span> <span class="k">as</span> <span class="n">dynamo_compile</span>
 <span class="kn">from</span> <span class="nn">torch_tensorrt.dynamo._refit</span> <span class="kn">import</span> <span class="n">refit_module_weights</span>
 <span class="kn">from</span> <span class="nn">torch_tensorrt.dynamo._settings</span> <span class="kn">import</span> <span class="n">CompilationSettings</span>
-<span class="kn">from</span> <span class="nn">torch_tensorrt.dynamo.utils</span> <span class="kn">import</span> <span class="n">to_torch_device</span><span class="p">,</span> <span class="n">to_torch_tensorrt_device</span>
+<span class="kn">from</span> <span class="nn">torch_tensorrt.dynamo.utils</span> <span class="kn">import</span> <span class="p">(</span>
+    <span class="n">check_output_equal</span><span class="p">,</span>
+    <span class="n">to_torch_device</span><span class="p">,</span>
+    <span class="n">to_torch_tensorrt_device</span><span class="p">,</span>
+<span class="p">)</span>
 
 <span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
 
@@ -516,7 +520,7 @@
             <span class="n">Union</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">dtype</span><span class="p">]</span>
         <span class="p">]</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">ENABLED_PRECISIONS</span><span class="p">,</span>
         <span class="n">engine_capability</span><span class="p">:</span> <span class="n">EngineCapability</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">ENGINE_CAPABILITY</span><span class="p">,</span>
-        <span class="n">make_refitable</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">MAKE_REFITABLE</span><span class="p">,</span>
+        <span class="n">make_refittable</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">MAKE_REFITTABLE</span><span class="p">,</span>
         <span class="n">debug</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">,</span>
         <span class="n">num_avg_timing_iters</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">NUM_AVG_TIMING_ITERS</span><span class="p">,</span>
         <span class="n">workspace_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">WORKSPACE_SIZE</span><span class="p">,</span>
@@ -603,8 +607,8 @@
         <span class="n">device</span> <span class="o">=</span> <span class="n">to_torch_tensorrt_device</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
         <span class="n">enabled_precisions</span> <span class="o">=</span> <span class="p">{</span><span class="n">dtype</span><span class="o">.</span><span class="n">_from</span><span class="p">(</span><span class="n">p</span><span class="p">)</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">enabled_precisions</span><span class="p">}</span>
         <span class="k">assert</span> <span class="p">(</span>
-            <span class="n">make_refitable</span>
-        <span class="p">),</span> <span class="s2">&quot;&#39;make_refitable&#39; has to be True for a MutableTorchTensorRTModule.&quot;</span>
+            <span class="n">make_refittable</span>
+        <span class="p">),</span> <span class="s2">&quot;&#39;make_refittable&#39; has to be True for a MutableTorchTensorRTModule.&quot;</span>
         <span class="n">compilation_options</span> <span class="o">=</span> <span class="p">{</span>
             <span class="s2">&quot;enabled_precisions&quot;</span><span class="p">:</span> <span class="p">(</span>
                 <span class="n">enabled_precisions</span>
@@ -631,7 +635,7 @@
             <span class="s2">&quot;require_full_compilation&quot;</span><span class="p">:</span> <span class="n">require_full_compilation</span><span class="p">,</span>
             <span class="s2">&quot;disable_tf32&quot;</span><span class="p">:</span> <span class="n">disable_tf32</span><span class="p">,</span>
             <span class="s2">&quot;sparse_weights&quot;</span><span class="p">:</span> <span class="n">sparse_weights</span><span class="p">,</span>
-            <span class="s2">&quot;make_refitable&quot;</span><span class="p">:</span> <span class="n">make_refitable</span><span class="p">,</span>
+            <span class="s2">&quot;make_refittable&quot;</span><span class="p">:</span> <span class="n">make_refittable</span><span class="p">,</span>
             <span class="s2">&quot;engine_capability&quot;</span><span class="p">:</span> <span class="n">engine_capability</span><span class="p">,</span>
             <span class="s2">&quot;dla_sram_size&quot;</span><span class="p">:</span> <span class="n">dla_sram_size</span><span class="p">,</span>
             <span class="s2">&quot;dla_local_dram_size&quot;</span><span class="p">:</span> <span class="n">dla_local_dram_size</span><span class="p">,</span>
@@ -683,7 +687,7 @@
             <span class="n">new_result</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">original_model</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">original_model</span><span class="o">.</span><span class="n">cpu</span><span class="p">()</span>
             <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">empty_cache</span><span class="p">()</span>
-            <span class="k">if</span> <span class="n">MutableTorchTensorRTModule</span><span class="o">.</span><span class="n">check_output_equal</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="n">new_result</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">check_output_equal</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="n">new_result</span><span class="p">):</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">refit_state</span><span class="o">.</span><span class="n">set_state</span><span class="p">(</span><span class="n">RefitFlag</span><span class="o">.</span><span class="n">LIVE</span><span class="p">)</span>
                 <span class="k">return</span>
 
@@ -723,7 +727,12 @@
                 <span class="p">)</span>
             <span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">gm</span> <span class="o">=</span> <span class="n">refit_module_weights</span><span class="p">(</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">gm</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">exp_program</span><span class="p">,</span> <span class="n">use_weight_map_cache</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">in_place</span><span class="o">=</span><span class="kc">True</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">gm</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">exp_program</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">arg_inputs</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">kwarg_inputs</span><span class="p">,</span>
+            <span class="n">use_weight_map_cache</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+            <span class="n">in_place</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
         <span class="p">)</span>
 
         <span class="bp">self</span><span class="o">.</span><span class="n">original_model</span><span class="o">.</span><span class="n">cpu</span><span class="p">()</span>
@@ -880,46 +889,6 @@
                 <span class="nb">setattr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">original_model</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="nb">object</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span>
-
-    <span class="nd">@staticmethod</span>
-    <span class="k">def</span> <span class="nf">check_output_equal</span><span class="p">(</span>
-        <span class="n">output1</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
-        <span class="n">output2</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
-    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
-        <span class="c1"># TODO: Move this to utils when all PRs are merged. This can be used by other functions.</span>
-        <span class="k">if</span> <span class="nb">type</span><span class="p">(</span><span class="n">output1</span><span class="p">)</span> <span class="o">!=</span> <span class="nb">type</span><span class="p">(</span><span class="n">output2</span><span class="p">):</span>
-            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
-                <span class="s2">&quot;This module does not support using output verification to skip refit. Refit will be performed </span><span class="se">\</span>
-<span class="s2">                           whenever the state is UNKNOWN&quot;</span>
-            <span class="p">)</span>
-            <span class="k">return</span> <span class="kc">False</span>
-
-        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">output1</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">):</span>
-            <span class="k">if</span> <span class="n">output1</span><span class="o">.</span><span class="n">shape</span> <span class="o">!=</span> <span class="n">output2</span><span class="o">.</span><span class="n">shape</span><span class="p">:</span>
-                <span class="k">return</span> <span class="kc">False</span>
-            <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">allclose</span><span class="p">(</span><span class="n">output1</span><span class="p">,</span> <span class="n">output2</span><span class="p">,</span> <span class="mf">1e-2</span><span class="p">,</span> <span class="mf">1e-2</span><span class="p">)</span>  <span class="c1"># type: ignore</span>
-
-        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">output1</span><span class="p">,</span> <span class="p">(</span><span class="nb">tuple</span><span class="p">,</span> <span class="nb">list</span><span class="p">)):</span>
-            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">output1</span><span class="p">)</span> <span class="o">!=</span> <span class="nb">len</span><span class="p">(</span><span class="n">output2</span><span class="p">):</span>
-                <span class="k">return</span> <span class="kc">False</span>
-            <span class="k">for</span> <span class="n">a</span><span class="p">,</span> <span class="n">b</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">output1</span><span class="p">,</span> <span class="n">output2</span><span class="p">):</span>
-                <span class="k">if</span> <span class="ow">not</span> <span class="n">MutableTorchTensorRTModule</span><span class="o">.</span><span class="n">check_output_equal</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">):</span>
-                    <span class="k">return</span> <span class="kc">False</span>
-                <span class="k">return</span> <span class="kc">True</span>
-
-        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">output1</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
-            <span class="k">if</span> <span class="n">output1</span><span class="o">.</span><span class="n">keys</span><span class="p">()</span> <span class="o">!=</span> <span class="n">output2</span><span class="o">.</span><span class="n">keys</span><span class="p">():</span>
-                <span class="k">return</span> <span class="kc">False</span>
-            <span class="k">for</span> <span class="n">a</span><span class="p">,</span> <span class="n">b</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">output1</span><span class="o">.</span><span class="n">values</span><span class="p">(),</span> <span class="n">output2</span><span class="o">.</span><span class="n">values</span><span class="p">()):</span>
-                <span class="k">if</span> <span class="ow">not</span> <span class="n">MutableTorchTensorRTModule</span><span class="o">.</span><span class="n">check_output_equal</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">):</span>
-                    <span class="k">return</span> <span class="kc">False</span>
-            <span class="k">return</span> <span class="kc">True</span>
-
-        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
-            <span class="s2">&quot;This module does not support using output verification to skip refit. Refit will be performed </span><span class="se">\</span>
-<span class="s2">                        whenever the state is UNKNOWN&quot;</span>
-        <span class="p">)</span>
-        <span class="k">return</span> <span class="kc">False</span>
 
     <span class="nd">@staticmethod</span>
     <span class="k">def</span> <span class="nf">check_inputs_equal</span><span class="p">(</span>
