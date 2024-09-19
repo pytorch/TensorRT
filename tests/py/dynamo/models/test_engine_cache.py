@@ -206,6 +206,7 @@ class TestEngineCache(TestCase):
         start = torch.cuda.Event(enable_timing=True)
         end = torch.cuda.Event(enable_timing=True)
         for i in range(3):
+            # remove timing cache and reset dynamo for engine caching messurement
             remove_timing_cache()
             torch._dynamo.reset()
             if i == 0:
@@ -220,7 +221,7 @@ class TestEngineCache(TestCase):
             trt_gm = torch_trt.dynamo.compile(
                 exp_program,
                 tuple(inputs),
-                use_python_runtime=False,
+                use_python_runtime=True,
                 enabled_precisions={torch.float},
                 debug=False,
                 min_block_size=1,
@@ -231,7 +232,6 @@ class TestEngineCache(TestCase):
             )
             end.record()
             torch.cuda.synchronize()
-            torch._dynamo.reset()
             times.append(start.elapsed_time(end))
             results.append(trt_gm(*inputs))
 
@@ -285,7 +285,7 @@ class TestEngineCache(TestCase):
             trt_gm = torch_trt.dynamo.compile(
                 exp_program,
                 tuple(inputs),
-                use_python_runtime=False,
+                use_python_runtime=True,
                 enabled_precisions={torch.float},
                 debug=False,
                 min_block_size=1,
@@ -332,7 +332,7 @@ class TestEngineCache(TestCase):
             trt_gm = torch_trt.dynamo.compile(
                 torch.export.export(model, args=inputs),
                 inputs=inputs,
-                use_python_runtime=False,
+                use_python_runtime=True,
                 enabled_precisions={torch.float},
                 debug=False,
                 min_block_size=1,
@@ -402,7 +402,6 @@ class TestEngineCache(TestCase):
             results.append(compiled_model(*inputs))  # trigger the compilation
             end.record()
             torch.cuda.synchronize()
-            torch._dynamo.reset()
             times.append(start.elapsed_time(end))
 
         cos_sim = cosine_similarity(results[0], results[1])
@@ -441,7 +440,6 @@ class TestEngineCache(TestCase):
         start = torch.cuda.Event(enable_timing=True)
         end = torch.cuda.Event(enable_timing=True)
         for i in range(3):
-            # remove timing cache and reset dynamo for engine caching messurement
             if i == 0:
                 cache_built_engines = False
                 reuse_cached_engines = False
@@ -501,7 +499,6 @@ class TestEngineCache(TestCase):
 
         custom_engine_cache = MyEngineCache(engine_cache_dir)
         for i in range(3):
-            # remove timing cache and reset dynamo for engine caching messurement
             inputs = [torch.rand((4 * (i + 1), 3, 224, 224)).to("cuda")]
             compiled_model = torch.compile(
                 model,

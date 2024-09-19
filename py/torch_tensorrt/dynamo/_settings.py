@@ -24,9 +24,11 @@ from torch_tensorrt.dynamo._defaults import (
     NUM_AVG_TIMING_ITERS,
     OPTIMIZATION_LEVEL,
     PASS_THROUGH_BUILD_FAILURES,
+    REFIT_IDENTICAL_ENGINE_WEIGHTS,
     REQUIRE_FULL_COMPILATION,
     REUSE_CACHED_ENGINES,
     SPARSE_WEIGHTS,
+    STRIP_ENGINE_WEIGHTS,
     TIMING_CACHE_PATH,
     TRUNCATE_DOUBLE,
     USE_FAST_PARTITIONER,
@@ -78,6 +80,8 @@ class CompilationSettings:
         timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation
         cache_built_engines (bool): Whether to save the compiled TRT engines to storage
         reuse_cached_engines (bool): Whether to load the compiled TRT engines from storage
+        refit_identical_engine_weights (bool): Whether to refit the engine with identical weights
+        strip_engine_weights (bool): Whether to strip the engine weights
     """
 
     enabled_precisions: Set[dtype] = field(default_factory=lambda: ENABLED_PRECISIONS)
@@ -112,6 +116,8 @@ class CompilationSettings:
     lazy_engine_init: bool = LAZY_ENGINE_INIT
     cache_built_engines: bool = CACHE_BUILT_ENGINES
     reuse_cached_engines: bool = REUSE_CACHED_ENGINES
+    refit_identical_engine_weights: bool = REFIT_IDENTICAL_ENGINE_WEIGHTS
+    strip_engine_weights: bool = STRIP_ENGINE_WEIGHTS
 
 
 _SETTINGS_TO_BE_ENGINE_INVARIANT = (
@@ -124,6 +130,8 @@ _SETTINGS_TO_BE_ENGINE_INVARIANT = (
     "make_refittable",
     "engine_capability",
     "hardware_compatible",
+    "refit_identical_engine_weights",
+    "strip_engine_weights",
 )
 
 
