@@ -7,6 +7,7 @@ from typing import Dict, Sequence, Tuple, Union
 import numpy as np
 import torch
 from torch.fx.node import Argument, Node, Target
+from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
 from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
     ConverterRegistry,
@@ -18,7 +19,7 @@ from torch_tensorrt.fx.utils import Frameworks, unified_dtype_converter
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
 
-def getitem_validator(getitem_node: Node) -> bool:
+def getitem_validator(getitem_node: Node, settings: CompilationSettings = None) -> bool:
     from torch_tensorrt.dynamo.conversion._ConverterRegistry import DYNAMO_CONVERTERS
 
     # Getitem nodes can only be converted if their parent node also can
@@ -45,7 +46,7 @@ def generic_evaluator(
     return target(*args)
 
 
-def rand_validator(rand_node: Node) -> bool:
+def rand_validator(rand_node: Node, settings: CompilationSettings = None) -> bool:
     dtype = rand_node.kwargs.get("dtype", None)
     layout = rand_node.kwargs.get("layout", None)
     if dtype is not None:
@@ -85,7 +86,9 @@ def aten_ops_randn(
     return np.random.randn(*args[0])
 
 
-def randperm_validator(randperm_node: Node) -> bool:
+def randperm_validator(
+    randperm_node: Node, settings: CompilationSettings = None
+) -> bool:
     dtype = randperm_node.kwargs.get("dtype", None)
     layout = randperm_node.kwargs.get("layout", None)
     input = randperm_node.args[0]
@@ -116,7 +119,7 @@ def aten_ops_randperm(
     return np.random.permutation(args[0])
 
 
-def empty_validator(empty_node: Node) -> bool:
+def empty_validator(empty_node: Node, settings: CompilationSettings = None) -> bool:
     device = empty_node.kwargs.get("device", None)
     if device is not None:
         _LOGGER.debug(f"Currently we don't support specifying device, got {device}.")
