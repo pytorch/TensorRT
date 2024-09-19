@@ -80,14 +80,15 @@ def _pretraced_backend(
             repair_input_aliasing(gm)
 
             # Remove sym_int placeholders and inputs
-            remove_sym_nodes(gm)
+            remove_sym_nodes(gm, sample_inputs)
+
             torch_inputs = [
                 input for input in sample_inputs if isinstance(input, torch.Tensor)
             ]
 
             # Remove detach nodes
             remove_detach(gm)
-            # breakpoint()
+
             # Invoke AOTAutograd to translate operators to aten
             gm = aot_export_joint_simple(
                 gm,
