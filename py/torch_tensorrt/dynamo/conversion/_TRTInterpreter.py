@@ -288,7 +288,16 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             builder_config.clear_flag(trt.BuilderFlag.TF32)
 
         if self.compilation_settings.make_refittable:
-            builder_config.set_flag(trt.BuilderFlag.REFIT)
+            if version.parse(trt.__version__) >= version.parse("10.0"):
+                if self.compilation_settings.refit_identical_engine_weights:
+                    builder_config.set_flag(trt.BuilderFlag.REFIT_IDENTICAL)
+                else:
+                    builder_config.set_flag(trt.BuilderFlag.REFIT)
+            else:
+                builder_config.set_flag(trt.BuilderFlag.REFIT)
+
+        if self.compilation_settings.strip_engine_weights:
+            builder_config.set_flag(trt.BuilderFlag.STRIP_PLAN)
 
         if strict_type_constraints:
             builder_config.set_flag(trt.BuilderFlag.STRICT_TYPES)
@@ -553,7 +562,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                 cached_data = self.engine_cache.check(hash_val)
                 if cached_data is not None:  # hit the cache
                     (
-                        serialized_engine,
+                        unrefitted_serialized_engine,
                         self._input_names,
                         self._output_names,
                         cached_engine_input_specs,
@@ -584,31 +593,12 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                         "Found the cached engine that corresponds to this graph. It is directly loaded."
                     )
 
-                    runtime = trt.Runtime(TRT_LOGGER)
-                    engine = runtime.deserialize_cuda_engine(serialized_engine)
-
-                    from torch_tensorrt.dynamo._refit import (
-                        _refit_single_trt_engine_with_gm,
-                    )
-
-                    # TODO: Fast refit is problematic for now. It will fail if the engine has batch_norm layers.
-                    # We set weight_name_map=None to use slow refit anyway for now. Will fix it in the future.
-                    _refit_single_trt_engine_with_gm(
-                        new_gm=self.module,
-                        old_engine=engine,
-                        input_list=self.input_specs,
-                        settings=self.compilation_settings,
-                        weight_name_map=None,
-                    )
-
-                    serialized_engine = engine.serialize()
-
                     with io.BytesIO() as engine_bytes:
-                        engine_bytes.write(serialized_engine)
-                        engine_str = engine_bytes.getvalue()
+                        engine_bytes.write(unrefitted_serialized_engine)
+                        unrefitted_engine_str = engine_bytes.getvalue()
 
                     return TRTInterpreterResult(
-                        engine_str,
+                        unrefitted_engine_str,
                         self._input_names,
                         self._output_names,
                         self.weight_name_map,
@@ -630,19 +620,24 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             builder_config, self.compilation_settings.timing_cache_path
         )
 
-        serialized_engine = self.builder.build_serialized_network(
+        # if strip_engine_weights is true, the serialized engine need to be refitted before using
+        maybe_unrefitted_serialized_engine = self.builder.build_serialized_network(
             self.ctx.net, builder_config
         )
-        assert serialized_engine
+        assert maybe_unrefitted_serialized_engine
 
         _LOGGER.info(
             f"Build TRT engine elapsed time: {datetime.now() - build_engine_start_time}"
         )
-        _LOGGER.info(f"TRT Engine uses: {serialized_engine.nbytes} bytes of Memory")
+        _LOGGER.info(
+            f"TRT Engine uses: {maybe_unrefitted_serialized_engine.nbytes} bytes of Memory"
+        )
 
         self._save_timing_cache(
             builder_config, self.compilation_settings.timing_cache_path
         )
+
+        # if strip_engine_weights is true, the weight-stripped engine will be saved in engine cache
         if (
             self.engine_cache is not None
             and self.compilation_settings.cache_built_engines
@@ -650,7 +645,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             self.engine_cache.insert(
                 hash_val,
                 (
-                    serialized_engine,
+                    maybe_unrefitted_serialized_engine,
                     self._input_names,
                     self._output_names,
                     self.input_specs,
@@ -660,11 +655,14 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             )
 
         with io.BytesIO() as engine_bytes:
-            engine_bytes.write(serialized_engine)
-            engine_str = engine_bytes.getvalue()
+            engine_bytes.write(maybe_unrefitted_serialized_engine)
+            maybe_unrefitted_engine_str = engine_bytes.getvalue()
 
         return TRTInterpreterResult(
-            engine_str, self._input_names, self._output_names, self.weight_name_map
+            maybe_unrefitted_engine_str,
+            self._input_names,
+            self._output_names,
+            self.weight_name_map,
         )
 
     def run_node(self, n: torch.fx.Node) -> torch.fx.Node:

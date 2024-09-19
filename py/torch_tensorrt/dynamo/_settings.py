@@ -24,9 +24,11 @@ from torch_tensorrt.dynamo._defaults import (
     NUM_AVG_TIMING_ITERS,
     OPTIMIZATION_LEVEL,
     PASS_THROUGH_BUILD_FAILURES,
+    REFIT_IDENTICAL_ENGINE_WEIGHTS,
     REQUIRE_FULL_COMPILATION,
     REUSE_CACHED_ENGINES,
     SPARSE_WEIGHTS,
+    STRIP_ENGINE_WEIGHTS,
     TIMING_CACHE_PATH,
     TRUNCATE_DOUBLE,
     USE_EXPLICIT_TYPING,
@@ -82,6 +84,8 @@ class CompilationSettings:
         reuse_cached_engines (bool): Whether to load the compiled TRT engines from storage
         use_strong_typing (bool): This flag enables strong typing in TensorRT compilation which respects the precisions set in the Pytorch model. This is useful when users have mixed precision graphs.
         use_fp32_acc (bool): This option inserts cast to FP32 nodes around matmul layers and TensorRT ensures the accumulation of matmul happens in FP32. Use this only when FP16 precision is configured in enabled_precisions.
+        refit_identical_engine_weights (bool): Whether to refit the engine with identical weights
+        strip_engine_weights (bool): Whether to strip the engine weights
     """
 
     enabled_precisions: Set[dtype] = field(default_factory=lambda: ENABLED_PRECISIONS)
@@ -118,6 +122,8 @@ class CompilationSettings:
     reuse_cached_engines: bool = REUSE_CACHED_ENGINES
     use_explicit_typing: bool = USE_EXPLICIT_TYPING
     use_fp32_acc: bool = USE_FP32_ACC
+    refit_identical_engine_weights: bool = REFIT_IDENTICAL_ENGINE_WEIGHTS
+    strip_engine_weights: bool = STRIP_ENGINE_WEIGHTS
 
 
 _SETTINGS_TO_BE_ENGINE_INVARIANT = (
@@ -130,6 +136,8 @@ _SETTINGS_TO_BE_ENGINE_INVARIANT = (
     "make_refittable",
     "engine_capability",
     "hardware_compatible",
+    "refit_identical_engine_weights",
+    "strip_engine_weights",
 )
 
 
