@@ -10,16 +10,15 @@ logger = logging.getLogger(__name__)
 
 def accumulate_fp32_matmul(gm: torch.fx.GraphModule) -> torch.fx.GraphModule:
     """Replace a matmul layer with fp32 accumulation nodes"""
-    matmul_targets = [torch.ops.aten.mm.default, torch.ops.aten.bmm.default]
+    matmul_targets = [torch.ops.aten.mm.default, torch.ops.aten.bmm.default, torch.ops.aten.addmm.default]
     matmul_nodes = [node for node in gm.graph.nodes if node.target in matmul_targets]
 
     for matmul_node in matmul_nodes:
         # Prior to the matmul node, insert a cast to the 32-bit float32 node
         node_inputs = matmul_node.all_input_nodes
-
         # Upcast only mm nodes in addmm and leave the bias
         if matmul_node.target == torch.ops.aten.addmm.default:
-            node_inputs = node_inputs[1:]
+            node_inputs = node_inputs[:2]
 
         for node_input in node_inputs:
             with gm.graph.inserting_before(matmul_node):
