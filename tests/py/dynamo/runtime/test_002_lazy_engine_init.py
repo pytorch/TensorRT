@@ -1,4 +1,5 @@
 # type: ignore
+import importlib
 import os
 import tempfile
 import unittest
@@ -6,7 +7,6 @@ import unittest
 import torch
 import torch_tensorrt
 import torch_tensorrt as torchtrt
-import torchvision.models as models
 from torch.testing._internal.common_utils import TestCase
 from torch_tensorrt.dynamo import CompilationSettings
 from torch_tensorrt.dynamo.utils import COSINE_THRESHOLD, cosine_similarity
@@ -142,7 +142,11 @@ class TestLazyEngineInit(TestCase):
 
         assert_close(trt_output, model_output)
 
+    @unittest.skipIf(not importlib.util.find_spec("torchvision"))
     def test_lazy_engine_init_py_e2e(self):
+
+        import torchvision.models as models
+
         model = models.resnet18(pretrained=True).eval().to("cuda")
         input = torch.randn((1, 3, 224, 224)).to("cuda")
 
@@ -178,7 +182,11 @@ class TestLazyEngineInit(TestCase):
         not torch_tensorrt.ENABLED_FEATURES.torch_tensorrt_runtime,
         "Torch-TensorRT Runtime is not available",
     )
+    @unittest.skipIf(not importlib.util.find_spec("torchvision"))
     def test_lazy_engine_init_cpp_e2e(self):
+
+        import torchvision.models as models
+
         model = models.resnet18(pretrained=False).eval().to("cuda")
         input = torch.randn((1, 3, 224, 224)).to("cuda")
 
@@ -214,7 +222,11 @@ class TestLazyEngineInit(TestCase):
         not torch_tensorrt.ENABLED_FEATURES.torch_tensorrt_runtime,
         "Torch-TensorRT Runtime is not available",
     )
+    @unittest.skipIf(not importlib.util.find_spec("torchvision"))
     def test_lazy_engine_init_cpp_serialization(self):
+
+        import torchvision.models as models
+
         model = models.resnet18(pretrained=False).eval().to("cuda")
         input = torch.randn((1, 3, 224, 224)).to("cuda")
 

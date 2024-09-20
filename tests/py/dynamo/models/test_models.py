@@ -1,20 +1,24 @@
 # type: ignore
 
+import importlib
 import unittest
 
 import pytest
 import timm
 import torch
 import torch_tensorrt as torchtrt
-import torchvision.models as models
 from torch_tensorrt.dynamo.utils import COSINE_THRESHOLD, cosine_similarity
 from transformers import BertModel
 
 assertions = unittest.TestCase()
 
 
+@unittest.skipIf(not importlib.util.find_spec("torchvision"))
 @pytest.mark.unit
 def test_resnet18(ir):
+
+    import torchvision.models as models
+
     model = models.resnet18(pretrained=True).eval().to("cuda")
     input = torch.randn((1, 3, 224, 224)).to("cuda")
 
@@ -45,8 +49,12 @@ def test_resnet18(ir):
     torch._dynamo.reset()
 
 
+@unittest.skipIf(not importlib.util.find_spec("torchvision"))
 @pytest.mark.unit
 def test_mobilenet_v2(ir):
+
+    import torchvision.models as models
+
     model = models.mobilenet_v2(pretrained=True).eval().to("cuda")
     input = torch.randn((1, 3, 224, 224)).to("cuda")
 
@@ -157,8 +165,12 @@ def test_bert_base_uncased(ir):
     torch._dynamo.reset()
 
 
+@unittest.skipIf(not importlib.util.find_spec("torchvision"))
 @pytest.mark.unit
 def test_resnet18_half(ir):
+
+    import torchvision.models as models
+
     model = models.resnet18(pretrained=True).eval().to("cuda").half()
     input = torch.randn((1, 3, 224, 224)).to("cuda").half()
 

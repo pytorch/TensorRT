@@ -1,5 +1,6 @@
 # type: ignore
 
+import importlib
 import unittest
 
 import pytest
@@ -175,6 +176,7 @@ def test_view(ir):
     )
 
 
+@unittest.skipIf(not importlib.util.find_spec("torchvision"))
 @pytest.mark.unit
 def test_resnet_dynamic(ir):
     """

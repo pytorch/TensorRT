@@ -1,4 +1,5 @@
 # type: ignore
+import importlib
 import os
 import tempfile
 import unittest
@@ -8,7 +9,6 @@ import timm
 import torch
 import torch.nn.functional as F
 import torch_tensorrt as torch_trt
-import torchvision.models as models
 from torch import nn
 from torch_tensorrt.dynamo.runtime._MutableTorchTensorRTModule import RefitFlag
 from torch_tensorrt.dynamo.utils import check_output_equal
@@ -40,8 +40,11 @@ def test_check_output_equal():
     not torch_trt.ENABLED_FEATURES.torch_tensorrt_runtime,
     "TorchScript Frontend is not available",
 )
+@unittest.skipIf(not importlib.util.find_spec("torchvision"))
 @pytest.mark.unit
 def test_resnet18():
+
+    import torchvision.models as models
 
     torch.manual_seed(0)
     inputs = [torch.rand((1, 3, 224, 224)).to("cuda")]
@@ -77,8 +80,11 @@ def test_resnet18():
     not torch_trt.ENABLED_FEATURES.torch_tensorrt_runtime,
     "TorchScript Frontend is not available",
 )
+@unittest.skipIf(not importlib.util.find_spec("torchvision"))
 @pytest.mark.unit
 def test_save():
+
+    import torchvision.models as models
 
     torch.manual_seed(0)
     inputs = [torch.rand((1, 3, 224, 224)).to("cuda")]
@@ -114,8 +120,11 @@ def test_save():
     not torch_trt.ENABLED_FEATURES.torch_tensorrt_runtime,
     "TorchScript Frontend is not available",
 )
+@unittest.skipIf(not importlib.util.find_spec("torchvision"))
 @pytest.mark.unit
 def test_resnet18_modify_attribute():
+
+    import torchvision.models as models
 
     torch.manual_seed(0)
     inputs = [torch.rand((1, 3, 224, 224)).to("cuda")]
@@ -155,8 +164,11 @@ def test_resnet18_modify_attribute():
     not torch_trt.ENABLED_FEATURES.torch_tensorrt_runtime,
     "TorchScript Frontend is not available",
 )
+@unittest.skipIf(not importlib.util.find_spec("torchvision"))
 @pytest.mark.unit
 def test_resnet18_modify_attribute_no_refit():
+
+    import torchvision.models as models
 
     torch.manual_seed(0)
     inputs = [torch.rand((1, 3, 224, 224)).to("cuda")]
