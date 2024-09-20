@@ -528,6 +528,8 @@ def convert_exported_program_to_serialized_trt_engine(
     calibrator: object = None,
     allow_shape_tensors: bool = False,
     timing_cache_path: str = _defaults.TIMING_CACHE_PATH,
+    refit_identical_engine_weights: bool = _defaults.REFIT_IDENTICAL_ENGINE_WEIGHTS,
+    strip_engine_weights: bool = _defaults.STRIP_ENGINE_WEIGHTS,
     **kwargs: Any,
 ) -> bytes:
     """Convert an ExportedProgram to a serialized TensorRT engine
@@ -586,6 +588,8 @@ def convert_exported_program_to_serialized_trt_engine(
         calibrator (Union(torch_tensorrt._C.IInt8Calibrator, tensorrt.IInt8Calibrator)): Calibrator object which will provide data to the PTQ system for INT8 Calibration
         allow_shape_tensors: (Experimental) Allow aten::size to output shape tensors using IShapeLayer in TensorRT
         timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation
+        refit_identical_engine_weights (bool): Refit engines with identical weights. This is useful when the same model is compiled multiple times with different inputs and the weights are the same. This will save time by reusing the same engine for different inputs.
+        strip_engine_weights (bool): Strip engine weights from the serialized engine. This is useful when the engine is to be deployed in an environment where the weights are not required.
     Returns:
         bytes: Serialized TensorRT engine, can either be saved to a file or deserialized via TensorRT APIs
     """
@@ -659,6 +663,8 @@ def convert_exported_program_to_serialized_trt_engine(
         "dla_local_dram_size": dla_local_dram_size,
         "dla_global_dram_size": dla_global_dram_size,
         "timing_cache_path": timing_cache_path,
+        "refit_identical_engine_weights": refit_identical_engine_weights,
+        "strip_engine_weights": strip_engine_weights,
     }
 
     exported_program = pre_export_lowering(exported_program)
