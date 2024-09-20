@@ -12,7 +12,7 @@ from torch.nn import Module
 from torch_tensorrt._Device import Device
 from torch_tensorrt._enums import Platform, dtype
 from torch_tensorrt.dynamo._settings import CompilationSettings
-from torch_tensorrt.dynamo.utils import DYNAMIC_DIM, get_model_device
+from torch_tensorrt.dynamo.utils import DYNAMIC_DIM
 from torch_tensorrt.logging import TRT_LOGGER
 from torch_tensorrt.runtime._utils import (
     _is_switch_required,
@@ -39,7 +39,6 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         name: str = "",
         settings: CompilationSettings = CompilationSettings(),
         weight_name_map: Optional[dict[Any, Any]] = None,
-        graph_module: torch.fx.GraphModule = None,
     ):
         """Takes a name, target device, serialized TensorRT engine, and binding names / order and constructs
         a PyTorch ``torch.nn.Module`` around it. Uses TensorRT Python APIs to run the engine
@@ -53,7 +52,6 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
             name (str): Name for module
             settings (torch_tensorrt.dynamo.CompilationSettings): Settings used to compile engine, assumes engine was built with default compilation settings if object not passed
             weight_name_map (dict): Mapping of engine weight name to state_dict weight name
-            graph_module (torch.fx.GraphModule): GraphModule used to refit the weights
 
         Example:
 
@@ -108,7 +106,6 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         self.settings = settings
         self.engine = None
         self.weight_name_map = weight_name_map
-        self.graph_module = graph_module  # may be used to refit the weights
         self.target_platform = Platform.current_platform()
 
         if self.serialized_engine is not None and not self.settings.lazy_engine_init:
@@ -123,52 +120,6 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         runtime = trt.Runtime(TRT_LOGGER)
         self.engine = runtime.deserialize_cuda_engine(self.serialized_engine)
         self.context = self.engine.create_execution_context()
-
-        if self.settings.strip_engine_weights:
-            assert (
-                self.settings.make_refittable
-            ), "weight-stripped engines must be refittable, please set make_refittable=True"
-
-            # Refit the weights
-            refitter = trt.Refitter(self.engine, TRT_LOGGER)
-            refittable_weights = refitter.get_all_weights()
-            torch_device = get_model_device(self.graph_module)
-
-            for layer_name in refittable_weights:
-                trt_wt_location = (
-                    trt.TensorLocation.DEVICE
-                    if torch_device.type == "cuda"
-                    else trt.TensorLocation.HOST
-                )
-                from torch_tensorrt.dynamo._refit import (
-                    construct_refit_mapping_from_weight_name_map,
-                )
-
-                mapping = construct_refit_mapping_from_weight_name_map(
-                    self.weight_name_map, self.graph_module.state_dict()
-                )
-
-                for layer_name in refittable_weights:
-                    if layer_name not in mapping:
-                        logger.warning(f"{layer_name} is not found in weight mapping.")
-                        continue
-                    # Use Numpy to create weights
-                    weight, weight_dtype = mapping[layer_name]
-                    trt_wt_tensor = trt.Weights(
-                        weight_dtype, weight.data_ptr(), torch.numel(weight)
-                    )
-                    refitter.set_named_weights(
-                        layer_name, trt_wt_tensor, trt_wt_location
-                    )
-                assert (
-                    len(refitter.get_missing_weights()) == 0
-                ), "Fast refitting failed due to incomplete mapping"
-
-            # Refit the engine
-            if refitter.refit_cuda_engine():
-                logger.info("Engine refitted successfully!")
-            else:
-                logger.info("Engine refit failed!")
 
         assert self.engine.num_io_tensors == (
             len(self.input_names) + len(self.output_names)

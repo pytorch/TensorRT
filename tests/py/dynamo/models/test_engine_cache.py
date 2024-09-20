@@ -332,7 +332,7 @@ class TestEngineCache(TestCase):
             trt_gm = torch_trt.dynamo.compile(
                 torch.export.export(model, args=inputs),
                 inputs=inputs,
-                use_python_runtime=True,
+                use_python_runtime=False,
                 enabled_precisions={torch.float},
                 debug=False,
                 min_block_size=1,
@@ -387,7 +387,7 @@ class TestEngineCache(TestCase):
                 model,
                 backend="tensorrt",
                 options={
-                    "use_python_runtime": True,
+                    "use_python_runtime": False,
                     "enabled_precisions": {torch.float},
                     "debug": False,
                     "min_block_size": 1,
@@ -452,7 +452,7 @@ class TestEngineCache(TestCase):
                 model,
                 backend="tensorrt",
                 options={
-                    "use_python_runtime": True,
+                    "use_python_runtime": False,
                     "enabled_precisions": {torch.float},
                     "debug": False,
                     "min_block_size": 1,

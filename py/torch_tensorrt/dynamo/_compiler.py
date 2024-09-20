@@ -550,6 +550,8 @@ def convert_exported_program_to_serialized_trt_engine(
     timing_cache_path: str = _defaults.TIMING_CACHE_PATH,
     use_explicit_typing: bool = _defaults.USE_EXPLICIT_TYPING,
     use_fp32_acc: bool = _defaults.USE_FP32_ACC,
+    refit_identical_engine_weights: bool = _defaults.REFIT_IDENTICAL_ENGINE_WEIGHTS,
+    strip_engine_weights: bool = _defaults.STRIP_ENGINE_WEIGHTS,
     **kwargs: Any,
 ) -> bytes:
     """Convert an ExportedProgram to a serialized TensorRT engine
@@ -610,6 +612,8 @@ def convert_exported_program_to_serialized_trt_engine(
         timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation
         use_explicit_typing (bool): This flag enables strong typing in TensorRT compilation which respects the precisions set in the Pytorch model. This is useful when users have mixed precision graphs.
         use_fp32_acc (bool): This option inserts cast to FP32 nodes around matmul layers and TensorRT ensures the accumulation of matmul happens in FP32. Use this only when FP16 precision is configured in enabled_precisions.
+        refit_identical_engine_weights (bool): Refit engines with identical weights. This is useful when the same model is compiled multiple times with different inputs and the weights are the same. This will save time by reusing the same engine for different inputs.
+        strip_engine_weights (bool): Strip engine weights from the serialized engine. This is useful when the engine is to be deployed in an environment where the weights are not required.
     Returns:
         bytes: Serialized TensorRT engine, can either be saved to a file or deserialized via TensorRT APIs
     """
@@ -685,6 +689,8 @@ def convert_exported_program_to_serialized_trt_engine(
         "timing_cache_path": timing_cache_path,
         "use_explicit_typing": use_explicit_typing,
         "use_fp32_acc": use_fp32_acc,
+        "refit_identical_engine_weights": refit_identical_engine_weights,
+        "strip_engine_weights": strip_engine_weights,
     }
 
     exported_program = pre_export_lowering(exported_program)

@@ -79,7 +79,6 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         name: str = "",
         settings: CompilationSettings = CompilationSettings(),  # Assumes engine was built with default compilation settings if object not passed
         weight_name_map: Optional[dict[Any, Any]] = None,
-        graph_module: torch.fx.GraphModule = None,
     ):
         """Takes a name, target device, serialized TensorRT engine, and binding names / order and constructs
         a PyTorch ``torch.nn.Module`` around it. Uses the Torch-TensorRT runtime extension to run the engines
@@ -98,7 +97,6 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
             name (str): Name for module
             settings (torch_tensorrt.dynamo.CompilationSettings): Settings used to compile engine, assumes engine was built with default compilation settings if object not passed
             weight_name_map (dict): Mapping of engine weight name to state_dict weight name
-            graph_module (torch.fx.GraphModule): GraphModule used to refit the weights
 
         Example:
 
@@ -132,7 +130,6 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         self.hardware_compatible = settings.hardware_compatible
         self.settings = copy.deepcopy(settings)
         self.weight_name_map = weight_name_map
-        self.graph_module = graph_module
         self.serialized_engine = serialized_engine
         self.engine = None
 

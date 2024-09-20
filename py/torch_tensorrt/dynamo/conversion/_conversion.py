@@ -165,5 +165,4 @@ def convert_module(
         name=name,
         settings=settings,
         weight_name_map=interpreter_result.weight_name_map,
-        graph_module=module,
     )
