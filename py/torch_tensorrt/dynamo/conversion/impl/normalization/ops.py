@@ -50,14 +50,27 @@ def batch_norm(
     # Save the original output shape for later use
     output_shape = input.shape
 
-    if weight is None:
-        weight = get_trt_tensor(ctx, 1.0, f"{name}_weight")
-    if bias is None:
-        bias = get_trt_tensor(ctx, 0.0, f"{name}_bias")
-    if running_mean is None:
-        running_mean = get_trt_tensor(ctx, 0.0, f"{name}_running_mean")
-    if running_var is None:
-        running_var = get_trt_tensor(ctx, 1.0, f"{name}_running_var")
+    # We name the weight here according to the state_dict name
+    weight = (
+        get_trt_tensor(ctx, 1.0, f"{name}_weight")
+        if weight is None
+        else get_trt_tensor(ctx, weight, f"{name}_weight")
+    )
+    bias = (
+        get_trt_tensor(ctx, 1.0, f"{name}_bias")
+        if bias is None
+        else get_trt_tensor(ctx, bias, f"{name}_bias")
+    )
+    running_mean = (
+        get_trt_tensor(ctx, 1.0, f"{name}_running_mean")
+        if running_mean is None
+        else get_trt_tensor(ctx, running_mean, f"{name}_running_mean")
+    )
+    running_var = (
+        get_trt_tensor(ctx, 1.0, f"{name}_running_var")
+        if running_var is None
+        else get_trt_tensor(ctx, running_var, f"{name}_running_var")
+    )
 
     # eps_tensor for numerical stability
     eps_tensor = get_trt_tensor(ctx, eps, f"{name}_eps")
