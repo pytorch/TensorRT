@@ -242,6 +242,9 @@ def test_hybrid_relu_fallback(ir):
         )
 
 
+@unittest.skip(
+    "Pending pytorch issue in torch2.6 https://github.com/pytorch/pytorch/issues/136322"
+)
 @pytest.mark.unit
 def test_resnet18(ir):
     """
@@ -283,6 +286,9 @@ def test_resnet18(ir):
     )
 
 
+@unittest.skip(
+    "Pending pytorch issue in torch2.6 https://github.com/pytorch/pytorch/issues/136322"
+)
 @pytest.mark.unit
 def test_resnet18_dynamic(ir):
     """
