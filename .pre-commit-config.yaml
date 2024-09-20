@@ -55,6 +55,12 @@ repos:
     rev: v1.22.9
     hooks:
       - id: typos
+  - repo: https://github.com/astral-sh/uv-pre-commit
+    # uv version.
+    rev: 0.4.10
+    hooks:
+      # Update the uv lockfile
+      - id: uv-lock
   - repo: local
     hooks:
     -   id: dont-commit-upstream

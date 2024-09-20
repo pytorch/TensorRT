@@ -9,7 +9,7 @@ requires = [
     "typing-extensions>=4.7.0",
     "future>=0.18.3",
     "tensorrt-cu12==10.3.0",
-    "torch >=2.5.0.dev,<2.6.0",
+    "torch>=2.5.0.dev,<2.6.0",
     "pybind11==2.6.2",
     "numpy",
 ]
@@ -36,7 +36,7 @@ classifiers = [
     "Topic :: Software Development :: Libraries",
 ]
 readme = { file = "README.md", content-type = "text/markdown" }
-requires-python = ">=3.8"
+requires-python = ">=3.9"
 keywords = [
     "pytorch",
     "torch",
@@ -54,7 +54,7 @@ keywords = [
     "inference",
 ]
 dependencies = [
-    "torch >=2.5.0.dev,<2.6.0",
+    "torch>=2.5.0.dev,<2.6.0",
     "tensorrt-cu12==10.3.0",
     "tensorrt-cu12-bindings==10.3.0",
     "tensorrt-cu12-libs==10.3.0",
@@ -65,10 +65,12 @@ dependencies = [
 dynamic = ["version"]
 
 [project.optional-dependencies]
-torchvision = ["torchvision >=0.20.dev,<0.21.0"]
+torchvision = [
+    "torchvision",
+] #Leaving torchvisions dependency unconstrained so uv can just install something that should work for the torch we have. TV's on PyT makes it hard to put version constrains in
 quantization = ["nvidia-modelopt[deploy,hf,torch]~=0.17.0"]
-monitoring-tools = ["rich >= 13.7.1"]
-jupyter = ["rich[jupyter] >= 13.7.1"]
+monitoring-tools = ["rich>=13.7.1"]
+jupyter = ["rich[jupyter]>=13.7.1"]
 
 [project.urls]
 Homepage = "https://pytorch.org/tensorrt"
@@ -79,6 +81,31 @@ Changelog = "https://github.com/pytorch/tensorrt/releases"
 [tool.setuptools]
 package-dir = { "" = "py" }
 include-package-data = false
+
+[tool.uv]
+dev-dependencies = [
+    "pre-commit>=2.20.0",
+    "black>=22.6.0",
+    "clang-format==14.0.6",
+    "typos",
+    "mypy",
+    "isort",
+    "ruff",
+    "pytest",
+    "pytest-xdist",
+    "parameterized>=0.2.0",
+    "expecttest==0.1.6",
+    "pyyaml",
+]
+
+environments = ["sys_platform == 'linux'", "sys_platform == 'windows'"]
+
+extra-index-url = [
+    "https://download.pytorch.org/whl/nightly/cu124", # We are going to define the dev enviorment as latest supported CUDA, and allow CI to handle the others, change as needed
+]
+
+prerelease = "if-necessary-or-explicit"
+index-strategy = "unsafe-best-match"
 
 [tool.ruff]
 # NOTE: Synchoronize the ignores with .flake8
@@ -144,7 +171,6 @@ lint.select = [
 
 # Allow unused variables when underscore-prefixed.
 lint.dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
-target-version = "py311"
 
 # Allow autofix for all enabled rules (when `--fix`) is provided.
 lint.fixable = [
@@ -194,6 +220,7 @@ lint.fixable = [
     "YTT",
 ]
 lint.unfixable = []
+target-version = "py311"
 
 # Exclude a variety of commonly ignored directories.
 exclude = [
