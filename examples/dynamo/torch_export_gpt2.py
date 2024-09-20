@@ -22,7 +22,6 @@ DEVICE = torch.device("cuda:0")
 
 # Define the GPT2 model from hugging face
 # kv_cache is not supported in Torch-TRT currently.
-# CPU is used here so that GPU memory is reserved for TRT compilation.
 with torch.no_grad():
     tokenizer = AutoTokenizer.from_pretrained("gpt2")
     model = (
@@ -34,6 +33,7 @@ with torch.no_grad():
         )
         .eval()
         .half()
+        .to('cuda')
     )
 
 # %%
@@ -44,7 +44,7 @@ input_ids = model_inputs["input_ids"]
 
 # Auto-regressive generation loop for greedy decoding using PyTorch model
 # We use a custom generate function which is very similar to the huggingface one.
-pyt_gen_tokens = generate(model, input_ids, MAX_TOKENS, tokenizer.eos_token_id)
+pyt_gen_tokens = generate(model, input_ids.to('cuda'), MAX_TOKENS, tokenizer.eos_token_id)
 
 
 # %%
