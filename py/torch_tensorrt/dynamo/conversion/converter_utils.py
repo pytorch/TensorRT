@@ -10,6 +10,7 @@ import torch_tensorrt.dynamo.conversion.impl as impl
 from torch.fx.node import Argument, Target
 from torch.fx.passes.shape_prop import TensorMetadata
 from torch_tensorrt import _enums
+from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
 from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
@@ -111,7 +112,9 @@ def get_node_io(
     return metadata_string
 
 
-def is_only_operator_on_placeholder(node: torch.fx.Node) -> bool:
+def is_only_operator_on_placeholder(
+    node: torch.fx.Node, settings: CompilationSettings = None
+) -> bool:
     """Detects whether a call_function node is the only operator on a placeholder"""
     # Returns true if the node operates on a placeholder and is a direct output
     return (
