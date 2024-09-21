@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Installation &mdash; Torch-TensorRT v2.5.0.dev0+dbc41ce documentation</title>
+  <title>Installation &mdash; Torch-TensorRT v2.5.0.dev0+1bf97a4 documentation</title>
   
 
   
@@ -275,7 +275,7 @@
               
               
                 <div class="version">
-                  v2.5.0.dev0+dbc41ce
+                  v2.5.0.dev0+1bf97a4
                 </div>
               
             
@@ -569,6 +569,12 @@ point the WORKSPACE file to the URL of the tarball or download the tarball for T
 <p>Once the WORKSPACE has been configured properly, all that is required to build torch-tensorrt is the following command</p>
 <blockquote>
 <div><div class="highlight-sh notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>--pre<span class="w"> </span>.<span class="w"> </span>--extra-index-url<span class="w"> </span>https://download.pytorch.org/whl/nightly/cu124
+</pre></div>
+</div>
+</div></blockquote>
+<p>If you use the <code class="docutils literal notranslate"><span class="pre">uv</span></code> (<a class="reference external" href="https://docs.astral.sh/uv/">https://docs.astral.sh/uv/</a>) tool to manage python and your projects, the command is slightly simpler</p>
+<blockquote>
+<div><div class="highlight-sh notranslate"><div class="highlight"><pre><span></span>uv<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span>.
 </pre></div>
 </div>
 </div></blockquote>

@@ -6,6 +6,7 @@ import logging
 from typing import Any, List, Optional, Sequence, Tuple
 
 import numpy as np
+import tensorrt as trt
 import torch
 from torch.export import ExportedProgram
 from torch_tensorrt._enums import dtype
@@ -41,8 +42,6 @@ from torch_tensorrt.dynamo.utils import (
     to_torch_tensorrt_device,
 )
 from torch_tensorrt.logging import TRT_LOGGER
-
-import tensorrt as trt
 
 logger = logging.getLogger(__name__)
 

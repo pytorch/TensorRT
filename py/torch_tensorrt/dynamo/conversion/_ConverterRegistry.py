@@ -23,6 +23,7 @@ import torch
 from torch import SymBool, SymFloat, SymInt
 from torch._ops import OpOverloadPacket
 from torch.fx.node import Argument, Node, Target, _get_qualified_name
+from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
 from torch_tensorrt.fx.converter_registry import CONVERTERS as FX_CONVERTERS
 
@@ -82,7 +83,9 @@ class ConverterSupport:
     """
 
     converter_implementation: ConverterImplSignature
-    capability_validator: Callable[[Node], bool] = field(default=lambda node: True)
+    capability_validator: Callable[[Node, CompilationSettings], bool] = field(
+        default=lambda node, compilation_settings: True
+    )
     supports_dynamic_shapes: bool = False
 
 
@@ -112,10 +115,10 @@ def has_dynamic_shapes_in_args(
 
 def has_static_shapes_in_args(
     arg_positions_to_check: Optional[List[int]] = None,
-) -> Callable[[torch.fx.Node], bool]:
+) -> Callable[[torch.fx.Node, CompilationSettings], bool]:
     """Returns True if a node has static inputs in node.args at specified positions"""
-    _has_static_shapes = lambda node, arg_positions_to_check: not _has_dynamic_shapes(
-        node, arg_positions_to_check
+    _has_static_shapes = lambda node, compilation_settings, arg_positions_to_check: not _has_dynamic_shapes(
+        node, compilation_settings, arg_positions_to_check
     )
     return functools.partial(
         _has_static_shapes, arg_positions_to_check=arg_positions_to_check
@@ -123,7 +126,9 @@ def has_static_shapes_in_args(
 
 
 def _has_dynamic_shapes(
-    node: torch.fx.Node, arg_positions_to_check: Optional[List[int]] = None
+    node: torch.fx.Node,
+    compilation_settings: CompilationSettings = None,
+    arg_positions_to_check: Optional[List[int]] = None,
 ) -> bool:
     # Validate that none of the inputs to the node have Dynamic shapes
     assert isinstance(
@@ -188,7 +193,7 @@ def dynamo_tensorrt_converter(
     key: Target,
     *,
     enabled: bool = True,
-    capability_validator: Optional[Callable[[Node], bool]] = None,
+    capability_validator: Optional[Callable[[Node, CompilationSettings], bool]] = None,
     priority: ConverterPriority = ConverterPriority.STANDARD,
     supports_dynamic_shapes: bool = False,
 ) -> Callable[[ConverterImplSignature], ConverterImplSignature]:
@@ -297,7 +302,6 @@ class ConverterRegistry:
         ],
         registry_names: Optional[Sequence[str]] = None,
         registry_calling_conventions: Optional[Sequence[CallingConvention]] = None,
-        assume_dynamic_shape_support: bool = False,
     ):
         # Copy reference to each dictionary object into attribute list
         self.registries = list(registries)
@@ -318,12 +322,16 @@ class ConverterRegistry:
                 CallingConvention.CTX for _ in range(len(self.registries))
             ]
 
+        self.compilation_settings: CompilationSettings = None
         self.disallowed_targets: Collection[Target] = set()
-        self.assume_dynamic_shape_support = assume_dynamic_shape_support
         self.validate_invariants()
 
-    def set_dynamic_shape_support(self, assume_dynamic_shape_support: bool) -> None:
-        self.assume_dynamic_shape_support = assume_dynamic_shape_support
+    def set_compilation_settings(
+        self, compilation_settings: CompilationSettings
+    ) -> None:
+        self.compilation_settings = compilation_settings
+        # set torch executed ops as disallowed targets
+        self.set_disallowed_targets(compilation_settings.torch_executed_ops)
 
     def set_disallowed_targets(self, torch_executed_ops: Collection[Target]) -> None:
         self.disallowed_targets = torch_executed_ops
@@ -412,7 +420,11 @@ class ConverterRegistry:
 
         self.validate_invariants()
         key = node.target
-
+        assume_dynamic_shape_support = False
+        if self.compilation_settings:
+            assume_dynamic_shape_support = (
+                self.compilation_settings.assume_dynamic_shape_support
+            )
         if (
             key in self.disallowed_targets
             or self.qualified_name_or_str(key) in self.disallowed_targets
@@ -436,8 +448,10 @@ class ConverterRegistry:
                         # 2) Assume dynamic_shape support is True
                         # 3) Node only has static shaped inputs
                         # 4) Node has dynamic inputs and the converter has supports_dynamic_shapes=True
-                        if candidate.capability_validator(node) and (
-                            self.assume_dynamic_shape_support
+                        if candidate.capability_validator(
+                            node, self.compilation_settings
+                        ) and (
+                            assume_dynamic_shape_support
                             or not node_has_dynamic_shapes(node)
                             or candidate.supports_dynamic_shapes
                         ):
