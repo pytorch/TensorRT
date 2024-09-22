@@ -395,4 +395,4 @@ def get_decompositions(
         return {**CORE_ATEN_DECOMPOSITIONS_FILTERED, **TORCH_TRT_DECOMPOSITIONS}
     else:
         # changes made here due to torch2.6 changes https://github.com/pytorch/pytorch/pull/135080
-        return {**_decomp_table_to_post_autograd_aten(), **TORCH_TRT_DECOMPOSITIONS}
+        return {**_decomp_table_to_post_autograd_aten(), **ENABLED_TORCH_DECOMPOSITIONS, **TORCH_TRT_DECOMPOSITIONS}
