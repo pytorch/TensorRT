@@ -89,32 +89,33 @@ class TestWeightStreamingPython(TestCase):
         )
         # Weight streaming budget is applied manually.
         with torchtrt.runtime.weight_streaming(optimized_model) as weight_streaming_ctx:
-            min_budget, max_budget = weight_streaming_ctx.get_required_device_budgets()
-            streamable_budget = max_budget - min_budget
+            streamable_budget = weight_streaming_ctx.device_budget
 
-            requested_budget = min_budget + int(streamable_budget * 0.7)
+            requested_budget = int(streamable_budget * 0.7)
             weight_streaming_ctx.device_budget = requested_budget
             assert weight_streaming_ctx.device_budget == requested_budget
 
             optimized_model(*input)
 
-            # Full streaming by applying min budget
-            weight_streaming_ctx.device_budget = min_budget
-            assert weight_streaming_ctx.device_budget == min_budget
+            # Full streaming by applying 0 budget
+            weight_streaming_ctx.device_budget = 0
+            assert weight_streaming_ctx.device_budget == 0
 
             # Automatic weight streaming size
-            val = weight_streaming_ctx.get_automatic_weight_streaming_budget()
-            weight_streaming_ctx.device_budget = val
-            assert weight_streaming_ctx.device_budget > 0
+            requested_budget = (
+                weight_streaming_ctx.get_automatic_weight_streaming_budget()
+            )
+            weight_streaming_ctx.device_budget = requested_budget
+            assert weight_streaming_ctx.device_budget == requested_budget
 
-            requested_budget = min_budget + int(streamable_budget * 0.5)
+            requested_budget = int(streamable_budget * 0.5)
             weight_streaming_ctx.device_budget = requested_budget
             assert weight_streaming_ctx.device_budget == requested_budget
 
             out = optimized_model(*input)
 
         # Weight streaming is disabled after the exit from weight streaming context
-        assert weight_streaming_ctx.device_budget == max_budget
+        assert weight_streaming_ctx.device_budget == streamable_budget
 
         ref = model(*input)
         torch.testing.assert_close(
@@ -156,19 +157,19 @@ class TestWeightStreamingPython(TestCase):
 
         # Setting weight streaming context to unsupported module
         with torchtrt.runtime.weight_streaming(model) as weight_streaming_ctx:
-            min_budget, max_budget = weight_streaming_ctx.get_required_device_budgets()
-            assert min_budget == max_budget
+            streamable_budget = weight_streaming_ctx.device_budget
+            assert streamable_budget == 0
 
         with torchtrt.runtime.weight_streaming(optimized_model) as weight_streaming_ctx:
-            min_budget, max_budget = weight_streaming_ctx.get_required_device_budgets()
+            streamable_budget = weight_streaming_ctx.device_budget
 
             # Values is larger than max budget disables weight streaming
-            weight_streaming_ctx.device_budget = max_budget + 1
-            assert weight_streaming_ctx.device_budget == max_budget
+            weight_streaming_ctx.device_budget = streamable_budget + 1
+            assert weight_streaming_ctx.device_budget == streamable_budget
 
             try:
-                # Runtime error if requested budget is less than mininum budget
-                weight_streaming_ctx.device_budget = min_budget - 1
+                # Runtime error if requested budget is negative
+                weight_streaming_ctx.device_budget = -1
                 assert False
             except RuntimeError:
                 assert True
@@ -201,10 +202,9 @@ class TestWeightStreamingPython(TestCase):
         )
 
         with torchtrt.runtime.weight_streaming(optimized_model) as weight_streaming_ctx:
-            min_budget, max_budget = weight_streaming_ctx.get_required_device_budgets()
-            streamable_budget = max_budget - min_budget
+            streamable_budget = weight_streaming_ctx.device_budget
             for pct in [0.05, 0.2, 0.4, 0.8, 1.0]:
-                requested_budget = min_budget + int(streamable_budget * pct)
+                requested_budget = int(streamable_budget * pct)
                 weight_streaming_ctx.device_budget = requested_budget
 
                 # Budget distribution to multiple submodule may result in integer differences of at most 1
@@ -212,7 +212,7 @@ class TestWeightStreamingPython(TestCase):
                 out = optimized_model(*input)
 
         # Weight streaming is disabled after the exit from weight streaming context
-        assert weight_streaming_ctx.device_budget == max_budget
+        assert weight_streaming_ctx.device_budget == streamable_budget
 
         ref = model(*input)
         torch.testing.assert_close(
