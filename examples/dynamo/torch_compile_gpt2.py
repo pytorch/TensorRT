@@ -40,9 +40,6 @@ with torch.no_grad():
 prompt = "I enjoy walking with my cute dog"
 model_inputs = tokenizer(prompt, return_tensors="pt")
 input_ids = model_inputs["input_ids"].cuda()
-position_ids = torch.arange(input_ids.shape[1]).unsqueeze(0).cuda()
-attention_mask = torch.ones_like(position_ids)
-
 
 # Auto-regressive generation loop for greedy search using PyTorch model.
 pyt_gen_tokens = model.generate(
@@ -56,34 +53,30 @@ pyt_gen_tokens = model.generate(
 # Compilation with `torch.compile` using tensorrt backend and generate TensorRT outputs
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-# Compile the model and mark the input sequence length to be dynamic
-torch._dynamo.mark_dynamic(input_ids, 1, min=2, max=1023)
-torch._dynamo.mark_dynamic(position_ids, 1, min=2, max=1023)
-torch._dynamo.mark_dynamic(attention_mask, 1, min=2, max=1023)
-trt_model = torch.compile(
-    model,
-    backend="tensorrt",
-    dynamic=None,
-    options={
-        "enabled_precisions": {torch.float32},
-        "disable_tf32": True,
-        "min_block_size": 1,
-    },
-)
-model_inputs = {
-    "input_ids": input_ids,
-    "position_ids": position_ids,
-    "attention_mask": attention_mask,
-}
-trt_model(input_ids)
+with torch_tensorrt.logging.debug():
+    # Compile the model and mark the input sequence length to be dynamic
+    torch._dynamo.mark_dynamic(input_ids, 1, min=2, max=1023)
+    model.forward = torch.compile(
+        model.forward,
+        backend="tensorrt",
+        dynamic=None,
+        options={
+            "enabled_precisions": {torch.float32},
+            "disable_tf32": True,
+            "min_block_size": 1,
+            "debug": True,
+        },
+    )
 
-# Auto-regressive generation loop for greedy decoding using TensorRT model
-trt_gen_tokens = trt_model.generate(
-    input_ids,
-    max_length=MAX_TOKENS,
-    use_cache=False,
-    pad_token_id=tokenizer.eos_token_id,
-)
+    # Auto-regressive generation loop for greedy decoding using TensorRT model
+    # The first token generation compiles the model using TensorRT and the second token
+    # encounters recompilation
+    trt_gen_tokens = model.generate(
+        inputs=input_ids,
+        max_length=MAX_TOKENS,
+        use_cache=False,
+        pad_token_id=tokenizer.eos_token_id,
+    )
 
 # %%
 # Decode the output sentences of PyTorch and TensorRT
