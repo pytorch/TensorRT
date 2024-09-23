@@ -1,16 +1,20 @@
-import os
-import sys
 import time
 
+import tensorrt as trt
+import tensorrt_llm
 import torch
 import torch.nn as nn
 import torch_tensorrt
+from tensor_parallel_nccl_ops import register_nccl_ops
 from torch.distributed._tensor import Shard
-from torch.distributed._tensor.device_mesh import init_device_mesh
 from torch.distributed.tensor.parallel import (
     ColwiseParallel,
     RowwiseParallel,
     parallelize_module,
+)
+
+device_mesh, _world_size, _rank, logger = register_nccl_ops(
+    "./tensor_parallel_simple_example"
 )
 
 """
@@ -36,14 +40,7 @@ class ToyModel(nn.Module):
         return x
 
 
-# create a device mesh based on the given world_size.
-_world_size = int(os.environ["WORLD_SIZE"])
-
-device_mesh = init_device_mesh(device_type="cuda", mesh_shape=(_world_size,))
-_rank = device_mesh.get_rank()
-
-
-print(f"Starting PyTorch TP example on rank {_rank}.")
+logger.info(f"Starting PyTorch TP example on rank {_rank}.")
 assert (
     _world_size % 2 == 0
 ), f"TP examples require even number of GPUs, but got {_world_size} gpus"
@@ -91,9 +88,9 @@ for i in range(10):
     output = tp_model(inp)
     end = time.time()
     if i == 0:
-        print(f"Compilation time is {end-start}")
+        logger.info(f"Compilation time is {end-start}")
         assert (
             python_result - output
         ).std() < 0.01, "Compilation result is not correct."
     elif _rank == 0:
-        print(f"Inference time is {end-start}")
+        logger.info(f"Inference time is {end-start}")
