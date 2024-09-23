@@ -90,11 +90,6 @@ TRTEngine::TRTEngine(
   TORCHTRT_CHECK((cuda_engine.get() != nullptr), "Unable to deserialize the TensorRT engine");
 
   if (get_streamable_weights_size() > 0) {
-    // Scratch memory size may change based on the current weight streaming budget
-    // Required memory for full streaming is used to minimum weight budget
-    cuda_engine->setWeightStreamingBudgetV2(0);
-    min_required_device_budget = cuda_engine->getWeightStreamingScratchMemorySize();
-
     int64_t budget_bytes = get_weight_streaming_automatic_budget();
     LOG_INFO("Set automatic weight streaming budget bytes " << budget_bytes);
     cuda_engine->setWeightStreamingBudgetV2(budget_bytes);
@@ -293,10 +288,6 @@ bool TRTEngine::set_device_memory_budget(int64_t budget) {
 // Returns 0 if BuilderFlag::kWEIGHT_STREAMING is unset during engine building.
 int64_t TRTEngine::get_streamable_weights_size() {
   return cuda_engine->getStreamableWeightsSize();
-}
-
-int64_t TRTEngine::get_min_required_device_budget() {
-  return min_required_device_budget;
 }
 
 int64_t TRTEngine::get_weight_streaming_automatic_budget() {
