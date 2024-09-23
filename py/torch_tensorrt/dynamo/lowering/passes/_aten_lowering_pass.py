@@ -6,6 +6,7 @@ import torch
 from .accumulate_fp32_matmul import accumulate_fp32_matmul
 from .constant_folding import constant_fold
 from .fuse_prims_broadcast import fuse_prims_broadcast
+from .fuse_distributed_ops import fuse_distributed_ops
 from .lower_linear import lower_linear
 from .lower_scaled_dot_product_attention import lower_scaled_dot_product_attention
 from .pass_manager import DynamoPassManager
