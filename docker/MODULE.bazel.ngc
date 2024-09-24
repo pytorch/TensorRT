@@ -50,13 +50,13 @@ http_archive = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "ht
 
 new_local_repository(
     name = "libtorch",
-    path = "/usr/local/lib/python$(python3 -c 'import sys; print(f\"{sys.version_info.major}.{sys.version_info.minor}\")')/dist-packages/torch/",
+    path = "/usr/local/lib/python3.10/dist-packages/torch/",
     build_file = "third_party/libtorch/BUILD"
 )
 
 new_local_repository(
     name = "libtorch_pre_cxx11_abi",
-    path = "/usr/local/lib/python$(python3 -c 'import sys; print(f\"{sys.version_info.major}.{sys.version_info.minor}\")')/dist-packages/torch/",
+    path = "/usr/local/lib/python3.10/dist-packages/torch/",
     build_file = "third_party/libtorch/BUILD"
 )
 
