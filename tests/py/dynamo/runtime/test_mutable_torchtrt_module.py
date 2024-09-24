@@ -11,8 +11,29 @@ import torch_tensorrt as torch_trt
 import torchvision.models as models
 from torch import nn
 from torch_tensorrt.dynamo.runtime._MutableTorchTensorRTModule import RefitFlag
+from torch_tensorrt.dynamo.utils import check_output_equal
 
 assertions = unittest.TestCase()
+
+
+@pytest.mark.unit
+def test_check_output_equal():
+    torch.manual_seed(0)
+    a = {
+        "a": torch.rand(10, 30),
+        "b": [torch.rand(10, 30), torch.rand(5, 5)],
+        "c": {"a": torch.rand(10, 30), "b": [torch.rand(10, 30), torch.rand(5, 5)]},
+    }
+    torch.manual_seed(0)
+    b = {
+        "a": torch.rand(10, 30),
+        "b": [torch.rand(10, 30), torch.rand(5, 5)],
+        "c": {"a": torch.rand(10, 30), "b": [torch.rand(10, 30), torch.rand(5, 5)]},
+    }
+    assertions.assertTrue(
+        check_output_equal(a, b),
+        msg=f"test_check_output_equal is not correct.",
+    )
 
 
 @unittest.skipIf(
@@ -28,11 +49,11 @@ def test_resnet18():
     compile_spec = {
         "use_python_runtime": False,
         "enabled_precisions": {torch.float32},
-        "make_refitable": True,
+        "make_refittable": True,
     }
 
-    model = models.resnet18(pretrained=False).eval().to("cuda")
-    model2 = models.resnet18(pretrained=True).eval().to("cuda")
+    model = models.resnet18(pretrained=True).eval().to("cuda")
+    model2 = models.resnet18(pretrained=False).eval().to("cuda")
     mutable_module = torch_trt.MutableTorchTensorRTModule(model, **compile_spec)
     mutable_module(*inputs)
 
@@ -44,9 +65,7 @@ def test_resnet18():
     # Check the output
     expected_outputs, refitted_outputs = model2(*inputs), mutable_module(*inputs)
     assertions.assertTrue(
-        torch_trt.MutableTorchTensorRTModule.check_output_equal(
-            expected_outputs, refitted_outputs
-        ),
+        check_output_equal(expected_outputs, refitted_outputs),
         msg=f"The output of saved and reloaded Mutable Module is not correct.",
     )
 
@@ -70,10 +89,10 @@ def test_save():
     compile_spec = {
         "use_python_runtime": False,
         "enabled_precisions": {torch.float32},
-        "make_refitable": True,
+        "make_refittable": True,
     }
 
-    model = models.resnet18(pretrained=False).eval().to("cuda")
+    model = models.resnet18(pretrained=True).eval().to("cuda")
     mutable_module = torch_trt.MutableTorchTensorRTModule(model, **compile_spec)
     mutable_module(*inputs)
 
@@ -83,9 +102,7 @@ def test_save():
 
     loaded_outputs, trt_gm_outputs = reload(*inputs), mutable_module(*inputs)
     assertions.assertTrue(
-        torch_trt.MutableTorchTensorRTModule.check_output_equal(
-            loaded_outputs, trt_gm_outputs
-        ),
+        check_output_equal(loaded_outputs, trt_gm_outputs),
         msg=f"The output of saved and reloaded Mutable Module is not correct.",
     )
 
@@ -106,10 +123,10 @@ def test_resnet18_modify_attribute():
     compile_spec = {
         "use_python_runtime": False,
         "enabled_precisions": {torch.float32},
-        "make_refitable": True,
+        "make_refittable": True,
     }
 
-    model = models.resnet18(pretrained=False).eval().to("cuda")
+    model = models.resnet18(pretrained=True).eval().to("cuda")
     mutable_module = torch_trt.MutableTorchTensorRTModule(model, **compile_spec)
     mutable_module(*inputs)
 
@@ -147,10 +164,10 @@ def test_resnet18_modify_attribute_no_refit():
     compile_spec = {
         "use_python_runtime": False,
         "enabled_precisions": {torch.float32},
-        "make_refitable": True,
+        "make_refittable": True,
     }
 
-    model = models.resnet18(pretrained=False).eval().to("cuda")
+    model = models.resnet18(pretrained=True).eval().to("cuda")
     mutable_module = torch_trt.MutableTorchTensorRTModule(model, **compile_spec)
     mutable_module(*inputs)
 
@@ -226,7 +243,7 @@ def test_custom_model_with_kwarg():
         "optimization_level": 1,
         "min_block_size": 1,
         "ir": "dynamo",
-        "make_refitable": True,
+        "make_refittable": True,
     }
 
     mutable_module = torch_trt.MutableTorchTensorRTModule(model, **compile_spec)
@@ -241,9 +258,7 @@ def test_custom_model_with_kwarg():
         *args, **kwargs
     )
     assertions.assertTrue(
-        torch_trt.MutableTorchTensorRTModule.check_output_equal(
-            expected_outputs, refitted_outputs
-        ),
+        check_output_equal(expected_outputs, refitted_outputs),
         msg=f"The output of saved and reloaded Mutable Module is not correct.",
     )
 
@@ -289,7 +304,7 @@ def test_custom_model_with_inplace_init():
         "optimization_level": 1,
         "min_block_size": 1,
         "ir": "dynamo",
-        "make_refitable": True,
+        "make_refittable": True,
     }
 
     mutable_module = torch_trt.MutableTorchTensorRTModule(model, **compile_spec)
@@ -306,9 +321,7 @@ def test_custom_model_with_inplace_init():
     model.cuda()
     expected_outputs, refitted_outputs = model(*args), mutable_module(*args)
     assertions.assertTrue(
-        torch_trt.MutableTorchTensorRTModule.check_output_equal(
-            expected_outputs, refitted_outputs
-        ),
+        check_output_equal(expected_outputs, refitted_outputs),
         msg=f"The output of saved and reloaded Mutable Module is not correct.",
     )
 
@@ -354,7 +367,7 @@ def test_custom_model_with_init_recompile():
         "optimization_level": 1,
         "min_block_size": 1,
         "ir": "dynamo",
-        "make_refitable": True,
+        "make_refittable": True,
     }
 
     mutable_module = torch_trt.MutableTorchTensorRTModule(model, **compile_spec)
@@ -371,9 +384,7 @@ def test_custom_model_with_init_recompile():
     model.cuda()  # move offloaded model from cpu to cuda
     expected_outputs, refitted_outputs = model(*args), mutable_module(*args)
     assertions.assertTrue(
-        torch_trt.MutableTorchTensorRTModule.check_output_equal(
-            expected_outputs, refitted_outputs
-        ),
+        check_output_equal(expected_outputs, refitted_outputs),
         msg=f"The output of saved and reloaded Mutable Module is not correct.",
     )
 
@@ -425,7 +436,7 @@ def test_custom_model_with_kwarg_different_input():
         "optimization_level": 1,
         "min_block_size": 1,
         "ir": "dynamo",
-        "make_refitable": True,
+        "make_refittable": True,
     }
 
     mutable_module = torch_trt.MutableTorchTensorRTModule(model, **compile_spec)
@@ -443,31 +454,9 @@ def test_custom_model_with_kwarg_different_input():
         *args, **kwargs
     )
     assertions.assertTrue(
-        torch_trt.MutableTorchTensorRTModule.check_output_equal(
-            expected_outputs, refitted_outputs
-        ),
+        check_output_equal(expected_outputs, refitted_outputs),
         msg=f"The output of saved and reloaded Mutable Module is not correct.",
     )
 
     # Clean up model env
     torch._dynamo.reset()
-
-
-@pytest.mark.unit
-def test_check_output_equal():
-    torch.manual_seed(0)
-    a = {
-        "a": torch.rand(10, 30),
-        "b": [torch.rand(10, 30), torch.rand(5, 5)],
-        "c": {"a": torch.rand(10, 30), "b": [torch.rand(10, 30), torch.rand(5, 5)]},
-    }
-    torch.manual_seed(0)
-    b = {
-        "a": torch.rand(10, 30),
-        "b": [torch.rand(10, 30), torch.rand(5, 5)],
-        "c": {"a": torch.rand(10, 30), "b": [torch.rand(10, 30), torch.rand(5, 5)]},
-    }
-    assertions.assertTrue(
-        torch_trt.MutableTorchTensorRTModule.check_output_equal(a, b),
-        msg=f"test_check_output_equal is not correct.",
-    )

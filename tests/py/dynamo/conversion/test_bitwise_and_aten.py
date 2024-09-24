@@ -5,6 +5,7 @@ from parameterized import parameterized
 from torch.export import Dim
 from torch.testing._internal.common_utils import run_tests
 from torch_tensorrt import Input
+from torch_tensorrt.dynamo.utils import ATOL, RTOL
 
 from .harness import DispatchTestCase
 
@@ -140,7 +141,12 @@ class TestBitwiseAndConverter(DispatchTestCase):
             mod, inputs, dynamic_shapes=({1: dyn_dim}, {0: dyn_dim})
         )
         trt_mod = torch_tensorrt.dynamo.compile(
-            fx_mod, inputs=inputs, enable_precisions={torch.bool}, min_block_size=1
+            fx_mod,
+            inputs=inputs,
+            enable_precisions={torch.bool},
+            min_block_size=1,
+            cache_built_engines=False,
+            reuse_cached_engines=False,
         )
         with torch.no_grad():
             cuda_inputs = []
@@ -152,8 +158,8 @@ class TestBitwiseAndConverter(DispatchTestCase):
                 torch.testing.assert_close(
                     out,
                     ref,
-                    rtol=0.001,
-                    atol=0.001,
+                    rtol=RTOL,
+                    atol=ATOL,
                     equal_nan=True,
                     check_dtype=True,
                 )

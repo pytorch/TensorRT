@@ -21,6 +21,7 @@ cc_library(
     name = "runtime",
     srcs = [
         "DeviceList.cpp",
+        "Platform.cpp",
         "RTDevice.cpp",
         "TRTEngine.cpp",
         "TRTEngineProfiler.cpp",
@@ -29,6 +30,7 @@ cc_library(
         "runtime.cpp",
     ],
     hdrs = [
+        "Platform.h",
         "RTDevice.h",
         "TRTEngine.h",
         "TRTEngineProfiler.h",
@@ -41,9 +43,18 @@ cc_library(
         "//core/plugins:torch_tensorrt_plugins",
         "//core/util:prelude",
     ] + select({
-        ":windows": ["@tensorrt_win//:nvinfer", "@libtorch_win//:libtorch"],
-        ":use_pre_cxx11_abi": ["@tensorrt//:nvinfer", "@libtorch_pre_cxx11_abi//:libtorch"],
-        "//conditions:default": ["@tensorrt//:nvinfer", "@libtorch"],
+        ":use_pre_cxx11_abi": [
+            "@libtorch_pre_cxx11_abi//:libtorch",
+            "@tensorrt//:nvinfer",
+        ],
+        ":windows": [
+            "@libtorch_win//:libtorch",
+            "@tensorrt_win//:nvinfer",
+        ],
+        "//conditions:default": [
+            "@libtorch",
+            "@tensorrt//:nvinfer",
+        ],
     }),
     alwayslink = True,
 )
@@ -51,6 +62,7 @@ cc_library(
 pkg_tar(
     name = "include",
     srcs = [
+        "Platform.h",
         "RTDevice.h",
         "TRTEngine.h",
         "TRTEngineProfiler.h",

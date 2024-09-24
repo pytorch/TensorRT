@@ -7,7 +7,7 @@ from torch.fx.node import Target
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
 from torch_tensorrt.dynamo.conversion.impl.activation.base import convert_activation
-from torch_tensorrt.fx.types import TRTTensor
+from torch_tensorrt.dynamo.types import TRTTensor
 
 
 def relu(
@@ -326,4 +326,27 @@ def thresholded_relu(
         input_val,
         alpha=alpha,
         dyn_range_fn=thresholded_relu_dyn_range_fn,
+    )
+
+
+def gelu(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    input_val: TRTTensor,
+    approximate: str,
+) -> TRTTensor:
+    if approximate == "none":
+        operation_type = trt.ActivationType.GELU_ERF
+    elif approximate == "tanh":
+        operation_type = trt.ActivationType.GELU_TANH
+
+    return convert_activation(
+        ctx,
+        target,
+        source_ir,
+        name,
+        operation_type,
+        input_val,
     )

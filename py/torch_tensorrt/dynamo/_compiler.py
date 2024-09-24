@@ -18,6 +18,7 @@ from torch_tensorrt.dynamo._DryRunTracker import (
     dryrun_stats_display,
     parse_non_trt_nodes,
 )
+from torch_tensorrt.dynamo._engine_cache import BaseEngineCache, DiskEngineCache
 from torch_tensorrt.dynamo.conversion import (
     CompilationSettings,
     UnsupportedOperatorException,
@@ -55,11 +56,11 @@ def compile(
     disable_tf32: bool = _defaults.DISABLE_TF32,
     assume_dynamic_shape_support: bool = _defaults.ASSUME_DYNAMIC_SHAPE_SUPPORT,
     sparse_weights: bool = _defaults.SPARSE_WEIGHTS,
-    enabled_precisions: (
-        Set[torch.dtype | dtype] | Tuple[torch.dtype | dtype]
-    ) = _defaults.ENABLED_PRECISIONS,
+    enabled_precisions: Union[
+        Set[Union[torch.dtype, dtype]], Tuple[Union[torch.dtype, dtype]]
+    ] = _defaults.ENABLED_PRECISIONS,
     engine_capability: EngineCapability = _defaults.ENGINE_CAPABILITY,
-    make_refitable: bool = _defaults.MAKE_REFITABLE,
+    make_refittable: bool = _defaults.MAKE_REFITTABLE,
     debug: bool = _defaults.DEBUG,
     num_avg_timing_iters: int = _defaults.NUM_AVG_TIMING_ITERS,
     workspace_size: int = _defaults.WORKSPACE_SIZE,
@@ -82,8 +83,11 @@ def compile(
     hardware_compatible: bool = _defaults.HARDWARE_COMPATIBLE,
     timing_cache_path: str = _defaults.TIMING_CACHE_PATH,
     lazy_engine_init: bool = _defaults.LAZY_ENGINE_INIT,
-    use_strong_types: bool = _defaults.USE_STRONG_TYPES,
-    use_fp32_acc: bool = _defaults.USE_FP32_ACC,
+    cache_built_engines: bool = _defaults.CACHE_BUILT_ENGINES,
+    reuse_cached_engines: bool = _defaults.REUSE_CACHED_ENGINES,
+    engine_cache_dir: str = _defaults.ENGINE_CACHE_DIR,
+    engine_cache_size: int = _defaults.ENGINE_CACHE_SIZE,
+    custom_engine_cache: Optional[BaseEngineCache] = _defaults.CUSTOM_ENGINE_CACHE,
     **kwargs: Any,
 ) -> torch.fx.GraphModule:
     """Compile an ExportedProgram module for NVIDIA GPUs using TensorRT
@@ -149,8 +153,11 @@ def compile(
         hardware_compatible (bool): Build the TensorRT engines compatible with GPU architectures other than that of the GPU on which the engine was built (currently works for NVIDIA Ampere and newer)
         timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation
         lazy_engine_init (bool): Defer setting up engines until the compilation of all engines is complete. Can allow larger models with multiple graph breaks to compile but can lead to oversubscription of GPU memory at runtime.
-        use_strong_types (bool): Enable strong typing in TensorRT compilation
-        use_fp32_acc (bool): This option inserts cast to FP32 nodes around matmul layers and TensorRT ensures the accumulation of matmul happens in FP32. Use this only when FP16 precision is configured in enabled_precisions.
+        cache_built_engines (bool): Whether to save the compiled TRT engines to storage
+        reuse_cached_engines (bool): Whether to load the compiled TRT engines from storage
+        engine_cache_dir (Optional[str]): Directory to store the cached TRT engines
+        engine_cache_size (Optional[int]): Maximum hard-disk space (bytes) to use for the engine cache, default is 1GB. If the cache exceeds this size, the oldest engines will be removed by default
+        custom_engine_cache (Optional[BaseEngineCache]): Engine cache instance to use for saving and loading engines. Users can provide their own engine cache by inheriting from BaseEngineCache. If used, engine_cache_dir and engine_cache_size will be ignored.
         **kwargs: Any,
     Returns:
         torch.fx.GraphModule: Compiled FX Module, when run it will execute via TensorRT
@@ -173,14 +180,14 @@ def compile(
 
     if "refit" in kwargs.keys():
         warnings.warn(
-            "Refit is deprecated. Please use make_refitable=True if you want to enable refitting of the engine.",
+            "Refit is deprecated. Please use make_refittable=True if you want to enable refitting of the engine.",
             DeprecationWarning,
             stacklevel=2,
         )
-        if make_refitable:
-            raise ValueError("Use flag make_refitable only. Flag refit is deprecated.")
+        if make_refittable:
+            raise ValueError("Use flag make_refittable only. Flag refit is deprecated.")
         else:
-            make_refitable = kwargs["refit"]
+            make_refittable = kwargs["refit"]
 
     engine_capability = EngineCapability._from(engine_capability)
 
@@ -225,8 +232,19 @@ def compile(
     logger.debug("Input graph: " + str(gm.graph))
 
     # Apply lowering on the graph module
-    gm = post_lowering(gm, use_fp32_acc=use_fp32_acc)
+    gm = post_lowering(gm)
     logger.debug("Lowered Input graph: " + str(gm.graph))
+
+    engine_cache = None
+    if cache_built_engines or reuse_cached_engines:
+        assert (
+            make_refittable
+        ), "Engine caching requires make_refittable to be set to True"
+        engine_cache = (
+            custom_engine_cache
+            if custom_engine_cache is not None
+            else DiskEngineCache(engine_cache_dir, engine_cache_size)
+        )
 
     compilation_options = {
         "enabled_precisions": (
@@ -252,7 +270,7 @@ def compile(
         "require_full_compilation": require_full_compilation,
         "disable_tf32": disable_tf32,
         "sparse_weights": sparse_weights,
-        "make_refitable": make_refitable,
+        "make_refittable": make_refittable,
         "engine_capability": engine_capability,
         "dla_sram_size": dla_sram_size,
         "dla_local_dram_size": dla_local_dram_size,
@@ -261,13 +279,15 @@ def compile(
         "hardware_compatible": hardware_compatible,
         "timing_cache_path": timing_cache_path,
         "lazy_engine_init": lazy_engine_init,
-        "use_strong_types": use_strong_types,
-        "use_fp32_acc": use_fp32_acc,
+        "cache_built_engines": cache_built_engines,
+        "reuse_cached_engines": reuse_cached_engines,
     }
 
     settings = CompilationSettings(**compilation_options)
     logger.info("Compilation Settings: %s\n", settings)
-    trt_gm = compile_module(gm, trt_arg_inputs, trt_kwarg_inputs, settings)
+    trt_gm = compile_module(
+        gm, trt_arg_inputs, trt_kwarg_inputs, settings, engine_cache
+    )
     return trt_gm
 
 
@@ -276,6 +296,7 @@ def compile_module(
     sample_arg_inputs: Sequence[Input],
     sample_kwarg_inputs: Optional[dict[Any, Any]] = None,
     settings: CompilationSettings = CompilationSettings(),
+    engine_cache: Optional[BaseEngineCache] = None,
 ) -> torch.fx.GraphModule:
     """Compile a traced FX module
 
@@ -286,17 +307,16 @@ def compile_module(
         arg_inputs: Inputs to the module
         kwarg_inputs: kwargs to the module
         settings: Compilation settings
+        engine_cache: Engine cache instance to store/load compiled engines
     Returns:
         Compiled FX GraphModule
     """
     dryrun_tracker = DryRunTracker()
     if sample_kwarg_inputs is None:
         sample_kwarg_inputs = {}
-    # Assume converters support dynamic shapes and disable validation
-    CONVERTERS.set_dynamic_shape_support(settings.assume_dynamic_shape_support)
 
-    # Set torch-executed ops
-    CONVERTERS.set_disallowed_targets(settings.torch_executed_ops)
+    # Configure user compilation settings to converters.
+    CONVERTERS.set_compilation_settings(settings)
 
     # Check the number of supported operations in the graph
     num_supported_ops, total_ops = partitioning.get_graph_converter_support(
@@ -442,6 +462,7 @@ def compile_module(
                 submodule_inputs,
                 settings=settings,
                 name=name,
+                engine_cache=engine_cache,
             )
 
             trt_modules[name] = trt_module
@@ -490,7 +511,7 @@ def convert_exported_program_to_serialized_trt_engine(
     require_full_compilation: bool = _defaults.REQUIRE_FULL_COMPILATION,
     disable_tf32: bool = _defaults.DISABLE_TF32,
     sparse_weights: bool = _defaults.SPARSE_WEIGHTS,
-    make_refitable: bool = _defaults.MAKE_REFITABLE,
+    make_refittable: bool = _defaults.MAKE_REFITTABLE,
     engine_capability: EngineCapability = _defaults.ENGINE_CAPABILITY,
     num_avg_timing_iters: int = _defaults.NUM_AVG_TIMING_ITERS,
     dla_sram_size: int = _defaults.DLA_SRAM_SIZE,
@@ -499,8 +520,6 @@ def convert_exported_program_to_serialized_trt_engine(
     calibrator: object = None,
     allow_shape_tensors: bool = False,
     timing_cache_path: str = _defaults.TIMING_CACHE_PATH,
-    use_strong_types: bool = _defaults.USE_STRONG_TYPES,
-    use_fp32_acc: bool = _defaults.USE_FP32_ACC,
     **kwargs: Any,
 ) -> bytes:
     """Convert an ExportedProgram to a serialized TensorRT engine
@@ -559,8 +578,6 @@ def convert_exported_program_to_serialized_trt_engine(
         calibrator (Union(torch_tensorrt._C.IInt8Calibrator, tensorrt.IInt8Calibrator)): Calibrator object which will provide data to the PTQ system for INT8 Calibration
         allow_shape_tensors: (Experimental) Allow aten::size to output shape tensors using IShapeLayer in TensorRT
         timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation
-        use_strong_types (bool): Enable strong typing in TensorRT compilation
-        use_fp32_acc (bool): This option inserts cast to FP32 nodes around matmul layers and TensorRT ensures the accumulation of matmul happens in FP32. Use this only when FP16 precision is configured in enabled_precisions.
     Returns:
         bytes: Serialized TensorRT engine, can either be saved to a file or deserialized via TensorRT APIs
     """
@@ -581,14 +598,14 @@ def convert_exported_program_to_serialized_trt_engine(
             )
     if "refit" in kwargs.keys():
         warnings.warn(
-            "Refit is deprecated. Please use make_refitable=True if you want to enable refitting of the engine.",
+            "Refit is deprecated. Please use make_refittable=True if you want to enable refitting of the engine.",
             DeprecationWarning,
             stacklevel=2,
         )
-    if not arg_inputs and not inputs:
+    if arg_inputs is None and inputs is None:
         raise AssertionError("'arg_inputs' and 'inputs' should not both be None.")
 
-    elif arg_inputs and inputs:
+    elif arg_inputs is not None and inputs is not None:
         raise AssertionError(
             "'arg_inputs' and 'inputs' should not be used at the same time."
         )
@@ -627,15 +644,13 @@ def convert_exported_program_to_serialized_trt_engine(
         "require_full_compilation": require_full_compilation,
         "disable_tf32": disable_tf32,
         "sparse_weights": sparse_weights,
-        "make_refitable": make_refitable,
+        "make_refittable": make_refittable,
         "engine_capability": engine_capability,
         "num_avg_timing_iters": num_avg_timing_iters,
         "dla_sram_size": dla_sram_size,
         "dla_local_dram_size": dla_local_dram_size,
         "dla_global_dram_size": dla_global_dram_size,
         "timing_cache_path": timing_cache_path,
-        "use_strong_types": use_strong_types,
-        "use_fp32_acc": use_fp32_acc,
     }
 
     exported_program = pre_export_lowering(exported_program)
@@ -653,8 +668,8 @@ def convert_exported_program_to_serialized_trt_engine(
     settings = CompilationSettings(**compilation_options)
     logger.info("Compilation Settings: %s\n", settings)
 
-    # Assume converters support dynamic shapes and disable validation
-    CONVERTERS.set_dynamic_shape_support(settings.assume_dynamic_shape_support)
+    # Configure user compilation settings to converters.
+    CONVERTERS.set_compilation_settings(settings)
 
     try:
         interpreter_result = interpret_module_to_result(

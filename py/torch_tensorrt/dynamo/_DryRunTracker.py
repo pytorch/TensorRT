@@ -226,16 +226,18 @@ def input_formatter(shapes: Any, dtypes: Any) -> str:
     def input_formatter_helper(shapes: Any, dtypes: Any) -> str:
         """Helper for input formatter"""
         # Base case 1 - single static/dynamic shape, single dtype
-        if isinstance(shapes, tuple) and all(isinstance(elt, (int, tuple)) for elt in shapes):
+        if isinstance(shapes, tuple) and all(
+            isinstance(elt, (int, tuple)) for elt in shapes
+        ):
             input_shape_string = "Tensor: ("
             for elt in shapes:
                 if isinstance(elt, tuple):
-                    input_shape_string+= f"(min={elt[0]}, max={elt[1]}), "
+                    input_shape_string += f"(min={elt[0]}, max={elt[1]}), "
                 else:
-                    input_shape_string+= f"{elt}, "
+                    input_shape_string += f"{elt}, "
             input_shape_string = input_shape_string[:-2] + ")" + f"@{str(dtypes)[6:]}, "
             return input_shape_string
-        
+
         # Base case 2 - dynamic shape, single dtype
         elif (
             isinstance(shapes, dict)

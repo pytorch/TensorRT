@@ -484,7 +484,7 @@ package_data = {}
 if not (PY_ONLY or NO_TS):
     tensorrt_linux_external_dir = (
         lambda: subprocess.check_output(
-            ["bazel", "query", "@tensorrt//:nvinfer", "--output", "location"]
+            [BAZEL_EXE, "query", "@tensorrt//:nvinfer", "--output", "location"]
         )
         .decode("ascii")
         .strip()
@@ -492,7 +492,7 @@ if not (PY_ONLY or NO_TS):
     )
     tensorrt_windows_external_dir = (
         lambda: subprocess.check_output(
-            ["bazel", "query", "@tensorrt_win//:nvinfer", "--output", "location"]
+            [BAZEL_EXE, "query", "@tensorrt_win//:nvinfer", "--output", "location"]
         )
         .decode("ascii")
         .strip()

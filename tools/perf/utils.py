@@ -30,15 +30,12 @@ BENCHMARK_MODEL_NAMES = {
 
 def load_hf_model(model_name_hf):
     print("Loading user-specified HF model: ", model_name_hf)
-    model_hf = (
-        AutoModelForCausalLM.from_pretrained(
-            model_name_hf,
-            trust_remote_code=True,
-            use_cache=False,
-            attn_implementation="eager",
-        )
-        .eval()
-    )
+    model_hf = AutoModelForCausalLM.from_pretrained(
+        model_name_hf,
+        trust_remote_code=True,
+        use_cache=False,
+        attn_implementation="eager",
+    ).eval()
 
     return {"model": model_hf}
 

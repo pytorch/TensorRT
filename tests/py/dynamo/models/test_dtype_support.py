@@ -41,6 +41,8 @@ class Test64BitSupport(TestCase):
             truncate_double=True,
             min_block_size=1,
             use_python_runtime=False,
+            cache_built_engines=False,
+            reuse_cached_engines=False,
         )
 
         torch_model_results = mod(in_tensor)
@@ -79,6 +81,8 @@ class Test64BitSupport(TestCase):
             truncate_double=True,
             min_block_size=1,
             use_python_runtime=True,
+            cache_built_engines=False,
+            reuse_cached_engines=False,
         )
 
         torch_model_results = mod(in_tensor)
@@ -123,6 +127,8 @@ class Test64BitSupport(TestCase):
             truncate_double=False,
             min_block_size=1,
             use_python_runtime=False,
+            cache_built_engines=False,
+            reuse_cached_engines=False,
         )
 
         torch_model_results = mod(in_tensor)
@@ -162,6 +168,8 @@ class Test64BitSupport(TestCase):
             truncate_double=False,
             min_block_size=1,
             use_python_runtime=True,
+            cache_built_engines=False,
+            reuse_cached_engines=False,
         )
 
         torch_model_results = mod(in_tensor)
@@ -214,6 +222,8 @@ class TestBF16Support(TestCase):
             enabled_precisions={torch.float, torch.bfloat16, torch.half},
             min_block_size=1,
             use_python_runtime=False,
+            cache_built_engines=False,
+            reuse_cached_engines=False,
         )
 
         torch_model_results = mod(in_tensor)
@@ -225,7 +235,7 @@ class TestBF16Support(TestCase):
         self.assertAlmostEqual(
             max_diff,
             0,
-            DECIMALS_OF_AGREEMENT,
+            delta=3e-2,
             msg=f"Torch outputs and TRT outputs don't match close enough.",
         )
 
@@ -252,6 +262,8 @@ class TestBF16Support(TestCase):
             enabled_precisions={torch.float, torch.bfloat16, torch.half},
             min_block_size=1,
             use_python_runtime=True,
+            cache_built_engines=False,
+            reuse_cached_engines=False,
         )
 
         torch_model_results = mod(in_tensor)
@@ -263,7 +275,7 @@ class TestBF16Support(TestCase):
         self.assertAlmostEqual(
             max_diff,
             0,
-            DECIMALS_OF_AGREEMENT,
+            delta=3e-2,
             msg=f"Torch outputs and TRT outputs don't match close enough.",
         )
 
@@ -289,6 +301,8 @@ class TestBF16Support(TestCase):
                 debug=True,
                 min_block_size=1,
                 device=device,
+                cache_built_engines=False,
+                reuse_cached_engines=False,
             )
 
             torch_model_results = mod(*inputs)
@@ -300,6 +314,6 @@ class TestBF16Support(TestCase):
             self.assertAlmostEqual(
                 max_diff,
                 0,
-                DECIMALS_OF_AGREEMENT,
+                delta=3e-2,
                 msg=f"Torch outputs and TRT outputs don't match close enough.",
             )

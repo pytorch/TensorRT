@@ -5,10 +5,9 @@ from enum import Enum, auto
 from typing import Any, Optional, Type, Union
 
 import numpy as np
-import torch
-from torch_tensorrt._features import ENABLED_FEATURES
-
 import tensorrt as trt
+import torch
+from torch_tensorrt._features import ENABLED_FEATURES, needs_torch_tensorrt_runtime
 
 
 class dtype(Enum):
@@ -1328,3 +1327,72 @@ class EngineCapability(Enum):
 
     def __hash__(self) -> int:
         return hash(self.value)
+
+
+class Platform(Enum):
+    """
+    Specifies a target OS and CPU architecture that a Torch-TensorRT program targets
+    """
+
+    LINUX_X86_64 = auto()
+    """
+    OS: Linux, CPU Arch: x86_64
+
+    :meta hide-value:
+    """
+
+    LINUX_AARCH64 = auto()
+    """
+    OS: Linux, CPU Arch: aarch64
+
+    :meta hide-value:
+    """
+
+    WIN_X86_64 = auto()
+    """
+    OS: Windows, CPU Arch: x86_64
+
+    :meta hide-value:
+    """
+
+    UNKNOWN = auto()
+
+    @classmethod
+    def current_platform(cls) -> Platform:
+        """
+        Returns an enum for the current platform Torch-TensorRT is running on
+
+        Returns:
+            Platform: Current platform
+        """
+        import platform
+
+        if platform.system().lower().startswith("linux"):
+            # linux
+            if platform.machine().lower().startswith("aarch64"):
+                return Platform.LINUX_AARCH64
+            elif platform.machine().lower().startswith("x86_64"):
+                return Platform.LINUX_X86_64
+
+        elif platform.system().lower().startswith("windows"):
+            # Windows...
+            if platform.machine().lower().startswith("amd64"):
+                return Platform.WIN_X86_64
+
+        return Platform.UNKNOWN
+
+    def __str__(self) -> str:
+        return str(self.name)
+
+    @needs_torch_tensorrt_runtime
+    def _to_serialized_rt_platform(self) -> str:
+        val: str = torch.ops.tensorrt._platform_unknown()
+
+        if self == Platform.LINUX_X86_64:
+            val = torch.ops.tensorrt._platform_linux_x86_64()
+        elif self == Platform.LINUX_AARCH64:
+            val = torch.ops.tensorrt._platform_linux_aarch64()
+        elif self == Platform.WIN_X86_64:
+            val = torch.ops.tensorrt._platform_win_x86_64()
+
+        return val

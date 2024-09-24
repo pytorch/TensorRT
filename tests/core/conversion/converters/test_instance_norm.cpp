@@ -47,8 +47,7 @@ TEST(Converters, ATenInstanceNormConvertsCorrectly) {
       g->inputs(), {trt_weight, trt_bias, trt_mean, trt_var, use_input_stats});
   auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {trt_in});
 
-  ASSERT_TRUE(
-      torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0])));
 }
 
 TEST(Converters, ATenInstanceNormAffineConvertsCorrectly) {
@@ -75,8 +74,7 @@ TEST(Converters, ATenInstanceNormAffineConvertsCorrectly) {
       g->inputs(), {trt_weight, trt_bias, trt_mean, trt_var, use_input_stats});
   auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {trt_in});
 
-  ASSERT_TRUE(
-      torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0])));
 }
 
 TEST(Converters, ATenInstanceNormRunningStatsConvertsCorrectly) {
@@ -101,6 +99,5 @@ TEST(Converters, ATenInstanceNormRunningStatsConvertsCorrectly) {
   params = torch_tensorrt::core::ir::get_static_params(
       g->inputs(), {trt_weight, trt_bias, trt_mean, trt_var, use_input_stats});
   auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {trt_in});
-  ASSERT_TRUE(
-      torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0])));
 }

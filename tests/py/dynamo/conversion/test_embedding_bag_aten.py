@@ -3,6 +3,7 @@ import torch_tensorrt
 from parameterized import param, parameterized
 from torch.testing._internal.common_utils import run_tests
 from torch_tensorrt import Input
+from torch_tensorrt.dynamo.utils import ATOL, RTOL
 
 from .harness import DispatchTestCase
 
@@ -147,6 +148,7 @@ class TestEmbeddingBagConverter(DispatchTestCase):
             precision=weight.dtype,
             enable_passes=True,
             propagate_shapes=True,
+            make_refittable=False,
         )
 
     @parameterized.expand(
@@ -344,6 +346,7 @@ class TestEmbeddingBagConverter(DispatchTestCase):
             precision=weight.dtype,
             enable_passes=True,
             propagate_shapes=True,
+            make_refittable=False,
         )
 
     @parameterized.expand(
@@ -408,6 +411,7 @@ class TestEmbeddingBagConverter(DispatchTestCase):
             precision=weight.dtype,
             enable_passes=True,
             propagate_shapes=True,
+            make_refittable=False,
         )
 
     @parameterized.expand(
@@ -483,7 +487,13 @@ class TestEmbeddingBagConverter(DispatchTestCase):
             dynamic_shapes["per_sample_weights"] = {}
         fx_mod = torch.export.export(mod, inputs, dynamic_shapes=dynamic_shapes)
         trt_mod = torch_tensorrt.dynamo.compile(
-            fx_mod, inputs=inputs, enable_precisions=torch.float32, min_block_size=1
+            fx_mod,
+            inputs=inputs,
+            enable_precisions=torch.float32,
+            min_block_size=1,
+            cache_built_engines=False,
+            reuse_cached_engines=False,
+            make_refittable=False,
         )
         # use the inputs with different shape to inference:
         if per_sample_weights is None:
@@ -501,8 +511,8 @@ class TestEmbeddingBagConverter(DispatchTestCase):
                 torch.testing.assert_close(
                     out,
                     ref,
-                    rtol=0.001,
-                    atol=0.001,
+                    rtol=RTOL,
+                    atol=ATOL,
                     equal_nan=True,
                     check_dtype=True,
                 )
