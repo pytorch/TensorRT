@@ -117,6 +117,9 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
     def get_automatic_weight_streaming_budget(self) -> Any:
         return self.engine.get_weight_streaming_automatic_budget()
 
+    def get_device_memory_budget(self) -> Any:
+        return self.engine.weight_streaming_budget_v2
+
     def set_device_memory_budget(self, budget_bytes: int) -> int:
         # Recreating the context because weight streaming budget cannot be modified while there are active context.
         if self.context is not None:
