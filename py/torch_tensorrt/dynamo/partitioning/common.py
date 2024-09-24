@@ -6,7 +6,12 @@ from torch._subclasses.fake_tensor import FakeTensor
 from torch.fx.experimental.proxy_tensor import unset_fake_temporarily
 from torch_tensorrt._Input import Input
 from torch_tensorrt.dynamo._defaults import DEBUG
-from torch_tensorrt.dynamo.utils import contains_sym_int, extract_var_range_info
+from torch_tensorrt.dynamo.utils import (
+    contains_sym_int,
+    extract_var_range_info,
+    get_model_device,
+    get_torch_inputs,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -130,36 +135,57 @@ def run_shape_analysis(
 ) -> Tuple[Dict[Any, Sequence[Any]], Dict[Any, Sequence[Any]]]:
     submod_inputs_shape_map: Dict[Any, Sequence[Any]] = {}
     submod_outputs_shape_map: Dict[Any, Sequence[Any]] = {}
-    sub_inputs: Sequence[torch.Tensor] = []
-    sub_outputs: Sequence[torch.Tensor] = []
-
-    # Register a hook to capture IO shapes for submodules
-    def get_submodule_io(
-        self: Any, inputs: Sequence[torch.Tensor], outputs: Sequence[torch.Tensor]
-    ) -> None:
-        nonlocal sub_inputs, sub_outputs
-        sub_inputs = inputs
-        sub_outputs = outputs
-        return
 
     if kwarg_inputs is None:
         kwarg_inputs = {}
-    # Iterate through submodules (both Torch and TRT) and store IO shapes
-    for name, _ in parent_module.named_children():
-        submodule = getattr(parent_module, name)
-        handle = submodule.register_forward_hook(get_submodule_io)
-        parent_module(*inputs, **kwarg_inputs)
-        handle.remove()
-        submod_inputs_shape_map[name] = (
-            [input.shape for input in sub_inputs]
-            if isinstance(sub_inputs, (tuple, list))
-            else [sub_inputs.shape]
-        )
-        submod_outputs_shape_map[name] = (
-            [output.shape for output in sub_outputs]
-            if isinstance(sub_outputs, (tuple, list))
-            else [sub_outputs.shape]
-        )
+
+    flag = "not hook"
+    if flag == "hook":
+        sub_inputs: Sequence[torch.Tensor] = []
+        sub_outputs: Sequence[torch.Tensor] = []
+
+        # Register a hook to capture IO shapes for submodules
+        def get_submodule_io(
+            self: Any, inputs: Sequence[torch.Tensor], outputs: Sequence[torch.Tensor]
+        ) -> None:
+            nonlocal sub_inputs, sub_outputs
+            sub_inputs = inputs
+            sub_outputs = outputs
+            return
+
+        # Iterate through submodules (both Torch and TRT) and store IO shapes
+        for name, _ in parent_module.named_children():
+            submodule = getattr(parent_module, name)
+            handle = submodule.register_forward_hook(get_submodule_io)
+            parent_module(*inputs, **kwarg_inputs)
+            handle.remove()
+            submod_inputs_shape_map[name] = (
+                [input.shape for input in sub_inputs]
+                if isinstance(sub_inputs, (tuple, list))
+                else [sub_inputs.shape]
+            )
+            submod_outputs_shape_map[name] = (
+                [output.shape for output in sub_outputs]
+                if isinstance(sub_outputs, (tuple, list))
+                else [sub_outputs.shape]
+            )
+    else:
+        device = get_model_device(parent_module)
+        torch_inputs = get_torch_inputs(inputs, device)
+        torch_kwarg_inputs = get_torch_inputs(kwarg_inputs, device)
+        module_outputs = parent_module(*torch_inputs, **torch_kwarg_inputs)
+        # Iterate to store IO shapes
+        for name, _ in parent_module.named_children():
+            submod_inputs_shape_map[name] = (
+                [input.shape for input in torch_inputs]
+                if isinstance(torch_inputs, (tuple, list))
+                else [torch_inputs.shape]
+            )
+            submod_outputs_shape_map[name] = (
+                [output.shape for output in module_outputs]
+                if isinstance(module_outputs, (tuple, list))
+                else [module_outputs.shape]
+            )
 
     return submod_inputs_shape_map, submod_outputs_shape_map
 

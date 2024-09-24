@@ -167,6 +167,8 @@ def get_torch_inputs(
                 result_dict[k] = get_torch_inputs(v, device)
             elif isinstance(v, Input):
                 result_dict[k] = get_torch_tensor(v, device, mode)
+            elif isinstance(v, torch.Tensor):
+                result_dict[k] = v.to(device)
         return result_dict
     else:
         result_list: List[Union[int, torch.Tensor]] = []
