@@ -53,30 +53,29 @@ pyt_gen_tokens = model.generate(
 # Compilation with `torch.compile` using tensorrt backend and generate TensorRT outputs
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-with torch_tensorrt.logging.debug():
-    # Compile the model and mark the input sequence length to be dynamic
-    torch._dynamo.mark_dynamic(input_ids, 1, min=2, max=1023)
-    model.forward = torch.compile(
-        model.forward,
-        backend="tensorrt",
-        dynamic=None,
-        options={
-            "enabled_precisions": {torch.float32},
-            "disable_tf32": True,
-            "min_block_size": 1,
-            "debug": True,
-        },
-    )
+# Compile the model and mark the input sequence length to be dynamic
+torch._dynamo.mark_dynamic(input_ids, 1, min=2, max=1023)
+model.forward = torch.compile(
+    model.forward,
+    backend="tensorrt",
+    dynamic=None,
+    options={
+        "enabled_precisions": {torch.float32},
+        "disable_tf32": True,
+        "min_block_size": 1,
+        "debug": True,
+    },
+)
 
-    # Auto-regressive generation loop for greedy decoding using TensorRT model
-    # The first token generation compiles the model using TensorRT and the second token
-    # encounters recompilation
-    trt_gen_tokens = model.generate(
-        inputs=input_ids,
-        max_length=MAX_TOKENS,
-        use_cache=False,
-        pad_token_id=tokenizer.eos_token_id,
-    )
+# Auto-regressive generation loop for greedy decoding using TensorRT model
+# The first token generation compiles the model using TensorRT and the second token
+# encounters recompilation
+trt_gen_tokens = model.generate(
+    inputs=input_ids,
+    max_length=MAX_TOKENS,
+    use_cache=False,
+    pad_token_id=tokenizer.eos_token_id,
+)
 
 # %%
 # Decode the output sentences of PyTorch and TensorRT
