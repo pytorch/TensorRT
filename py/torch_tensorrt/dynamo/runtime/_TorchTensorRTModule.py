@@ -175,6 +175,9 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
     def get_automatic_weight_streaming_budget(self) -> Any:
         return self.engine.weight_streaming_automatic_budget
 
+    def get_device_memory_budget(self) -> Any:
+        return self.engine.device_memory_budget
+
     def set_device_memory_budget(self, budget_bytes: int) -> int:
         # Disable weight streaming for invalid budget size
         if budget_bytes < 0:

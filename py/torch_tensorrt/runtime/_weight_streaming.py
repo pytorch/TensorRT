@@ -14,18 +14,20 @@ class _WeightStreamingContextManager(object):
 
     def __init__(self, module: torch.fx.GraphModule) -> None:
         rt_mods = []
+        current_device_budget = 0
         for name, rt_mod in module.named_children():
             if "_run_on_acc" in name and isinstance(
                 rt_mod, (PythonTorchTensorRTModule, TorchTensorRTModule)
             ):
                 rt_mods.append((name, rt_mod))
+                current_device_budget += rt_mod.get_device_memory_budget()
         self.streamable_budget = [
             mod.get_streamable_weights_size() for _, mod in rt_mods
         ]
         self.rt_mods = rt_mods
         total_device_budget = sum(self.streamable_budget)
         # Device_budget is initialized with total device budget
-        super().__setattr__("device_budget", total_device_budget)
+        super().__setattr__("device_budget", current_device_budget)
         super().__setattr__("total_device_budget", total_device_budget)
 
     def get_automatic_weight_streaming_budget(self) -> int:

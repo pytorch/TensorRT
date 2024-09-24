@@ -53,6 +53,14 @@ class TestWeightStreamingPython(TestCase):
         weight_streaming_ctx = torchtrt.runtime.weight_streaming(optimized_model)
         assert weight_streaming_ctx.device_budget > 0
 
+        requested_budget = int(weight_streaming_ctx.total_device_budget * 0.5)
+        weight_streaming_ctx.device_budget = requested_budget
+
+        # Weight streaming context keeps current device budget size
+        with torchtrt.runtime.weight_streaming(optimized_model) as weight_streaming_ctx:
+            current_budget = weight_streaming_ctx.device_budget
+            assert current_budget == requested_budget
+
         ref = model(*input)
         out = optimized_model(*input)
 
@@ -89,7 +97,7 @@ class TestWeightStreamingPython(TestCase):
         )
         # Weight streaming budget is applied manually.
         with torchtrt.runtime.weight_streaming(optimized_model) as weight_streaming_ctx:
-            streamable_budget = weight_streaming_ctx.device_budget
+            streamable_budget = weight_streaming_ctx.total_device_budget
 
             requested_budget = int(streamable_budget * 0.7)
             weight_streaming_ctx.device_budget = requested_budget
@@ -157,11 +165,11 @@ class TestWeightStreamingPython(TestCase):
 
         # Setting weight streaming context to unsupported module
         with torchtrt.runtime.weight_streaming(model) as weight_streaming_ctx:
-            streamable_budget = weight_streaming_ctx.device_budget
+            streamable_budget = weight_streaming_ctx.total_device_budget
             assert streamable_budget == 0
 
         with torchtrt.runtime.weight_streaming(optimized_model) as weight_streaming_ctx:
-            streamable_budget = weight_streaming_ctx.device_budget
+            streamable_budget = weight_streaming_ctx.total_device_budget
 
             # Values is larger than max budget disables weight streaming
             weight_streaming_ctx.device_budget = streamable_budget + 1
@@ -202,7 +210,7 @@ class TestWeightStreamingPython(TestCase):
         )
 
         with torchtrt.runtime.weight_streaming(optimized_model) as weight_streaming_ctx:
-            streamable_budget = weight_streaming_ctx.device_budget
+            streamable_budget = weight_streaming_ctx.total_device_budget
             for pct in [0.05, 0.2, 0.4, 0.8, 1.0]:
                 requested_budget = int(streamable_budget * pct)
                 weight_streaming_ctx.device_budget = requested_budget

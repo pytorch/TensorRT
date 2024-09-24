@@ -133,6 +133,7 @@ _SETTINGS_TO_BE_ENGINE_INVARIANT = (
     "make_refittable",
     "engine_capability",
     "hardware_compatible",
+    "enable_weight_streaming",
 )
 
 
