@@ -17,3 +17,4 @@ a number of ways you can leverage this backend to accelerate inference.
 * :ref:`vgg16_fp8_ptq`: Compiling a VGG16 model with FP8 and PTQ using ``torch.compile``
 * :ref:`engine_caching_example`: Utilizing engine caching to speed up compilation times
 * :ref:`engine_caching_bert_example`: Demonstrating engine caching on BERT
+* :ref:`weight_streaming_example`: How to use weight streaming to stream an engine’s weights during execution
