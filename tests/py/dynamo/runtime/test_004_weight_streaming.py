@@ -61,6 +61,12 @@ class TestWeightStreamingPython(TestCase):
             current_budget = weight_streaming_ctx.device_budget
             assert current_budget == requested_budget
 
+            new_budget = int(weight_streaming_ctx.total_device_budget * 0.2)
+            weight_streaming_ctx.device_budget = new_budget
+
+        # Weight streaming budget is reverted after the exit from weight streaming context
+        assert weight_streaming_ctx.device_budget == requested_budget
+
         ref = model(*input)
         out = optimized_model(*input)
 
@@ -121,9 +127,6 @@ class TestWeightStreamingPython(TestCase):
             assert weight_streaming_ctx.device_budget == requested_budget
 
             out = optimized_model(*input)
-
-        # Weight streaming is disabled after the exit from weight streaming context
-        assert weight_streaming_ctx.device_budget == streamable_budget
 
         ref = model(*input)
         torch.testing.assert_close(
@@ -218,9 +221,6 @@ class TestWeightStreamingPython(TestCase):
                 # Budget distribution to multiple submodule may result in integer differences of at most 1
                 assert abs(weight_streaming_ctx.device_budget - requested_budget) <= 1
                 out = optimized_model(*input)
-
-        # Weight streaming is disabled after the exit from weight streaming context
-        assert weight_streaming_ctx.device_budget == streamable_budget
 
         ref = model(*input)
         torch.testing.assert_close(
