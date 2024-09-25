@@ -208,6 +208,19 @@ def set_log_level(parent_logger: Any, level: Any) -> None:
     if parent_logger:
         parent_logger.setLevel(level)
 
+    if level == logging.DEBUG:
+        log_level = trt.ILogger.Severity.VERBOSE
+    elif level == logging.INFO:
+        log_level = trt.ILogger.Severity.INFO
+    elif level == logging.WARNING:
+        log_level = trt.ILogger.Severity.WARNING
+    elif level == logging.ERROR:
+        log_level = trt.ILogger.Severity.ERROR
+    elif level == logging.CRITICAL:
+        log_level = trt.ILogger.Severity.INTERNAL_ERROR
+
+    torch.ops.tensorrt.set_logging_level(int(log_level))
+
 
 def prepare_inputs(
     inputs: Input | torch.Tensor | Sequence[Any] | Dict[Any, Any],
