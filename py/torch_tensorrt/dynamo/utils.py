@@ -204,6 +204,7 @@ def set_log_level(parent_logger: Any, level: Any) -> None:
     Sets the log level to the user provided level.
     This is used to set debug logging at a global level
     at entry points of tracing, dynamo and torch_compile compilation.
+    It also set log level for c++ torch trt logger
     """
     if parent_logger:
         parent_logger.setLevel(level)
@@ -218,6 +219,8 @@ def set_log_level(parent_logger: Any, level: Any) -> None:
         log_level = trt.ILogger.Severity.ERROR
     elif level == logging.CRITICAL:
         log_level = trt.ILogger.Severity.INTERNAL_ERROR
+    else:
+        raise AssertionError(f"{level} is valid log level")
 
     torch.ops.tensorrt.set_logging_level(int(log_level))
 
