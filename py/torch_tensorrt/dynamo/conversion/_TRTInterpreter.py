@@ -124,7 +124,6 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             dict()
         )
 
-        self.compilation_settings = compilation_settings
         # Data types for TRT Module output Tensors
         self.output_dtypes = (
             [dtype._from(o) for o in output_dtypes] if output_dtypes else None
