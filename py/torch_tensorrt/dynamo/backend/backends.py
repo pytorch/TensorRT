@@ -109,7 +109,7 @@ def _pretraced_backend(
             )
             if settings.require_full_compilation:
                 logger.warning(
-                    "This argument is not applicable for torch.compile with backend='torch_tensorrt"
+                    "require_full_compilation arg is not applicable for torch.compile with backend='torch_tensorrt"
                 )
             trt_compiled = compile_module(
                 gm,
