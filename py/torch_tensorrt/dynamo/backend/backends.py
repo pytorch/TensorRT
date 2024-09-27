@@ -107,6 +107,10 @@ def _pretraced_backend(
             torchtrt_inputs = prepare_inputs(
                 torch_inputs, disable_memory_format_check=True
             )
+            if settings.require_full_compilation:
+                logger.warning(
+                    "This argument is not applicable for torch.compile with backend='torch_tensorrt"
+                )
             trt_compiled = compile_module(
                 gm,
                 torchtrt_inputs,
