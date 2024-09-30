@@ -201,10 +201,9 @@ TRTEngine::TRTEngine(
     }
     num_io = std::make_pair(inputs_size, outputs);
   }
+
 #ifndef NDEBUG
-  if (util::logging::get_logger().get_reportable_log_level() == util::logging::LogLevel::kDEBUG) {
-    this->enable_profiling();
-  }
+  this->enable_profiling();
 #endif
   LOG_DEBUG(*this);
 }

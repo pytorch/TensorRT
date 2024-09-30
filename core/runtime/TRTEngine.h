@@ -87,8 +87,11 @@ struct TRTEngine : torch::CustomClassHolder {
   // c10::List<at::Tensor> Run(c10::List<at::Tensor> inputs);
 
   void set_profiling_paths();
+#ifndef NDEBUG
+  bool profile_execution = true;
+#else
   bool profile_execution = false;
-
+#endif
   std::string device_profile_path;
   std::string input_profile_path;
   std::string output_profile_path;

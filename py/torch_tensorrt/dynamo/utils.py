@@ -220,7 +220,7 @@ def set_log_level(parent_logger: Any, level: Any) -> None:
     elif level == logging.CRITICAL:
         log_level = trt.ILogger.Severity.INTERNAL_ERROR
     else:
-        raise AssertionError(f"{level} is valid log level")
+        raise AssertionError(f"{level} is not valid log level")
 
     torch.ops.tensorrt.set_logging_level(int(log_level))
 
