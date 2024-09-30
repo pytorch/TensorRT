@@ -16,7 +16,6 @@ def accumulate_fp32_matmul(gm: torch.fx.GraphModule) -> torch.fx.GraphModule:
         torch.ops.aten.addmm.default,
     ]
     matmul_nodes = [node for node in gm.graph.nodes if node.target in matmul_targets]
-
     for matmul_node in matmul_nodes:
         # Prior to the matmul node, insert a cast to the 32-bit float32 node
         node_inputs = matmul_node.all_input_nodes
@@ -47,5 +46,4 @@ def accumulate_fp32_matmul(gm: torch.fx.GraphModule) -> torch.fx.GraphModule:
 
     gm = clean_up_graph_after_modifications(gm)
     logger.debug(f"Graph after changing matmuls to use FP32 accumulation:\n{gm.graph}")
-
     return gm

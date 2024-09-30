@@ -212,7 +212,7 @@ def compile(
     if use_fp32_acc:
         logger.debug(
             "FP32 accumulation for matmul layers is enabled. This option should only be enabled if the model already has FP16 weights and has no effect if it has FP32 weights. \
-                     This flag inserts casts around matmul layers and ensures TensorRT which executes the matmul layers in FP16 with FP32 accumulation."
+                     This flag inserts casts around matmul layers and ensures TensorRT executes the matmul layers in FP16 with FP32 accumulation."
         )
 
     # Aliasing inputs to arg_inputs for better understanding
