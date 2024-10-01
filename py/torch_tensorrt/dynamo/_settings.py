@@ -68,7 +68,6 @@ class CompilationSettings:
         assume_dynamic_shape_support (bool): Setting this to true enables the converters work for both dynamic and static shapes. Default: False
         disable_tf32 (bool): Whether to disable TF32 computation for TRT layers
         sparse_weights (bool): Whether to allow the builder to use sparse weights
-        refit (bool): Whether to build a refittable engine
         engine_capability (trt.EngineCapability): Restrict kernel selection to safe gpu kernels or safe dla kernels
         num_avg_timing_iters (int): Number of averaging timing iterations used to select kernels
         dla_sram_size (int): Fast software managed RAM used by DLA to communicate within a layer.
