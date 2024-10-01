@@ -11,6 +11,7 @@ a number of ways you can leverage this backend to accelerate inference.
 * :ref:`torch_compile_advanced_usage`: Advanced usage including making a custom backend to use directly with the ``torch.compile`` API
 * :ref:`torch_compile_stable_diffusion`: Compiling a Stable Diffusion model using ``torch.compile``
 * :ref:`torch_export_cudagraphs`: Using the Cudagraphs integration with `ir="dynamo"`
+* :ref:`converter_overloading`: How to write custom converters and overload existing ones
 * :ref:`custom_kernel_plugins`: Creating a plugin to use a custom kernel inside TensorRT engines
 * :ref:`refit_engine_example`: Refitting a compiled TensorRT Graph Module with updated weights
 * :ref:`mutable_torchtrt_module_example`: Compile, use, and modify TensorRT Graph Module with MutableTorchTensorRTModule
