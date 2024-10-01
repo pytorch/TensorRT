@@ -87,6 +87,10 @@ print(
 # %%
 # The output sentences should look like
 # =============================
-# Pytorch model generated text:  I enjoy walking with my cute dog, but I'm not sure if I'll ever be able to walk with my dog. I'm not sure if I'll ever be able to walk with my
+# Pytorch model generated text:  What is parallel programming ?
+
+# The parallel programming paradigm is a set of programming languages that are designed to be used in parallel. The main difference between parallel programming and parallel programming is that
 # =============================
-# TensorRT model generated text:  I enjoy walking with my cute dog, but I'm not sure if I'll ever be able to walk with my dog. I'm not sure if I'll ever be able to walk with my
+# TensorRT model generated text:  What is parallel programming ?
+
+# The parallel programming paradigm is a set of programming languages that are designed to be used in parallel. The main difference between parallel programming and parallel programming is that

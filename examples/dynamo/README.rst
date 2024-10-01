@@ -9,7 +9,7 @@ examples of Torch-TensorRT compilation of select computer vision and language mo
 Dependencies
 ------------------------------------
 
-Please install the following external depencies (assuming you already have `torch_tensorrt` installed)
+Please install the following external dependencies (assuming you already have correct `torch`, `torch_tensorrt` and `tensorrt` libraries installed (`dependencies <https://github.com/pytorch/TensorRT?tab=readme-ov-file#dependencies>`_))
 
 .. code-block:: python
 

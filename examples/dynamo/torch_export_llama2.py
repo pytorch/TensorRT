@@ -50,10 +50,11 @@ trt_model = torch_tensorrt.dynamo.compile(
     llama2_ep,
     inputs=[input_ids],
     enabled_precisions={torch.float32},
-    min_block_size=1,
     truncate_double=True,
     device=DEVICE,
     disable_tf32=True,
+    use_strong_types=True,
+    use_fp32_acc=True,
 )
 
 # Auto-regressive generation loop for greedy decoding using TensorRT model
