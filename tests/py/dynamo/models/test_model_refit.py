@@ -746,7 +746,6 @@ def test_refit_cumsum_fallback():
             enabled_precisions={torch.float},
             debug=True,
             min_block_size=1,
-            make_refittable=True,
         )
 
     num_pyt_segments = len(
