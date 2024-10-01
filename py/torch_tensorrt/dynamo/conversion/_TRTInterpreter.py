@@ -287,17 +287,15 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         if self.compilation_settings.disable_tf32:
             builder_config.clear_flag(trt.BuilderFlag.TF32)
 
-        if self.compilation_settings.make_refittable:
-            if version.parse(trt.__version__) >= version.parse("10.0"):
-                if self.compilation_settings.refit_identical_engine_weights:
-                    builder_config.set_flag(trt.BuilderFlag.REFIT_IDENTICAL)
-                else:
-                    builder_config.set_flag(trt.BuilderFlag.REFIT)
+        if version.parse(trt.__version__) >= version.parse("10.0"):
+            if self.compilation_settings.refit_identical_engine_weights:
+                builder_config.set_flag(trt.BuilderFlag.REFIT_IDENTICAL)
             else:
                 builder_config.set_flag(trt.BuilderFlag.REFIT)
+        else:
+            builder_config.set_flag(trt.BuilderFlag.REFIT)
 
-        if self.compilation_settings.strip_engine_weights:
-            builder_config.set_flag(trt.BuilderFlag.STRIP_PLAN)
+        builder_config.set_flag(trt.BuilderFlag.STRIP_PLAN)
 
         if strict_type_constraints:
             builder_config.set_flag(trt.BuilderFlag.STRICT_TYPES)
@@ -632,8 +630,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
 
         self._construct_trt_network_def()
 
-        if self.compilation_settings.make_refittable:
-            self._save_weight_mapping()
+        self._save_weight_mapping()
 
         build_engine_start_time = datetime.now()
         _LOGGER.info("Not found cached TRT engines. Start building engine.")
@@ -652,7 +649,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         assert serialized_engine
 
         _LOGGER.info(
-            f"Build TRT engine elapsed time: {datetime.now() - build_engine_start_time}"
+            f"Build weight-stripped TRT engine elapsed time: {datetime.now() - build_engine_start_time}"
         )
         _LOGGER.info(f"TRT Engine uses: {serialized_engine.nbytes} bytes of Memory")
 
@@ -664,26 +661,11 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             self.engine_cache is not None
             and self.compilation_settings.cache_built_engines
         ):
-            assert (
-                self.compilation_settings.make_refittable
-            ), "weight-stripped engines must be refittable, please set make_refittable=True"
-
-            # no matter what compilation_settings is, we cache the weight-stripped engine
-            if self.compilation_settings.strip_engine_weights:
-                weight_stripped_serialized_engine = serialized_engine
-            else:
-                runtime = trt.Runtime(TRT_LOGGER)
-                engine = runtime.deserialize_cuda_engine(serialized_engine)
-                serialization_config = engine.create_serialization_config()
-                serialization_config.set_flag(trt.SerializationFlag.EXCLUDE_WEIGHTS)
-                weight_stripped_serialized_engine = engine.serialize_with_config(
-                    serialization_config
-                )
-
+            # Cache the weight-stripped engine
             self.engine_cache.insert(
                 hash_val,
                 (
-                    weight_stripped_serialized_engine,
+                    serialized_engine,
                     self._input_names,
                     self._output_names,
                     self.input_specs,
@@ -691,6 +673,26 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                     self.weight_name_map,
                 ),
             )
+
+        if not self.compilation_settings.strip_engine_weights:
+            # Refit the engine with the original weights
+            runtime = trt.Runtime(TRT_LOGGER)
+            engine = runtime.deserialize_cuda_engine(serialized_engine)
+
+            from torch_tensorrt.dynamo._refit import _refit_single_trt_engine_with_gm
+
+            _refit_single_trt_engine_with_gm(
+                new_gm=self.module,
+                old_engine=engine,
+                input_list=self.input_specs,
+                settings=self.compilation_settings,
+                weight_name_map=self.weight_name_map,
+            )
+
+            # Serialize the refitted engine where the EXCLUDE_WEIGHTS flag must be cleared
+            serialization_config = engine.create_serialization_config()
+            serialization_config.clear_flag(trt.SerializationFlag.EXCLUDE_WEIGHTS)
+            serialized_engine = engine.serialize_with_config(serialization_config)
 
         with io.BytesIO() as engine_bytes:
             engine_bytes.write(serialized_engine)

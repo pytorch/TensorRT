@@ -62,8 +62,6 @@ def remove_timing_cache(path=TIMING_CACHE_PATH):
 # engines are saved to disk tied to a hash of their corresponding PyTorch subgraph. If
 # in a subsequent compilation, either as part of this session or a new session, the cache will
 # pull the built engine and **refit** the weights which can reduce compilation times by orders of magnitude.
-# As such, in order to insert a new engine into the cache (i.e. ``cache_built_engines=True``),
-# the engine must be refittable (``make_refittable=True``). See :ref:`refit_engine_example` for more details.
 
 
 def torch_compile(iterations=3):
@@ -97,7 +95,6 @@ def torch_compile(iterations=3):
                 "enabled_precisions": enabled_precisions,
                 "debug": debug,
                 "min_block_size": min_block_size,
-                "make_refittable": True,
                 "cache_built_engines": cache_built_engines,
                 "reuse_cached_engines": reuse_cached_engines,
             },
@@ -157,7 +154,6 @@ def dynamo_compile(iterations=3):
             enabled_precisions=enabled_precisions,
             debug=debug,
             min_block_size=min_block_size,
-            make_refittable=True,
             cache_built_engines=cache_built_engines,
             reuse_cached_engines=reuse_cached_engines,
             engine_cache_size=1 << 30,  # 1GB
@@ -268,7 +264,6 @@ def torch_compile_my_cache(iterations=3):
                 "enabled_precisions": enabled_precisions,
                 "debug": debug,
                 "min_block_size": min_block_size,
-                "make_refittable": True,
                 "cache_built_engines": cache_built_engines,
                 "reuse_cached_engines": reuse_cached_engines,
                 "custom_engine_cache": engine_cache,

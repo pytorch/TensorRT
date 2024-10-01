@@ -22,14 +22,12 @@ class TestWeightStrippedEngine(TestCase):
         weight_included_engine = convert_exported_program_to_serialized_trt_engine(
             exp_program,
             example_inputs,
-            make_refittable=False,
             strip_engine_weights=False,
             refit_identical_engine_weights=False,
         )
         weight_stripped_engine = convert_exported_program_to_serialized_trt_engine(
             exp_program,
             example_inputs,
-            make_refittable=True,
             strip_engine_weights=True,
             refit_identical_engine_weights=False,
         )
@@ -37,7 +35,6 @@ class TestWeightStrippedEngine(TestCase):
             convert_exported_program_to_serialized_trt_engine(
                 exp_program,
                 example_inputs,
-                make_refittable=True,
                 strip_engine_weights=True,
                 refit_identical_engine_weights=True,
             )
@@ -70,11 +67,10 @@ class TestWeightStrippedEngine(TestCase):
             enabled_precisions={torch.float},
             debug=False,
             min_block_size=1,
-            make_refittable=True,
             cache_built_engines=False,
             reuse_cached_engines=False,
-            refit_identical_engine_weights=False,
             strip_engine_weights=True,
+            refit_identical_engine_weights=False,
         )
         output = trt_gm(*inputs)
         assertions.assertEqual(
@@ -83,6 +79,7 @@ class TestWeightStrippedEngine(TestCase):
 
         from torch_tensorrt.dynamo._refit import refit_module_weights
 
+        # Refit the weight-stripped engine with the same weights
         refitted_trt_gm = refit_module_weights(trt_gm, exp_program)
         refitted_output = refitted_trt_gm(*inputs)
         assertions.assertNotEqual(
@@ -99,7 +96,6 @@ class TestWeightStrippedEngine(TestCase):
                 "enabled_precisions": {torch.float},
                 "debug": False,
                 "min_block_size": 1,
-                "make_refittable": True,
                 "cache_built_engines": False,
                 "reuse_cached_engines": False,
                 "refit_identical_engine_weights": False,
@@ -125,7 +121,6 @@ class TestWeightStrippedEngine(TestCase):
         weight_included_engine = convert_exported_program_to_serialized_trt_engine(
             exp_program,
             example_inputs,
-            make_refittable=False,
             strip_engine_weights=False,
             refit_identical_engine_weights=False,
         )
@@ -137,9 +132,8 @@ class TestWeightStrippedEngine(TestCase):
             enabled_precisions={torch.float},
             debug=False,
             min_block_size=1,
-            make_refittable=True,
-            refit_identical_engine_weights=True,
             strip_engine_weights=False,  # engine cache will save the stripped engine even if this is False
+            refit_identical_engine_weights=True,
             cache_built_engines=True,
             reuse_cached_engines=True,
             engine_cache_dir=engine_cache_dir,
@@ -203,21 +197,26 @@ class TestWeightStrippedEngine(TestCase):
                 enabled_precisions={torch.float},
                 debug=False,
                 min_block_size=1,
-                make_refittable=True,
-                refit_identical_engine_weights=False,
-                strip_engine_weights=False,
                 cache_built_engines=cache_built_engines,
                 reuse_cached_engines=reuse_cached_engines,
                 engine_cache_dir=engine_cache_dir,
+                strip_engine_weights=False,
+                refit_identical_engine_weights=False,
             )
             end.record()
             torch.cuda.synchronize()
             times.append(start.elapsed_time(end))
             results.append(trt_gm(*inputs))
 
-        assertions.assertNotEqual(results[0].sum(), 0, msg="results[0] are all zeros")
-        assertions.assertNotEqual(results[1].sum(), 0, msg="results[1] are all zeros")
-        assertions.assertNotEqual(results[2].sum(), 0, msg="results[2] are all zeros")
+        assertions.assertNotEqual(
+            results[0].sum(), 0, msg="results[0] shouldn't be all zeros"
+        )
+        assertions.assertNotEqual(
+            results[1].sum(), 0, msg="results[1] shouldn't be all zeros"
+        )
+        assertions.assertNotEqual(
+            results[2].sum(), 0, msg="results[2] shouldn't be all zeros"
+        )
 
         cos_sim = cosine_similarity(results[0], results[1])
         assertions.assertTrue(
@@ -278,13 +277,12 @@ class TestWeightStrippedEngine(TestCase):
                     "enabled_precisions": {torch.float},
                     "debug": False,
                     "min_block_size": 1,
-                    "make_refittable": True,
                     "cache_built_engines": cache_built_engines,
                     "reuse_cached_engines": reuse_cached_engines,
                     "engine_cache_dir": engine_cache_dir,
                     "torch_executed_ops": {"torch.ops.aten.relu.default"},
-                    "refit_identical_engine_weights": True,
                     "strip_engine_weights": False,
+                    "refit_identical_engine_weights": True,
                 },
             )
             results.append(compiled_model(*inputs))  # trigger the compilation
@@ -292,9 +290,15 @@ class TestWeightStrippedEngine(TestCase):
             torch.cuda.synchronize()
             times.append(start.elapsed_time(end))
 
-        assertions.assertNotEqual(results[0].sum(), 0, msg="results[0] are all zeros")
-        assertions.assertNotEqual(results[1].sum(), 0, msg="results[1] are all zeros")
-        assertions.assertNotEqual(results[2].sum(), 0, msg="results[2] are all zeros")
+        assertions.assertNotEqual(
+            results[0].sum(), 0, msg="results[0] shouldn't be all zeros"
+        )
+        assertions.assertNotEqual(
+            results[1].sum(), 0, msg="results[1] shouldn't be all zeros"
+        )
+        assertions.assertNotEqual(
+            results[2].sum(), 0, msg="results[2] shouldn't be all zeros"
+        )
 
         cos_sim = cosine_similarity(results[0], results[1])
         assertions.assertTrue(

@@ -18,7 +18,6 @@ from torch_tensorrt.dynamo._defaults import (
     ENGINE_CAPABILITY,
     HARDWARE_COMPATIBLE,
     LAZY_ENGINE_INIT,
-    MAKE_REFITTABLE,
     MAX_AUX_STREAMS,
     MIN_BLOCK_SIZE,
     NUM_AVG_TIMING_ITERS,
@@ -106,7 +105,6 @@ class CompilationSettings:
     disable_tf32: bool = DISABLE_TF32
     assume_dynamic_shape_support: bool = ASSUME_DYNAMIC_SHAPE_SUPPORT
     sparse_weights: bool = SPARSE_WEIGHTS
-    make_refittable: bool = MAKE_REFITTABLE
     engine_capability: EngineCapability = field(
         default_factory=lambda: ENGINE_CAPABILITY
     )
@@ -133,11 +131,10 @@ _SETTINGS_TO_BE_ENGINE_INVARIANT = (
     "optimization_level",
     "disable_tf32",
     "sparse_weights",
-    "make_refittable",
     "engine_capability",
     "hardware_compatible",
-    "refit_identical_engine_weights",
     "strip_engine_weights",
+    "refit_identical_engine_weights",
 )
 
 

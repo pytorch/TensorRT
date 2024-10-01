@@ -60,7 +60,6 @@ def compile(
         Set[Union[torch.dtype, dtype]], Tuple[Union[torch.dtype, dtype]]
     ] = _defaults.ENABLED_PRECISIONS,
     engine_capability: EngineCapability = _defaults.ENGINE_CAPABILITY,
-    make_refittable: bool = _defaults.MAKE_REFITTABLE,
     debug: bool = _defaults.DEBUG,
     num_avg_timing_iters: int = _defaults.NUM_AVG_TIMING_ITERS,
     workspace_size: int = _defaults.WORKSPACE_SIZE,
@@ -132,7 +131,6 @@ def compile(
         assume_dynamic_shape_support (bool): Setting this to true enables the converters work for both dynamic and static shapes. Default: False
         sparse_weights (bool): Enable sparsity for convolution and fully connected layers.
         enabled_precision (Set(Union(torch.dtype, torch_tensorrt.dtype))): The set of datatypes that TensorRT can use when selecting kernels
-        refit (bool): Enable refitting
         debug (bool): Enable debuggable engine
         capability (torch_tensorrt.EngineCapability): Restrict kernel selection to safe gpu kernels or safe dla kernels
         num_avg_timing_iters (int): Number of averaging timing iterations used to select kernels
@@ -188,14 +186,17 @@ def compile(
 
     if "refit" in kwargs.keys():
         warnings.warn(
-            "Refit is deprecated. Please use make_refittable=True if you want to enable refitting of the engine.",
+            "`refit` is deprecated. All engines are refittable now. If you want to disable refitting, please open an issue on the Github repo with reasons.",
             DeprecationWarning,
             stacklevel=2,
         )
-        if make_refittable:
-            raise ValueError("Use flag make_refittable only. Flag refit is deprecated.")
-        else:
-            make_refittable = kwargs["refit"]
+
+    if "make_refittable" in kwargs.keys():
+        warnings.warn(
+            "`make_refittable` is deprecated. All engines are refittable now. If you want to disable refitting, please open an issue on the Github repo with reasons.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
 
     engine_capability = EngineCapability._from(engine_capability)
 
@@ -259,9 +260,6 @@ def compile(
 
     engine_cache = None
     if cache_built_engines or reuse_cached_engines:
-        assert (
-            make_refittable
-        ), "Engine caching requires make_refittable to be set to True"
         engine_cache = (
             custom_engine_cache
             if custom_engine_cache is not None
@@ -292,7 +290,6 @@ def compile(
         "require_full_compilation": require_full_compilation,
         "disable_tf32": disable_tf32,
         "sparse_weights": sparse_weights,
-        "make_refittable": make_refittable,
         "engine_capability": engine_capability,
         "dla_sram_size": dla_sram_size,
         "dla_local_dram_size": dla_local_dram_size,
@@ -539,7 +536,6 @@ def convert_exported_program_to_serialized_trt_engine(
     require_full_compilation: bool = _defaults.REQUIRE_FULL_COMPILATION,
     disable_tf32: bool = _defaults.DISABLE_TF32,
     sparse_weights: bool = _defaults.SPARSE_WEIGHTS,
-    make_refittable: bool = _defaults.MAKE_REFITTABLE,
     engine_capability: EngineCapability = _defaults.ENGINE_CAPABILITY,
     num_avg_timing_iters: int = _defaults.NUM_AVG_TIMING_ITERS,
     dla_sram_size: int = _defaults.DLA_SRAM_SIZE,
@@ -601,7 +597,6 @@ def convert_exported_program_to_serialized_trt_engine(
             Only applicable for `ir="dynamo"`; has no effect for `torch.compile` path
         disable_tf32 (bool): Whether to disable TF32 computation for TRT layers
         sparse_weights (bool): Whether to allow the builder to use sparse weights
-        refit (bool): Whether to build a refittable engine
         engine_capability (trt.EngineCapability): Restrict kernel selection to safe gpu kernels or safe dla kernels
         num_avg_timing_iters (int): Number of averaging timing iterations used to select kernels
         dla_sram_size (int): Fast software managed RAM used by DLA to communicate within a layer.
@@ -634,10 +629,17 @@ def convert_exported_program_to_serialized_trt_engine(
             )
     if "refit" in kwargs.keys():
         warnings.warn(
-            "Refit is deprecated. Please use make_refittable=True if you want to enable refitting of the engine.",
+            "`refit` is deprecated. All engines are refittable now. If you want to disable refitting, please open an issue on the Github repo with reasons.",
             DeprecationWarning,
             stacklevel=2,
         )
+    if "make_refittable" in kwargs.keys():
+        warnings.warn(
+            "`make_refittable` is deprecated. All engines are refittable now. If you want to disable refitting, please open an issue on the Github repo with reasons.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+
     if arg_inputs is None and inputs is None:
         raise AssertionError("'arg_inputs' and 'inputs' should not both be None.")
 
@@ -680,7 +682,6 @@ def convert_exported_program_to_serialized_trt_engine(
         "require_full_compilation": require_full_compilation,
         "disable_tf32": disable_tf32,
         "sparse_weights": sparse_weights,
-        "make_refittable": make_refittable,
         "engine_capability": engine_capability,
         "num_avg_timing_iters": num_avg_timing_iters,
         "dla_sram_size": dla_sram_size,

@@ -31,7 +31,6 @@ inputs = [torch.rand((1, 3, 224, 224)).to("cuda")]
 settings = {
     "use_python": False,
     "enabled_precisions": {torch.float32},
-    "make_refittable": True,
 }
 
 model = models.resnet18(pretrained=True).eval().to("cuda")
@@ -80,7 +79,6 @@ with torch.no_grad():
         "use_python_runtime": True,
         "enabled_precisions": {torch.float16},
         "debug": True,
-        "make_refittable": True,
     }
 
     model_id = "runwayml/stable-diffusion-v1-5"
