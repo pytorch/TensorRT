@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Any, List, Optional, Sequence, Set, Tuple
+from warnings import warn
 
 import torch
 import torch_tensorrt._C.ts as _C
@@ -101,6 +102,14 @@ def compile(
     Returns:
         torch.jit.ScriptModule: Compiled TorchScript Module, when run it will execute via TensorRT
     """
+    warn(
+        """The torchscript frontend is now deprecated, it will be disabled in H1Y25.
+            The Torch-TensorRT runtime will continue to support running torchscript programs,
+            however torchscript programs should be created by using torch.jit.trace on
+            ExportedPrograms created by the dynamo frontend""",
+        DeprecationWarning,
+        stacklevel=2,
+    )
 
     input_list = list(inputs) if inputs is not None else []
     enabled_precisions_set = (
@@ -240,6 +249,16 @@ def convert_method_to_trt_engine(
     Returns:
         bytes: Serialized TensorRT engine, can either be saved to a file or deserialized via TensorRT APIs
     """
+
+    warn(
+        """The torchscript frontend is now deprecated, it will be disabled in H1Y25.
+            The Torch-TensorRT runtime will continue to support running torchscript programs,
+            however torchscript programs should be created by using torch.jit.trace on
+            ExportedPrograms created by the dynamo frontend""",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+
     input_list = list(inputs) if inputs is not None else []
     enabled_precisions_set = (
         enabled_precisions if enabled_precisions is not None else {torch.float}
@@ -309,6 +328,16 @@ def embed_engine_in_new_module(
     Returns:
         torch.jit.ScriptModule: New TorchScript module with engine embedded
     """
+
+    warn(
+        """The torchscript frontend is now deprecated, it will be disabled in H1Y25.
+            The Torch-TensorRT runtime will continue to support running torchscript programs,
+            however torchscript programs should be created by using torch.jit.trace on
+            ExportedPrograms created by the dynamo frontend""",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+
     input_binding_name_list = (
         input_binding_names if input_binding_names is not None else []
     )
@@ -341,5 +370,15 @@ def check_method_op_support(
     Returns:
         bool: True if supported Method
     """
+
+    warn(
+        """The torchscript frontend is now deprecated, it will be disabled in H1Y25.
+            The Torch-TensorRT runtime will continue to support running torchscript programs,
+            however torchscript programs should be created by using torch.jit.trace on
+            ExportedPrograms created by the dynamo frontend""",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+
     supported: bool = _C.check_method_op_support(module._c, method_name)
     return supported

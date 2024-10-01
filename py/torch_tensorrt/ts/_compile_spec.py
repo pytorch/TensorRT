@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from copy import deepcopy
 from typing import Any, Dict, List, Optional, Set
+from warnings import warn
 
 import torch
 import torch_tensorrt._C.ts as _ts_C
@@ -361,6 +362,15 @@ def TensorRTCompileSpec(
       Returns:
         torch.classes.tensorrt.CompileSpec: List of methods and formatted spec objects to be provided to ``torch._C._jit_to_tensorrt``
     """
+
+    warn(
+        """The torchscript frontend is now deprecated, it will be disabled in H1Y25.
+            The Torch-TensorRT runtime will continue to support running torchscript programs,
+            however torchscript programs should be created by using torch.jit.trace on
+            ExportedPrograms created by the dynamo frontend""",
+        DeprecationWarning,
+        stacklevel=2,
+    )
 
     compile_spec = {
         "inputs": inputs if inputs is not None else [],

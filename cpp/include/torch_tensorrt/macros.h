@@ -36,3 +36,6 @@ namespace torchscript {}
 namespace ts = torchscript;
 } // namespace torch_tensorrt
 namespace torchtrt = torch_tensorrt;
+
+#define TORCHTRT_DEPRICATION_WARNING_STR \
+  "The torchscript frontend is now deprecated, it will be disabled in H1Y25. The Torch-TensorRT runtime will continue to support running torchscript programs, however torchscript programs should be created by using torch.jit.trace on ExportedPrograms created by the dynamo frontend"
