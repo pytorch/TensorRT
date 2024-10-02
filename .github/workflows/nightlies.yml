@@ -9,7 +9,7 @@ jobs:
   cut_nightly:
     runs-on: ubuntu-latest
     environment: trigger-nightly
-    timeout-minutes: 60
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v3
         with:
