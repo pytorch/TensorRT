@@ -40,7 +40,7 @@ platform(
     constraint_values = [
         "@platforms//os:linux",
         "@platforms//cpu:aarch64",
-        "@//toolchains/jetpack:4.6",
+        "@//toolchains/jetpack:6.1",
     ],
 )
 
