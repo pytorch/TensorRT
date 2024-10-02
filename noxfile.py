@@ -479,8 +479,8 @@ def run_l1_int8_accuracy_tests(session):
 
 def run_l1_dynamo_tests(session):
     if not USE_HOST_DEPS:
-        install_deps(session)
         install_torch_trt(session)
+    install_deps(session)
     run_dynamo_model_tests(session)
     run_dynamo_partitioning_tests(session)
     run_dynamo_runtime_tests(session)

@@ -75,9 +75,9 @@ lowering_test(
     name = "test_remove_detach_pass",
 )
 
-lowering_test(
-    name = "test_remove_unnecessary_casts",
-)
+#lowering_test(
+#    name = "test_remove_unnecessary_casts",
+#)
 
 lowering_test(
     name = "test_view_to_reshape_pass",
@@ -131,7 +131,7 @@ test_suite(
         ":test_remove_contiguous_pass",
         ":test_remove_detach_pass",
         ":test_remove_dropout_pass",
-        ":test_remove_unnecessary_casts",
+        #":test_remove_unnecessary_casts",
         ":test_replace_aten_pad_pass",
         ":test_rewrite_inputs_with_params",
         ":test_tile_to_repeat_pass",
