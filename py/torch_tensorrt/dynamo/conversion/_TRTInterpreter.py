@@ -598,7 +598,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                             old_engine=engine,
                             input_list=self.input_specs,
                             settings=self.compilation_settings,
-                            weight_name_map=self.weight_name_map,
+                            weight_name_map=None,
                         )
 
                         # Serialize the refitted engine where the EXCLUDE_WEIGHTS flag must be cleared
@@ -679,7 +679,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                 old_engine=engine,
                 input_list=self.input_specs,
                 settings=self.compilation_settings,
-                weight_name_map=self.weight_name_map,
+                weight_name_map=None,
             )
 
             # Serialize the refitted engine where the EXCLUDE_WEIGHTS flag must be cleared
