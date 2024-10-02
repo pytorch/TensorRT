@@ -10,30 +10,32 @@ echo "Current jetpack_version: ${jetpack_version} cuda_version: ${cuda_version} 
 
 export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:/usr/lib/aarch64-linux-gnu:/usr/include/aarch64-linux-gnu:/usr/local/cuda-${cuda_version}/lib64
 
-# make sure cuda is installed:
-# nvcc --version or go to /usr/local/cuda/bin to see whether it is installed
-# if not installed, install via the below cmd:
-# sudo apt update
-# sudo apt install cuda-toolkit-12-2
-
-
 # make sure nvidia-jetpack dev package is installed:
 # go to /usr/include/aarch64-linux-gnu/ if you can see NvInfer.h(tensorrt related header files) which means dev package is installed
 # if not installed, install via the below cmd:
 # sudo apt update
 # sudo apt install nvidia-jetpack
 
+# make sure cuda is installed:
+# nvcc --version or go to /usr/local/cuda/bin to see whether it is installed
+# the install nvidia-jetpack dev package step will automatically install the cuda tool
+# if not installed, install via the below cmd:
+# sudo apt update
+# sudo apt install cuda-toolkit-12-2
+
 # make sure bazel is installed via the below cmd:
 # wget -v https://github.com/bazelbuild/bazelisk/releases/download/v1.20.0/bazelisk-linux-arm64
-# mv bazelisk-linux-arm64 /usr/bin/bazel
+# sudo mv bazelisk-linux-arm64 /usr/bin/bazel
 # chmod +x /usr/bin/bazel
+
+# make sure setuptools is installed
+# sudo apt install python3-pip
+# make sure setuptools is upgraded via the below cmd:
+# pip install -U pip setuptools
 
 # make sure torch is installed via the below cmd:
 # wget https://developer.download.nvidia.cn/compute/redist/jp/v60/pytorch/torch-2.4.0a0+3bcc3cddb5.nv24.07.16234504-cp310-cp310-linux_aarch64.whl
 # python -m pip install torch-2.4.0a0+3bcc3cddb5.nv24.07.16234504-cp310-cp310-linux_aarch64.whl
-
-# make sure setuptools is upgraded via the below cmd:
-# pip install -U pip setuptools
 
 # make sure libcusparseLt.so exists if not download and copy via the below cmd:
 # wget https://developer.download.nvidia.com/compute/cusparselt/redist/libcusparse_lt/linux-sbsa/libcusparse_lt-linux-sbsa-0.5.2.1-archive.tar.xz
