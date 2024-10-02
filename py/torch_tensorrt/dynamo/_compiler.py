@@ -89,6 +89,7 @@ def compile(
     custom_engine_cache: Optional[BaseEngineCache] = _defaults.CUSTOM_ENGINE_CACHE,
     refit_identical_engine_weights: bool = _defaults.REFIT_IDENTICAL_ENGINE_WEIGHTS,
     strip_engine_weights: bool = _defaults.STRIP_ENGINE_WEIGHTS,
+    immutable_weights: bool = _defaults.IMMUTABLE_WEIGHTS,
     **kwargs: Any,
 ) -> torch.fx.GraphModule:
     """Compile an ExportedProgram module for NVIDIA GPUs using TensorRT
@@ -160,6 +161,7 @@ def compile(
         custom_engine_cache (Optional[BaseEngineCache]): Engine cache instance to use for saving and loading engines. Users can provide their own engine cache by inheriting from BaseEngineCache. If used, engine_cache_dir and engine_cache_size will be ignored.
         refit_identical_engine_weights (bool): Refit engines with identical weights. This is useful when the same model is compiled multiple times with different inputs and the weights are the same. This will save time by reusing the same engine for different inputs.
         strip_engine_weights (bool): Strip engine weights from the serialized engine. This is useful when the engine is to be deployed in an environment where the weights are not required.
+        immutable_weights (bool): Build non-refittable engines. This is useful for some layers that are not refittable. If this argument is set, `strip_engine_weights` and `refit_identical_engine_weights` will be ignored.
         **kwargs: Any,
     Returns:
         torch.fx.GraphModule: Compiled FX Module, when run it will execute via TensorRT
@@ -182,14 +184,14 @@ def compile(
 
     if "refit" in kwargs.keys():
         warnings.warn(
-            "`refit` is deprecated. All engines are refittable now. If you want to disable refitting, please open an issue on the Github repo with reasons.",
+            "`refit` is deprecated. Engines are refittable by default. Please set immutable_weights=True to build a non-refittable engine whose weights will be fixed.",
             DeprecationWarning,
             stacklevel=2,
         )
 
     if "make_refittable" in kwargs.keys():
         warnings.warn(
-            "`make_refittable` is deprecated. All engines are refittable now. If you want to disable refitting, please open an issue on the Github repo with reasons.",
+            "`make_refittable` is deprecated. Engines are refittable by default. Please set immutable_weights=True to build a non-refittable engine whose weights will be fixed.",
             DeprecationWarning,
             stacklevel=2,
         )
@@ -284,6 +286,7 @@ def compile(
         "reuse_cached_engines": reuse_cached_engines,
         "refit_identical_engine_weights": refit_identical_engine_weights,
         "strip_engine_weights": strip_engine_weights,
+        "immutable_weights": immutable_weights,
     }
 
     settings = CompilationSettings(**compilation_options)
@@ -526,6 +529,7 @@ def convert_exported_program_to_serialized_trt_engine(
     timing_cache_path: str = _defaults.TIMING_CACHE_PATH,
     refit_identical_engine_weights: bool = _defaults.REFIT_IDENTICAL_ENGINE_WEIGHTS,
     strip_engine_weights: bool = _defaults.STRIP_ENGINE_WEIGHTS,
+    immutable_weights: bool = _defaults.IMMUTABLE_WEIGHTS,
     **kwargs: Any,
 ) -> bytes:
     """Convert an ExportedProgram to a serialized TensorRT engine
@@ -585,6 +589,7 @@ def convert_exported_program_to_serialized_trt_engine(
         timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation
         refit_identical_engine_weights (bool): Refit engines with identical weights. This is useful when the same model is compiled multiple times with different inputs and the weights are the same. This will save time by reusing the same engine for different inputs.
         strip_engine_weights (bool): Strip engine weights from the serialized engine. This is useful when the engine is to be deployed in an environment where the weights are not required.
+        immutable_weights (bool): Build non-refittable engines. This is useful for some layers that are not refittable. If this argument is set, `strip_engine_weights` and `refit_identical_engine_weights` will be ignored.
     Returns:
         bytes: Serialized TensorRT engine, can either be saved to a file or deserialized via TensorRT APIs
     """
@@ -605,13 +610,13 @@ def convert_exported_program_to_serialized_trt_engine(
             )
     if "refit" in kwargs.keys():
         warnings.warn(
-            "`refit` is deprecated. All engines are refittable now. If you want to disable refitting, please open an issue on the Github repo with reasons.",
+            "`refit` is deprecated. Engines are refittable by default. Please set immutable_weights=True to build a non-refittable engine whose weights will be fixed.",
             DeprecationWarning,
             stacklevel=2,
         )
     if "make_refittable" in kwargs.keys():
         warnings.warn(
-            "`make_refittable` is deprecated. All engines are refittable now. If you want to disable refitting, please open an issue on the Github repo with reasons.",
+            "`make_refittable` is deprecated. Engines are refittable by default. Please set immutable_weights=True to build a non-refittable engine whose weights will be fixed.",
             DeprecationWarning,
             stacklevel=2,
         )
@@ -666,6 +671,7 @@ def convert_exported_program_to_serialized_trt_engine(
         "timing_cache_path": timing_cache_path,
         "refit_identical_engine_weights": refit_identical_engine_weights,
         "strip_engine_weights": strip_engine_weights,
+        "immutable_weights": immutable_weights,
     }
 
     exported_program = pre_export_lowering(exported_program)

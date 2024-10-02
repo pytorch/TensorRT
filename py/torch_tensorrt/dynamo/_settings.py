@@ -17,6 +17,7 @@ from torch_tensorrt.dynamo._defaults import (
     ENABLED_PRECISIONS,
     ENGINE_CAPABILITY,
     HARDWARE_COMPATIBLE,
+    IMMUTABLE_WEIGHTS,
     LAZY_ENGINE_INIT,
     MAX_AUX_STREAMS,
     MIN_BLOCK_SIZE,
@@ -80,6 +81,7 @@ class CompilationSettings:
         reuse_cached_engines (bool): Whether to load the compiled TRT engines from storage
         refit_identical_engine_weights (bool): Whether to refit the engine with identical weights
         strip_engine_weights (bool): Whether to strip the engine weights
+        immutable_weights (bool): Build non-refittable engines. This is useful for some layers that are not refittable. If this argument is set, `strip_engine_weights` and `refit_identical_engine_weights` will be ignored
     """
 
     enabled_precisions: Set[dtype] = field(default_factory=lambda: ENABLED_PRECISIONS)
@@ -115,6 +117,7 @@ class CompilationSettings:
     reuse_cached_engines: bool = REUSE_CACHED_ENGINES
     refit_identical_engine_weights: bool = REFIT_IDENTICAL_ENGINE_WEIGHTS
     strip_engine_weights: bool = STRIP_ENGINE_WEIGHTS
+    immutable_weights: bool = IMMUTABLE_WEIGHTS
 
 
 _SETTINGS_TO_BE_ENGINE_INVARIANT = (
@@ -128,6 +131,7 @@ _SETTINGS_TO_BE_ENGINE_INVARIANT = (
     "hardware_compatible",
     "strip_engine_weights",
     "refit_identical_engine_weights",
+    "immutable_weights",
 )
 
 
