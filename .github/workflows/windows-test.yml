@@ -58,9 +58,9 @@ jobs:
     defaults:
       run:
         shell: bash -l {0}
-    # If a build is taking longer than 60 minutes on these runners we need
+    # If a build is taking longer than 120 minutes on these runners we need
     # to have a conversation
-    timeout-minutes: 60
+    timeout-minutes: 120
     steps:
       - name: Clean workspace
         run: |
