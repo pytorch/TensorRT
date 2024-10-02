@@ -263,6 +263,7 @@ class DispatchTestCase(TRTTestCase):
         enable_passes=False,
         propagate_shapes=False,
         int32_reqd=False,
+        immutable_weights=True,
     ):
         mod = self.generate_graph(
             mod,
@@ -278,6 +279,7 @@ class DispatchTestCase(TRTTestCase):
             enabled_precisions={dtype._from(precision)},
             truncate_double=True,
             debug=True,
+            immutable_weights=immutable_weights,
         )
 
         num_inputs = len(inputs)
@@ -346,6 +348,7 @@ class DispatchTestCase(TRTTestCase):
         output_dtypes=None,
         use_dynamo_tracer=False,
         enable_passes=False,
+        immutable_weights=True,
     ):
         mod = self.generate_graph(
             mod,
@@ -359,6 +362,7 @@ class DispatchTestCase(TRTTestCase):
             enabled_precisions={dtype._from(precision)},
             truncate_double=True,
             debug=True,
+            immutable_weights=immutable_weights,
         )
 
         interp = TRTInterpreter(
@@ -384,6 +388,7 @@ class DispatchTestCase(TRTTestCase):
         pyt_inputs=None,
         propagate_shapes=False,
         check_dtype=True,
+        immutable_weights=True,
     ):
         mod = self.generate_graph(
             mod,
@@ -397,6 +402,7 @@ class DispatchTestCase(TRTTestCase):
         # We replicate this behavior here
         compilation_settings = CompilationSettings(
             truncate_double=True,
+            immutable_weights=immutable_weights,
         )
 
         if check_dtype:

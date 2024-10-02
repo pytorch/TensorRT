@@ -43,6 +43,7 @@ USE_EXPLICIT_TYPING = False
 USE_FP32_ACC = False
 REFIT_IDENTICAL_ENGINE_WEIGHTS = False
 STRIP_ENGINE_WEIGHTS = False
+IMMUTABLE_WEIGHTS = False
 
 
 def default_device() -> Device:
