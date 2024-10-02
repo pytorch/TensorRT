@@ -73,8 +73,8 @@ struct TRTEngine : torch::CustomClassHolder {
   void dump_engine_layer_info();
   int64_t get_device_memory_budget();
   bool set_device_memory_budget(int64_t budget);
-  int64_t get_streamable_weights_size();
-  int64_t get_weight_streaming_automatic_budget();
+  int64_t get_streamable_device_memory_budget();
+  int64_t get_automatic_device_memory_budget();
   friend std::ostream& operator<<(std::ostream& os, const TRTEngine& engine);
   static const char BINDING_DELIM = '%';
 
