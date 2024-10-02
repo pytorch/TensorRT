@@ -111,10 +111,10 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         if self.serialized_engine is not None and not self.settings.lazy_engine_init:
             self.setup_engine()
 
-    def get_streamable_weights_size(self) -> Any:
+    def get_streamable_device_memory_budget(self) -> Any:
         return self.engine.streamable_weights_size
 
-    def get_automatic_weight_streaming_budget(self) -> Any:
+    def get_automatic_device_memory_budget(self) -> Any:
         return self.engine.get_weight_streaming_automatic_budget()
 
     def get_device_memory_budget(self) -> Any:
@@ -131,19 +131,20 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
     def _set_device_memory_budget(self, budget_bytes: int) -> int:
         # Disable weight streaming for invalid budget size
         if budget_bytes < 0:
-            budget_bytes = self.get_streamable_weights_size()
+            budget_bytes = self.get_streamable_device_memory_budget()
         self.engine.weight_streaming_budget_v2 = budget_bytes
         if self.engine.weight_streaming_budget_v2 != budget_bytes:
             logger.error(f"Failed to set weight streaming budget to {budget_bytes}")
             budget_bytes = self.engine.weight_streaming_budget_v2
-        if self.engine.streamable_weights_size == budget_bytes:
+        if self.get_streamable_device_memory_budget() == budget_bytes:
             logger.warning("Weight streaming is disabled")
 
         return budget_bytes
 
-    def set_default_streaming_budget(self) -> int:
-        budget_bytes = self.get_automatic_weight_streaming_budget()
+    def set_default_device_memory_budget(self) -> int:
+        budget_bytes = self.get_automatic_device_memory_budget()
         # Set automatic weight streaming budget as default when context is created
+        logger.debug(f"Weight streaming budget set to {budget_bytes}B")
         return self._set_device_memory_budget(budget_bytes)
 
     def setup_engine(self) -> None:
@@ -155,7 +156,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         runtime = trt.Runtime(TRT_LOGGER)
         self.engine = runtime.deserialize_cuda_engine(self.serialized_engine)
         if self.settings.enable_weight_streaming:
-            self.set_default_streaming_budget()
+            self.set_default_device_memory_budget()
         self.context = self.engine.create_execution_context()
 
         assert self.engine.num_io_tensors == (

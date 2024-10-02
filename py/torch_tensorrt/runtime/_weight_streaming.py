@@ -22,7 +22,7 @@ class _WeightStreamingContextManager(object):
                 rt_mods.append((name, rt_mod))
                 self.current_device_budget += rt_mod.get_device_memory_budget()
         self.streamable_budget = [
-            mod.get_streamable_weights_size() for _, mod in rt_mods
+            mod.get_streamable_device_memory_budget() for _, mod in rt_mods
         ]
         self.rt_mods = rt_mods
         total_device_budget = sum(self.streamable_budget)
@@ -32,7 +32,7 @@ class _WeightStreamingContextManager(object):
     def get_automatic_weight_streaming_budget(self) -> int:
         ws_budget_bytes = 0
         for _, rt_mod in self.rt_mods:
-            ws_budget_bytes += rt_mod.get_automatic_weight_streaming_budget()
+            ws_budget_bytes += rt_mod.get_automatic_device_memory_budget()
         return ws_budget_bytes
 
     def __enter__(self) -> "_WeightStreamingContextManager":
