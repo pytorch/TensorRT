@@ -228,21 +228,6 @@ def partition(
     # Determine partitions based on user specifications and operator support
     # Then, fuse partitions and display overview of supported/unsupported operators
     partitions = partitioner.propose_partitions()
-    # TODO: confirm with Naren whether this change is required or not
-    # tested both with and without this change, it both works
-    # the only difference is the graph node name, an example is as below:
-    # graph():
-    # %x : [num_users=1] = placeholder[target=x]
-    # %_run_on_acc_0 : [num_users=1] = call_module[target=_run_on_acc_0](args = (%x,), kwargs = {})
-    # return (_run_on_acc_0,)
-
-    # or
-
-    # graph():
-    # %x : [num_users=1] = placeholder[target=x]
-    # %fused_0 : [num_users=1] = call_module[target=fused_0](args = (%x,), kwargs = {})
-    # return (fused_0,)
-
     fused_graph = partitioner.fuse_partitions(partitions, prefix="_run_on_acc_")
     if verbose:
         supported_ops.print_support_overview(len(partitions))
