@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
+# how to run the jetson build on jetpack6.1:
+# ./.github/scripts/build_jetson_6.1.sh
+
 set -euxo pipefail
 
 # get jetpack version: eg: Version: 6.1+b123 ---> 6.1
@@ -28,10 +31,13 @@ export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:/usr/lib/aarch64-linux-gnu:/usr/includ
 # sudo mv bazelisk-linux-arm64 /usr/bin/bazel
 # chmod +x /usr/bin/bazel
 
-# make sure setuptools is installed
+# make sure pip is installed:
 # sudo apt install python3-pip
-# make sure setuptools is upgraded via the below cmd:
-# pip install -U pip setuptools
+
+# make sure setuptools is installed with the version < 71.*.*
+# version 71.*.* will give the following error during build
+# TypeError: canonicalize_version() got an unexpected keyword argument 'strip_trailing_zero'
+# python -m pip install setuptools==70.2.0
 
 # make sure torch is installed via the below cmd:
 # wget https://developer.download.nvidia.cn/compute/redist/jp/v61/pytorch/torch-2.5.0a0+872d972e41.nv24.08.17622132-cp310-cp310-linux_aarch64.whl
@@ -46,9 +52,9 @@ export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:/usr/lib/aarch64-linux-gnu:/usr/includ
 export TORCH_INSTALL_PATH=$(python -c "import torch, os; print(os.path.dirname(torch.__file__))")
 export SITE_PACKAGE_PATH=${TORCH_INSTALL_PATH::-6}
 export CUDA_HOME=/usr/local/cuda-${cuda_version}/
-# replace the WORKSPACE file with jetpack one
-cat WORKSPACE > WORKSPACE.orig
-cat toolchains/jp_workspaces/WORKSPACE.jp60 | envsubst > WORKSPACE
+
+# replace the Module file with jetpack one
+cat toolchains/jp_workspaces/MODULE.bazel.jp61 | envsubst > MODULE.bazel
 
 # build on jetpack
 python setup.py  --use-cxx11-abi  install --user
