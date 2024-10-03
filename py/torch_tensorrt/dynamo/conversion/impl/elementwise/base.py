@@ -10,16 +10,14 @@ from torch_tensorrt import _enums
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
 from torch_tensorrt.dynamo.conversion.converter_utils import (
+    broadcast,
     broadcast_to_same_shape,
     cast_trt_tensor,
     get_trt_tensor,
-)
-from torch_tensorrt.fx.converters.converter_utils import (
-    broadcast,
     has_dynamic_shape,
     set_layer_name,
 )
-from torch_tensorrt.fx.types import TRTElementWiseOp, TRTTensor
+from torch_tensorrt.dynamo.types import TRTElementWiseOp, TRTTensor
 
 
 def get_python_op_from_trt_elementwise_op(
@@ -152,7 +150,7 @@ def convert_binary_elementwise(
 
     if has_dynamic_shape(lhs_val.shape) or has_dynamic_shape(rhs_val.shape):
         lhs_val, rhs_val = broadcast(
-            ctx.net, lhs_val, rhs_val, f"{name}_broadcast_lhs", f"{name}_broadcast_rhs"
+            ctx, lhs_val, rhs_val, f"{name}_broadcast_lhs", f"{name}_broadcast_rhs"
         )
     else:
         lhs_val, rhs_val = broadcast_to_same_shape(

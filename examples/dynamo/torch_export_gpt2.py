@@ -25,12 +25,16 @@ DEVICE = torch.device("cuda:0")
 # CPU is used here so that GPU memory is reserved for TRT compilation.
 with torch.no_grad():
     tokenizer = AutoTokenizer.from_pretrained("gpt2")
-    model = AutoModelForCausalLM.from_pretrained(
-        "gpt2",
-        pad_token_id=tokenizer.eos_token_id,
-        use_cache=False,
-        attn_implementation="eager",
-    ).eval()
+    model = (
+        AutoModelForCausalLM.from_pretrained(
+            "gpt2",
+            pad_token_id=tokenizer.eos_token_id,
+            use_cache=False,
+            attn_implementation="eager",
+        )
+        .eval()
+        .half()
+    )
 
 # %%
 # Tokenize a sample input prompt and get pytorch model outputs
@@ -56,6 +60,8 @@ trt_model = torch_tensorrt.dynamo.compile(
     truncate_double=True,
     device=DEVICE,
     disable_tf32=True,
+    use_strong_types=True,
+    use_fp32_acc=True,
 )
 
 # Auto-regressive generation loop for greedy decoding using TensorRT model

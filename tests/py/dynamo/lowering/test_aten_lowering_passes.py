@@ -575,5 +575,44 @@ class TestLowerViewToReshape(TestCase):
         torch._dynamo.reset()
 
 
+class TestFP32Accumulation(TestCase):
+    def test_fp32_acc(self):
+        class FP32Acc(torch.nn.Module):
+            def forward(self, input, weight):
+                out = torch.ops.aten.mm.default(input, weight)
+                return out
+
+        inputs = [
+            torch.rand((3, 4)).cuda(),
+            torch.rand((4, 5)).cuda(),
+        ]
+
+        fx_graph = torch.fx.symbolic_trace(FP32Acc())
+        expected_ops = {torch.ops.aten._to_copy.default, torch.ops.aten.mm.default}
+        unexpected_ops = {}
+
+        unexpected_ops_seen, expected_ops_unseen = lower_graph_testing(
+            fx_graph,
+            inputs,
+            expected_ops=expected_ops,
+            unexpected_ops=unexpected_ops,
+            min_block_size=1,
+            use_fp32_acc=True,
+        )
+
+        self.assertEqual(
+            len(unexpected_ops_seen),
+            0,
+            f"The following unexpected ops were encountered: {unexpected_ops_seen}",
+        )
+
+        self.assertEqual(
+            len(expected_ops_unseen),
+            0,
+            f"The following expected ops were not encountered: {expected_ops_unseen}",
+        )
+        torch._dynamo.reset()
+
+
 if __name__ == "__main__":
     run_tests()

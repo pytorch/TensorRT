@@ -50,7 +50,7 @@ def fx_dynamo_testing_backend(
             decompositions=get_decompositions(),
         )
 
-        gm = post_lowering(gm)
+        gm = post_lowering(gm, use_fp32_acc=use_fp32_acc)
 
         trt_compiled = custom_backend(
             gm,
@@ -153,6 +153,7 @@ def lower_graph_testing(
     torch_executed_ops: Sequence[str] = set(),
     testing_partitioning: bool = False,
     use_fast_partitioner: bool = True,
+    use_fp32_acc: bool = False,
 ):
     """Helper function to assist with graph lowering for testing of Dynamo compile
 
@@ -165,6 +166,7 @@ def lower_graph_testing(
         torch_executed_ops: Sequence of operations to run in Torch, regardless of converter coverage
         testing_partitioning: Whether partitioning is being tested (to analyze only TRT-supported ops)
         use_fast_partitioner: Whether to use the fast or global partitioner
+        use_fp32_acc: This option inserts cast to FP32 nodes around matmul layers and TensorRT ensures the accumulation of matmul happens in FP32. Use this only when FP16 precision is configured in enabled_precisions.
     Returns:
         If testing_partitioning:
             List[torch.fx.GraphModule], Set, Set: List of partitioned graph outputs, unexpected ops seen, expected ops unseen
@@ -179,6 +181,7 @@ def lower_graph_testing(
         min_block_size=min_block_size,
         torch_executed_ops=torch_executed_ops,
         use_fast_partitioner=use_fast_partitioner,
+        use_fp32_acc=use_fp32_acc,
     )
 
     # Invoke compilation
