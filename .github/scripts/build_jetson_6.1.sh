@@ -54,7 +54,7 @@ export SITE_PACKAGE_PATH=${TORCH_INSTALL_PATH::-6}
 export CUDA_HOME=/usr/local/cuda-${cuda_version}/
 
 # replace the Module file with jetpack one
-cat toolchains/jp_workspaces/MODULE.bazel.jp61 | envsubst > MODULE.bazel
+cat toolchains/jp_workspaces/MODULE.bazel.tmpl | envsubst > MODULE.bazel
 
 # build on jetpack
 python setup.py  --use-cxx11-abi  install --user
