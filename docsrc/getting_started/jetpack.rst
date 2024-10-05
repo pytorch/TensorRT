@@ -1,4 +1,4 @@
-.. _Torch TensorRT in JetPack 6.1
+.. _Torch_TensorRT_in_JetPack_6.1
 
 Overview
 ##################
@@ -22,41 +22,40 @@ Prerequisites
 ~~~~~~~~~~~~~~
 
 
-Ensure your jetson devleoper kit has been flashed with the latest JetPack 6.1
-You can find more details on how to flash Jetson board via sdk-manager
+Ensure your jetson devleoper kit has been flashed with the latest JetPack 6.1. You can find more details on how to flash Jetson board via sdk-manager:
 
     * https://developer.nvidia.com/sdk-manager
 
+
+check the current jetpack version using
+
 .. code-block:: sh
-    # ensure the current jetpack version is 6.1
+
     apt show nvidia-jetpack
 
+Ensure you have installed JetPack Dev components. This step is required if you need to build on jetson board.
 
-Ensure you have installed JetPack Dev components
-This step is required if you need to build on jetson board
-You can only install the dev components that you require 
-ex: tensorrt-dev would be the meta-package for all TRT development
-or install everthing
+You can only install the dev components that you require: ex, tensorrt-dev would be the meta-package for all TRT development or install everthing.
 
 .. code-block:: sh
     # install all the nvidia-jetpack dev components
     sudo apt update
     sudo apt install nvidia-jetpack
 
-
 Ensure you have cuda 12.6 installed(this should be installed automatically from nvidia-jetpack)
 
 .. code-block:: sh
+
     # check the cuda version
     nvcc --version
     # if not installed or the version is not 12.6, install via the below cmd:
     sudo apt update
     sudo apt install cuda-toolkit-12-6
 
-
-Ensure libcusparseLt.so exists at /usr/local/cuda/lib64/
+Ensure libcusparseLt.so exists at /usr/local/cuda/lib64/:
 
 .. code-block:: sh
+
     # if not exist, download and copy to the directory
     wget https://developer.download.nvidia.com/compute/cusparselt/redist/libcusparse_lt/linux-sbsa/libcusparse_lt-linux-sbsa-0.5.2.1-archive.tar.xz
     tar xf libcusparse_lt-linux-sbsa-0.5.2.1-archive.tar.xz
@@ -71,6 +70,7 @@ Build torch_tensorrt
 Install bazel
 
 .. code-block:: sh
+
     wget -v https://github.com/bazelbuild/bazelisk/releases/download/v1.20.0/bazelisk-linux-arm64
     sudo mv bazelisk-linux-arm64 /usr/bin/bazel
     chmod +x /usr/bin/bazel
@@ -78,14 +78,17 @@ Install bazel
 Install pip and required python packages
 
 .. code-block:: sh
+
     # install pip
     sudp apt install python3-pip
 
 .. code-block:: sh
+
     # install setuptools with the version less than 71.*.* 
     python -m pip install setuptools==70.2.0
 
 .. code-block:: sh
+
     # install torch
     wget https://developer.download.nvidia.cn/compute/redist/jp/v61/pytorch/torch-2.5.0a0+872d972e41.nv24.08.17622132-cp310-cp310-linux_aarch64.whl
     python -m pip install torch-2.5.0a0+872d972e41.nv24.08.17622132-cp310-cp310-linux_aarch64.whl
@@ -96,7 +99,14 @@ Install pip and required python packages
 
 Build and Install torch_tensorrt wheel file
 
+
+Since torch_tensorrt version has dependencies on torch version. torch version supported by JetPack6.1 is from DLFW 24.08/24.09(torch 2.5.0).
+
+Please make sure to build torch_tensorrt wheel file from source release/2.5 branch
+(TODO: lanl to update the branch name once release/ngc branch is available)
+
 .. code-block:: sh
+
     cuda_version=$(nvcc --version | grep Cuda | grep release | cut -d ',' -f 2 | sed -e 's/ release //g')
     export TORCH_INSTALL_PATH=$(python -c "import torch, os; print(os.path.dirname(torch.__file__))")
     export SITE_PACKAGE_PATH=${TORCH_INSTALL_PATH::-6}
@@ -105,5 +115,3 @@ Build and Install torch_tensorrt wheel file
     cat toolchains/jp_workspaces/MODULE.bazel.tmpl | envsubst > MODULE.bazel
     # build and install torch_tensorrt wheel file
     python setup.py --use-cxx11-abi install --user
-
-
