@@ -15,6 +15,56 @@ assertions = unittest.TestCase()
 
 
 class TestWeightStrippedEngine(TestCase):
+    def test_three_ways_to_compile(self):
+        pyt_model = models.resnet18(pretrained=True).eval().to("cuda")
+        example_inputs = (torch.randn((100, 3, 224, 224)).to("cuda"),)
+        exp_program = torch.export.export(pyt_model, example_inputs)
+
+        settings = {
+            "use_python_runtime": False,
+            "enabled_precisions": {torch.float},
+            "debug": False,
+            "min_block_size": 1,
+            "strip_engine_weights": False,
+            "refit_identical_engine_weights": False,
+        }
+
+        # 1. Compile with torch_trt.dynamo.compile
+        gm1 = torch_trt.dynamo.compile(
+            exp_program,
+            example_inputs,
+            **settings,
+        )
+        gm1_output = gm1(*example_inputs)
+
+        # 2. Compile with torch_trt.compile using dynamo backend
+        gm2 = torch_trt.compile(
+            pyt_model, ir="dynamo", inputs=example_inputs, **settings
+        )
+        gm2_output = gm2(*example_inputs)
+
+        # 3. Compile with torch.compile using tensorrt backend
+        gm3 = torch.compile(
+            pyt_model,
+            backend="tensorrt",
+            options=settings,
+        )
+        gm3_output = gm3(*example_inputs)
+
+        pyt_model_output = pyt_model(*example_inputs)
+
+        assert torch.allclose(
+            pyt_model_output, gm1_output, 1e-2, 1e-2
+        ), "gm1_output is not correct"
+
+        assert torch.allclose(
+            gm1_output, gm2_output, 1e-2, 1e-2
+        ), "gm2_output is not correct"
+
+        assert torch.allclose(
+            gm2_output, gm3_output, 1e-2, 1e-2
+        ), "gm3_output is not correct"
+
     def test_weight_stripped_engine_sizes(self):
         pyt_model = models.resnet18(pretrained=True).eval().to("cuda")
         example_inputs = (torch.randn((100, 3, 224, 224)).to("cuda"),)
@@ -67,8 +117,6 @@ class TestWeightStrippedEngine(TestCase):
             enabled_precisions={torch.float},
             debug=False,
             min_block_size=1,
-            cache_built_engines=False,
-            reuse_cached_engines=False,
             strip_engine_weights=True,
             refit_identical_engine_weights=False,
         )
@@ -315,4 +363,41 @@ class TestWeightStrippedEngine(TestCase):
         assertions.assertTrue(
             times[0] > times[2],
             msg=f"Engine caching didn't speed up the compilation. Time taken without engine caching: {times[0]} ms, time taken with engine caching: {times[2]} ms",
+        )
+
+    def test_different_args_dont_share_engine_caching(self):
+        pyt_model = models.resnet18(pretrained=True).eval().to("cuda")
+
+        engine_cache_dir = "/tmp/test_different_args_dont_share_engine_caching"
+        if os.path.exists(engine_cache_dir):
+            shutil.rmtree(engine_cache_dir)
+
+        inputs = [torch.rand((128, 3, 224, 224)).to("cuda")]
+
+        for i in range(2):
+            if i == 0:
+                strip_engine_weights = False
+            else:
+                strip_engine_weights = True
+
+            compiled_model = torch.compile(
+                pyt_model,
+                backend="tensorrt",
+                options={
+                    "use_python_runtime": True,
+                    "enabled_precisions": {torch.float},
+                    "debug": False,
+                    "min_block_size": 1,
+                    "cache_built_engines": True,
+                    "reuse_cached_engines": True,
+                    "engine_cache_dir": engine_cache_dir,
+                    "strip_engine_weights": strip_engine_weights,
+                },
+            )
+            compiled_model(*inputs)
+
+        assertions.assertEqual(
+            len(os.listdir(engine_cache_dir)),
+            2,
+            msg=f"It has {len(os.listdir(engine_cache_dir))} cached engine(s) but should have 2 engines",
         )

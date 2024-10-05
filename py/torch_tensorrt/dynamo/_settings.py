@@ -81,7 +81,7 @@ class CompilationSettings:
         reuse_cached_engines (bool): Whether to load the compiled TRT engines from storage
         refit_identical_engine_weights (bool): Whether to refit the engine with identical weights
         strip_engine_weights (bool): Whether to strip the engine weights
-        immutable_weights (bool): Build non-refittable engines. This is useful for some layers that are not refittable. If this argument is set, `strip_engine_weights` and `refit_identical_engine_weights` will be ignored
+        immutable_weights (bool): Build non-refittable engines. This is useful for some layers that are not refittable. If this argument is set to true, `strip_engine_weights` and `refit_identical_engine_weights` will be ignored
     """
 
     enabled_precisions: Set[dtype] = field(default_factory=lambda: ENABLED_PRECISIONS)
