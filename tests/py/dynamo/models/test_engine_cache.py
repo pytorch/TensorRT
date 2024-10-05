@@ -485,8 +485,7 @@ class TestEngineCache(TestCase):
     def test_torch_compile_change_input_shape(self):
         # Custom Engine Cache
         model = models.resnet18(pretrained=True).eval().to("cuda")
-
-        engine_cache_dir = "/tmp/test_torch_compile_with_default_disk_engine_cache"
+        engine_cache_dir = "/tmp/test_torch_compile_change_input_shape"
         if os.path.exists(engine_cache_dir):
             shutil.rmtree(engine_cache_dir)
 
