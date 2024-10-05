@@ -18,6 +18,7 @@ from torch_tensorrt.dynamo.lowering import (
     repair_input_aliasing,
 )
 from torch_tensorrt.dynamo.utils import (
+    colorize_log,
     parse_dynamo_kwargs,
     prepare_inputs,
     set_log_level,
@@ -38,6 +39,13 @@ def torch_tensorrt_backend(
         and kwargs["options"]["debug"]
     ) or ("debug" in kwargs and kwargs["debug"]):
         set_log_level(logger.parent, logging.DEBUG)
+
+    if (
+        "options" in kwargs
+        and "color_log" in kwargs["options"]
+        and kwargs["options"]["color_log"]
+    ) or ("color_log" in kwargs and kwargs["color_log"]):
+        colorize_log()
 
     DEFAULT_BACKEND = aot_torch_tensorrt_aten_backend
 

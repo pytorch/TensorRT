@@ -35,6 +35,7 @@ from torch_tensorrt.dynamo.lowering import (
     pre_export_lowering,
 )
 from torch_tensorrt.dynamo.utils import (
+    colorize_log,
     get_flat_args_with_check,
     parse_graph_io,
     prepare_inputs,
@@ -88,6 +89,7 @@ def compile(
     engine_cache_dir: str = _defaults.ENGINE_CACHE_DIR,
     engine_cache_size: int = _defaults.ENGINE_CACHE_SIZE,
     custom_engine_cache: Optional[BaseEngineCache] = _defaults.CUSTOM_ENGINE_CACHE,
+    color_log: bool = _defaults.COLOR_LOG,
     **kwargs: Any,
 ) -> torch.fx.GraphModule:
     """Compile an ExportedProgram module for NVIDIA GPUs using TensorRT
@@ -158,6 +160,7 @@ def compile(
         engine_cache_dir (Optional[str]): Directory to store the cached TRT engines
         engine_cache_size (Optional[int]): Maximum hard-disk space (bytes) to use for the engine cache, default is 1GB. If the cache exceeds this size, the oldest engines will be removed by default
         custom_engine_cache (Optional[BaseEngineCache]): Engine cache instance to use for saving and loading engines. Users can provide their own engine cache by inheriting from BaseEngineCache. If used, engine_cache_dir and engine_cache_size will be ignored.
+        color_log (bool): Colorize logging output if rich module is available, otherwise do nothing.
         **kwargs: Any,
     Returns:
         torch.fx.GraphModule: Compiled FX Module, when run it will execute via TensorRT
@@ -165,6 +168,10 @@ def compile(
 
     if debug:
         set_log_level(logger.parent, logging.DEBUG)
+
+    if color_log:
+        colorize_log()
+
     if "truncate_long_and_double" in kwargs.keys():
         if truncate_double is not _defaults.TRUNCATE_DOUBLE:
             raise ValueError(
@@ -281,6 +288,7 @@ def compile(
         "lazy_engine_init": lazy_engine_init,
         "cache_built_engines": cache_built_engines,
         "reuse_cached_engines": reuse_cached_engines,
+        "color_log": color_log,
     }
 
     settings = CompilationSettings(**compilation_options)
@@ -520,6 +528,7 @@ def convert_exported_program_to_serialized_trt_engine(
     calibrator: object = None,
     allow_shape_tensors: bool = False,
     timing_cache_path: str = _defaults.TIMING_CACHE_PATH,
+    color_log: bool = _defaults.COLOR_LOG,
     **kwargs: Any,
 ) -> bytes:
     """Convert an ExportedProgram to a serialized TensorRT engine
@@ -578,11 +587,15 @@ def convert_exported_program_to_serialized_trt_engine(
         calibrator (Union(torch_tensorrt._C.IInt8Calibrator, tensorrt.IInt8Calibrator)): Calibrator object which will provide data to the PTQ system for INT8 Calibration
         allow_shape_tensors: (Experimental) Allow aten::size to output shape tensors using IShapeLayer in TensorRT
         timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation
+        color_log (bool): Colorize logging output if rich module is available, otherwise do nothing.
     Returns:
         bytes: Serialized TensorRT engine, can either be saved to a file or deserialized via TensorRT APIs
     """
     if debug:
         set_log_level(logger.parent, logging.DEBUG)
+
+    if color_log:
+        colorize_log()
 
     if "truncate_long_and_double" in kwargs.keys():
         if truncate_double is not _defaults.TRUNCATE_DOUBLE:
@@ -651,6 +664,7 @@ def convert_exported_program_to_serialized_trt_engine(
         "dla_local_dram_size": dla_local_dram_size,
         "dla_global_dram_size": dla_global_dram_size,
         "timing_cache_path": timing_cache_path,
+        "color_log": color_log,
     }
 
     exported_program = pre_export_lowering(exported_program)

@@ -7,6 +7,7 @@ from torch_tensorrt._enums import EngineCapability, dtype
 from torch_tensorrt.dynamo._defaults import (
     ASSUME_DYNAMIC_SHAPE_SUPPORT,
     CACHE_BUILT_ENGINES,
+    COLOR_LOG,
     DEBUG,
     DISABLE_TF32,
     DLA_GLOBAL_DRAM_SIZE,
@@ -78,6 +79,7 @@ class CompilationSettings:
         timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation
         cache_built_engines (bool): Whether to save the compiled TRT engines to storage
         reuse_cached_engines (bool): Whether to load the compiled TRT engines from storage
+        color_log (bool): Colorize logging output if rich module is available, otherwise do nothing.
     """
 
     enabled_precisions: Set[dtype] = field(default_factory=lambda: ENABLED_PRECISIONS)
@@ -112,6 +114,7 @@ class CompilationSettings:
     lazy_engine_init: bool = LAZY_ENGINE_INIT
     cache_built_engines: bool = CACHE_BUILT_ENGINES
     reuse_cached_engines: bool = REUSE_CACHED_ENGINES
+    color_log: bool = COLOR_LOG
 
 
 _SETTINGS_TO_BE_ENGINE_INVARIANT = (

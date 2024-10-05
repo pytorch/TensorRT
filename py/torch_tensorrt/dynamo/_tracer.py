@@ -7,8 +7,13 @@ from typing import Any, Optional, Tuple, Union
 import torch
 from torch.export import Dim, export
 from torch_tensorrt._Input import Input
-from torch_tensorrt.dynamo._defaults import DEBUG, default_device
-from torch_tensorrt.dynamo.utils import get_torch_inputs, set_log_level, to_torch_device
+from torch_tensorrt.dynamo._defaults import COLOR_LOG, DEBUG, default_device
+from torch_tensorrt.dynamo.utils import (
+    colorize_log,
+    get_torch_inputs,
+    set_log_level,
+    to_torch_device,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -73,6 +78,10 @@ def trace(
     debug = kwargs.get("debug", DEBUG)
     if debug:
         set_log_level(logger.parent, logging.DEBUG)
+
+    color_log = kwargs.get("color_log", COLOR_LOG)
+    if color_log:
+        colorize_log()
 
     device = to_torch_device(kwargs.get("device", default_device()))
     torch_arg_inputs = get_torch_inputs(arg_inputs, device)

@@ -227,6 +227,26 @@ def set_log_level(parent_logger: Any, level: Any) -> None:
         torch.ops.tensorrt.set_logging_level(int(log_level))
 
 
+def colorize_log() -> None:
+    try:
+        from rich.console import Console
+        from rich.logging import RichHandler
+
+        logging.basicConfig(
+            format="%(name)s:%(message)s",
+            handlers=[
+                RichHandler(
+                    console=Console(stderr=True),
+                    show_time=False,
+                    show_path=False,
+                    rich_tracebacks=True,
+                )
+            ],
+        )
+    except ImportError:
+        pass
+
+
 def prepare_inputs(
     inputs: Input | torch.Tensor | Sequence[Any] | Dict[Any, Any],
     disable_memory_format_check: bool = False,

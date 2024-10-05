@@ -35,6 +35,7 @@ from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (
 )
 from torch_tensorrt.dynamo.utils import (
     check_module_output,
+    colorize_log,
     get_model_device,
     get_torch_inputs,
     set_log_level,
@@ -276,6 +277,9 @@ def refit_module_weights(
 
     if settings.debug:
         set_log_level(logger.parent, logging.DEBUG)
+
+    if settings.color_log:
+        colorize_log()
 
     device = to_torch_tensorrt_device(settings.device)
     if arg_inputs:
