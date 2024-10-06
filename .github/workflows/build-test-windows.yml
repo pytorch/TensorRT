@@ -62,6 +62,7 @@ jobs:
       smoke-test-script: ${{ matrix.smoke-test-script }}
       package-name: ${{ matrix.package-name }}
       trigger-event: ${{ github.event_name }}
+      timeout: 120
 
   tests-py-torchscript-fe:
     name: Test torchscript frontend [Python]
