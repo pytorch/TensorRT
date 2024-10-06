@@ -16,7 +16,6 @@ from torch.export.exported_program import (
     OutputSpec,
     TensorArgument,
 )
-from torch_tensorrt.dynamo import partitioning
 
 
 def export(
@@ -58,11 +57,9 @@ def transform(
     if kwarg_inputs is None:
         kwarg_inputs = {}
     gm = copy.deepcopy(gm)
-    # Run shape analysis
-    _, outputs_map = partitioning.run_shape_analysis(gm, inputs, kwarg_inputs)
 
     # Inline TensorRT submodules
-    inline_trt_modules(gm, outputs_map)
+    inline_trt_modules(gm)
 
     # Inline pytorch submodules
     inline_torch_modules(gm)
@@ -361,9 +358,7 @@ def create_trt_exp_program(
     return trt_exp_program
 
 
-def inline_trt_modules(
-    gm: torch.fx.GraphModule, outputs_map: Dict[Any, Sequence[Any]]
-) -> torch.fx.GraphModule:
+def inline_trt_modules(gm: torch.fx.GraphModule) -> torch.fx.GraphModule:
     """
     Replace TRT submodules with trt engine nodes.
     """
@@ -379,7 +374,7 @@ def inline_trt_modules(
         trt_module_node = trt_module_node[0]
         assert trt_module_node.args
 
-        num_outputs = len(outputs_map[trt_module_node.name])
+        num_outputs = len(trt_module.output_shapes)
         # Insert a call_function node to perform inference on TRT engine
         with gm.graph.inserting_before(trt_module_node):
             engine_name = f"{name}_engine"
@@ -398,8 +393,8 @@ def inline_trt_modules(
                     cast(
                         FakeTensor,
                         torch.empty_strided(
-                            tuple(outputs_map[trt_module_node.name][idx]),
-                            tuple([1] * len(outputs_map[trt_module_node.name][idx])),
+                            tuple(trt_module.output_shapes[idx]),
+                            tuple([1] * len(trt_module.output_shapes[idx])),
                         ),
                     )
                 )
