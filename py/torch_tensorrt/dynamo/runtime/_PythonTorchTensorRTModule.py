@@ -5,6 +5,7 @@ from contextlib import nullcontext
 from tempfile import tempdir
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
+import tensorrt as trt
 import torch
 import torch_tensorrt
 from torch.nn import Module
@@ -18,8 +19,6 @@ from torch_tensorrt.runtime._utils import (
     _select_rt_device,
     multi_gpu_device_check,
 )
-
-import tensorrt as trt
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +35,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         serialized_engine: Optional[bytes] = None,
         input_binding_names: Optional[List[str]] = None,
         output_binding_names: Optional[List[str]] = None,
+        output_shapes: Optional[List[Tuple[int]]] = None,
         *,
         name: str = "",
         settings: CompilationSettings = CompilationSettings(),
@@ -93,6 +93,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         self.output_names = (
             output_binding_names if output_binding_names is not None else []
         )
+        self.output_shapes = output_shapes
         self.initialized = False
         self.target_device_id = (
             settings.device.gpu_id
