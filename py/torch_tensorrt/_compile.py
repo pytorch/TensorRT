@@ -191,7 +191,7 @@ def compile(
     Returns:
         torch.nn.Module: Compiled Module, when run it will execute via TensorRT
     """
-
+    breakpoint()
     input_list = inputs if inputs is not None else []
     enabled_precisions_set: Set[dtype | torch.dtype] = (
         enabled_precisions

@@ -14,7 +14,9 @@ from torch_tensorrt._Input import Input
 from torch_tensorrt.dynamo import partitioning
 from torch_tensorrt.dynamo._exporter import inline_torch_modules
 from torch_tensorrt.dynamo._settings import CompilationSettings
-from torch_tensorrt.dynamo.conversion._conversion import infer_module_output_dtypes
+from torch_tensorrt.dynamo.conversion._conversion import (
+    infer_module_output_shapes_dtypes,
+)
 from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
     DYNAMO_CONVERTERS as CONVERTERS,
 )
@@ -72,7 +74,7 @@ def construct_refit_mapping(
         "CONSTANT": (trt.IConstantLayer, [("weights", "CONSTANT")]),
     }
 
-    output_dtypes = infer_module_output_dtypes(
+    _, output_dtypes = infer_module_output_shapes_dtypes(
         module,
         inputs,
         settings.device,
