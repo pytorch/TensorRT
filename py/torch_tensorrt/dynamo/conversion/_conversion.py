@@ -34,7 +34,7 @@ def infer_module_output_shapes_dtypes(
     truncate_double: bool = False,
 ) -> Tuple[List[Tuple[int]], List[dtype]]:
     """
-    This function performs model inference to determine the output dtypes
+    This function performs model inference to determine the output shapes and output dtypes
     and truncates them accordingly. inputs can be either arg_inputs or flattened input list.
     If it is flattened list, kwarg_inputs should be None, as it is already included in the flattened input.
     """
@@ -69,7 +69,6 @@ def infer_module_output_shapes_dtypes(
                 output_ = torch.tensor(output)
 
         output_shapes.append(unwrap_tensor_shape(output_))
-        # output_shapes.append(output_.shape)
         if truncate_double and output_.dtype == dtype.float64:
             output_dtypes.append(dtype.float32)
         else:
@@ -86,7 +85,7 @@ def interpret_module_to_result(
     kwarg_inputs: Optional[dict[str, Any]] = None,
     engine_cache: Optional[BaseEngineCache] = None,
 ) -> Tuple[List[Tuple[int]], TRTInterpreterResult]:
-    """Interpret an FX module to a TRTInterpreterResult
+    """Interpret an FX module to the output shapes and a TRTInterpreterResult
     Args:
         module: FX GraphModule to interpret
         inputs: Sequence of FLATTENED Tensors representing inputs to the module. It should include both
@@ -96,7 +95,7 @@ def interpret_module_to_result(
         settings: Compilation settings
         engine_cache: Engine cache instance
     Returns:
-        Output shapes, TRTInterpreterResult
+        (List[Tuple[int]], TRTInterpreterResult)
     """
     if arg_inputs is not None:
         output_shapes, output_dtypes = infer_module_output_shapes_dtypes(
