@@ -472,16 +472,17 @@ def inline_trt_modules_for_windows(gm: torch.fx.GraphModule) -> torch.fx.GraphMo
             engine_info = trt_module._pack_engine_info()
             engine_bytes = engine_info[ENGINE_IDX]
             engine_info[ENGINE_IDX] = base64.b64encode(engine_bytes).decode("utf-8")
-            engine_node = (
-                gm.graph.call_function(
-                    torch.ops.tensorrt.setup_engine.default, **engine_info
-                ),
+
+            engine_node = gm.graph.call_function(
+                torch.ops.tensorrt.setup_engine.default,
+                tuple(engine_info),
             )
 
             trt_node = gm.graph.call_function(
                 torch.ops.tensorrt.execute_engine.default,
                 (trt_module_node.args, engine_node),
             )
+
             trt_node.meta["val"] = []
             assert num_outputs > 0
             # Generate meta data for TRT node (a FakeTensor with corresponding output shape)

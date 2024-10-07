@@ -306,9 +306,9 @@ def cross_compile_for_windows(
     """Compile a PyTorch module using TensorRT in Linux for Inference in Windows
 
     Takes an existing PyTorch module and a set of settings to configure the compiler
-    and will convert methods to JIT graphs which call equivalent TensorRT serialized
-    engine info into the disk in the specified file_path user input.
-    It will then allow user to load the serialized model from file_path in Windows.
+    and it will convert methods to JIT graphs which call equivalent TensorRT serialized
+    engine info into the disk in the specified file_path user provided.
+    It will then allow user to load the deserialized model from the disk in Windows.
     Note: the model cross compiled for windows in Linux environmen can only be loaded
     in Windows.
 
@@ -368,6 +368,7 @@ def cross_compile_for_windows(
         raise AssertionError(
             "'arg_inputs' and 'inputs' should not be used at the same time."
         )
+
     arg_inputs = inputs or arg_inputs
 
     if kwarg_inputs is None:
