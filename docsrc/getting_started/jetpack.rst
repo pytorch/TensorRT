@@ -10,7 +10,7 @@ With this release it incorporates:
 CUDA 12.6
 TensorRT 10.3
 cuDNN 9.3
-DLFW 24.0
+DLFW 24.09
 
 You can find more details for the JetPack 6.1:
 
@@ -22,7 +22,7 @@ Prerequisites
 ~~~~~~~~~~~~~~
 
 
-Ensure your jetson devleoper kit has been flashed with the latest JetPack 6.1. You can find more details on how to flash Jetson board via sdk-manager:
+Ensure your jetson developer kit has been flashed with the latest JetPack 6.1. You can find more details on how to flash Jetson board via sdk-manager:
 
     * https://developer.nvidia.com/sdk-manager
 
@@ -39,8 +39,8 @@ You can only install the dev components that you require: ex, tensorrt-dev would
 
 .. code-block:: sh
     # install all the nvidia-jetpack dev components
-    sudo apt update
-    sudo apt install nvidia-jetpack
+    sudo apt-get update
+    sudo apt-get install nvidia-jetpack
 
 Ensure you have cuda 12.6 installed(this should be installed automatically from nvidia-jetpack)
 
@@ -49,8 +49,8 @@ Ensure you have cuda 12.6 installed(this should be installed automatically from 
     # check the cuda version
     nvcc --version
     # if not installed or the version is not 12.6, install via the below cmd:
-    sudo apt update
-    sudo apt install cuda-toolkit-12-6
+    sudo apt-get update
+    sudo apt-get install cuda-toolkit-12-6
 
 Ensure libcusparseLt.so exists at /usr/local/cuda/lib64/:
 
@@ -90,8 +90,7 @@ Install pip and required python packages
 .. code-block:: sh
 
     # install torch
-    wget https://developer.download.nvidia.cn/compute/redist/jp/v61/pytorch/torch-2.5.0a0+872d972e41.nv24.08.17622132-cp310-cp310-linux_aarch64.whl
-    python -m pip install torch-2.5.0a0+872d972e41.nv24.08.17622132-cp310-cp310-linux_aarch64.whl
+    python -m pip install https://developer.download.nvidia.com/compute/redist/jp/v61/pytorch/torch-2.5.0a0+872d972e41.nv24.08.17622132-cp310-cp310-linux_aarch64.whl
 
     # install torchvision
     # currently it has not available yet for JetPack 6.1, it should be available in future
