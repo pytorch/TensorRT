@@ -25,6 +25,7 @@ def cross_save_for_windows(
     file_path: str,
 ) -> None:
     gm = copy.deepcopy(gm)
+
     # Inline TensorRT submodules for windows
     inline_trt_modules_for_windows(gm)
 

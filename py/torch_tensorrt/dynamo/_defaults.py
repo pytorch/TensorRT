@@ -40,7 +40,6 @@ REUSE_CACHED_ENGINES = False
 ENGINE_CACHE_DIR = os.path.join(tempfile.gettempdir(), "torch_tensorrt_engine_cache")
 ENGINE_CACHE_SIZE = 1073741824
 CUSTOM_ENGINE_CACHE = None
-ENABLE_CROSS_COMPILE_FOR_WINDOWS = False
 
 
 def default_device() -> Device:

@@ -40,7 +40,13 @@ if ENABLED_FEATURES.dynamo_frontend:
 
 logger = logging.getLogger(__name__)
 
-__all__ = ["compile", "convert_method_to_trt_engine", "save", "load"]
+__all__ = [
+    "compile",
+    "cross_compile_for_windows",
+    "convert_method_to_trt_engine",
+    "save",
+    "load",
+]
 
 
 def _non_fx_input_interface(
@@ -343,10 +349,10 @@ def cross_compile_for_windows(
 
     kwargs["enable_cross_compile_for_windows"] = True
 
-    if "use_python_runtime" in kwargs.keys():
-        assert kwargs.get(
-            "use_python_runtime"
-        ), "Cross compile for windows requires use_python_runtime to be set to False"
+    if "use_python_runtime" in kwargs.keys() and kwargs.get("use_python_runtime"):
+        raise RuntimeError(
+            "Cross compile for windows requires use_python_runtime to be set to False"
+        )
 
     enabled_precisions_set: Set[dtype | torch.dtype] = (
         enabled_precisions
