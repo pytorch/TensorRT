@@ -288,6 +288,7 @@ def compile(
     trt_gm = compile_module(
         gm, trt_arg_inputs, trt_kwarg_inputs, settings, engine_cache
     )
+
     return trt_gm
 
 
