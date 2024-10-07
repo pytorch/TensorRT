@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Torch-TensorRT Tutorials &mdash; Torch-TensorRT v2.5.0.dev0+1bf97a4 documentation</title>
+  <title>Torch-TensorRT Tutorials &mdash; Torch-TensorRT v2.6.0.dev0+ce38387 documentation</title>
   
 
   
@@ -273,7 +273,7 @@
               
               
                 <div class="version">
-                  v2.5.0.dev0+1bf97a4
+                  v2.6.0.dev0+ce38387
                 </div>
               
             
@@ -344,6 +344,7 @@
 <li class="toctree-l1"><a class="reference internal" href="dynamo/torch_compile_transformers_example.html">Compiling a Transformer using torch.compile and TensorRT</a></li>
 <li class="toctree-l1"><a class="reference internal" href="dynamo/torch_compile_stable_diffusion.html">Torch Compile Stable Diffusion</a></li>
 <li class="toctree-l1"><a class="reference internal" href="dynamo/torch_export_cudagraphs.html">Torch Export with Cudagraphs</a></li>
+<li class="toctree-l1"><a class="reference internal" href="dynamo/converter_overloading.html">Overloading Torch-TensorRT Converters with Custom Converters</a></li>
 <li class="toctree-l1"><a class="reference internal" href="dynamo/custom_kernel_plugins.html">Using Custom Kernels within TensorRT Engines with Torch-TensorRT</a></li>
 <li class="toctree-l1"><a class="reference internal" href="dynamo/mutable_torchtrt_module_example.html">Mutable Torch TensorRT Module</a></li>
 </ul>
@@ -469,6 +470,7 @@ a number of ways you can leverage this backend to accelerate inference.</p>
 <li><p><a class="reference internal" href="dynamo/torch_compile_advanced_usage.html#torch-compile-advanced-usage"><span class="std std-ref">Torch Compile Advanced Usage</span></a>: Advanced usage including making a custom backend to use directly with the <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code> API</p></li>
 <li><p><a class="reference internal" href="dynamo/torch_compile_stable_diffusion.html#torch-compile-stable-diffusion"><span class="std std-ref">Torch Compile Stable Diffusion</span></a>: Compiling a Stable Diffusion model using <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code></p></li>
 <li><p><a class="reference internal" href="dynamo/torch_export_cudagraphs.html#torch-export-cudagraphs"><span class="std std-ref">Torch Export with Cudagraphs</span></a>: Using the Cudagraphs integration with <cite>ir=”dynamo”</cite></p></li>
+<li><p><a class="reference internal" href="dynamo/converter_overloading.html#converter-overloading"><span class="std std-ref">Overloading Torch-TensorRT Converters with Custom Converters</span></a>: How to write custom converters and overload existing ones</p></li>
 <li><p><a class="reference internal" href="dynamo/custom_kernel_plugins.html#custom-kernel-plugins"><span class="std std-ref">Using Custom Kernels within TensorRT Engines with Torch-TensorRT</span></a>: Creating a plugin to use a custom kernel inside TensorRT engines</p></li>
 <li><p><a class="reference internal" href="dynamo/refit_engine_example.html#refit-engine-example"><span class="std std-ref">Refitting Torch-TensorRT Programs with New Weights</span></a>: Refitting a compiled TensorRT Graph Module with updated weights</p></li>
 <li><p><a class="reference internal" href="dynamo/mutable_torchtrt_module_example.html#mutable-torchtrt-module-example"><span class="std std-ref">Mutable Torch TensorRT Module</span></a>: Compile, use, and modify TensorRT Graph Module with MutableTorchTensorRTModule</p></li>
@@ -506,6 +508,9 @@ a number of ways you can leverage this backend to accelerate inference.</p>
 </div><div class="sphx-glr-thumbcontainer" tooltip="This interactive script is intended as a sample of the Torch-TensorRT workflow with torch.compi..."><img alt="" src="../../_images/sphx_glr_torch_compile_resnet_example_thumb.png" />
 <p><a class="reference internal" href="dynamo/torch_compile_resnet_example.html#sphx-glr-tutorials-rendered-examples-dynamo-torch-compile-resnet-example-py"><span class="std std-ref">Compiling ResNet using the Torch-TensorRT torch.compile Backend</span></a></p>
   <div class="sphx-glr-thumbnail-title">Compiling ResNet using the Torch-TensorRT torch.compile Backend</div>
+</div><div class="sphx-glr-thumbcontainer" tooltip="If for some reason you want to change the conversion behavior of a specific PyTorch operation t..."><img alt="" src="../../_images/sphx_glr_converter_overloading_thumb.png" />
+<p><a class="reference internal" href="dynamo/converter_overloading.html#sphx-glr-tutorials-rendered-examples-dynamo-converter-overloading-py"><span class="std std-ref">Overloading Torch-TensorRT Converters with Custom Converters</span></a></p>
+  <div class="sphx-glr-thumbnail-title">Overloading Torch-TensorRT Converters with Custom Converters</div>
 </div><div class="sphx-glr-thumbcontainer" tooltip="Here we demonstrate how to deploy a model quantized to INT8 or FP8 using the Dynamo frontend of..."><img alt="" src="../../_images/sphx_glr_vgg16_ptq_thumb.png" />
 <p><a class="reference internal" href="dynamo/vgg16_ptq.html#sphx-glr-tutorials-rendered-examples-dynamo-vgg16-ptq-py"><span class="std std-ref">Deploy Quantized Models using Torch-TensorRT</span></a></p>
   <div class="sphx-glr-thumbnail-title">Deploy Quantized Models using Torch-TensorRT</div>

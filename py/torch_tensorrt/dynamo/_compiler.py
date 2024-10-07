@@ -367,7 +367,6 @@ def compile_module(
 
     # Partition module into components that can be TRT-accelerated
     fast_partitioner_failed = False
-
     # If specified, try using the fast partitioner and fall back to the global one on failure
     if settings.use_fast_partitioner:
         try:
@@ -409,6 +408,9 @@ def compile_module(
     # Generate the corresponding TRT Module for those
     for name, _ in partitioned_module.named_children():
         submodule = getattr(partitioned_module, name)
+        # filter on the GraphModule
+        if not isinstance(submodule, torch.fx.graph_module.GraphModule):
+            continue
         # Criteria for a module to be convertible to TRT
         if settings.use_fast_partitioner and "_run_on_acc" not in name:
             dryrun_tracker.to_run_in_torch.extend(parse_non_trt_nodes(submodule))

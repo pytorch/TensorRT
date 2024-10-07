@@ -3,7 +3,7 @@ from enum import Enum, auto
 from typing import Any, Callable, Dict, List, Optional
 
 import torch
-from torch._decomp import register_decomposition
+from torch._decomp import _decomp_table_to_post_autograd_aten, register_decomposition
 from torch._ops import OpOverload
 from torch_tensorrt.dynamo._defaults import default_device
 from torch_tensorrt.dynamo.conversion.converter_utils import get_positive_dim
@@ -394,4 +394,9 @@ def get_decompositions(
         }
         return {**CORE_ATEN_DECOMPOSITIONS_FILTERED, **TORCH_TRT_DECOMPOSITIONS}
     else:
-        return {**ENABLED_TORCH_DECOMPOSITIONS, **TORCH_TRT_DECOMPOSITIONS}
+        # changes made here due to torch2.6 changes https://github.com/pytorch/pytorch/pull/135080
+        return {
+            **ENABLED_TORCH_DECOMPOSITIONS,
+            **_decomp_table_to_post_autograd_aten(),
+            **TORCH_TRT_DECOMPOSITIONS,
+        }

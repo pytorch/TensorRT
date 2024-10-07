@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt.dynamo._exporter &mdash; Torch-TensorRT v2.5.0.dev0+1bf97a4 documentation</title>
+  <title>torch_tensorrt.dynamo._exporter &mdash; Torch-TensorRT v2.6.0.dev0+ce38387 documentation</title>
   
 
   
@@ -272,7 +272,7 @@
               
               
                 <div class="version">
-                  v2.5.0.dev0+1bf97a4
+                  v2.6.0.dev0+ce38387
                 </div>
               
             
@@ -343,6 +343,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/torch_compile_transformers_example.html">Compiling a Transformer using torch.compile and TensorRT</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/torch_compile_stable_diffusion.html">Torch Compile Stable Diffusion</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/torch_export_cudagraphs.html">Torch Export with Cudagraphs</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/converter_overloading.html">Overloading Torch-TensorRT Converters with Custom Converters</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/custom_kernel_plugins.html">Using Custom Kernels within TensorRT Engines with Torch-TensorRT</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/mutable_torchtrt_module_example.html">Mutable Torch TensorRT Module</a></li>
 </ul>
@@ -553,6 +554,13 @@
     <span class="p">)</span>
     <span class="k">assert</span> <span class="n">fake_mode</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
 
+    <span class="c1"># This map stores the names of outputs (old to new)</span>
+    <span class="c1"># This is necessary to track because the output names can be changed when</span>
+    <span class="c1"># we convert graph constants to placeholder inputs below.</span>
+    <span class="n">output_names</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">for</span> <span class="n">output_spec</span> <span class="ow">in</span> <span class="n">graph_signature</span><span class="o">.</span><span class="n">output_specs</span><span class="p">:</span>
+        <span class="n">output_names</span><span class="p">[</span><span class="n">output_spec</span><span class="o">.</span><span class="n">arg</span><span class="o">.</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">output_spec</span><span class="o">.</span><span class="n">arg</span><span class="o">.</span><span class="n">name</span>
+
     <span class="c1"># Locate the user input to insert new placeholders before them</span>
     <span class="n">first_user_input</span> <span class="o">=</span> <span class="kc">None</span>
     <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">nodes</span><span class="p">:</span>
@@ -594,9 +602,8 @@
             <span class="c1"># Replace get_attr nodes with placeholder nodes and copy metadata.</span>
             <span class="k">with</span> <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">inserting_before</span><span class="p">(</span><span class="n">first_user_input</span><span class="p">):</span>
                 <span class="c1"># Ensure name doesn&#39;t contain period as it is used for submodules</span>
-                <span class="n">const_placeholder_node</span> <span class="o">=</span> <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">placeholder</span><span class="p">(</span>
-                    <span class="n">node</span><span class="o">.</span><span class="n">target</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;.&quot;</span><span class="p">,</span> <span class="s2">&quot;_&quot;</span><span class="p">)</span>
-                <span class="p">)</span>
+                <span class="n">const_placeholder_name</span> <span class="o">=</span> <span class="n">node</span><span class="o">.</span><span class="n">target</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;.&quot;</span><span class="p">,</span> <span class="s2">&quot;_&quot;</span><span class="p">)</span>
+                <span class="n">const_placeholder_node</span> <span class="o">=</span> <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">placeholder</span><span class="p">(</span><span class="n">const_placeholder_name</span><span class="p">)</span>
                 <span class="c1"># Copy the node meta into this new placeholder node</span>
                 <span class="n">const_placeholder_node</span><span class="o">.</span><span class="n">meta</span> <span class="o">=</span> <span class="n">node</span><span class="o">.</span><span class="n">meta</span>
 
@@ -611,6 +618,12 @@
 
                 <span class="n">node</span><span class="o">.</span><span class="n">replace_all_uses_with</span><span class="p">(</span><span class="n">const_placeholder_node</span><span class="p">)</span>
                 <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">erase_node</span><span class="p">(</span><span class="n">node</span><span class="p">)</span>
+
+                <span class="c1"># Verify if the const_placeholder being added is one of the output nodes</span>
+                <span class="c1"># This happens if there is just a single static arange op in the graph</span>
+                <span class="c1"># https://github.com/pytorch/TensorRT/issues/3189</span>
+                <span class="k">if</span> <span class="n">const_placeholder_name</span> <span class="ow">in</span> <span class="n">output_names</span><span class="p">:</span>
+                    <span class="n">output_names</span><span class="p">[</span><span class="n">const_placeholder_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">const_placeholder_node</span><span class="o">.</span><span class="n">name</span>
 
                 <span class="c1"># Add these parameters/buffers/constants to the existing graph signature</span>
                 <span class="c1"># before user inputs. These specs are looked up in the state_dict during ExportedProgram creation.</span>
@@ -628,6 +641,11 @@
                     <span class="p">),</span>
                 <span class="p">)</span>
                 <span class="n">non_user_input_idx</span> <span class="o">+=</span> <span class="mi">1</span>
+
+    <span class="c1"># Update output_specs with modified names. This only gets updated if the graph getattr nodes (weights)</span>
+    <span class="c1"># are also the outputs of the graph</span>
+    <span class="k">for</span> <span class="n">output_spec</span> <span class="ow">in</span> <span class="n">graph_signature</span><span class="o">.</span><span class="n">output_specs</span><span class="p">:</span>
+        <span class="n">output_spec</span><span class="o">.</span><span class="n">arg</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="n">output_names</span><span class="p">[</span><span class="n">output_spec</span><span class="o">.</span><span class="n">arg</span><span class="o">.</span><span class="n">name</span><span class="p">]</span>
 
     <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">eliminate_dead_code</span><span class="p">()</span>
     <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">lint</span><span class="p">()</span>
