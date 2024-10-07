@@ -375,6 +375,7 @@ def compile_module(
                 verbose=settings.debug,
                 min_block_size=settings.min_block_size,
                 torch_executed_ops=settings.torch_executed_ops,
+                require_full_compilation=settings.require_full_compilation,
             )
         except torch.fx.passes.splitter_base.FxNetSplitterInternalError:
             logger.error(
@@ -393,6 +394,7 @@ def compile_module(
             verbose=settings.debug,
             min_block_size=settings.min_block_size,
             torch_executed_ops=settings.torch_executed_ops,
+            require_full_compilation=settings.require_full_compilation,
         )
 
     dryrun_tracker.unsupported_ops = supported_ops.unsupported_operators
