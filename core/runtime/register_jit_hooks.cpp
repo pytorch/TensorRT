@@ -23,49 +23,6 @@ std::string serialize_bindings(const std::vector<std::string>& bindings) {
   return serialized_binding_info;
 }
 
-static const std::string sym_table = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"; //=
-std::string base64_encode(const std::string& in) {
-  std::string out;
-  int64_t val = 0, valb = -6;
-  for (unsigned char c : in) {
-    val = (val << 8) + c;
-    valb += 8;
-    while (valb >= 0) {
-      out.push_back(sym_table[(val >> valb) & 0x3F]);
-      valb -= 6;
-    }
-  }
-  if (valb > -6) {
-    out.push_back(sym_table[((val << 8) >> (valb + 8)) & 0x3F]);
-  };
-  while (out.size() % 4) {
-    out.push_back('=');
-  }
-  return out;
-}
-
-std::string base64_decode(const std::string& in) {
-  std::string out;
-  std::vector<int> T(256, -1);
-  for (int i = 0; i < 64; i++) {
-    T[sym_table[i]] = i;
-  }
-
-  int64_t val = 0, valb = -8;
-  for (unsigned char c : in) {
-    if (T[c] == -1) {
-      break;
-    }
-    val = (val << 6) + T[c];
-    valb += 6;
-    if (valb >= 0) {
-      out.push_back(char((val >> valb) & 0xFF));
-      valb -= 8;
-    }
-  }
-  return out;
-}
-
 // TODO: Implement a call method
 // c10::List<at::Tensor> TRTEngine::Run(c10::List<at::Tensor> inputs) {
 //     auto input_vec = inputs.vec();
@@ -112,12 +69,19 @@ static auto TORCHTRT_UNUSED TRTEngineTSRegistrtion =
               return serialize_info;
             },
             [](std::vector<std::string> serialized_info) -> c10::intrusive_ptr<TRTEngine> {
+              LOG_DEBUG(
+                  "lan added pickle deserialize serialized_info to TRTEngine: serialized engine.size():"
+                  << serialized_info[ENGINE_IDX].size() << "; engine str: " << serialized_info[ENGINE_IDX]);
               serialized_info[ENGINE_IDX] = base64_decode(serialized_info[ENGINE_IDX]);
+              LOG_DEBUG(
+                  "lan added pickle deserialize serialized engine str base64_decoded size: "
+                  << serialized_info[ENGINE_IDX].size() << "; decoded engine str: " << serialized_info[ENGINE_IDX]);
               TRTEngine::verify_serialization_fmt(serialized_info);
               return c10::make_intrusive<TRTEngine>(serialized_info);
             });
 
 TORCH_LIBRARY(tensorrt, m) {
+  m.def("setup_engine", setup_engine);
   m.def("execute_engine", execute_engine);
   m.def("SERIALIZED_ENGINE_BINDING_DELIM", []() -> std::string { return std::string(1, TRTEngine::BINDING_DELIM); });
   m.def("SERIALIZED_RT_DEVICE_DELIM", []() -> std::string { return DEVICE_INFO_DELIM; });

@@ -304,6 +304,12 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         if tactic_sources is not None:
             builder_config.set_tactic_sources(tactic_sources=tactic_sources)
 
+        if self.compilation_settings.enable_cross_compile_for_windows:
+            builder_config.runtime_platform = trt.RuntimePlatform.WINDOWS_AMD64
+            _LOGGER.info(
+                "Setting runtime_platform as trt.RuntimePlatform.WINDOWS_AMD64"
+            )
+
         return builder_config
 
     def _create_timing_cache(

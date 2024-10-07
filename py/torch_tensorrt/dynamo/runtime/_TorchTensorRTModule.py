@@ -134,7 +134,11 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         self.serialized_engine = serialized_engine
         self.engine = None
 
-        if serialized_engine and not self.settings.lazy_engine_init:
+        if (
+            serialized_engine
+            and not self.settings.lazy_engine_init
+            and not self.settings.enable_cross_compile_for_windows
+        ):
             self.setup_engine()
 
     def _pack_engine_info(self) -> List[str | bytes]:

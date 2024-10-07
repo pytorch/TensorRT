@@ -1,3 +1,4 @@
+import base64
 import copy
 import operator
 from typing import Any, Dict, Optional, Sequence, Tuple, cast
@@ -16,6 +17,27 @@ from torch.export.exported_program import (
     OutputSpec,
     TensorArgument,
 )
+from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import ENGINE_IDX
+
+
+def cross_save_for_windows(
+    gm: torch.fx.GraphModule,
+    file_path: str,
+) -> None:
+    gm = copy.deepcopy(gm)
+    # Inline TensorRT submodules for windows
+    inline_trt_modules_for_windows(gm)
+
+    # Inline pytorch submodules
+    inline_torch_modules(gm)
+
+    # Clean the graph
+    gm.delete_all_unused_submodules()
+    gm.graph.eliminate_dead_code()
+    gm.graph.lint()
+
+    exp_program = create_trt_exp_program(gm)
+    torch.export.save(exp_program, file_path)
 
 
 def export(
@@ -404,6 +426,81 @@ def inline_trt_modules(gm: torch.fx.GraphModule) -> torch.fx.GraphModule:
             # for custom object nodes, it should be CustomObjArgument
             engine_node.meta["val"] = CustomObjArgument(
                 name=engine_node.name, class_fqn=""
+            )
+
+        if num_outputs == 1:
+            # Insert getitem nodes as outputs (for export serialization to work)
+            with gm.graph.inserting_after(trt_node):
+                getitem_output = gm.graph.call_function(operator.getitem, (trt_node, 0))
+                getitem_output.meta["val"] = trt_node.meta["val"]
+            trt_module_node.replace_all_uses_with(getitem_output)
+        else:
+            # Multiple outputs case:
+            # Replace uses of submodule with the trt_node.
+            # getitem nodes are already added inherently by the partitioner
+            trt_module_node.replace_all_uses_with(trt_node)
+            getitem_nodes = trt_node.users
+            for idx, getitem_node in enumerate(getitem_nodes):
+                getitem_node.meta["val"] = trt_node.meta["val"][idx]
+
+        # Erase the TRT submodule (call_module) node.
+        gm.graph.erase_node(trt_module_node)
+
+    return gm
+
+
+def inline_trt_modules_for_windows(gm: torch.fx.GraphModule) -> torch.fx.GraphModule:
+    """
+    Replace TRT submodules with trt engine nodes.
+    """
+    for name, _ in gm.named_children():
+        if "_run_on_acc" not in name:
+            continue
+        # Get the TRT submodule
+        trt_module = getattr(gm, name)
+
+        # Ensure the trt module node in the main graph (gm) has inputs
+        trt_module_node = [node for node in gm.graph.nodes if node.name == name]
+        assert trt_module_node
+        trt_module_node = trt_module_node[0]
+        assert trt_module_node.args
+
+        num_outputs = len(trt_module.output_shapes)
+        # Insert a call_function node to perform inference on TRT engine
+        with gm.graph.inserting_before(trt_module_node):
+            engine_info = trt_module._pack_engine_info()
+            engine_bytes = engine_info[ENGINE_IDX]
+            engine_info[ENGINE_IDX] = base64.b64encode(engine_bytes).decode("utf-8")
+            engine_node = (
+                gm.graph.call_function(
+                    torch.ops.tensorrt.setup_engine.default, **engine_info
+                ),
+            )
+
+            trt_node = gm.graph.call_function(
+                torch.ops.tensorrt.execute_engine.default,
+                (trt_module_node.args, engine_node),
+            )
+            trt_node.meta["val"] = []
+            assert num_outputs > 0
+            # Generate meta data for TRT node (a FakeTensor with corresponding output shape)
+            for idx in range(num_outputs):
+                trt_node.meta["val"].append(
+                    cast(
+                        FakeTensor,
+                        torch.empty_strided(
+                            tuple(trt_module.output_shapes[idx]),
+                            tuple([1] * len(trt_module.output_shapes[idx])),
+                        ),
+                    )
+                )
+            # Generate meta data for engine_node (a FakeTensor with corresponding output shape)
+            engine_node.meta["val"] = cast(
+                FakeTensor,
+                torch.empty_strided(
+                    tuple(trt_module.output_shapes[0]),
+                    tuple([1] * len(trt_module.output_shapes[0])),
+                ),
             )
 
         if num_outputs == 1:
