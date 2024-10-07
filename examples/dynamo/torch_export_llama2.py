@@ -24,9 +24,13 @@ DEVICE = torch.device("cuda:0")
 # CPU is used here so that GPU memory is reserved for TRT compilation.
 llama_path = "meta-llama/Llama-2-7b-chat-hf"
 with torch.no_grad():
-    model = AutoModelForCausalLM.from_pretrained(
-        llama_path, use_cache=False, attn_implementation="eager"
-    ).eval()
+    model = (
+        AutoModelForCausalLM.from_pretrained(
+            llama_path, use_cache=False, attn_implementation="eager"
+        )
+        .eval()
+        .half()
+    )
 
 tokenizer = AutoTokenizer.from_pretrained(llama_path)
 
