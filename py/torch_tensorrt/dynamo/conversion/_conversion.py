@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, List, Optional, Sequence
+from typing import Any, List, Optional, Sequence, Tuple
 
+import tensorrt as trt
 import torch
 from torch.fx.experimental.proxy_tensor import unset_fake_temporarily
 from torch_tensorrt._Device import Device
@@ -16,22 +17,24 @@ from torch_tensorrt.dynamo.conversion._TRTInterpreter import (
     TRTInterpreterResult,
 )
 from torch_tensorrt.dynamo.runtime import PythonTorchTensorRTModule, TorchTensorRTModule
-from torch_tensorrt.dynamo.utils import get_model_device, get_torch_inputs
-
-import tensorrt as trt
+from torch_tensorrt.dynamo.utils import (
+    get_model_device,
+    get_torch_inputs,
+    unwrap_tensor_shape,
+)
 
 logger = logging.getLogger(__name__)
 
 
-def infer_module_output_dtypes(
+def infer_module_output_shapes_dtypes(
     module: torch.fx.GraphModule,
     inputs: Sequence[Input],
     device: Device,
     kwarg_inputs: Optional[dict[str, Any]] = None,
     truncate_double: bool = False,
-) -> List[dtype]:
+) -> Tuple[List[Tuple[int]], List[dtype]]:
     """
-    This function performs model inference to determine the output dtypes
+    This function performs model inference to determine the output shapes and output dtypes
     and truncates them accordingly. inputs can be either arg_inputs or flattened input list.
     If it is flattened list, kwarg_inputs should be None, as it is already included in the flattened input.
     """
@@ -53,6 +56,7 @@ def infer_module_output_dtypes(
     # Int64 outputs can sometimes be generated from within other operators
     # such as aten.sum - such outputs can be truncated
     output_dtypes = []
+    output_shapes = []
     for output in module_outputs:
         output_ = output
         # We don't need to check if output is nested here because the input module will be flattened
@@ -64,12 +68,13 @@ def infer_module_output_dtypes(
             else:
                 output_ = torch.tensor(output)
 
+        output_shapes.append(unwrap_tensor_shape(output_))
         if truncate_double and output_.dtype == dtype.float64:
             output_dtypes.append(dtype.float32)
         else:
             output_dtypes.append(dtype._from(output_.dtype))
 
-    return output_dtypes
+    return output_shapes, output_dtypes
 
 
 def interpret_module_to_result(
@@ -79,8 +84,8 @@ def interpret_module_to_result(
     arg_inputs: Optional[Sequence[Input]] = None,
     kwarg_inputs: Optional[dict[str, Any]] = None,
     engine_cache: Optional[BaseEngineCache] = None,
-) -> TRTInterpreterResult:
-    """Interpret an FX module to a TRTInterpreterResult
+) -> Tuple[List[Tuple[int]], TRTInterpreterResult]:
+    """Interpret an FX module to the output shapes and a TRTInterpreterResult
     Args:
         module: FX GraphModule to interpret
         inputs: Sequence of FLATTENED Tensors representing inputs to the module. It should include both
@@ -90,10 +95,10 @@ def interpret_module_to_result(
         settings: Compilation settings
         engine_cache: Engine cache instance
     Returns:
-        TRTInterpreterResult
+        (List[Tuple[int]], TRTInterpreterResult)
     """
     if arg_inputs is not None:
-        output_dtypes = infer_module_output_dtypes(
+        output_shapes, output_dtypes = infer_module_output_shapes_dtypes(
             module,
             arg_inputs,
             settings.device,
@@ -102,7 +107,7 @@ def interpret_module_to_result(
         )
     else:
         # args and kwargs are combined and flattened to one list
-        output_dtypes = infer_module_output_dtypes(
+        output_shapes, output_dtypes = infer_module_output_shapes_dtypes(
             module,
             inputs,
             settings.device,
@@ -119,7 +124,7 @@ def interpret_module_to_result(
     )
 
     interpreter_result = interpreter.run()
-    return interpreter_result
+    return output_shapes, interpreter_result
 
 
 def convert_module(
@@ -139,7 +144,8 @@ def convert_module(
     Returns:
         PythonTorchTensorRTModule or TorchTensorRTModule
     """
-    interpreter_result = interpret_module_to_result(
+
+    output_shapes, interpreter_result = interpret_module_to_result(
         module, inputs, settings, engine_cache=engine_cache
     )
 
@@ -163,6 +169,7 @@ def convert_module(
         serialized_engine=interpreter_result.serialized_engine,
         input_binding_names=list(interpreter_result.input_names),
         output_binding_names=list(interpreter_result.output_names),
+        output_shapes=output_shapes,
         name=name,
         settings=settings,
         weight_name_map=interpreter_result.weight_name_map,
