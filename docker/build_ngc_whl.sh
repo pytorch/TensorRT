@@ -2,6 +2,7 @@
 build_wheel() {
     cd /opt/pytorch/torch_tensorrt && \
     cp ./docker/MODULE.bazel.ngc  MODULE.bazel && \
+    cp ./docker/pyproject.toml.ngc  pyproject.toml && \
     MAX_JOBS=1 LANG=en_US.UTF-8 LANGUAGE=en_US:en LC_ALL=en_US.UTF-8 && \
     BUILD_VERSION=$(cat version.txt) python setup.py bdist_wheel --use-cxx11-abi --release && \
     pip install --no-cache-dir dist/*.whl
