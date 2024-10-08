@@ -57,7 +57,7 @@ trt_model = torch_tensorrt.dynamo.compile(
     truncate_double=True,
     device=DEVICE,
     disable_tf32=True,
-    use_strong_types=True,
+    use_strong_typing=True,
     use_fp32_acc=True,
 )
 

@@ -66,13 +66,6 @@ def trunc_div(
         prod_output,
     )
 
-    # TODO: This casting causes output divergence for llama2 in FP16.
-    # @apbose to investigate why this is needed and suggest alternatives.
-    # cast the sign_output back to int32 for trunc div
-    # This is required for scatter_reduce_.two(reduce='mean' where trunc_div casts it to float32 and TRTInterpreter expects int32)
-    # if (isinstance(sign_output, TRTTensor)) and (sign_output.dtype == trt.float32):
-    #     sign_output = cast_trt_tensor(ctx, sign_output, trt.int32, name)
-
     # Convert constant input into ITensor for UnaryOperation
     if not isinstance(input, trt.tensorrt.ITensor):
         input = get_trt_tensor(ctx, input, f"{name}_input")

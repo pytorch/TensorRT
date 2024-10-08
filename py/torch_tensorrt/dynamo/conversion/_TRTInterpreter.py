@@ -80,7 +80,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         self.builder = trt.Builder(self.logger)
 
         flag = 0
-        if compilation_settings.use_strong_types:
+        if compilation_settings.use_strong_typing:
             STRONGLY_TYPED = 1 << (int)(
                 trt.NetworkDefinitionCreationFlag.STRONGLY_TYPED
             )

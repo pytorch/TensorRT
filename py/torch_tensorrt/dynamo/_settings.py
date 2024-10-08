@@ -32,7 +32,7 @@ from torch_tensorrt.dynamo._defaults import (
     USE_FAST_PARTITIONER,
     USE_FP32_ACC,
     USE_PYTHON_RUNTIME,
-    USE_STRONG_TYPES,
+    USE_STRONG_TYPING,
     VERSION_COMPATIBLE,
     WORKSPACE_SIZE,
     default_device,
@@ -80,7 +80,7 @@ class CompilationSettings:
         timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation
         cache_built_engines (bool): Whether to save the compiled TRT engines to storage
         reuse_cached_engines (bool): Whether to load the compiled TRT engines from storage
-        use_strong_types (bool): Enable strong typing in TensorRT compilation
+        use_strong_typing (bool): Enable strong typing in TensorRT compilation
         use_fp32_acc (bool): This option inserts cast to FP32 nodes around matmul layers and TensorRT ensures the accumulation of matmul happens in FP32. Use this only when FP16 precision is configured in enabled_precisions.
     """
 
@@ -116,7 +116,7 @@ class CompilationSettings:
     lazy_engine_init: bool = LAZY_ENGINE_INIT
     cache_built_engines: bool = CACHE_BUILT_ENGINES
     reuse_cached_engines: bool = REUSE_CACHED_ENGINES
-    use_strong_types: bool = USE_STRONG_TYPES
+    use_strong_typing: bool = USE_STRONG_TYPING
     use_fp32_acc: bool = USE_FP32_ACC
 
 
