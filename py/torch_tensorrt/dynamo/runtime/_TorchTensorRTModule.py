@@ -134,7 +134,11 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         self.serialized_engine = serialized_engine
         self.engine = None
 
-        if serialized_engine and not self.settings.lazy_engine_init:
+        if (
+            serialized_engine
+            and not self.settings.lazy_engine_init
+            and not self.settings.enable_cross_compile_for_windows
+        ):
             self.setup_engine()
 
     def _pack_engine_info(self) -> List[str | bytes]:
@@ -146,6 +150,8 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         metadata = {"settings": self.settings, "weight_name_map": self.weight_name_map}
         target_platform = (
             Platform.current_platform()
+            if self.settings.enable_cross_compile_for_windows
+            else Platform.WIN_X86_64
         )  # Change to match target for engine
 
         engine_info: List[str | bytes] = [""] * SERIALIZATION_LEN
@@ -155,7 +161,6 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
             self.name + "_engine" if self.name != "" else "tensorrt_engine"
         )
         engine_info[DEVICE_IDX] = target_device._to_serialized_rt_device()
-
         assert self.serialized_engine
         engine_info[ENGINE_IDX] = self.serialized_engine
 

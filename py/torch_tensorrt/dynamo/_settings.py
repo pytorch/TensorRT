@@ -13,6 +13,7 @@ from torch_tensorrt.dynamo._defaults import (
     DLA_LOCAL_DRAM_SIZE,
     DLA_SRAM_SIZE,
     DRYRUN,
+    ENABLE_CROSS_COMPILE_FOR_WINDOWS,
     ENABLE_EXPERIMENTAL_DECOMPOSITIONS,
     ENABLED_PRECISIONS,
     ENGINE_CAPABILITY,
@@ -78,6 +79,8 @@ class CompilationSettings:
         timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation
         cache_built_engines (bool): Whether to save the compiled TRT engines to storage
         reuse_cached_engines (bool): Whether to load the compiled TRT engines from storage
+        enable_cross_compile_for_windows (bool): By default this is False means TensorRT engines can only be executed on the same platform where they were built.
+            True will enable cross-platform compatibility which allows the engine to be built on Linux and run on Windows
     """
 
     enabled_precisions: Set[dtype] = field(default_factory=lambda: ENABLED_PRECISIONS)
@@ -112,6 +115,7 @@ class CompilationSettings:
     lazy_engine_init: bool = LAZY_ENGINE_INIT
     cache_built_engines: bool = CACHE_BUILT_ENGINES
     reuse_cached_engines: bool = REUSE_CACHED_ENGINES
+    enable_cross_compile_for_windows: bool = ENABLE_CROSS_COMPILE_FOR_WINDOWS
 
 
 _SETTINGS_TO_BE_ENGINE_INVARIANT = (

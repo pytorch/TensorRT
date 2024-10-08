@@ -33,6 +33,9 @@ typedef enum {
   SERIALIZATION_LEN, // NEVER USED FOR DATA, USED TO DETERMINE LENGTH OF SERIALIZED INFO
 } SerializedInfoIndex;
 
+std::string base64_encode(const std::string& in);
+std::string base64_decode(const std::string& in);
+
 c10::optional<RTDevice> get_most_compatible_device(
     const RTDevice& target_device,
     const RTDevice& curr_device = RTDevice(),
@@ -40,6 +43,17 @@ c10::optional<RTDevice> get_most_compatible_device(
 std::vector<RTDevice> find_compatible_devices(const RTDevice& target_device, bool hardware_compatible);
 
 std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intrusive_ptr<TRTEngine> compiled_engine);
+
+c10::intrusive_ptr<TRTEngine> setup_engine(
+    const std::string& abi_version,
+    const std::string& name,
+    const std::string& serialized_device_info,
+    const std::string& serialized_engine,
+    const std::string& serialized_in_binding_names,
+    const std::string& serialized_out_binding_names,
+    const std::string& serialized_hardware_compatible,
+    const std::string& serialized_metadata,
+    const std::string& serialized_target_platform);
 
 void multi_gpu_device_check();
 

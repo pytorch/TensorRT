@@ -10,11 +10,56 @@ namespace runtime {
 bool MULTI_DEVICE_SAFE_MODE = false;
 bool CUDAGRAPHS_MODE = false;
 
+static const std::string sym_table = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+std::string base64_encode(const std::string& in) {
+  std::string out;
+  int64_t val = 0, valb = -6;
+  for (unsigned char c : in) {
+    val = (val << 8) + c;
+    valb += 8;
+    while (valb >= 0) {
+      out.push_back(sym_table[(val >> valb) & 0x3F]);
+      valb -= 6;
+    }
+  }
+  if (valb > -6) {
+    out.push_back(sym_table[((val << 8) >> (valb + 8)) & 0x3F]);
+  };
+  while (out.size() % 4) {
+    out.push_back('=');
+  }
+  return out;
+}
+
+std::string base64_decode(const std::string& in) {
+  std::string out;
+  std::vector<int> T(256, -1);
+  for (int i = 0; i < 64; i++) {
+    T[sym_table[i]] = i;
+  }
+
+  int64_t val = 0, valb = -8;
+  for (unsigned char c : in) {
+    if (T[c] == -1) {
+      break;
+    }
+    val = (val << 6) + T[c];
+    valb += 6;
+    if (valb >= 0) {
+      out.push_back(char((val >> valb) & 0xFF));
+      valb -= 8;
+    }
+  }
+  return out;
+}
+
 c10::optional<RTDevice> get_most_compatible_device(
     const RTDevice& target_device,
     const RTDevice& curr_device,
     bool hardware_compatible) {
   LOG_DEBUG("Target Device: " << target_device);
+  LOG_DEBUG("lan added curr_device: " << curr_device << "; hardware_compatible:" << hardware_compatible);
   auto device_options = find_compatible_devices(target_device, hardware_compatible);
   RTDevice current_device;
   if (current_device.id == -1) {
@@ -72,6 +117,7 @@ std::vector<RTDevice> find_compatible_devices(const RTDevice& target_device, boo
   std::vector<RTDevice> compatible_devices;
 
   for (auto device : device_list) {
+    LOG_DEBUG("lan added find_compatible_devices got device: " << device.first << ", " << device.second);
     auto poss_dev_cc = device.second.getSMCapability();
     if (target_device.device_type == nvinfer1::DeviceType::kDLA) {
       if (dla_supported.find(poss_dev_cc) != dla_supported.end() &&
@@ -83,6 +129,7 @@ std::vector<RTDevice> find_compatible_devices(const RTDevice& target_device, boo
       // If the SM Capabilities match, should be good enough to run
       // If hardware compatibility mode is enabled and the SM is at least 80, device is valid
       if ((poss_dev_cc == target_dev_cc) || (hardware_compatible && std::stoi(poss_dev_cc) >= 8)) {
+        LOG_DEBUG("lan added find_compatible_devices put device: " << device.second << " into comptaible devices");
         compatible_devices.push_back(device.second);
       }
     } else {
