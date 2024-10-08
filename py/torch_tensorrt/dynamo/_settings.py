@@ -14,6 +14,7 @@ from torch_tensorrt.dynamo._defaults import (
     DLA_SRAM_SIZE,
     DRYRUN,
     ENABLE_EXPERIMENTAL_DECOMPOSITIONS,
+    ENABLE_WEIGHT_STREAMING,
     ENABLED_PRECISIONS,
     ENGINE_CAPABILITY,
     HARDWARE_COMPATIBLE,
@@ -78,6 +79,7 @@ class CompilationSettings:
         timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation
         cache_built_engines (bool): Whether to save the compiled TRT engines to storage
         reuse_cached_engines (bool): Whether to load the compiled TRT engines from storage
+        enable_weight_streaming (bool): Enable weight streaming.
     """
 
     enabled_precisions: Set[dtype] = field(default_factory=lambda: ENABLED_PRECISIONS)
@@ -112,6 +114,7 @@ class CompilationSettings:
     lazy_engine_init: bool = LAZY_ENGINE_INIT
     cache_built_engines: bool = CACHE_BUILT_ENGINES
     reuse_cached_engines: bool = REUSE_CACHED_ENGINES
+    enable_weight_streaming: bool = ENABLE_WEIGHT_STREAMING
 
 
 _SETTINGS_TO_BE_ENGINE_INVARIANT = (
@@ -124,6 +127,7 @@ _SETTINGS_TO_BE_ENGINE_INVARIANT = (
     "make_refittable",
     "engine_capability",
     "hardware_compatible",
+    "enable_weight_streaming",
 )
 
 

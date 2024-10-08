@@ -85,6 +85,12 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         EXPLICIT_BATCH = 1 << (int)(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH)
         flag |= EXPLICIT_BATCH
 
+        if compilation_settings.enable_weight_streaming:
+            STRONGLY_TYPED = 1 << (int)(
+                trt.NetworkDefinitionCreationFlag.STRONGLY_TYPED
+            )
+            flag |= STRONGLY_TYPED
+
         self.ctx = ConversionContext(
             self.builder.create_network(flag), compilation_settings
         )
@@ -303,6 +309,9 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
 
         if tactic_sources is not None:
             builder_config.set_tactic_sources(tactic_sources=tactic_sources)
+
+        if self.compilation_settings.enable_weight_streaming:
+            builder_config.set_flag(trt.BuilderFlag.WEIGHT_STREAMING)
 
         return builder_config
 
