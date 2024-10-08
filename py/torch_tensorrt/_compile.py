@@ -31,10 +31,7 @@ if ENABLED_FEATURES.dynamo_frontend:
         convert_exported_program_to_serialized_trt_engine as dynamo_convert_exported_program_to_serialized_trt_engine,
     )
     from torch_tensorrt.dynamo._compiler import (
-        cross_compile_for_windows as dynamo_cross_compile_for_windows,
-    )
-    from torch_tensorrt.dynamo._exporter import (
-        cross_save_for_windows as dynamo_cross_save_for_windows,
+        cross_compile_save_for_windows as dynamo_cross_compile_save_for_windows,
     )
     from torch_tensorrt.dynamo._tracer import trace as dynamo_trace
 
@@ -42,7 +39,7 @@ logger = logging.getLogger(__name__)
 
 __all__ = [
     "compile",
-    "cross_compile_for_windows",
+    "cross_compile_save_for_windows",
     "convert_method_to_trt_engine",
     "save",
     "load",
@@ -294,7 +291,7 @@ def compile(
         raise RuntimeError("Module is an unknown format or the ir requested is unknown")
 
 
-def cross_compile_for_windows(
+def cross_compile_save_for_windows(
     module: Any,
     file_path: str,
     inputs: Optional[Sequence[Input | torch.Tensor | InputTensorSpec]] = None,
@@ -347,13 +344,6 @@ def cross_compile_for_windows(
     if not file_path:
         raise ValueError("File path cannot be empty. Please provide a valid file path")
 
-    kwargs["enable_cross_compile_for_windows"] = True
-
-    if "use_python_runtime" in kwargs.keys() and kwargs.get("use_python_runtime"):
-        raise RuntimeError(
-            "Cross compile for windows requires use_python_runtime to be set to False"
-        )
-
     enabled_precisions_set: Set[dtype | torch.dtype] = (
         enabled_precisions
         if enabled_precisions is not None
@@ -388,21 +378,16 @@ def cross_compile_for_windows(
     )
     logger.info("successfully exported the module")
 
-    # Compile the module
-    trt_graph_module = dynamo_cross_compile_for_windows(
+    # Compile and save the module
+    dynamo_cross_compile_save_for_windows(
         exp_program,
+        file_path,
         arg_inputs=torchtrt_arg_inputs,
         enabled_precisions=enabled_precisions_set,
+        enable_cross_compile_for_windows=True,
         **kwargs,
     )
-    logger.info("successfully compiled the module for windows")
-
-    # Save the module
-    dynamo_cross_save_for_windows(
-        trt_graph_module,
-        file_path,
-    )
-    logger.info(f"successfully saved the module for windows at {file_path}")
+    logger.info("successfully compiled and saved the module for windows")
 
 
 def torch_compile(module: torch.nn.Module, **kwargs: Any) -> Any:

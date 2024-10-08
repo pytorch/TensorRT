@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import collections.abc
 import logging
+import platform
 import warnings
 from typing import Any, Collection, List, Optional, Sequence, Set, Tuple, Union
 
@@ -43,152 +44,66 @@ from torch_tensorrt.dynamo.utils import (
     to_torch_tensorrt_device,
 )
 
+# from torch_tensorrt.dynamo._exporter import cross_save_for_windows
+
 logger = logging.getLogger(__name__)
 
 
-def cross_compile_for_windows(
+def cross_compile_save_for_windows(
     exported_program: ExportedProgram,
+    file_path: str,
     inputs: Optional[Sequence[Sequence[Any]]] = None,
     *,
     arg_inputs: Optional[Sequence[Sequence[Any]]] = None,
     kwarg_inputs: Optional[dict[Any, Any]] = None,
-    device: Optional[Union[Device, torch.device, str]] = _defaults.DEVICE,
-    disable_tf32: bool = _defaults.DISABLE_TF32,
-    assume_dynamic_shape_support: bool = _defaults.ASSUME_DYNAMIC_SHAPE_SUPPORT,
-    sparse_weights: bool = _defaults.SPARSE_WEIGHTS,
     enabled_precisions: Union[
         Set[Union[torch.dtype, dtype]], Tuple[Union[torch.dtype, dtype]]
     ] = _defaults.ENABLED_PRECISIONS,
-    engine_capability: EngineCapability = _defaults.ENGINE_CAPABILITY,
-    make_refittable: bool = _defaults.MAKE_REFITTABLE,
-    debug: bool = _defaults.DEBUG,
-    num_avg_timing_iters: int = _defaults.NUM_AVG_TIMING_ITERS,
-    workspace_size: int = _defaults.WORKSPACE_SIZE,
-    dla_sram_size: int = _defaults.DLA_SRAM_SIZE,
-    dla_local_dram_size: int = _defaults.DLA_LOCAL_DRAM_SIZE,
-    dla_global_dram_size: int = _defaults.DLA_GLOBAL_DRAM_SIZE,
-    truncate_double: bool = _defaults.TRUNCATE_DOUBLE,
-    require_full_compilation: bool = _defaults.REQUIRE_FULL_COMPILATION,
-    min_block_size: int = _defaults.MIN_BLOCK_SIZE,
-    torch_executed_ops: Optional[Collection[Target]] = None,
-    # torch_executed_modules: Optional[List[str]] = None,
-    pass_through_build_failures: bool = _defaults.PASS_THROUGH_BUILD_FAILURES,
-    max_aux_streams: Optional[int] = _defaults.MAX_AUX_STREAMS,
-    version_compatible: bool = _defaults.VERSION_COMPATIBLE,
-    optimization_level: Optional[int] = _defaults.OPTIMIZATION_LEVEL,
-    # use_python_runtime: bool = _defaults.USE_PYTHON_RUNTIME,
-    use_fast_partitioner: bool = _defaults.USE_FAST_PARTITIONER,
-    enable_experimental_decompositions: bool = _defaults.ENABLE_EXPERIMENTAL_DECOMPOSITIONS,
-    dryrun: bool = _defaults.DRYRUN,
-    hardware_compatible: bool = _defaults.HARDWARE_COMPATIBLE,
-    timing_cache_path: str = _defaults.TIMING_CACHE_PATH,
-    # lazy_engine_init: bool = _defaults.LAZY_ENGINE_INIT,
-    # cache_built_engines: bool = _defaults.CACHE_BUILT_ENGINES,
-    # reuse_cached_engines: bool = _defaults.REUSE_CACHED_ENGINES,
-    # engine_cache_dir: str = _defaults.ENGINE_CACHE_DIR,
-    # engine_cache_size: int = _defaults.ENGINE_CACHE_SIZE,
-    # custom_engine_cache: Optional[BaseEngineCache] = _defaults.CUSTOM_ENGINE_CACHE,
     **kwargs: Any,
-) -> torch.fx.GraphModule:
+) -> None:
 
-    if debug:
-        set_log_level(logger.parent, logging.DEBUG)
-    if "truncate_long_and_double" in kwargs.keys():
-        if truncate_double is not _defaults.TRUNCATE_DOUBLE:
-            raise ValueError(
-                'Provided configuration for "truncate_double" and deprecated API "truncate_long_and_double", please only use "truncate_double"'
-            )
-        else:
-            truncate_double = kwargs["truncate_long_and_double"]
-            warnings.warn(
-                'Compiler option "truncate_long_and_double" is deprecated in favor of "truncate_double" as int64 is now natively supported, this option will be removed in the next version',
-                DeprecationWarning,
-                stacklevel=2,
-            )
-    # Aliasing inputs to arg_inputs for better understanding
-    if not arg_inputs and not inputs:
-        raise AssertionError("'arg_inputs' and 'inputs' should not both be None.")
-
-    elif arg_inputs and inputs:
-        raise AssertionError(
-            "'arg_inputs' and 'inputs' should not be used at the same time."
+    if platform.system() != "Linux" or platform.architecture()[0] != "64bit":
+        raise RuntimeError(
+            f"Cross compile for windows is only supported on AMD 64bit Linux architecture, current platform: {platform.system()=}, {platform.architecture()[0]=}"
         )
 
-    arg_inputs = inputs or arg_inputs
+    if not file_path:
+        raise ValueError("File path cannot be empty. Please provide a valid file path")
 
-    if kwarg_inputs is None:
-        kwarg_inputs = {}
+    # enable cross compile for windows
+    kwargs["enable_cross_compile_for_windows"] = True
 
-    if not isinstance(arg_inputs, collections.abc.Sequence):
-        arg_inputs = [arg_inputs]  # type: ignore
-
-    # Prepare torch_trt inputs
-    trt_arg_inputs: Sequence[Input] = prepare_inputs(arg_inputs)
-    trt_kwarg_inputs: Optional[dict[Any, Any]] = prepare_inputs(kwarg_inputs)
-    device = to_torch_tensorrt_device(device)
-    enabled_precisions = {dtype._from(p) for p in enabled_precisions}
-
-    if not isinstance(exported_program, ExportedProgram):
-        raise AssertionError(
-            f"Input graph should be an ExportedProgram but got type {type(exported_program)}"
-        )
-    exported_program = pre_export_lowering(exported_program)
-    exported_program = exported_program.run_decompositions(
-        get_decompositions(enable_experimental_decompositions)
+    # TODO: confirm with Naren whether to raise the error or just warning and ignore what user's settings for the following flags
+    # disable the following settings which should not be enabled for cross compile for windows
+    keys = (
+        "use_python_runtime",
+        "make_refittable",
+        "lazy_engine_init",
+        "cache_built_engines",
+        "reuse_cached_engines",
+        "custom_engine_cache",
     )
-    gm = exported_program.module()
-    logger.debug("Input graph: " + str(gm.graph))
+    # disable these settings
+    for key in keys:
+        if key in kwargs.keys() and kwargs.get(key):
+            logger.warning(
+                f"arg: {key} should not be enabled for cross compile for windows feature, it is ignored."
+            )
+            kwargs[key] = False
 
-    # Apply lowering on the graph module
-    gm = post_lowering(gm)
-    logger.debug("Lowered Input graph: " + str(gm.graph))
-
-    compilation_options = {
-        "enabled_precisions": (
-            enabled_precisions if enabled_precisions else _defaults.ENABLED_PRECISIONS
-        ),
-        "debug": debug,
-        "device": device,
-        "assume_dynamic_shape_support": assume_dynamic_shape_support,
-        "workspace_size": workspace_size,
-        "min_block_size": min_block_size,
-        "torch_executed_ops": (
-            torch_executed_ops if torch_executed_ops is not None else set()
-        ),
-        "pass_through_build_failures": pass_through_build_failures,
-        "max_aux_streams": max_aux_streams,
-        "version_compatible": version_compatible,
-        "optimization_level": optimization_level,
-        "truncate_double": truncate_double,
-        "use_fast_partitioner": use_fast_partitioner,
-        "num_avg_timing_iters": num_avg_timing_iters,
-        "enable_experimental_decompositions": enable_experimental_decompositions,
-        "require_full_compilation": require_full_compilation,
-        "disable_tf32": disable_tf32,
-        "sparse_weights": sparse_weights,
-        # "make_refittable": make_refittable,
-        "engine_capability": engine_capability,
-        "dla_sram_size": dla_sram_size,
-        "dla_local_dram_size": dla_local_dram_size,
-        "dla_global_dram_size": dla_global_dram_size,
-        "dryrun": dryrun,
-        "hardware_compatible": hardware_compatible,
-        "timing_cache_path": timing_cache_path,
-        "enable_cross_compile_for_windows": True,
-        # "lazy_engine_init": lazy_engine_init,
-        # "cache_built_engines": cache_built_engines,
-        # "reuse_cached_engines": reuse_cached_engines,
-    }
-
-    settings = CompilationSettings(**compilation_options)
-    logger.info("Compilation Settings: %s\n", settings)
-    trt_gm = compile_module(
-        gm,
-        trt_arg_inputs,
-        trt_kwarg_inputs,
-        settings,
+    trt_gm = compile(
+        exported_program,
+        inputs=inputs,
+        arg_inputs=arg_inputs,
+        kwarg_inputs=kwarg_inputs,
+        enabled_precisions=enabled_precisions,
+        **kwargs,
     )
-    return trt_gm
+
+    from torch_tensorrt.dynamo._exporter import cross_save_for_windows
+
+    cross_save_for_windows(trt_gm, file_path)
+    logger.info(f"successfully saved the module for windows at {file_path}")
 
 
 def compile(
@@ -233,6 +148,7 @@ def compile(
     engine_cache_dir: str = _defaults.ENGINE_CACHE_DIR,
     engine_cache_size: int = _defaults.ENGINE_CACHE_SIZE,
     custom_engine_cache: Optional[BaseEngineCache] = _defaults.CUSTOM_ENGINE_CACHE,
+    enable_cross_compile_for_windows: bool = _defaults.ENABLE_CROSS_COMPILE_FOR_WINDOWS,
     **kwargs: Any,
 ) -> torch.fx.GraphModule:
     """Compile an ExportedProgram module for NVIDIA GPUs using TensorRT
@@ -426,6 +342,7 @@ def compile(
         "lazy_engine_init": lazy_engine_init,
         "cache_built_engines": cache_built_engines,
         "reuse_cached_engines": reuse_cached_engines,
+        "enable_cross_compile_for_windows": enable_cross_compile_for_windows,
     }
 
     settings = CompilationSettings(**compilation_options)
@@ -611,6 +528,7 @@ def compile_module(
             )
 
             trt_modules[name] = trt_module
+            print(f"lan added {name=}, {trt_module.output_shapes=}")
 
     # Parse the graph I/O and store it in dryrun tracker
     parse_graph_io(gm, dryrun_tracker)

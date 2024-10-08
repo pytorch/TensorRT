@@ -71,11 +71,11 @@ static auto TORCHTRT_UNUSED TRTEngineTSRegistrtion =
             [](std::vector<std::string> serialized_info) -> c10::intrusive_ptr<TRTEngine> {
               LOG_DEBUG(
                   "lan added pickle deserialize serialized_info to TRTEngine: serialized engine.size():"
-                  << serialized_info[ENGINE_IDX].size() << "; engine str: " << serialized_info[ENGINE_IDX]);
+                  << serialized_info[ENGINE_IDX].size());
               serialized_info[ENGINE_IDX] = base64_decode(serialized_info[ENGINE_IDX]);
               LOG_DEBUG(
                   "lan added pickle deserialize serialized engine str base64_decoded size: "
-                  << serialized_info[ENGINE_IDX].size() << "; decoded engine str: " << serialized_info[ENGINE_IDX]);
+                  << serialized_info[ENGINE_IDX].size());
               TRTEngine::verify_serialization_fmt(serialized_info);
               return c10::make_intrusive<TRTEngine>(serialized_info);
             });

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import platform
 from dataclasses import fields, replace
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
@@ -661,3 +662,32 @@ def get_flat_args_with_check(
     flat_args_with_path, received_spec = pytree.tree_flatten_with_path((args, kwargs))
     flat_args = tuple(x[1] for x in flat_args_with_path)
     return flat_args, received_spec
+
+
+def validate_cross_compile_for_windows_settings(file_path: str, **kwargs: Any) -> Any:
+    if platform.system() != "Linux" or platform.architecture()[0] != "64bit":
+        raise RuntimeError(
+            f"Cross compile for windows is only supported on AMD 64bit Linux architecture, current platform: {platform.system()=}, {platform.architecture()[0]=}"
+        )
+
+    if not file_path:
+        raise ValueError("File path cannot be empty. Please provide a valid file path")
+
+    # TODO: confirm with Naren whether to raise the error or just warning and ignore what user's settings for the following flags
+    keys = (
+        "use_python_runtime",
+        "make_refittable",
+        "lazy_engine_init",
+        "cache_built_engines",
+        "reuse_cached_engines",
+        "custom_engine_cache",
+    )
+    # if "use_python_runtime" in kwargs.keys() and kwargs.get("use_python_runtime"):
+    #     raise RuntimeError(
+    #         "cross_compile_save_for_windows() requires use_python_runtime arg to be set as False"
+    #     )
+    # disable these settings
+    for key in keys:
+        if key in kwargs.keys():
+            kwargs[key] = False
+    return kwargs

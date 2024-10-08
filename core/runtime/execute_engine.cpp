@@ -107,9 +107,7 @@ c10::intrusive_ptr<TRTEngine> setup_engine(
   LOG_DEBUG(
       "lan added Attempting to setup_engine, abi_version: " << abi_version << "; name: " << name
                                                             << "; serialized_device_info: " << serialized_device_info);
-  LOG_DEBUG(
-      "lan added serialized_engine.size(): " << serialized_engine.size()
-                                             << "; serialized_engine: " << serialized_engine);
+  LOG_DEBUG("lan added serialized_engine.size(): " << serialized_engine.size());
   LOG_DEBUG("lan added serialized_in_binding_names: " << serialized_in_binding_names);
   LOG_DEBUG("lan added serialized_out_binding_names: " << serialized_out_binding_names);
   LOG_DEBUG("lan added serialized_target_platform: " << serialized_target_platform);
