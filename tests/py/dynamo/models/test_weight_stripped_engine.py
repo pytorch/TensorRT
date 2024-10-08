@@ -450,16 +450,16 @@ class TestWeightStrippedEngine(TestCase):
 
     def test_constant_mul_in_refitting(self):
         class MyModel(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.weight = torch.tensor(0.5, requires_grad=False)
+
             def forward(self, x):
-                out = x * 0.5
+                out = x * self.weight
                 return out
 
-        # TODO: investigate why this doesn't work
         pyt_model = MyModel().eval().cuda()
         inputs = [torch.randn((1, 3, 4, 4)).to("cuda")]
-        # TODO: investigate why this works
-        # pyt_model = models.resnet18(pretrained=True).eval().to("cuda")
-        # inputs = [torch.rand((2, 3, 224, 224)).to("cuda")]
 
         exp_program = torch.export.export(pyt_model, args=tuple(inputs))
 
