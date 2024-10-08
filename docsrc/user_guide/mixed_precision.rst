@@ -30,7 +30,7 @@ Consider the following Pytorch model which explicitly casts intermediate layer t
 
 
 If we compile the above model using Torch-TensorRT, layer profiling logs indicate that all the layers are 
-run in FP32 which is not the desired outcome.  
+run in FP32. This is because TensorRT picks the kernels for layers which result in the best performance. 
 
 .. code-block:: python
 
