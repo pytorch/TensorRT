@@ -410,6 +410,10 @@ def refit_module_weights(
                 "The type of graph module is not supported for refitting or two compiled modules do not match."
             )
 
+        assert (
+            engine.refittable
+        ), "The engine is not refittable. The reason may be that the engine was built with an older version of Torch-TensorRT, or you are refitting a refitted weight-stripped engine. Note that weight-stripped engine can be refitted only once."
+
         # Get the submodule inputs for min, opt, max shapes of the graph inputs
         submodule_inputs = partitioning.construct_submodule_inputs(new_submodule)
         logger.debug(
@@ -447,17 +451,24 @@ def refit_module_weights(
                     weight_name_map=None,
                 )
 
+        # clear EXCLUDE_WEIGHTS flag
+        serialization_config = engine.create_serialization_config()
+        serialization_config.clear_flag(trt.SerializationFlag.EXCLUDE_WEIGHTS)
+        serialized_engine = engine.serialize_with_config(serialization_config)
+        engine = runtime.deserialize_cuda_engine(serialized_engine)
+
+        if isinstance(compiled_submodule, PythonTorchTensorRTModule):
+            compiled_submodule.engine = engine
+
         if isinstance(compiled_submodule, TorchTensorRTModule):
-            serialized_engine = bytes(engine.serialize())
             new_engine_info = list(engine_info)
-            new_engine_info[ENGINE_IDX] = serialized_engine
+            new_engine_info[ENGINE_IDX] = bytes(serialized_engine)
             refitted_engine = torch.classes.tensorrt.Engine(tuple(new_engine_info))
             compiled_submodule.engine = refitted_engine
 
         elif inline_module:
-            serialized_engine = bytes(engine.serialize())
             new_engine_info = list(engine_info)
-            new_engine_info[ENGINE_IDX] = serialized_engine
+            new_engine_info[ENGINE_IDX] = bytes(serialized_engine)
             refitted_engine = torch.classes.tensorrt.Engine(tuple(new_engine_info))
             setattr(compiled_module, f"{name}_engine", refitted_engine)
 
