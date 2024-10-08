@@ -37,6 +37,7 @@ User Guide
 * :ref:`saving_models`
 * :ref:`runtime`
 * :ref:`using_dla`
+* :ref:`mixed_precision`
 
 .. toctree::
    :caption: User Guide
@@ -48,6 +49,7 @@ User Guide
    user_guide/saving_models
    user_guide/runtime
    user_guide/using_dla
+   user_guide/mixed_precision
    tutorials/_rendered_examples/dynamo/torch_compile_advanced_usage
    tutorials/_rendered_examples/dynamo/vgg16_ptq
    tutorials/_rendered_examples/dynamo/engine_caching_example

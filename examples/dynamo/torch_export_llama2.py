@@ -49,6 +49,10 @@ pyt_gen_tokens = generate(model, input_ids, MAX_TOKENS, tokenizer.eos_token_id)
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 # Export the llama2 model into an ExportedProgram which is input of TRT compilation
+# To compile the model in FP16, we do the following
+# 1) Cast the model to FP16 via model.half()
+# 2) Enable use_explicit_typing=True. Certain layers are explicitly casted to FP32 within the pytorch model and this flag respects this behavior during TRT compilation
+# 3) Enable use_fp32_acc=True. This ensures all the matmuls are accumulated in FP32 precision (similar to PyTorch)
 llama2_ep = export_llm(model, input_ids, max_seq_len=64)
 trt_model = torch_tensorrt.dynamo.compile(
     llama2_ep,
@@ -57,7 +61,7 @@ trt_model = torch_tensorrt.dynamo.compile(
     truncate_double=True,
     device=DEVICE,
     disable_tf32=True,
-    use_strong_typing=True,
+    use_explicit_typing=True,
     use_fp32_acc=True,
 )
 
