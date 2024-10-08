@@ -156,18 +156,18 @@ TEST(LoweringPasses, RemoveSingleUse0DTensorsFloatCorrectly) {
   ASSERT_TRUE(!torch::jit::findPatternMatches(*tg, *sg).empty());
 }
 
-TEST(LoweringPasses, RemoveSingleUse0DTensorsFloorDivIntCorrectly) {
+TEST(LoweringPasses, RemoveSingleUse0DTensorsDivModIntCorrectly) {
   std::string source_graph = R"IR(
     graph(%0: int):
       %1: Tensor = prim::Constant[value=[7]]()
       %3: Tensor = prim::NumToTensor(%0)
-      %4: Tensor = aten::floor_divide(%1, %3)
+      %4: Tensor = aten::divmod(%1, %3)
       %5: int = aten::Int(%4)
       return (%5))IR";
   std::string target_graph = R"IR(
     graph(%0: int):
       %1: int = prim::Constant[value=7]()
-      %4: int = aten::floordiv(%1, %0)
+      %4: int = aten::divmod(%1, %0)
       return (%4))IR";
 
   torch_tensorrt::core::util::logging::get_logger().set_reportable_log_level(
@@ -191,18 +191,18 @@ TEST(LoweringPasses, RemoveSingleUse0DTensorsFloorDivIntCorrectly) {
   ASSERT_TRUE(!torch::jit::findPatternMatches(*tg, *sg).empty());
 }
 
-TEST(LoweringPasses, RemoveSingleUse0DTensorsFloorDivFloatCorrectly) {
+TEST(LoweringPasses, RemoveSingleUse0DTensorsDivModFloatCorrectly) {
   std::string source_graph = R"IR(
     graph(%0: float):
       %1: Tensor = prim::Constant[value=[8.]]()
       %3: Tensor = prim::NumToTensor(%0)
-      %4: Tensor = aten::floor_divide(%1, %3)
+      %4: Tensor = aten::divmod(%1, %3)
       %5: float = aten::Float(%4)
       return (%5))IR";
   std::string target_graph = R"IR(
     graph(%0: float):
       %1: float = prim::Constant[value=8.]()
-      %4: float = aten::floordiv(%1, %0)
+      %4: float = aten::divmod(%1, %0)
       return (%4))IR";
 
   torch_tensorrt::core::util::logging::get_logger().set_reportable_log_level(
