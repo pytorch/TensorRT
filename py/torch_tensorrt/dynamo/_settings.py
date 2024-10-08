@@ -17,16 +17,18 @@ from torch_tensorrt.dynamo._defaults import (
     ENABLED_PRECISIONS,
     ENGINE_CAPABILITY,
     HARDWARE_COMPATIBLE,
+    IMMUTABLE_WEIGHTS,
     LAZY_ENGINE_INIT,
-    MAKE_REFITTABLE,
     MAX_AUX_STREAMS,
     MIN_BLOCK_SIZE,
     NUM_AVG_TIMING_ITERS,
     OPTIMIZATION_LEVEL,
     PASS_THROUGH_BUILD_FAILURES,
+    REFIT_IDENTICAL_ENGINE_WEIGHTS,
     REQUIRE_FULL_COMPILATION,
     REUSE_CACHED_ENGINES,
     SPARSE_WEIGHTS,
+    STRIP_ENGINE_WEIGHTS,
     TIMING_CACHE_PATH,
     TRUNCATE_DOUBLE,
     USE_FAST_PARTITIONER,
@@ -65,7 +67,6 @@ class CompilationSettings:
         assume_dynamic_shape_support (bool): Setting this to true enables the converters work for both dynamic and static shapes. Default: False
         disable_tf32 (bool): Whether to disable TF32 computation for TRT layers
         sparse_weights (bool): Whether to allow the builder to use sparse weights
-        refit (bool): Whether to build a refittable engine
         engine_capability (trt.EngineCapability): Restrict kernel selection to safe gpu kernels or safe dla kernels
         num_avg_timing_iters (int): Number of averaging timing iterations used to select kernels
         dla_sram_size (int): Fast software managed RAM used by DLA to communicate within a layer.
@@ -78,6 +79,9 @@ class CompilationSettings:
         timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation
         cache_built_engines (bool): Whether to save the compiled TRT engines to storage
         reuse_cached_engines (bool): Whether to load the compiled TRT engines from storage
+        refit_identical_engine_weights (bool): Whether to refit the engine with identical weights
+        strip_engine_weights (bool): Whether to strip the engine weights
+        immutable_weights (bool): Build non-refittable engines. This is useful for some layers that are not refittable. If this argument is set to true, `strip_engine_weights` and `refit_identical_engine_weights` will be ignored
     """
 
     enabled_precisions: Set[dtype] = field(default_factory=lambda: ENABLED_PRECISIONS)
@@ -98,7 +102,6 @@ class CompilationSettings:
     disable_tf32: bool = DISABLE_TF32
     assume_dynamic_shape_support: bool = ASSUME_DYNAMIC_SHAPE_SUPPORT
     sparse_weights: bool = SPARSE_WEIGHTS
-    make_refittable: bool = MAKE_REFITTABLE
     engine_capability: EngineCapability = field(
         default_factory=lambda: ENGINE_CAPABILITY
     )
@@ -112,6 +115,9 @@ class CompilationSettings:
     lazy_engine_init: bool = LAZY_ENGINE_INIT
     cache_built_engines: bool = CACHE_BUILT_ENGINES
     reuse_cached_engines: bool = REUSE_CACHED_ENGINES
+    refit_identical_engine_weights: bool = REFIT_IDENTICAL_ENGINE_WEIGHTS
+    strip_engine_weights: bool = STRIP_ENGINE_WEIGHTS
+    immutable_weights: bool = IMMUTABLE_WEIGHTS
 
 
 _SETTINGS_TO_BE_ENGINE_INVARIANT = (
@@ -121,9 +127,11 @@ _SETTINGS_TO_BE_ENGINE_INVARIANT = (
     "optimization_level",
     "disable_tf32",
     "sparse_weights",
-    "make_refittable",
     "engine_capability",
     "hardware_compatible",
+    "strip_engine_weights",
+    "refit_identical_engine_weights",
+    "immutable_weights",
 )
 
 

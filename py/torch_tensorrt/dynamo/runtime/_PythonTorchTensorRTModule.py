@@ -5,6 +5,7 @@ from contextlib import nullcontext
 from tempfile import tempdir
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
+import tensorrt as trt
 import torch
 import torch_tensorrt
 from torch.nn import Module
@@ -18,8 +19,6 @@ from torch_tensorrt.runtime._utils import (
     _select_rt_device,
     multi_gpu_device_check,
 )
-
-import tensorrt as trt
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +38,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         *,
         name: str = "",
         settings: CompilationSettings = CompilationSettings(),
-        weight_name_map: Any = None,
+        weight_name_map: Optional[dict[Any, Any]] = None,
     ):
         """Takes a name, target device, serialized TensorRT engine, and binding names / order and constructs
         a PyTorch ``torch.nn.Module`` around it. Uses TensorRT Python APIs to run the engine
@@ -52,6 +51,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         Keyword Arguments:
             name (str): Name for module
             settings (torch_tensorrt.dynamo.CompilationSettings): Settings used to compile engine, assumes engine was built with default compilation settings if object not passed
+            weight_name_map (dict): Mapping of engine weight name to state_dict weight name
 
         Example:
 
