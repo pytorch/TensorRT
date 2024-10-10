@@ -318,6 +318,10 @@ void TRTEngine::verify_serialization_fmt(const std::vector<std::string>& seriali
           << ")");
 }
 
+std::string TRTEngine::__obj_flatten__() {
+  return std::tuple(std::tuple("queue", this->get_raw_queue()), std::tuple("init_tensor_", this->init_tensor_.clone()));
+}
+
 } // namespace runtime
 } // namespace core
 } // namespace torch_tensorrt

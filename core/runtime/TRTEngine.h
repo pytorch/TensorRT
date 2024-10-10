@@ -19,6 +19,9 @@ namespace torch_tensorrt {
 namespace core {
 namespace runtime {
 
+using FlattenedState =
+    std::tuple<std::tuple<std::string, std::vector<at::Tensor>>, std::tuple<std::string, at::Tensor>>;
+
 struct TRTEngine : torch::CustomClassHolder {
   // Each engine needs it's own runtime object
   std::shared_ptr<nvinfer1::IRuntime> rt;
@@ -73,6 +76,9 @@ struct TRTEngine : torch::CustomClassHolder {
   void dump_engine_layer_info();
   friend std::ostream& operator<<(std::ostream& os, const TRTEngine& engine);
   static const char BINDING_DELIM = '%';
+
+  // Serde re-export functionality
+  FlattenedState __obj_flatten__();
 
   // CUDAGraph-Related Functionality
   at::cuda::CUDAGraph cudagraph = {};
