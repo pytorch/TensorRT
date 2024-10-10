@@ -37,6 +37,7 @@ User Guide
 * :ref:`saving_models`
 * :ref:`runtime`
 * :ref:`using_dla`
+* :ref:`mixed_precision`
 
 .. toctree::
    :caption: User Guide
@@ -48,6 +49,7 @@ User Guide
    user_guide/saving_models
    user_guide/runtime
    user_guide/using_dla
+   user_guide/mixed_precision
    tutorials/_rendered_examples/dynamo/torch_compile_advanced_usage
    tutorials/_rendered_examples/dynamo/vgg16_ptq
    tutorials/_rendered_examples/dynamo/engine_caching_example
@@ -119,6 +121,8 @@ Tutorials
    tutorials/_rendered_examples/distributed_inference/data_parallel_gpt2
    tutorials/_rendered_examples/distributed_inference/data_parallel_stable_diffusion
    tutorials/_rendered_examples/dynamo/mutable_torchtrt_module_example
+   tutorials/_rendered_examples/dynamo/torch_export_gpt2
+   tutorials/_rendered_examples/dynamo/torch_export_llama2
 
 Python API Documentation
 ------------------------

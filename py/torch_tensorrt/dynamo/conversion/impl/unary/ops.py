@@ -478,10 +478,6 @@ def sign(
     name: str,
     input_val: TRTTensor,
 ) -> TRTTensor:
-    if (isinstance(input_val, TRTTensor)) and (
-        input_val.dtype == trt.int8 or input_val.dtype == trt.int32
-    ):
-        input_val = cast_trt_tensor(ctx, input_val, trt.float32, name)
 
     return convert_unary(
         ctx, target, source_ir, name, trt.UnaryOperation.SIGN, input_val

@@ -37,7 +37,11 @@ def convert_activation(
         layer.beta = beta
     set_layer_name(layer, target, name, source_ir)
 
-    if input_val.dynamic_range is not None and dyn_range_fn is not None:
+    if (
+        not ctx.net.get_flag(trt.NetworkDefinitionCreationFlag.STRONGLY_TYPED)
+        and input_val.dynamic_range is not None
+        and dyn_range_fn is not None
+    ):
         dyn_range = dyn_range_fn(input_val.dynamic_range)
         mark_as_int8_layer(layer, dyn_range)
     return layer.get_output(0)
