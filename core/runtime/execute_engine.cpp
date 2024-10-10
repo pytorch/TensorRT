@@ -305,6 +305,7 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
   if (compiled_engine->engine_stream == c10::cuda::getDefaultCUDAStream(current_device_id)) {
     // Create a new stream if the engine stream is the default stream
     compiled_engine->engine_stream = c10::cuda::getStreamFromPool(false, current_device_id);
+    c10::cuda::setCurrentCUDAStream(compiled_engine->engine_stream);
   } else {
     compiled_engine->engine_stream = compiled_engine->caller_stream;
   }
