@@ -57,7 +57,7 @@ def test_mapping():
         enabled_precisions=enabled_precisions,
         debug=debug,
         min_block_size=min_block_size,
-        make_refitable=True,
+        make_refittable=True,
         reuse_cached_engines=False,
     )
     settings = trt_gm._run_on_acc_0.settings
@@ -110,7 +110,7 @@ def test_refit_one_engine_with_weightmap():
         enabled_precisions=enabled_precisions,
         debug=debug,
         min_block_size=min_block_size,
-        make_refitable=True,
+        make_refittable=True,
         reuse_cached_engines=False,
     )
 
@@ -161,7 +161,7 @@ def test_refit_one_engine_no_map_with_weightmap():
         enabled_precisions=enabled_precisions,
         debug=debug,
         min_block_size=min_block_size,
-        make_refitable=True,
+        make_refittable=True,
         reuse_cached_engines=False,
     )
 
@@ -213,7 +213,7 @@ def test_refit_one_engine_with_wrong_weightmap():
         enabled_precisions=enabled_precisions,
         debug=debug,
         min_block_size=min_block_size,
-        make_refitable=True,
+        make_refittable=True,
         reuse_cached_engines=False,
     )
     # Manually Deleted all batch norm layer. This suppose to fail the fast refit
@@ -271,7 +271,7 @@ def test_refit_one_engine_bert_with_weightmap():
         enabled_precisions=enabled_precisions,
         debug=debug,
         min_block_size=min_block_size,
-        make_refitable=True,
+        make_refittable=True,
         reuse_cached_engines=False,
     )
 
@@ -325,7 +325,7 @@ def test_refit_one_engine_inline_runtime__with_weightmap():
         enabled_precisions=enabled_precisions,
         debug=debug,
         min_block_size=min_block_size,
-        make_refitable=True,
+        make_refittable=True,
         reuse_cached_engines=False,
     )
     torchtrt.save(trt_gm, trt_ep_path, inputs=inputs)
@@ -372,7 +372,7 @@ def test_refit_one_engine_python_runtime_with_weightmap():
         enabled_precisions=enabled_precisions,
         debug=debug,
         min_block_size=min_block_size,
-        make_refitable=True,
+        make_refittable=True,
         reuse_cached_engines=False,
     )
 
@@ -494,7 +494,7 @@ def test_refit_one_engine_without_weightmap():
         enabled_precisions=enabled_precisions,
         debug=debug,
         min_block_size=min_block_size,
-        make_refitable=True,
+        make_refittable=True,
         reuse_cached_engines=False,
     )
 
@@ -546,7 +546,7 @@ def test_refit_one_engine_bert_without_weightmap():
         enabled_precisions=enabled_precisions,
         debug=debug,
         min_block_size=min_block_size,
-        make_refitable=True,
+        make_refittable=True,
         reuse_cached_engines=False,
     )
 
@@ -600,7 +600,7 @@ def test_refit_one_engine_inline_runtime_without_weightmap():
         enabled_precisions=enabled_precisions,
         debug=debug,
         min_block_size=min_block_size,
-        make_refitable=True,
+        make_refittable=True,
         reuse_cached_engines=False,
     )
     torchtrt.save(trt_gm, trt_ep_path, inputs=inputs)
@@ -647,7 +647,7 @@ def test_refit_one_engine_python_runtime_without_weightmap():
         enabled_precisions=enabled_precisions,
         debug=debug,
         min_block_size=min_block_size,
-        make_refitable=True,
+        make_refittable=True,
         reuse_cached_engines=False,
     )
 

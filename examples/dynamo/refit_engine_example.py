@@ -69,7 +69,7 @@ trt_gm = torch_trt.dynamo.compile(
     debug=debug,
     min_block_size=min_block_size,
     torch_executed_ops=torch_executed_ops,
-    make_refitable=True,
+    make_refittable=True,
     reuse_cached_engines=False,
 )  # Output is a torch.fx.GraphModule
 
