@@ -305,9 +305,6 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
   if (compiled_engine->engine_stream == c10::cuda::getDefaultCUDAStream(current_device_id)) {
     // Create a new stream if the engine stream is the default stream
     compiled_engine->engine_stream = c10::cuda::getStreamFromPool(false, current_device_id);
-    c10::cuda::setCurrentCUDAStream(compiled_engine->engine_stream);
-  } else {
-    compiled_engine->engine_stream = compiled_engine->caller_stream;
   }
 
   // nvinfer1::IExecutionContext::enqueue is not thread safe and we need a mutex for it.
@@ -334,7 +331,7 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
       if (need_cudagraphs_record) {
         // If cudagraphs needs to record a graph, capture the enqueueV3 call in a graph
         c10::cuda::CUDAStream recording_stream = compiled_engine->engine_stream;
-        compiled_engine->cudagraph.capture_begin(compiled_engine->cudagraph_mempool_id);
+        compiled_engine->cudagraph.capture_begin();
         compiled_engine->exec_ctx->enqueueV3(recording_stream);
         compiled_engine->cudagraph.capture_end();
 
