@@ -86,16 +86,11 @@ Install pip and required python packages:
 
 .. code-block:: sh
 
-    # install setuptools with the version less than 71.*.* 
-    python -m pip install setuptools==70.2.0
+    # install required python packages
+    python -m pip install -r toolchains/jp_workspaces/requirements.txt
 
-.. code-block:: sh
-
-    # install torch
-    python -m pip install https://developer.download.nvidia.com/compute/redist/jp/v61/pytorch/torch-2.5.0a0+872d972e41.nv24.08.17622132-cp310-cp310-linux_aarch64.whl
-
-    # install torchvision
-    # currently it has not available yet for JetPack 6.1, it should be available in future
+    # if you want to run the test cases, then install the test required python packages
+    python -m pip install -r toolchains/jp_workspaces/test_requirements.txt
 
 
 Build and Install torch_tensorrt wheel file
@@ -116,3 +111,4 @@ Please make sure to build torch_tensorrt wheel file from source release/2.5 bran
     cat toolchains/jp_workspaces/MODULE.bazel.tmpl | envsubst > MODULE.bazel
     # build and install torch_tensorrt wheel file
     python setup.py --use-cxx11-abi install --user
+
