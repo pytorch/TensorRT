@@ -499,7 +499,7 @@ def test_refit_one_engine_without_weightmap():
     )
 
     new_trt_gm = refit_module_weights(
-        compiled_module=trt_gm, 
+        compiled_module=trt_gm,
         new_weight_module=exp_program2,
         arg_inputs=inputs,
         use_weight_map_cache=False,
