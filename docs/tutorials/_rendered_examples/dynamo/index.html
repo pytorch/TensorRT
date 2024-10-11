@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Dynamo / torch.compile &mdash; Torch-TensorRT v2.6.0.dev0+cc0cd07 documentation</title>
+  <title>Torch-TensorRT Examples &mdash; Torch-TensorRT v2.6.0.dev0+7f683fe documentation</title>
   
 
   
@@ -273,7 +273,7 @@
               
               
                 <div class="version">
-                  v2.6.0.dev0+cc0cd07
+                  v2.6.0.dev0+7f683fe
                 </div>
               
             
@@ -313,6 +313,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../../../user_guide/saving_models.html">Saving models compiled with Torch-TensorRT</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../user_guide/runtime.html">Deploying Torch-TensorRT Programs</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../user_guide/using_dla.html">DLA</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../user_guide/mixed_precision.html">Compile Mixed Precision models with Torch-TensorRT</a></li>
 <li class="toctree-l1"><a class="reference internal" href="torch_compile_advanced_usage.html">Torch Compile Advanced Usage</a></li>
 <li class="toctree-l1"><a class="reference internal" href="vgg16_ptq.html">Deploy Quantized Models using Torch-TensorRT</a></li>
 <li class="toctree-l1"><a class="reference internal" href="engine_caching_example.html">Engine Caching</a></li>
@@ -347,6 +348,11 @@
 <li class="toctree-l1"><a class="reference internal" href="converter_overloading.html">Overloading Torch-TensorRT Converters with Custom Converters</a></li>
 <li class="toctree-l1"><a class="reference internal" href="custom_kernel_plugins.html">Using Custom Kernels within TensorRT Engines with Torch-TensorRT</a></li>
 <li class="toctree-l1"><a class="reference internal" href="mutable_torchtrt_module_example.html">Mutable Torch TensorRT Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="torch_export_gpt2.html">Compiling GPT2 using the Torch-TensorRT with dynamo backend</a></li>
+<li class="toctree-l1"><a class="reference internal" href="torch_export_gpt2.html#the-output-sentences-should-look-like">The output sentences should look like</a></li>
+<li class="toctree-l1"><a class="reference internal" href="torch_export_llama2.html">Compiling Llama2 using the Torch-TensorRT with dynamo backend</a></li>
+<li class="toctree-l1"><a class="reference internal" href="torch_export_llama2.html#the-output-sentences-should-look-like">The output sentences should look like</a></li>
+<li class="toctree-l1"><a class="reference internal" href="torch_export_llama2.html#pytorch-model-generated-text-dynamic-programming-is-an-algorithmic-technique-used-to-solve-complex-problems-by-breaking-them-down-into-smaller-subproblems-solving-each-subproblem-only-once-and">Pytorch model generated text:  Dynamic programming is an algorithmic technique used to solve complex problems by breaking them down into smaller subproblems, solving each subproblem only once, and</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Python API Documentation</span></p>
 <ul>
@@ -420,7 +426,7 @@
       </li>
 
         
-      <li>Dynamo / <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code></li>
+      <li>Torch-TensorRT Examples</li>
     
     
       <li class="pytorch-breadcrumbs-aside">
@@ -456,15 +462,21 @@
             <div role="main" class="main-content" itemscope="itemscope" itemtype="http://schema.org/Article">
              <article itemprop="articleBody" id="pytorch-article" class="pytorch-article">
               
-  <section id="dynamo-torch-compile">
-<span id="torch-compile"></span><span id="sphx-glr-tutorials-rendered-examples-dynamo"></span><h1>Dynamo / <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code><a class="headerlink" href="#dynamo-torch-compile" title="Permalink to this heading">¶</a></h1>
-<p>Torch-TensorRT provides a backend for the new <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code> API released in PyTorch 2.0. In the following examples we describe
-a number of ways you can leverage this backend to accelerate inference.</p>
+  <section id="torch-tensorrt-examples">
+<span id="torch-compile"></span><span id="sphx-glr-tutorials-rendered-examples-dynamo"></span><h1>Torch-TensorRT Examples<a class="headerlink" href="#torch-tensorrt-examples" title="Permalink to this heading">¶</a></h1>
+<p>Please refer to the following examples which demonstrate the usage of different features of Torch-TensorRT. We also provide
+examples of Torch-TensorRT compilation of select computer vision and language models.</p>
+<section id="dependencies">
+<h2>Dependencies<a class="headerlink" href="#dependencies" title="Permalink to this heading">¶</a></h2>
+<p>Please install the following external dependencies (assuming you already have correct <cite>torch</cite>, <cite>torch_tensorrt</cite> and <cite>tensorrt</cite> libraries installed (<a class="reference external" href="https://github.com/pytorch/TensorRT?tab=readme-ov-file#dependencies">dependencies</a>))</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">pip</span> <span class="n">install</span> <span class="o">-</span><span class="n">r</span> <span class="n">requirements</span><span class="o">.</span><span class="n">txt</span>
+</pre></div>
+</div>
+</section>
+<section id="compiler-features">
+<h2>Compiler Features<a class="headerlink" href="#compiler-features" title="Permalink to this heading">¶</a></h2>
 <ul class="simple">
-<li><p><a class="reference internal" href="torch_compile_resnet_example.html#torch-compile-resnet"><span class="std std-ref">Compiling ResNet using the Torch-TensorRT torch.compile Backend</span></a>: Compiling a ResNet model using the Torch Compile Frontend for <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.compile</span></code></p></li>
-<li><p><a class="reference internal" href="torch_compile_transformers_example.html#torch-compile-transformer"><span class="std std-ref">Compiling a Transformer using torch.compile and TensorRT</span></a>: Compiling a Transformer model using <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code></p></li>
 <li><p><a class="reference internal" href="torch_compile_advanced_usage.html#torch-compile-advanced-usage"><span class="std std-ref">Torch Compile Advanced Usage</span></a>: Advanced usage including making a custom backend to use directly with the <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code> API</p></li>
-<li><p><a class="reference internal" href="torch_compile_stable_diffusion.html#torch-compile-stable-diffusion"><span class="std std-ref">Torch Compile Stable Diffusion</span></a>: Compiling a Stable Diffusion model using <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code></p></li>
 <li><p><a class="reference internal" href="torch_export_cudagraphs.html#torch-export-cudagraphs"><span class="std std-ref">Torch Export with Cudagraphs</span></a>: Using the Cudagraphs integration with <cite>ir=”dynamo”</cite></p></li>
 <li><p><a class="reference internal" href="converter_overloading.html#converter-overloading"><span class="std std-ref">Overloading Torch-TensorRT Converters with Custom Converters</span></a>: How to write custom converters and overload existing ones</p></li>
 <li><p><a class="reference internal" href="custom_kernel_plugins.html#custom-kernel-plugins"><span class="std std-ref">Using Custom Kernels within TensorRT Engines with Torch-TensorRT</span></a>: Creating a plugin to use a custom kernel inside TensorRT engines</p></li>
@@ -473,6 +485,16 @@ a number of ways you can leverage this backend to accelerate inference.</p>
 <li><p><span class="xref std std-ref">vgg16_fp8_ptq</span>: Compiling a VGG16 model with FP8 and PTQ using <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code></p></li>
 <li><p><a class="reference internal" href="engine_caching_example.html#engine-caching-example"><span class="std std-ref">Engine Caching</span></a>: Utilizing engine caching to speed up compilation times</p></li>
 <li><p><a class="reference internal" href="engine_caching_bert_example.html#engine-caching-bert-example"><span class="std std-ref">Engine Caching (BERT)</span></a>: Demonstrating engine caching on BERT</p></li>
+</ul>
+</section>
+<section id="model-zoo">
+<h2>Model Zoo<a class="headerlink" href="#model-zoo" title="Permalink to this heading">¶</a></h2>
+<ul class="simple">
+<li><p><a class="reference internal" href="torch_compile_resnet_example.html#torch-compile-resnet"><span class="std std-ref">Compiling ResNet using the Torch-TensorRT torch.compile Backend</span></a>: Compiling a ResNet model using the Torch Compile Frontend for <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.compile</span></code></p></li>
+<li><p><a class="reference internal" href="torch_compile_transformers_example.html#torch-compile-transformer"><span class="std std-ref">Compiling a Transformer using torch.compile and TensorRT</span></a>: Compiling a Transformer model using <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code></p></li>
+<li><p><a class="reference internal" href="torch_compile_stable_diffusion.html#torch-compile-stable-diffusion"><span class="std std-ref">Torch Compile Stable Diffusion</span></a>: Compiling a Stable Diffusion model using <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code></p></li>
+<li><p><span class="xref std std-ref">_torch_export_gpt2</span>: Compiling a GPT2 model using AOT workflow (<cite>ir=dynamo</cite>)</p></li>
+<li><p><span class="xref std std-ref">_torch_export_llama2</span>: Compiling a Llama2 model using AOT workflow (<cite>ir=dynamo</cite>)</p></li>
 </ul>
 <div class="sphx-glr-thumbnails"><div class="sphx-glr-thumbcontainer" tooltip="This interactive script is intended as a sample of the Torch-TensorRT workflow with torch.compi..."><img alt="" src="../../../_images/sphx_glr_torch_compile_stable_diffusion_thumb.png" />
 <p><a class="reference internal" href="torch_compile_stable_diffusion.html#sphx-glr-tutorials-rendered-examples-dynamo-torch-compile-stable-diffusion-py"><span class="std std-ref">Torch Compile Stable Diffusion</span></a></p>
@@ -486,24 +508,24 @@ a number of ways you can leverage this backend to accelerate inference.</p>
 </div><div class="sphx-glr-thumbcontainer" tooltip="This interactive script is intended as a sample of the Torch-TensorRT workflow with torch.compi..."><img alt="" src="../../../_images/sphx_glr_torch_compile_transformers_example_thumb.png" />
 <p><a class="reference internal" href="torch_compile_transformers_example.html#sphx-glr-tutorials-rendered-examples-dynamo-torch-compile-transformers-example-py"><span class="std std-ref">Compiling a Transformer using torch.compile and TensorRT</span></a></p>
   <div class="sphx-glr-thumbnail-title">Compiling a Transformer using torch.compile and TensorRT</div>
-</div><div class="sphx-glr-thumbcontainer" tooltip="This interactive script is intended as a sample of the Torch-TensorRT workflow with dynamo back..."><img alt="" src="../../../_images/sphx_glr_torch_export_gpt2_thumb.png" />
-<p><a class="reference internal" href="torch_export_gpt2.html#sphx-glr-tutorials-rendered-examples-dynamo-torch-export-gpt2-py"><span class="std std-ref">Compiling GPT2 using the Torch-TensorRT with dynamo backend</span></a></p>
-  <div class="sphx-glr-thumbnail-title">Compiling GPT2 using the Torch-TensorRT with dynamo backend</div>
 </div><div class="sphx-glr-thumbcontainer" tooltip="This interactive script is intended as an overview of the process by which torch_tensorrt.compi..."><img alt="" src="../../../_images/sphx_glr_torch_compile_advanced_usage_thumb.png" />
 <p><a class="reference internal" href="torch_compile_advanced_usage.html#sphx-glr-tutorials-rendered-examples-dynamo-torch-compile-advanced-usage-py"><span class="std std-ref">Torch Compile Advanced Usage</span></a></p>
   <div class="sphx-glr-thumbnail-title">Torch Compile Advanced Usage</div>
-</div><div class="sphx-glr-thumbcontainer" tooltip="This interactive script is intended as a sample of the Torch-TensorRT workflow with dynamo back..."><img alt="" src="../../../_images/sphx_glr_torch_export_llama2_thumb.png" />
-<p><a class="reference internal" href="torch_export_llama2.html#sphx-glr-tutorials-rendered-examples-dynamo-torch-export-llama2-py"><span class="std std-ref">Compiling Llama2 using the Torch-TensorRT with dynamo backend</span></a></p>
-  <div class="sphx-glr-thumbnail-title">Compiling Llama2 using the Torch-TensorRT with dynamo backend</div>
 </div><div class="sphx-glr-thumbcontainer" tooltip="Small caching example on BERT."><img alt="" src="../../../_images/sphx_glr_engine_caching_bert_example_thumb.png" />
 <p><a class="reference internal" href="engine_caching_bert_example.html#sphx-glr-tutorials-rendered-examples-dynamo-engine-caching-bert-example-py"><span class="std std-ref">Engine Caching (BERT)</span></a></p>
   <div class="sphx-glr-thumbnail-title">Engine Caching (BERT)</div>
+</div><div class="sphx-glr-thumbcontainer" tooltip="This interactive script is intended as a sample of the Torch-TensorRT workflow with dynamo back..."><img alt="" src="../../../_images/sphx_glr_torch_export_llama2_thumb.png" />
+<p><a class="reference internal" href="torch_export_llama2.html#sphx-glr-tutorials-rendered-examples-dynamo-torch-export-llama2-py"><span class="std std-ref">Compiling Llama2 using the Torch-TensorRT with dynamo backend</span></a></p>
+  <div class="sphx-glr-thumbnail-title">Compiling Llama2 using the Torch-TensorRT with dynamo backend</div>
 </div><div class="sphx-glr-thumbcontainer" tooltip="We are going to demonstrate how we can easily use Mutable Torch TensorRT Module to compile, int..."><img alt="" src="../../../_images/sphx_glr_mutable_torchtrt_module_example_thumb.png" />
 <p><a class="reference internal" href="mutable_torchtrt_module_example.html#sphx-glr-tutorials-rendered-examples-dynamo-mutable-torchtrt-module-example-py"><span class="std std-ref">Mutable Torch TensorRT Module</span></a></p>
   <div class="sphx-glr-thumbnail-title">Mutable Torch TensorRT Module</div>
 </div><div class="sphx-glr-thumbcontainer" tooltip="This interactive script is intended as a sample of the Torch-TensorRT workflow with torch.compi..."><img alt="" src="../../../_images/sphx_glr_torch_compile_resnet_example_thumb.png" />
 <p><a class="reference internal" href="torch_compile_resnet_example.html#sphx-glr-tutorials-rendered-examples-dynamo-torch-compile-resnet-example-py"><span class="std std-ref">Compiling ResNet using the Torch-TensorRT torch.compile Backend</span></a></p>
   <div class="sphx-glr-thumbnail-title">Compiling ResNet using the Torch-TensorRT torch.compile Backend</div>
+</div><div class="sphx-glr-thumbcontainer" tooltip="This interactive script is intended as a sample of the Torch-TensorRT workflow with dynamo back..."><img alt="" src="../../../_images/sphx_glr_torch_export_gpt2_thumb.png" />
+<p><a class="reference internal" href="torch_export_gpt2.html#sphx-glr-tutorials-rendered-examples-dynamo-torch-export-gpt2-py"><span class="std std-ref">Compiling GPT2 using the Torch-TensorRT with dynamo backend</span></a></p>
+  <div class="sphx-glr-thumbnail-title">Compiling GPT2 using the Torch-TensorRT with dynamo backend</div>
 </div><div class="sphx-glr-thumbcontainer" tooltip="If for some reason you want to change the conversion behavior of a specific PyTorch operation t..."><img alt="" src="../../../_images/sphx_glr_converter_overloading_thumb.png" />
 <p><a class="reference internal" href="converter_overloading.html#sphx-glr-tutorials-rendered-examples-dynamo-converter-overloading-py"><span class="std std-ref">Overloading Torch-TensorRT Converters with Custom Converters</span></a></p>
   <div class="sphx-glr-thumbnail-title">Overloading Torch-TensorRT Converters with Custom Converters</div>
@@ -518,6 +540,7 @@ a number of ways you can leverage this backend to accelerate inference.</p>
   <div class="sphx-glr-thumbnail-title">Using Custom Kernels within TensorRT Engines with Torch-TensorRT</div>
 </div></div><div class="toctree-wrapper compound">
 </div>
+</section>
 </section>
 
 
@@ -554,7 +577,12 @@ a number of ways you can leverage this backend to accelerate inference.</p>
           <div class="pytorch-right-menu" id="pytorch-right-menu">
             <div class="pytorch-side-scroll" id="pytorch-side-scroll-right">
               <ul>
-<li><a class="reference internal" href="#">Dynamo / <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code></a></li>
+<li><a class="reference internal" href="#">Torch-TensorRT Examples</a><ul>
+<li><a class="reference internal" href="#dependencies">Dependencies</a></li>
+<li><a class="reference internal" href="#compiler-features">Compiler Features</a></li>
+<li><a class="reference internal" href="#model-zoo">Model Zoo</a></li>
+</ul>
+</li>
 </ul>
 
             </div>
