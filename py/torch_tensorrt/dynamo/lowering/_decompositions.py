@@ -400,8 +400,21 @@ def get_decompositions(
         return {**CORE_ATEN_DECOMPOSITIONS_FILTERED, **TORCH_TRT_DECOMPOSITIONS}
     else:
         # changes made here due to torch2.6 changes https://github.com/pytorch/pytorch/pull/135080
+        decomp_table = _decomp_table_to_post_autograd_aten()
+        for key in (
+            aten.upsample_nearest1d.vec,
+            aten.upsample_nearest2d.vec,
+            aten.upsample_nearest3d.vec,
+            aten.upsample_linear1d.vec,
+            aten.upsample_bilinear2d.vec,
+            aten.upsample_trilinear3d.vec,
+            aten.upsample_bicubic2d.vec,
+        ):
+            if key in decomp_table:
+                del decomp_table[key]
+
         return {
             **ENABLED_TORCH_DECOMPOSITIONS,
-            **_decomp_table_to_post_autograd_aten(),
+            **decomp_table,
             **TORCH_TRT_DECOMPOSITIONS,
         }
