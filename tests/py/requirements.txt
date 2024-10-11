@@ -9,6 +9,5 @@ pytest-xdist>=3.6.1
 pyyaml
 timm>=1.0.3
 transformers==4.40.2
-# TODO: once 0.16.1 is out, update it here
-nvidia-modelopt>=0.15.1
+nvidia-modelopt[deploy,hf,torch]~=0.17.0
 --extra-index-url https://pypi.nvidia.com

@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Collection, Optional, Set, Union
+from typing import Collection, Optional, Set, Tuple, Union
 
 from torch.fx.node import Target
 from torch_tensorrt._Device import Device
@@ -18,7 +18,7 @@ from torch_tensorrt.dynamo._defaults import (
     ENGINE_CAPABILITY,
     HARDWARE_COMPATIBLE,
     LAZY_ENGINE_INIT,
-    MAKE_REFITABLE,
+    MAKE_REFITTABLE,
     MAX_AUX_STREAMS,
     MIN_BLOCK_SIZE,
     NUM_AVG_TIMING_ITERS,
@@ -29,7 +29,9 @@ from torch_tensorrt.dynamo._defaults import (
     SPARSE_WEIGHTS,
     TIMING_CACHE_PATH,
     TRUNCATE_DOUBLE,
+    USE_EXPLICIT_TYPING,
     USE_FAST_PARTITIONER,
+    USE_FP32_ACC,
     USE_PYTHON_RUNTIME,
     VERSION_COMPATIBLE,
     WORKSPACE_SIZE,
@@ -78,6 +80,8 @@ class CompilationSettings:
         timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation
         cache_built_engines (bool): Whether to save the compiled TRT engines to storage
         reuse_cached_engines (bool): Whether to load the compiled TRT engines from storage
+        use_strong_typing (bool): This flag enables strong typing in TensorRT compilation which respects the precisions set in the Pytorch model. This is useful when users have mixed precision graphs.
+        use_fp32_acc (bool): This option inserts cast to FP32 nodes around matmul layers and TensorRT ensures the accumulation of matmul happens in FP32. Use this only when FP16 precision is configured in enabled_precisions.
     """
 
     enabled_precisions: Set[dtype] = field(default_factory=lambda: ENABLED_PRECISIONS)
@@ -98,7 +102,7 @@ class CompilationSettings:
     disable_tf32: bool = DISABLE_TF32
     assume_dynamic_shape_support: bool = ASSUME_DYNAMIC_SHAPE_SUPPORT
     sparse_weights: bool = SPARSE_WEIGHTS
-    make_refitable: bool = MAKE_REFITABLE
+    make_refittable: bool = MAKE_REFITTABLE
     engine_capability: EngineCapability = field(
         default_factory=lambda: ENGINE_CAPABILITY
     )
@@ -112,3 +116,33 @@ class CompilationSettings:
     lazy_engine_init: bool = LAZY_ENGINE_INIT
     cache_built_engines: bool = CACHE_BUILT_ENGINES
     reuse_cached_engines: bool = REUSE_CACHED_ENGINES
+    use_explicit_typing: bool = USE_EXPLICIT_TYPING
+    use_fp32_acc: bool = USE_FP32_ACC
+
+
+_SETTINGS_TO_BE_ENGINE_INVARIANT = (
+    "enabled_precisions",
+    "max_aux_streams",
+    "version_compatible",
+    "optimization_level",
+    "disable_tf32",
+    "sparse_weights",
+    "make_refittable",
+    "engine_capability",
+    "hardware_compatible",
+)
+
+
+def settings_are_compatible(
+    set_a: CompilationSettings, set_b: CompilationSettings
+) -> Tuple[bool, Set[str]]:
+    incompatible_settings: Set[str] = set()
+
+    for f in _SETTINGS_TO_BE_ENGINE_INVARIANT:
+        if getattr(set_a, f) != getattr(set_b, f):
+            incompatible_settings.add(f)
+
+    if len(incompatible_settings) == 0:
+        return True, set()
+    else:
+        return False, incompatible_settings

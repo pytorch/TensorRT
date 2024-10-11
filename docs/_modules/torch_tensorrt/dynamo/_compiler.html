@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt.dynamo._compiler &mdash; Torch-TensorRT v2.5.0.dev0+97d4f2b documentation</title>
+  <title>torch_tensorrt.dynamo._compiler &mdash; Torch-TensorRT v2.6.0.dev0+6ba44fa documentation</title>
   
 
   
@@ -272,7 +272,7 @@
               
               
                 <div class="version">
-                  v2.5.0.dev0+97d4f2b
+                  v2.6.0.dev0+6ba44fa
                 </div>
               
             
@@ -312,6 +312,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../../../user_guide/saving_models.html">Saving models compiled with Torch-TensorRT</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../user_guide/runtime.html">Deploying Torch-TensorRT Programs</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../user_guide/using_dla.html">DLA</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../user_guide/mixed_precision.html">Compile Mixed Precision models with Torch-TensorRT</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/torch_compile_advanced_usage.html">Torch Compile Advanced Usage</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/vgg16_ptq.html">Deploy Quantized Models using Torch-TensorRT</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/engine_caching_example.html">Engine Caching</a></li>
@@ -343,8 +344,14 @@
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/torch_compile_transformers_example.html">Compiling a Transformer using torch.compile and TensorRT</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/torch_compile_stable_diffusion.html">Torch Compile Stable Diffusion</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/torch_export_cudagraphs.html">Torch Export with Cudagraphs</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/converter_overloading.html">Overloading Torch-TensorRT Converters with Custom Converters</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/custom_kernel_plugins.html">Using Custom Kernels within TensorRT Engines with Torch-TensorRT</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/mutable_torchtrt_module_example.html">Mutable Torch TensorRT Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/torch_export_gpt2.html">Compiling GPT2 using the Torch-TensorRT with dynamo backend</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/torch_export_gpt2.html#the-output-sentences-should-look-like">The output sentences should look like</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/torch_export_llama2.html">Compiling Llama2 using the Torch-TensorRT with dynamo backend</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/torch_export_llama2.html#the-output-sentences-should-look-like">The output sentences should look like</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/torch_export_llama2.html#pytorch-model-generated-text-dynamic-programming-is-an-algorithmic-technique-used-to-solve-complex-problems-by-breaking-them-down-into-smaller-subproblems-solving-each-subproblem-only-once-and">Pytorch model generated text:  Dynamic programming is an algorithmic technique used to solve complex problems by breaking them down into smaller subproblems, solving each subproblem only once, and</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Python API Documentation</span></p>
 <ul>
@@ -515,7 +522,7 @@
         <span class="n">Set</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">dtype</span><span class="p">]],</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">dtype</span><span class="p">]]</span>
     <span class="p">]</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">ENABLED_PRECISIONS</span><span class="p">,</span>
     <span class="n">engine_capability</span><span class="p">:</span> <span class="n">EngineCapability</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">ENGINE_CAPABILITY</span><span class="p">,</span>
-    <span class="n">make_refitable</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">MAKE_REFITABLE</span><span class="p">,</span>
+    <span class="n">make_refittable</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">MAKE_REFITTABLE</span><span class="p">,</span>
     <span class="n">debug</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">,</span>
     <span class="n">num_avg_timing_iters</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">NUM_AVG_TIMING_ITERS</span><span class="p">,</span>
     <span class="n">workspace_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">WORKSPACE_SIZE</span><span class="p">,</span>
@@ -543,6 +550,8 @@
     <span class="n">engine_cache_dir</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">ENGINE_CACHE_DIR</span><span class="p">,</span>
     <span class="n">engine_cache_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">ENGINE_CACHE_SIZE</span><span class="p">,</span>
     <span class="n">custom_engine_cache</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">BaseEngineCache</span><span class="p">]</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">CUSTOM_ENGINE_CACHE</span><span class="p">,</span>
+    <span class="n">use_explicit_typing</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">USE_EXPLICIT_TYPING</span><span class="p">,</span>
+    <span class="n">use_fp32_acc</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">USE_FP32_ACC</span><span class="p">,</span>
     <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Compile an ExportedProgram module for NVIDIA GPUs using TensorRT</span>
@@ -613,6 +622,8 @@
 <span class="sd">        engine_cache_dir (Optional[str]): Directory to store the cached TRT engines</span>
 <span class="sd">        engine_cache_size (Optional[int]): Maximum hard-disk space (bytes) to use for the engine cache, default is 1GB. If the cache exceeds this size, the oldest engines will be removed by default</span>
 <span class="sd">        custom_engine_cache (Optional[BaseEngineCache]): Engine cache instance to use for saving and loading engines. Users can provide their own engine cache by inheriting from BaseEngineCache. If used, engine_cache_dir and engine_cache_size will be ignored.</span>
+<span class="sd">        use_explicit_typing (bool): This flag enables strong typing in TensorRT compilation which respects the precisions set in the Pytorch model. This is useful when users have mixed precision graphs.</span>
+<span class="sd">        use_fp32_acc (bool): This option inserts cast to FP32 nodes around matmul layers and TensorRT ensures the accumulation of matmul happens in FP32. Use this only when FP16 precision is configured in enabled_precisions.</span>
 <span class="sd">        **kwargs: Any,</span>
 <span class="sd">    Returns:</span>
 <span class="sd">        torch.fx.GraphModule: Compiled FX Module, when run it will execute via TensorRT</span>
@@ -635,14 +646,14 @@
 
     <span class="k">if</span> <span class="s2">&quot;refit&quot;</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">keys</span><span class="p">():</span>
         <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
-            <span class="s2">&quot;Refit is deprecated. Please use make_refitable=True if you want to enable refitting of the engine.&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;Refit is deprecated. Please use make_refittable=True if you want to enable refitting of the engine.&quot;</span><span class="p">,</span>
             <span class="ne">DeprecationWarning</span><span class="p">,</span>
             <span class="n">stacklevel</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
         <span class="p">)</span>
-        <span class="k">if</span> <span class="n">make_refitable</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Use flag make_refitable only. Flag refit is deprecated.&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">make_refittable</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Use flag make_refittable only. Flag refit is deprecated.&quot;</span><span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
-            <span class="n">make_refitable</span> <span class="o">=</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;refit&quot;</span><span class="p">]</span>
+            <span class="n">make_refittable</span> <span class="o">=</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;refit&quot;</span><span class="p">]</span>
 
     <span class="n">engine_capability</span> <span class="o">=</span> <span class="n">EngineCapability</span><span class="o">.</span><span class="n">_from</span><span class="p">(</span><span class="n">engine_capability</span><span class="p">)</span>
 
@@ -650,6 +661,20 @@
         <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
             <span class="sa">f</span><span class="s2">&quot;Detected torch_executed_modules was non-empty: </span><span class="si">{</span><span class="n">torch_executed_modules</span><span class="si">}</span><span class="s2">&quot;</span>
             <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">This feature is unimplemented in Torch-TRT Dynamo currently.&quot;</span>
+        <span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">use_explicit_typing</span><span class="p">:</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">enabled_precisions</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">1</span> <span class="ow">or</span> <span class="ow">not</span> <span class="nb">any</span><span class="p">(</span>
+            <span class="n">x</span> <span class="ow">in</span> <span class="n">enabled_precisions</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="p">{</span><span class="n">torch</span><span class="o">.</span><span class="n">float32</span><span class="p">,</span> <span class="n">dtype</span><span class="o">.</span><span class="n">f32</span><span class="p">}</span>
+        <span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">AssertionError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;When use_explicit_typing is enabled, only torch.float32 is allowed in the enabled_precisions but found </span><span class="si">{</span><span class="n">enabled_precisions</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">use_fp32_acc</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+            <span class="s2">&quot;FP32 accumulation for matmul layers is enabled. This option should only be enabled if the model already has FP16 weights and has no effect if it has FP32 weights. </span><span class="se">\</span>
+<span class="s2">                     This flag inserts casts around matmul layers and ensures TensorRT executes the matmul layers in FP16 with FP32 accumulation.&quot;</span>
         <span class="p">)</span>
 
     <span class="c1"># Aliasing inputs to arg_inputs for better understanding</span>
@@ -687,14 +712,14 @@
     <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Input graph: &quot;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="p">))</span>
 
     <span class="c1"># Apply lowering on the graph module</span>
-    <span class="n">gm</span> <span class="o">=</span> <span class="n">post_lowering</span><span class="p">(</span><span class="n">gm</span><span class="p">)</span>
+    <span class="n">gm</span> <span class="o">=</span> <span class="n">post_lowering</span><span class="p">(</span><span class="n">gm</span><span class="p">,</span> <span class="n">use_fp32_acc</span><span class="o">=</span><span class="n">use_fp32_acc</span><span class="p">)</span>
     <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Lowered Input graph: &quot;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="p">))</span>
 
     <span class="n">engine_cache</span> <span class="o">=</span> <span class="kc">None</span>
     <span class="k">if</span> <span class="n">cache_built_engines</span> <span class="ow">or</span> <span class="n">reuse_cached_engines</span><span class="p">:</span>
         <span class="k">assert</span> <span class="p">(</span>
-            <span class="n">make_refitable</span>
-        <span class="p">),</span> <span class="s2">&quot;Engine caching requires make_refitable to be set to True&quot;</span>
+            <span class="n">make_refittable</span>
+        <span class="p">),</span> <span class="s2">&quot;Engine caching requires make_refittable to be set to True&quot;</span>
         <span class="n">engine_cache</span> <span class="o">=</span> <span class="p">(</span>
             <span class="n">custom_engine_cache</span>
             <span class="k">if</span> <span class="n">custom_engine_cache</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
@@ -725,7 +750,7 @@
         <span class="s2">&quot;require_full_compilation&quot;</span><span class="p">:</span> <span class="n">require_full_compilation</span><span class="p">,</span>
         <span class="s2">&quot;disable_tf32&quot;</span><span class="p">:</span> <span class="n">disable_tf32</span><span class="p">,</span>
         <span class="s2">&quot;sparse_weights&quot;</span><span class="p">:</span> <span class="n">sparse_weights</span><span class="p">,</span>
-        <span class="s2">&quot;make_refitable&quot;</span><span class="p">:</span> <span class="n">make_refitable</span><span class="p">,</span>
+        <span class="s2">&quot;make_refittable&quot;</span><span class="p">:</span> <span class="n">make_refittable</span><span class="p">,</span>
         <span class="s2">&quot;engine_capability&quot;</span><span class="p">:</span> <span class="n">engine_capability</span><span class="p">,</span>
         <span class="s2">&quot;dla_sram_size&quot;</span><span class="p">:</span> <span class="n">dla_sram_size</span><span class="p">,</span>
         <span class="s2">&quot;dla_local_dram_size&quot;</span><span class="p">:</span> <span class="n">dla_local_dram_size</span><span class="p">,</span>
@@ -736,6 +761,8 @@
         <span class="s2">&quot;lazy_engine_init&quot;</span><span class="p">:</span> <span class="n">lazy_engine_init</span><span class="p">,</span>
         <span class="s2">&quot;cache_built_engines&quot;</span><span class="p">:</span> <span class="n">cache_built_engines</span><span class="p">,</span>
         <span class="s2">&quot;reuse_cached_engines&quot;</span><span class="p">:</span> <span class="n">reuse_cached_engines</span><span class="p">,</span>
+        <span class="s2">&quot;use_explicit_typing&quot;</span><span class="p">:</span> <span class="n">use_explicit_typing</span><span class="p">,</span>
+        <span class="s2">&quot;use_fp32_acc&quot;</span><span class="p">:</span> <span class="n">use_fp32_acc</span><span class="p">,</span>
     <span class="p">}</span>
 
     <span class="n">settings</span> <span class="o">=</span> <span class="n">CompilationSettings</span><span class="p">(</span><span class="o">**</span><span class="n">compilation_options</span><span class="p">)</span>
@@ -769,11 +796,9 @@
     <span class="n">dryrun_tracker</span> <span class="o">=</span> <span class="n">DryRunTracker</span><span class="p">()</span>
     <span class="k">if</span> <span class="n">sample_kwarg_inputs</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">sample_kwarg_inputs</span> <span class="o">=</span> <span class="p">{}</span>
-    <span class="c1"># Assume converters support dynamic shapes and disable validation</span>
-    <span class="n">CONVERTERS</span><span class="o">.</span><span class="n">set_dynamic_shape_support</span><span class="p">(</span><span class="n">settings</span><span class="o">.</span><span class="n">assume_dynamic_shape_support</span><span class="p">)</span>
 
-    <span class="c1"># Set torch-executed ops</span>
-    <span class="n">CONVERTERS</span><span class="o">.</span><span class="n">set_disallowed_targets</span><span class="p">(</span><span class="n">settings</span><span class="o">.</span><span class="n">torch_executed_ops</span><span class="p">)</span>
+    <span class="c1"># Configure user compilation settings to converters.</span>
+    <span class="n">CONVERTERS</span><span class="o">.</span><span class="n">set_compilation_settings</span><span class="p">(</span><span class="n">settings</span><span class="p">)</span>
 
     <span class="c1"># Check the number of supported operations in the graph</span>
     <span class="n">num_supported_ops</span><span class="p">,</span> <span class="n">total_ops</span> <span class="o">=</span> <span class="n">partitioning</span><span class="o">.</span><span class="n">get_graph_converter_support</span><span class="p">(</span>
@@ -823,7 +848,6 @@
 
     <span class="c1"># Partition module into components that can be TRT-accelerated</span>
     <span class="n">fast_partitioner_failed</span> <span class="o">=</span> <span class="kc">False</span>
-
     <span class="c1"># If specified, try using the fast partitioner and fall back to the global one on failure</span>
     <span class="k">if</span> <span class="n">settings</span><span class="o">.</span><span class="n">use_fast_partitioner</span><span class="p">:</span>
         <span class="k">try</span><span class="p">:</span>
@@ -865,6 +889,9 @@
     <span class="c1"># Generate the corresponding TRT Module for those</span>
     <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">_</span> <span class="ow">in</span> <span class="n">partitioned_module</span><span class="o">.</span><span class="n">named_children</span><span class="p">():</span>
         <span class="n">submodule</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">partitioned_module</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span>
+        <span class="c1"># filter on the GraphModule</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">submodule</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">graph_module</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">):</span>
+            <span class="k">continue</span>
         <span class="c1"># Criteria for a module to be convertible to TRT</span>
         <span class="k">if</span> <span class="n">settings</span><span class="o">.</span><span class="n">use_fast_partitioner</span> <span class="ow">and</span> <span class="s2">&quot;_run_on_acc&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">name</span><span class="p">:</span>
             <span class="n">dryrun_tracker</span><span class="o">.</span><span class="n">to_run_in_torch</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">parse_non_trt_nodes</span><span class="p">(</span><span class="n">submodule</span><span class="p">))</span>
@@ -968,7 +995,7 @@
     <span class="n">require_full_compilation</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">REQUIRE_FULL_COMPILATION</span><span class="p">,</span>
     <span class="n">disable_tf32</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">DISABLE_TF32</span><span class="p">,</span>
     <span class="n">sparse_weights</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">SPARSE_WEIGHTS</span><span class="p">,</span>
-    <span class="n">make_refitable</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">MAKE_REFITABLE</span><span class="p">,</span>
+    <span class="n">make_refittable</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">MAKE_REFITTABLE</span><span class="p">,</span>
     <span class="n">engine_capability</span><span class="p">:</span> <span class="n">EngineCapability</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">ENGINE_CAPABILITY</span><span class="p">,</span>
     <span class="n">num_avg_timing_iters</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">NUM_AVG_TIMING_ITERS</span><span class="p">,</span>
     <span class="n">dla_sram_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">DLA_SRAM_SIZE</span><span class="p">,</span>
@@ -977,6 +1004,8 @@
     <span class="n">calibrator</span><span class="p">:</span> <span class="nb">object</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">allow_shape_tensors</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
     <span class="n">timing_cache_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">TIMING_CACHE_PATH</span><span class="p">,</span>
+    <span class="n">use_explicit_typing</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">USE_EXPLICIT_TYPING</span><span class="p">,</span>
+    <span class="n">use_fp32_acc</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">USE_FP32_ACC</span><span class="p">,</span>
     <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bytes</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Convert an ExportedProgram to a serialized TensorRT engine</span>
@@ -1035,6 +1064,8 @@
 <span class="sd">        calibrator (Union(torch_tensorrt._C.IInt8Calibrator, tensorrt.IInt8Calibrator)): Calibrator object which will provide data to the PTQ system for INT8 Calibration</span>
 <span class="sd">        allow_shape_tensors: (Experimental) Allow aten::size to output shape tensors using IShapeLayer in TensorRT</span>
 <span class="sd">        timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation</span>
+<span class="sd">        use_explicit_typing (bool): This flag enables strong typing in TensorRT compilation which respects the precisions set in the Pytorch model. This is useful when users have mixed precision graphs.</span>
+<span class="sd">        use_fp32_acc (bool): This option inserts cast to FP32 nodes around matmul layers and TensorRT ensures the accumulation of matmul happens in FP32. Use this only when FP16 precision is configured in enabled_precisions.</span>
 <span class="sd">    Returns:</span>
 <span class="sd">        bytes: Serialized TensorRT engine, can either be saved to a file or deserialized via TensorRT APIs</span>
 <span class="sd">    &quot;&quot;&quot;</span>
@@ -1055,7 +1086,7 @@
             <span class="p">)</span>
     <span class="k">if</span> <span class="s2">&quot;refit&quot;</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">keys</span><span class="p">():</span>
         <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
-            <span class="s2">&quot;Refit is deprecated. Please use make_refitable=True if you want to enable refitting of the engine.&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;Refit is deprecated. Please use make_refittable=True if you want to enable refitting of the engine.&quot;</span><span class="p">,</span>
             <span class="ne">DeprecationWarning</span><span class="p">,</span>
             <span class="n">stacklevel</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
         <span class="p">)</span>
@@ -1101,13 +1132,15 @@
         <span class="s2">&quot;require_full_compilation&quot;</span><span class="p">:</span> <span class="n">require_full_compilation</span><span class="p">,</span>
         <span class="s2">&quot;disable_tf32&quot;</span><span class="p">:</span> <span class="n">disable_tf32</span><span class="p">,</span>
         <span class="s2">&quot;sparse_weights&quot;</span><span class="p">:</span> <span class="n">sparse_weights</span><span class="p">,</span>
-        <span class="s2">&quot;make_refitable&quot;</span><span class="p">:</span> <span class="n">make_refitable</span><span class="p">,</span>
+        <span class="s2">&quot;make_refittable&quot;</span><span class="p">:</span> <span class="n">make_refittable</span><span class="p">,</span>
         <span class="s2">&quot;engine_capability&quot;</span><span class="p">:</span> <span class="n">engine_capability</span><span class="p">,</span>
         <span class="s2">&quot;num_avg_timing_iters&quot;</span><span class="p">:</span> <span class="n">num_avg_timing_iters</span><span class="p">,</span>
         <span class="s2">&quot;dla_sram_size&quot;</span><span class="p">:</span> <span class="n">dla_sram_size</span><span class="p">,</span>
         <span class="s2">&quot;dla_local_dram_size&quot;</span><span class="p">:</span> <span class="n">dla_local_dram_size</span><span class="p">,</span>
         <span class="s2">&quot;dla_global_dram_size&quot;</span><span class="p">:</span> <span class="n">dla_global_dram_size</span><span class="p">,</span>
         <span class="s2">&quot;timing_cache_path&quot;</span><span class="p">:</span> <span class="n">timing_cache_path</span><span class="p">,</span>
+        <span class="s2">&quot;use_explicit_typing&quot;</span><span class="p">:</span> <span class="n">use_explicit_typing</span><span class="p">,</span>
+        <span class="s2">&quot;use_fp32_acc&quot;</span><span class="p">:</span> <span class="n">use_fp32_acc</span><span class="p">,</span>
     <span class="p">}</span>
 
     <span class="n">exported_program</span> <span class="o">=</span> <span class="n">pre_export_lowering</span><span class="p">(</span><span class="n">exported_program</span><span class="p">)</span>
@@ -1125,8 +1158,8 @@
     <span class="n">settings</span> <span class="o">=</span> <span class="n">CompilationSettings</span><span class="p">(</span><span class="o">**</span><span class="n">compilation_options</span><span class="p">)</span>
     <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Compilation Settings: </span><span class="si">%s</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">settings</span><span class="p">)</span>
 
-    <span class="c1"># Assume converters support dynamic shapes and disable validation</span>
-    <span class="n">CONVERTERS</span><span class="o">.</span><span class="n">set_dynamic_shape_support</span><span class="p">(</span><span class="n">settings</span><span class="o">.</span><span class="n">assume_dynamic_shape_support</span><span class="p">)</span>
+    <span class="c1"># Configure user compilation settings to converters.</span>
+    <span class="n">CONVERTERS</span><span class="o">.</span><span class="n">set_compilation_settings</span><span class="p">(</span><span class="n">settings</span><span class="p">)</span>
 
     <span class="k">try</span><span class="p">:</span>
         <span class="n">interpreter_result</span> <span class="o">=</span> <span class="n">interpret_module_to_result</span><span class="p">(</span>

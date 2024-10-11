@@ -43,11 +43,11 @@ inputs = [torch.rand((1, 3, 224, 224)).to("cuda")]
 
 
 # %%
-# Make a Refitable Compilation Program
+# Make a refittable Compilation Program
 # ---------------------------------------
 #
 # The inital step is to compile a module and save it as with a normal. Note that there is an
-# additional parameter `make_refitable` that is set to `True`. This parameter is used to
+# additional parameter `make_refittable` that is set to `True`. This parameter is used to
 # indicate that the engine being built should support weight refitting later. Engines built without
 # these setttings will not be able to be refit.
 #

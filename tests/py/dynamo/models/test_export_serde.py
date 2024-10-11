@@ -382,6 +382,64 @@ def test_hybrid_conv_fallback(ir):
 
 
 @pytest.mark.unit
+def test_arange_export(ir):
+    """
+    This tests export save and load functionality on a arange static graph
+    Here the arange output is a static constant (which is registered as input to the graph)
+    in the exporter.
+    """
+
+    class MyModule(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+
+        def forward(self, x):
+            x_embed = torch.arange(
+                1, x.shape[-1] + 1, dtype=torch.float32, device=x.device
+            )
+            return x_embed
+
+    model = MyModule().eval().cuda()
+    input = torch.randn((1, 1, 128, 128)).to("cuda")
+
+    compile_spec = {
+        "inputs": [
+            torchtrt.Input(
+                input.shape, dtype=torch.float, format=torch.contiguous_format
+            )
+        ],
+        "ir": ir,
+        "min_block_size": 1,
+        "cache_built_engines": False,
+        "reuse_cached_engines": False,
+    }
+
+    exp_program = torchtrt.dynamo.trace(model, **compile_spec)
+    trt_module = torchtrt.dynamo.compile(exp_program, **compile_spec)
+
+    torchtrt.save(trt_module, trt_ep_path, inputs=[input])
+
+    deser_trt_module = torchtrt.load(trt_ep_path).module()
+    outputs_pyt = model(input)
+    outputs_trt = trt_module(input)
+
+    for idx in range(len(outputs_pyt)):
+        cos_sim = cosine_similarity(outputs_pyt[idx], outputs_trt[idx])
+        assertions.assertTrue(
+            cos_sim > COSINE_THRESHOLD,
+            msg=f"test_arange_export TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
+        )
+
+    outputs_trt_deser = deser_trt_module(input)
+    for idx in range(len(outputs_pyt)):
+        cos_sim = cosine_similarity(outputs_pyt[idx], outputs_trt_deser[idx])
+        assertions.assertTrue(
+            cos_sim > COSINE_THRESHOLD,
+            msg=f"test_arange_export deserialized TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
+        )
+
+
+@pytest.mark.unit
 def test_save_load_ts(ir):
     """
     This tests save/load API on Torchscript format (model still compiled using dynamo workflow)

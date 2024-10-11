@@ -23,7 +23,7 @@ from torch_tensorrt.dynamo.lowering import (
     pre_export_lowering,
 )
 from torch_tensorrt.dynamo.runtime import PythonTorchTensorRTModule
-from torch_tensorrt.dynamo.utils import ATOL, RTOL, get_torch_inputs
+from torch_tensorrt.dynamo.utils import ATOL, RTOL, get_model_device, get_torch_inputs
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -225,7 +225,6 @@ class DispatchTestCase(TRTTestCase):
         propagate_shapes: bool = False,
     ):
         mod = mod.eval()
-        torch_inputs = get_torch_inputs(original_inputs, _defaults.DEVICE)
         if use_dynamo_tracer:
             exported_program = torch_tensorrt.dynamo.trace(mod, tuple(original_inputs))
             exported_program = pre_export_lowering(exported_program)
@@ -242,6 +241,8 @@ class DispatchTestCase(TRTTestCase):
         if propagate_shapes:
             # TODO: This is currently being used to test embedding_bag_aten due to https://github.com/pytorch/TensorRT/issues/2843
             try:
+                device = get_model_device(fx_module)
+                torch_inputs = get_torch_inputs(original_inputs, device)
                 ShapeProp(fx_module).propagate(*torch_inputs)
             except (RuntimeError, AssertionError):
                 _LOGGER.warning(
@@ -262,6 +263,7 @@ class DispatchTestCase(TRTTestCase):
         enable_passes=False,
         propagate_shapes=False,
         int32_reqd=False,
+        make_refittable=False,
     ):
         mod = self.generate_graph(
             mod,
@@ -277,6 +279,7 @@ class DispatchTestCase(TRTTestCase):
             enabled_precisions={dtype._from(precision)},
             truncate_double=True,
             debug=True,
+            make_refittable=make_refittable,
         )
 
         num_inputs = len(inputs)
@@ -345,6 +348,7 @@ class DispatchTestCase(TRTTestCase):
         output_dtypes=None,
         use_dynamo_tracer=False,
         enable_passes=False,
+        make_refittable=False,
     ):
         mod = self.generate_graph(
             mod,
@@ -358,6 +362,7 @@ class DispatchTestCase(TRTTestCase):
             enabled_precisions={dtype._from(precision)},
             truncate_double=True,
             debug=True,
+            make_refittable=make_refittable,
         )
 
         interp = TRTInterpreter(
@@ -383,6 +388,7 @@ class DispatchTestCase(TRTTestCase):
         pyt_inputs=None,
         propagate_shapes=False,
         check_dtype=True,
+        make_refittable=False,
     ):
         mod = self.generate_graph(
             mod,
@@ -394,7 +400,9 @@ class DispatchTestCase(TRTTestCase):
 
         # Previous instance of the interpreter auto-casted 64-bit inputs
         # We replicate this behavior here
-        compilation_settings = CompilationSettings(truncate_double=True)
+        compilation_settings = CompilationSettings(
+            truncate_double=True, make_refittable=make_refittable
+        )
 
         if check_dtype:
             output_dtypes = infer_module_output_dtypes(

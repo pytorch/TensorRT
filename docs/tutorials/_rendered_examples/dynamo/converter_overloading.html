@@ -1,0 +1,1006 @@
+
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Overloading Torch-TensorRT Converters with Custom Converters &mdash; Torch-TensorRT v2.6.0.dev0+6ba44fa documentation</title>
+  
+
+  
+  
+  
+  
+
+  
+
+  
+  
+    
+
+  
+
+  <link rel="stylesheet" href="../../../_static/css/theme.css" type="text/css" />
+  <!-- <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" /> -->
+  <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="../../../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../../../_static/sg_gallery.css" type="text/css" />
+  <link rel="stylesheet" href="../../../_static/sg_gallery-binder.css" type="text/css" />
+  <link rel="stylesheet" href="../../../_static/sg_gallery-dataframe.css" type="text/css" />
+  <link rel="stylesheet" href="../../../_static/sg_gallery-rendered-html.css" type="text/css" />
+  <link rel="stylesheet" href="../../../_static/collapsible-lists/css/tree_view.css" type="text/css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.10.0-beta/dist/katex.min.css" type="text/css" />
+  <link rel="stylesheet" href="../../../_static/css/custom.css" type="text/css" />
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+    <link rel="next" title="Using Custom Kernels within TensorRT Engines with Torch-TensorRT" href="custom_kernel_plugins.html" />
+    <link rel="prev" title="Torch Export with Cudagraphs" href="torch_export_cudagraphs.html" />
+  <!-- Google Tag Manager -->
+    <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+    new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+    j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+    'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+    })(window,document,'script','dataLayer','');</script>
+    <!-- End Google Tag Manager -->
+  
+
+  
+  <script src="../../../_static/js/modernizr.min.js"></script>
+
+  <!-- Preload the theme fonts -->
+
+<link rel="preload" href="../../../_static/fonts/FreightSans/freight-sans-book.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="../../../_static/fonts/FreightSans/freight-sans-medium.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="../../../_static/fonts/IBMPlexMono/IBMPlexMono-Medium.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="../../../_static/fonts/FreightSans/freight-sans-bold.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="../../../_static/fonts/FreightSans/freight-sans-medium-italic.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="../../../_static/fonts/IBMPlexMono/IBMPlexMono-SemiBold.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+
+<!-- Preload the katex fonts -->
+
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/fonts/KaTeX_Math-Italic.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/fonts/KaTeX_Main-Regular.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/fonts/KaTeX_Main-Bold.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/fonts/KaTeX_Size1-Regular.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/fonts/KaTeX_Size4-Regular.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/fonts/KaTeX_Size2-Regular.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/fonts/KaTeX_Size3-Regular.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/fonts/KaTeX_Caligraphic-Regular.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.15.2/css/all.css" integrity="sha384-vSIIfh2YWi9wW0r9iZe7RJPrKwp6bG+s9QZMoITbCckVJqGCCRhc+ccxNcdpHuYu" crossorigin="anonymous">
+</head>
+
+<div class="container-fluid header-holder tutorials-header" id="header-holder">
+  <div class="container">
+    <div class="header-container">
+      <a class="header-logo" href="https://pytorch.org/" aria-label="PyTorch"></a>
+
+      <div class="main-menu">
+        <ul>
+
+          <li class="main-menu-item">
+          <div id="resourcesDropdownButton" data-toggle="resources-dropdown" class="resources-dropdown">
+              <a class="with-down-arrow">
+                Learn
+              </a>
+              <div class="resources-dropdown-menu">
+                <a class="nav-dropdown-item" href="https://pytorch.org/get-started">
+                  <span class=dropdown-title>Get Started</span>
+                  <p>Run PyTorch locally or get started quickly with one of the supported cloud platforms</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/tutorials">
+                  <span class="dropdown-title">Tutorials</span>
+                  <p>Whats new in PyTorch tutorials</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/tutorials/beginner/basics/intro.html">
+                  <span class="dropdown-title">Learn the Basics</span>
+                  <p>Familiarize yourself with PyTorch concepts and modules</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/tutorials/recipes/recipes_index.html">
+                  <span class="dropdown-title">PyTorch Recipes</span>
+                  <p>Bite-size, ready-to-deploy PyTorch code examples</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/tutorials/beginner/introyt.html">
+                  <span class="dropdown-title">Intro to PyTorch - YouTube Series</span>
+                  <p>Master PyTorch basics with our engaging YouTube tutorial series</p>
+                </a>
+              </div>
+            </div>
+          </li>
+
+          <li>
+          <div id="resourcesDropdownButton" data-toggle="resources-dropdown" class="resources-dropdown">
+              <a class="with-down-arrow">
+                Ecosystem
+              </a>
+              <div class="resources-dropdown-menu">
+                <a class="nav-dropdown-item" href="https://pytorch.org/ecosystem">
+                  <span class="dropdown-title">Tools</span>
+                  <p>Learn about the tools and frameworks in the PyTorch Ecosystem</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/#community-module">
+                  <span class=dropdown-title>Community</span>
+                  <p>Join the PyTorch developer community to contribute, learn, and get your questions answered</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://discuss.pytorch.org/" target="_blank">
+                  <span class=dropdown-title>Forums</span>
+                  <p>A place to discuss PyTorch code, issues, install, research</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/resources">
+                  <span class=dropdown-title>Developer Resources</span>
+                  <p>Find resources and get questions answered</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/ecosystem/contributor-awards-2023">
+                  <span class="dropdown-title">Contributor Awards - 2023</span>
+                  <p>Award winners announced at this year's PyTorch Conference</p>
+                </a>
+              </div>
+            </div>
+          </li>
+
+          <li>
+          <div id="resourcesDropdownButton" data-toggle="resources-dropdown" class="resources-dropdown">
+              <a class="with-down-arrow">
+                Edge
+              </a>
+              <div class="resources-dropdown-menu">
+                <a class="nav-dropdown-item" href="https://pytorch.org/edge">
+                  <span class="dropdown-title">About PyTorch Edge</span>
+                  <p>Build innovative and privacy-aware AI experiences for edge devices</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/executorch-overview">
+                  <span class="dropdown-title">ExecuTorch</span>
+                  <p>End-to-end solution for enabling on-device inference capabilities across mobile and edge devices</p>
+                </a>
+              </div>
+            </div>  
+          </li>
+
+          <li class="main-menu-item">
+            <div id="resourcesDropdownButton" data-toggle="resources-dropdown" class="resources-dropdown">
+              <a class="with-down-arrow">
+                Docs
+              </a>
+              <div class="resources-dropdown-menu">
+                <a class="nav-dropdown-item" href="https://pytorch.org/docs/stable/index.html">
+                  <span class="dropdown-title">PyTorch</span>
+                  <p>Explore the documentation for comprehensive guidance on how to use PyTorch</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/pytorch-domains">
+                  <span class="dropdown-title">PyTorch Domains</span>
+                  <p>Read the PyTorch Domains documentation to learn more about domain-specific libraries</p>
+                </a>
+              </div>
+            </div>
+          </li>
+
+          <li>
+            <div id="resourcesDropdownButton" data-toggle="resources-dropdown" class="resources-dropdown">
+              <a class="with-down-arrow">
+                Blogs & News 
+              </a>
+              <div class="resources-dropdown-menu">
+                <a class="nav-dropdown-item" href="https://pytorch.org/blog/">
+                  <span class="dropdown-title">PyTorch Blog</span>
+                  <p>Catch up on the latest technical news and happenings</p>
+                </a>
+                 <a class="nav-dropdown-item" href="https://pytorch.org/community-blog">
+                  <span class="dropdown-title">Community Blog</span>
+                  <p>Stories from the PyTorch ecosystem</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/videos">
+                  <span class="dropdown-title">Videos</span>
+                  <p>Learn about the latest PyTorch tutorials, new, and more </p>
+                <a class="nav-dropdown-item" href="https://pytorch.org/community-stories">
+                  <span class="dropdown-title">Community Stories</span>
+                  <p>Learn how our community solves real, everyday machine learning problems with PyTorch</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/events">
+                  <span class="dropdown-title">Events</span>
+                  <p>Find events, webinars, and podcasts</p>
+                </a>
+            </div>
+          </li>
+
+          <li>
+            <div id="resourcesDropdownButton" data-toggle="resources-dropdown" class="resources-dropdown">
+              <a class="with-down-arrow">
+                About
+              </a>
+              <div class="resources-dropdown-menu">
+                <a class="nav-dropdown-item" href="https://pytorch.org/foundation">
+                  <span class="dropdown-title">PyTorch Foundation</span>
+                  <p>Learn more about the PyTorch Foundation</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/governing-board">
+                  <span class="dropdown-title">Governing Board</span>
+                  <p></p>
+                </a>
+              </div>
+            </div>
+          </li>
+
+          <li class="main-menu-item">
+            <div class="no-dropdown">
+              <a href="https://pytorch.org/join" data-cta="join">
+                Become a Member
+              </a>
+            </div>
+          </li>
+          <li>
+           <div class="main-menu-item">
+             <a href="https://github.com/pytorch/pytorch" class="github-icon">
+             </a>
+           </div>
+          </li>
+          <!--- TODO: This block adds the search icon to the nav bar. We will enable it later. 
+          <li>
+            <div class="main-menu-item">
+             <a href="https://github.com/pytorch/pytorch" class="search-icon">
+             </a>
+            </div>
+          </li>
+          --->
+        </ul>
+      </div>
+
+      <a class="main-menu-open-button" href="#" data-behavior="open-mobile-menu"></a>
+    </div>
+  </div>
+</div>
+
+<body class="pytorch-body">
+
+   
+
+    
+
+    <div class="table-of-contents-link-wrapper">
+      <span>Table of Contents</span>
+      <a href="#" class="toggle-table-of-contents" data-behavior="toggle-table-of-contents"></a>
+    </div>
+
+    <nav data-toggle="wy-nav-shift" class="pytorch-left-menu" id="pytorch-left-menu">
+      <div class="pytorch-side-scroll">
+        <div class="pytorch-menu pytorch-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          <div class="pytorch-left-menu-search">
+            
+
+            
+              
+              
+                <div class="version">
+                  v2.6.0.dev0+6ba44fa
+                </div>
+              
+            
+
+            
+
+
+  
+
+
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search Docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+            
+          </div>
+
+          
+            
+            
+              
+            
+            
+              <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../getting_started/installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../getting_started/quick_start.html">Quick Start</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User Guide</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../user_guide/torch_tensorrt_explained.html">Torch-TensorRT Explained</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../user_guide/dynamic_shapes.html">Dynamic shapes with Torch-TensorRT</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../user_guide/saving_models.html">Saving models compiled with Torch-TensorRT</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../user_guide/runtime.html">Deploying Torch-TensorRT Programs</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../user_guide/using_dla.html">DLA</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../user_guide/mixed_precision.html">Compile Mixed Precision models with Torch-TensorRT</a></li>
+<li class="toctree-l1"><a class="reference internal" href="torch_compile_advanced_usage.html">Torch Compile Advanced Usage</a></li>
+<li class="toctree-l1"><a class="reference internal" href="vgg16_ptq.html">Deploy Quantized Models using Torch-TensorRT</a></li>
+<li class="toctree-l1"><a class="reference internal" href="engine_caching_example.html">Engine Caching</a></li>
+<li class="toctree-l1"><a class="reference internal" href="refit_engine_example.html">Refitting Torch-TensorRT Programs with New Weights</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Dynamo Frontend</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../dynamo/torch_compile.html">TensorRT Backend for <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code></a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../dynamo/dynamo_export.html">Compiling Exported Programs with Torch-TensorRT</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">TorchScript Frontend</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../ts/creating_torchscript_module_in_python.html">Creating a TorchScript Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../ts/creating_torchscript_module_in_python.html#working-with-torchscript-in-python">Working with TorchScript in Python</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../ts/creating_torchscript_module_in_python.html#saving-torchscript-module-to-disk">Saving TorchScript Module to Disk</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../ts/getting_started_with_python_api.html">Using Torch-TensorRT in Python</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../ts/getting_started_with_cpp_api.html">Using Torch-TensorRT in  C++</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../ts/ptq.html">Post Training Quantization (PTQ)</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">FX Frontend</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../fx/getting_started_with_fx_path.html">Torch-TensorRT (FX Frontend) User Guide</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../serving_torch_tensorrt_with_triton.html">Serving a Torch-TensorRT model with Triton</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../notebooks.html">Example notebooks</a></li>
+<li class="toctree-l1"><a class="reference internal" href="torch_compile_resnet_example.html">Compiling ResNet using the Torch-TensorRT <cite>torch.compile</cite> Backend</a></li>
+<li class="toctree-l1"><a class="reference internal" href="torch_compile_transformers_example.html">Compiling a Transformer using torch.compile and TensorRT</a></li>
+<li class="toctree-l1"><a class="reference internal" href="torch_compile_stable_diffusion.html">Torch Compile Stable Diffusion</a></li>
+<li class="toctree-l1"><a class="reference internal" href="torch_export_cudagraphs.html">Torch Export with Cudagraphs</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Overloading Torch-TensorRT Converters with Custom Converters</a></li>
+<li class="toctree-l1"><a class="reference internal" href="custom_kernel_plugins.html">Using Custom Kernels within TensorRT Engines with Torch-TensorRT</a></li>
+<li class="toctree-l1"><a class="reference internal" href="mutable_torchtrt_module_example.html">Mutable Torch TensorRT Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="torch_export_gpt2.html">Compiling GPT2 using the Torch-TensorRT with dynamo backend</a></li>
+<li class="toctree-l1"><a class="reference internal" href="torch_export_gpt2.html#the-output-sentences-should-look-like">The output sentences should look like</a></li>
+<li class="toctree-l1"><a class="reference internal" href="torch_export_llama2.html">Compiling Llama2 using the Torch-TensorRT with dynamo backend</a></li>
+<li class="toctree-l1"><a class="reference internal" href="torch_export_llama2.html#the-output-sentences-should-look-like">The output sentences should look like</a></li>
+<li class="toctree-l1"><a class="reference internal" href="torch_export_llama2.html#pytorch-model-generated-text-dynamic-programming-is-an-algorithmic-technique-used-to-solve-complex-problems-by-breaking-them-down-into-smaller-subproblems-solving-each-subproblem-only-once-and">Pytorch model generated text:  Dynamic programming is an algorithmic technique used to solve complex problems by breaking them down into smaller subproblems, solving each subproblem only once, and</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Python API Documentation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../py_api/torch_tensorrt.html">torch_tensorrt</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../py_api/dynamo.html">torch_tensorrt.dynamo</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../py_api/logging.html">torch_tensorrt.logging</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../py_api/fx.html">torch_tensorrt.fx</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../py_api/ts.html">torch_tensorrt.ts</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../py_api/ptq.html">torch_tensorrt.ts.ptq</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">C++ API Documentation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../_cpp_api/torch_tensort_cpp.html">Torch-TensorRT C++ API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../_cpp_api/namespace_torch_tensorrt.html">Namespace torch_tensorrt</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../_cpp_api/namespace_torch_tensorrt__logging.html">Namespace torch_tensorrt::logging</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../_cpp_api/namespace_torch_tensorrt__torchscript.html">Namespace torch_tensorrt::torchscript</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../_cpp_api/namespace_torch_tensorrt__ptq.html">Namespace torch_tensorrt::ptq</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">CLI Documentation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../cli/torchtrtc.html">torchtrtc</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Contributor Documentation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../contributors/system_overview.html">System Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../contributors/dynamo_converters.html">Writing Dynamo Converters</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../contributors/writing_dynamo_aten_lowering_passes.html">Writing Dynamo ATen Lowering Passes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../contributors/ts_converters.html">Writing TorchScript Converters</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../contributors/useful_links.html">Useful Links for Torch-TensorRT Development</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Indices</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../indices/supported_ops.html">Operators Supported</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <div class="pytorch-container">
+      <div class="pytorch-page-level-bar" id="pytorch-page-level-bar">
+        <div class="pytorch-breadcrumbs-wrapper">
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="pytorch-breadcrumbs">
+    
+      <li>
+        <a href="../../../index.html">
+          
+            Docs
+          
+        </a> &gt;
+      </li>
+
+        
+      <li>Overloading Torch-TensorRT Converters with Custom Converters</li>
+    
+    
+      <li class="pytorch-breadcrumbs-aside">
+        
+            
+            <a href="../../../_sources/tutorials/_rendered_examples/dynamo/converter_overloading.rst.txt" rel="nofollow"><img src="../../../_static/images/view-page-source-icon.svg"></a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+</div>
+        </div>
+
+        <div class="pytorch-shortcuts-wrapper" id="pytorch-shortcuts-wrapper">
+          Shortcuts
+        </div>
+      </div>
+
+      <section data-toggle="wy-nav-shift" id="pytorch-content-wrap" class="pytorch-content-wrap">
+        <div class="pytorch-content-left">
+
+        
+          <!-- Google Tag Manager (noscript) -->
+          <noscript><iframe src="https://www.googletagmanager.com/ns.html?id="
+          height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+          <!-- End Google Tag Manager (noscript) -->
+          
+          <div class="rst-content">
+          
+            <div role="main" class="main-content" itemscope="itemscope" itemtype="http://schema.org/Article">
+             <article itemprop="articleBody" id="pytorch-article" class="pytorch-article">
+              
+  <div class="sphx-glr-download-link-note admonition note">
+<p class="admonition-title">Note</p>
+<p><a class="reference internal" href="#sphx-glr-download-tutorials-rendered-examples-dynamo-converter-overloading-py"><span class="std std-ref">Go to the end</span></a>
+to download the full example code</p>
+</div>
+<section class="sphx-glr-example-title" id="overloading-torch-tensorrt-converters-with-custom-converters">
+<span id="converter-overloading"></span><span id="sphx-glr-tutorials-rendered-examples-dynamo-converter-overloading-py"></span><h1>Overloading Torch-TensorRT Converters with Custom Converters<a class="headerlink" href="#overloading-torch-tensorrt-converters-with-custom-converters" title="Permalink to this heading">¶</a></h1>
+<p>If for some reason you want to change the conversion behavior of a specific PyTorch operation to TensorRT, you can do so by writing a custom converter and overloading Torch-TensorRT’s.
+This may be for reasons like wanting to use a custom kernel instead of TensorRT’s kernels or because you want to use a different implementation of a layer in TensorRT than the one
+Torch-TensorRT would normally use.</p>
+<p>In this tutorial, we will demonstrate how to overload Torch-TensorRT’s conversion of the <cite>torch.nn.functional.gelu</cite> operation to TensorRT with a custom converter that uses a different implementation
+of the GeLU layer.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">import</span> <span class="nn">sys</span>
+
+<span class="kn">import</span> <span class="nn">torch</span>
+<span class="kn">import</span> <span class="nn">torch_tensorrt</span>
+</pre></div>
+</div>
+<p>GeLU has 2 modes in PyTorch, one using the <code class="docutils literal notranslate"><span class="pre">erf</span></code> function and the other using the <code class="docutils literal notranslate"><span class="pre">tanh</span></code> approximation.
+TensorRT natively supports both implementations as an activation layer, but suppose we want to use a custom implementation of GeLU in TensorRT only for <code class="docutils literal notranslate"><span class="pre">tanh</span></code> mode.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">class</span> <span class="nc">GeLU</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;tanh&quot;</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">mode</span> <span class="o">=</span> <span class="n">mode</span>
+
+    <span class="k">def</span> <span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">functional</span><span class="o">.</span><span class="n">gelu</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">approximate</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">mode</span><span class="p">)</span>
+
+
+<span class="n">my_mod</span> <span class="o">=</span> <span class="n">GeLU</span><span class="p">(</span><span class="n">mode</span><span class="o">=</span><span class="s2">&quot;tanh&quot;</span><span class="p">)</span>
+<span class="n">ex_input</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">5</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">&quot;cuda&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>As a baseline, we can use the standard Torch-TensorRT GeLU converter (in tanh approximation mode) with our module.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">my_standard_gelu</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span>
+    <span class="n">my_mod</span><span class="p">,</span> <span class="n">arg_inputs</span><span class="o">=</span><span class="p">(</span><span class="n">ex_input</span><span class="p">,),</span> <span class="n">min_block_size</span><span class="o">=</span><span class="mi">1</span>
+<span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">my_standard_gelu</span><span class="o">.</span><span class="n">graph</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">my_standard_gelu</span><span class="p">(</span><span class="n">ex_input</span><span class="p">))</span>
+</pre></div>
+</div>
+<section id="writing-a-custom-converter">
+<h2>Writing a Custom Converter<a class="headerlink" href="#writing-a-custom-converter" title="Permalink to this heading">¶</a></h2>
+<p>Converters are functions that take a specific instance of a PyTorch operation in a PyTorch graph and convert it to an equivalent set TensorRT operations in an under-construction TensorRT graph.
+They are registered with Torch-TensorRT using the <code class="docutils literal notranslate"><span class="pre">&#64;torch_tensorrt.dynamo.conversion.dynamo_tensorrt_converter</span></code> decorator.
+At a code level, converter takes the current conversion state (<code class="docutils literal notranslate"><span class="pre">ConversionCtx</span></code>), the next operator in the graph to convert, and the arguments to that node
+and returns the placeholder outputs for that operation, while as side-effect inserting the necessary TensorRT layers into the TensorRT network.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">Sequence</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">,</span> <span class="n">Union</span>
+
+<span class="kn">from</span> <span class="nn">torch.fx.node</span> <span class="kn">import</span> <span class="n">Argument</span><span class="p">,</span> <span class="n">Node</span><span class="p">,</span> <span class="n">Target</span>
+<span class="kn">from</span> <span class="nn">torch_tensorrt.dynamo</span> <span class="kn">import</span> <span class="n">CompilationSettings</span>
+<span class="kn">from</span> <span class="nn">torch_tensorrt.dynamo.conversion</span> <span class="kn">import</span> <span class="n">ConversionContext</span>
+
+<span class="kn">import</span> <span class="nn">tensorrt</span> <span class="k">as</span> <span class="nn">trt</span>
+</pre></div>
+</div>
+<section id="converter-metadata">
+<h3>Converter Metadata<a class="headerlink" href="#converter-metadata" title="Permalink to this heading">¶</a></h3>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="nd">@torch_tensorrt</span><span class="o">.</span><span class="n">dynamo</span><span class="o">.</span><span class="n">conversion</span><span class="o">.</span><span class="n">dynamo_tensorrt_converter</span><span class="p">(</span>
+    <span class="c1"># The PyTorch operation to convert, when this operation is encountered, this converter will be called</span>
+    <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">aten</span><span class="o">.</span><span class="n">gelu</span><span class="o">.</span><span class="n">default</span><span class="p">,</span>
+    <span class="c1"># Validators are functions that determine that given a specific node, if it can be converted by the converter</span>
+    <span class="n">capability_validator</span><span class="o">=</span><span class="k">lambda</span> <span class="n">node</span><span class="p">,</span> <span class="n">settings</span><span class="p">:</span> <span class="p">(</span>
+        <span class="s2">&quot;approximate&quot;</span> <span class="ow">in</span> <span class="n">node</span><span class="o">.</span><span class="n">kwargs</span> <span class="ow">and</span> <span class="n">node</span><span class="o">.</span><span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;approximate&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;tanh&quot;</span>
+    <span class="p">),</span>
+    <span class="c1"># Can this converter be used in cases where the input shapes are dynamic</span>
+    <span class="n">supports_dynamic_shapes</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="c1"># Set the priority of the converter to supersede the default one</span>
+    <span class="n">priority</span><span class="o">=</span><span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">dynamo</span><span class="o">.</span><span class="n">conversion</span><span class="o">.</span><span class="n">ConverterPriority</span><span class="o">.</span><span class="n">HIGH</span><span class="p">,</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p>For the decorator defining a converter, there is one required argument and a few optional ones.
+All converters need a target operator they will run against, the idea being that when there is an instance of <code class="docutils literal notranslate"><span class="pre">torch.ops.aten.gelu.default</span></code> in the graph, this converter will be called.</p>
+<p>Following the target operator, you can provide additional metadata that defines the capabilities of the converter and the priority of the converter verses other possible converters for the target in question</p>
+<p>The primary tool for defining the capabilities of a converter is the <code class="docutils literal notranslate"><span class="pre">capability_validator</span></code> argument,
+which is a lambda function that takes a specific node in the graph as well as the user compilation settings and returns a boolean indicating if the converter can be used for that node.
+This validator function gets run prior to the graph partitioning phase against each instance of the converter target op. Nodes where there are no converters with validators that pass during this phase, will be executed in PyTorch at runtime.
+This is useful for cases where you want to use a custom converter only in specific cases, like in our case where we only want to use our converter when <code class="docutils literal notranslate"><span class="pre">approximate</span> <span class="pre">==</span> <span class="pre">&quot;tanh&quot;</span></code>.</p>
+<p>Distinct to the validator is the <code class="docutils literal notranslate"><span class="pre">supports_dynamic_shapes</span></code> argument, which is a boolean indicating if the converter can be used in cases where the input shapes are dynamic.
+If this is set to <code class="docutils literal notranslate"><span class="pre">False</span></code>, in cases where the inputs provided by the user are dynamic, this converter will be disabled. If there are no alternatives that support dynamic shape, the operation will be run in PyTorch.</p>
+<p>Finally there is the <code class="docutils literal notranslate"><span class="pre">priority</span></code> argument, which is an enum from the <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.dynamo.conversion.ConverterPriority</span></code> class that defines the priority of the converter. The two options are <code class="docutils literal notranslate"><span class="pre">HIGH</span></code> and <code class="docutils literal notranslate"><span class="pre">STANDARD</span></code>.
+Converters registered with <code class="docutils literal notranslate"><span class="pre">STANDARD</span></code> will be appended to the converter list for a given operation, while converters registered with <code class="docutils literal notranslate"><span class="pre">HIGH</span></code> will be prepended to the list.
+Candidate converters are evalated for their suitablity in this priority order and the first converter that passes the validator is used.</p>
+</section>
+<section id="converter-implementation">
+<h3>Converter Implementation<a class="headerlink" href="#converter-implementation" title="Permalink to this heading">¶</a></h3>
+<p>The converter function itself takes the following arguments: the current conversion context, the target operator, the arguments to the target operator, the keyword arguments to the target operator, and the name of the target operator.
+Arguments can either any of python primitives, <code class="docutils literal notranslate"><span class="pre">torch.Tensor</span></code>, <code class="docutils literal notranslate"><span class="pre">np.Arrays</span></code> or <code class="docutils literal notranslate"><span class="pre">ITensor</span></code> objects.
+The converter function should return the outputs of the target operator in terms of TensorRT <code class="docutils literal notranslate"><span class="pre">ITensor</span></code> primarily. These inputs and outputs should correspond to the schema
+of the target PyTorch operator which can be found here <a class="reference external" href="https://pytorch.org/docs/main/torch.compiler_ir.html">https://pytorch.org/docs/main/torch.compiler_ir.html</a>.</p>
+<p>Since Torch-TensorRT covers the core ATen opset, it has already abstracted many of the common low-level operations into helper functions that can be used to build up the TensorRT network.
+This allows developers to avoid the boilerplate of creating the TensorRT layers directly and instead focus on the high-level logic of the conversion.
+The helper functions are located in the <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.dynamo.conversion.impl</span></code> module and are designed to be composable and interoperable with raw-TensorRT implementations.
+In this case, we will use the Torch-TensorRT <code class="docutils literal notranslate"><span class="pre">mul</span></code>, <code class="docutils literal notranslate"><span class="pre">add</span></code> and <code class="docutils literal notranslate"><span class="pre">tanh</span></code> functions from <code class="docutils literal notranslate"><span class="pre">impl</span></code> to implement our alternative GeLU layer.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span> <span class="nf">aten_ops_gelu</span><span class="p">(</span>
+    <span class="n">ctx</span><span class="p">:</span> <span class="n">ConversionContext</span><span class="p">,</span>
+    <span class="n">target</span><span class="p">:</span> <span class="n">Target</span><span class="p">,</span>
+    <span class="n">args</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Argument</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span>
+    <span class="n">kwargs</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Argument</span><span class="p">],</span>
+    <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Union</span><span class="p">[</span><span class="n">trt</span><span class="o">.</span><span class="n">ITensor</span><span class="p">,</span> <span class="n">Sequence</span><span class="p">[</span><span class="n">trt</span><span class="o">.</span><span class="n">ITensor</span><span class="p">]]:</span>
+    <span class="c1"># The schema for torch.ops.aten.gelu.default is gelu(Tensor self, *, str approximate=’none’) -&gt; Tensor</span>
+
+    <span class="kn">from</span> <span class="nn">torch_tensorrt.dynamo</span> <span class="kn">import</span> <span class="n">SourceIR</span>
+    <span class="kn">from</span> <span class="nn">torch_tensorrt.dynamo.conversion</span> <span class="kn">import</span> <span class="n">impl</span>
+
+    <span class="c1"># Cheap way to allow layer names to be unqiue</span>
+    <span class="n">op_count</span> <span class="o">=</span> <span class="mi">0</span>
+
+    <span class="k">def</span> <span class="nf">get_op_count</span><span class="p">():</span>
+        <span class="k">nonlocal</span> <span class="n">op_count</span>
+        <span class="n">op_count</span> <span class="o">+=</span> <span class="mi">1</span>
+        <span class="k">return</span> <span class="n">op_count</span>
+
+    <span class="n">mul</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">:</span> <span class="n">impl</span><span class="o">.</span><span class="n">elementwise</span><span class="o">.</span><span class="n">mul</span><span class="p">(</span>
+        <span class="n">ctx</span><span class="p">,</span>
+        <span class="n">target</span><span class="p">,</span>
+        <span class="n">name</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;mul_</span><span class="si">{</span><span class="n">get_op_count</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
+        <span class="n">source_ir</span><span class="o">=</span><span class="n">SourceIR</span><span class="o">.</span><span class="n">ATEN</span><span class="p">,</span>
+        <span class="n">lhs_val</span><span class="o">=</span><span class="n">x</span><span class="p">,</span>
+        <span class="n">rhs_val</span><span class="o">=</span><span class="n">y</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">add</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">:</span> <span class="n">impl</span><span class="o">.</span><span class="n">elementwise</span><span class="o">.</span><span class="n">add</span><span class="p">(</span>
+        <span class="n">ctx</span><span class="p">,</span>
+        <span class="n">target</span><span class="p">,</span>
+        <span class="n">name</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;add_</span><span class="si">{</span><span class="n">get_op_count</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
+        <span class="n">source_ir</span><span class="o">=</span><span class="n">SourceIR</span><span class="o">.</span><span class="n">ATEN</span><span class="p">,</span>
+        <span class="n">lhs_val</span><span class="o">=</span><span class="n">x</span><span class="p">,</span>
+        <span class="n">rhs_val</span><span class="o">=</span><span class="n">y</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">tanh</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">impl</span><span class="o">.</span><span class="n">activation</span><span class="o">.</span><span class="n">tanh</span><span class="p">(</span>
+        <span class="n">ctx</span><span class="p">,</span> <span class="n">target</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;tanh_</span><span class="si">{</span><span class="n">get_op_count</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">source_ir</span><span class="o">=</span><span class="n">SourceIR</span><span class="o">.</span><span class="n">ATEN</span><span class="p">,</span> <span class="n">input_val</span><span class="o">=</span><span class="n">x</span>
+    <span class="p">)</span>
+
+    <span class="c1"># So we know that our custom converter is being run instead of the standard one</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n\n</span><span class="s2">---------------------------&quot;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Using custom GeLU converter&quot;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;---------------------------</span><span class="se">\n\n</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="n">x_7</span> <span class="o">=</span> <span class="n">mul</span><span class="p">(</span><span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="mf">0.5</span><span class="p">)</span>
+    <span class="n">x_8</span> <span class="o">=</span> <span class="n">mul</span><span class="p">(</span><span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="mf">0.79788456080000003</span><span class="p">)</span>
+    <span class="n">x_9</span> <span class="o">=</span> <span class="n">mul</span><span class="p">(</span><span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="mf">0.044714999999999998</span><span class="p">)</span>
+    <span class="n">x_10</span> <span class="o">=</span> <span class="n">mul</span><span class="p">(</span><span class="n">x_9</span><span class="p">,</span> <span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+    <span class="n">x_11</span> <span class="o">=</span> <span class="n">add</span><span class="p">(</span><span class="n">x_10</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">)</span>
+    <span class="n">x_12</span> <span class="o">=</span> <span class="n">mul</span><span class="p">(</span><span class="n">x_8</span><span class="p">,</span> <span class="n">x_11</span><span class="p">)</span>
+    <span class="n">x_13</span> <span class="o">=</span> <span class="n">tanh</span><span class="p">(</span><span class="n">x_12</span><span class="p">)</span>
+    <span class="n">x_14</span> <span class="o">=</span> <span class="n">add</span><span class="p">(</span><span class="n">x_13</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">)</span>
+    <span class="n">x_15</span> <span class="o">=</span> <span class="n">mul</span><span class="p">(</span><span class="n">x_7</span><span class="p">,</span> <span class="n">x_14</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">x_15</span>
+</pre></div>
+</div>
+</section>
+<section id="using-our-custom-converter">
+<h3>Using our Custom Converter<a class="headerlink" href="#using-our-custom-converter" title="Permalink to this heading">¶</a></h3>
+<p>We can now recompile and see that our custom converter is being called to convert GeLU to TensorRT.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">my_custom_gelu</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span>
+    <span class="n">my_mod</span><span class="p">,</span> <span class="n">arg_inputs</span><span class="o">=</span><span class="p">(</span><span class="n">ex_input</span><span class="p">,),</span> <span class="n">min_block_size</span><span class="o">=</span><span class="mi">1</span>
+<span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="n">my_custom_gelu</span><span class="o">.</span><span class="n">graph</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">my_custom_gelu</span><span class="p">(</span><span class="n">ex_input</span><span class="p">))</span>
+</pre></div>
+</div>
+<p>We can verify that our implementation matches the TensorRT implementation for the <code class="docutils literal notranslate"><span class="pre">tanh</span></code> approximation.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="nb">print</span><span class="p">(</span>
+    <span class="sa">f</span><span class="s2">&quot;tanh approximations are close: </span><span class="si">{</span><span class="n">torch</span><span class="o">.</span><span class="n">allclose</span><span class="p">(</span><span class="n">my_standard_gelu</span><span class="p">(</span><span class="n">ex_input</span><span class="p">),</span><span class="w"> </span><span class="n">my_custom_gelu</span><span class="p">(</span><span class="n">ex_input</span><span class="p">))</span><span class="si">}</span><span class="s2">&quot;</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p>Finally, we want to verify that in the case that the <code class="docutils literal notranslate"><span class="pre">approximate</span></code> argument is not set to <code class="docutils literal notranslate"><span class="pre">tanh</span></code>, our custom converter is not used.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">my_mod_erf</span> <span class="o">=</span> <span class="n">GeLU</span><span class="p">(</span><span class="n">mode</span><span class="o">=</span><span class="s2">&quot;none&quot;</span><span class="p">)</span>
+<span class="n">my_gelu_erf</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span>
+    <span class="n">my_mod_erf</span><span class="p">,</span> <span class="n">arg_inputs</span><span class="o">=</span><span class="p">(</span><span class="n">ex_input</span><span class="p">,),</span> <span class="n">min_block_size</span><span class="o">=</span><span class="mi">1</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p>Notice that we don’t see the print statement from our custom converter, indicating that it was not used. However, looking at the graph, we can still see that a TensorRT engine was created to run the GeLU operation.
+In this case, the validator for our custom converter returned <code class="docutils literal notranslate"><span class="pre">False</span></code>, so the conversion system moved on to the next converter in the list, the standard GeLU converter and used that one to convert the operation.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="nb">print</span><span class="p">(</span><span class="n">my_gelu_erf</span><span class="o">.</span><span class="n">graph</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">my_gelu_erf</span><span class="p">(</span><span class="n">ex_input</span><span class="p">))</span>
+</pre></div>
+</div>
+<p class="sphx-glr-timing"><strong>Total running time of the script:</strong> ( 0 minutes  0.000 seconds)</p>
+<div class="sphx-glr-footer sphx-glr-footer-example docutils container" id="sphx-glr-download-tutorials-rendered-examples-dynamo-converter-overloading-py">
+<div class="sphx-glr-download sphx-glr-download-python docutils container">
+<p><a class="reference download internal" download="" href="../../../_downloads/00385a056ff6154295316980c92392f8/converter_overloading.py"><code class="xref download docutils literal notranslate"><span class="pre">Download</span> <span class="pre">Python</span> <span class="pre">source</span> <span class="pre">code:</span> <span class="pre">converter_overloading.py</span></code></a></p>
+</div>
+<div class="sphx-glr-download sphx-glr-download-jupyter docutils container">
+<p><a class="reference download internal" download="" href="../../../_downloads/d6acb461de023f3484b5a07f2bbaed33/converter_overloading.ipynb"><code class="xref download docutils literal notranslate"><span class="pre">Download</span> <span class="pre">Jupyter</span> <span class="pre">notebook:</span> <span class="pre">converter_overloading.ipynb</span></code></a></p>
+</div>
+</div>
+<p class="sphx-glr-signature"><a class="reference external" href="https://sphinx-gallery.github.io">Gallery generated by Sphinx-Gallery</a></p>
+</section>
+</section>
+</section>
+
+
+             </article>
+             
+            </div>
+            <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="custom_kernel_plugins.html" class="btn btn-neutral float-right" title="Using Custom Kernels within TensorRT Engines with Torch-TensorRT" accesskey="n" rel="next">Next <img src="../../../_static/images/chevron-right-orange.svg" class="next-page"></a>
+      
+      
+        <a href="torch_export_cudagraphs.html" class="btn btn-neutral" title="Torch Export with Cudagraphs" accesskey="p" rel="prev"><img src="../../../_static/images/chevron-right-orange.svg" class="previous-page"> Previous</a>
+      
+    </div>
+  
+
+  
+
+    <hr>
+
+  
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2024, NVIDIA Corporation.
+
+    </p>
+  </div>
+    
+      <div>
+        Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+      </div>
+     
+
+</footer>
+
+          </div>
+        </div>
+
+        <div class="pytorch-content-right" id="pytorch-content-right">
+          <div class="pytorch-right-menu" id="pytorch-right-menu">
+            <div class="pytorch-side-scroll" id="pytorch-side-scroll-right">
+              <ul>
+<li><a class="reference internal" href="#">Overloading Torch-TensorRT Converters with Custom Converters</a><ul>
+<li><a class="reference internal" href="#writing-a-custom-converter">Writing a Custom Converter</a><ul>
+<li><a class="reference internal" href="#converter-metadata">Converter Metadata</a></li>
+<li><a class="reference internal" href="#converter-implementation">Converter Implementation</a></li>
+<li><a class="reference internal" href="#using-our-custom-converter">Using our Custom Converter</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+  
+
+
+  
+
+     
+       <script type="text/javascript" id="documentation_options" data-url_root="../../../" src="../../../_static/documentation_options.js"></script>
+         <script data-url_root="../../../" id="documentation_options" src="../../../_static/documentation_options.js"></script>
+         <script src="../../../_static/jquery.js"></script>
+         <script src="../../../_static/underscore.js"></script>
+         <script src="../../../_static/_sphinx_javascript_frameworks_compat.js"></script>
+         <script src="../../../_static/doctools.js"></script>
+         <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js"></script>
+         <script src="../../../_static/collapsible-lists/js/apply-collapsible-lists.js"></script>
+         <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+     
+
+  
+
+  <script type="text/javascript" src="../../../_static/js/vendor/popper.min.js"></script>
+  <script type="text/javascript" src="../../../_static/js/vendor/bootstrap.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/list.js/1.5.0/list.min.js"></script>
+  <script type="text/javascript" src="../../../_static/js/theme.js"></script>
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+  <!-- Begin Footer -->
+
+  <div class="container-fluid docs-tutorials-resources" id="docs-tutorials-resources">
+    <div class="container">
+      <div class="row">
+        <div class="col-md-4 text-center">
+          <h2>Docs</h2>
+          <p>Access comprehensive developer documentation for PyTorch</p>
+          <a class="with-right-arrow" href="https://pytorch.org/docs/stable/index.html">View Docs</a>
+        </div>
+
+        <div class="col-md-4 text-center">
+          <h2>Tutorials</h2>
+          <p>Get in-depth tutorials for beginners and advanced developers</p>
+          <a class="with-right-arrow" href="https://pytorch.org/tutorials">View Tutorials</a>
+        </div>
+
+        <div class="col-md-4 text-center">
+          <h2>Resources</h2>
+          <p>Find development resources and get your questions answered</p>
+          <a class="with-right-arrow" href="https://pytorch.org/resources">View Resources</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer class="site-footer">
+    <div class="container footer-container">
+      <div class="footer-logo-wrapper">
+        <a href="https://pytorch.org/" class="footer-logo"></a>
+      </div>
+
+      <div class="footer-links-wrapper">
+        <div class="footer-links-col">
+          <ul>
+            <li class="list-title"><a href="https://pytorch.org/">PyTorch</a></li>
+            <li><a href="https://pytorch.org/get-started">Get Started</a></li>
+            <li><a href="https://pytorch.org/features">Features</a></li>
+            <li><a href="https://pytorch.org/ecosystem">Ecosystem</a></li>
+            <li><a href="https://pytorch.org/blog/">Blog</a></li>
+            <li><a href="https://github.com/pytorch/pytorch/blob/master/CONTRIBUTING.md">Contributing</a></li>
+          </ul>
+        </div>
+
+        <div class="footer-links-col">
+          <ul>
+            <li class="list-title"><a href="https://pytorch.org/resources">Resources</a></li>
+            <li><a href="https://pytorch.org/tutorials">Tutorials</a></li>
+            <li><a href="https://pytorch.org/docs/stable/index.html">Docs</a></li>
+            <li><a href="https://discuss.pytorch.org" target="_blank">Discuss</a></li>
+            <li><a href="https://github.com/pytorch/pytorch/issues" target="_blank">Github Issues</a></li>
+            <li><a href="https://pytorch.org/assets/brand-guidelines/PyTorch-Brand-Guidelines.pdf" target="_blank">Brand Guidelines</a></li>
+          </ul>
+        </div>
+
+        <div class="footer-links-col">
+          <ul>
+            <li class="list-title">Stay up to date</li>
+            <li><a href="https://www.facebook.com/pytorch" target="_blank">Facebook</a></li>
+            <li><a href="https://twitter.com/pytorch" target="_blank">Twitter</a></li>
+            <li><a href="https://www.youtube.com/pytorch" target="_blank">YouTube</a></li>
+            <li><a href="https://www.linkedin.com/company/pytorch" target="_blank">LinkedIn</a></li>
+          </ul>  
+          </div>
+
+        <div class="footer-links-col">
+          <ul>
+            <li class="list-title">PyTorch Podcasts</li>
+            <li><a href="https://open.spotify.com/show/6UzHKeiy368jKfQMKKvJY5" target="_blank">Spotify</a></li>
+            <li><a href="https://podcasts.apple.com/us/podcast/pytorch-developer-podcast/id1566080008" target="_blank">Apple</a></li>
+            <li><a href="https://www.google.com/podcasts?feed=aHR0cHM6Ly9mZWVkcy5zaW1wbGVjYXN0LmNvbS9PQjVGa0lsOA%3D%3D" target="_blank">Google</a></li>
+            <li><a href="https://music.amazon.com/podcasts/7a4e6f0e-26c2-49e9-a478-41bd244197d0/PyTorch-Developer-Podcast?" target="_blank">Amazon</a></li>
+          </ul>
+         </div>
+        </div>
+        
+        <div class="privacy-policy">
+          <ul>
+            <li class="privacy-policy-links"><a href="https://www.linuxfoundation.org/terms/" target="_blank">Terms</a></li>
+            <li class="privacy-policy-links">|</li>
+            <li class="privacy-policy-links"><a href="https://www.linuxfoundation.org/privacy-policy/" target="_blank">Privacy</a></li>
+          </ul>
+        </div>
+        <div class="copyright">
+        <p>© Copyright The Linux Foundation. The PyTorch Foundation is a project of The Linux Foundation.
+          For web site terms of use, trademark policy and other policies applicable to The PyTorch Foundation please see
+          <a href="https://www.linuxfoundation.org/policies/">www.linuxfoundation.org/policies/</a>. The PyTorch Foundation supports the PyTorch open source
+          project, which has been established as PyTorch Project a Series of LF Projects, LLC. For policies applicable to the PyTorch Project a Series of LF Projects, LLC,
+          please see <a href="https://www.lfprojects.org/policies/">www.lfprojects.org/policies/</a>.</p>
+      </div>
+     </div>
+
+  </footer>
+
+  <div class="cookie-banner-wrapper">
+  <div class="container">
+    <p class="gdpr-notice">To analyze traffic and optimize your experience, we serve cookies on this site. By clicking or navigating, you agree to allow our usage of cookies. As the current maintainers of this site, Facebook’s Cookies Policy applies. Learn more, including about available controls: <a href="https://www.facebook.com/policies/cookies/">Cookies Policy</a>.</p>
+    <img class="close-button" src="../../../_static/images/pytorch-x.svg">
+  </div>
+</div>
+
+  <!-- End Footer -->
+
+  <!-- Begin Mobile Menu -->
+
+  <div class="mobile-main-menu">
+    <div class="container-fluid">
+      <div class="container">
+        <div class="mobile-main-menu-header-container">
+          <a class="header-logo" href="https://pytorch.org/" aria-label="PyTorch"></a>
+          <a class="main-menu-close-button" href="#" data-behavior="close-mobile-menu"></a>
+        </div>
+      </div>
+    </div>
+
+    <div class="mobile-main-menu-links-container">
+      <div class="main-menu">
+        <ul>
+           <li class="resources-mobile-menu-title">
+             <a>Learn</a>
+           </li>
+           <ul class="resources-mobile-menu-items">
+             <li>
+               <a href="https://pytorch.org/get-started">Get Started</a>
+             </li>
+             <li>
+               <a href="https://pytorch.org/tutorials">Tutorials</a>
+             </li>
+             <li>
+               <a href="https://pytorch.org/tutorials/beginner/basics/intro.html">Learn the Basics</a>
+             </li>
+             <li>
+               <a href="https://pytorch.org/tutorials/recipes/recipes_index.html">PyTorch Recipes</a>
+             </li>
+             <li>
+               <a href="https://pytorch.org/tutorials/beginner/introyt.html">Introduction to PyTorch - YouTube Series</a>
+             </li>
+           </ul>
+           <li class="resources-mobile-menu-title">
+             <a>Ecosystem</a>
+           </li>
+           <ul class="resources-mobile-menu-items">
+             <li>
+               <a href="https://pytorch.org/ecosystem">Tools</a>
+             </li>
+             <li>
+               <a href="https://pytorch.org/#community-module">Community</a>
+             </li>
+             <li>
+               <a href="https://discuss.pytorch.org/">Forums</a>
+             </li>
+             <li>
+               <a href="https://pytorch.org/resources">Developer Resources</a>
+             </li>
+             <li>
+               <a href="https://pytorch.org/ecosystem/contributor-awards-2023">Contributor Awards - 2023</a>
+             </li>
+           </ul>
+
+           <li class="resources-mobile-menu-title">
+             <a>Edge</a>
+           </li>
+
+           <ul class="resources-mobile-menu-items">
+             <li>
+               <a href="https://pytorch.org/edge">About PyTorch Edge</a>
+             </li>
+             
+             <li>
+               <a href="https://pytorch.org/executorch-overview">ExecuTorch</a>
+             </li>
+           </ul>
+
+           <li class="resources-mobile-menu-title">
+             <a>Docs</a>
+           </li>
+
+           <ul class="resources-mobile-menu-items">
+            <li>
+              <a href="https://pytorch.org/docs/stable/index.html">PyTorch</a>
+            </li>
+
+            <li>
+              <a href="https://pytorch.org/pytorch-domains">PyTorch Domains</a>
+            </li>
+          </ul>
+
+          <li class="resources-mobile-menu-title">
+            <a>Blog & News</a>
+          </li>
+            
+           <ul class="resources-mobile-menu-items">
+            <li>
+              <a href="https://pytorch.org/blog/">PyTorch Blog</a>
+            </li>
+            <li>
+              <a href="https://pytorch.org/community-blog">Community Blog</a>
+            </li>
+
+            <li>
+              <a href="https://pytorch.org/videos">Videos</a>
+            </li>
+
+            <li>
+              <a href="https://pytorch.org/community-stories">Community Stories</a>
+            </li>
+            <li>
+              <a href="https://pytorch.org/events">Events</a>
+            </li>
+          </ul>
+          
+          <li class="resources-mobile-menu-title">
+            <a>About</a>
+          </li>
+
+          <ul class="resources-mobile-menu-items">
+            <li>
+              <a href="https://pytorch.org/foundation">PyTorch Foundation</a>
+            </li>
+            <li>
+              <a href="https://pytorch.org/governing-board">Governing Board</a>
+            </li>
+          </ul>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- End Mobile Menu -->
+
+  <script type="text/javascript" src="../../../_static/js/vendor/anchor.min.js"></script>
+
+  <script type="text/javascript">
+    $(document).ready(function() {
+      mobileMenu.bind();
+      mobileTOC.bind();
+      pytorchAnchors.bind();
+      sideMenus.bind();
+      scrollToAnchor.bind();
+      highlightNavigation.bind();
+      mainMenuDropdown.bind();
+      filterTags.bind();
+
+      // Add class to links that have code blocks, since we cannot create links in code blocks
+      $("article.pytorch-article a span.pre").each(function(e) {
+        $(this).closest("a").addClass("has-code");
+      });
+    })
+  </script>
+</body>
+</html>

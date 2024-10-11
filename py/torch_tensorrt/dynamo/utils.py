@@ -6,16 +6,18 @@ from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 import numpy as np
+import tensorrt as trt
 import torch
 from torch._subclasses.fake_tensor import FakeTensor
 from torch_tensorrt._Device import Device
 from torch_tensorrt._enums import dtype
+from torch_tensorrt._features import ENABLED_FEATURES
 from torch_tensorrt._Input import Input
 from torch_tensorrt.dynamo import _defaults
+from torch_tensorrt.dynamo._defaults import default_device
 from torch_tensorrt.dynamo._engine_cache import BaseEngineCache
 from torch_tensorrt.dynamo._settings import CompilationSettings
 
-import tensorrt as trt
 from packaging import version
 
 from .types import TRTDataType
@@ -186,14 +188,15 @@ def get_model_device(module: torch.fx.GraphModule) -> torch.device:
     device = None
     for parameter in list(module.parameters()):
         if isinstance(parameter, (torch.nn.parameter.Parameter, torch.Tensor)):
-            device = parameter.device
-            break
+            return parameter.device
+
+    for buffer in list(module.buffers()):
+        if isinstance(buffer, (torch.Tensor)):
+            return buffer.device
 
     if device is None:
-        device = torch.device("cpu")
-        logger.warning(
-            "Could not detect the device on which the model exists. Assuming the model is on CPU"
-        )
+        device = to_torch_device(default_device())
+
     return device
 
 
@@ -202,9 +205,26 @@ def set_log_level(parent_logger: Any, level: Any) -> None:
     Sets the log level to the user provided level.
     This is used to set debug logging at a global level
     at entry points of tracing, dynamo and torch_compile compilation.
+    And set log level for c++ torch trt logger if runtime is available.
     """
     if parent_logger:
         parent_logger.setLevel(level)
+
+    if ENABLED_FEATURES.torch_tensorrt_runtime:
+        if level == logging.DEBUG:
+            log_level = trt.ILogger.Severity.VERBOSE
+        elif level == logging.INFO:
+            log_level = trt.ILogger.Severity.INFO
+        elif level == logging.WARNING:
+            log_level = trt.ILogger.Severity.WARNING
+        elif level == logging.ERROR:
+            log_level = trt.ILogger.Severity.ERROR
+        elif level == logging.CRITICAL:
+            log_level = trt.ILogger.Severity.INTERNAL_ERROR
+        else:
+            raise AssertionError(f"{level} is not valid log level")
+
+        torch.ops.tensorrt.set_logging_level(int(log_level))
 
 
 def prepare_inputs(
@@ -449,7 +469,6 @@ def parse_dynamo_kwargs(
     Returns:
         CompilationSettings object with relevant kwargs
     """
-
     # Initialize an empty CompilationSettings object
     settings = CompilationSettings()
 
@@ -500,11 +519,12 @@ def parse_dynamo_kwargs(
 
     # If cache_built_engines and reuse_cached_engines are True but custom_engine_cache is not provided,
     # then create a default disk engine cache
+
     engine_cache = None
     if kwargs.get("cache_built_engines") or kwargs.get("reuse_cached_engines"):
         assert kwargs.get(
-            "make_refitable"
-        ), "Engine caching requires make_refitable to be set to True"
+            "make_refittable"
+        ), "Engine caching requires make_refittable to be set to True"
 
         if kwargs.get("custom_engine_cache") is not None:
             engine_cache = kwargs.get("custom_engine_cache")
@@ -518,6 +538,9 @@ def parse_dynamo_kwargs(
                 "engine_cache_size", _defaults.ENGINE_CACHE_SIZE
             )
             engine_cache = DiskEngineCache(engine_cache_dir, engine_cache_size)
+
+    if kwargs.get("torch_executed_ops"):
+        settings.torch_executed_ops = kwargs.get("torch_executed_ops")
 
     logger.info("Compilation Settings: %s\n", settings)
 

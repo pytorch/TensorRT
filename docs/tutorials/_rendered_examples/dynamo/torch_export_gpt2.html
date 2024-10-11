@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Compiling GPT2 using the Torch-TensorRT with dynamo backend &mdash; Torch-TensorRT v2.5.0.dev0+97d4f2b documentation</title>
+  <title>Compiling GPT2 using the Torch-TensorRT with dynamo backend &mdash; Torch-TensorRT v2.6.0.dev0+6ba44fa documentation</title>
   
 
   
@@ -39,6 +39,8 @@
   <link rel="stylesheet" href="../../../_static/css/custom.css" type="text/css" />
     <link rel="index" title="Index" href="../../../genindex.html" />
     <link rel="search" title="Search" href="../../../search.html" />
+    <link rel="next" title="Compiling Llama2 using the Torch-TensorRT with dynamo backend" href="torch_export_llama2.html" />
+    <link rel="prev" title="Mutable Torch TensorRT Module" href="mutable_torchtrt_module_example.html" />
   <!-- Google Tag Manager -->
     <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
     new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
@@ -273,7 +275,7 @@
               
               
                 <div class="version">
-                  v2.5.0.dev0+97d4f2b
+                  v2.6.0.dev0+6ba44fa
                 </div>
               
             
@@ -313,6 +315,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../../../user_guide/saving_models.html">Saving models compiled with Torch-TensorRT</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../user_guide/runtime.html">Deploying Torch-TensorRT Programs</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../user_guide/using_dla.html">DLA</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../user_guide/mixed_precision.html">Compile Mixed Precision models with Torch-TensorRT</a></li>
 <li class="toctree-l1"><a class="reference internal" href="torch_compile_advanced_usage.html">Torch Compile Advanced Usage</a></li>
 <li class="toctree-l1"><a class="reference internal" href="vgg16_ptq.html">Deploy Quantized Models using Torch-TensorRT</a></li>
 <li class="toctree-l1"><a class="reference internal" href="engine_caching_example.html">Engine Caching</a></li>
@@ -337,15 +340,21 @@
 <li class="toctree-l1"><a class="reference internal" href="../../../fx/getting_started_with_fx_path.html">Torch-TensorRT (FX Frontend) User Guide</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
-<ul>
+<ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="../../serving_torch_tensorrt_with_triton.html">Serving a Torch-TensorRT model with Triton</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../notebooks.html">Example notebooks</a></li>
 <li class="toctree-l1"><a class="reference internal" href="torch_compile_resnet_example.html">Compiling ResNet using the Torch-TensorRT <cite>torch.compile</cite> Backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="torch_compile_transformers_example.html">Compiling a Transformer using torch.compile and TensorRT</a></li>
 <li class="toctree-l1"><a class="reference internal" href="torch_compile_stable_diffusion.html">Torch Compile Stable Diffusion</a></li>
 <li class="toctree-l1"><a class="reference internal" href="torch_export_cudagraphs.html">Torch Export with Cudagraphs</a></li>
+<li class="toctree-l1"><a class="reference internal" href="converter_overloading.html">Overloading Torch-TensorRT Converters with Custom Converters</a></li>
 <li class="toctree-l1"><a class="reference internal" href="custom_kernel_plugins.html">Using Custom Kernels within TensorRT Engines with Torch-TensorRT</a></li>
 <li class="toctree-l1"><a class="reference internal" href="mutable_torchtrt_module_example.html">Mutable Torch TensorRT Module</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Compiling GPT2 using the Torch-TensorRT with dynamo backend</a></li>
+<li class="toctree-l1"><a class="reference internal" href="#the-output-sentences-should-look-like">The output sentences should look like</a></li>
+<li class="toctree-l1"><a class="reference internal" href="torch_export_llama2.html">Compiling Llama2 using the Torch-TensorRT with dynamo backend</a></li>
+<li class="toctree-l1"><a class="reference internal" href="torch_export_llama2.html#the-output-sentences-should-look-like">The output sentences should look like</a></li>
+<li class="toctree-l1"><a class="reference internal" href="torch_export_llama2.html#pytorch-model-generated-text-dynamic-programming-is-an-algorithmic-technique-used-to-solve-complex-problems-by-breaking-them-down-into-smaller-subproblems-solving-each-subproblem-only-once-and">Pytorch model generated text:  Dynamic programming is an algorithmic technique used to solve complex problems by breaking them down into smaller subproblems, solving each subproblem only once, and</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Python API Documentation</span></p>
 <ul>
@@ -480,12 +489,16 @@ to download the full example code</p>
 <span class="c1"># CPU is used here so that GPU memory is reserved for TRT compilation.</span>
 <span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
     <span class="n">tokenizer</span> <span class="o">=</span> <span class="n">AutoTokenizer</span><span class="o">.</span><span class="n">from_pretrained</span><span class="p">(</span><span class="s2">&quot;gpt2&quot;</span><span class="p">)</span>
-    <span class="n">model</span> <span class="o">=</span> <span class="n">AutoModelForCausalLM</span><span class="o">.</span><span class="n">from_pretrained</span><span class="p">(</span>
-        <span class="s2">&quot;gpt2&quot;</span><span class="p">,</span>
-        <span class="n">pad_token_id</span><span class="o">=</span><span class="n">tokenizer</span><span class="o">.</span><span class="n">eos_token_id</span><span class="p">,</span>
-        <span class="n">use_cache</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
-        <span class="n">attn_implementation</span><span class="o">=</span><span class="s2">&quot;eager&quot;</span><span class="p">,</span>
-    <span class="p">)</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span>
+    <span class="n">model</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">AutoModelForCausalLM</span><span class="o">.</span><span class="n">from_pretrained</span><span class="p">(</span>
+            <span class="s2">&quot;gpt2&quot;</span><span class="p">,</span>
+            <span class="n">pad_token_id</span><span class="o">=</span><span class="n">tokenizer</span><span class="o">.</span><span class="n">eos_token_id</span><span class="p">,</span>
+            <span class="n">use_cache</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+            <span class="n">attn_implementation</span><span class="o">=</span><span class="s2">&quot;eager&quot;</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="o">.</span><span class="n">eval</span><span class="p">()</span>
+        <span class="o">.</span><span class="n">half</span><span class="p">()</span>
+    <span class="p">)</span>
 </pre></div>
 </div>
 <p>Tokenize a sample input prompt and get pytorch model outputs</p>
@@ -502,6 +515,10 @@ to download the full example code</p>
 <section id="compilation-with-torch-tensorrt-using-dynamo-backend-and-generate-tensorrt-outputs">
 <h2>Compilation with <cite>Torch-TensorRT</cite> using dynamo backend and generate TensorRT outputs<a class="headerlink" href="#compilation-with-torch-tensorrt-using-dynamo-backend-and-generate-tensorrt-outputs" title="Permalink to this heading">¶</a></h2>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Export the GPT2 model into an ExportedProgram which is input of TRT compilation</span>
+<span class="c1"># To compile the model in FP16, we do the following</span>
+<span class="c1"># 1) Cast the model to FP16 via model.half()</span>
+<span class="c1"># 2) Enable use_explicit_typing=True. Certain layers are explicitly casted to FP32 within the pytorch model and this flag respects this behavior during TRT compilation</span>
+<span class="c1"># 3) Enable use_fp32_acc=True. This ensures all the matmuls are accumulated in FP32 precision (similar to PyTorch)</span>
 <span class="n">gpt2_ep</span> <span class="o">=</span> <span class="n">export_llm</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">input_ids</span><span class="p">,</span> <span class="n">max_seq_len</span><span class="o">=</span><span class="mi">1024</span><span class="p">)</span>
 <span class="n">trt_model</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">dynamo</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span>
     <span class="n">gpt2_ep</span><span class="p">,</span>
@@ -510,6 +527,8 @@ to download the full example code</p>
     <span class="n">truncate_double</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
     <span class="n">device</span><span class="o">=</span><span class="n">DEVICE</span><span class="p">,</span>
     <span class="n">disable_tf32</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">use_explicit_typing</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">use_fp32_acc</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
 <span class="p">)</span>
 
 <span class="c1"># Auto-regressive generation loop for greedy decoding using TensorRT model</span>
@@ -538,10 +557,14 @@ to download the full example code</p>
 </section>
 <section id="the-output-sentences-should-look-like">
 <h1>The output sentences should look like<a class="headerlink" href="#the-output-sentences-should-look-like" title="Permalink to this heading">¶</a></h1>
-</section>
-<section id="pytorch-model-generated-text-i-enjoy-walking-with-my-cute-dog-but-i-m-not-sure-if-i-ll-ever-be-able-to-walk-with-my-dog-i-m-not-sure-if-i-ll-ever-be-able-to-walk-with-my">
-<h1>Pytorch model generated text:  I enjoy walking with my cute dog, but I’m not sure if I’ll ever be able to walk with my dog. I’m not sure if I’ll ever be able to walk with my<a class="headerlink" href="#pytorch-model-generated-text-i-enjoy-walking-with-my-cute-dog-but-i-m-not-sure-if-i-ll-ever-be-able-to-walk-with-my-dog-i-m-not-sure-if-i-ll-ever-be-able-to-walk-with-my" title="Permalink to this heading">¶</a></h1>
-<p>TensorRT model generated text:  I enjoy walking with my cute dog, but I’m not sure if I’ll ever be able to walk with my dog. I’m not sure if I’ll ever be able to walk with my</p>
+<p>Pytorch model generated text:  What is parallel programming ?</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># The parallel programming paradigm is a set of programming languages that are designed to be used in parallel. The main difference between parallel programming and parallel programming is that</span>
+<span class="c1"># =============================</span>
+<span class="c1"># TensorRT model generated text:  What is parallel programming ?</span>
+
+<span class="c1"># The parallel programming paradigm is a set of programming languages that are designed to be used in parallel. The main difference between parallel programming and parallel programming is that</span>
+</pre></div>
+</div>
 <p class="sphx-glr-timing"><strong>Total running time of the script:</strong> ( 0 minutes  0.000 seconds)</p>
 <div class="sphx-glr-footer sphx-glr-footer-example docutils container" id="sphx-glr-download-tutorials-rendered-examples-dynamo-torch-export-gpt2-py">
 <div class="sphx-glr-download sphx-glr-download-python docutils container">
@@ -559,6 +582,15 @@ to download the full example code</p>
              
             </div>
             <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="torch_export_llama2.html" class="btn btn-neutral float-right" title="Compiling Llama2 using the Torch-TensorRT with dynamo backend" accesskey="n" rel="next">Next <img src="../../../_static/images/chevron-right-orange.svg" class="next-page"></a>
+      
+      
+        <a href="mutable_torchtrt_module_example.html" class="btn btn-neutral" title="Mutable Torch TensorRT Module" accesskey="p" rel="prev"><img src="../../../_static/images/chevron-right-orange.svg" class="previous-page"> Previous</a>
+      
+    </div>
   
 
   
@@ -595,7 +627,6 @@ to download the full example code</p>
 </ul>
 </li>
 <li><a class="reference internal" href="#the-output-sentences-should-look-like">The output sentences should look like</a></li>
-<li><a class="reference internal" href="#pytorch-model-generated-text-i-enjoy-walking-with-my-cute-dog-but-i-m-not-sure-if-i-ll-ever-be-able-to-walk-with-my-dog-i-m-not-sure-if-i-ll-ever-be-able-to-walk-with-my">Pytorch model generated text:  I enjoy walking with my cute dog, but I’m not sure if I’ll ever be able to walk with my dog. I’m not sure if I’ll ever be able to walk with my</a></li>
 </ul>
 
             </div>

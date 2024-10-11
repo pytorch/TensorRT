@@ -24,9 +24,13 @@ DEVICE = torch.device("cuda:0")
 # CPU is used here so that GPU memory is reserved for TRT compilation.
 llama_path = "meta-llama/Llama-2-7b-chat-hf"
 with torch.no_grad():
-    model = AutoModelForCausalLM.from_pretrained(
-        llama_path, use_cache=False, attn_implementation="eager"
-    ).eval()
+    model = (
+        AutoModelForCausalLM.from_pretrained(
+            llama_path, use_cache=False, attn_implementation="eager"
+        )
+        .eval()
+        .half()
+    )
 
 tokenizer = AutoTokenizer.from_pretrained(llama_path)
 
@@ -45,15 +49,20 @@ pyt_gen_tokens = generate(model, input_ids, MAX_TOKENS, tokenizer.eos_token_id)
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 # Export the llama2 model into an ExportedProgram which is input of TRT compilation
+# To compile the model in FP16, we do the following
+# 1) Cast the model to FP16 via model.half()
+# 2) Enable use_explicit_typing=True. Certain layers are explicitly casted to FP32 within the pytorch model and this flag respects this behavior during TRT compilation
+# 3) Enable use_fp32_acc=True. This ensures all the matmuls are accumulated in FP32 precision (similar to PyTorch)
 llama2_ep = export_llm(model, input_ids, max_seq_len=64)
 trt_model = torch_tensorrt.dynamo.compile(
     llama2_ep,
     inputs=[input_ids],
     enabled_precisions={torch.float32},
-    min_block_size=1,
     truncate_double=True,
     device=DEVICE,
     disable_tf32=True,
+    use_explicit_typing=True,
+    use_fp32_acc=True,
 )
 
 # Auto-regressive generation loop for greedy decoding using TensorRT model
@@ -85,6 +94,6 @@ print(
 # %%
 # The output sentences should look like
 # =============================
-# Pytorch model generated text:  I enjoy walking with my cute dog, but I'm not sure if I'll ever be able to walk with my dog. I'm not sure if I'll ever be able to walk with my
+# Pytorch model generated text:  Dynamic programming is an algorithmic technique used to solve complex problems by breaking them down into smaller subproblems, solving each subproblem only once, and
 # =============================
-# TensorRT model generated text:  I enjoy walking with my cute dog, but I'm not sure if I'll ever be able to walk with my dog. I'm not sure if I'll ever be able to walk with my
+# TensorRT model generated text:  Dynamic programming is an algorithmic technique used to solve complex problems by breaking them down into smaller subproblems, solving each subproblem only once, and

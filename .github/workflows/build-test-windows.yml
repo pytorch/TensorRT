@@ -33,7 +33,7 @@ jobs:
       - name: Substitute runner
         id: substitute
         run: |
-          echo matrix="$(echo '${{ needs.generate-matrix.outputs.matrix }}' | sed -e 's/windows.8xlarge.nvidia.gpu/windows.g5.4xlarge.nvidia.gpu/g')" >> ${GITHUB_OUTPUT}
+          echo matrix="$(echo '${{ needs.generate-matrix.outputs.matrix }}' | sed -e 's/windows.g4dn.xlarge/windows.g5.4xlarge.nvidia.gpu/g')" >> ${GITHUB_OUTPUT}
 
   build:
     needs: substitute-runner
@@ -62,6 +62,7 @@ jobs:
       smoke-test-script: ${{ matrix.smoke-test-script }}
       package-name: ${{ matrix.package-name }}
       trigger-event: ${{ github.event_name }}
+      timeout: 120
 
   tests-py-torchscript-fe:
     name: Test torchscript frontend [Python]

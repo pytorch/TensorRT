@@ -1,6 +1,7 @@
 from typing import Optional, Union
 
 import numpy as np
+import tensorrt as trt
 import torch
 import torch_tensorrt.dynamo.conversion.impl as impl
 from torch.fx.node import Target
@@ -21,8 +22,6 @@ from torch_tensorrt.dynamo.conversion.impl.unary import atan, sign
 from torch_tensorrt.dynamo.conversion.impl.unary.base import convert_unary
 from torch_tensorrt.fx.converters.converter_utils import broadcast
 from torch_tensorrt.fx.types import TRTTensor
-
-import tensorrt as trt
 
 
 def trunc_div(

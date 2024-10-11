@@ -1,8 +1,9 @@
 import logging
+from enum import Enum, auto
 from typing import Any, Callable, Dict, List, Optional
 
 import torch
-from torch._decomp import register_decomposition
+from torch._decomp import _decomp_table_to_post_autograd_aten, register_decomposition
 from torch._ops import OpOverload
 from torch_tensorrt.dynamo._defaults import default_device
 from torch_tensorrt.dynamo.conversion.converter_utils import get_positive_dim
@@ -287,6 +288,106 @@ def scatter_add_decomposition(
     return scatter_add_tensor
 
 
+# enum class for reduce operation of scatter_reduce
+class ReduceOperation(Enum):
+    SUM = ("Sum reduce operation", lambda x, y: torch.add(x, y))
+    PROD = ("Product reduce operation", lambda x, y: torch.mul(x, y))
+    MEAN = ("Mean reduce operation", lambda x, y: torch.add(x, y))
+    AMAX = ("Amax reduce operation", lambda x, y: torch.max(x, y))
+    AMIN = ("Amin reduce operation", lambda x, y: torch.min(x, y))
+
+    def __new__(cls, description: Any, func: Any) -> Any:
+        obj = object.__new__(cls)
+        obj._value_ = auto()
+        obj.description = description
+        obj.func = func
+        return obj
+
+    def reduce_operation_with_scatter(
+        self,
+        operation_lhs: Any,
+        initial_tensor: torch.Tensor,
+        dim: int,
+        index_tensor: torch.Tensor,
+        src_tensor: torch.Tensor,
+    ) -> Any:
+        scatter_tensor = None
+        if self == ReduceOperation.SUM or self == ReduceOperation.MEAN:
+            scatter_tensor = torch.zeros_like(initial_tensor)
+        elif self == ReduceOperation.PROD:
+            scatter_tensor = torch.ones_like(initial_tensor)
+        elif self == ReduceOperation.AMIN or self == ReduceOperation.AMAX:
+            scatter_tensor = initial_tensor
+        else:
+            # This case would not be encountered from torch itself
+            print("Invalid Operation for Reduce op!!")
+
+        operation_rhs = torch.scatter(scatter_tensor, dim, index_tensor, src_tensor)
+        device = to_torch_device(scatter_tensor.device)
+        operation_lhs = operation_lhs.to(device)
+        operation_rhs = operation_rhs.to(device)
+        return self.func(operation_lhs, operation_rhs)
+
+
+@register_torch_trt_decomposition(
+    torch.ops.aten.scatter_reduce.two, registry=TORCH_TRT_DECOMPOSITIONS
+)
+def scatter_reduce_decomposition(
+    input_tensor: torch.Tensor,
+    dim: int,
+    index: torch.Tensor,
+    src_tensor: torch.Tensor,
+    reduce: str,
+    include_self: bool = True,
+) -> torch.Tensor:
+    scatter_loop_tensor = input_tensor
+    device_input_tensor = input_tensor.device
+    # required for mean reduce operation
+    scatter_count_tensor = torch.zeros_like(input_tensor)
+    src_shape = list(src_tensor.shape)
+    src_dim = src_shape[dim]
+    if not include_self:
+        raise AssertionError("include_self False for scatter reduce not yet supported")
+    for i in range(0, src_dim):
+        src_slice = torch.select(src_tensor, dim, i)
+        index_slice = torch.select(index, dim, i)
+        # unsqueeze src and index in dim
+        src_slice = torch.unsqueeze(src_slice, dim)
+        index_slice = torch.unsqueeze(index_slice, dim)
+
+        # moving tensor to default device
+        scatter_loop_tensor = scatter_loop_tensor.to(device_input_tensor)
+        index_slice = index_slice.to(device_input_tensor)
+        src_slice = src_slice.to(device_input_tensor)
+        if reduce == "sum":
+            reduceOp = ReduceOperation.SUM
+        elif reduce == "prod":
+            reduceOp = ReduceOperation.PROD
+        elif reduce == "mean":
+            reduceOp = ReduceOperation.MEAN
+            scatter_count_tensor = reduceOp.reduce_operation_with_scatter(
+                scatter_count_tensor,
+                input_tensor,
+                dim,
+                index_slice,
+                torch.ones_like(src_slice),
+            )
+        elif reduce == "amax":
+            reduceOp = ReduceOperation.AMAX
+        elif reduce == "amin":
+            reduceOp = ReduceOperation.AMIN
+        scatter_loop_tensor = reduceOp.reduce_operation_with_scatter(
+            scatter_loop_tensor, input_tensor, dim, index_slice, src_slice
+        )
+    if reduce == "mean":
+        scatter_loop_tensor = torch.div(
+            scatter_loop_tensor,
+            torch.add(scatter_count_tensor, torch.ones_like(scatter_count_tensor)),
+            rounding_mode="trunc",
+        )
+    return scatter_loop_tensor
+
+
 def get_decompositions(
     enable_experimental_decompositions: bool = False,
 ) -> Dict[OpOverload, Callable[[Any], Any]]:
@@ -298,4 +399,9 @@ def get_decompositions(
         }
         return {**CORE_ATEN_DECOMPOSITIONS_FILTERED, **TORCH_TRT_DECOMPOSITIONS}
     else:
-        return {**ENABLED_TORCH_DECOMPOSITIONS, **TORCH_TRT_DECOMPOSITIONS}
+        # changes made here due to torch2.6 changes https://github.com/pytorch/pytorch/pull/135080
+        return {
+            **ENABLED_TORCH_DECOMPOSITIONS,
+            **_decomp_table_to_post_autograd_aten(),
+            **TORCH_TRT_DECOMPOSITIONS,
+        }
