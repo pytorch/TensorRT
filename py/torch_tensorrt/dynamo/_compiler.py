@@ -88,6 +88,8 @@ def compile(
     engine_cache_dir: str = _defaults.ENGINE_CACHE_DIR,
     engine_cache_size: int = _defaults.ENGINE_CACHE_SIZE,
     custom_engine_cache: Optional[BaseEngineCache] = _defaults.CUSTOM_ENGINE_CACHE,
+    use_explicit_typing: bool = _defaults.USE_EXPLICIT_TYPING,
+    use_fp32_acc: bool = _defaults.USE_FP32_ACC,
     **kwargs: Any,
 ) -> torch.fx.GraphModule:
     """Compile an ExportedProgram module for NVIDIA GPUs using TensorRT
@@ -158,6 +160,8 @@ def compile(
         engine_cache_dir (Optional[str]): Directory to store the cached TRT engines
         engine_cache_size (Optional[int]): Maximum hard-disk space (bytes) to use for the engine cache, default is 1GB. If the cache exceeds this size, the oldest engines will be removed by default
         custom_engine_cache (Optional[BaseEngineCache]): Engine cache instance to use for saving and loading engines. Users can provide their own engine cache by inheriting from BaseEngineCache. If used, engine_cache_dir and engine_cache_size will be ignored.
+        use_explicit_typing (bool): This flag enables strong typing in TensorRT compilation which respects the precisions set in the Pytorch model. This is useful when users have mixed precision graphs.
+        use_fp32_acc (bool): This option inserts cast to FP32 nodes around matmul layers and TensorRT ensures the accumulation of matmul happens in FP32. Use this only when FP16 precision is configured in enabled_precisions.
         **kwargs: Any,
     Returns:
         torch.fx.GraphModule: Compiled FX Module, when run it will execute via TensorRT
@@ -197,6 +201,20 @@ def compile(
             "\nThis feature is unimplemented in Torch-TRT Dynamo currently."
         )
 
+    if use_explicit_typing:
+        if len(enabled_precisions) != 1 or not any(
+            x in enabled_precisions for x in {torch.float32, dtype.f32}
+        ):
+            raise AssertionError(
+                f"When use_explicit_typing is enabled, only torch.float32 is allowed in the enabled_precisions but found {enabled_precisions}"
+            )
+
+    if use_fp32_acc:
+        logger.debug(
+            "FP32 accumulation for matmul layers is enabled. This option should only be enabled if the model already has FP16 weights and has no effect if it has FP32 weights. \
+                     This flag inserts casts around matmul layers and ensures TensorRT executes the matmul layers in FP16 with FP32 accumulation."
+        )
+
     # Aliasing inputs to arg_inputs for better understanding
     if not arg_inputs and not inputs:
         raise AssertionError("'arg_inputs' and 'inputs' should not both be None.")
@@ -232,7 +250,7 @@ def compile(
     logger.debug("Input graph: " + str(gm.graph))
 
     # Apply lowering on the graph module
-    gm = post_lowering(gm)
+    gm = post_lowering(gm, use_fp32_acc=use_fp32_acc)
     logger.debug("Lowered Input graph: " + str(gm.graph))
 
     engine_cache = None
@@ -281,6 +299,8 @@ def compile(
         "lazy_engine_init": lazy_engine_init,
         "cache_built_engines": cache_built_engines,
         "reuse_cached_engines": reuse_cached_engines,
+        "use_explicit_typing": use_explicit_typing,
+        "use_fp32_acc": use_fp32_acc,
     }
 
     settings = CompilationSettings(**compilation_options)
@@ -366,7 +386,6 @@ def compile_module(
 
     # Partition module into components that can be TRT-accelerated
     fast_partitioner_failed = False
-
     # If specified, try using the fast partitioner and fall back to the global one on failure
     if settings.use_fast_partitioner:
         try:
@@ -408,6 +427,9 @@ def compile_module(
     # Generate the corresponding TRT Module for those
     for name, _ in partitioned_module.named_children():
         submodule = getattr(partitioned_module, name)
+        # filter on the GraphModule
+        if not isinstance(submodule, torch.fx.graph_module.GraphModule):
+            continue
         # Criteria for a module to be convertible to TRT
         if settings.use_fast_partitioner and "_run_on_acc" not in name:
             dryrun_tracker.to_run_in_torch.extend(parse_non_trt_nodes(submodule))
@@ -520,6 +542,8 @@ def convert_exported_program_to_serialized_trt_engine(
     calibrator: object = None,
     allow_shape_tensors: bool = False,
     timing_cache_path: str = _defaults.TIMING_CACHE_PATH,
+    use_explicit_typing: bool = _defaults.USE_EXPLICIT_TYPING,
+    use_fp32_acc: bool = _defaults.USE_FP32_ACC,
     **kwargs: Any,
 ) -> bytes:
     """Convert an ExportedProgram to a serialized TensorRT engine
@@ -578,6 +602,8 @@ def convert_exported_program_to_serialized_trt_engine(
         calibrator (Union(torch_tensorrt._C.IInt8Calibrator, tensorrt.IInt8Calibrator)): Calibrator object which will provide data to the PTQ system for INT8 Calibration
         allow_shape_tensors: (Experimental) Allow aten::size to output shape tensors using IShapeLayer in TensorRT
         timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation
+        use_explicit_typing (bool): This flag enables strong typing in TensorRT compilation which respects the precisions set in the Pytorch model. This is useful when users have mixed precision graphs.
+        use_fp32_acc (bool): This option inserts cast to FP32 nodes around matmul layers and TensorRT ensures the accumulation of matmul happens in FP32. Use this only when FP16 precision is configured in enabled_precisions.
     Returns:
         bytes: Serialized TensorRT engine, can either be saved to a file or deserialized via TensorRT APIs
     """
@@ -651,6 +677,8 @@ def convert_exported_program_to_serialized_trt_engine(
         "dla_local_dram_size": dla_local_dram_size,
         "dla_global_dram_size": dla_global_dram_size,
         "timing_cache_path": timing_cache_path,
+        "use_explicit_typing": use_explicit_typing,
+        "use_fp32_acc": use_fp32_acc,
     }
 
     exported_program = pre_export_lowering(exported_program)

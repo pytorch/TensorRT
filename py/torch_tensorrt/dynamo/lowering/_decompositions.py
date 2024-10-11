@@ -296,7 +296,7 @@ class ReduceOperation(Enum):
     AMAX = ("Amax reduce operation", lambda x, y: torch.max(x, y))
     AMIN = ("Amin reduce operation", lambda x, y: torch.min(x, y))
 
-    def __new__(cls, description, func):
+    def __new__(cls, description: Any, func: Any) -> Any:
         obj = object.__new__(cls)
         obj._value_ = auto()
         obj.description = description
@@ -304,8 +304,13 @@ class ReduceOperation(Enum):
         return obj
 
     def reduce_operation_with_scatter(
-        self, operation_lhs, initial_tensor, dim, index_tensor, src_tensor
-    ):
+        self,
+        operation_lhs: Any,
+        initial_tensor: torch.Tensor,
+        dim: int,
+        index_tensor: torch.Tensor,
+        src_tensor: torch.Tensor,
+    ) -> Any:
         scatter_tensor = None
         if self == ReduceOperation.SUM or self == ReduceOperation.MEAN:
             scatter_tensor = torch.zeros_like(initial_tensor)
@@ -341,7 +346,7 @@ def scatter_reduce_decomposition(
     scatter_count_tensor = torch.zeros_like(input_tensor)
     src_shape = list(src_tensor.shape)
     src_dim = src_shape[dim]
-    if include_self == False:
+    if not include_self:
         raise AssertionError("include_self False for scatter reduce not yet supported")
     for i in range(0, src_dim):
         src_slice = torch.select(src_tensor, dim, i)
