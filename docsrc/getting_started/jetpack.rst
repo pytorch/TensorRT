@@ -75,12 +75,14 @@ Install bazel
     sudo mv bazelisk-linux-arm64 /usr/bin/bazel
     chmod +x /usr/bin/bazel
 
-Install pip and required python packages
+Install pip and required python packages:
+    * https://pip.pypa.io/en/stable/installation/
 
 .. code-block:: sh
 
     # install pip
-    sudp apt install python3-pip
+    wget https://bootstrap.pypa.io/get-pip.py
+    python get-pip.py
 
 .. code-block:: sh
 
