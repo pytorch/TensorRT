@@ -611,6 +611,10 @@ def save(
                 "Provided model is a torch.jit.ScriptModule but the output_format specified is exported_program. Please verify the output_format"
             )
         else:
+            if arg_inputs is not None:
+                raise ValueError(
+                    "Provided model is a torch.jit.ScriptModule, do not allow user to provide inputs or arg_inputs."
+                )
             torch.jit.save(module, file_path)
     elif module_type == _ModuleType.ep:
         if output_format == "torchscript":
@@ -618,12 +622,13 @@ def save(
                 "Provided model is a torch.export.ExportedProgram but the output_format specified is torchscript. Please verify the output_format"
             )
         else:
+            if arg_inputs is not None:
+                raise ValueError(
+                    "Provided model is a torch.export.ExportedProgram, do not allow user to provide inputs or arg_inputs during save, it should be provided during export and compile stage"
+                )
             torch.export.save(module, file_path)
     elif module_type == _ModuleType.fx:
-        if arg_inputs is None:
-            raise ValueError(
-                "Provided model is a torch.fx.GraphModule however the inputs are empty. Please provide valid torch.tensors as inputs to trace and save the model"
-            )
+
         # The module type is torch.fx.GraphModule
         if output_format == "torchscript":
             module_ts = torch.jit.trace(
@@ -634,11 +639,19 @@ def save(
             if not retrace:
                 from torch_tensorrt.dynamo._exporter import export
 
-                exp_program = export(module, arg_inputs, kwarg_inputs)
+                if arg_inputs is not None:
+                    raise ValueError(
+                        "Provided model is a torch.fx.GraphModule and retrace is False, do not allow user to provide inputs or arg_inputs."
+                    )
+                exp_program = export(module)
                 torch.export.save(exp_program, file_path)
             else:
                 from torch._higher_order_ops.torchbind import enable_torchbind_tracing
 
+                if arg_inputs is None:
+                    raise ValueError(
+                        "Provided model is a torch.fx.GraphModule and retrace is True, however the inputs or arg_inputs are empty. Please provide valid torch.tensors as inputs or arg_inputs to trace and save the model"
+                    )
                 with enable_torchbind_tracing():
                     exp_program = torch.export.export(
                         module, tuple(arg_inputs), kwargs=kwarg_inputs, strict=False

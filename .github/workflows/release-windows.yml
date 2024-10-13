@@ -55,7 +55,7 @@ jobs:
       - name: Substitute runner
         id: substitute
         run: |
-          echo matrix="$(echo '${{ needs.generate-release-matrix.outputs.matrix }}' | sed -e 's/windows.8xlarge.nvidia.gpu/windows.g5.4xlarge.nvidia.gpu/g')" >> ${GITHUB_OUTPUT}
+          echo matrix="$(echo '${{ needs.generate-release-matrix.outputs.matrix }}' | sed -e 's/windows.g4dn.xlarge/windows.g5.4xlarge.nvidia.gpu/g')" >> ${GITHUB_OUTPUT}
 
   release-wheel-artifacts:
     needs: substitute-runner

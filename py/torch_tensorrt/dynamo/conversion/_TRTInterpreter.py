@@ -80,10 +80,11 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         self.builder = trt.Builder(self.logger)
 
         flag = 0
-
-        # It is deprecated to not use this flag
-        EXPLICIT_BATCH = 1 << (int)(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH)
-        flag |= EXPLICIT_BATCH
+        if compilation_settings.use_explicit_typing:
+            STRONGLY_TYPED = 1 << (int)(
+                trt.NetworkDefinitionCreationFlag.STRONGLY_TYPED
+            )
+            flag |= STRONGLY_TYPED
 
         self.ctx = ConversionContext(
             self.builder.create_network(flag), compilation_settings

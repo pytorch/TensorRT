@@ -40,6 +40,8 @@ REUSE_CACHED_ENGINES = False
 ENGINE_CACHE_DIR = os.path.join(tempfile.gettempdir(), "torch_tensorrt_engine_cache")
 ENGINE_CACHE_SIZE = 1073741824
 CUSTOM_ENGINE_CACHE = None
+USE_EXPLICIT_TYPING = False
+USE_FP32_ACC = False
 ENABLE_CROSS_COMPILE_FOR_WINDOWS = False
 
 
