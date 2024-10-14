@@ -109,6 +109,7 @@ Model Zoo
 * :ref:`torch_compile_stable_diffusion`
 * :ref:`torch_export_gpt2`
 * :ref:`torch_export_llama2`
+* :ref:`notebooks`
 
 .. toctree::
    :caption: Model Zoo
