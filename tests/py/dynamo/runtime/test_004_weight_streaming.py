@@ -47,6 +47,7 @@ class TestWeightStreamingPython(TestCase):
             cache_built_engines=False,
             reuse_cached_engines=False,
             use_python_runtime=use_python_runtime,
+            use_explicit_typing=True,
             enable_weight_streaming=True,
         )
         # Checking if default weight streaming budget(automatic) is applied when compiler option was provided
@@ -99,6 +100,7 @@ class TestWeightStreamingPython(TestCase):
             cache_built_engines=False,
             reuse_cached_engines=False,
             use_python_runtime=use_python_runtime,
+            use_explicit_typing=True,
             enable_weight_streaming=True,
         )
         # Weight streaming budget is applied manually.
@@ -163,6 +165,7 @@ class TestWeightStreamingPython(TestCase):
                 {"torch.ops.aten.convolution.default"} if multi_rt else {}
             ),
             use_python_runtime=use_python_runtime,
+            use_explicit_typing=True,
             enable_weight_streaming=True,
         )
 
@@ -209,6 +212,7 @@ class TestWeightStreamingPython(TestCase):
             reuse_cached_engines=False,
             torch_executed_ops={"torch.ops.aten.convolution.default"},
             use_python_runtime=use_python_runtime,
+            use_explicit_typing=True,
             enable_weight_streaming=True,
         )
 
