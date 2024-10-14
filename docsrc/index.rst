@@ -54,6 +54,11 @@ User Guide
    tutorials/_rendered_examples/dynamo/vgg16_ptq
    tutorials/_rendered_examples/dynamo/engine_caching_example
    tutorials/_rendered_examples/dynamo/refit_engine_example
+   tutorials/serving_torch_tensorrt_with_triton
+   tutorials/_rendered_examples/dynamo/torch_export_cudagraphs
+   tutorials/_rendered_examples/dynamo/converter_overloading
+   tutorials/_rendered_examples/dynamo/custom_kernel_plugins
+   tutorials/_rendered_examples/dynamo/mutable_torchtrt_module_example
 
 Dynamo Frontend
 ----------------
@@ -99,30 +104,27 @@ FX Frontend
 
    fx/getting_started_with_fx_path
 
-Tutorials
+Model Zoo
 ------------
-* :ref:`torch_tensorrt_tutorials`
-* :ref:`serving_torch_tensorrt_with_triton`
-* :ref:`notebooks`
+* :ref:`torch_compile_resnet`
+* :ref:`torch_compile_transformer`
+* :ref:`torch_compile_stable_diffusion`
+* :ref:`torch_export_gpt2`
+* :ref:`torch_export_llama2`
 
 .. toctree::
-   :caption: Tutorials
+   :caption: Model Zoo
    :maxdepth: 3
    :hidden:
-
-   tutorials/serving_torch_tensorrt_with_triton
-   tutorials/notebooks
+   
    tutorials/_rendered_examples/dynamo/torch_compile_resnet_example
    tutorials/_rendered_examples/dynamo/torch_compile_transformers_example
    tutorials/_rendered_examples/dynamo/torch_compile_stable_diffusion
-   tutorials/_rendered_examples/dynamo/torch_export_cudagraphs
-   tutorials/_rendered_examples/dynamo/converter_overloading
-   tutorials/_rendered_examples/dynamo/custom_kernel_plugins
    tutorials/_rendered_examples/distributed_inference/data_parallel_gpt2
    tutorials/_rendered_examples/distributed_inference/data_parallel_stable_diffusion
-   tutorials/_rendered_examples/dynamo/mutable_torchtrt_module_example
    tutorials/_rendered_examples/dynamo/torch_export_gpt2
    tutorials/_rendered_examples/dynamo/torch_export_llama2
+   tutorials/notebooks
 
 Python API Documentation
 ------------------------
