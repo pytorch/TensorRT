@@ -75,17 +75,18 @@ def cross_compile_save_for_windows(
 
     # TODO: confirm with Naren whether to raise the error or just warning and ignore what user's settings for the following flags
     # disable the following settings which should not be enabled for cross compile for windows
-    keys = (
+    key_sets = {
         "use_python_runtime",
         "make_refittable",
         "lazy_engine_init",
         "cache_built_engines",
         "reuse_cached_engines",
         "custom_engine_cache",
-    )
+    }
     # disable these settings
-    for key in keys:
-        if key in kwargs.keys() and kwargs.get(key):
+    kwarg_key_sets = set(kwargs.keys())
+    for key in key_sets.intersection(kwarg_key_sets):
+        if kwargs.get(key):
             logger.warning(
                 f"arg: {key} should not be enabled for cross compile for windows feature, it is ignored."
             )
@@ -360,6 +361,7 @@ def compile(
         "lazy_engine_init": lazy_engine_init,
         "cache_built_engines": cache_built_engines,
         "reuse_cached_engines": reuse_cached_engines,
+        "enable_cross_compile_for_windows": enable_cross_compile_for_windows,
     }
 
     settings = CompilationSettings(**compilation_options)
@@ -547,7 +549,6 @@ def compile_module(
             )
 
             trt_modules[name] = trt_module
-            print(f"lan added {name=}, {trt_module.output_shapes=}")
 
     # Parse the graph I/O and store it in dryrun tracker
     parse_graph_io(gm, dryrun_tracker)

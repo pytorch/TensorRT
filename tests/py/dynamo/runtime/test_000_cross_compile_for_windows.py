@@ -62,7 +62,7 @@ class TestCrossCompileSaveForWindows(TestCase):
     def test_load_from_windows(self):
         trt_ep_path = "tests/py/dynamo/runtime/test_data/trt.ep"
         try:
-            loaded_trt_module = torch.export.load(file_path=trt_ep_path)
+            loaded_trt_module = torch.export.load(trt_ep_path)
             trt_gm = loaded_trt_module.module()
             a = torch.randn(2, 3).cuda()
             b = torch.randn(2, 3).cuda()

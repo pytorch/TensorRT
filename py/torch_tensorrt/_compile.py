@@ -384,7 +384,6 @@ def cross_compile_save_for_windows(
         file_path,
         arg_inputs=torchtrt_arg_inputs,
         enabled_precisions=enabled_precisions_set,
-        enable_cross_compile_for_windows=True,
         **kwargs,
     )
     logger.info("successfully compiled and saved the module for windows")

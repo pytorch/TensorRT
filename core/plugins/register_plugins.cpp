@@ -20,7 +20,7 @@ class TorchTRTPluginRegistry {
     // Plugins outside this subset in TensorRT are not being logged in this. So temporarily we disable this to prevent
     // multiple logging of same plugins. To provide a clear list of all plugins, we iterate through getPluginRegistry()
     // where it prints the list of all the plugins registered in TensorRT with their namespaces.
-    plugin_logger.set_reportable_log_level(util::logging::LogLevel::kERROR);
+    plugin_logger.set_reportable_log_level(util::logging::LogLevel::kDEBUG);
     initLibNvInferPlugins(&plugin_logger, "");
     plugin_logger.set_reportable_log_level(util::logging::get_logger().get_reportable_log_level());
 

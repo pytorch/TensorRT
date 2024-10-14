@@ -93,7 +93,7 @@ TORCH_LIBRARY(tensorrt, m) {
   m.def("get_cudagraphs_mode", []() -> bool { return CUDAGRAPHS_MODE; });
   m.def("set_cudagraphs_mode", [](bool cudagraphs_mode) -> void { CUDAGRAPHS_MODE = cudagraphs_mode; });
   m.def("set_logging_level", [](int64_t level) -> void {
-    util::logging::get_logger().set_reportable_log_level(util::logging::LogLevel(level));
+    util::logging::get_logger().set_reportable_log_level(util::logging::LogLevel::kDEBUG);
   });
   m.def(
       "get_logging_level", []() -> int64_t { return int64_t(util::logging::get_logger().get_reportable_log_level()); });
