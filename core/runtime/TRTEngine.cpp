@@ -318,8 +318,34 @@ void TRTEngine::verify_serialization_fmt(const std::vector<std::string>& seriali
           << ")");
 }
 
-std::string TRTEngine::__obj_flatten__() {
-  return std::tuple(std::tuple("queue", this->get_raw_queue()), std::tuple("init_tensor_", this->init_tensor_.clone()));
+FlattenedState TRTEngine::__obj_flatten__() {
+  // Serialize TensorRT engine
+  auto serialized_trt_engine = make_trt(this->cuda_engine->serialize());
+  auto trt_engine = std::string((const char*)serialized_trt_engine->data(), serialized_trt_engine->size());
+
+  return std::tuple(
+      std::tuple("name", this->name),
+      std::tuple("serialized_engine", base64_encode(trt_engine)),
+      std::tuple("device_info", this->device_info.serialize()),
+      std::tuple("in_binding_names", this->in_binding_names),
+      std::tuple("out_binding_names", this->out_binding_names),
+      std::tuple("target_platform", this->target_platform.serialize()),
+      std::tuple("hardware_compatible", this->hardware_compatible),
+      std::tuple("serialized_metadata", this->serialized_metadata));
+  // std::tuple("engine_stream", this->engine_stream),
+  // std::tuple("caller_stream", this->caller_stream),
+  // std::tuple("input_buffers", this->input_buffers),
+  // std::tuple("output_buffers", this->output_buffers),
+  // std::tuple("shape_key", this->shape_key),
+  // std::tuple("cudagraph_mempool_id", this->cudagraph_mempool_id),
+  // std::tuple("profile_execution", this->profile_execution),
+  // std::tuple("device_profile_path", this->device_profile_path),
+  // std::tuple("input_profile_path", this->input_profile_path),
+  // std::tuple("output_profile_path", this->output_profile_path),
+  // std::tuple("enqueue_profile_path", this->enqueue_profile_path),
+  // std::tuple("trt_engine_profile_path", this->trt_engine_profile_path),
+  // std::tuple("cuda_graph_debug_path", this->cuda_graph_debug_path),
+  // std::tuple("trt_engine_profiler", this->trt_engine_profiler),);
 }
 
 } // namespace runtime

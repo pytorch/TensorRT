@@ -7,7 +7,6 @@
 namespace torch_tensorrt {
 namespace core {
 namespace runtime {
-namespace {
 
 std::string serialize_bindings(const std::vector<std::string>& bindings) {
   std::stringstream ss;
@@ -66,6 +65,7 @@ std::string base64_decode(const std::string& in) {
   return out;
 }
 
+namespace {
 // TODO: Implement a call method
 // c10::List<at::Tensor> TRTEngine::Run(c10::List<at::Tensor> inputs) {
 //     auto input_vec = inputs.vec();
@@ -80,6 +80,7 @@ static auto TORCHTRT_UNUSED TRTEngineTSRegistrtion =
         // TODO: .def("run", &TRTEngine::Run)
         .def("__str__", &TRTEngine::to_str)
         .def("__repr__", &TRTEngine::to_str)
+        .def("__obj_flatten__", &TRTEngine::__obj_flatten__)
         .def("enable_profiling", &TRTEngine::enable_profiling)
         .def("disable_profiling", &TRTEngine::disable_profiling)
         .def_readwrite("profile_path_prefix", &TRTEngine::profile_path_prefix)

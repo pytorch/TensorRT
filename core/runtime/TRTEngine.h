@@ -19,8 +19,15 @@ namespace torch_tensorrt {
 namespace core {
 namespace runtime {
 
-using FlattenedState =
-    std::tuple<std::tuple<std::string, std::vector<at::Tensor>>, std::tuple<std::string, at::Tensor>>;
+using FlattenedState = std::tuple<
+    std::tuple<std::string, std::string>, // name
+    std::tuple<std::string, std::string>, // engine
+    std::tuple<std::string, std::string>, // device
+    std::tuple<std::string, std::vector<std::string>>, // input binding names
+    std::tuple<std::string, std::vector<std::string>>, // output binding names
+    std::tuple<std::string, std::string>, // Platform
+    std::tuple<std::string, bool>, // HW compatibility
+    std::tuple<std::string, std::string>>; // serialized metadata
 
 struct TRTEngine : torch::CustomClassHolder {
   // Each engine needs it's own runtime object
