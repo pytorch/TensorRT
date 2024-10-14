@@ -85,8 +85,8 @@ with torch.no_grad():
 # Compiler option
 # ----------------------------------
 #
-# enable_weight_streaming=True option and use_strong_types=True are required to build
-# the engine with weight streaming feature. use_strong_types=True option creates a
+# enable_weight_streaming=True option and use_explicit_typing=True are required to build
+# the engine with weight streaming feature. use_explicit_typing=True option creates a
 # `strongly typed network <https://docs.nvidia.com/deeplearning/tensorrt/developer-guide/index.html#strongly-typed-networks>`_ and only float32 precision is allowed in enabled_precisions option
 #
 trt_model = torch_tensorrt.dynamo.compile(
@@ -95,6 +95,7 @@ trt_model = torch_tensorrt.dynamo.compile(
     enabled_precisions={torch.float32},
     truncate_double=True,
     device=DEVICE,
+    use_explicit_typing=True,
     enable_weight_streaming=True,
 )
 

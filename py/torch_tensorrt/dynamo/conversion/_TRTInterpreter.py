@@ -86,12 +86,6 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             )
             flag |= STRONGLY_TYPED
 
-        if compilation_settings.enable_weight_streaming:
-            STRONGLY_TYPED = 1 << (int)(
-                trt.NetworkDefinitionCreationFlag.STRONGLY_TYPED
-            )
-            flag |= STRONGLY_TYPED
-
         self.ctx = ConversionContext(
             self.builder.create_network(flag), compilation_settings
         )
