@@ -150,7 +150,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         metadata = {"settings": self.settings, "weight_name_map": self.weight_name_map}
         target_platform = (
             Platform.current_platform()
-            if self.settings.enable_cross_compile_for_windows
+            if not self.settings.enable_cross_compile_for_windows
             else Platform.WIN_X86_64
         )  # Change to match target for engine
 
