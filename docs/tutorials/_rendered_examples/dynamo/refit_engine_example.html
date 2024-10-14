@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Refitting Torch-TensorRT Programs with New Weights &mdash; Torch-TensorRT v2.6.0.dev0+6ba44fa documentation</title>
+  <title>Refitting Torch-TensorRT Programs with New Weights &mdash; Torch-TensorRT v2.6.0.dev0+6303068 documentation</title>
   
 
   
@@ -275,7 +275,7 @@
               
               
                 <div class="version">
-                  v2.6.0.dev0+6ba44fa
+                  v2.6.0.dev0+6303068
                 </div>
               
             
@@ -530,6 +530,7 @@ these setttings will not be able to be refit.</p>
     <span class="n">min_block_size</span><span class="o">=</span><span class="n">min_block_size</span><span class="p">,</span>
     <span class="n">torch_executed_ops</span><span class="o">=</span><span class="n">torch_executed_ops</span><span class="p">,</span>
     <span class="n">make_refittable</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">reuse_cached_engines</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
 <span class="p">)</span>  <span class="c1"># Output is a torch.fx.GraphModule</span>
 
 <span class="c1"># Save the graph module as an exported program</span>
