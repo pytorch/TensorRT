@@ -81,7 +81,6 @@ struct TRTEngine : torch::CustomClassHolder {
   std::vector<at::Tensor> input_buffers = {};
   std::vector<at::Tensor> output_buffers = {};
   std::string shape_key;
-  at::cuda::MempoolId_t cudagraph_mempool_id;
 
   // TODO: Implement a call method
   // c10::List<at::Tensor> Run(c10::List<at::Tensor> inputs);
