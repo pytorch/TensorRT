@@ -73,8 +73,6 @@ TRTEngine::TRTEngine(
                                                                        << get_current_platform() << ")");
   this->target_platform = target_platform;
 
-  this->cudagraph_mempool_id = at::cuda::graph_pool_handle();
-
   this->hardware_compatible = hardware_compatible;
   auto most_compatible_device = get_most_compatible_device(cuda_device, RTDevice(), hardware_compatible);
   TORCHTRT_CHECK(most_compatible_device, "No compatible device was found for instantiating TensorRT engine");
