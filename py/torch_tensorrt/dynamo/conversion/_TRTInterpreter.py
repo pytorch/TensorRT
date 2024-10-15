@@ -305,8 +305,6 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         if tactic_sources is not None:
             builder_config.set_tactic_sources(tactic_sources=tactic_sources)
 
-        builder_config.set_flag(trt.BuilderFlag.PREFER_PRECISION_CONSTRAINTS)
-
         return builder_config
 
     def _create_timing_cache(

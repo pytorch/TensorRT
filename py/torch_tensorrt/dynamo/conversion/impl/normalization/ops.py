@@ -444,13 +444,12 @@ def softmax(
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     dim = get_positive_dim(dim, len(input.shape))
 
+    if half_to_float:
+        input = cast_trt_tensor(ctx, input, torch.float, name, target, source_ir)
+
     layer = ctx.net.add_softmax(input)
     layer.axes = 1 << dim
     set_layer_name(layer, target, name, source_ir)
-
-    if half_to_float:
-        layer.precision = trt.DataType.FLOAT
-
     return layer.get_output(0)
 
 
