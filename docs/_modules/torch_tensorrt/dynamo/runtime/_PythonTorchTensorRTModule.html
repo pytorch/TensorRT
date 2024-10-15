@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt.dynamo.runtime._PythonTorchTensorRTModule &mdash; Torch-TensorRT v2.6.0.dev0+6303068 documentation</title>
+  <title>torch_tensorrt.dynamo.runtime._PythonTorchTensorRTModule &mdash; Torch-TensorRT v2.6.0.dev0+743fdbd documentation</title>
   
 
   
@@ -272,7 +272,7 @@
               
               
                 <div class="version">
-                  v2.6.0.dev0+6303068
+                  v2.6.0.dev0+743fdbd
                 </div>
               
             
@@ -467,6 +467,7 @@
 <span class="kn">from</span> <span class="nn">tempfile</span> <span class="kn">import</span> <span class="n">tempdir</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Sequence</span><span class="p">,</span> <span class="n">Tuple</span>
 
+<span class="kn">import</span> <span class="nn">tensorrt</span> <span class="k">as</span> <span class="nn">trt</span>
 <span class="kn">import</span> <span class="nn">torch</span>
 <span class="kn">import</span> <span class="nn">torch_tensorrt</span>
 <span class="kn">from</span> <span class="nn">torch.nn</span> <span class="kn">import</span> <span class="n">Module</span>
@@ -480,8 +481,6 @@
     <span class="n">_select_rt_device</span><span class="p">,</span>
     <span class="n">multi_gpu_device_check</span><span class="p">,</span>
 <span class="p">)</span>
-
-<span class="kn">import</span> <span class="nn">tensorrt</span> <span class="k">as</span> <span class="nn">trt</span>
 
 <span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
 
@@ -834,8 +833,6 @@
                     <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">_engine_stream</span> <span class="ow">is</span> <span class="kc">None</span>
                 <span class="p">):</span>
                     <span class="bp">self</span><span class="o">.</span><span class="n">_engine_stream</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">Stream</span><span class="p">()</span>
-                <span class="k">else</span><span class="p">:</span>
-                    <span class="bp">self</span><span class="o">.</span><span class="n">_engine_stream</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_caller_stream</span>
 
                 <span class="bp">self</span><span class="o">.</span><span class="n">_engine_stream</span><span class="o">.</span><span class="n">wait_stream</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_caller_stream</span><span class="p">)</span>
 
@@ -926,7 +923,8 @@
         <span class="k">if</span> <span class="n">new_shape_key</span> <span class="o">!=</span> <span class="bp">self</span><span class="o">.</span><span class="n">shape_key</span><span class="p">:</span>
             <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Resetting Cudagraph on new shape key </span><span class="si">{</span><span class="n">new_shape_key</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">shape_key</span> <span class="o">=</span> <span class="n">new_shape_key</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">cudagraph</span><span class="o">.</span><span class="n">reset</span><span class="p">()</span>  <span class="c1"># type: ignore</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">cudagraph</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">cudagraph</span><span class="o">.</span><span class="n">reset</span><span class="p">()</span>
             <span class="k">return</span> <span class="kc">False</span>
 
         <span class="k">return</span> <span class="kc">True</span></div></div>
