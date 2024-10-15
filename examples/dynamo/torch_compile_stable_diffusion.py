@@ -1,7 +1,7 @@
 """
 .. _torch_compile_stable_diffusion:
 
-Torch Compile Stable Diffusion
+Compiling Stable Diffusion model using the `torch.compile` backend
 ======================================================
 
 This interactive script is intended as a sample of the Torch-TensorRT workflow with `torch.compile` on a Stable Diffusion model. A sample output is featured below:

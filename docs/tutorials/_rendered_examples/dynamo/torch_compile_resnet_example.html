@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Compiling ResNet using the Torch-TensorRT torch.compile Backend &mdash; Torch-TensorRT v2.6.0.dev0+38771e6 documentation</title>
+  <title>Compiling ResNet with dynamic shapes using the torch.compile backend &mdash; Torch-TensorRT v2.6.0.dev0+2c517be documentation</title>
   
 
   
@@ -39,8 +39,8 @@
   <link rel="stylesheet" href="../../../_static/css/custom.css" type="text/css" />
     <link rel="index" title="Index" href="../../../genindex.html" />
     <link rel="search" title="Search" href="../../../search.html" />
-    <link rel="next" title="Compiling a Transformer using torch.compile and TensorRT" href="torch_compile_transformers_example.html" />
-    <link rel="prev" title="Example notebooks" href="../../notebooks.html" />
+    <link rel="next" title="Compiling BERT using the torch.compile backend" href="torch_compile_transformers_example.html" />
+    <link rel="prev" title="Torch-TensorRT (FX Frontend) User Guide" href="../../../fx/getting_started_with_fx_path.html" />
   <!-- Google Tag Manager -->
     <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
     new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
@@ -275,7 +275,7 @@
               
               
                 <div class="version">
-                  v2.6.0.dev0+38771e6
+                  v2.6.0.dev0+2c517be
                 </div>
               
             
@@ -320,6 +320,11 @@
 <li class="toctree-l1"><a class="reference internal" href="vgg16_ptq.html">Deploy Quantized Models using Torch-TensorRT</a></li>
 <li class="toctree-l1"><a class="reference internal" href="engine_caching_example.html">Engine Caching</a></li>
 <li class="toctree-l1"><a class="reference internal" href="refit_engine_example.html">Refitting Torch-TensorRT Programs with New Weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../serving_torch_tensorrt_with_triton.html">Serving a Torch-TensorRT model with Triton</a></li>
+<li class="toctree-l1"><a class="reference internal" href="torch_export_cudagraphs.html">Torch Export with Cudagraphs</a></li>
+<li class="toctree-l1"><a class="reference internal" href="converter_overloading.html">Overloading Torch-TensorRT Converters with Custom Converters</a></li>
+<li class="toctree-l1"><a class="reference internal" href="custom_kernel_plugins.html">Using Custom Kernels within TensorRT Engines with Torch-TensorRT</a></li>
+<li class="toctree-l1"><a class="reference internal" href="mutable_torchtrt_module_example.html">Mutable Torch TensorRT Module</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Dynamo Frontend</span></p>
 <ul>
@@ -339,22 +344,14 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../../fx/getting_started_with_fx_path.html">Torch-TensorRT (FX Frontend) User Guide</a></li>
 </ul>
-<p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<p class="caption" role="heading"><span class="caption-text">Model Zoo</span></p>
 <ul class="current">
-<li class="toctree-l1"><a class="reference internal" href="../../serving_torch_tensorrt_with_triton.html">Serving a Torch-TensorRT model with Triton</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../notebooks.html">Example notebooks</a></li>
-<li class="toctree-l1 current"><a class="current reference internal" href="#">Compiling ResNet using the Torch-TensorRT <cite>torch.compile</cite> Backend</a></li>
-<li class="toctree-l1"><a class="reference internal" href="torch_compile_transformers_example.html">Compiling a Transformer using torch.compile and TensorRT</a></li>
-<li class="toctree-l1"><a class="reference internal" href="torch_compile_stable_diffusion.html">Torch Compile Stable Diffusion</a></li>
-<li class="toctree-l1"><a class="reference internal" href="torch_export_cudagraphs.html">Torch Export with Cudagraphs</a></li>
-<li class="toctree-l1"><a class="reference internal" href="converter_overloading.html">Overloading Torch-TensorRT Converters with Custom Converters</a></li>
-<li class="toctree-l1"><a class="reference internal" href="custom_kernel_plugins.html">Using Custom Kernels within TensorRT Engines with Torch-TensorRT</a></li>
-<li class="toctree-l1"><a class="reference internal" href="mutable_torchtrt_module_example.html">Mutable Torch TensorRT Module</a></li>
-<li class="toctree-l1"><a class="reference internal" href="torch_export_gpt2.html">Compiling GPT2 using the Torch-TensorRT with dynamo backend</a></li>
-<li class="toctree-l1"><a class="reference internal" href="torch_export_gpt2.html#the-output-sentences-should-look-like">The output sentences should look like</a></li>
-<li class="toctree-l1"><a class="reference internal" href="torch_export_llama2.html">Compiling Llama2 using the Torch-TensorRT with dynamo backend</a></li>
-<li class="toctree-l1"><a class="reference internal" href="torch_export_llama2.html#the-output-sentences-should-look-like">The output sentences should look like</a></li>
-<li class="toctree-l1"><a class="reference internal" href="torch_export_llama2.html#pytorch-model-generated-text-dynamic-programming-is-an-algorithmic-technique-used-to-solve-complex-problems-by-breaking-them-down-into-smaller-subproblems-solving-each-subproblem-only-once-and">Pytorch model generated text:  Dynamic programming is an algorithmic technique used to solve complex problems by breaking them down into smaller subproblems, solving each subproblem only once, and</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Compiling ResNet with dynamic shapes using the <cite>torch.compile</cite> backend</a></li>
+<li class="toctree-l1"><a class="reference internal" href="torch_compile_transformers_example.html">Compiling BERT using the <cite>torch.compile</cite> backend</a></li>
+<li class="toctree-l1"><a class="reference internal" href="torch_compile_stable_diffusion.html">Compiling Stable Diffusion model using the <cite>torch.compile</cite> backend</a></li>
+<li class="toctree-l1"><a class="reference internal" href="torch_export_gpt2.html">Compiling GPT2 using the dynamo backend</a></li>
+<li class="toctree-l1"><a class="reference internal" href="torch_export_llama2.html">Compiling Llama2 using the dynamo backend</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../notebooks.html">Legacy notebooks</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Python API Documentation</span></p>
 <ul>
@@ -428,7 +425,7 @@
       </li>
 
         
-      <li>Compiling ResNet using the Torch-TensorRT <cite>torch.compile</cite> Backend</li>
+      <li>Compiling ResNet with dynamic shapes using the <cite>torch.compile</cite> backend</li>
     
     
       <li class="pytorch-breadcrumbs-aside">
@@ -469,8 +466,8 @@
 <p><a class="reference internal" href="#sphx-glr-download-tutorials-rendered-examples-dynamo-torch-compile-resnet-example-py"><span class="std std-ref">Go to the end</span></a>
 to download the full example code</p>
 </div>
-<section class="sphx-glr-example-title" id="compiling-resnet-using-the-torch-tensorrt-torch-compile-backend">
-<span id="torch-compile-resnet"></span><span id="sphx-glr-tutorials-rendered-examples-dynamo-torch-compile-resnet-example-py"></span><h1>Compiling ResNet using the Torch-TensorRT <cite>torch.compile</cite> Backend<a class="headerlink" href="#compiling-resnet-using-the-torch-tensorrt-torch-compile-backend" title="Permalink to this heading">¶</a></h1>
+<section class="sphx-glr-example-title" id="compiling-resnet-with-dynamic-shapes-using-the-torch-compile-backend">
+<span id="torch-compile-resnet"></span><span id="sphx-glr-tutorials-rendered-examples-dynamo-torch-compile-resnet-example-py"></span><h1>Compiling ResNet with dynamic shapes using the <cite>torch.compile</cite> backend<a class="headerlink" href="#compiling-resnet-with-dynamic-shapes-using-the-torch-compile-backend" title="Permalink to this heading">¶</a></h1>
 <p>This interactive script is intended as a sample of the Torch-TensorRT workflow with <cite>torch.compile</cite> on a ResNet model.</p>
 <section id="imports-and-model-definition">
 <h2>Imports and Model Definition<a class="headerlink" href="#imports-and-model-definition" title="Permalink to this heading">¶</a></h2>
@@ -600,10 +597,10 @@ to download the full example code</p>
   
     <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
       
-        <a href="torch_compile_transformers_example.html" class="btn btn-neutral float-right" title="Compiling a Transformer using torch.compile and TensorRT" accesskey="n" rel="next">Next <img src="../../../_static/images/chevron-right-orange.svg" class="next-page"></a>
+        <a href="torch_compile_transformers_example.html" class="btn btn-neutral float-right" title="Compiling BERT using the torch.compile backend" accesskey="n" rel="next">Next <img src="../../../_static/images/chevron-right-orange.svg" class="next-page"></a>
       
       
-        <a href="../../notebooks.html" class="btn btn-neutral" title="Example notebooks" accesskey="p" rel="prev"><img src="../../../_static/images/chevron-right-orange.svg" class="previous-page"> Previous</a>
+        <a href="../../../fx/getting_started_with_fx_path.html" class="btn btn-neutral" title="Torch-TensorRT (FX Frontend) User Guide" accesskey="p" rel="prev"><img src="../../../_static/images/chevron-right-orange.svg" class="previous-page"> Previous</a>
       
     </div>
   
@@ -635,7 +632,7 @@ to download the full example code</p>
           <div class="pytorch-right-menu" id="pytorch-right-menu">
             <div class="pytorch-side-scroll" id="pytorch-side-scroll-right">
               <ul>
-<li><a class="reference internal" href="#">Compiling ResNet using the Torch-TensorRT <cite>torch.compile</cite> Backend</a><ul>
+<li><a class="reference internal" href="#">Compiling ResNet with dynamic shapes using the <cite>torch.compile</cite> backend</a><ul>
 <li><a class="reference internal" href="#imports-and-model-definition">Imports and Model Definition</a></li>
 <li><a class="reference internal" href="#optional-input-arguments-to-torch-tensorrt-compile">Optional Input Arguments to <cite>torch_tensorrt.compile</cite></a></li>
 <li><a class="reference internal" href="#compilation-with-torch-tensorrt-compile">Compilation with <cite>torch_tensorrt.compile</cite></a></li>
