@@ -2,13 +2,9 @@
 
 .. _sphx_glr_tutorials__rendered_examples_dynamo:
 
-.. _torch_compile:
+.. _torch_tensorrt_examples:
 
-Torch-TensorRT Examples
-====================================
-
-Please refer to the following examples which demonstrate the usage of different features of Torch-TensorRT. We also provide
-examples of Torch-TensorRT compilation of select computer vision and language models.
+Here we provide examples of Torch-TensorRT compilation of popular computer vision and language models.
 
 Dependencies
 ------------------------------------
@@ -19,18 +15,6 @@ Please install the following external dependencies (assuming you already have co
 
     pip install -r requirements.txt
 
-
-Compiler Features
-------------------------------------
-* :ref:`torch_compile_advanced_usage`: Advanced usage including making a custom backend to use directly with the ``torch.compile`` API
-* :ref:`torch_export_cudagraphs`: Using the Cudagraphs integration with `ir="dynamo"`
-* :ref:`converter_overloading`: How to write custom converters and overload existing ones
-* :ref:`custom_kernel_plugins`: Creating a plugin to use a custom kernel inside TensorRT engines
-* :ref:`refit_engine_example`: Refitting a compiled TensorRT Graph Module with updated weights
-* :ref:`mutable_torchtrt_module_example`: Compile, use, and modify TensorRT Graph Module with MutableTorchTensorRTModule
-* :ref:`vgg16_fp8_ptq`: Compiling a VGG16 model with FP8 and PTQ using ``torch.compile``
-* :ref:`engine_caching_example`: Utilizing engine caching to speed up compilation times
-* :ref:`engine_caching_bert_example`: Demonstrating engine caching on BERT
 
 Model Zoo
 ------------------------------------
@@ -59,7 +43,7 @@ Model Zoo
 
 .. raw:: html
 
-      <div class="sphx-glr-thumbnail-title">Torch Compile Stable Diffusion</div>
+      <div class="sphx-glr-thumbnail-title">Compiling Stable Diffusion model using the torch.compile backend</div>
     </div>
 
 
@@ -110,7 +94,7 @@ Model Zoo
 
 .. raw:: html
 
-      <div class="sphx-glr-thumbnail-title">Compiling a Transformer using torch.compile and TensorRT</div>
+      <div class="sphx-glr-thumbnail-title">Compiling BERT using the torch.compile backend</div>
     </div>
 
 
@@ -150,23 +134,6 @@ Model Zoo
 
 .. raw:: html
 
-    <div class="sphx-glr-thumbcontainer" tooltip="This interactive script is intended as a sample of the Torch-TensorRT workflow with dynamo back...">
-
-.. only:: html
-
-  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_torch_export_llama2_thumb.png
-    :alt:
-
-  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_torch_export_llama2.py`
-
-.. raw:: html
-
-      <div class="sphx-glr-thumbnail-title">Compiling Llama2 using the Torch-TensorRT with dynamo backend</div>
-    </div>
-
-
-.. raw:: html
-
     <div class="sphx-glr-thumbcontainer" tooltip="We are going to demonstrate how we can easily use Mutable Torch TensorRT Module to compile, int...">
 
 .. only:: html
@@ -195,13 +162,13 @@ Model Zoo
 
 .. raw:: html
 
-      <div class="sphx-glr-thumbnail-title">Compiling ResNet using the Torch-TensorRT torch.compile Backend</div>
+      <div class="sphx-glr-thumbnail-title">Compiling ResNet with dynamic shapes using the torch.compile backend</div>
     </div>
 
 
 .. raw:: html
 
-    <div class="sphx-glr-thumbcontainer" tooltip="This interactive script is intended as a sample of the Torch-TensorRT workflow with dynamo back...">
+    <div class="sphx-glr-thumbcontainer" tooltip="This script illustrates Torch-TensorRT workflow with dynamo backend on popular GPT2 model.">
 
 .. only:: html
 
@@ -212,7 +179,24 @@ Model Zoo
 
 .. raw:: html
 
-      <div class="sphx-glr-thumbnail-title">Compiling GPT2 using the Torch-TensorRT with dynamo backend</div>
+      <div class="sphx-glr-thumbnail-title">Compiling GPT2 using the dynamo backend</div>
+    </div>
+
+
+.. raw:: html
+
+    <div class="sphx-glr-thumbcontainer" tooltip="This script illustrates Torch-TensorRT workflow with dynamo backend on popular Llama2 model.">
+
+.. only:: html
+
+  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_torch_export_llama2_thumb.png
+    :alt:
+
+  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_torch_export_llama2.py`
+
+.. raw:: html
+
+      <div class="sphx-glr-thumbnail-title">Compiling Llama2 using the dynamo backend</div>
     </div>
 
 
@@ -298,10 +282,10 @@ Model Zoo
    /tutorials/_rendered_examples/dynamo/torch_compile_transformers_example
    /tutorials/_rendered_examples/dynamo/torch_compile_advanced_usage
    /tutorials/_rendered_examples/dynamo/engine_caching_bert_example
-   /tutorials/_rendered_examples/dynamo/torch_export_llama2
    /tutorials/_rendered_examples/dynamo/mutable_torchtrt_module_example
    /tutorials/_rendered_examples/dynamo/torch_compile_resnet_example
    /tutorials/_rendered_examples/dynamo/torch_export_gpt2
+   /tutorials/_rendered_examples/dynamo/torch_export_llama2
    /tutorials/_rendered_examples/dynamo/converter_overloading
    /tutorials/_rendered_examples/dynamo/vgg16_ptq
    /tutorials/_rendered_examples/dynamo/engine_caching_example
