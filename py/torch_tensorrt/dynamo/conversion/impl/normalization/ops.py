@@ -184,10 +184,17 @@ def layer_norm(
         bias = impl.slice.expand(
             ctx, target, source_ir, f"{name}_expand_bias", bias, input.shape
         )
+    strongly_typed_network = False
+    if ctx.net.get_flag(trt.NetworkDefinitionCreationFlag.STRONGLY_TYPED):
+        weight = cast_trt_tensor(ctx, weight, input.dtype, name)
+        bias = cast_trt_tensor(ctx, bias, input.dtype, name)
+        strongly_typed_network = True
 
     layer_norm = ctx.net.add_normalization(input, weight, bias, axes)
     layer_norm.epsilon = eps
-    layer_norm.compute_precision = input.dtype
+    # compute_precision ignored for strongly typed network.
+    if not strongly_typed_network:
+        layer_norm.compute_precision = input.dtype
     set_layer_name(layer_norm, target, f"{name}_layer_norm", source_ir)
 
     if return_mean_rstd:
