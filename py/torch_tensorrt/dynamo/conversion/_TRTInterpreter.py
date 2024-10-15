@@ -640,7 +640,8 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
 
         self._construct_trt_network_def()
 
-        self._save_weight_mapping()
+        if not self.compilation_settings.immutable_weights:
+            self._save_weight_mapping()
 
         build_engine_start_time = datetime.now()
         _LOGGER.info("Not found cached TRT engines. Start building engine.")
@@ -659,7 +660,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         assert serialized_engine
 
         _LOGGER.info(
-            f"Build weight-stripped TRT engine elapsed time: {datetime.now() - build_engine_start_time}"
+            f"Build TRT engine elapsed time: {datetime.now() - build_engine_start_time}"
         )
         _LOGGER.info(f"TRT Engine uses: {serialized_engine.nbytes} bytes of Memory")
 
