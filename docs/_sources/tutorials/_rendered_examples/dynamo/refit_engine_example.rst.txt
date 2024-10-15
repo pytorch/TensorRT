@@ -80,7 +80,7 @@ these setttings will not be able to be refit.
 
 In this case we are going to compile a ResNet18 model with randomly initialized weights and save it.
 
-.. GENERATED FROM PYTHON SOURCE LINES 55-79
+.. GENERATED FROM PYTHON SOURCE LINES 55-80
 
 .. code-block:: python
 
@@ -102,6 +102,7 @@ In this case we are going to compile a ResNet18 model with randomly initialized 
         min_block_size=min_block_size,
         torch_executed_ops=torch_executed_ops,
         make_refittable=True,
+        reuse_cached_engines=False,
     )  # Output is a torch.fx.GraphModule
 
     # Save the graph module as an exported program
@@ -109,7 +110,7 @@ In this case we are going to compile a ResNet18 model with randomly initialized 
 
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 80-87
+.. GENERATED FROM PYTHON SOURCE LINES 81-88
 
 Refit the Program with Pretrained Weights
 ------------------------------------------
@@ -119,7 +120,7 @@ refit the model with the pretrained weights. This is done by setting up another 
 with the target weights and exporting it as an ExportedProgram. Then the ``refit_module_weights``
 function is used to update the weights of the compiled module with the new weights.
 
-.. GENERATED FROM PYTHON SOURCE LINES 87-111
+.. GENERATED FROM PYTHON SOURCE LINES 88-112
 
 .. code-block:: python
 
@@ -148,7 +149,7 @@ function is used to update the weights of the compiled module with the new weigh
     print("Refit successfully!")
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 112-140
+.. GENERATED FROM PYTHON SOURCE LINES 113-141
 
 Advanced Usage
 -----------------------------

@@ -5,6 +5,7 @@ from contextlib import nullcontext
 from tempfile import tempdir
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
+import tensorrt as trt
 import torch
 import torch_tensorrt
 from torch.nn import Module
@@ -18,8 +19,6 @@ from torch_tensorrt.runtime._utils import (
     _select_rt_device,
     multi_gpu_device_check,
 )
-
-import tensorrt as trt
 
 logger = logging.getLogger(__name__)
 
@@ -372,8 +371,6 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                     or self._engine_stream is None
                 ):
                     self._engine_stream = torch.cuda.Stream()
-                else:
-                    self._engine_stream = self._caller_stream
 
                 self._engine_stream.wait_stream(self._caller_stream)
 
@@ -464,7 +461,8 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         if new_shape_key != self.shape_key:
             logger.debug(f"Resetting Cudagraph on new shape key {new_shape_key}")
             self.shape_key = new_shape_key
-            self.cudagraph.reset()  # type: ignore
+            if self.cudagraph:
+                self.cudagraph.reset()
             return False
 
         return True
