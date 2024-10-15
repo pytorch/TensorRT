@@ -503,8 +503,8 @@ def save(
             )
         else:
             if arg_inputs is not None:
-                raise ValueError(
-                    "Provided model is a torch.jit.ScriptModule, do not allow user to provide inputs or arg_inputs."
+                logger.warning(
+                    "Provided model is a torch.jit.ScriptModule, inputs or arg_inputs is not necessary during save."
                 )
             torch.jit.save(module, file_path)
     elif module_type == _ModuleType.ep:
@@ -514,8 +514,8 @@ def save(
             )
         else:
             if arg_inputs is not None:
-                raise ValueError(
-                    "Provided model is a torch.export.ExportedProgram, do not allow user to provide inputs or arg_inputs during save, it should be provided during export and compile stage"
+                logger.warning(
+                    "Provided model is a torch.export.ExportedProgram, inputs or arg_inputs is not necessary during save, it uses the inputs or arg_inputs provided during export and compile"
                 )
             torch.export.save(module, file_path)
     elif module_type == _ModuleType.fx:
@@ -531,8 +531,8 @@ def save(
                 from torch_tensorrt.dynamo._exporter import export
 
                 if arg_inputs is not None:
-                    raise ValueError(
-                        "Provided model is a torch.fx.GraphModule and retrace is False, do not allow user to provide inputs or arg_inputs."
+                    logger.warning(
+                        "Provided model is a torch.fx.GraphModule and retrace is False, inputs or arg_inputs is not necessary during save."
                     )
                 exp_program = export(module)
                 torch.export.save(exp_program, file_path)

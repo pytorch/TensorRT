@@ -700,7 +700,7 @@ def convert_exported_program_to_serialized_trt_engine(
     CONVERTERS.set_compilation_settings(settings)
 
     try:
-        _, interpreter_result = interpret_module_to_result(
+        interpreter_result, _ = interpret_module_to_result(
             gm,
             inputs=flattened_input_list,
             arg_inputs=arg_input_list,

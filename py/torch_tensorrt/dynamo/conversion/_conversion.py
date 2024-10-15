@@ -26,7 +26,7 @@ from torch_tensorrt.dynamo.utils import (
 logger = logging.getLogger(__name__)
 
 
-def infer_module_output_shapes_dtypes(
+def infer_module_outputs(
     module: torch.fx.GraphModule,
     inputs: Sequence[Input],
     device: Device,
@@ -84,7 +84,7 @@ def interpret_module_to_result(
     arg_inputs: Optional[Sequence[Input]] = None,
     kwarg_inputs: Optional[dict[str, Any]] = None,
     engine_cache: Optional[BaseEngineCache] = None,
-) -> Tuple[List[Tuple[int]], TRTInterpreterResult]:
+) -> Tuple[TRTInterpreterResult, List[Tuple[int]]]:
     """Interpret an FX module to the output shapes and a TRTInterpreterResult
     Args:
         module: FX GraphModule to interpret
@@ -95,10 +95,10 @@ def interpret_module_to_result(
         settings: Compilation settings
         engine_cache: Engine cache instance
     Returns:
-        (List[Tuple[int]], TRTInterpreterResult)
+        (TRTInterpreterResult, List[Tuple[int]])
     """
     if arg_inputs is not None:
-        output_shapes, output_dtypes = infer_module_output_shapes_dtypes(
+        output_shapes, output_dtypes = infer_module_outputs(
             module,
             arg_inputs,
             settings.device,
@@ -107,7 +107,7 @@ def interpret_module_to_result(
         )
     else:
         # args and kwargs are combined and flattened to one list
-        output_shapes, output_dtypes = infer_module_output_shapes_dtypes(
+        output_shapes, output_dtypes = infer_module_outputs(
             module,
             inputs,
             settings.device,
@@ -145,7 +145,7 @@ def convert_module(
         PythonTorchTensorRTModule or TorchTensorRTModule
     """
 
-    output_shapes, interpreter_result = interpret_module_to_result(
+    interpreter_result, output_shapes = interpret_module_to_result(
         module, inputs, settings, engine_cache=engine_cache
     )
 
