@@ -290,16 +290,11 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         if self.compilation_settings.immutable_weights:
             # non-refittable engine
             if self.compilation_settings.strip_engine_weights:
-                _LOGGER.warning(
-                    "You cannot get a non-refittable engine with weights stripped. `strip_engine_weights` will be set to false and engine caching will be disabled."
-                )
+                _LOGGER.warning("strip_engine_weights will be ignored.")
         else:
             # refittable engine
-            if version.parse(trt.__version__) >= version.parse("10.0"):
-                if self.compilation_settings.refit_identical_engine_weights:
-                    builder_config.set_flag(trt.BuilderFlag.REFIT_IDENTICAL)
-                else:
-                    builder_config.set_flag(trt.BuilderFlag.REFIT)
+            if self.compilation_settings.refit_identical_engine_weights:
+                builder_config.set_flag(trt.BuilderFlag.REFIT_IDENTICAL)
             else:
                 builder_config.set_flag(trt.BuilderFlag.REFIT)
 

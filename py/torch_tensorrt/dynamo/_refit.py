@@ -410,10 +410,6 @@ def refit_module_weights(
                 "The type of graph module is not supported for refitting or two compiled modules do not match."
             )
 
-        assert (
-            engine.refittable
-        ), "The engine is not refittable. The reason may be that the engine was built with an older version of Torch-TensorRT, or you are refitting a refitted weight-stripped engine. Note that weight-stripped engine can be refitted only once."
-
         # Get the submodule inputs for min, opt, max shapes of the graph inputs
         submodule_inputs = partitioning.construct_submodule_inputs(new_submodule)
         logger.debug(
