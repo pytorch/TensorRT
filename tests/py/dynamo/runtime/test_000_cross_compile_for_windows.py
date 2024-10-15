@@ -55,7 +55,7 @@ class TestCrossCompileSaveForWindows(TestCase):
             pytest.fail(f"unexpected exception raised: {e}")
 
     @unittest.skipIf(
-        platform.system() != "Windows" or platform.machine != "AMD64",
+        platform.system() != "Windows" or platform.machin() != "AMD64",
         "Cross compile for windows can only be loaded on on windows AMD64 platform",
     )
     @pytest.mark.unit
@@ -65,6 +65,7 @@ class TestCrossCompileSaveForWindows(TestCase):
         try:
             loaded_trt_module = torch.export.load(trt_ep_path)
             trt_gm = loaded_trt_module.module()
+            print("lan added successfully loaded from windows.")
             a = torch.randn(2, 3).cuda()
             b = torch.randn(2, 3).cuda()
             trt_output = trt_gm(a, b)
