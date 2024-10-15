@@ -231,9 +231,9 @@ recommended commands:
 +-------------------------------------------------------------+----------------------------------------------------------+--------------------------------------------------------------------+
 | PyTorch Source                                              | Recommended Python Compilation Command                   | Recommended C++ Compilation Command                                |
 +=============================================================+==========================================================+====================================================================+
-| PyTorch whl file from PyTorch.org                           | python -m pip install .                                  | bazel build //:libtorchtrt -c opt --config pre_cxx11_abi           |
+| PyTorch whl file from PyTorch.org                           | python -m pip install .                                  | bazel build //:libtorchtrt -c opt \-\-config pre_cxx11_abi         |
 +-------------------------------------------------------------+----------------------------------------------------------+--------------------------------------------------------------------+
-| libtorch-shared-with-deps-*.zip from PyTorch.org            | python -m pip install .                                  | bazel build //:libtorchtrt -c opt --config pre_cxx11_abi           |
+| libtorch-shared-with-deps-*.zip from PyTorch.org            | python -m pip install .                                  | bazel build //:libtorchtrt -c opt \-\-config pre_cxx11_abi         |
 +-------------------------------------------------------------+----------------------------------------------------------+--------------------------------------------------------------------+
 | libtorch-cxx11-abi-shared-with-deps-*.zip from PyTorch.org  | python setup.py bdist_wheel --use-cxx11-abi              | bazel build //:libtorchtrt -c opt                                  |
 +-------------------------------------------------------------+----------------------------------------------------------+--------------------------------------------------------------------+
