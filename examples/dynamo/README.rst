@@ -1,10 +1,6 @@
-.. _torch_compile:
+.. _torch_tensorrt_examples:
 
-Torch-TensorRT Examples
-====================================
-
-Please refer to the following examples which demonstrate the usage of different features of Torch-TensorRT. We also provide
-examples of Torch-TensorRT compilation of select computer vision and language models.
+Here we provide examples of Torch-TensorRT compilation of popular computer vision and language models.
 
 Dependencies
 ------------------------------------
@@ -15,18 +11,6 @@ Please install the following external dependencies (assuming you already have co
 
     pip install -r requirements.txt
 
-
-Compiler Features
-------------------------------------
-* :ref:`torch_compile_advanced_usage`: Advanced usage including making a custom backend to use directly with the ``torch.compile`` API
-* :ref:`torch_export_cudagraphs`: Using the Cudagraphs integration with `ir="dynamo"`
-* :ref:`converter_overloading`: How to write custom converters and overload existing ones
-* :ref:`custom_kernel_plugins`: Creating a plugin to use a custom kernel inside TensorRT engines
-* :ref:`refit_engine_example`: Refitting a compiled TensorRT Graph Module with updated weights
-* :ref:`mutable_torchtrt_module_example`: Compile, use, and modify TensorRT Graph Module with MutableTorchTensorRTModule
-* :ref:`vgg16_fp8_ptq`: Compiling a VGG16 model with FP8 and PTQ using ``torch.compile``
-* :ref:`engine_caching_example`: Utilizing engine caching to speed up compilation times
-* :ref:`engine_caching_bert_example`: Demonstrating engine caching on BERT
 
 Model Zoo
 ------------------------------------
