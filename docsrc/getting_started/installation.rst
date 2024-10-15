@@ -134,6 +134,14 @@ Once the WORKSPACE has been configured properly, all that is required to build t
         python -m pip install --pre . --extra-index-url https://download.pytorch.org/whl/nightly/cu124
 
 
+If you use the ``uv`` (`https://docs.astral.sh/uv/ <https://docs.astral.sh/uv/>`_) tool to manage python and your projects, the command is slightly simpler
+
+
+    .. code-block:: sh
+
+        uv pip install -e .
+
+
 To build the wheel file
 
     .. code-block:: sh

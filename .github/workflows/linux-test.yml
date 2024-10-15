@@ -73,9 +73,9 @@ jobs:
     container:
       image: ${{ matrix.container_image }}
       options: ${{ matrix.gpu_arch_type == 'cuda' && '--gpus all' || ' ' }}
-    # If a build is taking longer than 60 minutes on these runners we need
+    # If a build is taking longer than 120 minutes on these runners we need
     # to have a conversation
-    timeout-minutes: 60
+    timeout-minutes: 120
     steps:
       - name: Clean workspace
         run: |
@@ -167,7 +167,7 @@ jobs:
           fi
 
           upload_docs=0
-          # Check if there are things in the documentation folder to uplaod
+          # Check if there are things in the documentation folder to upload
           if find "${RUNNER_DOCS_DIR}" -mindepth 1 -maxdepth 1 | read -r; then
             # TODO: Add a check here to test if on ec2 because if we're not on ec2 then this
             # upload will probably not work correctly

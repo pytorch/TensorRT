@@ -98,6 +98,13 @@ def lift(
     )
     assert fake_mode is not None
 
+    # This map stores the names of outputs (old to new)
+    # This is necessary to track because the output names can be changed when
+    # we convert graph constants to placeholder inputs below.
+    output_names = {}
+    for output_spec in graph_signature.output_specs:
+        output_names[output_spec.arg.name] = output_spec.arg.name
+
     # Locate the user input to insert new placeholders before them
     first_user_input = None
     for node in gm.graph.nodes:
@@ -139,9 +146,8 @@ def lift(
             # Replace get_attr nodes with placeholder nodes and copy metadata.
             with gm.graph.inserting_before(first_user_input):
                 # Ensure name doesn't contain period as it is used for submodules
-                const_placeholder_node = gm.graph.placeholder(
-                    node.target.replace(".", "_")
-                )
+                const_placeholder_name = node.target.replace(".", "_")
+                const_placeholder_node = gm.graph.placeholder(const_placeholder_name)
                 # Copy the node meta into this new placeholder node
                 const_placeholder_node.meta = node.meta
 
@@ -156,6 +162,12 @@ def lift(
 
                 node.replace_all_uses_with(const_placeholder_node)
                 gm.graph.erase_node(node)
+
+                # Verify if the const_placeholder being added is one of the output nodes
+                # This happens if there is just a single static arange op in the graph
+                # https://github.com/pytorch/TensorRT/issues/3189
+                if const_placeholder_name in output_names:
+                    output_names[const_placeholder_name] = const_placeholder_node.name
 
                 # Add these parameters/buffers/constants to the existing graph signature
                 # before user inputs. These specs are looked up in the state_dict during ExportedProgram creation.
@@ -173,6 +185,11 @@ def lift(
                     ),
                 )
                 non_user_input_idx += 1
+
+    # Update output_specs with modified names. This only gets updated if the graph getattr nodes (weights)
+    # are also the outputs of the graph
+    for output_spec in graph_signature.output_specs:
+        output_spec.arg.name = output_names[output_spec.arg.name]
 
     gm.graph.eliminate_dead_code()
     gm.graph.lint()

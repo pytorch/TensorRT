@@ -5,6 +5,7 @@ import unittest
 
 import numpy as np
 import pytest
+import tensorrt as trt
 import torch
 import torch.nn.functional as F
 import torch_tensorrt as torchtrt
@@ -24,8 +25,6 @@ from torch_tensorrt.dynamo.lowering import (
 from torch_tensorrt.logging import TRT_LOGGER
 from transformers import BertModel
 
-import tensorrt as trt
-
 assertions = unittest.TestCase()
 
 
@@ -36,8 +35,8 @@ assertions = unittest.TestCase()
 @pytest.mark.unit
 def test_mapping():
 
-    model = models.resnet18(pretrained=True).eval().to("cuda")
-    model2 = models.resnet18(pretrained=False).eval().to("cuda")
+    model = models.resnet18(pretrained=False).eval().to("cuda")
+    model2 = models.resnet18(pretrained=True).eval().to("cuda")
     inputs = [torch.randn((1, 3, 224, 224)).to("cuda")]
     trt_input = [
         torchtrt.Input(i.shape, dtype=torch.float, format=torch.contiguous_format)
@@ -59,6 +58,7 @@ def test_mapping():
         debug=debug,
         min_block_size=min_block_size,
         make_refittable=True,
+        reuse_cached_engines=False,
     )
     settings = trt_gm._run_on_acc_0.settings
     runtime = trt.Runtime(TRT_LOGGER)
@@ -111,6 +111,7 @@ def test_refit_one_engine_with_weightmap():
         debug=debug,
         min_block_size=min_block_size,
         make_refittable=True,
+        reuse_cached_engines=False,
     )
 
     new_trt_gm = refit_module_weights(
@@ -142,8 +143,8 @@ def test_refit_one_engine_with_weightmap():
 @pytest.mark.unit
 def test_refit_one_engine_no_map_with_weightmap():
 
-    model = models.resnet18(pretrained=True).eval().to("cuda")
-    model2 = models.resnet18(pretrained=False).eval().to("cuda")
+    model = models.resnet18(pretrained=False).eval().to("cuda")
+    model2 = models.resnet18(pretrained=True).eval().to("cuda")
     inputs = [torch.randn((1, 3, 224, 224)).to("cuda")]
     enabled_precisions = {torch.float}
     debug = False
@@ -161,6 +162,7 @@ def test_refit_one_engine_no_map_with_weightmap():
         debug=debug,
         min_block_size=min_block_size,
         make_refittable=True,
+        reuse_cached_engines=False,
     )
 
     trt_gm._run_on_acc_0.weight_name_map = None
@@ -193,8 +195,8 @@ def test_refit_one_engine_no_map_with_weightmap():
 @pytest.mark.unit
 def test_refit_one_engine_with_wrong_weightmap():
 
-    model = models.resnet18(pretrained=True).eval().to("cuda")
-    model2 = models.resnet18(pretrained=False).eval().to("cuda")
+    model = models.resnet18(pretrained=False).eval().to("cuda")
+    model2 = models.resnet18(pretrained=True).eval().to("cuda")
     inputs = [torch.randn((1, 3, 224, 224)).to("cuda")]
     enabled_precisions = {torch.float}
     debug = False
@@ -212,6 +214,7 @@ def test_refit_one_engine_with_wrong_weightmap():
         debug=debug,
         min_block_size=min_block_size,
         make_refittable=True,
+        reuse_cached_engines=False,
     )
     # Manually Deleted all batch norm layer. This suppose to fail the fast refit
     trt_gm._run_on_acc_0.weight_name_map = {
@@ -269,6 +272,7 @@ def test_refit_one_engine_bert_with_weightmap():
         debug=debug,
         min_block_size=min_block_size,
         make_refittable=True,
+        reuse_cached_engines=False,
     )
 
     new_trt_gm = refit_module_weights(
@@ -303,8 +307,8 @@ def test_refit_one_engine_bert_with_weightmap():
 @pytest.mark.unit
 def test_refit_one_engine_inline_runtime__with_weightmap():
     trt_ep_path = os.path.join(tempfile.gettempdir(), "compiled.ep")
-    model = models.resnet18(pretrained=True).eval().to("cuda")
-    model2 = models.resnet18(pretrained=False).eval().to("cuda")
+    model = models.resnet18(pretrained=False).eval().to("cuda")
+    model2 = models.resnet18(pretrained=True).eval().to("cuda")
     inputs = [torch.randn((1, 3, 224, 224)).to("cuda")]
     enabled_precisions = {torch.float}
     debug = False
@@ -322,6 +326,7 @@ def test_refit_one_engine_inline_runtime__with_weightmap():
         debug=debug,
         min_block_size=min_block_size,
         make_refittable=True,
+        reuse_cached_engines=False,
     )
     torchtrt.save(trt_gm, trt_ep_path, inputs=inputs)
     trt_gm = torch.export.load(trt_ep_path)
@@ -349,8 +354,8 @@ def test_refit_one_engine_inline_runtime__with_weightmap():
 @pytest.mark.unit
 def test_refit_one_engine_python_runtime_with_weightmap():
 
-    model = models.resnet18(pretrained=True).eval().to("cuda")
-    model2 = models.resnet18(pretrained=False).eval().to("cuda")
+    model = models.resnet18(pretrained=False).eval().to("cuda")
+    model2 = models.resnet18(pretrained=True).eval().to("cuda")
     inputs = [torch.randn((1, 3, 224, 224)).to("cuda")]
     enabled_precisions = {torch.float}
     debug = False
@@ -368,6 +373,7 @@ def test_refit_one_engine_python_runtime_with_weightmap():
         debug=debug,
         min_block_size=min_block_size,
         make_refittable=True,
+        reuse_cached_engines=False,
     )
 
     new_trt_gm = refit_module_weights(
@@ -439,6 +445,7 @@ def test_refit_multiple_engine_with_weightmap():
         min_block_size=min_block_size,
         make_refittable=True,
         torch_executed_ops=torch_executed_ops,
+        reuse_cached_engines=False,
     )
 
     new_trt_gm = refit_module_weights(
@@ -488,6 +495,7 @@ def test_refit_one_engine_without_weightmap():
         debug=debug,
         min_block_size=min_block_size,
         make_refittable=True,
+        reuse_cached_engines=False,
     )
 
     new_trt_gm = refit_module_weights(
@@ -539,6 +547,7 @@ def test_refit_one_engine_bert_without_weightmap():
         debug=debug,
         min_block_size=min_block_size,
         make_refittable=True,
+        reuse_cached_engines=False,
     )
 
     new_trt_gm = refit_module_weights(
@@ -592,6 +601,7 @@ def test_refit_one_engine_inline_runtime_without_weightmap():
         debug=debug,
         min_block_size=min_block_size,
         make_refittable=True,
+        reuse_cached_engines=False,
     )
     torchtrt.save(trt_gm, trt_ep_path, inputs=inputs)
     trt_gm = torch.export.load(trt_ep_path)
@@ -638,6 +648,7 @@ def test_refit_one_engine_python_runtime_without_weightmap():
         debug=debug,
         min_block_size=min_block_size,
         make_refittable=True,
+        reuse_cached_engines=False,
     )
 
     new_trt_gm = refit_module_weights(
@@ -709,6 +720,7 @@ def test_refit_multiple_engine_without_weightmap():
         min_block_size=min_block_size,
         make_refittable=True,
         torch_executed_ops=torch_executed_ops,
+        reuse_cached_engines=False,
     )
 
     new_trt_gm = refit_module_weights(
@@ -725,6 +737,59 @@ def test_refit_multiple_engine_without_weightmap():
     for expected_output, refitted_output in zip(expected_outputs, refitted_outputs):
         assertions.assertTrue(
             torch.allclose(expected_output, refitted_output, 1e-2, 1e-2),
+            "Refit Result is not correct. Refit failed",
+        )
+        # Clean up model env
+
+    torch._dynamo.reset()
+
+
+@pytest.mark.unit
+def test_refit_cumsum_fallback():
+
+    class net(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.conv1 = nn.Conv2d(3, 12, 3, padding=1)
+            self.fc1 = nn.Linear(12 * 16 * 16, 10)
+
+        def forward(self, x):
+            x = self.conv1(x)
+            x = F.relu(x)
+            x = torch.flatten(x, 1)
+            x = torch.cumsum(self.fc1(x), 1)
+            x = x**2
+            return x
+
+    model = net().eval().to("cuda")
+    inputs = [torch.randn((1, 3, 16, 16)).to("cuda")]
+    model(*inputs)
+    exp_program = torch.export.export(model, tuple(inputs))
+    with torchtrt.logging.debug():
+        trt_gm = torchtrt.dynamo.compile(
+            exp_program,
+            tuple(inputs),
+            enabled_precisions={torch.float},
+            debug=True,
+            min_block_size=1,
+            make_refittable=True,
+        )
+
+    num_pyt_segments = len(
+        [1 for submod in list(trt_gm.named_children()) if "_run_on_gpu" in submod[0]]
+    )
+
+    # Number of pyt segments should be 1 (because of cumsum being non-refitable)
+    assertions.assertTrue(
+        num_pyt_segments == 1,
+        f"test_refit_cumsum_fallback test found {num_pyt_segments} pytorch segments but expected 1",
+    )
+
+    # Check the output
+    pyt_outputs, trt_outputs = exp_program.module()(*inputs), trt_gm(*inputs)
+    for pyt_output, trt_output in zip(pyt_outputs, trt_outputs):
+        assertions.assertTrue(
+            torch.allclose(pyt_output, trt_output, 1e-2, 1e-2),
             "Refit Result is not correct. Refit failed",
         )
         # Clean up model env

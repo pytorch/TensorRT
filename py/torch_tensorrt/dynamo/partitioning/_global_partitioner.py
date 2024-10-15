@@ -228,8 +228,7 @@ def partition(
     # Determine partitions based on user specifications and operator support
     # Then, fuse partitions and display overview of supported/unsupported operators
     partitions = partitioner.propose_partitions()
-    fused_graph = partitioner.fuse_partitions(partitions)
-
+    fused_graph = partitioner.fuse_partitions(partitions, prefix="_run_on_acc_")
     if verbose:
         supported_ops.print_support_overview(len(partitions))
 
