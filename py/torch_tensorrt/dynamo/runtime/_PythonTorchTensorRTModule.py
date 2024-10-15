@@ -373,8 +373,6 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                     or self._engine_stream is None
                 ):
                     self._engine_stream = torch.cuda.Stream()
-                else:
-                    self._engine_stream = self._caller_stream
 
                 self._engine_stream.wait_stream(self._caller_stream)
 
@@ -465,7 +463,8 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         if new_shape_key != self.shape_key:
             logger.debug(f"Resetting Cudagraph on new shape key {new_shape_key}")
             self.shape_key = new_shape_key
-            self.cudagraph.reset()  # type: ignore
+            if self.cudagraph:
+                self.cudagraph.reset()
             return False
 
         return True
