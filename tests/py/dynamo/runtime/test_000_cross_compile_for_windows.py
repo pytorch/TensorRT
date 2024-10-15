@@ -61,6 +61,7 @@ class TestCrossCompileSaveForWindows(TestCase):
     @pytest.mark.unit
     def test_load_from_windows(self):
         trt_ep_path = "tests/py/dynamo/runtime/test_data/trt.ep"
+        print("lan added run the test_load_from_windows test")
         try:
             loaded_trt_module = torch.export.load(trt_ep_path)
             trt_gm = loaded_trt_module.module()
