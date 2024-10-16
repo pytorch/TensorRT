@@ -180,8 +180,10 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         """
         if self.engine is not None:
             return
+
         self.engine = torch.classes.tensorrt.Engine(self._pack_engine_info())
 
+    @staticmethod
     def encode_metadata(self, metadata: Any) -> str:
         metadata = copy.deepcopy(metadata)
         dumped_metadata = pickle.dumps(metadata)
@@ -270,7 +272,6 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
             (i if isinstance(i, torch.Tensor) else torch.tensor(i).cuda())
             for i in inputs
         ]
-
         outputs: List[torch.Tensor] = torch.ops.tensorrt.execute_engine(
             list(input_tensors), self.engine
         )
