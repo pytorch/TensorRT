@@ -3,7 +3,9 @@
 
 cross runtime compilation limitations:
 The cross compile and saved model can only be loaded in Windows, it can no longer be loaded in Linux
-The cross compile and saved model can only be loaded in the same Compute capacity as the Linux which it has been cross compiled
+The cross compile and saved model can only be loaded in the same Compute capacity as the Linux which it was cross compiled
+(for example, if the model was cross compiled in Linux with GeForceRTX 4080 which has Compute capacity of 8.9,
+It cannot be loaded in Windows with GeForceRTX 3080 which has Compute capacity of 8.6)
 
 Cross runtime compilation for windows example
 ======================================================
