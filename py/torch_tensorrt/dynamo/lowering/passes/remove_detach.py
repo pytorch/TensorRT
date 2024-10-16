@@ -1,11 +1,14 @@
 import logging
 
 import torch
+from torch_tensorrt.dynamo._settings import CompilationSettings
 
 logger = logging.getLogger(__name__)
 
 
-def remove_detach(gm: torch.fx.GraphModule) -> torch.fx.GraphModule:
+def remove_detach(
+    gm: torch.fx.GraphModule, settings: CompilationSettings
+) -> torch.fx.GraphModule:
     """Remove detach ops in the graph"""
     count = 0
     for node in gm.graph.nodes:
