@@ -388,6 +388,17 @@ def scatter_reduce_decomposition(
     return scatter_loop_tensor
 
 
+@register_torch_trt_decomposition(aten._log_softmax, registry=TORCH_TRT_DECOMPOSITIONS)
+def log_softmax_decomposition(
+    x: torch.Tensor,
+    dim: int,
+    half_to_float: bool,
+) -> torch.Tensor:
+    return torch.log(
+        torch.softmax(x, dim, dtype=torch.float if half_to_float else None)
+    )
+
+
 def get_decompositions(
     enable_experimental_decompositions: bool = False,
 ) -> Dict[OpOverload, Callable[[Any], Any]]:
