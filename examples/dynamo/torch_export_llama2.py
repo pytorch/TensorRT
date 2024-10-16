@@ -1,10 +1,10 @@
 """
 .. _torch_export_llama2:
 
-Compiling Llama2 using the Torch-TensorRT with dynamo backend
+Compiling Llama2 using the dynamo backend
 ==========================================================
 
-This interactive script is intended as a sample of the Torch-TensorRT workflow with dynamo backend on a Llama2 model."""
+This script illustrates Torch-TensorRT workflow with dynamo backend on popular Llama2 model."""
 
 # %%
 # Imports and Model Definition
@@ -82,9 +82,11 @@ print(
     )[0],
 )
 
-# %%
-# The output sentences should look like
+
+# Prompt : What is dynamic programming?
+
 # =============================
-# Pytorch model generated text:  I enjoy walking with my cute dog, but I'm not sure if I'll ever be able to walk with my dog. I'm not sure if I'll ever be able to walk with my
+# Pytorch model generated text: Dynamic programming is an algorithmic technique used to solve complex problems by breaking them down into smaller subproblems, solving each subproblem only once, and
+
 # =============================
-# TensorRT model generated text:  I enjoy walking with my cute dog, but I'm not sure if I'll ever be able to walk with my dog. I'm not sure if I'll ever be able to walk with my
+# TensorRT model generated text: Dynamic programming is an algorithmic technique used to solve complex problems by breaking them down into smaller subproblems, solving each subproblem only once, and

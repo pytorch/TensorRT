@@ -1,10 +1,10 @@
 """
 .. _torch_export_gpt2:
 
-Compiling GPT2 using the Torch-TensorRT with dynamo backend
+Compiling GPT2 using the dynamo backend
 ==========================================================
 
-This interactive script is intended as a sample of the Torch-TensorRT workflow with dynamo backend on a GPT2 model."""
+This script illustrates Torch-TensorRT workflow with dynamo backend on popular GPT2 model."""
 
 # %%
 # Imports and Model Definition
@@ -78,9 +78,10 @@ print(
     tokenizer.decode(trt_gen_tokens[0], skip_special_tokens=True),
 )
 
-# %%
-# The output sentences should look like
+# Prompt : What is parallel programming ?
+
 # =============================
-# Pytorch model generated text:  I enjoy walking with my cute dog, but I'm not sure if I'll ever be able to walk with my dog. I'm not sure if I'll ever be able to walk with my
+# Pytorch model generated text: The parallel programming paradigm is a set of programming languages that are designed to be used in parallel. The main difference between parallel programming and parallel programming is that
+
 # =============================
-# TensorRT model generated text:  I enjoy walking with my cute dog, but I'm not sure if I'll ever be able to walk with my dog. I'm not sure if I'll ever be able to walk with my
+# TensorRT model generated text: The parallel programming paradigm is a set of programming languages that are designed to be used in parallel. The main difference between parallel programming and parallel programming is that
