@@ -37,7 +37,6 @@ User Guide
 * :ref:`saving_models`
 * :ref:`runtime`
 * :ref:`using_dla`
-* :ref:`mixed_precision`
 
 .. toctree::
    :caption: User Guide
@@ -49,7 +48,6 @@ User Guide
    user_guide/saving_models
    user_guide/runtime
    user_guide/using_dla
-   user_guide/mixed_precision
 
 
 Tutorials
