@@ -101,8 +101,6 @@ def post_lowering(
         f"Invoking DynamoPassManager and applying lowering passes: {ATEN_POST_LOWERING_PASSES}"
     )
     gm = ATEN_POST_LOWERING_PASSES(gm, settings)
-    # if kwargs.get("use_fp32_acc", False):
-    #     gm = accumulate_fp32_matmul(gm)
 
     return gm
 
