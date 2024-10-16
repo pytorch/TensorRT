@@ -1,32 +1,47 @@
 import torch
+from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
 from torch_tensorrt import Input
 
 from .harness import DispatchTestCase
 
 
-class TestSoftMaxConverter(DispatchTestCase):
-    def test_softmax(self):
+class TestSoftmaxConverter(DispatchTestCase):
+    @parameterized.expand(
+        [
+            (torch.float, False),
+            (torch.half, False),
+            (torch.half, True),
+        ]
+    )
+    def test_softmax(self, dtype, half_to_float):
         class TestModule(torch.nn.Module):
             def forward(self, x):
-                return torch.ops.aten._softmax.default(x, 1, False)
+                return torch.ops.aten._softmax.default(x, 1, half_to_float)
 
-        inputs = [torch.randn(1, 3, 224, 224)]
+        inputs = [torch.randn(1, 3, 224, 224, dtype=dtype)]
         self.run_test(TestModule(), inputs)
 
-    def test_softmax_with_dynamic_shape(self):
+    @parameterized.expand(
+        [
+            (torch.float, False),
+            (torch.half, False),
+            (torch.half, True),
+        ]
+    )
+    def test_softmax_with_dynamic_shape(self, dtype, half_to_float):
         class TestModule(torch.nn.Module):
             def forward(self, x):
-                return torch.ops.aten._softmax.default(x, 2, False)
+                return torch.ops.aten._softmax.default(x, 2, half_to_float)
 
         input_specs = [
             Input(
-                shape=(-1, 3, -1, -1),
-                dtype=torch.float32,
-                shape_ranges=[((1, 3, 1, 1), (1, 3, 5, 5), (2, 3, 10, 10))],
-            ),
+                min_shape=(1, 1, 1, 1),
+                opt_shape=(2, 4, 6, 8),
+                max_shape=(8, 8, 8, 8),
+                dtype=dtype,
+            )
         ]
-
         self.run_test_with_dynamic_shape(TestModule(), input_specs)
 
 

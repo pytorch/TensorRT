@@ -76,7 +76,6 @@ torch_enabled_decompositions: Set[Union[OpOverload, OpOverloadPacket]] = {
     aten.logit_backward,
     aten.log_sigmoid_backward,
     aten.log_sigmoid_forward,
-    aten._log_softmax,
     aten._log_softmax_backward_data,
     aten.logspace,
     aten.logsumexp.default,
