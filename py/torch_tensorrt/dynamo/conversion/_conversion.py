@@ -124,7 +124,7 @@ def interpret_module_to_result(
     )
 
     interpreter_result = interpreter.run()
-    return output_shapes, interpreter_result
+    return interpreter_result, output_shapes
 
 
 def convert_module(
