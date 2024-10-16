@@ -44,8 +44,6 @@ from torch_tensorrt.dynamo.utils import (
     to_torch_tensorrt_device,
 )
 
-# from torch_tensorrt.dynamo._exporter import cross_save_for_windows
-
 logger = logging.getLogger(__name__)
 
 

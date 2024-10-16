@@ -59,7 +59,6 @@ c10::optional<RTDevice> get_most_compatible_device(
     const RTDevice& curr_device,
     bool hardware_compatible) {
   LOG_DEBUG("Target Device: " << target_device);
-  LOG_DEBUG("lan added curr_device: " << curr_device << "; hardware_compatible:" << hardware_compatible);
   auto device_options = find_compatible_devices(target_device, hardware_compatible);
   RTDevice current_device;
   if (current_device.id == -1) {
@@ -117,7 +116,6 @@ std::vector<RTDevice> find_compatible_devices(const RTDevice& target_device, boo
   std::vector<RTDevice> compatible_devices;
 
   for (auto device : device_list) {
-    LOG_DEBUG("lan added find_compatible_devices got device: " << device.first << ", " << device.second);
     auto poss_dev_cc = device.second.getSMCapability();
     if (target_device.device_type == nvinfer1::DeviceType::kDLA) {
       if (dla_supported.find(poss_dev_cc) != dla_supported.end() &&
@@ -129,7 +127,6 @@ std::vector<RTDevice> find_compatible_devices(const RTDevice& target_device, boo
       // If the SM Capabilities match, should be good enough to run
       // If hardware compatibility mode is enabled and the SM is at least 80, device is valid
       if ((poss_dev_cc == target_dev_cc) || (hardware_compatible && std::stoi(poss_dev_cc) >= 8)) {
-        LOG_DEBUG("lan added find_compatible_devices put device: " << device.second << " into comptaible devices");
         compatible_devices.push_back(device.second);
       }
     } else {

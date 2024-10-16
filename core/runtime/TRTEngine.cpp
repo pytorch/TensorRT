@@ -90,7 +90,6 @@ TRTEngine::TRTEngine(
 
   cuda_engine = make_trt(rt->deserializeCudaEngine(serialized_engine.c_str(), serialized_engine.size()));
   TORCHTRT_CHECK((cuda_engine.get() != nullptr), "Unable to deserialize the TensorRT engine");
-  LOG_DEBUG("lan added deserializeCudaEngine runs successfully");
   exec_ctx = make_trt(cuda_engine->createExecutionContext());
   TORCHTRT_CHECK((exec_ctx.get() != nullptr), "Unable to create TensorRT execution context");
 

@@ -104,17 +104,9 @@ c10::intrusive_ptr<TRTEngine> setup_engine(
     const std::string& serialized_hardware_compatible,
     const std::string& serialized_metadata,
     const std::string& serialized_target_platform) {
-  LOG_INFO("lan added Attempting to setup_engine, abi_version: " << abi_version << "; name: " << name);
-  LOG_INFO("lan added serialized_engine.size(): " << serialized_engine.size());
-  LOG_INFO("lan added serialized_in_binding_names: " << serialized_in_binding_names);
-  LOG_INFO("lan added serialized_out_binding_names: " << serialized_out_binding_names);
-  LOG_INFO("lan added serialized_target_platform: " << serialized_target_platform);
-  LOG_INFO("lan added serialized_device_info: " << serialized_device_info);
-
   // only keep the device id and device type
   RTDevice device = RTDevice(serialized_device_info);
   RTDevice new_device = RTDevice(device.id, device.device_type);
-  LOG_INFO("lan added new_serialized_device_info: " << new_device.serialize());
 
   std::vector<std::string> serialize_info;
   serialize_info.resize(SERIALIZATION_LEN);

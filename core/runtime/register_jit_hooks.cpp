@@ -69,13 +69,7 @@ static auto TORCHTRT_UNUSED TRTEngineTSRegistrtion =
               return serialize_info;
             },
             [](std::vector<std::string> serialized_info) -> c10::intrusive_ptr<TRTEngine> {
-              LOG_DEBUG(
-                  "lan added pickle deserialize serialized_info to TRTEngine: serialized engine.size():"
-                  << serialized_info[ENGINE_IDX].size());
               serialized_info[ENGINE_IDX] = base64_decode(serialized_info[ENGINE_IDX]);
-              LOG_DEBUG(
-                  "lan added pickle deserialize serialized engine str base64_decoded size: "
-                  << serialized_info[ENGINE_IDX].size());
               TRTEngine::verify_serialization_fmt(serialized_info);
               return c10::make_intrusive<TRTEngine>(serialized_info);
             });
@@ -93,7 +87,7 @@ TORCH_LIBRARY(tensorrt, m) {
   m.def("get_cudagraphs_mode", []() -> bool { return CUDAGRAPHS_MODE; });
   m.def("set_cudagraphs_mode", [](bool cudagraphs_mode) -> void { CUDAGRAPHS_MODE = cudagraphs_mode; });
   m.def("set_logging_level", [](int64_t level) -> void {
-    util::logging::get_logger().set_reportable_log_level(util::logging::LogLevel::kDEBUG);
+    util::logging::get_logger().set_reportable_log_level(util::logging::LogLevel(level));
   });
   m.def(
       "get_logging_level", []() -> int64_t { return int64_t(util::logging::get_logger().get_reportable_log_level()); });
