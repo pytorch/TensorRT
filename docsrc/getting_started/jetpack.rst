@@ -86,6 +86,11 @@ Install pip and required python packages:
 
 .. code-block:: sh
 
+   # install pytorch from nvidia jetson distribution: https://developer.download.nvidia.com/compute/redist/jp/v61/pytorch
+   python -m pip install torch https://developer.download.nvidia.com/compute/redist/jp/v61/pytorch/torch-2.5.0a0+872d972e41.nv24.08.17622132-cp310-cp310-linux_aarch64.whl
+
+.. code-block:: sh
+
     # install required python packages
     python -m pip install -r toolchains/jp_workspaces/requirements.txt
 
