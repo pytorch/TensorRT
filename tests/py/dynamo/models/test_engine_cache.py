@@ -74,7 +74,7 @@ class TestHashFunction(TestCase):
             ),
         )
         settings1 = CompilationSettings(
-            make_refittable=True, cache_built_engines=True, reuse_cached_engines=True
+            cache_built_engines=True, reuse_cached_engines=True
         )
         hash1 = BaseEngineCache.get_hash(exp_program1.module(), input_specs1, settings1)
 
@@ -89,7 +89,7 @@ class TestHashFunction(TestCase):
             ),
         )
         settings2 = CompilationSettings(
-            make_refittable=True, cache_built_engines=True, reuse_cached_engines=True
+            cache_built_engines=True, reuse_cached_engines=True
         )
         hash2 = BaseEngineCache.get_hash(exp_program2.module(), input_specs2, settings2)
 
@@ -111,7 +111,7 @@ class TestHashFunction(TestCase):
             ),
         )
         settings1 = CompilationSettings(
-            make_refittable=True, cache_built_engines=True, reuse_cached_engines=True
+            cache_built_engines=True, reuse_cached_engines=True
         )
         hash1 = BaseEngineCache.get_hash(exp_program1.module(), input_specs1, settings1)
 
@@ -126,7 +126,7 @@ class TestHashFunction(TestCase):
             ),
         )
         settings2 = CompilationSettings(
-            make_refittable=True, cache_built_engines=True, reuse_cached_engines=True
+            cache_built_engines=True, reuse_cached_engines=True
         )
         hash2 = BaseEngineCache.get_hash(exp_program2.module(), input_specs2, settings2)
 
@@ -148,7 +148,6 @@ class TestHashFunction(TestCase):
             ),
         )
         settings1 = CompilationSettings(
-            make_refittable=True,
             cache_built_engines=True,
             reuse_cached_engines=True,
             enabled_precisions={torch.float32},
@@ -166,7 +165,6 @@ class TestHashFunction(TestCase):
             ),
         )
         settings2 = CompilationSettings(
-            make_refittable=True,
             cache_built_engines=True,
             reuse_cached_engines=True,
             enabled_precisions={torch.float32, torch.float16},
@@ -206,6 +204,7 @@ class TestEngineCache(TestCase):
         start = torch.cuda.Event(enable_timing=True)
         end = torch.cuda.Event(enable_timing=True)
         for i in range(3):
+            # remove timing cache and reset dynamo for engine caching messurement
             remove_timing_cache()
             torch._dynamo.reset()
             if i == 0:
@@ -220,18 +219,16 @@ class TestEngineCache(TestCase):
             trt_gm = torch_trt.dynamo.compile(
                 exp_program,
                 tuple(inputs),
-                use_python_runtime=False,
+                use_python_runtime=True,
                 enabled_precisions={torch.float},
                 debug=False,
                 min_block_size=1,
-                make_refittable=True,
                 cache_built_engines=cache_built_engines,
                 reuse_cached_engines=reuse_cached_engines,
                 engine_cache_dir=engine_cache_dir,
             )
             end.record()
             torch.cuda.synchronize()
-            torch._dynamo.reset()
             times.append(start.elapsed_time(end))
             results.append(trt_gm(*inputs))
 
@@ -285,11 +282,10 @@ class TestEngineCache(TestCase):
             trt_gm = torch_trt.dynamo.compile(
                 exp_program,
                 tuple(inputs),
-                use_python_runtime=False,
+                use_python_runtime=True,
                 enabled_precisions={torch.float},
                 debug=False,
                 min_block_size=1,
-                make_refittable=True,
                 cache_built_engines=cache_built_engines,
                 reuse_cached_engines=reuse_cached_engines,
                 custom_engine_cache=custom_engine_cache,
@@ -336,7 +332,6 @@ class TestEngineCache(TestCase):
                 enabled_precisions={torch.float},
                 debug=False,
                 min_block_size=1,
-                make_refittable=True,
                 cache_built_engines=True,
                 reuse_cached_engines=True,
             )
@@ -387,11 +382,10 @@ class TestEngineCache(TestCase):
                 model,
                 backend="tensorrt",
                 options={
-                    "use_python_runtime": True,
+                    "use_python_runtime": False,
                     "enabled_precisions": {torch.float},
                     "debug": False,
                     "min_block_size": 1,
-                    "make_refittable": True,
                     "cache_built_engines": cache_built_engines,
                     "reuse_cached_engines": reuse_cached_engines,
                     "engine_cache_dir": engine_cache_dir,
@@ -402,7 +396,6 @@ class TestEngineCache(TestCase):
             results.append(compiled_model(*inputs))  # trigger the compilation
             end.record()
             torch.cuda.synchronize()
-            torch._dynamo.reset()
             times.append(start.elapsed_time(end))
 
         cos_sim = cosine_similarity(results[0], results[1])
@@ -441,7 +434,6 @@ class TestEngineCache(TestCase):
         start = torch.cuda.Event(enable_timing=True)
         end = torch.cuda.Event(enable_timing=True)
         for i in range(3):
-            # remove timing cache and reset dynamo for engine caching messurement
             if i == 0:
                 cache_built_engines = False
                 reuse_cached_engines = False
@@ -454,11 +446,10 @@ class TestEngineCache(TestCase):
                 model,
                 backend="tensorrt",
                 options={
-                    "use_python_runtime": True,
+                    "use_python_runtime": False,
                     "enabled_precisions": {torch.float},
                     "debug": False,
                     "min_block_size": 1,
-                    "make_refittable": True,
                     "cache_built_engines": cache_built_engines,
                     "reuse_cached_engines": reuse_cached_engines,
                     "custom_engine_cache": custom_engine_cache,
@@ -494,14 +485,12 @@ class TestEngineCache(TestCase):
     def test_torch_compile_change_input_shape(self):
         # Custom Engine Cache
         model = models.resnet18(pretrained=True).eval().to("cuda")
-
-        engine_cache_dir = "/tmp/test_torch_compile_with_default_disk_engine_cache"
+        engine_cache_dir = "/tmp/test_torch_compile_change_input_shape"
         if os.path.exists(engine_cache_dir):
             shutil.rmtree(engine_cache_dir)
 
         custom_engine_cache = MyEngineCache(engine_cache_dir)
         for i in range(3):
-            # remove timing cache and reset dynamo for engine caching messurement
             inputs = [torch.rand((4 * (i + 1), 3, 224, 224)).to("cuda")]
             compiled_model = torch.compile(
                 model,
@@ -511,7 +500,6 @@ class TestEngineCache(TestCase):
                     "enabled_precisions": {torch.float},
                     "debug": False,
                     "min_block_size": 1,
-                    "make_refittable": True,
                     "cache_built_engines": True,
                     "reuse_cached_engines": True,
                     "custom_engine_cache": custom_engine_cache,

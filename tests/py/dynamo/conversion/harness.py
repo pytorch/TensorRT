@@ -263,7 +263,7 @@ class DispatchTestCase(TRTTestCase):
         enable_passes=False,
         propagate_shapes=False,
         int32_reqd=False,
-        make_refittable=False,
+        immutable_weights=True,
     ):
         mod = self.generate_graph(
             mod,
@@ -279,7 +279,7 @@ class DispatchTestCase(TRTTestCase):
             enabled_precisions={dtype._from(precision)},
             truncate_double=True,
             debug=True,
-            make_refittable=make_refittable,
+            immutable_weights=immutable_weights,
         )
 
         num_inputs = len(inputs)
@@ -348,7 +348,7 @@ class DispatchTestCase(TRTTestCase):
         output_dtypes=None,
         use_dynamo_tracer=False,
         enable_passes=False,
-        make_refittable=False,
+        immutable_weights=True,
     ):
         mod = self.generate_graph(
             mod,
@@ -362,7 +362,7 @@ class DispatchTestCase(TRTTestCase):
             enabled_precisions={dtype._from(precision)},
             truncate_double=True,
             debug=True,
-            make_refittable=make_refittable,
+            immutable_weights=immutable_weights,
         )
 
         interp = TRTInterpreter(
@@ -388,7 +388,7 @@ class DispatchTestCase(TRTTestCase):
         pyt_inputs=None,
         propagate_shapes=False,
         check_dtype=True,
-        make_refittable=False,
+        immutable_weights=True,
     ):
         mod = self.generate_graph(
             mod,
@@ -401,7 +401,8 @@ class DispatchTestCase(TRTTestCase):
         # Previous instance of the interpreter auto-casted 64-bit inputs
         # We replicate this behavior here
         compilation_settings = CompilationSettings(
-            truncate_double=True, make_refittable=make_refittable
+            truncate_double=True,
+            immutable_weights=immutable_weights,
         )
 
         if check_dtype:

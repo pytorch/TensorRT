@@ -60,7 +60,6 @@ def compile(
         Set[Union[torch.dtype, dtype]], Tuple[Union[torch.dtype, dtype]]
     ] = _defaults.ENABLED_PRECISIONS,
     engine_capability: EngineCapability = _defaults.ENGINE_CAPABILITY,
-    make_refittable: bool = _defaults.MAKE_REFITTABLE,
     debug: bool = _defaults.DEBUG,
     num_avg_timing_iters: int = _defaults.NUM_AVG_TIMING_ITERS,
     workspace_size: int = _defaults.WORKSPACE_SIZE,
@@ -90,6 +89,9 @@ def compile(
     custom_engine_cache: Optional[BaseEngineCache] = _defaults.CUSTOM_ENGINE_CACHE,
     use_explicit_typing: bool = _defaults.USE_EXPLICIT_TYPING,
     use_fp32_acc: bool = _defaults.USE_FP32_ACC,
+    refit_identical_engine_weights: bool = _defaults.REFIT_IDENTICAL_ENGINE_WEIGHTS,
+    strip_engine_weights: bool = _defaults.STRIP_ENGINE_WEIGHTS,
+    immutable_weights: bool = _defaults.IMMUTABLE_WEIGHTS,
     **kwargs: Any,
 ) -> torch.fx.GraphModule:
     """Compile an ExportedProgram module for NVIDIA GPUs using TensorRT
@@ -130,7 +132,6 @@ def compile(
         assume_dynamic_shape_support (bool): Setting this to true enables the converters work for both dynamic and static shapes. Default: False
         sparse_weights (bool): Enable sparsity for convolution and fully connected layers.
         enabled_precision (Set(Union(torch.dtype, torch_tensorrt.dtype))): The set of datatypes that TensorRT can use when selecting kernels
-        refit (bool): Enable refitting
         debug (bool): Enable debuggable engine
         capability (torch_tensorrt.EngineCapability): Restrict kernel selection to safe gpu kernels or safe dla kernels
         num_avg_timing_iters (int): Number of averaging timing iterations used to select kernels
@@ -162,6 +163,9 @@ def compile(
         custom_engine_cache (Optional[BaseEngineCache]): Engine cache instance to use for saving and loading engines. Users can provide their own engine cache by inheriting from BaseEngineCache. If used, engine_cache_dir and engine_cache_size will be ignored.
         use_explicit_typing (bool): This flag enables strong typing in TensorRT compilation which respects the precisions set in the Pytorch model. This is useful when users have mixed precision graphs.
         use_fp32_acc (bool): This option inserts cast to FP32 nodes around matmul layers and TensorRT ensures the accumulation of matmul happens in FP32. Use this only when FP16 precision is configured in enabled_precisions.
+        refit_identical_engine_weights (bool): Refit engines with identical weights. This is useful when the same model is compiled multiple times with different inputs and the weights are the same. This will save time by reusing the same engine for different inputs.
+        strip_engine_weights (bool): Strip engine weights from the serialized engine. This is useful when the engine is to be deployed in an environment where the weights are not required.
+        immutable_weights (bool): Build non-refittable engines. This is useful for some layers that are not refittable. If this argument is set to true, `strip_engine_weights` and `refit_identical_engine_weights` will be ignored.
         **kwargs: Any,
     Returns:
         torch.fx.GraphModule: Compiled FX Module, when run it will execute via TensorRT
@@ -184,14 +188,17 @@ def compile(
 
     if "refit" in kwargs.keys():
         warnings.warn(
-            "Refit is deprecated. Please use make_refittable=True if you want to enable refitting of the engine.",
+            "`refit` is deprecated. Engines are refittable by default. Please set immutable_weights=True to build a non-refittable engine whose weights will be fixed.",
             DeprecationWarning,
             stacklevel=2,
         )
-        if make_refittable:
-            raise ValueError("Use flag make_refittable only. Flag refit is deprecated.")
-        else:
-            make_refittable = kwargs["refit"]
+
+    if "make_refittable" in kwargs.keys():
+        warnings.warn(
+            "`make_refittable` is deprecated. Engines are refittable by default. Please set immutable_weights=True to build a non-refittable engine whose weights will be fixed.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
 
     engine_capability = EngineCapability._from(engine_capability)
 
@@ -255,9 +262,6 @@ def compile(
 
     engine_cache = None
     if cache_built_engines or reuse_cached_engines:
-        assert (
-            make_refittable
-        ), "Engine caching requires make_refittable to be set to True"
         engine_cache = (
             custom_engine_cache
             if custom_engine_cache is not None
@@ -288,7 +292,6 @@ def compile(
         "require_full_compilation": require_full_compilation,
         "disable_tf32": disable_tf32,
         "sparse_weights": sparse_weights,
-        "make_refittable": make_refittable,
         "engine_capability": engine_capability,
         "dla_sram_size": dla_sram_size,
         "dla_local_dram_size": dla_local_dram_size,
@@ -301,6 +304,9 @@ def compile(
         "reuse_cached_engines": reuse_cached_engines,
         "use_explicit_typing": use_explicit_typing,
         "use_fp32_acc": use_fp32_acc,
+        "refit_identical_engine_weights": refit_identical_engine_weights,
+        "strip_engine_weights": strip_engine_weights,
+        "immutable_weights": immutable_weights,
     }
 
     settings = CompilationSettings(**compilation_options)
@@ -533,7 +539,6 @@ def convert_exported_program_to_serialized_trt_engine(
     require_full_compilation: bool = _defaults.REQUIRE_FULL_COMPILATION,
     disable_tf32: bool = _defaults.DISABLE_TF32,
     sparse_weights: bool = _defaults.SPARSE_WEIGHTS,
-    make_refittable: bool = _defaults.MAKE_REFITTABLE,
     engine_capability: EngineCapability = _defaults.ENGINE_CAPABILITY,
     num_avg_timing_iters: int = _defaults.NUM_AVG_TIMING_ITERS,
     dla_sram_size: int = _defaults.DLA_SRAM_SIZE,
@@ -544,6 +549,9 @@ def convert_exported_program_to_serialized_trt_engine(
     timing_cache_path: str = _defaults.TIMING_CACHE_PATH,
     use_explicit_typing: bool = _defaults.USE_EXPLICIT_TYPING,
     use_fp32_acc: bool = _defaults.USE_FP32_ACC,
+    refit_identical_engine_weights: bool = _defaults.REFIT_IDENTICAL_ENGINE_WEIGHTS,
+    strip_engine_weights: bool = _defaults.STRIP_ENGINE_WEIGHTS,
+    immutable_weights: bool = _defaults.IMMUTABLE_WEIGHTS,
     **kwargs: Any,
 ) -> bytes:
     """Convert an ExportedProgram to a serialized TensorRT engine
@@ -593,7 +601,6 @@ def convert_exported_program_to_serialized_trt_engine(
             Only applicable for `ir="dynamo"`; has no effect for `torch.compile` path
         disable_tf32 (bool): Whether to disable TF32 computation for TRT layers
         sparse_weights (bool): Whether to allow the builder to use sparse weights
-        refit (bool): Whether to build a refittable engine
         engine_capability (trt.EngineCapability): Restrict kernel selection to safe gpu kernels or safe dla kernels
         num_avg_timing_iters (int): Number of averaging timing iterations used to select kernels
         dla_sram_size (int): Fast software managed RAM used by DLA to communicate within a layer.
@@ -604,6 +611,9 @@ def convert_exported_program_to_serialized_trt_engine(
         timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation
         use_explicit_typing (bool): This flag enables strong typing in TensorRT compilation which respects the precisions set in the Pytorch model. This is useful when users have mixed precision graphs.
         use_fp32_acc (bool): This option inserts cast to FP32 nodes around matmul layers and TensorRT ensures the accumulation of matmul happens in FP32. Use this only when FP16 precision is configured in enabled_precisions.
+        refit_identical_engine_weights (bool): Refit engines with identical weights. This is useful when the same model is compiled multiple times with different inputs and the weights are the same. This will save time by reusing the same engine for different inputs.
+        strip_engine_weights (bool): Strip engine weights from the serialized engine. This is useful when the engine is to be deployed in an environment where the weights are not required.
+        immutable_weights (bool): Build non-refittable engines. This is useful for some layers that are not refittable. If this argument is set to true, `strip_engine_weights` and `refit_identical_engine_weights` will be ignored.
     Returns:
         bytes: Serialized TensorRT engine, can either be saved to a file or deserialized via TensorRT APIs
     """
@@ -624,10 +634,17 @@ def convert_exported_program_to_serialized_trt_engine(
             )
     if "refit" in kwargs.keys():
         warnings.warn(
-            "Refit is deprecated. Please use make_refittable=True if you want to enable refitting of the engine.",
+            "`refit` is deprecated. Engines are refittable by default. Please set immutable_weights=True to build a non-refittable engine whose weights will be fixed.",
             DeprecationWarning,
             stacklevel=2,
         )
+    if "make_refittable" in kwargs.keys():
+        warnings.warn(
+            "`make_refittable` is deprecated. Engines are refittable by default. Please set immutable_weights=True to build a non-refittable engine whose weights will be fixed.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+
     if arg_inputs is None and inputs is None:
         raise AssertionError("'arg_inputs' and 'inputs' should not both be None.")
 
@@ -670,7 +687,6 @@ def convert_exported_program_to_serialized_trt_engine(
         "require_full_compilation": require_full_compilation,
         "disable_tf32": disable_tf32,
         "sparse_weights": sparse_weights,
-        "make_refittable": make_refittable,
         "engine_capability": engine_capability,
         "num_avg_timing_iters": num_avg_timing_iters,
         "dla_sram_size": dla_sram_size,
@@ -679,6 +695,9 @@ def convert_exported_program_to_serialized_trt_engine(
         "timing_cache_path": timing_cache_path,
         "use_explicit_typing": use_explicit_typing,
         "use_fp32_acc": use_fp32_acc,
+        "refit_identical_engine_weights": refit_identical_engine_weights,
+        "strip_engine_weights": strip_engine_weights,
+        "immutable_weights": immutable_weights,
     }
 
     exported_program = pre_export_lowering(exported_program)

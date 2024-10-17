@@ -38,7 +38,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         *,
         name: str = "",
         settings: CompilationSettings = CompilationSettings(),
-        weight_name_map: Any = None,
+        weight_name_map: Optional[dict[Any, Any]] = None,
     ):
         """Takes a name, target device, serialized TensorRT engine, and binding names / order and constructs
         a PyTorch ``torch.nn.Module`` around it. Uses TensorRT Python APIs to run the engine
@@ -51,6 +51,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         Keyword Arguments:
             name (str): Name for module
             settings (torch_tensorrt.dynamo.CompilationSettings): Settings used to compile engine, assumes engine was built with default compilation settings if object not passed
+            weight_name_map (dict): Mapping of engine weight name to state_dict weight name
 
         Example:
 
