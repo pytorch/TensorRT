@@ -16,7 +16,7 @@ from torch_tensorrt.dynamo._settings import CompilationSettings
 
 # Use interpreter, input spec, and test case from fx_ts_compat to test Dynamo Converter Registry
 from torch_tensorrt.dynamo.conversion import TRTInterpreter
-from torch_tensorrt.dynamo.conversion._conversion import infer_module_output_dtypes
+from torch_tensorrt.dynamo.conversion._conversion import infer_module_outputs
 from torch_tensorrt.dynamo.lowering import (
     get_decompositions,
     post_lowering,
@@ -310,7 +310,7 @@ class DispatchTestCase(TRTTestCase):
 
         output_dtypes = None
         if check_dtype:
-            output_dtypes = infer_module_output_dtypes(
+            _, output_dtypes = infer_module_outputs(
                 mod,
                 input_specs,
                 compilation_settings.device,
@@ -405,7 +405,7 @@ class DispatchTestCase(TRTTestCase):
         )
 
         if check_dtype:
-            output_dtypes = infer_module_output_dtypes(
+            _, output_dtypes = infer_module_outputs(
                 mod,
                 input_specs,
                 compilation_settings.device,

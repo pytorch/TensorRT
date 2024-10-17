@@ -35,6 +35,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         serialized_engine: Optional[bytes] = None,
         input_binding_names: Optional[List[str]] = None,
         output_binding_names: Optional[List[str]] = None,
+        output_shapes: Optional[List[Tuple[int]]] = None,
         *,
         name: str = "",
         settings: CompilationSettings = CompilationSettings(),
@@ -92,6 +93,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         self.output_names = (
             output_binding_names if output_binding_names is not None else []
         )
+        self.output_shapes = output_shapes
         self.initialized = False
         self.target_device_id = (
             settings.device.gpu_id
