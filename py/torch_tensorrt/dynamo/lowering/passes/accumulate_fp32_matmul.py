@@ -55,6 +55,11 @@ def accumulate_fp32_matmul(
 
         gm = clean_up_graph_after_modifications(gm)
         logger.debug(
-            f"Graph after changing matmul layers to use FP32 accumulation:\n{gm.graph}"
+            f"Graph after enabling matmul layers to use FP32 accumulation:\n{gm.graph}"
         )
-        return gm
+    else:
+        logger.debug(
+            "Skipping FP32 accumulation for matmul layers as use_fp32_acc is not enabled in the compilation settings"
+        )
+
+    return gm
