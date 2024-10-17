@@ -292,7 +292,7 @@ def refit_module_weights(
         raise AssertionError(
             f"Input graph should be an ExportedProgram but got type {type(new_weight_module)}"
         )
-    new_weight_module = pre_export_lowering(new_weight_module)
+    new_weight_module = pre_export_lowering(new_weight_module, settings)
     new_weight_module = new_weight_module.run_decompositions(
         get_decompositions(settings.enable_experimental_decompositions)
     )
@@ -300,7 +300,7 @@ def refit_module_weights(
     logger.debug("Input graph: " + str(new_gm.graph))
     # Apply lowering on the graph module
 
-    new_gm = post_lowering(new_gm)
+    new_gm = post_lowering(new_gm, settings)
 
     logger.info("Compilation Settings: %s\n", settings)
 
@@ -397,7 +397,7 @@ def refit_module_weights(
                 if isinstance(compiled_submodule, PythonTorchTensorRTModule):
                     engine = compiled_submodule.engine
                 elif isinstance(compiled_submodule, TorchTensorRTModule):
-                    engine_info = compiled_submodule.engine.__getstate__()[0]  # type: ignore[index]
+                    engine_info = compiled_submodule.engine.__getstate__()[0]
                     engine = get_engine_from_encoded_engine(
                         engine_info[ENGINE_IDX], runtime
                     )
