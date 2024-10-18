@@ -49,7 +49,9 @@ def get_ir(target: Target) -> SourceIR:
     return SourceIR.UNKNOWN
 
 
-def one_user_validator(node: Node, settings: CompilationSettings = None) -> bool:
+def one_user_validator(
+    node: Node, settings: Optional[CompilationSettings] = None
+) -> bool:
     # Validate only one user, which is a getitem node that accesses the first element in the list
     return (
         len(node.users) == 1
@@ -271,9 +273,11 @@ def aten_ops_embedding(
     )
 
 
-def embedding_bag_validator(node: Node, settings: CompilationSettings = None) -> bool:
+def embedding_bag_validator(
+    node: Node, settings: Optional[CompilationSettings] = None
+) -> bool:
     # Embedding bag op is not refitable
-    if settings.make_refittable:
+    if not settings or not settings.immutable_weights:
         return False
 
     if not one_user_validator(node):
@@ -421,7 +425,9 @@ def aten_ops_symsize_int(
     return impl.shape.shape(ctx, target, SourceIR.ATEN, name, args[0], args[1])
 
 
-def index_dtype_validator(node: Node, settings: CompilationSettings = None) -> bool:
+def index_dtype_validator(
+    node: Node, settings: Optional[CompilationSettings] = None
+) -> bool:
     index = node.args[1]
     for ind in index:
         if ind is not None:
@@ -847,7 +853,9 @@ def aten_ops_select(
     )
 
 
-def index_put_validator(node: Node, settings: CompilationSettings = None) -> bool:
+def index_put_validator(
+    node: Node, settings: Optional[CompilationSettings] = None
+) -> bool:
     if args_bounds_check(node.args, 3, False):  # Check if accumulate is valid
         _LOGGER.debug("We do not support accumulate=True for aten.index_put operation")
         accumulate_valid = False
@@ -934,9 +942,9 @@ def aten_ops_slice(
     )
 
 
-def refit_validator(node: Node, settings: CompilationSettings = None) -> bool:
+def refit_validator(node: Node, settings: Optional[CompilationSettings] = None) -> bool:
     # cumsum op is not refitable
-    if settings and settings.make_refittable:
+    if not settings or not settings.immutable_weights:
         return False
     return True
 
@@ -991,7 +999,9 @@ def aten_ops_tile(
     )
 
 
-def zero_output_validator(node: Node, settings: CompilationSettings = None) -> bool:
+def zero_output_validator(
+    node: Node, settings: Optional[CompilationSettings] = None
+) -> bool:
     if 0 in node.args[1]:
         _LOGGER.debug(
             f"We do not support output tensor {node.args[1]} tensors with zero-sized dimensions for this operation."
@@ -1049,7 +1059,7 @@ def aten_ops_permute(
 
 
 def to_copy_dtype_validator(
-    placeholder_only: bool, settings: CompilationSettings = None
+    placeholder_only: bool, settings: Optional[CompilationSettings] = None
 ) -> Callable[[Node, CompilationSettings], bool]:
     """Return validator for to_copy node with placeholder restrictions"""
 
@@ -1082,7 +1092,9 @@ def to_copy_dtype_validator(
             )
             return False
 
-    def validator(to_copy_node: Node, settings: CompilationSettings = None) -> bool:
+    def validator(
+        to_copy_node: Node, settings: Optional[CompilationSettings] = None
+    ) -> bool:
         """Returns true if the to_copy node can be converted to TRT
         and the placeholder restriction is satisfied
         """
@@ -2153,7 +2165,9 @@ def aten_ops_logical_xor(
     )
 
 
-def bitwise_type_validator(node: Node, settings: CompilationSettings = None) -> bool:
+def bitwise_type_validator(
+    node: Node, settings: Optional[CompilationSettings] = None
+) -> bool:
     supported_type = [torch.bool, bool]
 
     tensor_targets = [
@@ -2297,7 +2311,7 @@ def aten_ops_bitwise_xor(
 
 
 def bitwise_not_type_validator(
-    node: Node, settings: CompilationSettings = None
+    node: Node, settings: Optional[CompilationSettings] = None
 ) -> bool:
     val = node.args[0]
     val_meta = val.meta.get("tensor_meta")
@@ -2480,7 +2494,9 @@ def aten_ops_le(
     )
 
 
-def conv_param_validator(conv_node: Node, settings: CompilationSettings = None) -> bool:
+def conv_param_validator(
+    conv_node: Node, settings: Optional[CompilationSettings] = None
+) -> bool:
     return conv_node.args[7] in ([0], [0, 0], [0, 0, 0])
 
 
@@ -2577,7 +2593,7 @@ def aten_ops_cdist_forward(
 
 
 def avg_pool_param_validator(
-    pool_node: Node, settings: CompilationSettings = None
+    pool_node: Node, settings: Optional[CompilationSettings] = None
 ) -> bool:
     ceil_mode = args_bounds_check(pool_node.args, 4, False)
     divisor_override = args_bounds_check(pool_node.args, 6)
@@ -2694,12 +2710,12 @@ def aten_ops_adaptive_avg_poolNd(
     )
 
 
-def topk_validator(node: Node, settings: CompilationSettings = None) -> bool:
+def topk_validator(node: Node, settings: Optional[CompilationSettings] = None) -> bool:
     k = node.args[1]
     return topk_sort_validator(k)
 
 
-def sort_validator(node: Node, settings: CompilationSettings = None) -> bool:
+def sort_validator(node: Node, settings: Optional[CompilationSettings] = None) -> bool:
     meta_data = node.args[0].meta.get("tensor_meta")
     if meta_data is None:
         return False
@@ -2722,7 +2738,7 @@ def topk_sort_validator(k: int) -> bool:
 
 
 def max_pool_param_validator(
-    pool_node: Node, settings: CompilationSettings = None
+    pool_node: Node, settings: Optional[CompilationSettings] = None
 ) -> bool:
     dilation = args_bounds_check(pool_node.args, 4, 1)
     ceil_mode = args_bounds_check(pool_node.args, 5, False)
@@ -2777,7 +2793,9 @@ def aten_ops_max_pool(
     )
 
 
-def attention_validator(node: Node, settings: CompilationSettings = None) -> bool:
+def attention_validator(
+    node: Node, settings: Optional[CompilationSettings] = None
+) -> bool:
     # Currently, `attn_mask` is not supported
     return args_bounds_check(node.args, 3) is None
 
@@ -3668,7 +3686,9 @@ def aten_ops_flip(
     )
 
 
-def zero_diag_size_validator(node: Node, settings: CompilationSettings = None) -> bool:
+def zero_diag_size_validator(
+    node: Node, settings: Optional[CompilationSettings] = None
+) -> bool:
     meta = node.args[0].meta.get("tensor_meta")
     if meta:
         input_shape = meta.shape
@@ -3797,7 +3817,7 @@ def aten_ops_index_select(
 
 
 def dropout_inference_validator(
-    node: Node, settings: CompilationSettings = None
+    node: Node, settings: Optional[CompilationSettings] = None
 ) -> bool:
     train_mode = args_bounds_check(node.args, 2, None)
     if train_mode is False:
