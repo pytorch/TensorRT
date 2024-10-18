@@ -2,6 +2,7 @@ import logging
 import operator
 
 import torch
+from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.lowering.passes.pass_utils import (
     clean_up_graph_after_modifications,
 )
@@ -10,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 
 def replace_max_pool_with_indices(
-    gm: torch.fx.GraphModule,
+    gm: torch.fx.GraphModule, settings: CompilationSettings
 ) -> torch.fx.GraphModule:
     """Replace MaxPool nodes which return unused indices"""
     replacement_dict = {
