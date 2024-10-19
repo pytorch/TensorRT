@@ -14,3 +14,7 @@ See the examples started with `data_parallel` for more details.
 Here we use torch.distributed as an example, but compilation with tensor parallelism is agnostic to the implementation framework as long as the module is properly sharded.
 
 torchrun --nproc_per_node=2 tensor_parallel_llama2.py
+
+3. Tensor parallel distributed inference using nccl ops plugin
+
+ mpirun -n 2 --allow-run-as-root python tensor_parallel_simple_example.py

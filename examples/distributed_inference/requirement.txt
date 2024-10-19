@@ -1,3 +1,6 @@
 accelerate
 transformers
 diffusers
+site
+# Install tensorrt-llm without its dependencies (use the command separately). pip install tensorrt-llm --no-deps
+tensorrt-llm
