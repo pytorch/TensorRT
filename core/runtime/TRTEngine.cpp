@@ -89,6 +89,12 @@ TRTEngine::TRTEngine(
   cuda_engine = make_trt(rt->deserializeCudaEngine(serialized_engine.c_str(), serialized_engine.size()));
   TORCHTRT_CHECK((cuda_engine.get() != nullptr), "Unable to deserialize the TensorRT engine");
 
+  if (get_streamable_device_memory_budget() > 0) {
+    int64_t budget_bytes = get_automatic_device_memory_budget();
+    LOG_DEBUG("Weight streaming budget set to " << budget_bytes << "B");
+    cuda_engine->setWeightStreamingBudgetV2(budget_bytes);
+  }
+
   exec_ctx = make_trt(cuda_engine->createExecutionContext());
   TORCHTRT_CHECK((exec_ctx.get() != nullptr), "Unable to create TensorRT execution context");
 
@@ -256,6 +262,38 @@ void TRTEngine::set_profiling_paths() {
   trt_engine_profile_path =
       std::filesystem::path{profile_path_prefix + "/" + name + "_engine_exectuion_profile.trace"}.string();
   cuda_graph_debug_path = std::filesystem::path{profile_path_prefix + "/" + name + "_cudagraph.dot"}.string();
+}
+
+int64_t TRTEngine::get_device_memory_budget() {
+  return cuda_engine->getWeightStreamingBudgetV2();
+}
+
+bool TRTEngine::set_device_memory_budget(int64_t budget) {
+  // Recreating the context because weight streaming budget cannot be modified while there are active context.
+  if (exec_ctx.get() != nullptr) {
+    exec_ctx.reset();
+  }
+  if (profile_execution) {
+    trt_engine_profiler.reset();
+  }
+  bool result = cuda_engine->setWeightStreamingBudgetV2(budget);
+  exec_ctx = make_trt(cuda_engine->createExecutionContext());
+  TORCHTRT_CHECK(
+      (exec_ctx.get() != nullptr),
+      "Unable to recreate TensorRT execution context after setting new device memory budget");
+  if (profile_execution) {
+    enable_profiling();
+  }
+  return result;
+}
+
+// Returns 0 if BuilderFlag::kWEIGHT_STREAMING is unset during engine building.
+int64_t TRTEngine::get_streamable_device_memory_budget() {
+  return cuda_engine->getStreamableWeightsSize();
+}
+
+int64_t TRTEngine::get_automatic_device_memory_budget() {
+  return cuda_engine->getWeightStreamingAutomaticBudget();
 }
 
 std::string TRTEngine::to_str() const {
