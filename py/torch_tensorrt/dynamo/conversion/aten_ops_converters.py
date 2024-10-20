@@ -704,6 +704,11 @@ def aten_ops_unsqueeze(
 @dynamo_tensorrt_converter(
     torch.ops.aten._softmax.default, supports_dynamic_shapes=True
 )
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+    }
+)
 def aten_ops_softmax(
     ctx: ConversionContext,
     target: Target,
@@ -712,7 +717,7 @@ def aten_ops_softmax(
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     return impl.normalization.softmax(
-        ctx, target, SourceIR.ATEN, name, args[0], args[1]
+        ctx, target, SourceIR.ATEN, name, args[0], args[1], args[2]
     )
 
 

@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>File torch_tensorrt.h &mdash; Torch-TensorRT v2.6.0.dev0+b99d080 documentation</title>
+  <title>Overview &mdash; Torch-TensorRT v2.6.0.dev0+b99d080 documentation</title>
   
 
   
@@ -39,6 +39,8 @@
   <link rel="stylesheet" href="../_static/css/custom.css" type="text/css" />
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Quick Start" href="quick_start.html" />
+    <link rel="prev" title="Installation" href="installation.html" />
   <!-- Google Tag Manager -->
     <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
     new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
@@ -302,10 +304,10 @@
             
             
               <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
-<ul>
-<li class="toctree-l1"><a class="reference internal" href="../getting_started/installation.html">Installation</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../getting_started/jetpack.html">Overview</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../getting_started/quick_start.html">Quick Start</a></li>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quick_start.html">Quick Start</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">User Guide</span></p>
 <ul>
@@ -367,11 +369,11 @@
 </ul>
 <p class="caption" role="heading"><span class="caption-text">C++ API Documentation</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="torch_tensort_cpp.html">Torch-TensorRT C++ API</a></li>
-<li class="toctree-l1"><a class="reference internal" href="namespace_torch_tensorrt.html">Namespace torch_tensorrt</a></li>
-<li class="toctree-l1"><a class="reference internal" href="namespace_torch_tensorrt__logging.html">Namespace torch_tensorrt::logging</a></li>
-<li class="toctree-l1"><a class="reference internal" href="namespace_torch_tensorrt__torchscript.html">Namespace torch_tensorrt::torchscript</a></li>
-<li class="toctree-l1"><a class="reference internal" href="namespace_torch_tensorrt__ptq.html">Namespace torch_tensorrt::ptq</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../_cpp_api/torch_tensort_cpp.html">Torch-TensorRT C++ API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../_cpp_api/namespace_torch_tensorrt.html">Namespace torch_tensorrt</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../_cpp_api/namespace_torch_tensorrt__logging.html">Namespace torch_tensorrt::logging</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../_cpp_api/namespace_torch_tensorrt__torchscript.html">Namespace torch_tensorrt::torchscript</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../_cpp_api/namespace_torch_tensorrt__ptq.html">Namespace torch_tensorrt::ptq</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">CLI Documentation</span></p>
 <ul>
@@ -428,13 +430,13 @@
       </li>
 
         
-      <li>File torch_tensorrt.h</li>
+      <li>Overview</li>
     
     
       <li class="pytorch-breadcrumbs-aside">
         
             
-            <a href="../_sources/_cpp_api/file_cpp_include_torch_tensorrt_torch_tensorrt.h.rst.txt" rel="nofollow"><img src="../_static/images/view-page-source-icon.svg"></a>
+            <a href="../_sources/getting_started/jetpack.rst.txt" rel="nofollow"><img src="../_static/images/view-page-source-icon.svg"></a>
           
         
       </li>
@@ -464,57 +466,99 @@
             <div role="main" class="main-content" itemscope="itemscope" itemtype="http://schema.org/Article">
              <article itemprop="articleBody" id="pytorch-article" class="pytorch-article">
               
-  <section id="file-torch-tensorrt-h">
-<span id="file-cpp-include-torch-tensorrt-torch-tensorrt-h"></span><h1>File torch_tensorrt.h<a class="headerlink" href="#file-torch-tensorrt-h" title="Permalink to this heading">¶</a></h1>
-<p>↰ <a class="reference internal" href="dir_cpp_include_torch_tensorrt.html#dir-cpp-include-torch-tensorrt"><span class="std std-ref">Parent directory</span></a> (<code class="docutils literal notranslate"><span class="pre">cpp/include/torch_tensorrt</span></code>)</p>
-<div class="contents local topic" id="contents">
-<p class="topic-title">Contents</p>
-<ul class="simple">
-<li><p><a class="reference internal" href="#definition-cpp-include-torch-tensorrt-torch-tensorrt-h" id="id1">Definition (<code class="docutils literal notranslate"><span class="pre">cpp/include/torch_tensorrt/torch_tensorrt.h</span></code>)</a></p></li>
-<li><p><a class="reference internal" href="#includes" id="id2">Includes</a></p></li>
-<li><p><a class="reference internal" href="#namespaces" id="id3">Namespaces</a></p></li>
-<li><p><a class="reference internal" href="#classes" id="id4">Classes</a></p></li>
+  <section id="overview">
+<h1>Overview<a class="headerlink" href="#overview" title="Permalink to this heading">¶</a></h1>
+<section id="jetpack-6-1">
+<h2>JetPack 6.1<a class="headerlink" href="#jetpack-6-1" title="Permalink to this heading">¶</a></h2>
+<p>Nvida JetPack 6.1 is the latest production release ofJetPack 6.
+With this release it incorporates:
+CUDA 12.6
+TensorRT 10.3
+cuDNN 9.3
+DLFW 24.09</p>
+<p>You can find more details for the JetPack 6.1:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p><a class="reference external" href="https://docs.nvidia.com/jetson/jetpack/release-notes/index.html">https://docs.nvidia.com/jetson/jetpack/release-notes/index.html</a></p></li>
+<li><p><a class="reference external" href="https://docs.nvidia.com/deeplearning/frameworks/install-pytorch-jetson-platform/index.html">https://docs.nvidia.com/deeplearning/frameworks/install-pytorch-jetson-platform/index.html</a></p></li>
 </ul>
+</div></blockquote>
+<section id="prerequisites">
+<h3>Prerequisites<a class="headerlink" href="#prerequisites" title="Permalink to this heading">¶</a></h3>
+<p>Ensure your jetson developer kit has been flashed with the latest JetPack 6.1. You can find more details on how to flash Jetson board via sdk-manager:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p><a class="reference external" href="https://developer.nvidia.com/sdk-manager">https://developer.nvidia.com/sdk-manager</a></p></li>
+</ul>
+</div></blockquote>
+<p>check the current jetpack version using</p>
+<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span>apt<span class="w"> </span>show<span class="w"> </span>nvidia-jetpack
+</pre></div>
 </div>
-<section id="definition-cpp-include-torch-tensorrt-torch-tensorrt-h">
-<h2>Definition (<code class="docutils literal notranslate"><span class="pre">cpp/include/torch_tensorrt/torch_tensorrt.h</span></code>)<a class="headerlink" href="#definition-cpp-include-torch-tensorrt-torch-tensorrt-h" title="Permalink to this heading">¶</a></h2>
-<div class="toctree-wrapper compound">
-<ul>
-<li class="toctree-l1"><a class="reference internal" href="program_listing_file_cpp_include_torch_tensorrt_torch_tensorrt.h.html">Program Listing for File torch_tensorrt.h</a></li>
-</ul>
+<p>Ensure you have installed JetPack Dev components. This step is required if you need to build on jetson board.</p>
+<p>You can only install the dev components that you require: ex, tensorrt-dev would be the meta-package for all TRT development or install everthing.</p>
+<p>Ensure you have cuda 12.6 installed(this should be installed automatically from nvidia-jetpack)</p>
+<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span><span class="c1"># check the cuda version</span>
+nvcc<span class="w"> </span>--version
+<span class="c1"># if not installed or the version is not 12.6, install via the below cmd:</span>
+sudo<span class="w"> </span>apt-get<span class="w"> </span>update
+sudo<span class="w"> </span>apt-get<span class="w"> </span>install<span class="w"> </span>cuda-toolkit-12-6
+</pre></div>
+</div>
+<p>Ensure libcusparseLt.so exists at /usr/local/cuda/lib64/:</p>
+<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span><span class="c1"># if not exist, download and copy to the directory</span>
+wget<span class="w"> </span>https://developer.download.nvidia.com/compute/cusparselt/redist/libcusparse_lt/linux-sbsa/libcusparse_lt-linux-sbsa-0.5.2.1-archive.tar.xz
+tar<span class="w"> </span>xf<span class="w"> </span>libcusparse_lt-linux-sbsa-0.5.2.1-archive.tar.xz
+sudo<span class="w"> </span>cp<span class="w"> </span>-a<span class="w"> </span>libcusparse_lt-linux-sbsa-0.5.2.1-archive/include/*<span class="w"> </span>/usr/local/cuda/include/
+sudo<span class="w"> </span>cp<span class="w"> </span>-a<span class="w"> </span>libcusparse_lt-linux-sbsa-0.5.2.1-archive/lib/*<span class="w"> </span>/usr/local/cuda/lib64/
+</pre></div>
 </div>
 </section>
-<section id="includes">
-<h2>Includes<a class="headerlink" href="#includes" title="Permalink to this heading">¶</a></h2>
-<ul class="simple">
-<li><p><code class="docutils literal notranslate"><span class="pre">cuda_runtime.h</span></code></p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">iostream</span></code></p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">memory</span></code></p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">set</span></code></p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">string</span></code></p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">torch/custom_class.h</span></code></p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">torch_tensorrt/macros.h</span></code> (<a class="reference internal" href="file_cpp_include_torch_tensorrt_macros.h.html#file-cpp-include-torch-tensorrt-macros-h"><span class="std std-ref">File macros.h</span></a>)</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">vector</span></code></p></li>
+<section id="build-torch-tensorrt">
+<h3>Build torch_tensorrt<a class="headerlink" href="#build-torch-tensorrt" title="Permalink to this heading">¶</a></h3>
+<p>Install bazel</p>
+<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span>wget<span class="w"> </span>-v<span class="w"> </span>https://github.com/bazelbuild/bazelisk/releases/download/v1.20.0/bazelisk-linux-arm64
+sudo<span class="w"> </span>mv<span class="w"> </span>bazelisk-linux-arm64<span class="w"> </span>/usr/bin/bazel
+chmod<span class="w"> </span>+x<span class="w"> </span>/usr/bin/bazel
+</pre></div>
+</div>
+<dl class="simple">
+<dt>Install pip and required python packages:</dt><dd><ul class="simple">
+<li><p><a class="reference external" href="https://pip.pypa.io/en/stable/installation/">https://pip.pypa.io/en/stable/installation/</a></p></li>
 </ul>
+</dd>
+</dl>
+<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span><span class="c1"># install pip</span>
+wget<span class="w"> </span>https://bootstrap.pypa.io/get-pip.py
+python<span class="w"> </span>get-pip.py
+</pre></div>
+</div>
+<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span><span class="c1"># install pytorch from nvidia jetson distribution: https://developer.download.nvidia.com/compute/redist/jp/v61/pytorch</span>
+python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>torch<span class="w"> </span>https://developer.download.nvidia.com/compute/redist/jp/v61/pytorch/torch-2.5.0a0+872d972e41.nv24.08.17622132-cp310-cp310-linux_aarch64.whl
+</pre></div>
+</div>
+<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span><span class="c1"># install required python packages</span>
+python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>-r<span class="w"> </span>toolchains/jp_workspaces/requirements.txt
+
+<span class="c1"># if you want to run the test cases, then install the test required python packages</span>
+python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>-r<span class="w"> </span>toolchains/jp_workspaces/test_requirements.txt
+</pre></div>
+</div>
+<p>Build and Install torch_tensorrt wheel file</p>
+<p>Since torch_tensorrt version has dependencies on torch version. torch version supported by JetPack6.1 is from DLFW 24.08/24.09(torch 2.5.0).</p>
+<p>Please make sure to build torch_tensorrt wheel file from source release/2.5 branch
+(TODO: lanl to update the branch name once release/ngc branch is available)</p>
+<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span><span class="nv">cuda_version</span><span class="o">=</span><span class="k">$(</span>nvcc<span class="w"> </span>--version<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>Cuda<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>release<span class="w"> </span><span class="p">|</span><span class="w"> </span>cut<span class="w"> </span>-d<span class="w"> </span><span class="s1">&#39;,&#39;</span><span class="w"> </span>-f<span class="w"> </span><span class="m">2</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>sed<span class="w"> </span>-e<span class="w"> </span><span class="s1">&#39;s/ release //g&#39;</span><span class="k">)</span>
+<span class="nb">export</span><span class="w"> </span><span class="nv">TORCH_INSTALL_PATH</span><span class="o">=</span><span class="k">$(</span>python<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;import torch, os; print(os.path.dirname(torch.__file__))&quot;</span><span class="k">)</span>
+<span class="nb">export</span><span class="w"> </span><span class="nv">SITE_PACKAGE_PATH</span><span class="o">=</span><span class="si">${</span><span class="nv">TORCH_INSTALL_PATH</span><span class="p">:</span><span class="k">:-</span><span class="nv">6</span><span class="si">}</span>
+<span class="nb">export</span><span class="w"> </span><span class="nv">CUDA_HOME</span><span class="o">=</span>/usr/local/cuda-<span class="si">${</span><span class="nv">cuda_version</span><span class="si">}</span>/
+<span class="c1"># replace the MODULE.bazel with the jetpack one</span>
+cat<span class="w"> </span>toolchains/jp_workspaces/MODULE.bazel.tmpl<span class="w"> </span><span class="p">|</span><span class="w"> </span>envsubst<span class="w"> </span>&gt;<span class="w"> </span>MODULE.bazel
+<span class="c1"># build and install torch_tensorrt wheel file</span>
+python<span class="w"> </span>setup.py<span class="w"> </span>--use-cxx11-abi<span class="w"> </span>install<span class="w"> </span>--user
+</pre></div>
+</div>
 </section>
-<section id="namespaces">
-<h2>Namespaces<a class="headerlink" href="#namespaces" title="Permalink to this heading">¶</a></h2>
-<ul class="simple">
-<li><p><a class="reference internal" href="namespace_torch_tensorrt.html#namespace-torch-tensorrt"><span class="std std-ref">Namespace torch_tensorrt</span></a></p></li>
-<li><p><a class="reference internal" href="namespace_torch_tensorrt__torchscript.html#namespace-torch-tensorrt-torchscript"><span class="std std-ref">Namespace torch_tensorrt::torchscript</span></a></p></li>
-</ul>
-</section>
-<section id="classes">
-<h2>Classes<a class="headerlink" href="#classes" title="Permalink to this heading">¶</a></h2>
-<ul class="simple">
-<li><p><a class="reference internal" href="structtorch__tensorrt_1_1Device.html#exhale-struct-structtorch-tensorrt-1-1device"><span class="std std-ref">Struct Device</span></a></p></li>
-<li><p><a class="reference internal" href="structtorch__tensorrt_1_1GraphInputs.html#exhale-struct-structtorch-tensorrt-1-1graphinputs"><span class="std std-ref">Struct GraphInputs</span></a></p></li>
-<li><p><a class="reference internal" href="structtorch__tensorrt_1_1Input.html#exhale-struct-structtorch-tensorrt-1-1input"><span class="std std-ref">Struct Input</span></a></p></li>
-<li><p><a class="reference internal" href="structtorch__tensorrt_1_1torchscript_1_1CompileSpec.html#exhale-struct-structtorch-tensorrt-1-1torchscript-1-1compilespec"><span class="std std-ref">Struct CompileSpec</span></a></p></li>
-<li><p><a class="reference internal" href="classtorch__tensorrt_1_1DataType.html#exhale-class-classtorch-tensorrt-1-1datatype"><span class="std std-ref">Class DataType</span></a></p></li>
-<li><p><a class="reference internal" href="classtorch__tensorrt_1_1Device_1_1DeviceType.html#exhale-class-classtorch-tensorrt-1-1device-1-1devicetype"><span class="std std-ref">Class Device::DeviceType</span></a></p></li>
-<li><p><a class="reference internal" href="classtorch__tensorrt_1_1TensorFormat.html#exhale-class-classtorch-tensorrt-1-1tensorformat"><span class="std std-ref">Class TensorFormat</span></a></p></li>
-</ul>
 </section>
 </section>
 
@@ -523,6 +567,15 @@
              
             </div>
             <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="quick_start.html" class="btn btn-neutral float-right" title="Quick Start" accesskey="n" rel="next">Next <img src="../_static/images/chevron-right-orange.svg" class="next-page"></a>
+      
+      
+        <a href="installation.html" class="btn btn-neutral" title="Installation" accesskey="p" rel="prev"><img src="../_static/images/chevron-right-orange.svg" class="previous-page"> Previous</a>
+      
+    </div>
   
 
   
@@ -552,11 +605,12 @@
           <div class="pytorch-right-menu" id="pytorch-right-menu">
             <div class="pytorch-side-scroll" id="pytorch-side-scroll-right">
               <ul>
-<li><a class="reference internal" href="#">File torch_tensorrt.h</a><ul>
-<li><a class="reference internal" href="#definition-cpp-include-torch-tensorrt-torch-tensorrt-h">Definition (<code class="docutils literal notranslate"><span class="pre">cpp/include/torch_tensorrt/torch_tensorrt.h</span></code>)</a></li>
-<li><a class="reference internal" href="#includes">Includes</a></li>
-<li><a class="reference internal" href="#namespaces">Namespaces</a></li>
-<li><a class="reference internal" href="#classes">Classes</a></li>
+<li><a class="reference internal" href="#">Overview</a><ul>
+<li><a class="reference internal" href="#jetpack-6-1">JetPack 6.1</a><ul>
+<li><a class="reference internal" href="#prerequisites">Prerequisites</a></li>
+<li><a class="reference internal" href="#build-torch-tensorrt">Build torch_tensorrt</a></li>
+</ul>
+</li>
 </ul>
 </li>
 </ul>
