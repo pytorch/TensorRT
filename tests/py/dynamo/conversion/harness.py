@@ -312,8 +312,6 @@ class DispatchTestCase(TRTTestCase):
         if check_dtype:
             output_dtypes = infer_module_output_dtypes(
                 mod,
-                # input_specs,
-                # compilation_settings.device,
                 truncate_double=compilation_settings.truncate_double,
             )
 
@@ -407,8 +405,6 @@ class DispatchTestCase(TRTTestCase):
         if check_dtype:
             output_dtypes = infer_module_output_dtypes(
                 mod,
-                # input_specs,
-                # compilation_settings.device,
                 truncate_double=compilation_settings.truncate_double,
             )
 

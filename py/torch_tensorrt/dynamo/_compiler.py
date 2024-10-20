@@ -455,7 +455,7 @@ def compile_module(
             if isinstance(ele, torch.fx.node.Node):
                 if "val" not in ele.meta:
                     raise ValueError(
-                        "expect submodule output node has meta['val'] info"
+                        f"node.name={ele.name}: meta['val'] does not exist, expect submodule output node has meta['val'] info"
                     )
                 outputs_meta_val.append(ele.meta["val"])
             elif isinstance(ele, tuple):
@@ -463,13 +463,17 @@ def compile_module(
                     if isinstance(node, torch.fx.node.Node):
                         if "val" not in ele.meta:
                             raise ValueError(
-                                "expect submodule output node has meta['val'] info"
+                                f"{node.name=}: meta['val'] does not exist, expect submodule output node has meta['val'] info"
                             )
                         outputs_meta_val.append(node.meta["val"])
                     else:
-                        raise ValueError(f"not expected types: {type(node)=}")
+                        raise ValueError(
+                            f"expect torch.fx.node.Node type, got not expected types: {type(node)=}"
+                        )
             else:
-                raise ValueError(f"not expected types: {type(ele)=}")
+                raise ValueError(
+                    f"expect torch.fx.node.Node or tuple of torch.fx.node.Node type, got not expected types: {type(ele)=}"
+                )
 
         if name not in submodule_node_dict:
             raise ValueError(

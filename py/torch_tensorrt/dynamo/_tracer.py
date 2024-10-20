@@ -134,13 +134,11 @@ def get_dynamic_shapes(input: Input) -> dict[Any, Any]:
             max_shape = input.shape["max_shape"]
             assert len(min_shape) == len(opt_shape) == len(max_shape)
             for dim in range(len(min_shape)):
-                # reverse_dim = len(min_shape)-1 - dim
                 if min_shape[dim] == opt_shape[dim] == max_shape[dim]:
                     continue
                 else:
                     dynamic_dims[dim] = Dim(
                         input.name + "_" + str(dim),
-                        # input.name + "_" + str(reverse_dim),
                         min=min_shape[dim],
                         max=max_shape[dim],
                     )

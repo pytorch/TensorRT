@@ -368,7 +368,7 @@ def inline_trt_modules(gm: torch.fx.GraphModule) -> torch.fx.GraphModule:
 
         if "val" not in trt_module_node.meta:
             raise ValueError(
-                f"trt_module_node: {trt_module_node.name} does not have the meta['val'] info"
+                f"trt_module_node: {trt_module_node.name} does not have the meta['val'] info, it should be set during dynamo compile_module step."
             )
         num_outputs = len(trt_module_node.meta["val"])
         # Insert a call_function node to perform inference on TRT engine
