@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, List, Optional, Sequence, Tuple
+from typing import Any, List, Optional, Sequence
 
 import tensorrt as trt
 import torch
-from torch.fx.experimental.proxy_tensor import unset_fake_temporarily
-from torch_tensorrt._Device import Device
+from torch._subclasses.fake_tensor import FakeTensor
 from torch_tensorrt._enums import dtype
 from torch_tensorrt._features import ENABLED_FEATURES
 from torch_tensorrt._Input import Input
@@ -17,64 +16,83 @@ from torch_tensorrt.dynamo.conversion._TRTInterpreter import (
     TRTInterpreterResult,
 )
 from torch_tensorrt.dynamo.runtime import PythonTorchTensorRTModule, TorchTensorRTModule
-from torch_tensorrt.dynamo.utils import (
-    get_model_device,
-    get_torch_inputs,
-    unwrap_tensor_shape,
-)
+
+# from torch_tensorrt.dynamo.utils import (
+#     get_model_device,
+#     get_torch_inputs,
+#     unwrap_tensor_shape,
+# )
 
 logger = logging.getLogger(__name__)
 
 
-def infer_module_outputs(
+def get_output_dtypes(output: Any, truncate_doulbe: bool = False) -> List[dtype]:
+    output_dtypes = []
+    if isinstance(output, torch.fx.node.Node):
+        if "val" in output.meta:
+            output_meta = output.meta["val"]
+            if isinstance(output_meta, (FakeTensor, torch.Tensor)):
+                if truncate_doulbe and output_meta.dtype == torch.float64:
+                    output_dtypes.append(dtype.float32)
+                else:
+                    output_dtypes.append(dtype._from(output_meta.dtype))
+        else:
+            raise ValueError(
+                "meta['val'] does not exist, expect meta['val'] exists for each output node"
+            )
+    elif isinstance(output, tuple):
+        for ele in output:
+            output_dtypes.extend(get_output_dtypes(ele))
+    else:
+        raise ValueError(
+            f"got type {type(output)}, expected type is a torch.fx.node.Node or a tuple of torch.fx.node.Node"
+        )
+    return output_dtypes
+
+
+def infer_module_output_dtypes(
     module: torch.fx.GraphModule,
-    inputs: Sequence[Input],
-    device: Device,
-    kwarg_inputs: Optional[dict[str, Any]] = None,
+    # inputs: Sequence[Input],
+    # device: Device,
+    # kwarg_inputs: Optional[dict[str, Any]] = None,
     truncate_double: bool = False,
-) -> Tuple[List[Tuple[int]], List[dtype]]:
+) -> List[dtype]:
     """
     This function performs model inference to determine the output shapes and output dtypes
     and truncates them accordingly. inputs can be either arg_inputs or flattened input list.
     If it is flattened list, kwarg_inputs should be None, as it is already included in the flattened input.
     """
+    outputs = [node for node in module.graph.nodes if node.op == "output"]
+    outputs = outputs[0].args
+    return get_output_dtypes(outputs, truncate_double)
+
     # TODO: We can also determine output dtypes from the module.graph based on node metadata.
     # However, our converter tests use fx.symbolic_trace which sometimes does not provide metadata,
     # so we stick to the model inference approach currently.
-    with unset_fake_temporarily():
-        # Get the device on which the model exists
-        # For large models, this can be done on CPU to save GPU memory allocation for TRT.
-        device = get_model_device(module)
-        torch_inputs = get_torch_inputs(inputs, device)
-        if kwarg_inputs is None:
-            kwarg_inputs = {}
-        torch_kwarg_inputs = get_torch_inputs(kwarg_inputs, device)
-        module_outputs = module(*torch_inputs, **torch_kwarg_inputs)
-        if not isinstance(module_outputs, (list, tuple)):
-            module_outputs = [module_outputs]
+    # with unset_fake_temporarily():
+    #     # Get the device on which the model exists
+    #     # For large models, this can be done on CPU to save GPU memory allocation for TRT.
+    #     device = get_model_device(module)
+    #     torch_inputs = get_torch_inputs(inputs, device)
+    #     if kwarg_inputs is None:
+    #         kwarg_inputs = {}
+    #     torch_kwarg_inputs = get_torch_inputs(kwarg_inputs, device)
+    #     module_outputs = module(*torch_inputs, **torch_kwarg_inputs)
+    #     if not isinstance(module_outputs, (list, tuple)):
+    #         module_outputs = [module_outputs]
 
     # Int64 outputs can sometimes be generated from within other operators
-    # such as aten.sum - such outputs can be truncated
-    output_dtypes = []
-    output_shapes = []
-    for output in module_outputs:
-        output_ = output
-        # We don't need to check if output is nested here because the input module will be flattened
-        if not isinstance(output, torch.Tensor):
-            if isinstance(output, str):
-                raise ValueError(
-                    f"Received an output type {type(output)} that's not in the acceptable datatypes (https://pytorch.org/docs/stable/tensor_attributes.html#torch.dtype)"
-                )
-            else:
-                output_ = torch.tensor(output)
+    # # such as aten.sum - such outputs can be truncated
+    # output_dtypes_ret = []
 
-        output_shapes.append(unwrap_tensor_shape(output_))
-        if truncate_double and output_.dtype == dtype.float64:
-            output_dtypes.append(dtype.float32)
-        else:
-            output_dtypes.append(dtype._from(output_.dtype))
+    # for output_dtype in output_dtypes:
 
-    return output_shapes, output_dtypes
+    #     if truncate_double and output_dtype == dtype.float64:
+    #         output_dtypes_ret.append(dtype.float32)
+    #     else:
+    #         output_dtypes_ret.append(dtype._from(output_dtype))
+
+    # return output_shapes, output_dtypes
 
 
 def interpret_module_to_result(
@@ -84,7 +102,7 @@ def interpret_module_to_result(
     arg_inputs: Optional[Sequence[Input]] = None,
     kwarg_inputs: Optional[dict[str, Any]] = None,
     engine_cache: Optional[BaseEngineCache] = None,
-) -> Tuple[TRTInterpreterResult, List[Tuple[int]]]:
+) -> TRTInterpreterResult:
     """Interpret an FX module to the output shapes and a TRTInterpreterResult
     Args:
         module: FX GraphModule to interpret
@@ -97,22 +115,9 @@ def interpret_module_to_result(
     Returns:
         (TRTInterpreterResult, List[Tuple[int]])
     """
-    if arg_inputs is not None:
-        output_shapes, output_dtypes = infer_module_outputs(
-            module,
-            arg_inputs,
-            settings.device,
-            kwarg_inputs=kwarg_inputs,
-            truncate_double=settings.truncate_double,
-        )
-    else:
-        # args and kwargs are combined and flattened to one list
-        output_shapes, output_dtypes = infer_module_outputs(
-            module,
-            inputs,
-            settings.device,
-            truncate_double=settings.truncate_double,
-        )
+    output_dtypes = infer_module_output_dtypes(
+        module, truncate_double=settings.truncate_double
+    )
 
     interpreter = TRTInterpreter(
         module,
@@ -124,7 +129,7 @@ def interpret_module_to_result(
     )
 
     interpreter_result = interpreter.run()
-    return interpreter_result, output_shapes
+    return interpreter_result
 
 
 def convert_module(
@@ -145,7 +150,7 @@ def convert_module(
         PythonTorchTensorRTModule or TorchTensorRTModule
     """
 
-    interpreter_result, output_shapes = interpret_module_to_result(
+    interpreter_result = interpret_module_to_result(
         module, inputs, settings, engine_cache=engine_cache
     )
 
@@ -169,7 +174,6 @@ def convert_module(
         serialized_engine=interpreter_result.serialized_engine,
         input_binding_names=list(interpreter_result.input_names),
         output_binding_names=list(interpreter_result.output_names),
-        output_shapes=output_shapes,
         name=name,
         settings=settings,
         weight_name_map=interpreter_result.weight_name_map,

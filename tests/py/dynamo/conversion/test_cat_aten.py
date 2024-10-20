@@ -42,12 +42,14 @@ class TestCatConverter(DispatchTestCase):
                 min_shape=(16, 2, 3),
                 opt_shape=(16, 3, 3),
                 max_shape=(16, 32, 3),
+                name="x",
             ),
             Input(
                 dtype=torch.float32,
                 min_shape=(16, 2, 3),
                 opt_shape=(16, 16, 3),
                 max_shape=(16, 32, 3),
+                name="y",
             ),
         ]
         self.run_test_with_dynamic_shape(

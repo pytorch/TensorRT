@@ -50,7 +50,12 @@ class TestIsInfConverter(DispatchTestCase):
                 max_shape=(5, 3, 3),
                 dtype=torch.float32,
                 torch_tensor=torch.tensor(
-                    ([[[2.7, float("-inf"), 1.1], [4.7, -2.3, float("inf")]]]),
+                    (
+                        [
+                            [[2.7, float("-inf"), 1.1], [4.7, -2.3, float("inf")]],
+                            [[2.7, float("-inf"), 1.1], [4.7, -2.3, float("inf")]],
+                        ]
+                    ),
                     dtype=torch.float32,
                 ).cuda(),
             )
@@ -72,7 +77,9 @@ class TestIsInfConverter(DispatchTestCase):
                 opt_shape=(3, 2),
                 max_shape=(5, 3),
                 dtype=torch.int,
-                torch_tensor=torch.tensor(([[-3, 2]]), dtype=torch.int).cuda(),
+                torch_tensor=torch.tensor(
+                    ([[-3, 2], [-2, 1], [1, 2]]), dtype=torch.int
+                ).cuda(),
             )
         ]
         self.run_test_with_dynamic_shape(

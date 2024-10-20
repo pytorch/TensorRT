@@ -50,7 +50,11 @@ class TestFullConverter(DispatchTestCase):
             )
         ]
         self.run_test_with_dynamic_shape(
-            full(), inputs, use_example_tensors=False, check_dtype=False
+            full(),
+            inputs,
+            use_example_tensors=False,
+            check_dtype=False,
+            use_dynamo_tracer=False,
         )
 
     @parameterized.expand(

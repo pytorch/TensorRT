@@ -115,6 +115,9 @@ def get_dynamic_shapes_args(mod: torch.nn.Module, inputs: Any) -> dict[str, Any]
     args = list(signature(mod.forward).parameters.keys())
     dynamic_shapes = {}
     for input, input_name in zip(inputs, args[: len(inputs)]):
+        # if input.name is not None, also not empty str, use the input.name
+        if input.name is not None and len(input.name) > 0 and input.name != input_name:
+            input_name = input.name
         dynamic_shapes[input_name] = get_dynamic_shapes(input)
     return dynamic_shapes
 
@@ -131,11 +134,13 @@ def get_dynamic_shapes(input: Input) -> dict[Any, Any]:
             max_shape = input.shape["max_shape"]
             assert len(min_shape) == len(opt_shape) == len(max_shape)
             for dim in range(len(min_shape)):
+                # reverse_dim = len(min_shape)-1 - dim
                 if min_shape[dim] == opt_shape[dim] == max_shape[dim]:
                     continue
                 else:
                     dynamic_dims[dim] = Dim(
                         input.name + "_" + str(dim),
+                        # input.name + "_" + str(reverse_dim),
                         min=min_shape[dim],
                         max=max_shape[dim],
                     )

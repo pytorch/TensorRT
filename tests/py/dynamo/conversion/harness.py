@@ -16,7 +16,7 @@ from torch_tensorrt.dynamo._settings import CompilationSettings
 
 # Use interpreter, input spec, and test case from fx_ts_compat to test Dynamo Converter Registry
 from torch_tensorrt.dynamo.conversion import TRTInterpreter
-from torch_tensorrt.dynamo.conversion._conversion import infer_module_outputs
+from torch_tensorrt.dynamo.conversion._conversion import infer_module_output_dtypes
 from torch_tensorrt.dynamo.lowering import (
     get_decompositions,
     post_lowering,
@@ -259,7 +259,7 @@ class DispatchTestCase(TRTTestCase):
         atol=ATOL,
         precision=dtype.f32,
         check_dtype=True,
-        use_dynamo_tracer=False,
+        use_dynamo_tracer=True,
         enable_passes=False,
         propagate_shapes=False,
         int32_reqd=False,
@@ -310,10 +310,10 @@ class DispatchTestCase(TRTTestCase):
 
         output_dtypes = None
         if check_dtype:
-            _, output_dtypes = infer_module_outputs(
+            output_dtypes = infer_module_output_dtypes(
                 mod,
-                input_specs,
-                compilation_settings.device,
+                # input_specs,
+                # compilation_settings.device,
                 truncate_double=compilation_settings.truncate_double,
             )
 
@@ -382,7 +382,7 @@ class DispatchTestCase(TRTTestCase):
         rtol=RTOL,
         atol=ATOL,
         output_dtypes=None,
-        use_dynamo_tracer=False,
+        use_dynamo_tracer=True,
         enable_passes=False,
         use_example_tensors=True,
         pyt_inputs=None,
@@ -405,10 +405,10 @@ class DispatchTestCase(TRTTestCase):
         )
 
         if check_dtype:
-            _, output_dtypes = infer_module_outputs(
+            output_dtypes = infer_module_output_dtypes(
                 mod,
-                input_specs,
-                compilation_settings.device,
+                # input_specs,
+                # compilation_settings.device,
                 truncate_double=compilation_settings.truncate_double,
             )
 
