@@ -423,6 +423,12 @@ def compile_module(
     if not settings.use_fast_partitioner:
         dryrun_tracker.to_run_in_torch.extend(parse_non_trt_nodes(partitioned_module))
 
+    submodule_node_dict = {}
+    for node in partitioned_module.graph.nodes:
+        if "_run_on_acc" not in node.name:
+            continue
+        submodule_node_dict[node.name] = node
+
     # Store TRT replicas of Torch subgraphs
     trt_modules = {}
     # Iterate over all components that can be accelerated
@@ -441,6 +447,41 @@ def compile_module(
                 str(submodule.graph),
             )
             continue
+
+        # set the submodule meta val back to the parent trt_module_node
+        outputs = [node for node in submodule.graph.nodes if node.op == "output"]
+        outputs = outputs[0].args
+        outputs_meta_val = []
+        for ele in outputs:
+            # it can be a torch.fx.node.Node or a tuple of torch.fx.node.Node
+            if isinstance(ele, torch.fx.node.Node):
+                if "val" not in ele.meta:
+                    raise ValueError(
+                        f"node.name={ele.name}: meta['val'] does not exist, expect submodule output node has meta['val'] info"
+                    )
+                outputs_meta_val.append(ele.meta["val"])
+            elif isinstance(ele, tuple):
+                for node in ele:
+                    if isinstance(node, torch.fx.node.Node):
+                        if "val" not in ele.meta:
+                            raise ValueError(
+                                f"{node.name=}: meta['val'] does not exist, expect submodule output node has meta['val'] info"
+                            )
+                        outputs_meta_val.append(node.meta["val"])
+                    else:
+                        raise ValueError(
+                            f"expect torch.fx.node.Node type, got not expected types: {type(node)=}"
+                        )
+            else:
+                raise ValueError(
+                    f"expect torch.fx.node.Node or tuple of torch.fx.node.Node type, got not expected types: {type(ele)=}"
+                )
+
+        if name not in submodule_node_dict:
+            raise ValueError(
+                f"node_name: {name} does not exist in the submodule node dictionary"
+            )
+        submodule_node_dict[name].meta["val"] = outputs_meta_val
 
         subgraph_data = PerSubgraphData()
         subgraph_data.subgraph_name = name

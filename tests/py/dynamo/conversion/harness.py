@@ -259,7 +259,7 @@ class DispatchTestCase(TRTTestCase):
         atol=ATOL,
         precision=dtype.f32,
         check_dtype=True,
-        use_dynamo_tracer=False,
+        use_dynamo_tracer=True,
         enable_passes=False,
         propagate_shapes=False,
         int32_reqd=False,
@@ -312,8 +312,6 @@ class DispatchTestCase(TRTTestCase):
         if check_dtype:
             output_dtypes = infer_module_output_dtypes(
                 mod,
-                input_specs,
-                compilation_settings.device,
                 truncate_double=compilation_settings.truncate_double,
             )
 
@@ -382,7 +380,7 @@ class DispatchTestCase(TRTTestCase):
         rtol=RTOL,
         atol=ATOL,
         output_dtypes=None,
-        use_dynamo_tracer=False,
+        use_dynamo_tracer=True,
         enable_passes=False,
         use_example_tensors=True,
         pyt_inputs=None,
@@ -407,8 +405,6 @@ class DispatchTestCase(TRTTestCase):
         if check_dtype:
             output_dtypes = infer_module_output_dtypes(
                 mod,
-                input_specs,
-                compilation_settings.device,
                 truncate_double=compilation_settings.truncate_double,
             )
 
