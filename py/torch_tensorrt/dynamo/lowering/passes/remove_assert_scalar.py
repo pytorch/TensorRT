@@ -1,6 +1,7 @@
 import logging
 
 import torch
+from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.lowering.passes.pass_utils import (
     clean_up_graph_after_modifications,
 )
@@ -8,7 +9,9 @@ from torch_tensorrt.dynamo.lowering.passes.pass_utils import (
 logger = logging.getLogger(__name__)
 
 
-def remove_assert_scalar(gm: torch.fx.GraphModule) -> torch.fx.GraphModule:
+def remove_assert_scalar(
+    gm: torch.fx.GraphModule, settings: CompilationSettings
+) -> torch.fx.GraphModule:
     """Remove assert_scalar ops in the graph"""
     count = 0
     for node in gm.graph.nodes:

@@ -129,7 +129,7 @@ void RemoveSingleUse0DTensors(std::shared_ptr<torch::jit::Graph>& g) {
                             new_node->outputs()[0]->setType(c10::IntType::get());
                             user->outputs()[0]->replaceAllUsesWith(new_node->outputs()[0]);
                             user->destroy();
-                          } else if (user->kind() == c10::Symbol::fromQualString("aten::floordiv")) {
+                          } else if (user->kind() == c10::Symbol::fromQualString("aten::floor_divide")) {
                             new_node = g->create(c10::aten::floordiv, user->inputs(), 1);
                             new_node->insertAfter(user);
                             new_node->outputs()[0]->setType(c10::IntType::get());

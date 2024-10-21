@@ -62,7 +62,7 @@ import torch_tensorrt
 model = MyModel().eval().cuda() # define your model here
 inputs = [torch.randn((1, 3, 224, 224)).cuda()] # define a list of representative inputs here
 
-trt_gm = torch_tensorrt.compile(model, ir="dynamo", inputs)
+trt_gm = torch_tensorrt.compile(model, ir="dynamo", inputs=inputs)
 torch_tensorrt.save(trt_gm, "trt.ep", inputs=inputs) # PyTorch only supports Python runtime for an ExportedProgram. For C++ deployment, use a TorchScript file
 torch_tensorrt.save(trt_gm, "trt.ts", output_format="torchscript", inputs=inputs)
 ```

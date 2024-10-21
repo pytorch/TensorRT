@@ -224,6 +224,7 @@ class DispatchTestCase(TRTTestCase):
         use_dynamo_tracer: bool,
         enable_passes: bool,
         propagate_shapes: bool = False,
+        settings: CompilationSettings = CompilationSettings(),
         torch_export_dynamic_shapes: Optional[Any] = None,
     ):
         mod = mod.eval()
@@ -240,7 +241,7 @@ class DispatchTestCase(TRTTestCase):
                 exported_program = torch_tensorrt.dynamo.trace(
                     mod, tuple(original_inputs)
                 )
-            exported_program = pre_export_lowering(exported_program)
+            exported_program = pre_export_lowering(exported_program, settings)
             exported_program = exported_program.run_decompositions(
                 get_decompositions(False)
             )
@@ -249,7 +250,7 @@ class DispatchTestCase(TRTTestCase):
             fx_module = torch.fx.symbolic_trace(mod)
 
         if enable_passes:
-            fx_module = post_lowering(fx_module)
+            fx_module = post_lowering(fx_module, settings)
 
         if propagate_shapes:
             # TODO: This is currently being used to test embedding_bag_aten due to https://github.com/pytorch/TensorRT/issues/2843
@@ -278,13 +279,6 @@ class DispatchTestCase(TRTTestCase):
         int32_reqd=False,
         make_refittable=False,
     ):
-        mod = self.generate_graph(
-            mod,
-            inputs,
-            use_dynamo_tracer=use_dynamo_tracer,
-            enable_passes=enable_passes,
-            propagate_shapes=propagate_shapes,
-        )
 
         # Previous instance of the interpreter auto-casted 64-bit inputs
         # We replicate this behavior here
@@ -293,6 +287,15 @@ class DispatchTestCase(TRTTestCase):
             truncate_double=True,
             debug=True,
             make_refittable=make_refittable,
+        )
+
+        mod = self.generate_graph(
+            mod,
+            inputs,
+            use_dynamo_tracer=use_dynamo_tracer,
+            enable_passes=enable_passes,
+            propagate_shapes=propagate_shapes,
+            settings=compilation_settings,
         )
 
         num_inputs = len(inputs)
@@ -361,12 +364,7 @@ class DispatchTestCase(TRTTestCase):
         enable_passes=False,
         make_refittable=False,
     ):
-        mod = self.generate_graph(
-            mod,
-            inputs,
-            use_dynamo_tracer=use_dynamo_tracer,
-            enable_passes=enable_passes,
-        )
+
         # Previous instance of the interpreter auto-casted 64-bit inputs
         # We replicate this behavior here
         compilation_settings = CompilationSettings(
@@ -374,6 +372,14 @@ class DispatchTestCase(TRTTestCase):
             truncate_double=True,
             debug=True,
             make_refittable=make_refittable,
+        )
+
+        mod = self.generate_graph(
+            mod,
+            inputs,
+            use_dynamo_tracer=use_dynamo_tracer,
+            enable_passes=enable_passes,
+            settings=compilation_settings,
         )
 
         interp = TRTInterpreter(
@@ -400,22 +406,23 @@ class DispatchTestCase(TRTTestCase):
         propagate_shapes=False,
         check_dtype=True,
         make_refittable=False,
-        # this field is optional, in case user wants to specify custom dynamic_shapes rules for the testcase
-        torch_export_dynamic_shapes: Optional[Any] = None,
+        torch_export_dynamic_shapes=None,
     ):
+
+        # Previous instance of the interpreter auto-casted 64-bit inputs
+        # We replicate this behavior here
+        compilation_settings = CompilationSettings(
+            truncate_double=True, make_refittable=make_refittable
+        )
+
         mod = self.generate_graph(
             mod,
             input_specs,
             use_dynamo_tracer=use_dynamo_tracer,
             enable_passes=enable_passes,
             propagate_shapes=propagate_shapes,
+            settings=compilation_settings,
             torch_export_dynamic_shapes=torch_export_dynamic_shapes,
-        )
-
-        # Previous instance of the interpreter auto-casted 64-bit inputs
-        # We replicate this behavior here
-        compilation_settings = CompilationSettings(
-            truncate_double=True, make_refittable=make_refittable
         )
 
         if check_dtype:
