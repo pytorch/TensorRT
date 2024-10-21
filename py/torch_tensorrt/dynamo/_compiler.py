@@ -242,16 +242,6 @@ def compile(
         raise AssertionError(
             f"Input graph should be an ExportedProgram but got type {type(exported_program)}"
         )
-    exported_program = pre_export_lowering(exported_program)
-    exported_program = exported_program.run_decompositions(
-        get_decompositions(enable_experimental_decompositions)
-    )
-    gm = exported_program.module()
-    logger.debug("Input graph: " + str(gm.graph))
-
-    # Apply lowering on the graph module
-    gm = post_lowering(gm, use_fp32_acc=use_fp32_acc)
-    logger.debug("Lowered Input graph: " + str(gm.graph))
 
     engine_cache = None
     if cache_built_engines or reuse_cached_engines:
@@ -305,6 +295,19 @@ def compile(
 
     settings = CompilationSettings(**compilation_options)
     logger.info("Compilation Settings: %s\n", settings)
+
+    exported_program = pre_export_lowering(exported_program, settings)
+    exported_program = exported_program.run_decompositions(
+        get_decompositions(enable_experimental_decompositions)
+    )
+
+    gm = exported_program.module()
+    logger.debug("Input graph: " + str(gm.graph))
+
+    # Apply lowering on the graph module
+    gm = post_lowering(gm, settings)
+    logger.debug("Lowered Input graph: " + str(gm.graph))
+
     trt_gm = compile_module(
         gm, trt_arg_inputs, trt_kwarg_inputs, settings, engine_cache
     )
@@ -683,7 +686,10 @@ def convert_exported_program_to_serialized_trt_engine(
         "use_fp32_acc": use_fp32_acc,
     }
 
-    exported_program = pre_export_lowering(exported_program)
+    settings = CompilationSettings(**compilation_options)
+    logger.info("Compilation Settings: %s\n", settings)
+
+    exported_program = pre_export_lowering(exported_program, settings)
     # Decompose the exported program
     exported_program = exported_program.run_decompositions(
         get_decompositions(enable_experimental_decompositions)
@@ -692,11 +698,8 @@ def convert_exported_program_to_serialized_trt_engine(
     logger.debug("Input graph: " + str(gm.graph))
 
     # Apply lowering on the graph module
-    gm = post_lowering(gm)
+    gm = post_lowering(gm, settings)
     logger.debug("Lowered Input graph: " + str(gm.graph))
-
-    settings = CompilationSettings(**compilation_options)
-    logger.info("Compilation Settings: %s\n", settings)
 
     # Configure user compilation settings to converters.
     CONVERTERS.set_compilation_settings(settings)

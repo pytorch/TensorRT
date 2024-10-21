@@ -1,7 +1,8 @@
 import logging
-from typing import Any, Callable, Optional, Sequence, Union
+from typing import Callable, Optional, Sequence, Union
 
 import torch
+from torch_tensorrt.dynamo._settings import CompilationSettings
 
 from .accumulate_fp32_matmul import accumulate_fp32_matmul
 from .constant_folding import constant_fold
@@ -29,6 +30,7 @@ ATEN_POST_LOWERING_PASSES = DynamoPassManager.build_from_passlist(
         replace_full_like_with_full,
         view_to_reshape,
         remove_assert_scalar,
+        accumulate_fp32_matmul,
     ]
 )
 
@@ -91,25 +93,28 @@ def _remove_lowering_pass(*, index: int) -> None:
     return
 
 
-def post_lowering(gm: torch.fx.GraphModule, **kwargs: Any) -> torch.fx.GraphModule:
+def post_lowering(
+    gm: torch.fx.GraphModule, settings: CompilationSettings = CompilationSettings()
+) -> torch.fx.GraphModule:
     """Applies the lowering passes to a graph module after torch.export/ torch.compile and their decompositions, returns the modified GraphModule"""
     logging.debug(
         f"Invoking DynamoPassManager and applying lowering passes: {ATEN_POST_LOWERING_PASSES}"
     )
-    gm = ATEN_POST_LOWERING_PASSES(gm)
-    if kwargs.get("use_fp32_acc", False):
-        gm = accumulate_fp32_matmul(gm)
+    gm = ATEN_POST_LOWERING_PASSES(gm, settings)
 
     return gm
 
 
-def pre_export_lowering(ep: torch.export.ExportedProgram) -> torch.fx.GraphModule:
+def pre_export_lowering(
+    ep: torch.export.ExportedProgram,
+    settings: CompilationSettings = CompilationSettings(),
+) -> torch.fx.GraphModule:
     """Applies the lowering passes to a graph module after torch.export/ torch.compile and their decompositions, returns the modified GraphModule"""
     logging.debug(
         f"Invoking DynamoPassManager and applying lowering passes: {ATEN_PRE_LOWERING_PASSES}"
     )
     gm = ep.graph_module
-    gm = ATEN_PRE_LOWERING_PASSES(gm)
+    gm = ATEN_PRE_LOWERING_PASSES(gm, settings)
     return ep
 
 
