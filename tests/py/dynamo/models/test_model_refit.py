@@ -8,7 +8,6 @@ import pytest
 import tensorrt as trt
 import torch
 import torch.nn.functional as F
-import torch_tensorrt as torchtrt
 import torch_tensorrt as torch_trt
 import torchvision.models as models
 from torch import nn
@@ -39,7 +38,7 @@ def test_mapping():
     model2 = models.resnet18(pretrained=True).eval().to("cuda")
     inputs = [torch.randn((1, 3, 224, 224)).to("cuda")]
     trt_input = [
-        torchtrt.Input(i.shape, dtype=torch.float, format=torch.contiguous_format)
+        torch_trt.Input(i.shape, dtype=torch.float, format=torch.contiguous_format)
         for i in inputs
     ]
     enabled_precisions = {torch.float}
@@ -50,7 +49,7 @@ def test_mapping():
     exp_program = torch.export.export(model, tuple(inputs))
     exp_program2 = torch.export.export(model2, tuple(inputs))
 
-    trt_gm = torchtrt.dynamo.compile(
+    trt_gm = torch_trt.dynamo.compile(
         exp_program,
         tuple(inputs),
         use_python_runtime=use_python_runtime,
@@ -103,7 +102,7 @@ def test_refit_one_engine_with_weightmap():
     exp_program = torch.export.export(model, tuple(inputs))
     exp_program2 = torch.export.export(model2, tuple(inputs))
 
-    trt_gm = torchtrt.dynamo.compile(
+    trt_gm = torch_trt.dynamo.compile(
         exp_program,
         tuple(inputs),
         use_python_runtime=use_python_runtime,
@@ -154,7 +153,7 @@ def test_refit_one_engine_no_map_with_weightmap():
     exp_program = torch.export.export(model, tuple(inputs))
     exp_program2 = torch.export.export(model2, tuple(inputs))
 
-    trt_gm = torchtrt.dynamo.compile(
+    trt_gm = torch_trt.dynamo.compile(
         exp_program,
         tuple(inputs),
         use_python_runtime=use_python_runtime,
@@ -206,7 +205,7 @@ def test_refit_one_engine_with_wrong_weightmap():
     exp_program = torch.export.export(model, tuple(inputs))
     exp_program2 = torch.export.export(model2, tuple(inputs))
 
-    trt_gm = torchtrt.dynamo.compile(
+    trt_gm = torch_trt.dynamo.compile(
         exp_program,
         tuple(inputs),
         use_python_runtime=use_python_runtime,
@@ -264,7 +263,7 @@ def test_refit_one_engine_bert_with_weightmap():
     exp_program = torch.export.export(model, tuple(inputs))
     exp_program2 = torch.export.export(model2, tuple(inputs))
 
-    trt_gm = torchtrt.dynamo.compile(
+    trt_gm = torch_trt.dynamo.compile(
         exp_program,
         tuple(inputs),
         use_python_runtime=use_python_runtime,
@@ -318,7 +317,7 @@ def test_refit_one_engine_inline_runtime__with_weightmap():
     exp_program = torch.export.export(model, tuple(inputs))
     exp_program2 = torch.export.export(model2, tuple(inputs))
 
-    trt_gm = torchtrt.dynamo.compile(
+    trt_gm = torch_trt.dynamo.compile(
         exp_program,
         tuple(inputs),
         use_python_runtime=use_python_runtime,
@@ -328,7 +327,7 @@ def test_refit_one_engine_inline_runtime__with_weightmap():
         make_refittable=True,
         reuse_cached_engines=False,
     )
-    torchtrt.save(trt_gm, trt_ep_path, inputs=inputs)
+    torch_trt.save(trt_gm, trt_ep_path, inputs=inputs)
     trt_gm = torch.export.load(trt_ep_path)
     new_trt_gm = refit_module_weights(
         compiled_module=trt_gm,
@@ -365,7 +364,7 @@ def test_refit_one_engine_python_runtime_with_weightmap():
     exp_program = torch.export.export(model, tuple(inputs))
     exp_program2 = torch.export.export(model2, tuple(inputs))
 
-    trt_gm = torchtrt.dynamo.compile(
+    trt_gm = torch_trt.dynamo.compile(
         exp_program,
         tuple(inputs),
         use_python_runtime=use_python_runtime,
@@ -436,7 +435,7 @@ def test_refit_multiple_engine_with_weightmap():
     exp_program2 = torch.export.export(model2, tuple(inputs))
 
     torch_executed_ops = {"torch.ops.aten.convolution.default"}
-    trt_gm = torchtrt.dynamo.compile(
+    trt_gm = torch_trt.dynamo.compile(
         exp_program,
         tuple(inputs),
         use_python_runtime=use_python_runtime,
@@ -487,7 +486,7 @@ def test_refit_one_engine_without_weightmap():
     exp_program = torch.export.export(model, tuple(inputs))
     exp_program2 = torch.export.export(model2, tuple(inputs))
 
-    trt_gm = torchtrt.dynamo.compile(
+    trt_gm = torch_trt.dynamo.compile(
         exp_program,
         tuple(inputs),
         use_python_runtime=use_python_runtime,
@@ -539,7 +538,7 @@ def test_refit_one_engine_bert_without_weightmap():
     exp_program = torch.export.export(model, tuple(inputs))
     exp_program2 = torch.export.export(model2, tuple(inputs))
 
-    trt_gm = torchtrt.dynamo.compile(
+    trt_gm = torch_trt.dynamo.compile(
         exp_program,
         tuple(inputs),
         use_python_runtime=use_python_runtime,
@@ -593,7 +592,7 @@ def test_refit_one_engine_inline_runtime_without_weightmap():
     exp_program = torch.export.export(model, tuple(inputs))
     exp_program2 = torch.export.export(model2, tuple(inputs))
 
-    trt_gm = torchtrt.dynamo.compile(
+    trt_gm = torch_trt.dynamo.compile(
         exp_program,
         tuple(inputs),
         use_python_runtime=use_python_runtime,
@@ -603,7 +602,7 @@ def test_refit_one_engine_inline_runtime_without_weightmap():
         make_refittable=True,
         reuse_cached_engines=False,
     )
-    torchtrt.save(trt_gm, trt_ep_path, inputs=inputs)
+    torch_trt.save(trt_gm, trt_ep_path, inputs=inputs)
     trt_gm = torch.export.load(trt_ep_path)
     new_trt_gm = refit_module_weights(
         compiled_module=trt_gm,
@@ -640,7 +639,7 @@ def test_refit_one_engine_python_runtime_without_weightmap():
     exp_program = torch.export.export(model, tuple(inputs))
     exp_program2 = torch.export.export(model2, tuple(inputs))
 
-    trt_gm = torchtrt.dynamo.compile(
+    trt_gm = torch_trt.dynamo.compile(
         exp_program,
         tuple(inputs),
         use_python_runtime=use_python_runtime,
@@ -711,7 +710,7 @@ def test_refit_multiple_engine_without_weightmap():
     exp_program2 = torch.export.export(model2, tuple(inputs))
 
     torch_executed_ops = {"torch.ops.aten.convolution.default"}
-    trt_gm = torchtrt.dynamo.compile(
+    trt_gm = torch_trt.dynamo.compile(
         exp_program,
         tuple(inputs),
         use_python_runtime=use_python_runtime,
@@ -765,8 +764,8 @@ def test_refit_cumsum_fallback():
     inputs = [torch.randn((1, 3, 16, 16)).to("cuda")]
     model(*inputs)
     exp_program = torch.export.export(model, tuple(inputs))
-    with torchtrt.logging.debug():
-        trt_gm = torchtrt.dynamo.compile(
+    with torch_trt.logging.debug():
+        trt_gm = torch_trt.dynamo.compile(
             exp_program,
             tuple(inputs),
             enabled_precisions={torch.float},
