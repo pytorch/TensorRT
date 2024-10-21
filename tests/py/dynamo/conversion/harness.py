@@ -3,7 +3,7 @@
 import logging
 import time
 import unittest
-from typing import Callable, List, Optional, Tuple
+from typing import Any, Callable, List, Optional, Tuple
 
 import torch
 import torch_tensorrt
@@ -12,6 +12,7 @@ from torch.testing._internal.common_utils import TestCase
 from torch_tensorrt import Input
 from torch_tensorrt._enums import dtype
 from torch_tensorrt.dynamo import _defaults
+from torch_tensorrt.dynamo._defaults import default_device
 from torch_tensorrt.dynamo._settings import CompilationSettings
 
 # Use interpreter, input spec, and test case from fx_ts_compat to test Dynamo Converter Registry
@@ -223,10 +224,22 @@ class DispatchTestCase(TRTTestCase):
         use_dynamo_tracer: bool,
         enable_passes: bool,
         propagate_shapes: bool = False,
+        torch_export_dynamic_shapes: Optional[Any] = None,
     ):
         mod = mod.eval()
         if use_dynamo_tracer:
-            exported_program = torch_tensorrt.dynamo.trace(mod, tuple(original_inputs))
+            if torch_export_dynamic_shapes is not None:
+                device = default_device()
+                torch_export_inputs = get_torch_inputs(original_inputs, device)
+                exported_program = torch.export.export(
+                    mod,
+                    tuple(torch_export_inputs),
+                    dynamic_shapes=torch_export_dynamic_shapes,
+                )
+            else:
+                exported_program = torch_tensorrt.dynamo.trace(
+                    mod, tuple(original_inputs)
+                )
             exported_program = pre_export_lowering(exported_program)
             exported_program = exported_program.run_decompositions(
                 get_decompositions(False)
@@ -387,6 +400,8 @@ class DispatchTestCase(TRTTestCase):
         propagate_shapes=False,
         check_dtype=True,
         make_refittable=False,
+        # this field is optional, in case user wants to specify custom dynamic_shapes rules for the testcase
+        torch_export_dynamic_shapes: Optional[Any] = None,
     ):
         mod = self.generate_graph(
             mod,
@@ -394,6 +409,7 @@ class DispatchTestCase(TRTTestCase):
             use_dynamo_tracer=use_dynamo_tracer,
             enable_passes=enable_passes,
             propagate_shapes=propagate_shapes,
+            torch_export_dynamic_shapes=torch_export_dynamic_shapes,
         )
 
         # Previous instance of the interpreter auto-casted 64-bit inputs

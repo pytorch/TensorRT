@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 from parameterized import parameterized
+from torch.export import Dim
 from torch.testing._internal.common_utils import run_tests
 from torch_tensorrt import Input
 
@@ -85,8 +86,38 @@ class TestGtConverter(DispatchTestCase):
 
     @parameterized.expand(
         [
-            ("2d_2d", (2, 3), (4, 3), (5, 3), (2, 3), (4, 3), (5, 3)),
             ("3d_2d", (2, 2, 2), (2, 3, 2), (2, 4, 2), (2, 1), (3, 1), (4, 1)),
+        ]
+    )
+    def test_ge_dynamic_tensor_torch_export(self, *args):
+        class ge(nn.Module):
+            def forward(self, lhs_val, rhs_val):
+                return torch.ops.aten.ge.Tensor(lhs_val, rhs_val)
+
+        input_specs = [
+            Input(
+                min_shape=args[1],
+                opt_shape=args[2],
+                max_shape=args[3],
+            ),
+            Input(
+                min_shape=args[4],
+                opt_shape=args[5],
+                max_shape=args[6],
+            ),
+        ]
+        dyn_dim = Dim("dyn_dim", min=2, max=4)
+        torch_export_dynamic_shapes = {"lhs_val": {1: dyn_dim}, "rhs_val": {0: dyn_dim}}
+
+        self.run_test_with_dynamic_shape(
+            ge(),
+            input_specs,
+            torch_export_dynamic_shapes=torch_export_dynamic_shapes,
+        )
+
+    @parameterized.expand(
+        [
+            ("2d_2d", (2, 3), (4, 3), (5, 3), (2, 3), (4, 3), (5, 3)),
         ]
     )
     def test_ge_dynamic_tensor(self, *args):
