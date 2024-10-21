@@ -52,18 +52,7 @@ class TestIsNanConverter(DispatchTestCase):
                 max_shape=(5, 3, 3),
                 dtype=torch.float32,
                 torch_tensor=torch.tensor(
-                    (
-                        [
-                            [
-                                [3.2, float("nan"), 3.1],
-                                [float("inf"), 1.1, float("nan")],
-                            ],
-                            [
-                                [3.2, float("nan"), 3.1],
-                                [float("inf"), 1.1, float("nan")],
-                            ],
-                        ]
-                    ),
+                    ([[[3.2, float("nan"), 3.1], [float("inf"), 1.1, float("nan")]]]),
                     dtype=torch.float32,
                 ).cuda(),
             )
