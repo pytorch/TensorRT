@@ -370,7 +370,7 @@ def cumsum(
         )
     else:
         new_dims = tuple(data.shape)
-        zeros = np.zeros(new_dims)
+        zeros = np.zeros(new_dims, dtype=np.float32)
         zero_trttensor = get_trt_tensor(ctx, zeros, f"{name}_initial_value")
 
     running_sum = loop.add_recurrence(zero_trttensor)
