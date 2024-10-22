@@ -456,6 +456,7 @@ def compile_module(
         outputs = outputs[0].args
         outputs_meta_val = []
         for ele in outputs:
+            breakpoint()
             # it can be a torch.fx.node.Node or a tuple of torch.fx.node.Node
             if isinstance(ele, torch.fx.node.Node):
                 if "val" not in ele.meta:
@@ -466,7 +467,7 @@ def compile_module(
             elif isinstance(ele, tuple):
                 for node in ele:
                     if isinstance(node, torch.fx.node.Node):
-                        if "val" not in ele.meta:
+                        if "val" not in node.meta:
                             raise ValueError(
                                 f"{node.name=}: meta['val'] does not exist, expect submodule output node has meta['val'] info"
                             )

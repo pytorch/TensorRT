@@ -12,7 +12,6 @@ from torch.testing._internal.common_utils import TestCase
 from torch_tensorrt import Input
 from torch_tensorrt._enums import dtype
 from torch_tensorrt.dynamo import _defaults
-from torch_tensorrt.dynamo._defaults import default_device
 from torch_tensorrt.dynamo._settings import CompilationSettings
 
 # Use interpreter, input spec, and test case from fx_ts_compat to test Dynamo Converter Registry
@@ -227,22 +226,10 @@ class DispatchTestCase(TRTTestCase):
         enable_passes: bool,
         propagate_shapes: bool = False,
         settings: CompilationSettings = CompilationSettings(),
-        torch_export_dynamic_shapes: Optional[Any] = None,
     ):
         mod = mod.eval()
         if use_dynamo_tracer:
-            if torch_export_dynamic_shapes is not None:
-                device = default_device()
-                torch_export_inputs = get_torch_inputs(original_inputs, device)
-                exported_program = torch.export.export(
-                    mod,
-                    tuple(torch_export_inputs),
-                    dynamic_shapes=torch_export_dynamic_shapes,
-                )
-            else:
-                exported_program = torch_tensorrt.dynamo.trace(
-                    mod, tuple(original_inputs)
-                )
+            exported_program = torch_tensorrt.dynamo.trace(mod, tuple(original_inputs))
             exported_program = pre_export_lowering(exported_program, settings)
             exported_program = exported_program.run_decompositions(
                 get_decompositions(False)
@@ -410,7 +397,6 @@ class DispatchTestCase(TRTTestCase):
         propagate_shapes=False,
         check_dtype=True,
         make_refittable=False,
-        torch_export_dynamic_shapes=None,
     ):
 
         # Previous instance of the interpreter auto-casted 64-bit inputs
@@ -426,7 +412,6 @@ class DispatchTestCase(TRTTestCase):
             enable_passes=enable_passes,
             propagate_shapes=propagate_shapes,
             settings=compilation_settings,
-            torch_export_dynamic_shapes=torch_export_dynamic_shapes,
         )
 
         if check_dtype:

@@ -60,6 +60,9 @@ def infer_module_output_dtypes(
     return get_output_dtypes(outputs, truncate_double)
 
 
+# this method is only used in our converter test to infer the module output dtypes via dummy inference
+# which is due to fx.symbolic_trace does not have the meta['val'] info in the node
+# TODO: lan to remove this once our converter test is moved from fx.symbolic_trace to dynamo trace
 def infer_module_output_dtypes_for_test(
     module: torch.fx.GraphModule,
     inputs: Sequence[Input],
