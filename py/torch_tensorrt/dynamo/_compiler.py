@@ -36,6 +36,7 @@ from torch_tensorrt.dynamo.lowering import (
 )
 from torch_tensorrt.dynamo.utils import (
     get_flat_args_with_check,
+    get_output_meta_val,
     parse_graph_io,
     prepare_inputs,
     set_log_level,
@@ -454,31 +455,7 @@ def compile_module(
         # set the submodule meta val back to the parent trt_module_node
         outputs = [node for node in submodule.graph.nodes if node.op == "output"]
         outputs = outputs[0].args
-        outputs_meta_val = []
-        for ele in outputs:
-            # it can be a torch.fx.node.Node or a tuple of torch.fx.node.Node
-            if isinstance(ele, torch.fx.node.Node):
-                if "val" not in ele.meta:
-                    raise ValueError(
-                        f"node.name={ele.name}: meta['val'] does not exist, expect submodule output node has meta['val'] info"
-                    )
-                outputs_meta_val.append(ele.meta["val"])
-            elif isinstance(ele, tuple):
-                for node in ele:
-                    if isinstance(node, torch.fx.node.Node):
-                        if "val" not in node.meta:
-                            raise ValueError(
-                                f"{node.name=}: meta['val'] does not exist, expect submodule output node has meta['val'] info"
-                            )
-                        outputs_meta_val.append(node.meta["val"])
-                    else:
-                        raise ValueError(
-                            f"expect torch.fx.node.Node type, got not expected types: {type(node)=}"
-                        )
-            else:
-                raise ValueError(
-                    f"expect torch.fx.node.Node or tuple of torch.fx.node.Node type, got not expected types: {type(ele)=}"
-                )
+        outputs_meta_val = get_output_meta_val(outputs)
 
         if name not in submodule_node_dict:
             raise ValueError(
