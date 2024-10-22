@@ -12,11 +12,14 @@ from torch.testing._internal.common_utils import TestCase
 from torch_tensorrt import Input
 from torch_tensorrt._enums import dtype
 from torch_tensorrt.dynamo import _defaults
+from torch_tensorrt.dynamo._defaults import default_device
 from torch_tensorrt.dynamo._settings import CompilationSettings
+from torch_tensorrt.dynamo._tracer import get_dynamic_shapes_args
 
 # Use interpreter, input spec, and test case from fx_ts_compat to test Dynamo Converter Registry
 from torch_tensorrt.dynamo.conversion import TRTInterpreter
 from torch_tensorrt.dynamo.conversion._conversion import (
+    infer_module_output_dtypes,
     infer_module_output_dtypes_for_test,
 )
 from torch_tensorrt.dynamo.lowering import (
@@ -28,6 +31,26 @@ from torch_tensorrt.dynamo.runtime import PythonTorchTensorRTModule
 from torch_tensorrt.dynamo.utils import ATOL, RTOL, get_model_device, get_torch_inputs
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
+
+
+# this is to enable dynamo tracer as Truein the converter test files batch by batch
+def get_use_dynamo_tracer(use_dynamo_tracer: Any) -> bool:
+    # if in our converter tests we specifically set use_dynamo_tracer field, honor it
+    if use_dynamo_tracer is not None and isinstance(use_dynamo_tracer, bool):
+        return use_dynamo_tracer
+
+    # if in our converter tests, we did not specify use_dynamo_tracer field
+    import inspect
+    import os
+    import re
+
+    filename = os.path.basename(inspect.stack()[2].filename)
+    # enable converter test files which starts with test_a*.py to use dynamo tracer
+    pattern = re.compile("^test_([a])+")
+    if pattern.match(filename):
+        return True
+    else:
+        return False
 
 
 def fetch_attr(mod, target):
@@ -226,10 +249,21 @@ class DispatchTestCase(TRTTestCase):
         enable_passes: bool,
         propagate_shapes: bool = False,
         settings: CompilationSettings = CompilationSettings(),
+        torch_export_dynamic_shapes: Optional[Any] = None,
     ):
         mod = mod.eval()
         if use_dynamo_tracer:
-            exported_program = torch_tensorrt.dynamo.trace(mod, tuple(original_inputs))
+            if torch_export_dynamic_shapes is None:
+                torch_export_dynamic_shapes = get_dynamic_shapes_args(
+                    mod, original_inputs
+                )
+            device = default_device()
+            torch_export_inputs = get_torch_inputs(original_inputs, device)
+            exported_program = torch.export.export(
+                mod,
+                tuple(torch_export_inputs),
+                dynamic_shapes=torch_export_dynamic_shapes,
+            )
             exported_program = pre_export_lowering(exported_program, settings)
             exported_program = exported_program.run_decompositions(
                 get_decompositions(False)
@@ -262,7 +296,6 @@ class DispatchTestCase(TRTTestCase):
         atol=ATOL,
         precision=dtype.f32,
         check_dtype=True,
-        use_dynamo_tracer=False,
         enable_passes=False,
         propagate_shapes=False,
         int32_reqd=False,
@@ -281,7 +314,7 @@ class DispatchTestCase(TRTTestCase):
         mod = self.generate_graph(
             mod,
             inputs,
-            use_dynamo_tracer=use_dynamo_tracer,
+            use_dynamo_tracer=True,
             enable_passes=enable_passes,
             propagate_shapes=propagate_shapes,
             settings=compilation_settings,
@@ -315,10 +348,8 @@ class DispatchTestCase(TRTTestCase):
 
         output_dtypes = None
         if check_dtype:
-            output_dtypes = infer_module_output_dtypes_for_test(
+            output_dtypes = infer_module_output_dtypes(
                 mod,
-                input_specs,
-                compilation_settings.device,
                 truncate_double=compilation_settings.truncate_double,
             )
 
@@ -390,21 +421,24 @@ class DispatchTestCase(TRTTestCase):
         rtol=RTOL,
         atol=ATOL,
         output_dtypes=None,
-        use_dynamo_tracer=False,
+        use_dynamo_tracer=None,
         enable_passes=False,
         use_example_tensors=True,
         pyt_inputs=None,
         propagate_shapes=False,
         check_dtype=True,
         make_refittable=False,
+        torch_export_dynamic_shapes=None,
     ):
+        # TODO: lan to remove this and set use_dynamo_traccer to True by default
+        # once all the converter test files are moved to use_dynamo_tracer
+        use_dynamo_tracer = get_use_dynamo_tracer(use_dynamo_tracer)
 
         # Previous instance of the interpreter auto-casted 64-bit inputs
         # We replicate this behavior here
         compilation_settings = CompilationSettings(
             truncate_double=True, make_refittable=make_refittable
         )
-
         mod = self.generate_graph(
             mod,
             input_specs,
@@ -412,15 +446,22 @@ class DispatchTestCase(TRTTestCase):
             enable_passes=enable_passes,
             propagate_shapes=propagate_shapes,
             settings=compilation_settings,
+            torch_export_dynamic_shapes=torch_export_dynamic_shapes,
         )
 
         if check_dtype:
-            output_dtypes = infer_module_output_dtypes_for_test(
-                mod,
-                input_specs,
-                compilation_settings.device,
-                truncate_double=compilation_settings.truncate_double,
-            )
+            if use_dynamo_tracer:
+                output_dtypes = infer_module_output_dtypes(
+                    mod,
+                    truncate_double=compilation_settings.truncate_double,
+                )
+            else:
+                output_dtypes = infer_module_output_dtypes_for_test(
+                    mod,
+                    input_specs,
+                    compilation_settings.device,
+                    truncate_double=compilation_settings.truncate_double,
+                )
 
         interp = TRTInterpreter(
             mod,
