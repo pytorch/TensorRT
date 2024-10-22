@@ -4,6 +4,7 @@ import operator
 from typing import Callable, Sequence, Tuple
 
 import torch
+from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.conversion.aten_ops_converters import args_bounds_check
 from torch_tensorrt.dynamo.lowering.passes.pass_utils import (
     clean_up_graph_after_modifications,
@@ -17,7 +18,7 @@ REPLACEABLE_ATEN_OPS = {
 
 
 def lower_scaled_dot_product_attention(
-    gm: torch.fx.GraphModule,
+    gm: torch.fx.GraphModule, settings: CompilationSettings
 ) -> torch.fx.GraphModule:
     """Replace specific versions of scaled_dot_product_attention with an equivalent
     implementation which can be easily converted to TRT

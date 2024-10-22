@@ -2,27 +2,27 @@
 
 .. _sphx_glr_tutorials__rendered_examples_dynamo:
 
-.. _torch_compile:
+.. _torch_tensorrt_examples:
 
-Dynamo / ``torch.compile``
-----------------------------
+Here we provide examples of Torch-TensorRT compilation of popular computer vision and language models.
 
-Torch-TensorRT provides a backend for the new ``torch.compile`` API released in PyTorch 2.0. In the following examples we describe
-a number of ways you can leverage this backend to accelerate inference.
+Dependencies
+------------------------------------
 
+Please install the following external dependencies (assuming you already have correct `torch`, `torch_tensorrt` and `tensorrt` libraries installed (`dependencies <https://github.com/pytorch/TensorRT?tab=readme-ov-file#dependencies>`_))
+
+.. code-block:: python
+
+    pip install -r requirements.txt
+
+
+Model Zoo
+------------------------------------
 * :ref:`torch_compile_resnet`: Compiling a ResNet model using the Torch Compile Frontend for ``torch_tensorrt.compile``
 * :ref:`torch_compile_transformer`: Compiling a Transformer model using ``torch.compile``
-* :ref:`torch_compile_advanced_usage`: Advanced usage including making a custom backend to use directly with the ``torch.compile`` API
 * :ref:`torch_compile_stable_diffusion`: Compiling a Stable Diffusion model using ``torch.compile``
-* :ref:`torch_export_cudagraphs`: Using the Cudagraphs integration with `ir="dynamo"`
-* :ref:`converter_overloading`: How to write custom converters and overload existing ones
-* :ref:`custom_kernel_plugins`: Creating a plugin to use a custom kernel inside TensorRT engines
-* :ref:`refit_engine_example`: Refitting a compiled TensorRT Graph Module with updated weights
-* :ref:`mutable_torchtrt_module_example`: Compile, use, and modify TensorRT Graph Module with MutableTorchTensorRTModule
-* :ref:`vgg16_fp8_ptq`: Compiling a VGG16 model with FP8 and PTQ using ``torch.compile``
-* :ref:`engine_caching_example`: Utilizing engine caching to speed up compilation times
-* :ref:`engine_caching_bert_example`: Demonstrating engine caching on BERT
-
+* :ref:`_torch_export_gpt2`: Compiling a GPT2 model using AOT workflow (`ir=dynamo`)
+* :ref:`_torch_export_llama2`: Compiling a Llama2 model using AOT workflow (`ir=dynamo`)
 
 
 .. raw:: html
@@ -43,7 +43,7 @@ a number of ways you can leverage this backend to accelerate inference.
 
 .. raw:: html
 
-      <div class="sphx-glr-thumbnail-title">Torch Compile Stable Diffusion</div>
+      <div class="sphx-glr-thumbnail-title">Compiling Stable Diffusion model using the torch.compile backend</div>
     </div>
 
 
@@ -94,24 +94,7 @@ a number of ways you can leverage this backend to accelerate inference.
 
 .. raw:: html
 
-      <div class="sphx-glr-thumbnail-title">Compiling a Transformer using torch.compile and TensorRT</div>
-    </div>
-
-
-.. raw:: html
-
-    <div class="sphx-glr-thumbcontainer" tooltip="This interactive script is intended as a sample of the Torch-TensorRT workflow with dynamo back...">
-
-.. only:: html
-
-  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_torch_export_gpt2_thumb.png
-    :alt:
-
-  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_torch_export_gpt2.py`
-
-.. raw:: html
-
-      <div class="sphx-glr-thumbnail-title">Compiling GPT2 using the Torch-TensorRT with dynamo backend</div>
+      <div class="sphx-glr-thumbnail-title">Compiling BERT using the torch.compile backend</div>
     </div>
 
 
@@ -129,23 +112,6 @@ a number of ways you can leverage this backend to accelerate inference.
 .. raw:: html
 
       <div class="sphx-glr-thumbnail-title">Torch Compile Advanced Usage</div>
-    </div>
-
-
-.. raw:: html
-
-    <div class="sphx-glr-thumbcontainer" tooltip="This interactive script is intended as a sample of the Torch-TensorRT workflow with dynamo back...">
-
-.. only:: html
-
-  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_torch_export_llama2_thumb.png
-    :alt:
-
-  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_torch_export_llama2.py`
-
-.. raw:: html
-
-      <div class="sphx-glr-thumbnail-title">Compiling Llama2 using the Torch-TensorRT with dynamo backend</div>
     </div>
 
 
@@ -196,7 +162,41 @@ a number of ways you can leverage this backend to accelerate inference.
 
 .. raw:: html
 
-      <div class="sphx-glr-thumbnail-title">Compiling ResNet using the Torch-TensorRT torch.compile Backend</div>
+      <div class="sphx-glr-thumbnail-title">Compiling ResNet with dynamic shapes using the torch.compile backend</div>
+    </div>
+
+
+.. raw:: html
+
+    <div class="sphx-glr-thumbcontainer" tooltip="This script illustrates Torch-TensorRT workflow with dynamo backend on popular GPT2 model.">
+
+.. only:: html
+
+  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_torch_export_gpt2_thumb.png
+    :alt:
+
+  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_torch_export_gpt2.py`
+
+.. raw:: html
+
+      <div class="sphx-glr-thumbnail-title">Compiling GPT2 using the dynamo backend</div>
+    </div>
+
+
+.. raw:: html
+
+    <div class="sphx-glr-thumbcontainer" tooltip="This script illustrates Torch-TensorRT workflow with dynamo backend on popular Llama2 model.">
+
+.. only:: html
+
+  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_torch_export_llama2_thumb.png
+    :alt:
+
+  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_torch_export_llama2.py`
+
+.. raw:: html
+
+      <div class="sphx-glr-thumbnail-title">Compiling Llama2 using the dynamo backend</div>
     </div>
 
 
@@ -280,12 +280,12 @@ a number of ways you can leverage this backend to accelerate inference.
    /tutorials/_rendered_examples/dynamo/torch_export_cudagraphs
    /tutorials/_rendered_examples/dynamo/refit_engine_example
    /tutorials/_rendered_examples/dynamo/torch_compile_transformers_example
-   /tutorials/_rendered_examples/dynamo/torch_export_gpt2
    /tutorials/_rendered_examples/dynamo/torch_compile_advanced_usage
-   /tutorials/_rendered_examples/dynamo/torch_export_llama2
    /tutorials/_rendered_examples/dynamo/engine_caching_bert_example
    /tutorials/_rendered_examples/dynamo/mutable_torchtrt_module_example
    /tutorials/_rendered_examples/dynamo/torch_compile_resnet_example
+   /tutorials/_rendered_examples/dynamo/torch_export_gpt2
+   /tutorials/_rendered_examples/dynamo/torch_export_llama2
    /tutorials/_rendered_examples/dynamo/converter_overloading
    /tutorials/_rendered_examples/dynamo/vgg16_ptq
    /tutorials/_rendered_examples/dynamo/engine_caching_example

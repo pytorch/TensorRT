@@ -3,6 +3,7 @@ import logging
 import torch
 import torch.fx
 from torch_tensorrt.dynamo._defaults import default_device
+from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.lowering.passes.pass_utils import (
     clean_up_graph_after_modifications,
 )
@@ -12,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 def replace_full_like_with_full(
-    gm: torch.fx.GraphModule,
+    gm: torch.fx.GraphModule, settings: CompilationSettings
 ) -> torch.fx.GraphModule:
     """Replace full_like nodes with equivalent full nodes"""
     modified_graph = False

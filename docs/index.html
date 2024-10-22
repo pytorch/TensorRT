@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Torch-TensorRT &mdash; Torch-TensorRT v2.6.0.dev0+ce38387 documentation</title>
+  <title>Torch-TensorRT &mdash; Torch-TensorRT v2.6.0.dev0+b99d080 documentation</title>
   
 
   
@@ -274,7 +274,7 @@
               
               
                 <div class="version">
-                  v2.6.0.dev0+ce38387
+                  v2.6.0.dev0+b99d080
                 </div>
               
             
@@ -305,6 +305,7 @@
               <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="getting_started/installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="getting_started/jetpack.html">Overview</a></li>
 <li class="toctree-l1"><a class="reference internal" href="getting_started/quick_start.html">Quick Start</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">User Guide</span></p>
@@ -314,10 +315,20 @@
 <li class="toctree-l1"><a class="reference internal" href="user_guide/saving_models.html">Saving models compiled with Torch-TensorRT</a></li>
 <li class="toctree-l1"><a class="reference internal" href="user_guide/runtime.html">Deploying Torch-TensorRT Programs</a></li>
 <li class="toctree-l1"><a class="reference internal" href="user_guide/using_dla.html">DLA</a></li>
+<li class="toctree-l1"><a class="reference internal" href="user_guide/mixed_precision.html">Compile Mixed Precision models with Torch-TensorRT</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul>
 <li class="toctree-l1"><a class="reference internal" href="tutorials/_rendered_examples/dynamo/torch_compile_advanced_usage.html">Torch Compile Advanced Usage</a></li>
 <li class="toctree-l1"><a class="reference internal" href="tutorials/_rendered_examples/dynamo/vgg16_ptq.html">Deploy Quantized Models using Torch-TensorRT</a></li>
 <li class="toctree-l1"><a class="reference internal" href="tutorials/_rendered_examples/dynamo/engine_caching_example.html">Engine Caching</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tutorials/_rendered_examples/dynamo/engine_caching_bert_example.html">Engine Caching (BERT)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="tutorials/_rendered_examples/dynamo/refit_engine_example.html">Refitting Torch-TensorRT Programs with New Weights</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tutorials/serving_torch_tensorrt_with_triton.html">Serving a Torch-TensorRT model with Triton</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tutorials/_rendered_examples/dynamo/torch_export_cudagraphs.html">Torch Export with Cudagraphs</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tutorials/_rendered_examples/dynamo/converter_overloading.html">Overloading Torch-TensorRT Converters with Custom Converters</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tutorials/_rendered_examples/dynamo/custom_kernel_plugins.html">Using Custom Kernels within TensorRT Engines with Torch-TensorRT</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tutorials/_rendered_examples/dynamo/mutable_torchtrt_module_example.html">Mutable Torch TensorRT Module</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Dynamo Frontend</span></p>
 <ul>
@@ -337,17 +348,14 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="fx/getting_started_with_fx_path.html">Torch-TensorRT (FX Frontend) User Guide</a></li>
 </ul>
-<p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<p class="caption" role="heading"><span class="caption-text">Model Zoo</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="tutorials/serving_torch_tensorrt_with_triton.html">Serving a Torch-TensorRT model with Triton</a></li>
-<li class="toctree-l1"><a class="reference internal" href="tutorials/notebooks.html">Example notebooks</a></li>
-<li class="toctree-l1"><a class="reference internal" href="tutorials/_rendered_examples/dynamo/torch_compile_resnet_example.html">Compiling ResNet using the Torch-TensorRT <cite>torch.compile</cite> Backend</a></li>
-<li class="toctree-l1"><a class="reference internal" href="tutorials/_rendered_examples/dynamo/torch_compile_transformers_example.html">Compiling a Transformer using torch.compile and TensorRT</a></li>
-<li class="toctree-l1"><a class="reference internal" href="tutorials/_rendered_examples/dynamo/torch_compile_stable_diffusion.html">Torch Compile Stable Diffusion</a></li>
-<li class="toctree-l1"><a class="reference internal" href="tutorials/_rendered_examples/dynamo/torch_export_cudagraphs.html">Torch Export with Cudagraphs</a></li>
-<li class="toctree-l1"><a class="reference internal" href="tutorials/_rendered_examples/dynamo/converter_overloading.html">Overloading Torch-TensorRT Converters with Custom Converters</a></li>
-<li class="toctree-l1"><a class="reference internal" href="tutorials/_rendered_examples/dynamo/custom_kernel_plugins.html">Using Custom Kernels within TensorRT Engines with Torch-TensorRT</a></li>
-<li class="toctree-l1"><a class="reference internal" href="tutorials/_rendered_examples/dynamo/mutable_torchtrt_module_example.html">Mutable Torch TensorRT Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tutorials/_rendered_examples/dynamo/torch_compile_resnet_example.html">Compiling ResNet with dynamic shapes using the <cite>torch.compile</cite> backend</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tutorials/_rendered_examples/dynamo/torch_compile_transformers_example.html">Compiling BERT using the <cite>torch.compile</cite> backend</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tutorials/_rendered_examples/dynamo/torch_compile_stable_diffusion.html">Compiling Stable Diffusion model using the <cite>torch.compile</cite> backend</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tutorials/_rendered_examples/dynamo/torch_export_gpt2.html">Compiling GPT2 using the dynamo backend</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tutorials/_rendered_examples/dynamo/torch_export_llama2.html">Compiling Llama2 using the dynamo backend</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tutorials/notebooks.html">Legacy notebooks</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Python API Documentation</span></p>
 <ul>
@@ -486,6 +494,24 @@ Torch-TensorRT integrates seamlessly into the PyTorch ecosystem supporting hybri
 <li><p><a class="reference internal" href="user_guide/saving_models.html#saving-models"><span class="std std-ref">Saving models compiled with Torch-TensorRT</span></a></p></li>
 <li><p><a class="reference internal" href="user_guide/runtime.html#runtime"><span class="std std-ref">Deploying Torch-TensorRT Programs</span></a></p></li>
 <li><p><a class="reference internal" href="user_guide/using_dla.html#using-dla"><span class="std std-ref">DLA</span></a></p></li>
+<li><p><a class="reference internal" href="user_guide/mixed_precision.html#mixed-precision"><span class="std std-ref">Compile Mixed Precision models with Torch-TensorRT</span></a></p></li>
+</ul>
+<div class="toctree-wrapper compound">
+</div>
+</section>
+<section id="tutorials">
+<h2>Tutorials<a class="headerlink" href="#tutorials" title="Permalink to this heading">¶</a></h2>
+<ul class="simple">
+<li><p><a class="reference internal" href="tutorials/_rendered_examples/dynamo/torch_compile_advanced_usage.html#torch-compile-advanced-usage"><span class="std std-ref">Torch Compile Advanced Usage</span></a></p></li>
+<li><p><a class="reference internal" href="tutorials/_rendered_examples/dynamo/vgg16_ptq.html#vgg16-ptq"><span class="std std-ref">Deploy Quantized Models using Torch-TensorRT</span></a></p></li>
+<li><p><a class="reference internal" href="tutorials/_rendered_examples/dynamo/engine_caching_example.html#engine-caching-example"><span class="std std-ref">Engine Caching</span></a></p></li>
+<li><p><a class="reference internal" href="tutorials/_rendered_examples/dynamo/engine_caching_bert_example.html#engine-caching-bert-example"><span class="std std-ref">Engine Caching (BERT)</span></a></p></li>
+<li><p><a class="reference internal" href="tutorials/_rendered_examples/dynamo/refit_engine_example.html#refit-engine-example"><span class="std std-ref">Refitting Torch-TensorRT Programs with New Weights</span></a></p></li>
+<li><p><a class="reference internal" href="tutorials/serving_torch_tensorrt_with_triton.html#serving-torch-tensorrt-with-triton"><span class="std std-ref">Serving a Torch-TensorRT model with Triton</span></a></p></li>
+<li><p><a class="reference internal" href="tutorials/_rendered_examples/dynamo/torch_export_cudagraphs.html#torch-export-cudagraphs"><span class="std std-ref">Torch Export with Cudagraphs</span></a></p></li>
+<li><p><a class="reference internal" href="tutorials/_rendered_examples/dynamo/converter_overloading.html#converter-overloading"><span class="std std-ref">Overloading Torch-TensorRT Converters with Custom Converters</span></a></p></li>
+<li><p><a class="reference internal" href="tutorials/_rendered_examples/dynamo/custom_kernel_plugins.html#custom-kernel-plugins"><span class="std std-ref">Using Custom Kernels within TensorRT Engines with Torch-TensorRT</span></a></p></li>
+<li><p><a class="reference internal" href="tutorials/_rendered_examples/dynamo/mutable_torchtrt_module_example.html#mutable-torchtrt-module-example"><span class="std std-ref">Mutable Torch TensorRT Module</span></a></p></li>
 </ul>
 <div class="toctree-wrapper compound">
 </div>
@@ -493,7 +519,7 @@ Torch-TensorRT integrates seamlessly into the PyTorch ecosystem supporting hybri
 <section id="dynamo-frontend">
 <h2>Dynamo Frontend<a class="headerlink" href="#dynamo-frontend" title="Permalink to this heading">¶</a></h2>
 <ul class="simple">
-<li><p><a class="reference internal" href="tutorials/_rendered_examples/dynamo/index.html#torch-compile"><span class="std std-ref">Dynamo / torch.compile</span></a></p></li>
+<li><p><a class="reference internal" href="dynamo/torch_compile.html#torch-compile"><span class="std std-ref">TensorRT Backend for torch.compile</span></a></p></li>
 <li><p><a class="reference internal" href="dynamo/dynamo_export.html#dynamo-export"><span class="std std-ref">Compiling Exported Programs with Torch-TensorRT</span></a></p></li>
 </ul>
 <div class="toctree-wrapper compound">
@@ -518,12 +544,15 @@ Torch-TensorRT integrates seamlessly into the PyTorch ecosystem supporting hybri
 <div class="toctree-wrapper compound">
 </div>
 </section>
-<section id="tutorials">
-<h2>Tutorials<a class="headerlink" href="#tutorials" title="Permalink to this heading">¶</a></h2>
+<section id="model-zoo">
+<h2>Model Zoo<a class="headerlink" href="#model-zoo" title="Permalink to this heading">¶</a></h2>
 <ul class="simple">
-<li><p><a class="reference internal" href="tutorials/_rendered_examples/index.html#torch-tensorrt-tutorials"><span class="std std-ref">Torch-TensorRT Tutorials</span></a></p></li>
-<li><p><a class="reference internal" href="tutorials/serving_torch_tensorrt_with_triton.html#serving-torch-tensorrt-with-triton"><span class="std std-ref">Serving a Torch-TensorRT model with Triton</span></a></p></li>
-<li><p><a class="reference internal" href="tutorials/notebooks.html#notebooks"><span class="std std-ref">Example notebooks</span></a></p></li>
+<li><p><a class="reference internal" href="tutorials/_rendered_examples/dynamo/torch_compile_resnet_example.html#torch-compile-resnet"><span class="std std-ref">Compiling ResNet with dynamic shapes using the torch.compile backend</span></a></p></li>
+<li><p><a class="reference internal" href="tutorials/_rendered_examples/dynamo/torch_compile_transformers_example.html#torch-compile-transformer"><span class="std std-ref">Compiling BERT using the torch.compile backend</span></a></p></li>
+<li><p><a class="reference internal" href="tutorials/_rendered_examples/dynamo/torch_compile_stable_diffusion.html#torch-compile-stable-diffusion"><span class="std std-ref">Compiling Stable Diffusion model using the torch.compile backend</span></a></p></li>
+<li><p><a class="reference internal" href="tutorials/_rendered_examples/dynamo/torch_export_gpt2.html#torch-export-gpt2"><span class="std std-ref">Compiling GPT2 using the dynamo backend</span></a></p></li>
+<li><p><a class="reference internal" href="tutorials/_rendered_examples/dynamo/torch_export_llama2.html#torch-export-llama2"><span class="std std-ref">Compiling Llama2 using the dynamo backend</span></a></p></li>
+<li><p><a class="reference internal" href="tutorials/notebooks.html#notebooks"><span class="std std-ref">Legacy notebooks</span></a></p></li>
 </ul>
 <div class="toctree-wrapper compound">
 </div>
@@ -642,10 +671,11 @@ Torch-TensorRT integrates seamlessly into the PyTorch ecosystem supporting hybri
 <li><a class="reference internal" href="#in-framework-compilation-of-pytorch-inference-code-for-nvidia-gpus">In-framework compilation of PyTorch inference code for NVIDIA GPUs</a></li>
 <li><a class="reference internal" href="#getting-started">Getting Started</a></li>
 <li><a class="reference internal" href="#user-guide">User Guide</a></li>
+<li><a class="reference internal" href="#tutorials">Tutorials</a></li>
 <li><a class="reference internal" href="#dynamo-frontend">Dynamo Frontend</a></li>
 <li><a class="reference internal" href="#torchscript-frontend">TorchScript Frontend</a></li>
 <li><a class="reference internal" href="#fx-frontend">FX Frontend</a></li>
-<li><a class="reference internal" href="#tutorials">Tutorials</a></li>
+<li><a class="reference internal" href="#model-zoo">Model Zoo</a></li>
 <li><a class="reference internal" href="#python-api-documentation">Python API Documentation</a></li>
 <li><a class="reference internal" href="#c-api-documentation">C++ API Documentation</a></li>
 <li><a class="reference internal" href="#cli-documentation">CLI Documentation</a></li>

@@ -2,12 +2,15 @@ import logging
 from typing import Any, Sequence
 
 import torch
+from torch_tensorrt.dynamo._settings import CompilationSettings
 
 logger = logging.getLogger(__name__)
 
 
 def remove_sym_nodes(
-    gm: torch.fx.GraphModule, sample_inputs: Sequence[Any]
+    gm: torch.fx.GraphModule,
+    sample_inputs: Sequence[Any],
+    settings: CompilationSettings,
 ) -> torch.fx.GraphModule:
     """Remove sym_int placeholders which get inserted due to torch.compile's
     dynamic=True behavior

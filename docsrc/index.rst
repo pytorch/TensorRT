@@ -26,6 +26,7 @@ Getting Started
    :hidden:
 
    getting_started/installation
+   getting_started/jetpack
    getting_started/quick_start
 
 User Guide
@@ -37,6 +38,7 @@ User Guide
 * :ref:`saving_models`
 * :ref:`runtime`
 * :ref:`using_dla`
+* :ref:`mixed_precision`
 
 .. toctree::
    :caption: User Guide
@@ -48,10 +50,38 @@ User Guide
    user_guide/saving_models
    user_guide/runtime
    user_guide/using_dla
+   user_guide/mixed_precision
+
+
+Tutorials
+------------
+
+* :ref:`torch_compile_advanced_usage`
+* :ref:`vgg16_ptq`
+* :ref:`engine_caching_example`
+* :ref:`engine_caching_bert_example`
+* :ref:`refit_engine_example`
+* :ref:`serving_torch_tensorrt_with_triton`
+* :ref:`torch_export_cudagraphs`
+* :ref:`converter_overloading`
+* :ref:`custom_kernel_plugins`
+* :ref:`mutable_torchtrt_module_example`
+
+.. toctree::
+   :caption: Tutorials
+   :maxdepth: 1
+   :hidden:
+
    tutorials/_rendered_examples/dynamo/torch_compile_advanced_usage
    tutorials/_rendered_examples/dynamo/vgg16_ptq
    tutorials/_rendered_examples/dynamo/engine_caching_example
+   tutorials/_rendered_examples/dynamo/engine_caching_bert_example
    tutorials/_rendered_examples/dynamo/refit_engine_example
+   tutorials/serving_torch_tensorrt_with_triton
+   tutorials/_rendered_examples/dynamo/torch_export_cudagraphs
+   tutorials/_rendered_examples/dynamo/converter_overloading
+   tutorials/_rendered_examples/dynamo/custom_kernel_plugins
+   tutorials/_rendered_examples/dynamo/mutable_torchtrt_module_example
 
 Dynamo Frontend
 ----------------
@@ -97,30 +127,28 @@ FX Frontend
 
    fx/getting_started_with_fx_path
 
-Tutorials
+Model Zoo
 ------------
-* :ref:`torch_tensorrt_tutorials`
-* :ref:`serving_torch_tensorrt_with_triton`
+* :ref:`torch_compile_resnet`
+* :ref:`torch_compile_transformer`
+* :ref:`torch_compile_stable_diffusion`
+* :ref:`torch_export_gpt2`
+* :ref:`torch_export_llama2`
 * :ref:`notebooks`
 
 .. toctree::
-   :caption: Tutorials
+   :caption: Model Zoo
    :maxdepth: 3
    :hidden:
-
-   tutorials/serving_torch_tensorrt_with_triton
-   tutorials/notebooks
+   
    tutorials/_rendered_examples/dynamo/torch_compile_resnet_example
    tutorials/_rendered_examples/dynamo/torch_compile_transformers_example
    tutorials/_rendered_examples/dynamo/torch_compile_stable_diffusion
-   tutorials/_rendered_examples/dynamo/torch_export_cudagraphs
-   tutorials/_rendered_examples/dynamo/converter_overloading
-   tutorials/_rendered_examples/dynamo/custom_kernel_plugins
    tutorials/_rendered_examples/distributed_inference/data_parallel_gpt2
    tutorials/_rendered_examples/distributed_inference/data_parallel_stable_diffusion
-   tutorials/_rendered_examples/dynamo/mutable_torchtrt_module_example
    tutorials/_rendered_examples/dynamo/torch_export_gpt2
    tutorials/_rendered_examples/dynamo/torch_export_llama2
+   tutorials/notebooks
 
 Python API Documentation
 ------------------------
