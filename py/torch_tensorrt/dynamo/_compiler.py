@@ -456,7 +456,6 @@ def compile_module(
         outputs = outputs[0].args
         outputs_meta_val = []
         for ele in outputs:
-            breakpoint()
             # it can be a torch.fx.node.Node or a tuple of torch.fx.node.Node
             if isinstance(ele, torch.fx.node.Node):
                 if "val" not in ele.meta:
