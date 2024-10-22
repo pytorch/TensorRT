@@ -1,12 +1,15 @@
 import logging
 
 import torch
+from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.lowering.passes.pass_utils import get_tensor_placeholders
 
 logger = logging.getLogger(__name__)
 
 
-def repair_input_aliasing(gm: torch.fx.GraphModule) -> torch.fx.GraphModule:
+def repair_input_aliasing(
+    gm: torch.fx.GraphModule, settings: CompilationSettings
+) -> torch.fx.GraphModule:
     """Inserts clone operators temporarily ahead of every placeholder
 
     See: https://github.com/pytorch/pytorch/issues/108079
