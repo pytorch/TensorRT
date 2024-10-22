@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt.dynamo._compiler &mdash; Torch-TensorRT v2.6.0.dev0+b99d080 documentation</title>
+  <title>torch_tensorrt.dynamo._compiler &mdash; Torch-TensorRT v2.6.0.dev0+b6ed1c5 documentation</title>
   
 
   
@@ -272,7 +272,7 @@
               
               
                 <div class="version">
-                  v2.6.0.dev0+b99d080
+                  v2.6.0.dev0+b6ed1c5
                 </div>
               
             
@@ -706,16 +706,6 @@
         <span class="k">raise</span> <span class="ne">AssertionError</span><span class="p">(</span>
             <span class="sa">f</span><span class="s2">&quot;Input graph should be an ExportedProgram but got type </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">exported_program</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span>
         <span class="p">)</span>
-    <span class="n">exported_program</span> <span class="o">=</span> <span class="n">pre_export_lowering</span><span class="p">(</span><span class="n">exported_program</span><span class="p">)</span>
-    <span class="n">exported_program</span> <span class="o">=</span> <span class="n">exported_program</span><span class="o">.</span><span class="n">run_decompositions</span><span class="p">(</span>
-        <span class="n">get_decompositions</span><span class="p">(</span><span class="n">enable_experimental_decompositions</span><span class="p">)</span>
-    <span class="p">)</span>
-    <span class="n">gm</span> <span class="o">=</span> <span class="n">exported_program</span><span class="o">.</span><span class="n">module</span><span class="p">()</span>
-    <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Input graph: &quot;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="p">))</span>
-
-    <span class="c1"># Apply lowering on the graph module</span>
-    <span class="n">gm</span> <span class="o">=</span> <span class="n">post_lowering</span><span class="p">(</span><span class="n">gm</span><span class="p">,</span> <span class="n">use_fp32_acc</span><span class="o">=</span><span class="n">use_fp32_acc</span><span class="p">)</span>
-    <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Lowered Input graph: &quot;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="p">))</span>
 
     <span class="n">engine_cache</span> <span class="o">=</span> <span class="kc">None</span>
     <span class="k">if</span> <span class="n">cache_built_engines</span> <span class="ow">or</span> <span class="n">reuse_cached_engines</span><span class="p">:</span>
@@ -769,6 +759,19 @@
 
     <span class="n">settings</span> <span class="o">=</span> <span class="n">CompilationSettings</span><span class="p">(</span><span class="o">**</span><span class="n">compilation_options</span><span class="p">)</span>
     <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Compilation Settings: </span><span class="si">%s</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">settings</span><span class="p">)</span>
+
+    <span class="n">exported_program</span> <span class="o">=</span> <span class="n">pre_export_lowering</span><span class="p">(</span><span class="n">exported_program</span><span class="p">,</span> <span class="n">settings</span><span class="p">)</span>
+    <span class="n">exported_program</span> <span class="o">=</span> <span class="n">exported_program</span><span class="o">.</span><span class="n">run_decompositions</span><span class="p">(</span>
+        <span class="n">get_decompositions</span><span class="p">(</span><span class="n">enable_experimental_decompositions</span><span class="p">)</span>
+    <span class="p">)</span>
+
+    <span class="n">gm</span> <span class="o">=</span> <span class="n">exported_program</span><span class="o">.</span><span class="n">module</span><span class="p">()</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Input graph: &quot;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="p">))</span>
+
+    <span class="c1"># Apply lowering on the graph module</span>
+    <span class="n">gm</span> <span class="o">=</span> <span class="n">post_lowering</span><span class="p">(</span><span class="n">gm</span><span class="p">,</span> <span class="n">settings</span><span class="p">)</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Lowered Input graph: &quot;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="p">))</span>
+
     <span class="n">trt_gm</span> <span class="o">=</span> <span class="n">compile_module</span><span class="p">(</span>
         <span class="n">gm</span><span class="p">,</span> <span class="n">trt_arg_inputs</span><span class="p">,</span> <span class="n">trt_kwarg_inputs</span><span class="p">,</span> <span class="n">settings</span><span class="p">,</span> <span class="n">engine_cache</span>
     <span class="p">)</span>
@@ -1147,7 +1150,10 @@
         <span class="s2">&quot;use_fp32_acc&quot;</span><span class="p">:</span> <span class="n">use_fp32_acc</span><span class="p">,</span>
     <span class="p">}</span>
 
-    <span class="n">exported_program</span> <span class="o">=</span> <span class="n">pre_export_lowering</span><span class="p">(</span><span class="n">exported_program</span><span class="p">)</span>
+    <span class="n">settings</span> <span class="o">=</span> <span class="n">CompilationSettings</span><span class="p">(</span><span class="o">**</span><span class="n">compilation_options</span><span class="p">)</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Compilation Settings: </span><span class="si">%s</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">settings</span><span class="p">)</span>
+
+    <span class="n">exported_program</span> <span class="o">=</span> <span class="n">pre_export_lowering</span><span class="p">(</span><span class="n">exported_program</span><span class="p">,</span> <span class="n">settings</span><span class="p">)</span>
     <span class="c1"># Decompose the exported program</span>
     <span class="n">exported_program</span> <span class="o">=</span> <span class="n">exported_program</span><span class="o">.</span><span class="n">run_decompositions</span><span class="p">(</span>
         <span class="n">get_decompositions</span><span class="p">(</span><span class="n">enable_experimental_decompositions</span><span class="p">)</span>
@@ -1156,11 +1162,8 @@
     <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Input graph: &quot;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="p">))</span>
 
     <span class="c1"># Apply lowering on the graph module</span>
-    <span class="n">gm</span> <span class="o">=</span> <span class="n">post_lowering</span><span class="p">(</span><span class="n">gm</span><span class="p">)</span>
+    <span class="n">gm</span> <span class="o">=</span> <span class="n">post_lowering</span><span class="p">(</span><span class="n">gm</span><span class="p">,</span> <span class="n">settings</span><span class="p">)</span>
     <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Lowered Input graph: &quot;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="p">))</span>
-
-    <span class="n">settings</span> <span class="o">=</span> <span class="n">CompilationSettings</span><span class="p">(</span><span class="o">**</span><span class="n">compilation_options</span><span class="p">)</span>
-    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Compilation Settings: </span><span class="si">%s</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">settings</span><span class="p">)</span>
 
     <span class="c1"># Configure user compilation settings to converters.</span>
     <span class="n">CONVERTERS</span><span class="o">.</span><span class="n">set_compilation_settings</span><span class="p">(</span><span class="n">settings</span><span class="p">)</span>
