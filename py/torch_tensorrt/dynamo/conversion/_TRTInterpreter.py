@@ -617,7 +617,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                             weight_name_map=self.weight_name_map,
                         )
 
-                        # Serialize the refitted engine where the EXCLUDE_WEIGHTS flag must be cleared
+                        # EXCLUDE_WEIGHTS flag must be cleared
                         serialization_config = engine.create_serialization_config()
                         serialization_config.clear_flag(
                             trt.SerializationFlag.EXCLUDE_WEIGHTS
@@ -679,21 +679,9 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                 if self.compilation_settings.strip_engine_weights:
                     weight_stripped_serialized_engine = serialized_engine
                 else:
-                    # Serialize the refitted engine where the EXCLUDE_WEIGHTS flag must be cleared
+                    # set EXCLUDE_WEIGHTS flag to strip weights
                     runtime = trt.Runtime(TRT_LOGGER)
                     engine = runtime.deserialize_cuda_engine(serialized_engine)
-
-                    from torch_tensorrt.dynamo._refit import (
-                        _refit_single_trt_engine_with_gm,
-                    )
-
-                    _refit_single_trt_engine_with_gm(
-                        new_gm=self.module,
-                        old_engine=engine,
-                        input_list=self.input_specs,
-                        settings=self.compilation_settings,
-                        weight_name_map=self.weight_name_map,
-                    )
 
                     serialization_config = engine.create_serialization_config()
                     serialization_config.set_flag(trt.SerializationFlag.EXCLUDE_WEIGHTS)

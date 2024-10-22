@@ -135,7 +135,6 @@ _SETTINGS_TO_BE_ENGINE_INVARIANT = (
     "sparse_weights",
     "engine_capability",
     "hardware_compatible",
-    "strip_engine_weights",
     "refit_identical_engine_weights",
     "immutable_weights",
 )

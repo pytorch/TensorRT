@@ -1,4 +1,5 @@
 import copy
+import hashlib
 import io
 import logging
 import os
@@ -6,10 +7,10 @@ import pickle
 import pickletools
 import shutil
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional, Sequence, Tuple, cast
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import torch
-from torch._inductor.codecache import FxGraphCachePickler, sha256_hash
+from torch._inductor.codecache import sha256_hash
 from torch.fx.experimental.proxy_tensor import unset_fake_temporarily
 from torch_tensorrt._Input import Input
 from torch_tensorrt.dynamo._settings import (
@@ -59,7 +60,11 @@ class BaseEngineCache(ABC):
             for name, param in new_gm.named_parameters():
                 param.data.zero_()
 
-            graph_hash_val = cast(str, FxGraphCachePickler.get_hash(new_gm))
+            # TODO: This hash function is slow, reported in https://github.com/pytorch/TensorRT/issues/3249
+            # Waiting for a fix from PyTorch team
+            # graph_hash = FxGraphCachePickler.get_hash(new_gm)
+            graph_str = str(new_gm.graph)
+            graph_hash = hashlib.sha256(graph_str.encode()).hexdigest()
 
         input_spec_strs = [str(i) for i in input_specs]
         with io.BytesIO() as stream:
@@ -75,7 +80,7 @@ class BaseEngineCache(ABC):
             engine_specs_data = pickletools.optimize(engine_specs_data)
         engine_specs_hash = sha256_hash(engine_specs_data)
 
-        hash_val: str = graph_hash_val + input_specs_hash + engine_specs_hash
+        hash_val: str = graph_hash + input_specs_hash + engine_specs_hash
 
         return hash_val
 
