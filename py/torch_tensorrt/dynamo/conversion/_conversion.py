@@ -5,7 +5,6 @@ from typing import Any, List, Optional, Sequence
 
 import tensorrt as trt
 import torch
-from torch._subclasses.fake_tensor import FakeTensor
 from torch.fx.experimental.proxy_tensor import unset_fake_temporarily
 from torch_tensorrt._Device import Device
 from torch_tensorrt._enums import dtype
@@ -18,33 +17,13 @@ from torch_tensorrt.dynamo.conversion._TRTInterpreter import (
     TRTInterpreterResult,
 )
 from torch_tensorrt.dynamo.runtime import PythonTorchTensorRTModule, TorchTensorRTModule
-from torch_tensorrt.dynamo.utils import get_model_device, get_torch_inputs
+from torch_tensorrt.dynamo.utils import (
+    get_model_device,
+    get_output_dtypes,
+    get_torch_inputs,
+)
 
 logger = logging.getLogger(__name__)
-
-
-def get_output_dtypes(output: Any, truncate_doulbe: bool = False) -> List[dtype]:
-    output_dtypes = []
-    if isinstance(output, torch.fx.node.Node):
-        if "val" in output.meta:
-            output_meta = output.meta["val"]
-            if isinstance(output_meta, (FakeTensor, torch.Tensor)):
-                if truncate_doulbe and output_meta.dtype == torch.float64:
-                    output_dtypes.append(dtype.float32)
-                else:
-                    output_dtypes.append(dtype._from(output_meta.dtype))
-        else:
-            raise ValueError(
-                f"node.name={output.name}: node.meta['val'] does not exist, expect node.meta['val'] exists for each output node"
-            )
-    elif isinstance(output, tuple):
-        for ele in output:
-            output_dtypes.extend(get_output_dtypes(ele))
-    else:
-        raise ValueError(
-            f"got unexpected type {type(output)}, expected type is a torch.fx.node.Node or a tuple of torch.fx.node.Node"
-        )
-    return output_dtypes
 
 
 def infer_module_output_dtypes(
