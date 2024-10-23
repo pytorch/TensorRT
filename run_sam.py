@@ -2,6 +2,7 @@ import timeit
 from typing import Tuple
 
 import numpy as np
+import pandas as pd
 import torch
 import torch_tensorrt
 from PIL import Image
@@ -33,7 +34,6 @@ def recordStats(backend, timings, precision, batch_size=1, compile_time_s=None):
         "Median-Latency(ms)": time_med * 1000,
         "Mean-Latency(ms)": time_mean * 1000,
         "Latency-StdDev(ms)": time_std * 1000,
-        "Compile Time(s)": compile_time_s,
     }
     results.append(stats)
 
@@ -69,9 +69,11 @@ def record_perf(
             end_time = timeit.default_timer()
             timings.append(end_time - start_time)
 
-    recordStats(
+    results = recordStats(
         "Torch-TensorRT " + backend, timings, precision, batch_size, compile_time_s
     )
+
+    return results
 
 
 image = Image.open("./truck.jpg")
@@ -101,11 +103,18 @@ class MyModule(torch.nn.Module):
 input_image = predictor._transforms(image)
 input_image = input_image[None, ...].to("cuda:0")
 
-ep = torch.export.export(MyModule(model), (input_image,))
+pyt_model = MyModule(model)
+pyt_results = record_perf(pyt_model, "Torch", [input_image], "fp32", 3, 1)
+
+ep = torch.export.export(pyt_model, (input_image,))
 with torch_tensorrt.logging.debug():
     trt_gm = torch_tensorrt.dynamo.compile(
         ep, inputs=[input_image], debug=True, min_block_size=1
     )
 
-breakpoint()
-print("done")
+trt_results = record_perf(trt_gm, "Dynamo", [input_image], "fp32", 3, 1)
+
+print("==================================")
+print(pd.DataFrame(pyt_results))
+print("==================================")
+print(pd.DataFrame(trt_results))
