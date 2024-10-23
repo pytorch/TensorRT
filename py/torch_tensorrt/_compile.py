@@ -354,7 +354,7 @@ def convert_method_to_trt_engine(
             ts_mod = torch.jit.script(module)
         serialized_engine: bytes = ts_convert_method_to_trt_engine(
             ts_mod,
-            inputs=arg_inputs,
+            inputs=inputs,
             method_name=method_name,
             enabled_precisions=enabled_precisions_set,
             **kwargs,
