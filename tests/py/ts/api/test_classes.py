@@ -232,7 +232,7 @@ class TestInput(unittest.TestCase):
 )
 class TestTorchTensorRTModule(unittest.TestCase):
     @staticmethod
-    def _get_trt_mod():
+    def _get_trt_mod(via_ts: bool = False):
         class Test(torch.nn.Module):
             def __init__(self):
                 super(Test, self).__init__()
@@ -244,9 +244,14 @@ class TestTorchTensorRTModule(unittest.TestCase):
                 return out
 
         mod = torch.jit.script(Test())
-        test_mod_engine_str = torchtrt.ts.convert_method_to_trt_engine(
-            mod, "forward", inputs=[torchtrt.Input((2, 10))]
-        )
+        if via_ts:
+            test_mod_engine_str = torchtrt.ts.convert_method_to_trt_engine(
+                mod, "forward", inputs=[torchtrt.Input((2, 10))]
+            )
+        else:
+            test_mod_engine_str = torchtrt.convert_method_to_trt_engine(
+                mod, "forward", inputs=[torchtrt.Input((2, 10))]
+            )
         return TorchTensorRTModule(
             name="test",
             serialized_engine=test_mod_engine_str,
@@ -301,9 +306,12 @@ class TestTorchTensorRTModule(unittest.TestCase):
             )
 
     def test_set_get_profile_path_prefix(self):
-        trt_mod = TestTorchTensorRTModule._get_trt_mod()
-        trt_mod.engine.profile_path_prefix = "/tmp/"
-        self.assertTrue(trt_mod.engine.profile_path_prefix == "/tmp/")
+        for trt_mod in (
+            TestTorchTensorRTModule._get_trt_mod(),
+            TestTorchTensorRTModule._get_trt_mod(via_ts=True),
+        ):
+            trt_mod.engine.profile_path_prefix = "/tmp/"
+            self.assertTrue(trt_mod.engine.profile_path_prefix == "/tmp/")
 
     def test_get_layer_info(self):
         """
@@ -321,11 +329,14 @@ class TestTorchTensorRTModule(unittest.TestCase):
 
         import json
 
-        trt_mod = TestTorchTensorRTModule._get_trt_mod()
-        trt_json = json.loads(trt_mod.get_layer_info())
-        [self.assertTrue(k in trt_json.keys()) for k in ["Layers", "Bindings"]]
-        self.assertTrue(len(trt_json["Layers"]) == 2)
-        self.assertTrue(len(trt_json["Bindings"]) == 2)
+        for trt_mod in (
+            TestTorchTensorRTModule._get_trt_mod(),
+            TestTorchTensorRTModule._get_trt_mod(via_ts=True),
+        ):
+            trt_json = json.loads(trt_mod.get_layer_info())
+            [self.assertTrue(k in trt_json.keys()) for k in ["Layers", "Bindings"]]
+            self.assertTrue(len(trt_json["Layers"]) == 2)
+            self.assertTrue(len(trt_json["Bindings"]) == 2)
 
 
 if __name__ == "__main__":
