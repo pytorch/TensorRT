@@ -36,6 +36,7 @@ from torch_tensorrt.dynamo.lowering import (
 )
 from torch_tensorrt.dynamo.utils import (
     get_flat_args_with_check,
+    get_output_meta_val,
     parse_graph_io,
     prepare_inputs,
     set_log_level,
@@ -302,7 +303,6 @@ def compile(
 
     settings = CompilationSettings(**compilation_options)
     logger.info("Compilation Settings: %s\n", settings)
-
     exported_program = pre_export_lowering(exported_program, settings)
     exported_program = exported_program.run_decompositions(
         get_decompositions(enable_experimental_decompositions)
@@ -433,6 +433,12 @@ def compile_module(
     if not settings.use_fast_partitioner:
         dryrun_tracker.to_run_in_torch.extend(parse_non_trt_nodes(partitioned_module))
 
+    submodule_node_dict = {}
+    for node in partitioned_module.graph.nodes:
+        if "_run_on_acc" not in node.name:
+            continue
+        submodule_node_dict[node.name] = node
+
     # Store TRT replicas of Torch subgraphs
     trt_modules = {}
     # Iterate over all components that can be accelerated
@@ -451,6 +457,19 @@ def compile_module(
                 str(submodule.graph),
             )
             continue
+
+        if name not in submodule_node_dict:
+            raise ValueError(
+                f"node_name: {name} does not exist in the submodule node dictionary"
+            )
+
+        # set the submodule meta val back to the parent trt_module_node
+        if "val" not in submodule_node_dict[name].meta:
+            outputs = [node for node in submodule.graph.nodes if node.op == "output"]
+            outputs = outputs[0].args
+            outputs_meta_val = get_output_meta_val(outputs)
+            assert len(outputs_meta_val) > 0
+            submodule_node_dict[name].meta["val"] = outputs_meta_val
 
         subgraph_data = PerSubgraphData()
         subgraph_data.subgraph_name = name

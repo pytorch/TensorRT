@@ -115,6 +115,9 @@ def get_dynamic_shapes_args(mod: torch.nn.Module, inputs: Any) -> dict[str, Any]
     args = list(signature(mod.forward).parameters.keys())
     dynamic_shapes = {}
     for input, input_name in zip(inputs, args[: len(inputs)]):
+        # if input.name is not None, also not empty str, use the input.name
+        if input.name is not None and len(input.name) > 0 and input.name != input_name:
+            input_name = input.name
         dynamic_shapes[input_name] = get_dynamic_shapes(input)
     return dynamic_shapes
 

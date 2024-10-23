@@ -17,12 +17,32 @@ from torch_tensorrt.dynamo.conversion._TRTInterpreter import (
     TRTInterpreterResult,
 )
 from torch_tensorrt.dynamo.runtime import PythonTorchTensorRTModule, TorchTensorRTModule
-from torch_tensorrt.dynamo.utils import get_model_device, get_torch_inputs
+from torch_tensorrt.dynamo.utils import (
+    get_model_device,
+    get_output_dtypes,
+    get_torch_inputs,
+)
 
 logger = logging.getLogger(__name__)
 
 
 def infer_module_output_dtypes(
+    module: torch.fx.GraphModule,
+    truncate_double: bool = False,
+) -> List[dtype]:
+    """
+    This function get the output dtypes from node.meta['val'] which was set during dynamo compile_module step
+    and truncates them accordingly.
+    """
+    outputs = [node for node in module.graph.nodes if node.op == "output"]
+    outputs = outputs[0].args
+    return get_output_dtypes(outputs, truncate_double)
+
+
+# this method is only used in our converter test to infer the module output dtypes via dummy inference
+# which is due to fx.symbolic_trace does not have the meta['val'] info in the node
+# TODO: lan to remove this once our converter test is moved from fx.symbolic_trace to dynamo trace
+def infer_module_output_dtypes_for_test(
     module: torch.fx.GraphModule,
     inputs: Sequence[Input],
     device: Device,
@@ -91,22 +111,9 @@ def interpret_module_to_result(
     Returns:
         TRTInterpreterResult
     """
-    if arg_inputs is not None:
-        output_dtypes = infer_module_output_dtypes(
-            module,
-            arg_inputs,
-            settings.device,
-            kwarg_inputs=kwarg_inputs,
-            truncate_double=settings.truncate_double,
-        )
-    else:
-        # args and kwargs are combined and flattened to one list
-        output_dtypes = infer_module_output_dtypes(
-            module,
-            inputs,
-            settings.device,
-            truncate_double=settings.truncate_double,
-        )
+    output_dtypes = infer_module_output_dtypes(
+        module, truncate_double=settings.truncate_double
+    )
 
     interpreter = TRTInterpreter(
         module,
