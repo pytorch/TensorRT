@@ -668,12 +668,12 @@ def get_output_meta_val(output: Any) -> List[Any]:
     if isinstance(output, torch.fx.node.Node):
         if "val" in output.meta:
             output_meta_val.append(output.meta["val"])
-    elif isinstance(output, tuple):
+    elif isinstance(output, (tuple, list)):
         for node in output:
             output_meta_val.extend(get_output_meta_val(node))
     else:
         raise ValueError(
-            f"expect torch.fx.node.Node or a tuple of torch.fx.node.Node type, got unexpected types: {type(output)=}"
+            f"expect torch.fx.node.Node or a tuple/list of torch.fx.node.Node type, got unexpected types: {type(output)=}"
         )
     return output_meta_val
 
@@ -684,12 +684,12 @@ def set_output_meta_val(output: Any, outputs_meta_val: List[Any]) -> None:
         if "val" not in output.meta:
             output.meta["val"] = outputs_meta_val[0]
         outputs_meta_val.pop(0)
-    elif isinstance(output, tuple):
+    elif isinstance(output, (tuple, list)):
         for node in output:
             set_output_meta_val(node, outputs_meta_val)
     else:
         raise ValueError(
-            f"expect torch.fx.node.Node or a tuple of torch.fx.node.Node type, got unexpected types: {type(output)=}"
+            f"expect torch.fx.node.Node or a tuple/list of torch.fx.node.Node type, got unexpected types: {type(output)=}"
         )
 
 
@@ -707,11 +707,11 @@ def get_output_dtypes(output: Any, truncate_doulbe: bool = False) -> List[dtype]
             raise ValueError(
                 f"node.name={output.name}: node.meta['val'] does not exist, expect node.meta['val'] exists for each output node"
             )
-    elif isinstance(output, tuple):
+    elif isinstance(output, (tuple, list)):
         for ele in output:
             output_dtypes.extend(get_output_dtypes(ele))
     else:
         raise ValueError(
-            f"got unexpected type {type(output)}, expected type is a torch.fx.node.Node or a tuple of torch.fx.node.Node"
+            f"got unexpected type {type(output)}, expected type is a torch.fx.node.Node or a tuple/list of torch.fx.node.Node"
         )
     return output_dtypes
