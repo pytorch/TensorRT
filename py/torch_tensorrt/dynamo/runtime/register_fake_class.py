@@ -4,6 +4,12 @@ from typing import Any
 import torch
 
 
+@torch.library.register_fake("tensorrt::execute_engine")
+def fake_execute_engine(inputs, trt_engine):
+    breakpoint()
+    return trt_engine(inputs)
+
+
 # namespace::class_name
 @torch._library.register_fake_class("tensorrt::Engine")
 class FakeTRTEngine:
