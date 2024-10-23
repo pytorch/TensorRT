@@ -354,6 +354,23 @@ void TRTEngine::verify_serialization_fmt(const std::vector<std::string>& seriali
           << ")");
 }
 
+FlattenedState TRTEngine::__obj_flatten__() {
+  // Serialize TensorRT engine
+  auto serialized_trt_engine = make_trt(this->cuda_engine->serialize());
+  auto trt_engine = std::string((const char*)serialized_trt_engine->data(), serialized_trt_engine->size());
+
+  return std::tuple(
+      std::tuple("version", ABI_VERSION),
+      std::tuple("name", this->name),
+      std::tuple("device_info", this->device_info.serialize()),
+      std::tuple("serialized_engine", base64_encode(trt_engine)),
+      std::tuple("in_binding_names", this->in_binding_names),
+      std::tuple("out_binding_names", this->out_binding_names),
+      std::tuple("hardware_compatible", this->hardware_compatible),
+      std::tuple("serialized_metadata", this->serialized_metadata),
+      std::tuple("target_platform", this->target_platform.serialize()));
+}
+
 } // namespace runtime
 } // namespace core
 } // namespace torch_tensorrt

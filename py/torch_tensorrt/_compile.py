@@ -528,10 +528,10 @@ def save(
                 exp_program = export(module, arg_inputs, kwarg_inputs)
                 torch.export.save(exp_program, file_path)
             else:
-                from torch._higher_order_ops.torchbind import enable_torchbind_tracing
+                # from torch._higher_order_ops.torchbind import enable_torchbind_tracing
 
-                with enable_torchbind_tracing():
-                    exp_program = torch.export.export(
-                        module, tuple(arg_inputs), kwargs=kwarg_inputs, strict=False
-                    )
-                    torch.export.save(exp_program, file_path)
+                # with enable_torchbind_tracing():
+                exp_program = torch.export.export(
+                    module, tuple(arg_inputs), kwargs=kwarg_inputs, strict=False
+                )
+                torch.export.save(exp_program, file_path)
