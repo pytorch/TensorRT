@@ -262,7 +262,7 @@ class DispatchTestCase(TRTTestCase):
         atol=ATOL,
         precision=dtype.f32,
         check_dtype=True,
-        use_dynamo_tracer=False,
+        use_dynamo_tracer=True,
         enable_passes=False,
         propagate_shapes=False,
         int32_reqd=False,

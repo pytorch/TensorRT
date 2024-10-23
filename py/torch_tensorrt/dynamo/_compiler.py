@@ -296,7 +296,6 @@ def compile(
 
     settings = CompilationSettings(**compilation_options)
     logger.info("Compilation Settings: %s\n", settings)
-
     exported_program = pre_export_lowering(exported_program, settings)
     exported_program = exported_program.run_decompositions(
         get_decompositions(enable_experimental_decompositions)
@@ -452,16 +451,18 @@ def compile_module(
             )
             continue
 
-        # set the submodule meta val back to the parent trt_module_node
-        outputs = [node for node in submodule.graph.nodes if node.op == "output"]
-        outputs = outputs[0].args
-        outputs_meta_val = get_output_meta_val(outputs)
-
         if name not in submodule_node_dict:
             raise ValueError(
                 f"node_name: {name} does not exist in the submodule node dictionary"
             )
-        submodule_node_dict[name].meta["val"] = outputs_meta_val
+
+        # set the submodule meta val back to the parent trt_module_node
+        if "val" not in submodule_node_dict[name].meta:
+            outputs = [node for node in submodule.graph.nodes if node.op == "output"]
+            outputs = outputs[0].args
+            outputs_meta_val = get_output_meta_val(outputs)
+            assert len(outputs_meta_val) > 0
+            submodule_node_dict[name].meta["val"] = outputs_meta_val
 
         subgraph_data = PerSubgraphData()
         subgraph_data.subgraph_name = name

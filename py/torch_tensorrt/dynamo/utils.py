@@ -666,11 +666,8 @@ def get_flat_args_with_check(
 def get_output_meta_val(output: Any) -> List[Any]:
     output_meta_val = []
     if isinstance(output, torch.fx.node.Node):
-        if "val" not in output.meta:
-            raise ValueError(
-                f"node.name={output.name}: meta['val'] does not exist, expect output node has meta['val'] info"
-            )
-        output_meta_val.append(output.meta["val"])
+        if "val" in output.meta:
+            output_meta_val.append(output.meta["val"])
     elif isinstance(output, tuple):
         for node in output:
             output_meta_val.extend(get_output_meta_val(node))
@@ -686,7 +683,7 @@ def set_output_meta_val(output: Any, outputs_meta_val: List[Any]) -> None:
         assert len(outputs_meta_val) > 0
         if "val" not in output.meta:
             output.meta["val"] = outputs_meta_val[0]
-            outputs_meta_val.pop(0)
+        outputs_meta_val.pop(0)
     elif isinstance(output, tuple):
         for node in output:
             set_output_meta_val(node, outputs_meta_val)
