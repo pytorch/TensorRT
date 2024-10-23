@@ -1,4 +1,5 @@
 import logging
+from typing import Any, Sequence
 
 import torch
 from torch_tensorrt.dynamo._settings import CompilationSettings
@@ -7,15 +8,17 @@ logger = logging.getLogger(__name__)
 
 
 def remove_sym_nodes(
-    gm: torch.fx.GraphModule, settings: CompilationSettings
+    gm: torch.fx.GraphModule,
+    sample_inputs: Sequence[Any],
+    settings: CompilationSettings,
 ) -> torch.fx.GraphModule:
     """Remove sym_int placeholders which get inserted due to torch.compile's
     dynamic=True behavior
     """
     # Extract SymInt placeholder Tensors
-    placeholder_sym_ints = [
-        node
-        for node in gm.graph.nodes
+    placeholder_idx_sym_ints = [
+        (idx, node)
+        for idx, node in enumerate(gm.graph.nodes)
         if (
             node.op == "placeholder"
             and isinstance(node.type, type)
@@ -24,8 +27,9 @@ def remove_sym_nodes(
         )
     ]
 
-    for node in placeholder_sym_ints:
+    for idx, node in placeholder_idx_sym_ints:
         gm.graph.erase_node(node)
+        sample_inputs.pop(idx)
 
     gm.graph.lint()
     gm.recompile()
