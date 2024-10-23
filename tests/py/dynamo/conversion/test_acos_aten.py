@@ -66,7 +66,7 @@ class TestAcosConverter(DispatchTestCase):
             (
                 "3d_dim_dtype_float",
                 (1, 1, 1),
-                (1, 2, 3),
+                (2, 2, 3),
                 (3, 3, 3),
                 torch.float,
                 torch.float,
