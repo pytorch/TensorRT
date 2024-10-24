@@ -36,6 +36,9 @@ from torch_tensorrt.dynamo.lowering import (
     post_lowering,
     pre_export_lowering,
 )
+from torch_tensorrt.dynamo.runtime._WrapperTorchTensorRTModule import (
+    WrapperTorchTensorRTModule,
+)
 from torch_tensorrt.dynamo.utils import (
     get_flat_args_with_check,
     get_output_metadata,
@@ -902,6 +905,12 @@ def compile_module(
         settings.use_fast_partitioner = True
 
     dryrun_stats_display(dryrun_tracker, settings.dryrun)
+
+    if len(trt_modules) > 1:
+        # Capture/replay a series of CUDA operations in subgraphs in a wrapped runtime module.
+        partitioned_module = WrapperTorchTensorRTModule(
+            partitioned_module, dryrun_tracker.output_dtypes
+        )
 
     return partitioned_module
 

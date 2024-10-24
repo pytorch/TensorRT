@@ -5,6 +5,7 @@ from contextlib import nullcontext
 from tempfile import tempdir
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
+import nvtx
 import tensorrt as trt
 import torch
 import torch_tensorrt
@@ -115,7 +116,6 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         self.cudagraph: Optional[torch.cuda.CUDAGraph] = None
         self._caller_stream: Optional[torch.cuda.Stream] = None
         self._engine_stream: Optional[torch.cuda.Stream] = None
-
         # TODO: Make the below a Dictionary {shape: cudagraph}
         self.shape_key: Optional[str] = None
 
@@ -347,13 +347,9 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
             (i.contiguous() if isinstance(i, torch.Tensor) else torch.tensor(i).cuda())
             for i in inputs
         ]
-
-        with (
-            torch.autograd.profiler.record_function("PythonTorchTensorRTModule:Forward")
-            if self.profiling_enabled
-            else nullcontext()
-        ):
+        with nvtx.annotate(f"Forward", color="red"):
             self._check_initialized()
+            cudagraphs_enabled = torch_tensorrt.runtime.get_cudagraphs_mode() and not self.cudagraphs_disabled
 
             cudagraphs_enabled = torch_tensorrt.runtime.get_cudagraphs_mode()
             shape_changed = self.validate_input_shapes(inputs)
@@ -405,13 +401,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                     ]
                     logger.warning(f"Moved all input Tensors to cuda:{device_id}")
 
-            with (
-                torch.autograd.profiler.record_function(
-                    "PythonTorchTensorRTModule:ProcessInputs"
-                )
-                if self.profiling_enabled
-                else nullcontext()
-            ):
+            with nvtx.annotate(f"ProcessInputs", color="red"):
                 assert len(contiguous_inputs) == len(
                     self.input_names
                 ), f"Wrong number of inputs, expect {len(self.input_names)} get {len(contiguous_inputs)}."
@@ -436,14 +426,12 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                 if self.profiling_enabled
                 else nullcontext()
             ):
-                if can_use_pre_allocated_outputs:
-                    outputs = self.pre_allocated_outputs
-                else:
-                    self.output_shapes = [
-                        tuple(self.context.get_tensor_shape(output_name))
-                        for output_name in self.output_names
-                    ]
-                    if DYNAMIC_DIM in self.output_shapes:
+                # create output tensors
+                outputs: List[torch.Tensor] = []
+
+                for o, output_name in enumerate(self.output_names):
+                    shape = tuple(self.context.get_tensor_shape(output_name))
+                    if DYNAMIC_DIM in shape:
                         raise ValueError(
                             "Encountered dynamic output shapes during runtime. This could mean the network has data-dependent output shapes which is not currently supported."
                         )
@@ -463,13 +451,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                             output_name, outputs[o].data_ptr()
                         )
 
-            with (
-                torch.autograd.profiler.record_function(
-                    "PythonTorchTensorRTModule:TensorRTRuntime"
-                )
-                if self.profiling_enabled
-                else nullcontext()
-            ):
+            with nvtx.annotate(f"TensorRTRuntime", color="red"):
                 self._caller_stream = torch.cuda.current_stream()
                 if (
                     self._engine_stream == torch.cuda.default_stream()
@@ -477,23 +459,27 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                 ):
                     self._engine_stream = torch.cuda.Stream()
 
-                self._engine_stream.wait_stream(self._caller_stream)
+                with nvtx.annotate(f"wait_stream", color="green"):
+                    self._engine_stream.wait_stream(self._caller_stream)
 
                 with torch.cuda.stream(self._engine_stream):
-
                     if cudagraphs_enabled:
                         if need_cudagraphs_record:
-                            self.cudagraph = torch.cuda.CUDAGraph()
+                            with nvtx.annotate(f"CUDAGraph", color="green"):
+                                self.cudagraph = torch.cuda.CUDAGraph()
 
                             if self.profiling_enabled:
                                 self.cudagraph.enable_debug_mode()
-
-                            with torch.cuda.graph(
-                                self.cudagraph, stream=self._engine_stream
-                            ):
-                                self.context.execute_async_v3(
-                                    self._engine_stream.cuda_stream
-                                )
+                            with nvtx.annotate(f"torch.cuda.graph", color="green"):
+                                with torch.cuda.graph(
+                                    self.cudagraph, stream=self._engine_stream
+                                ):
+                                    with nvtx.annotate(
+                                        f"execute_async_v3", color="green"
+                                    ):
+                                        self.context.execute_async_v3(
+                                            self._engine_stream.cuda_stream
+                                        )
 
                             if self.profiling_enabled:
                                 import tempfile
@@ -502,8 +488,8 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                                     self.cudagraph.debug_dump(
                                         f"{tempdir}/{self.name}_cudagraph.dot"
                                     )
-
-                        self.cudagraph.replay()  # type: ignore
+                        with nvtx.annotate(f"replay", color="green"):
+                            self.cudagraph.replay()  # type: ignore
 
                     else:
                         self.context.execute_async_v3(self._engine_stream.cuda_stream)

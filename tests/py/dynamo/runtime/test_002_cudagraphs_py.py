@@ -162,6 +162,76 @@ class TestCudagraphsPython(TestCase):
                 msg=f"CUDA Graph Python TRT outputs don't match with the original model. (trial: {i})",
             )
 
+    def test_cudagraphs_dynamic_py(self):
+        class SampleModel(torch.nn.Module):
+            def forward(self, x):
+                return torch.relu((x + 2) * 0.5)
+
+        # TODO: more dynamic dim
+        # TODO: multiple output
+        # TODO: module that graph cannot be used
+        inputs = torch_tensorrt.Input(
+            min_shape=(1, 3, 224, 224),
+            opt_shape=(8, 3, 224, 224),
+            max_shape=(16, 3, 224, 224),
+            dtype=torch.float,
+            name="x",
+        )
+        fx_graph = torch.fx.symbolic_trace(SampleModel())
+
+        # Validate that the results between Torch and Torch-TRT are similar
+        optimized_model = torch_tensorrt.compile(
+            fx_graph,
+            "dynamo",
+            inputs,
+            min_block_size=1,
+            pass_through_build_failures=True,
+            torch_executed_ops={"torch.ops.aten.mul.Tensor"},
+            use_python_runtime=True,
+        )
+
+        result_samples = []
+        torch_results_samples = []
+
+        inputs = []
+        for i in [1, 3, 8, 11, 16]:
+            inputs.append(torch.randn((i, 3, 224, 224)).cuda())
+
+        for n in range(len(inputs) * TRIALS):
+            i = n // TRIALS
+            # disable cuda graph at all index for all trials
+            if n % TRIALS == n // TRIALS:
+                torch_tensorrt.runtime.set_cudagraphs_mode(False)
+            else:
+                torch_tensorrt.runtime.set_cudagraphs_mode(True)
+
+            result_samples.append(optimized_model(inputs[i]).detach().cpu())
+            torch_results_samples.append(fx_graph(inputs[i]).detach().cpu())
+
+        for n in range(len(inputs) * TRIALS):
+            i = n // TRIALS
+            # enable cuda graph at all index for all trials
+            if n % TRIALS == n // TRIALS:
+                torch_tensorrt.runtime.set_cudagraphs_mode(True)
+            else:
+                torch_tensorrt.runtime.set_cudagraphs_mode(False)
+
+            result_samples.append(optimized_model(inputs[i]).detach().cpu())
+            torch_results_samples.append(fx_graph(inputs[i]).detach().cpu())
+
+        for i, (optimized_model_results, torch_model_results) in enumerate(
+            zip(result_samples, torch_results_samples)
+        ):
+            max_diff = float(
+                torch.max(torch.abs(optimized_model_results - torch_model_results))
+            )
+            self.assertAlmostEqual(
+                max_diff,
+                0,
+                DECIMALS_OF_AGREEMENT,
+                msg=f"CUDA Graph Python TRT outputs don't match with the original model. (trial: {i})",
+            )
+
 
 if __name__ == "__main__":
     run_tests()
