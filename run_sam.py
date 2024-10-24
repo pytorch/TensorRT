@@ -28,12 +28,12 @@ def recordStats(backend, timings, precision, batch_size=1, compile_time_s=None):
     stats = {
         "Backend": backend,
         "Precision": precision,
-        "Batch size": batch_size,
+        # "Batch size": batch_size,
         "Median(FPS)": speed_med,
-        "Mean(FPS)": speed_mean,
+        # "Mean(FPS)": speed_mean,
         "Median-Latency(ms)": time_med * 1000,
-        "Mean-Latency(ms)": time_mean * 1000,
-        "Latency-StdDev(ms)": time_std * 1000,
+        # "Mean-Latency(ms)": time_mean * 1000,
+        # "Latency-StdDev(ms)": time_std * 1000,
     }
     results.append(stats)
 
@@ -76,18 +76,41 @@ def record_perf(
     return results
 
 
+def infer(
+    predictor, image, input_point, input_label, mode="enc", multimask_output=True
+):
+
+    if mode == "enc":
+        predictor.set_image(image)
+    elif mode == "head":
+        masks, scores, logits = predictor.predict(
+            point_coords=input_point,
+            point_labels=input_label,
+            multimask_output=multimask_output,
+        )
+
+
+# Raw input
 image = Image.open("./truck.jpg")
 image = np.array(image.convert("RGB"))
+input_point = np.array([[500, 375]])
+input_label = np.array([1])
 
+# Predictor
 predictor = SAM2ImagePredictor.from_pretrained("facebook/sam2-hiera-small")
-# with torch_tensorrt.logging.debug():
-#     predictor.set_image = torch.compile(predictor.set_image, backend="tensorrt", options={"debug": True, "min_block_size": 1})
-#     predictor.set_image(image)
+
+# measure time for image enc or prediction head
+mode = "head"
+timings = []
+for _ in range(10):
+    start_time = timeit.default_timer()
+    infer(predictor, image, input_point, input_label, mode)
+    end_time = timeit.default_timer()
+    timings.append(end_time - start_time)
+
+results = recordStats("Torch-TensorRT SAM " + mode, timings, "fp32", 1)
 
 # https://github.com/pytorch/pytorch/issues/115534
-
-# Just model
-model = predictor.model  # .image_encoder
 
 
 class MyModule(torch.nn.Module):
@@ -101,18 +124,23 @@ class MyModule(torch.nn.Module):
 
 # pre process
 input_image = predictor._transforms(image)
-input_image = input_image[None, ...].to("cuda:0")
+input_image = input_image[None, ...].to("cuda:0").half()
+precision = "fp16"
 
-pyt_model = MyModule(model)
-pyt_results = record_perf(pyt_model, "Torch", [input_image], "fp32", 3, 1)
+pyt_model = MyModule(predictor.model).eval().cuda().half()
+pyt_results = record_perf(pyt_model, "Torch", [input_image], precision, 3, 1)
 
 ep = torch.export.export(pyt_model, (input_image,))
 with torch_tensorrt.logging.debug():
     trt_gm = torch_tensorrt.dynamo.compile(
-        ep, inputs=[input_image], debug=True, min_block_size=1
+        ep,
+        inputs=[input_image],
+        debug=True,
+        min_block_size=1,
+        enabled_precisions={torch.float16},
     )
 
-trt_results = record_perf(trt_gm, "Dynamo", [input_image], "fp32", 3, 1)
+trt_results = record_perf(trt_gm, "TensorRT", [input_image], precision, 3, 1)
 
 print("==================================")
 print(pd.DataFrame(pyt_results))
