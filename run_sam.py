@@ -101,6 +101,9 @@ predictor = SAM2ImagePredictor.from_pretrained("facebook/sam2-hiera-small")
 
 # measure time for image enc or prediction head
 mode = "head"
+if mode == "head":
+    # Pre-process input image
+    predictor.set_image(image)
 timings = []
 for _ in range(10):
     start_time = timeit.default_timer()
@@ -109,6 +112,8 @@ for _ in range(10):
     timings.append(end_time - start_time)
 
 results = recordStats("Torch-TensorRT SAM " + mode, timings, "fp32", 1)
+print(results)
+
 
 # https://github.com/pytorch/pytorch/issues/115534
 
