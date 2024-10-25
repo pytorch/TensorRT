@@ -1,12 +1,18 @@
+import argparse
 import timeit
 from typing import Tuple
 
+import modelopt.torch.quantization as mtq
 import numpy as np
 import pandas as pd
 import torch
 import torch_tensorrt
+from modelopt.torch.quantization.utils import export_torch_mode
 from PIL import Image
 from sam2.sam2_image_predictor import SAM2ImagePredictor
+
+# Github issue related to SAM
+# https://github.com/pytorch/pytorch/issues/115534
 
 WARMUP_ITER = 10
 
@@ -90,64 +96,122 @@ def infer(
         )
 
 
-# Raw input
-image = Image.open("./truck.jpg")
-image = np.array(image.convert("RGB"))
-input_point = np.array([[500, 375]])
-input_label = np.array([1])
-
-# Predictor
-predictor = SAM2ImagePredictor.from_pretrained("facebook/sam2-hiera-small")
-
-# measure time for image enc or prediction head
-mode = "head"
-if mode == "head":
-    # Pre-process input image
-    predictor.set_image(image)
-timings = []
-for _ in range(10):
-    start_time = timeit.default_timer()
-    infer(predictor, image, input_point, input_label, mode)
-    end_time = timeit.default_timer()
-    timings.append(end_time - start_time)
-
-results = recordStats("Torch-TensorRT SAM " + mode, timings, "fp32", 1)
-print(results)
-
-
-# https://github.com/pytorch/pytorch/issues/115534
-
-
 class MyModule(torch.nn.Module):
     def __init__(self, module):
         super().__init__()
         self.module = module
+        self._bb_feat_sizes = [
+            (256, 256),
+            (128, 128),
+            (64, 64),
+        ]
 
     def forward(self, torch_img: torch.Tensor):
-        return self.module.forward_image(torch_img)
+        backbone_out = self.module.forward_image(torch_img)
+        _, vision_feats, _, _ = self.module._prepare_backbone_features(backbone_out)
+        # Add no_mem_embed, which is added to the lowest rest feat. map during training on videos
+        if self.module.directly_add_no_mem_embed:
+            vision_feats[-1] = vision_feats[-1] + self.module.no_mem_embed
+
+        feats = [
+            feat.permute(1, 2, 0).view(1, -1, *feat_size)
+            for feat, feat_size in zip(vision_feats[::-1], self._bb_feat_sizes[::-1])
+        ][::-1]
+        image_features = {"image_embed": feats[-1], "high_res_feats": feats[:-1]}
+        return image_features
 
 
-# pre process
-input_image = predictor._transforms(image)
-input_image = input_image[None, ...].to("cuda:0").half()
-precision = "fp16"
+def build_model(args):
 
-pyt_model = MyModule(predictor.model).eval().cuda().half()
-pyt_results = record_perf(pyt_model, "Torch", [input_image], precision, 3, 1)
+    # Predictor
+    predictor = SAM2ImagePredictor.from_pretrained("facebook/sam2-hiera-small")
+    pyt_model = predictor.model
+    if args.precision == "fp16":
+        pyt_model = pyt_model.half()
+        full_model = MyModule(pyt_model).eval().cuda()
+    elif args.precision == "fp8":
+        full_model = MyModule(pyt_model).eval().cuda()
+        input_tensor = torch.randn((1, 3, 1024, 1024), dtype=torch.float32).cuda()
 
-ep = torch.export.export(pyt_model, (input_image,))
-with torch_tensorrt.logging.debug():
-    trt_gm = torch_tensorrt.dynamo.compile(
-        ep,
-        inputs=[input_image],
-        debug=True,
-        min_block_size=1,
-        enabled_precisions={torch.float16},
+        def calibrate_loop(model):
+            """Simple calibration function for testing."""
+            model(input_tensor)
+
+        quant_cfg = mtq.FP8_DEFAULT_CFG
+        mtq.quantize(full_model, quant_cfg, forward_loop=calibrate_loop)
+        breakpoint()
+        print("done")
+    else:
+        full_model = MyModule(pyt_model).eval().cuda()
+
+    return full_model, predictor
+
+
+def build_input(args, file_path, predictor):
+
+    # Raw input
+    image = Image.open(file_path)
+    image = np.array(image.convert("RGB"))
+    input_point = np.array([[500, 375]])
+    input_label = np.array([1])
+    # pre process
+    input_image = predictor._transforms(image)
+    input_image = input_image[None, ...].to("cuda:0")
+    if args.precision == "fp16":
+        input_image = input_image.half()
+
+    return input_image
+
+
+def compile_with_torchtrt(model, inputs, args):
+
+    precision = torch.float32
+    if args.precision == "fp16":
+        precision = torch.float16
+
+    # ep = torch.export.export(model, inputs)
+    ep = torch.export._trace._export(
+        model,
+        inputs,
+        strict=False,
+        allow_complex_guards_as_runtime_asserts=True,
+    )
+    with torch_tensorrt.logging.debug():
+        trt_gm = torch_tensorrt.dynamo.compile(
+            ep,
+            inputs=[input_image],
+            debug=True,
+            min_block_size=1,
+            enabled_precisions={precision},
+        )
+
+    return trt_gm
+
+
+if __name__ == "__main__":
+    arg_parser = argparse.ArgumentParser(description="Run inference on SAM")
+    # The following options are manual user provided settings
+    arg_parser.add_argument(
+        "--precision",
+        type=str,
+        default="fp32",
+        help="Precision of the model to compile for TensorRT",
     )
 
-trt_results = record_perf(trt_gm, "TensorRT", [input_image], precision, 3, 1)
+    args = arg_parser.parse_args()
 
-print("==================================")
-print(pd.DataFrame(pyt_results))
-print("==================================")
-print(pd.DataFrame(trt_results))
+    pyt_model, predictor = build_model(args)
+
+    input_image = build_input(args, "./truck.jpg", predictor)
+
+    trt_model = compile_with_torchtrt(pyt_model, (input_image,), args)
+
+    pyt_results = record_perf(pyt_model, "Torch", [input_image], args.precision, 3, 1)
+    trt_results = record_perf(
+        trt_model, "TensorRT", [input_image], args.precision, 3, 1
+    )
+
+    print("==================================")
+    print(pd.DataFrame(pyt_results))
+    print("==================================")
+    print(pd.DataFrame(trt_results))
