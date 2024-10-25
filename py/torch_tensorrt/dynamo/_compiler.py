@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import collections.abc
 import logging
+import platform
 import warnings
 from typing import Any, Collection, List, Optional, Sequence, Set, Tuple, Union
 
@@ -45,6 +46,64 @@ from torch_tensorrt.dynamo.utils import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def cross_compile_save_for_windows(
+    exported_program: ExportedProgram,
+    file_path: str,
+    inputs: Optional[Sequence[Sequence[Any]]] = None,
+    *,
+    arg_inputs: Optional[Sequence[Sequence[Any]]] = None,
+    kwarg_inputs: Optional[dict[Any, Any]] = None,
+    enabled_precisions: Union[
+        Set[Union[torch.dtype, dtype]], Tuple[Union[torch.dtype, dtype]]
+    ] = _defaults.ENABLED_PRECISIONS,
+    **kwargs: Any,
+) -> None:
+
+    if platform.system() != "Linux" or platform.architecture()[0] != "64bit":
+        raise RuntimeError(
+            f"Cross compile for windows is only supported on AMD 64bit Linux architecture, current platform: {platform.system()=}, {platform.architecture()[0]=}"
+        )
+
+    if not file_path:
+        raise ValueError("File path cannot be empty. Please provide a valid file path")
+
+    # enable cross compile for windows
+    kwargs["enable_cross_compile_for_windows"] = True
+
+    # TODO: confirm with Naren whether to raise the error or just warning and ignore what user's settings for the following flags
+    # disable the following settings which should not be enabled for cross compile for windows
+    key_sets = {
+        "use_python_runtime",
+        "make_refittable",
+        "lazy_engine_init",
+        "cache_built_engines",
+        "reuse_cached_engines",
+        "custom_engine_cache",
+    }
+    # disable these settings
+    kwarg_key_sets = set(kwargs.keys())
+    for key in key_sets.intersection(kwarg_key_sets):
+        if kwargs.get(key):
+            logger.warning(
+                f"arg: {key} should not be enabled for cross compile for windows feature, it is ignored."
+            )
+            kwargs[key] = False
+
+    trt_gm = compile(
+        exported_program,
+        inputs=inputs,
+        arg_inputs=arg_inputs,
+        kwarg_inputs=kwarg_inputs,
+        enabled_precisions=enabled_precisions,
+        **kwargs,
+    )
+
+    from torch_tensorrt.dynamo._exporter import cross_save_for_windows
+
+    cross_save_for_windows(trt_gm, file_path)
+    logger.info(f"successfully saved the module for windows at {file_path}")
 
 
 def compile(
@@ -91,6 +150,7 @@ def compile(
     custom_engine_cache: Optional[BaseEngineCache] = _defaults.CUSTOM_ENGINE_CACHE,
     use_explicit_typing: bool = _defaults.USE_EXPLICIT_TYPING,
     use_fp32_acc: bool = _defaults.USE_FP32_ACC,
+    enable_cross_compile_for_windows: bool = _defaults.ENABLE_CROSS_COMPILE_FOR_WINDOWS,
     **kwargs: Any,
 ) -> torch.fx.GraphModule:
     """Compile an ExportedProgram module for NVIDIA GPUs using TensorRT
@@ -290,8 +350,7 @@ def compile(
         "lazy_engine_init": lazy_engine_init,
         "cache_built_engines": cache_built_engines,
         "reuse_cached_engines": reuse_cached_engines,
-        "use_explicit_typing": use_explicit_typing,
-        "use_fp32_acc": use_fp32_acc,
+        "enable_cross_compile_for_windows": enable_cross_compile_for_windows,
     }
 
     settings = CompilationSettings(**compilation_options)
@@ -519,7 +578,7 @@ def compile_module(
     # Replace all FX Modules with TRT Modules
     for name, trt_module in trt_modules.items():
         setattr(partitioned_module, name, trt_module)
-        if settings.lazy_engine_init:
+        if settings.lazy_engine_init and not settings.enable_cross_compile_for_windows:
             getattr(partitioned_module, name).setup_engine()
 
     # Reset settings object to user specification after fallback to global partitioning mode
