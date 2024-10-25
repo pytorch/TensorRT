@@ -684,30 +684,29 @@ def set_metadata(
         node.meta = metadata[idx]
 
 
-def get_output_target_ops(output: Any) -> List[torch._ops.OpOverload]:
+def flatten_nodes(nodes: Any) -> List[torch.fx.node.Node]:
     ret = []
-    if isinstance(output, torch.fx.node.Node):
-        if "val" in output.meta:
-            ret.append(output.target)
-    elif isinstance(output, (tuple, list)):
-        for node in output:
-            ret.extend(get_output_target_ops(node))
+    if isinstance(nodes, torch.fx.node.Node):
+        ret.append(nodes)
+    elif isinstance(nodes, (tuple, list)):
+        for node in nodes:
+            ret.extend(flatten_nodes(node))
     else:
         raise ValueError(
-            f"expect torch.fx.node.Node or a tuple/list of torch.fx.node.Node type, got unexpected types: {type(output)=}"
+            f"expect torch.fx.node.Node or a tuple/list of torch.fx.node.Node type, got unexpected types: {type(nodes)=}"
         )
     return ret
 
 
-def get_output_meta_val(
+def get_output_metadata(
     gm: torch.fx.GraphModule,
 ) -> List[Any]:
     outputs = [node for node in gm.graph.nodes if node.op == "output"]
     assert len(outputs) > 0
     outputs = outputs[0].args
-    target_ops = get_output_target_ops(outputs)
-    assert len(target_ops) > 0
-    return get_metadata(gm, target_ops[0])
+    nodes = flatten_nodes(outputs)
+    assert len(nodes) > 0
+    return [node.meta for node in nodes]
 
 
 def get_output_dtypes(output: Any, truncate_doulbe: bool = False) -> List[dtype]:
