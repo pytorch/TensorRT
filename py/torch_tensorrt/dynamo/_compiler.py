@@ -455,14 +455,10 @@ def compile_module(
             raise ValueError(
                 f"node_name: {name} does not exist in the submodule node dictionary"
             )
-
         # set the submodule meta val back to the parent trt_module_node
-        if "val" not in submodule_node_dict[name].meta:
-            outputs = [node for node in submodule.graph.nodes if node.op == "output"]
-            outputs = outputs[0].args
-            outputs_meta_val = get_output_meta_val(outputs)
-            assert len(outputs_meta_val) > 0
-            submodule_node_dict[name].meta["val"] = outputs_meta_val
+        metadata = get_output_meta_val(submodule)
+        assert len(metadata) > 0
+        submodule_node_dict[name].meta = metadata
 
         subgraph_data = PerSubgraphData()
         subgraph_data.subgraph_name = name

@@ -663,34 +663,51 @@ def get_flat_args_with_check(
     return flat_args, received_spec
 
 
-def get_output_meta_val(output: Any) -> List[Any]:
-    output_meta_val = []
+def get_metadata(
+    gm: torch.fx.GraphModule, target_op: torch._ops.OpOverload
+) -> List[Any]:
+    """
+    Return the list which has the metadata of all the target_op nodes present in the graph.
+    """
+    return [node.meta for node in gm.graph.nodes if node.target == target_op]
+
+
+def set_metadata(
+    gm: torch.fx.GraphModule, target_op: torch._ops.OpOverload, metadata: List[Any]
+) -> None:
+    """
+    Return the list which has the metadata of all the target_op nodes present in the graph.
+    """
+    target_nodes = [node for node in gm.graph.nodes if node.target == target_op]
+    assert len(target_nodes) == len(metadata)
+    for idx, node in enumerate(target_nodes):
+        node.meta = metadata[idx]
+
+
+def get_output_target_ops(output: Any) -> List[torch._ops.OpOverload]:
+    ret = []
     if isinstance(output, torch.fx.node.Node):
         if "val" in output.meta:
-            output_meta_val.append(output.meta["val"])
+            ret.append(output.target)
     elif isinstance(output, (tuple, list)):
         for node in output:
-            output_meta_val.extend(get_output_meta_val(node))
+            ret.extend(get_output_target_ops(node))
     else:
         raise ValueError(
             f"expect torch.fx.node.Node or a tuple/list of torch.fx.node.Node type, got unexpected types: {type(output)=}"
         )
-    return output_meta_val
+    return ret
 
 
-def set_output_meta_val(output: Any, outputs_meta_val: List[Any]) -> None:
-    if isinstance(output, torch.fx.node.Node):
-        assert len(outputs_meta_val) > 0
-        if "val" not in output.meta:
-            output.meta["val"] = outputs_meta_val[0]
-        outputs_meta_val.pop(0)
-    elif isinstance(output, (tuple, list)):
-        for node in output:
-            set_output_meta_val(node, outputs_meta_val)
-    else:
-        raise ValueError(
-            f"expect torch.fx.node.Node or a tuple/list of torch.fx.node.Node type, got unexpected types: {type(output)=}"
-        )
+def get_output_meta_val(
+    gm: torch.fx.GraphModule,
+) -> List[Any]:
+    outputs = [node for node in gm.graph.nodes if node.op == "output"]
+    assert len(outputs) > 0
+    outputs = outputs[0].args
+    target_ops = get_output_target_ops(outputs)
+    assert len(target_ops) > 0
+    return get_metadata(gm, target_ops[0])
 
 
 def get_output_dtypes(output: Any, truncate_doulbe: bool = False) -> List[dtype]:
@@ -703,9 +720,12 @@ def get_output_dtypes(output: Any, truncate_doulbe: bool = False) -> List[dtype]
                     output_dtypes.append(dtype.float32)
                 else:
                     output_dtypes.append(dtype._from(output_meta.dtype))
+        elif "tensor_meta" in output.meta:
+            output_meta = output.meta["tensor_meta"]
+            output_dtypes.append(dtype._from(output_meta.dtype))
         else:
             raise ValueError(
-                f"node.name={output.name}: node.meta['val'] does not exist, expect node.meta['val'] exists for each output node"
+                f"node.name={output.name}: metadata does not exist, expect metadata exists for each output node"
             )
     elif isinstance(output, (tuple, list)):
         for ele in output:

@@ -3,22 +3,21 @@
 import logging
 import time
 import unittest
-from typing import Any, Callable, List, Optional, Tuple
+from typing import Any, Callable, List, Optional, Sequence, Tuple
 
 import torch
 import torch_tensorrt
+from torch.fx.experimental.proxy_tensor import unset_fake_temporarily
 from torch.fx.passes.shape_prop import ShapeProp
 from torch.testing._internal.common_utils import TestCase
 from torch_tensorrt import Input
+from torch_tensorrt._Device import Device
 from torch_tensorrt._enums import dtype
 from torch_tensorrt.dynamo import _defaults
 from torch_tensorrt.dynamo._settings import CompilationSettings
 
 # Use interpreter, input spec, and test case from fx_ts_compat to test Dynamo Converter Registry
 from torch_tensorrt.dynamo.conversion import TRTInterpreter
-from torch_tensorrt.dynamo.conversion._conversion import (
-    infer_module_output_dtypes_for_test,
-)
 from torch_tensorrt.dynamo.lowering import (
     get_decompositions,
     post_lowering,
@@ -28,6 +27,58 @@ from torch_tensorrt.dynamo.runtime import PythonTorchTensorRTModule
 from torch_tensorrt.dynamo.utils import ATOL, RTOL, get_model_device, get_torch_inputs
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
+
+
+# this method is only used in our converter test to infer the module output dtypes via dummy inference
+# which is due to fx.symbolic_trace does not have the meta['val'] info in the node
+# TODO: lan to remove this once our converter test is moved from fx.symbolic_trace to dynamo trace
+def infer_module_output_dtypes_for_test(
+    module: torch.fx.GraphModule,
+    inputs: Sequence[Input],
+    device: Device,
+    kwarg_inputs: Optional[dict[str, Any]] = None,
+    truncate_double: bool = False,
+) -> List[dtype]:
+    """
+    This function performs model inference to determine the output dtypes
+    and truncates them accordingly. inputs can be either arg_inputs or flattened input list.
+    If it is flattened list, kwarg_inputs should be None, as it is already included in the flattened input.
+    """
+    # TODO: We can also determine output dtypes from the module.graph based on node metadata.
+    # However, our converter tests use fx.symbolic_trace which sometimes does not provide metadata,
+    # so we stick to the model inference approach currently.
+    with unset_fake_temporarily():
+        # Get the device on which the model exists
+        # For large models, this can be done on CPU to save GPU memory allocation for TRT.
+        device = get_model_device(module)
+        torch_inputs = get_torch_inputs(inputs, device)
+        if kwarg_inputs is None:
+            kwarg_inputs = {}
+        torch_kwarg_inputs = get_torch_inputs(kwarg_inputs, device)
+        module_outputs = module(*torch_inputs, **torch_kwarg_inputs)
+        if not isinstance(module_outputs, (list, tuple)):
+            module_outputs = [module_outputs]
+
+    # Int64 outputs can sometimes be generated from within other operators
+    # such as aten.sum - such outputs can be truncated
+    output_dtypes = []
+    for output in module_outputs:
+        output_ = output
+        # We don't need to check if output is nested here because the input module will be flattened
+        if not isinstance(output, torch.Tensor):
+            if isinstance(output, str):
+                raise ValueError(
+                    f"Received an output type {type(output)} that's not in the acceptable datatypes (https://pytorch.org/docs/stable/tensor_attributes.html#torch.dtype)"
+                )
+            else:
+                output_ = torch.tensor(output)
+
+        if truncate_double and output_.dtype == dtype.float64:
+            output_dtypes.append(dtype.float32)
+        else:
+            output_dtypes.append(dtype._from(output_.dtype))
+
+    return output_dtypes
 
 
 def fetch_attr(mod, target):
