@@ -7,6 +7,7 @@ import torch
 from torch._dynamo.utils import detect_fake_mode
 from torch._functorch.aot_autograd import aot_export_joint_simple
 from torch_tensorrt.dynamo import partitioning
+from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.lowering import (
     get_decompositions,
     post_lowering,
@@ -35,13 +36,20 @@ def fx_dynamo_testing_backend(
         use_fast_partitioner=use_fast_partitioner,
     )
 
+    settings = CompilationSettings(
+        min_block_size=min_block_size,
+        torch_executed_ops=torch_executed_ops,
+        use_fast_partitioner=use_fast_partitioner,
+        use_fp32_acc=use_fp32_acc,
+    )
+
     fake_mode = detect_fake_mode(sample_inputs)
 
     # Place backend tracing within FakeTensor context allowing nonfake Tensors
     with unittest.mock.patch.object(
         fake_mode, "allow_non_fake_inputs", True
     ), fake_mode:
-        repair_input_aliasing(gm)
+        repair_input_aliasing(gm, settings)
 
         # Invoke AOTAutograd to translate operators to aten
         gm = aot_export_joint_simple(
@@ -51,7 +59,7 @@ def fx_dynamo_testing_backend(
             decompositions=get_decompositions(),
         )
 
-        gm = post_lowering(gm, use_fp32_acc=use_fp32_acc)
+        gm = post_lowering(gm, settings)
 
         trt_compiled = custom_backend(
             gm,

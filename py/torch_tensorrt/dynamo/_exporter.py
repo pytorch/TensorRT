@@ -389,7 +389,11 @@ def inline_trt_modules(gm: torch.fx.GraphModule) -> torch.fx.GraphModule:
         trt_module_node = trt_module_node[0]
         assert trt_module_node.args
 
-        num_outputs = len(trt_module.output_shapes)
+        if "val" not in trt_module_node.meta:
+            raise ValueError(
+                f"trt_module_node: {trt_module_node.name} does not have the metadata which should be set during dynamo compile_module step."
+            )
+        num_outputs = len(trt_module_node.meta["val"])
         # Insert a call_function node to perform inference on TRT engine
         with gm.graph.inserting_before(trt_module_node):
             engine_name = f"{name}_engine"
@@ -400,19 +404,9 @@ def inline_trt_modules(gm: torch.fx.GraphModule) -> torch.fx.GraphModule:
                 torch.ops.tensorrt.execute_engine.default,
                 (trt_module_node.args, engine_node),
             )
-            trt_node.meta["val"] = []
+            # set trt_node.meta with trt_module_node.meta
             assert num_outputs > 0
-            # Generate meta data for TRT node (a FakeTensor with corresponding output shape)
-            for idx in range(num_outputs):
-                trt_node.meta["val"].append(
-                    cast(
-                        FakeTensor,
-                        torch.empty_strided(
-                            tuple(trt_module.output_shapes[idx]),
-                            tuple([1] * len(trt_module.output_shapes[idx])),
-                        ),
-                    )
-                )
+            trt_node.meta["val"] = trt_module_node.meta["val"]
 
             # meta["val"] should be a lighter version of a tensor. For eg: it should be a FakeTensor (with output shape and dtype properties)
             # Lighter version of a custom_obj is not defined clearly. meta["val"] does not have any type expectations but
