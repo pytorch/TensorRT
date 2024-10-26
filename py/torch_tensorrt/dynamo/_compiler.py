@@ -47,7 +47,7 @@ from torch_tensorrt.dynamo.utils import (
 logger = logging.getLogger(__name__)
 
 
-def cross_compile_save_for_windows(
+def cross_compile_for_windows(
     exported_program: ExportedProgram,
     file_path: str,
     inputs: Optional[Sequence[Sequence[Any]]] = None,
@@ -71,17 +71,15 @@ def cross_compile_save_for_windows(
     # enable cross compile for windows
     kwargs["enable_cross_compile_for_windows"] = True
 
-    # TODO: confirm with Naren whether to raise the error or just warning and ignore what user's settings for the following flags
     # disable the following settings which should not be enabled for cross compile for windows
     key_sets = {
         "use_python_runtime",
-        "make_refittable",
         "lazy_engine_init",
         "cache_built_engines",
         "reuse_cached_engines",
         "custom_engine_cache",
     }
-    # disable these settings
+    # disable these settings if anything is turned on
     kwarg_key_sets = set(kwargs.keys())
     for key in key_sets.intersection(kwarg_key_sets):
         if kwargs.get(key):

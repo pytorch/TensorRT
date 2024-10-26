@@ -3,19 +3,30 @@ from __future__ import annotations
 import collections.abc
 import logging
 import platform
+
+# import operator
 from enum import Enum
 from typing import Any, Callable, List, Optional, Sequence, Set
 
+# import base64
 import torch
 import torch.fx
 from torch_tensorrt._enums import dtype
 from torch_tensorrt._features import ENABLED_FEATURES
 from torch_tensorrt._Input import Input
 from torch_tensorrt.dynamo import _defaults
+from torch_tensorrt.dynamo._exporter import replace_placeholder_node_in_windows
 from torch_tensorrt.fx import InputTensorSpec
 from torch_tensorrt.fx.lower import compile as fx_compile
 from torch_tensorrt.fx.utils import LowerPrecision
 from typing_extensions import TypeGuard
+
+# from torch.export.exported_program import (
+#     CustomObjArgument,
+# )
+# from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (
+#     ENGINE_IDX,
+# )
 
 if ENABLED_FEATURES.torchscript_frontend:
     import torch_tensorrt.ts
@@ -31,7 +42,7 @@ if ENABLED_FEATURES.dynamo_frontend:
         convert_exported_program_to_serialized_trt_engine as dynamo_convert_exported_program_to_serialized_trt_engine,
     )
     from torch_tensorrt.dynamo._compiler import (
-        cross_compile_save_for_windows as dynamo_cross_compile_save_for_windows,
+        cross_compile_for_windows as dynamo_cross_compile_for_windows,
     )
     from torch_tensorrt.dynamo._tracer import trace as dynamo_trace
 
@@ -39,7 +50,8 @@ logger = logging.getLogger(__name__)
 
 __all__ = [
     "compile",
-    "cross_compile_save_for_windows",
+    "cross_compile_for_windows",
+    "cross_load_in_windows",
     "convert_method_to_trt_engine",
     "save",
     "load",
@@ -291,7 +303,7 @@ def compile(
         raise RuntimeError("Module is an unknown format or the ir requested is unknown")
 
 
-def cross_compile_save_for_windows(
+def cross_compile_for_windows(
     module: Any,
     file_path: str,
     inputs: Optional[Sequence[Input | torch.Tensor | InputTensorSpec]] = None,
@@ -379,7 +391,7 @@ def cross_compile_save_for_windows(
     logger.info("successfully exported the module")
 
     # Compile and save the module
-    dynamo_cross_compile_save_for_windows(
+    dynamo_cross_compile_for_windows(
         exp_program,
         file_path,
         arg_inputs=torchtrt_arg_inputs,
@@ -512,6 +524,22 @@ def convert_method_to_trt_engine(
         )
     else:
         raise RuntimeError("Module is an unknown format or the ir requested is unknown")
+
+
+def cross_load_in_windows(file_path: str = "") -> Any:
+    try:
+        logger.debug(f"Loading the provided file {file_path} using torch.export.load()")
+        exp_program = torch.export.load(file_path)
+    except Exception as e:
+        logger.info(
+            f"Loading the provided file {file_path} via torch.export.load() failed with the following error: {e}",
+            exc_info=True,
+        )
+        raise ValueError(
+            f"Cross_load The file {file_path} doesn't correspond to a valid Torchscript module or ExportedProgram. Please verify the file path."
+        )
+
+    return replace_placeholder_node_in_windows(exp_program)
 
 
 def load(file_path: str = "") -> Any:

@@ -23,6 +23,49 @@ std::string serialize_bindings(const std::vector<std::string>& bindings) {
   return serialized_binding_info;
 }
 
+static const std::string sym_table = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"; //=
+std::string base64_encode(const std::string& in) {
+  std::string out;
+  int64_t val = 0, valb = -6;
+  for (unsigned char c : in) {
+    val = (val << 8) + c;
+    valb += 8;
+    while (valb >= 0) {
+      out.push_back(sym_table[(val >> valb) & 0x3F]);
+      valb -= 6;
+    }
+  }
+  if (valb > -6) {
+    out.push_back(sym_table[((val << 8) >> (valb + 8)) & 0x3F]);
+  };
+  while (out.size() % 4) {
+    out.push_back('=');
+  }
+  return out;
+}
+
+std::string base64_decode(const std::string& in) {
+  std::string out;
+  std::vector<int> T(256, -1);
+  for (int i = 0; i < 64; i++) {
+    T[sym_table[i]] = i;
+  }
+
+  int64_t val = 0, valb = -8;
+  for (unsigned char c : in) {
+    if (T[c] == -1) {
+      break;
+    }
+    val = (val << 6) + T[c];
+    valb += 6;
+    if (valb >= 0) {
+      out.push_back(char((val >> valb) & 0xFF));
+      valb -= 8;
+    }
+  }
+  return out;
+}
+
 // TODO: Implement a call method
 // c10::List<at::Tensor> TRTEngine::Run(c10::List<at::Tensor> inputs) {
 //     auto input_vec = inputs.vec();
@@ -75,7 +118,6 @@ static auto TORCHTRT_UNUSED TRTEngineTSRegistrtion =
             });
 
 TORCH_LIBRARY(tensorrt, m) {
-  m.def("setup_engine", setup_engine);
   m.def("execute_engine", execute_engine);
   m.def("SERIALIZED_ENGINE_BINDING_DELIM", []() -> std::string { return std::string(1, TRTEngine::BINDING_DELIM); });
   m.def("SERIALIZED_RT_DEVICE_DELIM", []() -> std::string { return DEVICE_INFO_DELIM; });

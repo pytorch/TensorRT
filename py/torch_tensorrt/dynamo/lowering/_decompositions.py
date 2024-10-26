@@ -3,7 +3,8 @@ from enum import Enum, auto
 from typing import Any, Callable, Dict, List, Optional
 
 import torch
-from torch._decomp import _decomp_table_to_post_autograd_aten, register_decomposition
+from torch._decomp import register_decomposition
+from torch._export.utils import _decomp_table_to_post_autograd_aten
 from torch._ops import OpOverload
 from torch_tensorrt.dynamo._defaults import default_device
 from torch_tensorrt.dynamo.conversion.converter_utils import get_positive_dim

@@ -17,7 +17,7 @@ from torch.export.exported_program import (
     OutputSpec,
     TensorArgument,
 )
-from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import ENGINE_IDX
+from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import ENGINE_IDX, NAME_IDX
 
 
 def cross_save_for_windows(
@@ -464,15 +464,10 @@ def inline_trt_modules_for_windows(gm: torch.fx.GraphModule) -> torch.fx.GraphMo
             engine_info = trt_module._pack_engine_info()
             engine_bytes = engine_info[ENGINE_IDX]
             engine_info[ENGINE_IDX] = base64.b64encode(engine_bytes).decode("utf-8")
-
-            engine_node = gm.graph.call_function(
-                torch.ops.tensorrt.setup_engine.default,
-                tuple(engine_info),
-            )
-
+            # insert the no_placeholder node in the graph which should be replaced to the actual execute_engine node while load in the windows
             trt_node = gm.graph.call_function(
-                torch.ops.tensorrt.execute_engine.default,
-                (trt_module_node.args, engine_node),
+                torch.ops.tensorrt.no_op_placeholder_for_execute_engine.default,
+                (trt_module_node.args, *engine_info),
             )
 
             trt_node.meta["val"] = []
@@ -488,14 +483,6 @@ def inline_trt_modules_for_windows(gm: torch.fx.GraphModule) -> torch.fx.GraphMo
                         ),
                     )
                 )
-            # Generate meta data for engine_node (a FakeTensor with corresponding output shape)
-            engine_node.meta["val"] = cast(
-                FakeTensor,
-                torch.empty_strided(
-                    tuple(trt_module.output_shapes[0]),
-                    tuple([1] * len(trt_module.output_shapes[0])),
-                ),
-            )
 
         if num_outputs == 1:
             # Insert getitem nodes as outputs (for export serialization to work)
@@ -514,5 +501,107 @@ def inline_trt_modules_for_windows(gm: torch.fx.GraphModule) -> torch.fx.GraphMo
 
         # Erase the TRT submodule (call_module) node.
         gm.graph.erase_node(trt_module_node)
-
     return gm
+
+
+def replace_placeholder_node_in_windows(
+    exp_program: ExportedProgram,
+) -> ExportedProgram:
+    gm = exp_program.graph_module
+    no_op_placeholder_nodes = []
+    for node in gm.graph.nodes:
+        if "no_op_placeholder_for_execute_engine" in node.name:
+            no_op_placeholder_nodes.append(node)
+    assert len(no_op_placeholder_nodes) > 0
+    for no_op_placeholder_node in no_op_placeholder_nodes:
+        if "val" not in no_op_placeholder_node.meta:
+            raise ValueError(f"metadata info is missing for the node: {node.name}")
+        with gm.graph.inserting_before(no_op_placeholder_node):
+            packed_engine_info = list(no_op_placeholder_node.args[1:])
+            engine_bytes = packed_engine_info[ENGINE_IDX]
+            engine_name = packed_engine_info[NAME_IDX]
+
+            packed_engine_info[ENGINE_IDX] = base64.b64decode(
+                engine_bytes.encode("utf-8")
+            )
+            trt_engine = torch.classes.tensorrt.Engine(tuple(packed_engine_info))
+            setattr(gm, engine_name, trt_engine)
+            engine_node = gm.graph.get_attr(engine_name)
+
+            trt_node = gm.graph.call_function(
+                torch.ops.tensorrt.execute_engine.default,
+                (no_op_placeholder_node.args[0], engine_node),
+            )
+            trt_node.meta["val"] = no_op_placeholder_node.meta["val"]
+            engine_node.meta["val"] = CustomObjArgument(
+                name=engine_node.name, class_fqn=""
+            )
+
+        if len(no_op_placeholder_node.meta["val"]) == 1:
+            with gm.graph.inserting_after(trt_node):
+                getitem_output = gm.graph.call_function(operator.getitem, (trt_node, 0))
+                getitem_output.meta["val"] = trt_node.meta["val"]
+            no_op_placeholder_node.replace_all_uses_with(getitem_output)
+        else:
+            no_op_placeholder_node.replace_all_uses_with(trt_node)
+            getitem_nodes = trt_node.users
+            for idx, getitem_node in enumerate(getitem_nodes):
+                getitem_node.meta["val"] = trt_node.meta["val"][idx]
+
+        gm.graph.erase_node(no_op_placeholder_node)
+
+    gm.delete_all_unused_submodules()
+    gm.graph.eliminate_dead_code()
+    gm.graph.lint()
+    gm.recompile()
+
+    return exp_program
+
+
+# def replace_placeholder_node_in_windows(
+#     exp_program: ExportedProgram,
+# ) -> ExportedProgram:
+#     gm = exp_program.graph_module
+#     no_op_placeholder_node = None
+#     for node in gm.graph.nodes:
+#         if  "no_op_placeholder_for_execute_engine" in node.name:
+#             no_op_placeholder_node = node
+#             break
+#     assert no_op_placeholder_node
+#     if 'val' not in no_op_placeholder_node.meta:
+#         raise ValueError(f"metadata info is missing for the node: {node.name}")
+#     with gm.graph.inserting_before(no_op_placeholder_node):
+#         engine_name = "placeholder_engine"
+#         packed_engine_info = list(no_op_placeholder_node.args[1:])
+#         engine_bytes = packed_engine_info[ENGINE_IDX]
+#         packed_engine_info[ENGINE_IDX] = base64.b64decode(engine_bytes.encode("utf-8"))
+#         trt_engine = torch.classes.tensorrt.Engine(tuple(packed_engine_info))
+#         setattr(gm, engine_name, trt_engine)
+#         engine_node = gm.graph.get_attr(engine_name)
+
+#         trt_node = gm.graph.call_function(
+#             torch.ops.tensorrt.execute_engine.default,
+#             (no_op_placeholder_node.args[0], engine_node)
+#         )
+#         trt_node.meta['val'] = no_op_placeholder_node.meta['val']
+#         engine_node.meta['val'] = CustomObjArgument(
+#             name=engine_node.name, class_fqn=""
+#         )
+
+#     if len(no_op_placeholder_node.meta['val']) == 1:
+#         with gm.graph.inserting_after(trt_node):
+#             getitem_output = gm.graph.call_function(operator.getitem, (trt_node, 0))
+#             getitem_output.meta["val"] = trt_node.meta["val"]
+#         no_op_placeholder_node.replace_all_uses_with(getitem_output)
+#     else:
+#         no_op_placeholder_node.replace_all_uses_with(trt_node)
+#         getitem_nodes = trt_node.users
+#         for idx, getitem_node in enumerate(getitem_nodes):
+#             getitem_node.meta["val"] = trt_node.meta["val"][idx]
+#     gm.graph.erase_node(no_op_placeholder_node)
+#     gm.delete_all_unused_submodules()
+#     gm.graph.eliminate_dead_code()
+#     gm.graph.lint()
+#     gm.recompile()
+
+#     return exp_program

@@ -94,37 +94,6 @@ bool _cudagraphs_validate_shapes(std::vector<at::Tensor> inputs, c10::intrusive_
   return true;
 }
 
-c10::intrusive_ptr<TRTEngine> setup_engine(
-    const std::string& abi_version,
-    const std::string& name,
-    const std::string& serialized_device_info,
-    const std::string& serialized_engine,
-    const std::string& serialized_in_binding_names,
-    const std::string& serialized_out_binding_names,
-    const std::string& serialized_hardware_compatible,
-    const std::string& serialized_metadata,
-    const std::string& serialized_target_platform) {
-  // only keep the device id and device type
-  RTDevice device = RTDevice(serialized_device_info);
-  RTDevice new_device = RTDevice(device.id, device.device_type);
-
-  std::vector<std::string> serialize_info;
-  serialize_info.resize(SERIALIZATION_LEN);
-
-  serialize_info[ABI_TARGET_IDX] = abi_version;
-  serialize_info[NAME_IDX] = name;
-  serialize_info[DEVICE_IDX] = new_device.serialize();
-  serialize_info[ENGINE_IDX] = base64_decode(serialized_engine);
-  serialize_info[INPUT_BINDING_NAMES_IDX] = serialized_in_binding_names;
-  serialize_info[OUTPUT_BINDING_NAMES_IDX] = serialized_out_binding_names;
-  serialize_info[HW_COMPATIBLE_IDX] = serialized_hardware_compatible;
-  serialize_info[SERIALIZED_METADATA_IDX] = serialized_metadata;
-  serialize_info[TARGET_PLATFORM_IDX] = serialized_target_platform;
-
-  c10::intrusive_ptr<TRTEngine> compiled_engine = c10::make_intrusive<TRTEngine>(serialize_info);
-  return compiled_engine;
-}
-
 std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intrusive_ptr<TRTEngine> compiled_engine) {
   LOG_DEBUG(
       "Attempting to run engine (ID: " << compiled_engine->name

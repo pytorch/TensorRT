@@ -12,11 +12,11 @@ Cross runtime compilation for windows example
 
 Compile and save the Resnet Model using Torch-TensorRT in Linux:
 
-python cross_runtime_compilation_for_windows.py --path trt_resnet.ep
+python examples/dynamo/cross_runtime_compilation_for_windows.py --path trt_resnet.ep
 
 Load the Resnet Model saved in Windows:
 
-python cross_runtime_compilation_for_windows.py --path trt_resnet.ep --load True
+python examples/dynamo/cross_runtime_compilation_for_windows.py --path trt_resnet.ep --load True
 
 """
 
@@ -56,23 +56,25 @@ inputs = [input]
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 if args.load:
     # load the saved model in Windows
-    if platform.system() != "Windows" or platform.machine() != "AMD64":
-        raise ValueError(
-            "cross runtime compiled model for windows can only be loaded in Windows system"
-        )
-    loaded_model = torch.export.load(args.path).module()
-    loaded_model(input)
+    # if platform.system() != "Windows" or platform.machine() != "AMD64":
+    #     raise ValueError(
+    #         "cross runtime compiled model for windows can only be loaded in Windows system"
+    #     )
+    loaded_model = torchtrt.cross_load_in_windows(args.path).module()
     print(f"model has been successfully loaded from ${args.path}")
-
+    # inference
+    trt_output = loaded_model(input)
+    print(f"inference result: {trt_output}")
 else:
     if platform.system() != "Linux" or platform.architecture()[0] != "64bit":
         raise ValueError(
             "cross runtime compiled model for windows can only be compiled in Linux system"
         )
     compile_spec = {
+        "debug": True,
         "min_block_size": 1,
     }
-    torchtrt.cross_compile_save_for_windows(
+    torchtrt.cross_compile_for_windows(
         model, file_path=args.path, inputs=inputs, **compile_spec
     )
     print(

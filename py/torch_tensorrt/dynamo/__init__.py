@@ -10,7 +10,7 @@ if version.parse(sanitized_torch_version()) >= version.parse("2.1.dev"):
     from ._compiler import (
         compile,
         convert_exported_program_to_serialized_trt_engine,
-        cross_compile_save_for_windows,
+        cross_compile_for_windows,
     )
     from ._exporter import export
     from ._refit import refit_module_weights
