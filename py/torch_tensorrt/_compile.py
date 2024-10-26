@@ -3,12 +3,9 @@ from __future__ import annotations
 import collections.abc
 import logging
 import platform
-
-# import operator
 from enum import Enum
 from typing import Any, Callable, List, Optional, Sequence, Set
 
-# import base64
 import torch
 import torch.fx
 from torch_tensorrt._enums import dtype
@@ -20,13 +17,6 @@ from torch_tensorrt.fx import InputTensorSpec
 from torch_tensorrt.fx.lower import compile as fx_compile
 from torch_tensorrt.fx.utils import LowerPrecision
 from typing_extensions import TypeGuard
-
-# from torch.export.exported_program import (
-#     CustomObjArgument,
-# )
-# from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (
-#     ENGINE_IDX,
-# )
 
 if ENABLED_FEATURES.torchscript_frontend:
     import torch_tensorrt.ts
@@ -527,8 +517,18 @@ def convert_method_to_trt_engine(
 
 
 def cross_load_in_windows(file_path: str = "") -> Any:
+
+    if not file_path:
+        raise ValueError("File path cannot be empty. Please provide a valid file path")
+
+    if platform.system() != "Windows" or platform.machine() != "AMD64":
+        raise ValueError(
+            "cross runtime compiled model for windows can only be loaded in Windows system"
+        )
+
     try:
         logger.debug(f"Loading the provided file {file_path} using torch.export.load()")
+        # TODO: think about how to handle the torch.jit.load route?
         exp_program = torch.export.load(file_path)
     except Exception as e:
         logger.info(
@@ -536,7 +536,7 @@ def cross_load_in_windows(file_path: str = "") -> Any:
             exc_info=True,
         )
         raise ValueError(
-            f"Cross_load The file {file_path} doesn't correspond to a valid Torchscript module or ExportedProgram. Please verify the file path."
+            f"cross_load the file {file_path} doesn't correspond to a valid ExportedProgram. Please verify the file path."
         )
 
     return replace_placeholder_node_in_windows(exp_program)

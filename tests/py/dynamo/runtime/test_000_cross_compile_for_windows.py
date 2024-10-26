@@ -18,7 +18,7 @@ class TestCrossCompileSaveForWindows(TestCase):
         "Cross compile for windows can only be enabled on linux 64 AMD platform",
     )
     @pytest.mark.unit
-    def test_cross_compile_save_for_windows(self):
+    def test_cross_compile_for_windows(self):
         class Add(torch.nn.Module):
             def forward(self, a, b):
                 return torch.add(a, b)
@@ -38,7 +38,7 @@ class TestCrossCompileSaveForWindows(TestCase):
         "Cross compile for windows can only be enabled on linux 64 AMD platform",
     )
     @pytest.mark.unit
-    def test_dynamo_cross_compile_save_for_windows(self):
+    def test_dynamo_cross_compile_for_windows(self):
         class Add(torch.nn.Module):
             def forward(self, a, b):
                 return torch.add(a, b)

@@ -153,7 +153,6 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         )  # Change to match target for engine
 
         engine_info: List[str | bytes] = [""] * SERIALIZATION_LEN
-
         engine_info[ABI_TARGET_IDX] = torch.ops.tensorrt.ABI_VERSION()
         engine_info[NAME_IDX] = (
             self.name + "_engine" if self.name != "" else "tensorrt_engine"
