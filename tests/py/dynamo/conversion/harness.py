@@ -33,7 +33,7 @@ from torch_tensorrt.dynamo.utils import ATOL, RTOL, get_model_device, get_torch_
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
 
-# this is to enable dynamo tracer as Truein the converter test files batch by batch
+# this is to enable dynamo tracer as True in the converter test files batch by batch
 def get_use_dynamo_tracer(use_dynamo_tracer: Any) -> bool:
     # if in our converter tests we specifically set use_dynamo_tracer field, honor it
     if use_dynamo_tracer is not None and isinstance(use_dynamo_tracer, bool):
@@ -296,12 +296,15 @@ class DispatchTestCase(TRTTestCase):
         atol=ATOL,
         precision=dtype.f32,
         check_dtype=True,
+        use_dynamo_tracer=None,
         enable_passes=False,
         propagate_shapes=False,
         int32_reqd=False,
         make_refittable=False,
     ):
-
+        # TODO: lan to remove this and set use_dynamo_traccer to True by default
+        # once all the converter test files are moved to use_dynamo_tracer
+        use_dynamo_tracer = get_use_dynamo_tracer(use_dynamo_tracer)
         # Previous instance of the interpreter auto-casted 64-bit inputs
         # We replicate this behavior here
         compilation_settings = CompilationSettings(
@@ -314,7 +317,7 @@ class DispatchTestCase(TRTTestCase):
         mod = self.generate_graph(
             mod,
             inputs,
-            use_dynamo_tracer=True,
+            use_dynamo_tracer=use_dynamo_tracer,
             enable_passes=enable_passes,
             propagate_shapes=propagate_shapes,
             settings=compilation_settings,
@@ -348,10 +351,18 @@ class DispatchTestCase(TRTTestCase):
 
         output_dtypes = None
         if check_dtype:
-            output_dtypes = infer_module_output_dtypes(
-                mod,
-                truncate_double=compilation_settings.truncate_double,
-            )
+            if use_dynamo_tracer:
+                output_dtypes = infer_module_output_dtypes(
+                    mod,
+                    truncate_double=compilation_settings.truncate_double,
+                )
+            else:
+                output_dtypes = infer_module_output_dtypes_for_test(
+                    mod,
+                    input_specs,
+                    compilation_settings.device,
+                    truncate_double=compilation_settings.truncate_double,
+                )
 
         _LOGGER.debug(f"Compilation settings: {compilation_settings}")
         _LOGGER.debug(f"Inputs: {input_specs}")
