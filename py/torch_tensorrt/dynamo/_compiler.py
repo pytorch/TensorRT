@@ -36,7 +36,7 @@ from torch_tensorrt.dynamo.lowering import (
 )
 from torch_tensorrt.dynamo.utils import (
     get_flat_args_with_check,
-    get_output_meta_val,
+    get_output_metadata,
     parse_graph_io,
     prepare_inputs,
     set_log_level,
@@ -456,13 +456,17 @@ def compile_module(
                 f"node_name: {name} does not exist in the submodule node dictionary"
             )
 
-        # set the submodule meta val back to the parent trt_module_node
+        # set the submodule metadata back to the parent trt_module_node
+        metadata_list = get_output_metadata(submodule)
+        assert len(metadata_list) > 0
         if "val" not in submodule_node_dict[name].meta:
-            outputs = [node for node in submodule.graph.nodes if node.op == "output"]
-            outputs = outputs[0].args
-            outputs_meta_val = get_output_meta_val(outputs)
-            assert len(outputs_meta_val) > 0
-            submodule_node_dict[name].meta["val"] = outputs_meta_val
+            meta_val_list = [
+                metadata["val"] for metadata in metadata_list if "val" in metadata
+            ]
+            submodule_node_dict[name].meta["val"] = meta_val_list
+            logger.debug(
+                f"Update submodule output metadata back to the parent trt_module_node: {name}"
+            )
 
         subgraph_data = PerSubgraphData()
         subgraph_data.subgraph_name = name
