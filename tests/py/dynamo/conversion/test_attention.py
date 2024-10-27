@@ -34,27 +34,26 @@ class TestScaledDotProductAttention(DispatchTestCase):
             enable_passes=True,
         )
 
-    @unittest.skip("need to change to custom dynamic shapes")
     @parameterized.expand(
         [
-            # (
-            #     "4d-2d",
-            #     (4, 2, 16, 32),
-            #     (6, 3, 32, 64),
-            #     (32, 8, 64, 128),
-            #     (4, 32),
-            #     (4, 64),
-            #     (16, 128),
-            # ),
-            # (
-            #     "4d-3d",
-            #     (2, 2, 2, 2),
-            #     (3, 3, 3, 4),
-            #     (3, 4, 4, 5),
-            #     (2, 3, 2),
-            #     (3, 3, 4),
-            #     (4, 5, 5),
-            # ),
+            (
+                "4d-2d",
+                (4, 2, 16, 32),
+                (6, 3, 32, 64),
+                (32, 8, 64, 128),
+                (4, 32),
+                (4, 64),
+                (16, 128),
+            ),
+            (
+                "4d-3d",
+                (2, 2, 2, 2),
+                (3, 3, 3, 4),
+                (3, 4, 4, 5),
+                (2, 3, 2),
+                (3, 3, 4),
+                (4, 5, 5),
+            ),
             (
                 "4d-4d",
                 (4, 2, 12, 4),
@@ -66,6 +65,7 @@ class TestScaledDotProductAttention(DispatchTestCase):
             ),
         ]
     )
+    @unittest.skip("need to change to custom dynamic shapes")
     def test_sdpa_no_causal_dynamic_shape_with_scale(
         self,
         _,
@@ -146,7 +146,6 @@ class TestScaledDotProductAttention(DispatchTestCase):
             enable_passes=True,
         )
 
-    @unittest.skip("need to change to custom dynamic shapes")
     @parameterized.expand(
         [
             (
@@ -169,6 +168,7 @@ class TestScaledDotProductAttention(DispatchTestCase):
             ),
         ]
     )
+    @unittest.skip("need to change to custom dynamic shapes")
     def test_sdpa_no_causal_no_scale_dynamic_shape(
         self,
         _,
@@ -217,7 +217,6 @@ class TestScaledDotProductAttention(DispatchTestCase):
 
         self.run_test_with_dynamic_shape(SDPA(), inputs)
 
-    @unittest.skip("need to change to custom dynamic shapes")
     @parameterized.expand(
         [
             (
@@ -252,6 +251,7 @@ class TestScaledDotProductAttention(DispatchTestCase):
             ),
         ]
     )
+    @unittest.skip("need to change to custom dynamic shapes")
     def test_sdpa_causal_dynamic_shape(
         self,
         _,
@@ -295,11 +295,11 @@ class TestScaledDotProductAttention(DispatchTestCase):
 
         self.run_test_with_dynamic_shape(SDPA(), inputs)
 
-    # it is already added in the integration test
+    @parameterized.expand([((32, 8, 128, 64), (32, 8, 128, 64))])
+    # it is already added in the test_composite_aten_op.py as integration test
     @unittest.skip(
         "skip torch.nn.functional.scaled_dot_product_attention converter test"
     )
-    @parameterized.expand([((32, 8, 128, 64), (32, 8, 128, 64))])
     def test_sdpa_causal(self, query_shape, key_shape):
         class SDPA(nn.Module):
             def forward(self, query, key, value):
