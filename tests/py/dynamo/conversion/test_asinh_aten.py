@@ -11,9 +11,9 @@ class TestAsinhConverter(DispatchTestCase):
     @parameterized.expand(
         [
             ((10,), torch.float),
-            # ((1, 20), torch.float),
-            # ((2, 3, 4), torch.float),
-            # ((2, 3, 4, 5), torch.float),
+            ((1, 20), torch.float),
+            ((2, 3, 4), torch.float),
+            ((2, 3, 4, 5), torch.float),
         ]
     )
     def test_asinh_float(self, input_shape, dtype):

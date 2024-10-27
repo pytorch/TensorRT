@@ -20,10 +20,7 @@ from torch_tensorrt.dynamo._tracer import get_dynamic_shapes_args
 
 # Use interpreter, input spec, and test case from fx_ts_compat to test Dynamo Converter Registry
 from torch_tensorrt.dynamo.conversion import TRTInterpreter
-from torch_tensorrt.dynamo.conversion._conversion import (
-    infer_module_output_dtypes,
-    infer_module_output_dtypes_for_test,
-)
+from torch_tensorrt.dynamo.conversion._conversion import infer_module_output_dtypes
 from torch_tensorrt.dynamo.lowering import (
     get_decompositions,
     post_lowering,
@@ -33,6 +30,25 @@ from torch_tensorrt.dynamo.runtime import PythonTorchTensorRTModule
 from torch_tensorrt.dynamo.utils import ATOL, RTOL, get_model_device, get_torch_inputs
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
+
+
+# this is to enable dynamo tracer as True in the converter test files batch by batch
+def get_use_dynamo_tracer(use_dynamo_tracer: Any) -> bool:
+    # if in our converter tests we specifically set use_dynamo_tracer field, honor it
+    if use_dynamo_tracer is not None and isinstance(use_dynamo_tracer, bool):
+        return use_dynamo_tracer
+    # if in our converter tests, we did not specify use_dynamo_tracer field
+    import inspect
+    import os
+    import re
+
+    filename = os.path.basename(inspect.stack()[2].filename)
+    # enable converter test files which starts with test_a*.py to use dynamo tracer
+    pattern = re.compile("^test_([a])+")
+    if pattern.match(filename):
+        return True
+    else:
+        return False
 
 
 # this method is only used in our converter test to infer the module output dtypes via dummy inference
