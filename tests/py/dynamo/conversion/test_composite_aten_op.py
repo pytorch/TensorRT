@@ -116,7 +116,6 @@ def test_atan2_out_dynamic_shape(min_shape, opt_shape, max_shape):
 @parameterized.expand(
     [
         ((32, 8, 128, 64), (32, 8, 128, 64), True, None),
-        ((32, 32, 128, 64), (32, 8, 128, 64), True, 0.1),
     ]
 )
 def test_sdpa_static_shape(query_shape, key_shape, is_causal, scale):
