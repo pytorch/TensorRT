@@ -6,15 +6,15 @@ import json
 import sys
 
 CUDA_VERSIONS_DICT = {
-    "nightly": ["cu121"],
+    "nightly": ["cu124"],
     "test": ["cu121", "cu124"],
     "release": ["cu121", "cu124"],
 }
 
 PYTHON_VERSIONS_DICT = {
     "nightly": ["3.9"],
-    "test": ["3.9", "3.12"],
-    "release": ["3.9", "3.12"],
+    "test": ["3.9", "3.10", "3.11", "3.12"],
+    "release": ["3.9", "3.10", "3.11", "3.12"],
 }
 
 TENSORRT_VERSIONS_DICT = {
