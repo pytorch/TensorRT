@@ -5,8 +5,8 @@ import torch
 
 
 @torch.library.register_fake("tensorrt::execute_engine")
-def execute_engine(inputs, trt_engine):
-    breakpoint()
+def fake_tensorrt_execute_engine(inputs, trt_engine):
+    print("==============done==========")
     return trt_engine(inputs)
 
 
