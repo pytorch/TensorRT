@@ -119,7 +119,7 @@ static auto TORCHTRT_UNUSED TRTEngineTSRegistrtion =
             });
 
 TORCH_LIBRARY(tensorrt, m) {
-  m.def("execute_engine", execute_engine);
+  m.def("execute_engine(Tensor[] input_tensors, __torch__.torch.classes.tensorrt.Engine engine) -> Tensor[]");
   m.def("SERIALIZED_ENGINE_BINDING_DELIM", []() -> std::string { return std::string(1, TRTEngine::BINDING_DELIM); });
   m.def("SERIALIZED_RT_DEVICE_DELIM", []() -> std::string { return DEVICE_INFO_DELIM; });
   m.def("ABI_VERSION", []() -> std::string { return ABI_VERSION; });
@@ -164,6 +164,10 @@ TORCH_LIBRARY(tensorrt, m) {
     auto it = get_platform_name_map().find(get_current_platform()._platform);
     return it->second;
   });
+}
+
+TORCH_LIBRARY_IMPL(tensorrt, CompositeExplicitAutograd, m) {
+  m.impl("execute_engine", execute_engine);
 }
 
 } // namespace
