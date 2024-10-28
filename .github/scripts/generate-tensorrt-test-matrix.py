@@ -61,10 +61,21 @@ def main(args: list[str]) -> None:
     matrix_dict = json.loads(options.matrix)
     includes = matrix_dict["include"]
     assert len(includes) > 0
-    channel = includes[0].channel
-    if "windows" in includes[0].validation_runner:
+    if "channel" not in includes[0]:
+        raise Exception(f"channel field is missing from the matrix: {options.matrix}")
+    channel = includes[0]["channel"]
+    if channel not in ("nightly", "test", "release"):
+        raise Exception(
+            f"channel field: {channel} is not supported, currently supported value: nightly, test, release"
+        )
+
+    if "validation_runner" not in includes[0]:
+        raise Exception(
+            f"validation_runner field is missing from the matrix: {options.matrix}"
+        )
+    if "windows" in includes[0]["validation_runner"]:
         arch = "windows"
-    elif "linux" in includes[0].validation_runner:
+    elif "linux" in includes[0]["validation_runner"]:
         arch = "linux"
     else:
         raise Exception(
