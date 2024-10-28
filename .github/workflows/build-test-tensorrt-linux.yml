@@ -54,7 +54,7 @@ jobs:
             post-script: packaging/post_build_script.sh
             smoke-test-script: packaging/smoke_test_script.sh
             package-name: torch_tensorrt
-    uses: ./.github/workflows/build-torch-tensorrt-linux.yml
+    uses: ./.github/workflows/build-tensorrt-linux.yml
     with:
       repository: ${{ matrix.repository }}
       ref: ""
