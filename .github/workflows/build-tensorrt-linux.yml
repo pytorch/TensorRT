@@ -89,6 +89,7 @@ jobs:
       UPLOAD_TO_BASE_BUCKET: ${{ matrix.upload_to_base_bucket }}
       ARCH: ${{ inputs.architecture }}
       TENSORRT_STRIP_PREFIX: ${{ matrix.tensorrt.strip_prefix }}
+      TENSORRT_VERSION: ${{ matrix.tensorrt.version }}
       TENSORRT_URLS: ${{ matrix.tensorrt.urls }}
       TENSORRT_SHA256: ${{ matrix.tensorrt.sha256 }}
     name: release_${{ matrix.build_name }}
