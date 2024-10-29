@@ -466,24 +466,17 @@ def compile_module(
         # set the submodule metadata back to the parent trt_module_node
         metadata_list = get_output_metadata(submodule)
         assert len(metadata_list) > 0
-        if "val" not in submodule_node_dict[name].meta:
-            meta_val_list = [
-                metadata["val"] for metadata in metadata_list if "val" in metadata
-            ]
-            submodule_node_dict[name].meta["val"] = meta_val_list
-            logger.debug(
-                f"Updated val metadata for node: {name} with its corresponding submodule outputs"
-            )
-        if "tensor_meta" not in submodule_node_dict[name].meta:
-            tensor_meta_list = [
-                metadata["tensor_meta"]
-                for metadata in metadata_list
-                if "tensor_meta" in metadata
-            ]
-            submodule_node_dict[name].meta["tensor_meta"] = tensor_meta_list
-            logger.debug(
-                f"Updated tensor_meta metadata for node: {name} with its corresponding submodule outputs"
-            )
+        metadata_keys = ["val", "tensor_meta"]
+        for key in metadata_keys:
+            if key not in submodule_node_dict[name].meta:
+                meta_val_list = [
+                    metadata[key] for metadata in metadata_list if key in metadata
+                ]
+                submodule_node_dict[name].meta[key] = meta_val_list
+                logger.debug(
+                    f"Updated metadata for node: {name} with its corresponding submodule outputs"
+                )
+                break
 
         subgraph_data = PerSubgraphData()
         subgraph_data.subgraph_name = name
