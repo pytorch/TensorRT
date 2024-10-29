@@ -711,13 +711,7 @@ def get_output_metadata(
 
 def get_output_dtypes(output: Any, truncate_doulbe: bool = False) -> List[dtype]:
     output_dtypes = []
-    if isinstance(output, int):
-        output_dtypes.append(dtype.int64)
-    elif isinstance(output, bool):
-        output_dtypes.append(dtype.bool)
-    elif isinstance(output, float):
-        output_dtypes.append(dtype.float32)
-    elif isinstance(output, torch.fx.node.Node):
+    if isinstance(output, torch.fx.node.Node):
         if "val" in output.meta:
             output_meta = output.meta["val"]
             if isinstance(output_meta, (FakeTensor, torch.Tensor)):
