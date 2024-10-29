@@ -343,15 +343,6 @@ def convert_method_to_trt_engine(
         enabled_precisions if enabled_precisions is not None else {torch.float}
     )
 
-    if not arg_inputs and not inputs:
-        raise AssertionError("'arg_inputs' and 'inputs' should not both be None.")
-
-    elif arg_inputs and inputs:
-        raise AssertionError(
-            "'arg_inputs' and 'inputs' should not be used at the same time."
-        )
-    arg_inputs = arg_inputs or inputs
-
     module_type = _parse_module_type(module)
     target_ir = _get_target_fe(module_type, ir)
     if target_ir == _IRType.ts:
@@ -375,6 +366,15 @@ def convert_method_to_trt_engine(
         )
     elif target_ir == _IRType.dynamo:
         # Prepare torch and torchtrt inputs
+        if not arg_inputs and not inputs:
+            raise AssertionError("'arg_inputs' and 'inputs' should not both be None.")
+
+        elif arg_inputs and inputs:
+            raise AssertionError(
+                "'arg_inputs' and 'inputs' should not be used at the same time."
+            )
+        arg_inputs = arg_inputs or inputs
+
         if kwarg_inputs is None:
             kwarg_inputs = {}
 
