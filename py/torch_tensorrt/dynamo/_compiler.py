@@ -465,7 +465,17 @@ def compile_module(
             ]
             submodule_node_dict[name].meta["val"] = meta_val_list
             logger.debug(
-                f"Update submodule output metadata back to the parent trt_module_node: {name}"
+                f"Updated val metadata for node: {name} with its corresponding submodule outputs"
+            )
+        if "tensor_meta" not in submodule_node_dict[name].meta:
+            tensor_meta_list = [
+                metadata["tensor_meta"]
+                for metadata in metadata_list
+                if "tensor_meta" in metadata
+            ]
+            submodule_node_dict[name].meta["tensor_meta"] = tensor_meta_list
+            logger.debug(
+                f"Updated tensor_meta metadata for node: {name} with its corresponding submodule outputs"
             )
 
         subgraph_data = PerSubgraphData()
