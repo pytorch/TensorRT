@@ -1,10 +1,10 @@
 """
 .. _torch_export_gpt2:
 
-Compiling GPT2 using the Torch-TensorRT with dynamo backend
+Compiling GPT2 using the dynamo backend
 ==========================================================
 
-This interactive script is intended as a sample of the Torch-TensorRT workflow with dynamo backend on a GPT2 model."""
+This script illustrates Torch-TensorRT workflow with dynamo backend on popular GPT2 model."""
 
 # %%
 # Imports and Model Definition
@@ -25,12 +25,16 @@ DEVICE = torch.device("cuda:0")
 # CPU is used here so that GPU memory is reserved for TRT compilation.
 with torch.no_grad():
     tokenizer = AutoTokenizer.from_pretrained("gpt2")
-    model = AutoModelForCausalLM.from_pretrained(
-        "gpt2",
-        pad_token_id=tokenizer.eos_token_id,
-        use_cache=False,
-        attn_implementation="eager",
-    ).eval()
+    model = (
+        AutoModelForCausalLM.from_pretrained(
+            "gpt2",
+            pad_token_id=tokenizer.eos_token_id,
+            use_cache=False,
+            attn_implementation="eager",
+        )
+        .eval()
+        .half()
+    )
 
 # %%
 # Tokenize a sample input prompt and get pytorch model outputs
@@ -48,6 +52,10 @@ pyt_gen_tokens = generate(model, input_ids, MAX_TOKENS, tokenizer.eos_token_id)
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 # Export the GPT2 model into an ExportedProgram which is input of TRT compilation
+# To compile the model in FP16, we do the following
+# 1) Cast the model to FP16 via model.half()
+# 2) Enable use_explicit_typing=True. Certain layers are explicitly casted to FP32 within the pytorch model and this flag respects this behavior during TRT compilation
+# 3) Enable use_fp32_acc=True. This ensures all the matmuls are accumulated in FP32 precision (similar to PyTorch)
 gpt2_ep = export_llm(model, input_ids, max_seq_len=1024)
 trt_model = torch_tensorrt.dynamo.compile(
     gpt2_ep,
@@ -56,6 +64,8 @@ trt_model = torch_tensorrt.dynamo.compile(
     truncate_double=True,
     device=DEVICE,
     disable_tf32=True,
+    use_explicit_typing=True,
+    use_fp32_acc=True,
 )
 
 # Auto-regressive generation loop for greedy decoding using TensorRT model
@@ -78,9 +88,10 @@ print(
     tokenizer.decode(trt_gen_tokens[0], skip_special_tokens=True),
 )
 
-# %%
-# The output sentences should look like
+# Prompt : What is parallel programming ?
+
 # =============================
-# Pytorch model generated text:  I enjoy walking with my cute dog, but I'm not sure if I'll ever be able to walk with my dog. I'm not sure if I'll ever be able to walk with my
+# Pytorch model generated text: The parallel programming paradigm is a set of programming languages that are designed to be used in parallel. The main difference between parallel programming and parallel programming is that
+
 # =============================
-# TensorRT model generated text:  I enjoy walking with my cute dog, but I'm not sure if I'll ever be able to walk with my dog. I'm not sure if I'll ever be able to walk with my
+# TensorRT model generated text: The parallel programming paradigm is a set of programming languages that are designed to be used in parallel. The main difference between parallel programming and parallel programming is that

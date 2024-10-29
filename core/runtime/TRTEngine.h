@@ -80,8 +80,13 @@ struct TRTEngine : torch::CustomClassHolder {
   void enable_profiling();
   void disable_profiling();
   std::string get_engine_layer_info();
+  std::shared_ptr<nvinfer1::IExecutionContext> create_execution_context();
   void dump_engine_layer_info_to_file(const std::string& path);
   void dump_engine_layer_info();
+  int64_t get_device_memory_budget();
+  bool set_device_memory_budget(int64_t budget);
+  int64_t get_streamable_device_memory_budget();
+  int64_t get_automatic_device_memory_budget();
   friend std::ostream& operator<<(std::ostream& os, const TRTEngine& engine);
   static const char BINDING_DELIM = '%';
 
@@ -95,7 +100,6 @@ struct TRTEngine : torch::CustomClassHolder {
   std::vector<at::Tensor> input_buffers = {};
   std::vector<at::Tensor> output_buffers = {};
   std::string shape_key;
-  at::cuda::MempoolId_t cudagraph_mempool_id;
 
   // TODO: Implement a call method
   // c10::List<at::Tensor> Run(c10::List<at::Tensor> inputs);

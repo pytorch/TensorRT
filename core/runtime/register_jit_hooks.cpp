@@ -87,6 +87,13 @@ static auto TORCHTRT_UNUSED TRTEngineTSRegistrtion =
         .def("dump_engine_layer_info_to_file", &TRTEngine::dump_engine_layer_info_to_file)
         .def("dump_engine_layer_info", &TRTEngine::dump_engine_layer_info)
         .def("get_engine_layer_info", &TRTEngine::get_engine_layer_info)
+        .def("create_execution_context", &TRTEngine::create_execution_context)
+        .def_property(
+            "device_memory_budget",
+            &TRTEngine::get_device_memory_budget,
+            &TRTEngine::set_device_memory_budget)
+        .def_property("streamable_device_memory_budget", &TRTEngine::get_streamable_device_memory_budget)
+        .def_property("automatic_device_memory_budget", &TRTEngine::get_automatic_device_memory_budget)
         .def_pickle(
             [](const c10::intrusive_ptr<TRTEngine>& self) -> std::vector<std::string> {
               // Serialize TensorRT engine

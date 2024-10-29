@@ -1,10 +1,9 @@
 .. _notebooks:
 
-Example notebooks
+Legacy notebooks
 ===================
 
-There exists a number of notebooks which cover specific using specific features and models
-with Torch-TensorRT
+There exists a number of notebooks which demonstrate different model conversions / features / frontends available within Torch-TensorRT
 
 Notebooks
 ------------

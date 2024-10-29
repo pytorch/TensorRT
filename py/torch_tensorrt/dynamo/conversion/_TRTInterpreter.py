@@ -80,10 +80,11 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         self.builder = trt.Builder(self.logger)
 
         flag = 0
-
-        # It is deprecated to not use this flag
-        EXPLICIT_BATCH = 1 << (int)(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH)
-        flag |= EXPLICIT_BATCH
+        if compilation_settings.use_explicit_typing:
+            STRONGLY_TYPED = 1 << (int)(
+                trt.NetworkDefinitionCreationFlag.STRONGLY_TYPED
+            )
+            flag |= STRONGLY_TYPED
 
         self.ctx = ConversionContext(
             self.builder.create_network(flag), compilation_settings
@@ -304,6 +305,9 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         if tactic_sources is not None:
             builder_config.set_tactic_sources(tactic_sources=tactic_sources)
 
+        if self.compilation_settings.enable_weight_streaming:
+            builder_config.set_flag(trt.BuilderFlag.WEIGHT_STREAMING)
+
         return builder_config
 
     def _create_timing_cache(
@@ -476,12 +480,18 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                     # Retrieve each weight name(s) in state_dict
                     if layer_type == "CONSTANT":
                         if "embedding" in suffix:
-                            sd_weight_name = f"{sd_weight_name}.{torch_attr[0]}"
+                            sd_weight_name = f"{sd_weight_name}.weight"
                         elif "weight" in suffix or "mm_other" in suffix:
                             # Linear layer weight
-                            sd_weight_name = f"{sd_weight_name}.{torch_attr[0]}"
+                            sd_weight_name = f"{sd_weight_name}.weight"
+                        elif "running_mean" in suffix:
+                            # Linear layer weight
+                            sd_weight_name = f"{sd_weight_name}.running_mean"
+                        elif "running_var" in suffix:
+                            # Linear layer weight
+                            sd_weight_name = f"{sd_weight_name}.running_var"
                         else:
-                            sd_weight_name = f"{sd_weight_name}.{torch_attr[1]}"
+                            sd_weight_name = f"{sd_weight_name}.bias"
                     elif layer_type == "SCALE":
                         # Batch norm needs all weights to calculate scale and shift
                         sd_weight_name = [f"{sd_weight_name}.{n}" for n in torch_attr]

@@ -77,16 +77,16 @@ def _pretraced_backend(
         with unittest.mock.patch.object(
             fake_mode, "allow_non_fake_inputs", True
         ), fake_mode:
-            repair_input_aliasing(gm)
+            repair_input_aliasing(gm, settings)
 
             # Remove sym_int placeholders and inputs
-            remove_sym_nodes(gm)
+            remove_sym_nodes(gm, settings)
             torch_inputs = [
                 input for input in sample_inputs if isinstance(input, torch.Tensor)
             ]
 
             # Remove detach nodes
-            remove_detach(gm)
+            remove_detach(gm, settings)
 
             # Invoke AOTAutograd to translate operators to aten
             gm = aot_export_joint_simple(
@@ -100,13 +100,17 @@ def _pretraced_backend(
 
             logger.debug("Post-AOT Autograd graph:\n" + str(gm.graph))
 
-            gm = post_lowering(gm)
+            gm = post_lowering(gm, settings)
 
             logger.debug("Lowered Input graph:\n " + str(gm.graph))
 
             torchtrt_inputs = prepare_inputs(
                 torch_inputs, disable_memory_format_check=True
             )
+            if settings.require_full_compilation:
+                logger.warning(
+                    "require_full_compilation arg is not applicable for torch.compile with backend='torch_tensorrt"
+                )
             trt_compiled = compile_module(
                 gm,
                 torchtrt_inputs,

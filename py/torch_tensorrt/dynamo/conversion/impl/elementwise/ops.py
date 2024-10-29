@@ -9,6 +9,7 @@ from torch_tensorrt import _enums
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
 from torch_tensorrt.dynamo.conversion.converter_utils import (
+    broadcast,
     cast_int_int_div_trt_tensor,
     cast_int_or_float_to_bool,
     cast_trt_tensor,
@@ -18,13 +19,9 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
 from torch_tensorrt.dynamo.conversion.impl.elementwise.base import (
     convert_binary_elementwise,
 )
-from torch_tensorrt.dynamo.conversion.impl.shape import get_shape_with_dynamic_shape
 from torch_tensorrt.dynamo.conversion.impl.unary import atan, sign
 from torch_tensorrt.dynamo.conversion.impl.unary.base import convert_unary
-from torch_tensorrt.fx.converters.converter_utils import broadcast
 from torch_tensorrt.fx.types import TRTTensor
-
-import tensorrt as trt
 
 
 def trunc_div(
@@ -68,11 +65,6 @@ def trunc_div(
         name,
         prod_output,
     )
-
-    # cast the sign_output back to int32 for trunc div
-    # This is required for scatter_reduce_.two(reduce='mean' where trunc_div casts it to float32 and TRTInterpreter expects int32)
-    if (isinstance(sign_output, TRTTensor)) and (sign_output.dtype == trt.float32):
-        sign_output = cast_trt_tensor(ctx, sign_output, trt.int32, name)
 
     # Convert constant input into ITensor for UnaryOperation
     if not isinstance(input, trt.tensorrt.ITensor):
@@ -265,7 +257,7 @@ def atan2(
     if isinstance(other, TRTTensor):
         other = cast_trt_tensor(ctx, other, trt.float32, f"{name}_other")
 
-    input, other = broadcast(ctx.net, input, other, f"{name}_input", f"{name}_other")
+    input, other = broadcast(ctx, input, other, f"{name}_input", f"{name}_other")
 
     # Calculate x_zero, y_zero (whether inputs are zero)
     x_zero = eq(ctx, target, source_ir, f"{name}_x_zero", input, 0)

@@ -297,7 +297,7 @@ class ReduceOperation(Enum):
     AMAX = ("Amax reduce operation", lambda x, y: torch.max(x, y))
     AMIN = ("Amin reduce operation", lambda x, y: torch.min(x, y))
 
-    def __new__(cls, description, func):
+    def __new__(cls, description: Any, func: Any) -> Any:
         obj = object.__new__(cls)
         obj._value_ = auto()
         obj.description = description
@@ -305,8 +305,13 @@ class ReduceOperation(Enum):
         return obj
 
     def reduce_operation_with_scatter(
-        self, operation_lhs, initial_tensor, dim, index_tensor, src_tensor
-    ):
+        self,
+        operation_lhs: Any,
+        initial_tensor: torch.Tensor,
+        dim: int,
+        index_tensor: torch.Tensor,
+        src_tensor: torch.Tensor,
+    ) -> Any:
         scatter_tensor = None
         if self == ReduceOperation.SUM or self == ReduceOperation.MEAN:
             scatter_tensor = torch.zeros_like(initial_tensor)
@@ -342,7 +347,7 @@ def scatter_reduce_decomposition(
     scatter_count_tensor = torch.zeros_like(input_tensor)
     src_shape = list(src_tensor.shape)
     src_dim = src_shape[dim]
-    if include_self == False:
+    if not include_self:
         raise AssertionError("include_self False for scatter reduce not yet supported")
     for i in range(0, src_dim):
         src_slice = torch.select(src_tensor, dim, i)
@@ -384,6 +389,17 @@ def scatter_reduce_decomposition(
     return scatter_loop_tensor
 
 
+@register_torch_trt_decomposition(aten._log_softmax, registry=TORCH_TRT_DECOMPOSITIONS)
+def log_softmax_decomposition(
+    x: torch.Tensor,
+    dim: int,
+    half_to_float: bool,
+) -> torch.Tensor:
+    return torch.log(
+        torch.softmax(x, dim, dtype=torch.float if half_to_float else None)
+    )
+
+
 def get_decompositions(
     enable_experimental_decompositions: bool = False,
 ) -> Dict[OpOverload, Callable[[Any], Any]]:
@@ -396,8 +412,15 @@ def get_decompositions(
         return {**CORE_ATEN_DECOMPOSITIONS_FILTERED, **TORCH_TRT_DECOMPOSITIONS}
     else:
         # changes made here due to torch2.6 changes https://github.com/pytorch/pytorch/pull/135080
+        decomp_table = _decomp_table_to_post_autograd_aten()
+        DECOMP_TABLE_FILTERED: Dict[OpOverload, Callable[[Any], Any]] = {
+            decomp: decomp_table[decomp]
+            for decomp in decomp_table
+            if decomp not in torch_disabled_decompositions
+        }
+
         return {
             **ENABLED_TORCH_DECOMPOSITIONS,
-            **_decomp_table_to_post_autograd_aten(),
+            **DECOMP_TABLE_FILTERED,
             **TORCH_TRT_DECOMPOSITIONS,
         }
