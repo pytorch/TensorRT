@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt.dynamo._compiler &mdash; Torch-TensorRT v2.6.0.dev0+2840531 documentation</title>
+  <title>torch_tensorrt.dynamo._compiler &mdash; Torch-TensorRT v2.6.0.dev0+bfa4c9a documentation</title>
   
 
   
@@ -272,7 +272,7 @@
               
               
                 <div class="version">
-                  v2.6.0.dev0+2840531
+                  v2.6.0.dev0+bfa4c9a
                 </div>
               
             
@@ -501,6 +501,7 @@
 <span class="p">)</span>
 <span class="kn">from</span> <span class="nn">torch_tensorrt.dynamo.utils</span> <span class="kn">import</span> <span class="p">(</span>
     <span class="n">get_flat_args_with_check</span><span class="p">,</span>
+    <span class="n">get_output_metadata</span><span class="p">,</span>
     <span class="n">parse_graph_io</span><span class="p">,</span>
     <span class="n">prepare_inputs</span><span class="p">,</span>
     <span class="n">set_log_level</span><span class="p">,</span>
@@ -767,7 +768,6 @@
 
     <span class="n">settings</span> <span class="o">=</span> <span class="n">CompilationSettings</span><span class="p">(</span><span class="o">**</span><span class="n">compilation_options</span><span class="p">)</span>
     <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Compilation Settings: </span><span class="si">%s</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">settings</span><span class="p">)</span>
-
     <span class="n">exported_program</span> <span class="o">=</span> <span class="n">pre_export_lowering</span><span class="p">(</span><span class="n">exported_program</span><span class="p">,</span> <span class="n">settings</span><span class="p">)</span>
     <span class="n">exported_program</span> <span class="o">=</span> <span class="n">exported_program</span><span class="o">.</span><span class="n">run_decompositions</span><span class="p">(</span>
         <span class="n">get_decompositions</span><span class="p">(</span><span class="n">enable_experimental_decompositions</span><span class="p">)</span>
@@ -898,6 +898,12 @@
     <span class="k">if</span> <span class="ow">not</span> <span class="n">settings</span><span class="o">.</span><span class="n">use_fast_partitioner</span><span class="p">:</span>
         <span class="n">dryrun_tracker</span><span class="o">.</span><span class="n">to_run_in_torch</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">parse_non_trt_nodes</span><span class="p">(</span><span class="n">partitioned_module</span><span class="p">))</span>
 
+    <span class="n">submodule_node_dict</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">partitioned_module</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">nodes</span><span class="p">:</span>
+        <span class="k">if</span> <span class="s2">&quot;_run_on_acc&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">node</span><span class="o">.</span><span class="n">name</span><span class="p">:</span>
+            <span class="k">continue</span>
+        <span class="n">submodule_node_dict</span><span class="p">[</span><span class="n">node</span><span class="o">.</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">node</span>
+
     <span class="c1"># Store TRT replicas of Torch subgraphs</span>
     <span class="n">trt_modules</span> <span class="o">=</span> <span class="p">{}</span>
     <span class="c1"># Iterate over all components that can be accelerated</span>
@@ -916,6 +922,26 @@
                 <span class="nb">str</span><span class="p">(</span><span class="n">submodule</span><span class="o">.</span><span class="n">graph</span><span class="p">),</span>
             <span class="p">)</span>
             <span class="k">continue</span>
+
+        <span class="k">if</span> <span class="n">name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">submodule_node_dict</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;node_name: </span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2"> does not exist in the submodule node dictionary&quot;</span>
+            <span class="p">)</span>
+
+        <span class="c1"># set the submodule metadata back to the parent trt_module_node</span>
+        <span class="n">metadata_list</span> <span class="o">=</span> <span class="n">get_output_metadata</span><span class="p">(</span><span class="n">submodule</span><span class="p">)</span>
+        <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">metadata_list</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span>
+        <span class="n">metadata_keys</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;val&quot;</span><span class="p">,</span> <span class="s2">&quot;tensor_meta&quot;</span><span class="p">]</span>
+        <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">metadata_keys</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">key</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">submodule_node_dict</span><span class="p">[</span><span class="n">name</span><span class="p">]</span><span class="o">.</span><span class="n">meta</span><span class="p">:</span>
+                <span class="n">meta_val_list</span> <span class="o">=</span> <span class="p">[</span>
+                    <span class="n">metadata</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="k">for</span> <span class="n">metadata</span> <span class="ow">in</span> <span class="n">metadata_list</span> <span class="k">if</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">metadata</span>
+                <span class="p">]</span>
+                <span class="n">submodule_node_dict</span><span class="p">[</span><span class="n">name</span><span class="p">]</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">meta_val_list</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;Updated metadata for node: </span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2"> with its corresponding submodule outputs&quot;</span>
+                <span class="p">)</span>
+                <span class="k">break</span>
 
         <span class="n">subgraph_data</span> <span class="o">=</span> <span class="n">PerSubgraphData</span><span class="p">()</span>
         <span class="n">subgraph_data</span><span class="o">.</span><span class="n">subgraph_name</span> <span class="o">=</span> <span class="n">name</span>
