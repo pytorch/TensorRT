@@ -328,7 +328,7 @@ def test_refit_one_engine_inline_runtime__with_weightmap():
         make_refittable=True,
         reuse_cached_engines=False,
     )
-    torchtrt.save(trt_gm, trt_ep_path, inputs=inputs)
+    torchtrt.save(trt_gm, trt_ep_path)
     trt_gm = torch.export.load(trt_ep_path)
     new_trt_gm = refit_module_weights(
         compiled_module=trt_gm,
@@ -603,7 +603,7 @@ def test_refit_one_engine_inline_runtime_without_weightmap():
         make_refittable=True,
         reuse_cached_engines=False,
     )
-    torchtrt.save(trt_gm, trt_ep_path, inputs=inputs)
+    torchtrt.save(trt_gm, trt_ep_path)
     trt_gm = torch.export.load(trt_ep_path)
     new_trt_gm = refit_module_weights(
         compiled_module=trt_gm,

@@ -36,6 +36,7 @@ from torch_tensorrt.dynamo.lowering import (
 )
 from torch_tensorrt.dynamo.utils import (
     get_flat_args_with_check,
+    get_output_metadata,
     parse_graph_io,
     prepare_inputs,
     set_log_level,
@@ -302,7 +303,6 @@ def compile(
 
     settings = CompilationSettings(**compilation_options)
     logger.info("Compilation Settings: %s\n", settings)
-
     exported_program = pre_export_lowering(exported_program, settings)
     exported_program = exported_program.run_decompositions(
         get_decompositions(enable_experimental_decompositions)
@@ -433,6 +433,12 @@ def compile_module(
     if not settings.use_fast_partitioner:
         dryrun_tracker.to_run_in_torch.extend(parse_non_trt_nodes(partitioned_module))
 
+    submodule_node_dict = {}
+    for node in partitioned_module.graph.nodes:
+        if "_run_on_acc" not in node.name:
+            continue
+        submodule_node_dict[node.name] = node
+
     # Store TRT replicas of Torch subgraphs
     trt_modules = {}
     # Iterate over all components that can be accelerated
@@ -451,6 +457,26 @@ def compile_module(
                 str(submodule.graph),
             )
             continue
+
+        if name not in submodule_node_dict:
+            raise ValueError(
+                f"node_name: {name} does not exist in the submodule node dictionary"
+            )
+
+        # set the submodule metadata back to the parent trt_module_node
+        metadata_list = get_output_metadata(submodule)
+        assert len(metadata_list) > 0
+        metadata_keys = ["val", "tensor_meta"]
+        for key in metadata_keys:
+            if key not in submodule_node_dict[name].meta:
+                meta_val_list = [
+                    metadata[key] for metadata in metadata_list if key in metadata
+                ]
+                submodule_node_dict[name].meta[key] = meta_val_list
+                logger.debug(
+                    f"Updated metadata for node: {name} with its corresponding submodule outputs"
+                )
+                break
 
         subgraph_data = PerSubgraphData()
         subgraph_data.subgraph_name = name
