@@ -74,8 +74,6 @@ def construct_refit_mapping(
 
     output_dtypes = infer_module_output_dtypes(
         module,
-        inputs,
-        settings.device,
         truncate_double=settings.truncate_double,
     )
 
