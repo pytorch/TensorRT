@@ -173,6 +173,28 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
 
         return engine_info
 
+    def get_streamable_device_memory_budget(self) -> Any:
+        return self.engine.streamable_device_memory_budget
+
+    def get_automatic_device_memory_budget(self) -> Any:
+        return self.engine.automatic_device_memory_budget
+
+    def get_device_memory_budget(self) -> Any:
+        return self.engine.device_memory_budget
+
+    def set_device_memory_budget(self, budget_bytes: int) -> int:
+        # Disable weight streaming for invalid budget size
+        if budget_bytes < 0:
+            budget_bytes = self.get_streamable_device_memory_budget()
+        self.engine.device_memory_budget = budget_bytes
+        if self.engine.device_memory_budget != budget_bytes:
+            logger.error(f"Failed to set weight streaming budget to {budget_bytes}")
+            budget_bytes = self.engine.device_memory_budget
+        if self.get_streamable_device_memory_budget() == budget_bytes:
+            logger.warning("Weight streaming is disabled")
+
+        return budget_bytes
+
     def setup_engine(self) -> None:
         """
         Setup engine for a module which has deferred engine setup.

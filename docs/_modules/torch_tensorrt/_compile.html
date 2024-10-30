@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt._compile &mdash; Torch-TensorRT v2.6.0.dev0+b99d080 documentation</title>
+  <title>torch_tensorrt._compile &mdash; Torch-TensorRT v2.6.0.dev0+2840531 documentation</title>
   
 
   
@@ -272,7 +272,7 @@
               
               
                 <div class="version">
-                  v2.6.0.dev0+b99d080
+                  v2.6.0.dev0+2840531
                 </div>
               
             
@@ -327,6 +327,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/converter_overloading.html">Overloading Torch-TensorRT Converters with Custom Converters</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/custom_kernel_plugins.html">Using Custom Kernels within TensorRT Engines with Torch-TensorRT</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/mutable_torchtrt_module_example.html">Mutable Torch TensorRT Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/weight_streaming_example.html">Weight Streaming</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Dynamo Frontend</span></p>
 <ul>
@@ -807,6 +808,15 @@
         <span class="n">enabled_precisions</span> <span class="k">if</span> <span class="n">enabled_precisions</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="p">{</span><span class="n">torch</span><span class="o">.</span><span class="n">float</span><span class="p">}</span>
     <span class="p">)</span>
 
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">arg_inputs</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">inputs</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">AssertionError</span><span class="p">(</span><span class="s2">&quot;&#39;arg_inputs&#39; and &#39;inputs&#39; should not both be None.&quot;</span><span class="p">)</span>
+
+    <span class="k">elif</span> <span class="n">arg_inputs</span> <span class="ow">and</span> <span class="n">inputs</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">AssertionError</span><span class="p">(</span>
+            <span class="s2">&quot;&#39;arg_inputs&#39; and &#39;inputs&#39; should not be used at the same time.&quot;</span>
+        <span class="p">)</span>
+    <span class="n">arg_inputs</span> <span class="o">=</span> <span class="n">arg_inputs</span> <span class="ow">or</span> <span class="n">inputs</span>
+
     <span class="n">module_type</span> <span class="o">=</span> <span class="n">_parse_module_type</span><span class="p">(</span><span class="n">module</span><span class="p">)</span>
     <span class="n">target_ir</span> <span class="o">=</span> <span class="n">_get_target_fe</span><span class="p">(</span><span class="n">module_type</span><span class="p">,</span> <span class="n">ir</span><span class="p">)</span>
     <span class="k">if</span> <span class="n">target_ir</span> <span class="o">==</span> <span class="n">_IRType</span><span class="o">.</span><span class="n">ts</span><span class="p">:</span>
@@ -830,15 +840,6 @@
         <span class="p">)</span>
     <span class="k">elif</span> <span class="n">target_ir</span> <span class="o">==</span> <span class="n">_IRType</span><span class="o">.</span><span class="n">dynamo</span><span class="p">:</span>
         <span class="c1"># Prepare torch and torchtrt inputs</span>
-        <span class="k">if</span> <span class="ow">not</span> <span class="n">arg_inputs</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">inputs</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">AssertionError</span><span class="p">(</span><span class="s2">&quot;&#39;arg_inputs&#39; and &#39;inputs&#39; should not both be None.&quot;</span><span class="p">)</span>
-
-        <span class="k">elif</span> <span class="n">arg_inputs</span> <span class="ow">and</span> <span class="n">inputs</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">AssertionError</span><span class="p">(</span>
-                <span class="s2">&quot;&#39;arg_inputs&#39; and &#39;inputs&#39; should not be used at the same time.&quot;</span>
-            <span class="p">)</span>
-        <span class="n">arg_inputs</span> <span class="o">=</span> <span class="n">arg_inputs</span> <span class="ow">or</span> <span class="n">inputs</span>
-
         <span class="k">if</span> <span class="n">kwarg_inputs</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="n">kwarg_inputs</span> <span class="o">=</span> <span class="p">{}</span>
 
