@@ -12,7 +12,7 @@ from torch_tensorrt._enums import dtype
 from torch_tensorrt._features import ENABLED_FEATURES
 from torch_tensorrt._Input import Input
 from torch_tensorrt.dynamo import _defaults
-from torch_tensorrt.dynamo._exporter import replace_placeholder_node_in_windows
+from torch_tensorrt.dynamo._exporter import replace_execute_engine_no_op_node
 from torch_tensorrt.fx import InputTensorSpec
 from torch_tensorrt.fx.lower import compile as fx_compile
 from torch_tensorrt.fx.utils import LowerPrecision
@@ -41,7 +41,8 @@ logger = logging.getLogger(__name__)
 __all__ = [
     "compile",
     "cross_compile_for_windows",
-    "cross_load_in_windows",
+    "load_cross_compiled_exported_program",
+    "save_cross_compiled_exported_program",
     "convert_method_to_trt_engine",
     "save",
     "load",
@@ -294,9 +295,9 @@ def compile(
 
 
 def cross_compile_for_windows(
-    module: Any,
+    module: torch.nn.Module,
     file_path: str,
-    inputs: Optional[Sequence[Input | torch.Tensor | InputTensorSpec]] = None,
+    inputs: Optional[Sequence[Input | torch.Tensor]] = None,
     arg_inputs: Optional[Sequence[Sequence[Any]]] = None,
     kwarg_inputs: Optional[dict[Any, Any]] = None,
     enabled_precisions: Optional[Set[torch.dtype | dtype]] = None,
@@ -305,14 +306,14 @@ def cross_compile_for_windows(
     """Compile a PyTorch module using TensorRT in Linux for Inference in Windows
 
     Takes an existing PyTorch module and a set of settings to configure the compiler
-    and it will convert methods to JIT graphs which call equivalent TensorRT serialized
+    and it will convert methods to AOT graphs which call equivalent TensorRT serialized
     engine info into the disk in the specified file_path user provided.
     It will then allow user to load the deserialized model from the disk in Windows.
     Note: the model cross compiled for windows in Linux environmen can only be loaded
     in Windows.
 
     Argument:
-        module (Union(torch.nn.Module,torch.jit.ScriptModule): Source module
+        module (torch.nn.Module): Source module
         file_path (str): the file path to store the serialized module into the disk
 
     Keyword Arguments:
@@ -340,7 +341,7 @@ def cross_compile_for_windows(
 
     if platform.system() != "Linux" or platform.architecture()[0] != "64bit":
         raise RuntimeError(
-            f"Cross compile for windows is only supported on AMD 64bit Linux architecture, current platform: {platform.system()=}, {platform.architecture()[0]=}"
+            f"Cross compile for windows is only supported on x86-64 Linux architecture, current platform: {platform.system()=}, {platform.architecture()[0]=}"
         )
 
     if not file_path:
@@ -378,7 +379,7 @@ def cross_compile_for_windows(
     exp_program = dynamo_trace(
         module, torchtrt_arg_inputs, kwarg_inputs=torchtrt_kwarg_inputs, **kwargs
     )
-    logger.info("successfully exported the module")
+    logger.debug("successfully exported the module")
 
     # Compile and save the module
     dynamo_cross_compile_for_windows(
@@ -388,7 +389,7 @@ def cross_compile_for_windows(
         enabled_precisions=enabled_precisions_set,
         **kwargs,
     )
-    logger.info("successfully compiled and saved the module for windows")
+    logger.debug("successfully compiled and saved the module for windows")
 
 
 def torch_compile(module: torch.nn.Module, **kwargs: Any) -> Any:
@@ -516,8 +517,16 @@ def convert_method_to_trt_engine(
         raise RuntimeError("Module is an unknown format or the ir requested is unknown")
 
 
-def cross_load_in_windows(file_path: str = "") -> Any:
+def load_cross_compiled_exported_program(file_path: str = "") -> Any:
+    """
+    Load an ExportedProgram file in Windows which was previously cross compiled in Linux
 
+    Arguments:
+        file_path (str): Path to file on the disk
+
+    Raises:
+        ValueError: If the api is not called in windows or there is no file or the file is a valid ExportedProgram file
+    """
     if not file_path:
         raise ValueError("File path cannot be empty. Please provide a valid file path")
 
@@ -539,7 +548,7 @@ def cross_load_in_windows(file_path: str = "") -> Any:
             f"cross_load the file {file_path} doesn't correspond to a valid ExportedProgram. Please verify the file path."
         )
 
-    return replace_placeholder_node_in_windows(exp_program)
+    return replace_execute_engine_no_op_node(exp_program)
 
 
 def load(file_path: str = "") -> Any:
@@ -684,3 +693,13 @@ def save(
                         module, tuple(arg_inputs), kwargs=kwarg_inputs, strict=False
                     )
                     torch.export.save(exp_program, file_path)
+
+
+
+def save_cross_compiled_exported_program(
+    gm: torch.fx.GraphModule,
+    file_path: str,
+) -> None:
+    from torch_tensorrt.dynamo._exporter import export
+    exp_program = export(gm, cross_compile_flag=True)
+    torch.export.save(exp_program, file_path)

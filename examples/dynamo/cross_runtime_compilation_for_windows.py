@@ -3,7 +3,7 @@
 
 cross runtime compilation limitations:
 The cross compile and saved model can only be loaded in Windows, it can no longer be loaded in Linux
-The cross compile and saved model can only be loaded in the same Compute capacity as the Linux which it was cross compiled
+The cross compile and saved model can only be loaded in the same Compute Capability as the Linux which it was cross compiled
 (for example, if the model was cross compiled in Linux with GeForceRTX 4080 which has Compute Capability of 8.9,
 It cannot be loaded in Windows with GeForceRTX 3080 which has Compute Capability of 8.6)
 
@@ -60,7 +60,7 @@ if args.load:
         raise ValueError(
             "cross runtime compiled model for windows can only be loaded in Windows system"
         )
-    loaded_model = torchtrt.cross_load_in_windows(args.path).module()
+    loaded_model = torchtrt.load_cross_compiled_exported_program(args.path).module()
     print(f"model has been successfully loaded from ${args.path}")
     # inference
     trt_output = loaded_model(input)

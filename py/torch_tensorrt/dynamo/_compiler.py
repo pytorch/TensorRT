@@ -63,7 +63,7 @@ def cross_compile_for_windows(
 
     if platform.system() != "Linux" or platform.architecture()[0] != "64bit":
         raise RuntimeError(
-            f"Cross compile for windows is only supported on AMD 64bit Linux architecture, current platform: {platform.system()=}, {platform.architecture()[0]=}"
+            f"Cross compile for windows is only supported on x86-64 Linux architecture, current platform: {platform.system()=}, {platform.architecture()[0]=}"
         )
 
     if not file_path:
@@ -72,8 +72,8 @@ def cross_compile_for_windows(
     # enable cross compile for windows
     kwargs["enable_cross_compile_for_windows"] = True
 
-    # disable the following settings which should not be enabled for cross compile for windows
-    key_sets = {
+    # disable the following settings is not supported for cross compilation for windows feature
+    unsupported_settings = {
         "use_python_runtime",
         "lazy_engine_init",
         "cache_built_engines",
@@ -82,10 +82,10 @@ def cross_compile_for_windows(
     }
     # disable these settings if anything is turned on
     kwarg_key_sets = set(kwargs.keys())
-    for key in key_sets.intersection(kwarg_key_sets):
+    for key in unsupported_settings.intersection(kwarg_key_sets):
         if kwargs.get(key):
             logger.warning(
-                f"arg: {key} should not be enabled for cross compile for windows feature, it is ignored."
+                f"arg: {key} is not supported for cross compilation for windows feature, it is ignored."
             )
             kwargs[key] = False
 
@@ -98,10 +98,10 @@ def cross_compile_for_windows(
         **kwargs,
     )
 
-    from torch_tensorrt.dynamo._exporter import cross_save_for_windows
+    from torch_tensorrt import save_cross_compiled_exported_program
 
-    cross_save_for_windows(trt_gm, file_path)
-    logger.info(f"successfully saved the module for windows at {file_path}")
+    save_cross_compiled_exported_program(trt_gm, file_path)
+    logger.debug(f"successfully saved the module for windows at {file_path}")
 
 
 def compile(
