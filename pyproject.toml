@@ -40,7 +40,6 @@ requires-python = ">=3.9"
 keywords = [
     "pytorch",
     "torch",
-    "tensorrt",
     "trt",
     "ai",
     "artificial intelligence",
@@ -54,10 +53,7 @@ keywords = [
     "inference",
 ]
 dependencies = [
-    "torch>=2.6.0.dev,<2.7.0",
-    "tensorrt-cu12==10.3.0",
-    "tensorrt-cu12-bindings==10.3.0",
-    "tensorrt-cu12-libs==10.3.0",
+    "torch>=2.5.0",
     "packaging>=23",
     "numpy",
     "typing-extensions>=4.7.0",
