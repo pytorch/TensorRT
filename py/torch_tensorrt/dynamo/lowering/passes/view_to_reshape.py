@@ -2,16 +2,18 @@ import logging
 from typing import List
 
 import torch
+from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.lowering.passes.pass_utils import (
     clean_up_graph_after_modifications,
-    get_metadata,
-    set_metadata,
 )
+from torch_tensorrt.dynamo.utils import get_metadata, set_metadata
 
 logger = logging.getLogger(__name__)
 
 
-def view_to_reshape(gm: torch.fx.GraphModule) -> torch.fx.GraphModule:
+def view_to_reshape(
+    gm: torch.fx.GraphModule, settings: CompilationSettings
+) -> torch.fx.GraphModule:
     """Replace aten.view with an equivalent implementation which avoids Tensor memory issues"""
     orig_op = torch.ops.aten.view.default
     replacement_op = torch.ops.aten.reshape.default

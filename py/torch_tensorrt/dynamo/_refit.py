@@ -74,8 +74,6 @@ def construct_refit_mapping(
 
     output_dtypes = infer_module_output_dtypes(
         module,
-        inputs,
-        settings.device,
         truncate_double=settings.truncate_double,
     )
 
@@ -288,7 +286,7 @@ def refit_module_weights(
         raise AssertionError(
             f"Input graph should be an ExportedProgram but got type {type(new_weight_module)}"
         )
-    new_weight_module = pre_export_lowering(new_weight_module)
+    new_weight_module = pre_export_lowering(new_weight_module, settings)
     new_weight_module = new_weight_module.run_decompositions(
         get_decompositions(settings.enable_experimental_decompositions)
     )
@@ -296,7 +294,7 @@ def refit_module_weights(
     logger.debug("Input graph: " + str(new_gm.graph))
     # Apply lowering on the graph module
 
-    new_gm = post_lowering(new_gm)
+    new_gm = post_lowering(new_gm, settings)
 
     logger.info("Compilation Settings: %s\n", settings)
 

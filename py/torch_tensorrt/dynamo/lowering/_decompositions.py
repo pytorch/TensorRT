@@ -3,7 +3,8 @@ from enum import Enum, auto
 from typing import Any, Callable, Dict, List, Optional
 
 import torch
-from torch._decomp import _decomp_table_to_post_autograd_aten, register_decomposition
+from torch._decomp import register_decomposition
+from torch._export.utils import _decomp_table_to_post_autograd_aten
 from torch._ops import OpOverload
 from torch_tensorrt.dynamo._defaults import default_device
 from torch_tensorrt.dynamo.conversion.converter_utils import get_positive_dim
@@ -388,6 +389,17 @@ def scatter_reduce_decomposition(
     return scatter_loop_tensor
 
 
+@register_torch_trt_decomposition(aten._log_softmax, registry=TORCH_TRT_DECOMPOSITIONS)
+def log_softmax_decomposition(
+    x: torch.Tensor,
+    dim: int,
+    half_to_float: bool,
+) -> torch.Tensor:
+    return torch.log(
+        torch.softmax(x, dim, dtype=torch.float if half_to_float else None)
+    )
+
+
 def get_decompositions(
     enable_experimental_decompositions: bool = False,
 ) -> Dict[OpOverload, Callable[[Any], Any]]:
@@ -400,8 +412,15 @@ def get_decompositions(
         return {**CORE_ATEN_DECOMPOSITIONS_FILTERED, **TORCH_TRT_DECOMPOSITIONS}
     else:
         # changes made here due to torch2.6 changes https://github.com/pytorch/pytorch/pull/135080
+        decomp_table = _decomp_table_to_post_autograd_aten()
+        DECOMP_TABLE_FILTERED: Dict[OpOverload, Callable[[Any], Any]] = {
+            decomp: decomp_table[decomp]
+            for decomp in decomp_table
+            if decomp not in torch_disabled_decompositions
+        }
+
         return {
             **ENABLED_TORCH_DECOMPOSITIONS,
-            **_decomp_table_to_post_autograd_aten(),
+            **DECOMP_TABLE_FILTERED,
             **TORCH_TRT_DECOMPOSITIONS,
         }

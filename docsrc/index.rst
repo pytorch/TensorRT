@@ -26,6 +26,7 @@ Getting Started
    :hidden:
 
    getting_started/installation
+   getting_started/jetpack
    getting_started/quick_start
 
 User Guide
@@ -50,15 +51,39 @@ User Guide
    user_guide/runtime
    user_guide/using_dla
    user_guide/mixed_precision
+
+
+Tutorials
+------------
+
+* :ref:`torch_compile_advanced_usage`
+* :ref:`vgg16_ptq`
+* :ref:`engine_caching_example`
+* :ref:`engine_caching_bert_example`
+* :ref:`refit_engine_example`
+* :ref:`serving_torch_tensorrt_with_triton`
+* :ref:`torch_export_cudagraphs`
+* :ref:`converter_overloading`
+* :ref:`custom_kernel_plugins`
+* :ref:`mutable_torchtrt_module_example`
+* :ref:`weight_streaming_example`
+
+.. toctree::
+   :caption: Tutorials
+   :maxdepth: 1
+   :hidden:
+
    tutorials/_rendered_examples/dynamo/torch_compile_advanced_usage
    tutorials/_rendered_examples/dynamo/vgg16_ptq
    tutorials/_rendered_examples/dynamo/engine_caching_example
+   tutorials/_rendered_examples/dynamo/engine_caching_bert_example
    tutorials/_rendered_examples/dynamo/refit_engine_example
    tutorials/serving_torch_tensorrt_with_triton
    tutorials/_rendered_examples/dynamo/torch_export_cudagraphs
    tutorials/_rendered_examples/dynamo/converter_overloading
    tutorials/_rendered_examples/dynamo/custom_kernel_plugins
    tutorials/_rendered_examples/dynamo/mutable_torchtrt_module_example
+   tutorials/_rendered_examples/dynamo/weight_streaming_example
 
 Dynamo Frontend
 ----------------

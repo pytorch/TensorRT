@@ -14,6 +14,7 @@ from torch_tensorrt.dynamo._defaults import (
     DLA_SRAM_SIZE,
     DRYRUN,
     ENABLE_EXPERIMENTAL_DECOMPOSITIONS,
+    ENABLE_WEIGHT_STREAMING,
     ENABLED_PRECISIONS,
     ENGINE_CAPABILITY,
     HARDWARE_COMPATIBLE,
@@ -86,6 +87,7 @@ class CompilationSettings:
         refit_identical_engine_weights (bool): Whether to refit the engine with identical weights
         strip_engine_weights (bool): Whether to strip the engine weights
         immutable_weights (bool): Build non-refittable engines. This is useful for some layers that are not refittable. If this argument is set to true, `strip_engine_weights` and `refit_identical_engine_weights` will be ignored
+        enable_weight_streaming (bool): Enable weight streaming.
     """
 
     enabled_precisions: Set[dtype] = field(default_factory=lambda: ENABLED_PRECISIONS)
@@ -124,6 +126,7 @@ class CompilationSettings:
     refit_identical_engine_weights: bool = REFIT_IDENTICAL_ENGINE_WEIGHTS
     strip_engine_weights: bool = STRIP_ENGINE_WEIGHTS
     immutable_weights: bool = IMMUTABLE_WEIGHTS
+    enable_weight_streaming: bool = ENABLE_WEIGHT_STREAMING
 
 
 _SETTINGS_TO_BE_ENGINE_INVARIANT = (
@@ -137,6 +140,7 @@ _SETTINGS_TO_BE_ENGINE_INVARIANT = (
     "hardware_compatible",
     "refit_identical_engine_weights",
     "immutable_weights",
+    "enable_weight_streaming",
 )
 
 

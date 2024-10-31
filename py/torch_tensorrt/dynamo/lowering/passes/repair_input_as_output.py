@@ -1,6 +1,7 @@
 import logging
 
 import torch
+from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.lowering.passes.pass_utils import (
     clean_up_graph_after_modifications,
     get_tensor_placeholders,
@@ -9,7 +10,9 @@ from torch_tensorrt.dynamo.lowering.passes.pass_utils import (
 logger = logging.getLogger(__name__)
 
 
-def repair_input_as_output(gm: torch.fx.GraphModule) -> torch.fx.GraphModule:
+def repair_input_as_output(
+    gm: torch.fx.GraphModule, settings: CompilationSettings
+) -> torch.fx.GraphModule:
     """Repair scenarios where inputs are also outputs of the graph
 
     TRT does not allow such cases, so we insert a clone (identity) layer

@@ -62,12 +62,12 @@ def test_mapping():
     engine_info = trt_gm._run_on_acc_0.engine.__getstate__()[0]
     engine = get_engine_from_encoded_engine(engine_info[3], runtime)
 
-    exp_program2 = pre_export_lowering(exp_program2)
+    exp_program2 = pre_export_lowering(exp_program2, settings)
     exp_program2 = exp_program2.run_decompositions(
         get_decompositions(settings.enable_experimental_decompositions)
     )
     new_gm = exp_program2.module()
-    new_gm = post_lowering(new_gm)
+    new_gm = post_lowering(new_gm, settings)
     mapping = construct_refit_mapping(new_gm, trt_input, settings)
 
     refitter = trt.Refitter(engine, TRT_LOGGER)
@@ -314,7 +314,7 @@ def test_refit_one_engine_inline_runtime__with_weightmap():
         debug=debug,
         min_block_size=min_block_size,
     )
-    torchtrt.save(trt_gm, trt_ep_path, inputs=inputs)
+    torchtrt.save(trt_gm, trt_ep_path)
     trt_gm = torch.export.load(trt_ep_path)
     new_trt_gm = refit_module_weights(
         compiled_module=trt_gm,
@@ -580,7 +580,7 @@ def test_refit_one_engine_inline_runtime_without_weightmap():
         debug=debug,
         min_block_size=min_block_size,
     )
-    torchtrt.save(trt_gm, trt_ep_path, inputs=inputs)
+    torchtrt.save(trt_gm, trt_ep_path)
     trt_gm = torch.export.load(trt_ep_path)
     new_trt_gm = refit_module_weights(
         compiled_module=trt_gm,

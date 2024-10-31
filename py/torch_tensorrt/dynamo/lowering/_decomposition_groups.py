@@ -76,7 +76,6 @@ torch_enabled_decompositions: Set[Union[OpOverload, OpOverloadPacket]] = {
     aten.logit_backward,
     aten.log_sigmoid_backward,
     aten.log_sigmoid_forward,
-    aten._log_softmax,
     aten._log_softmax_backward_data,
     aten.logspace,
     aten.logsumexp.default,
@@ -165,6 +164,13 @@ torch_enabled_decompositions: Set[Union[OpOverload, OpOverloadPacket]] = {
 }
 torch_disabled_decompositions: Set[Union[OpOverload, OpOverloadPacket]] = {
     aten._softmax.default,
+    aten.upsample_nearest1d.vec,
+    aten.upsample_nearest2d.vec,
+    aten.upsample_nearest3d.vec,
+    aten.upsample_linear1d.vec,
+    aten.upsample_bilinear2d.vec,
+    aten.upsample_trilinear3d.vec,
+    aten.upsample_bicubic2d.vec,
 }
 
 

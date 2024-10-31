@@ -184,10 +184,17 @@ def layer_norm(
         bias = impl.slice.expand(
             ctx, target, source_ir, f"{name}_expand_bias", bias, input.shape
         )
+    strongly_typed_network = False
+    if ctx.net.get_flag(trt.NetworkDefinitionCreationFlag.STRONGLY_TYPED):
+        weight = cast_trt_tensor(ctx, weight, input.dtype, name)
+        bias = cast_trt_tensor(ctx, bias, input.dtype, name)
+        strongly_typed_network = True
 
     layer_norm = ctx.net.add_normalization(input, weight, bias, axes)
     layer_norm.epsilon = eps
-    layer_norm.compute_precision = input.dtype
+    # compute_precision ignored for strongly typed network.
+    if not strongly_typed_network:
+        layer_norm.compute_precision = input.dtype
     set_layer_name(layer_norm, target, f"{name}_layer_norm", source_ir)
 
     if return_mean_rstd:
@@ -439,30 +446,13 @@ def softmax(
     source_ir: Optional[SourceIR],
     name: str,
     input: TRTTensor,
-    dim: Optional[Any] = None,
+    dim: int,
+    half_to_float: bool,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    input_ranks = len(input.shape)
+    dim = get_positive_dim(dim, len(input.shape))
 
-    if not isinstance(input, TRTTensor):
-        raise RuntimeError(
-            f"softmax received input {input} that is not part "
-            "of the TensorRT region!"
-        )
-
-    # Used to get dim when dim is None. Copied from PyTorch softmax implementation.
-    def get_softmax_dim(ndim: int) -> int:
-        if ndim == 0 or ndim == 1 or ndim == 3:
-            ret = 0
-        else:
-            ret = 1
-        return ret
-
-    if dim is None:
-        dim = get_softmax_dim(input_ranks)
-    else:
-        dim = cast(int, dim)
-
-    dim = get_positive_dim(dim, input_ranks)
+    if half_to_float:
+        input = cast_trt_tensor(ctx, input, torch.float, name, target, source_ir)
 
     layer = ctx.net.add_softmax(input)
     layer.axes = 1 << dim

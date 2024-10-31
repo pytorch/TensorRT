@@ -36,6 +36,7 @@ from torch_tensorrt.dynamo.lowering import (
 )
 from torch_tensorrt.dynamo.utils import (
     get_flat_args_with_check,
+    get_output_metadata,
     parse_graph_io,
     prepare_inputs,
     set_log_level,
@@ -92,6 +93,7 @@ def compile(
     refit_identical_engine_weights: bool = _defaults.REFIT_IDENTICAL_ENGINE_WEIGHTS,
     strip_engine_weights: bool = _defaults.STRIP_ENGINE_WEIGHTS,
     immutable_weights: bool = _defaults.IMMUTABLE_WEIGHTS,
+    enable_weight_streaming: bool = _defaults.ENABLE_WEIGHT_STREAMING,
     **kwargs: Any,
 ) -> torch.fx.GraphModule:
     """Compile an ExportedProgram module for NVIDIA GPUs using TensorRT
@@ -166,6 +168,7 @@ def compile(
         refit_identical_engine_weights (bool): Refit engines with identical weights. This is useful when the same model is compiled multiple times with different inputs and the weights are the same. This will save time by reusing the same engine for different inputs.
         strip_engine_weights (bool): Strip engine weights from the serialized engine. This is useful when the engine is to be deployed in an environment where the weights are not required.
         immutable_weights (bool): Build non-refittable engines. This is useful for some layers that are not refittable. If this argument is set to true, `strip_engine_weights` and `refit_identical_engine_weights` will be ignored.
+        enable_weight_streaming (bool): Enable weight streaming.
         **kwargs: Any,
     Returns:
         torch.fx.GraphModule: Compiled FX Module, when run it will execute via TensorRT
@@ -222,6 +225,10 @@ def compile(
                      This flag inserts casts around matmul layers and ensures TensorRT executes the matmul layers in FP16 with FP32 accumulation."
         )
 
+    if enable_weight_streaming and not use_explicit_typing:
+        raise AssertionError(
+            "When enable_weight_streaming is enabled, it requires use_explicit_typing to be set to True"
+        )
     # Aliasing inputs to arg_inputs for better understanding
     if not arg_inputs and not inputs:
         raise AssertionError("'arg_inputs' and 'inputs' should not both be None.")
@@ -249,16 +256,6 @@ def compile(
         raise AssertionError(
             f"Input graph should be an ExportedProgram but got type {type(exported_program)}"
         )
-    exported_program = pre_export_lowering(exported_program)
-    exported_program = exported_program.run_decompositions(
-        get_decompositions(enable_experimental_decompositions)
-    )
-    gm = exported_program.module()
-    logger.debug("Input graph: " + str(gm.graph))
-
-    # Apply lowering on the graph module
-    gm = post_lowering(gm, use_fp32_acc=use_fp32_acc)
-    logger.debug("Lowered Input graph: " + str(gm.graph))
 
     engine_cache = None
     if cache_built_engines or reuse_cached_engines:
@@ -307,10 +304,23 @@ def compile(
         "refit_identical_engine_weights": refit_identical_engine_weights,
         "strip_engine_weights": strip_engine_weights,
         "immutable_weights": immutable_weights,
+        "enable_weight_streaming": enable_weight_streaming,
     }
 
     settings = CompilationSettings(**compilation_options)
     logger.info("Compilation Settings: %s\n", settings)
+    exported_program = pre_export_lowering(exported_program, settings)
+    exported_program = exported_program.run_decompositions(
+        get_decompositions(enable_experimental_decompositions)
+    )
+
+    gm = exported_program.module()
+    logger.debug("Input graph: " + str(gm.graph))
+
+    # Apply lowering on the graph module
+    gm = post_lowering(gm, settings)
+    logger.debug("Lowered Input graph: " + str(gm.graph))
+
     trt_gm = compile_module(
         gm, trt_arg_inputs, trt_kwarg_inputs, settings, engine_cache
     )
@@ -401,6 +411,7 @@ def compile_module(
                 verbose=settings.debug,
                 min_block_size=settings.min_block_size,
                 torch_executed_ops=settings.torch_executed_ops,
+                require_full_compilation=settings.require_full_compilation,
             )
         except torch.fx.passes.splitter_base.FxNetSplitterInternalError:
             logger.error(
@@ -419,6 +430,7 @@ def compile_module(
             verbose=settings.debug,
             min_block_size=settings.min_block_size,
             torch_executed_ops=settings.torch_executed_ops,
+            require_full_compilation=settings.require_full_compilation,
         )
 
     dryrun_tracker.unsupported_ops = supported_ops.unsupported_operators
@@ -426,6 +438,12 @@ def compile_module(
     # The global partitioner leaves non-TRT nodes as-is
     if not settings.use_fast_partitioner:
         dryrun_tracker.to_run_in_torch.extend(parse_non_trt_nodes(partitioned_module))
+
+    submodule_node_dict = {}
+    for node in partitioned_module.graph.nodes:
+        if "_run_on_acc" not in node.name:
+            continue
+        submodule_node_dict[node.name] = node
 
     # Store TRT replicas of Torch subgraphs
     trt_modules = {}
@@ -445,6 +463,26 @@ def compile_module(
                 str(submodule.graph),
             )
             continue
+
+        if name not in submodule_node_dict:
+            raise ValueError(
+                f"node_name: {name} does not exist in the submodule node dictionary"
+            )
+
+        # set the submodule metadata back to the parent trt_module_node
+        metadata_list = get_output_metadata(submodule)
+        assert len(metadata_list) > 0
+        metadata_keys = ["val", "tensor_meta"]
+        for key in metadata_keys:
+            if key not in submodule_node_dict[name].meta:
+                meta_val_list = [
+                    metadata[key] for metadata in metadata_list if key in metadata
+                ]
+                submodule_node_dict[name].meta[key] = meta_val_list
+                logger.debug(
+                    f"Updated metadata for node: {name} with its corresponding submodule outputs"
+                )
+                break
 
         subgraph_data = PerSubgraphData()
         subgraph_data.subgraph_name = name
@@ -552,6 +590,7 @@ def convert_exported_program_to_serialized_trt_engine(
     refit_identical_engine_weights: bool = _defaults.REFIT_IDENTICAL_ENGINE_WEIGHTS,
     strip_engine_weights: bool = _defaults.STRIP_ENGINE_WEIGHTS,
     immutable_weights: bool = _defaults.IMMUTABLE_WEIGHTS,
+    enable_weight_streaming: bool = _defaults.ENABLE_WEIGHT_STREAMING,
     **kwargs: Any,
 ) -> bytes:
     """Convert an ExportedProgram to a serialized TensorRT engine
@@ -614,6 +653,7 @@ def convert_exported_program_to_serialized_trt_engine(
         refit_identical_engine_weights (bool): Refit engines with identical weights. This is useful when the same model is compiled multiple times with different inputs and the weights are the same. This will save time by reusing the same engine for different inputs.
         strip_engine_weights (bool): Strip engine weights from the serialized engine. This is useful when the engine is to be deployed in an environment where the weights are not required.
         immutable_weights (bool): Build non-refittable engines. This is useful for some layers that are not refittable. If this argument is set to true, `strip_engine_weights` and `refit_identical_engine_weights` will be ignored.
+        enable_weight_streaming (bool): Enable weight streaming.
     Returns:
         bytes: Serialized TensorRT engine, can either be saved to a file or deserialized via TensorRT APIs
     """
@@ -698,9 +738,13 @@ def convert_exported_program_to_serialized_trt_engine(
         "refit_identical_engine_weights": refit_identical_engine_weights,
         "strip_engine_weights": strip_engine_weights,
         "immutable_weights": immutable_weights,
+        "enable_weight_streaming": enable_weight_streaming,
     }
 
-    exported_program = pre_export_lowering(exported_program)
+    settings = CompilationSettings(**compilation_options)
+    logger.info("Compilation Settings: %s\n", settings)
+
+    exported_program = pre_export_lowering(exported_program, settings)
     # Decompose the exported program
     exported_program = exported_program.run_decompositions(
         get_decompositions(enable_experimental_decompositions)
@@ -709,11 +753,8 @@ def convert_exported_program_to_serialized_trt_engine(
     logger.debug("Input graph: " + str(gm.graph))
 
     # Apply lowering on the graph module
-    gm = post_lowering(gm)
+    gm = post_lowering(gm, settings)
     logger.debug("Lowered Input graph: " + str(gm.graph))
-
-    settings = CompilationSettings(**compilation_options)
-    logger.info("Compilation Settings: %s\n", settings)
 
     # Configure user compilation settings to converters.
     CONVERTERS.set_compilation_settings(settings)

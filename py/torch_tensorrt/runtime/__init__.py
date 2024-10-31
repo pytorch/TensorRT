@@ -8,3 +8,4 @@ from torch_tensorrt.runtime._cudagraphs import (
     set_cudagraphs_mode,
 )
 from torch_tensorrt.runtime._multi_device_safe_mode import set_multi_device_safe_mode
+from torch_tensorrt.runtime._weight_streaming import weight_streaming

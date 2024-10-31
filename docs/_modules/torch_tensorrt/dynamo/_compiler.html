@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt.dynamo._compiler &mdash; Torch-TensorRT v2.6.0.dev0+2c517be documentation</title>
+  <title>torch_tensorrt.dynamo._compiler &mdash; Torch-TensorRT v2.6.0.dev0+1d5be25 documentation</title>
   
 
   
@@ -272,7 +272,7 @@
               
               
                 <div class="version">
-                  v2.6.0.dev0+2c517be
+                  v2.6.0.dev0+1d5be25
                 </div>
               
             
@@ -303,6 +303,7 @@
               <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../../getting_started/installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../getting_started/jetpack.html">Overview</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../getting_started/quick_start.html">Quick Start</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">User Guide</span></p>
@@ -313,15 +314,20 @@
 <li class="toctree-l1"><a class="reference internal" href="../../../user_guide/runtime.html">Deploying Torch-TensorRT Programs</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../user_guide/using_dla.html">DLA</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../user_guide/mixed_precision.html">Compile Mixed Precision models with Torch-TensorRT</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul>
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/torch_compile_advanced_usage.html">Torch Compile Advanced Usage</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/vgg16_ptq.html">Deploy Quantized Models using Torch-TensorRT</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/engine_caching_example.html">Engine Caching</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/engine_caching_bert_example.html">Engine Caching (BERT)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/refit_engine_example.html">Refitting Torch-TensorRT Programs with New Weights</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/serving_torch_tensorrt_with_triton.html">Serving a Torch-TensorRT model with Triton</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/torch_export_cudagraphs.html">Torch Export with Cudagraphs</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/converter_overloading.html">Overloading Torch-TensorRT Converters with Custom Converters</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/custom_kernel_plugins.html">Using Custom Kernels within TensorRT Engines with Torch-TensorRT</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/mutable_torchtrt_module_example.html">Mutable Torch TensorRT Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/weight_streaming_example.html">Weight Streaming</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Dynamo Frontend</span></p>
 <ul>
@@ -495,6 +501,7 @@
 <span class="p">)</span>
 <span class="kn">from</span> <span class="nn">torch_tensorrt.dynamo.utils</span> <span class="kn">import</span> <span class="p">(</span>
     <span class="n">get_flat_args_with_check</span><span class="p">,</span>
+    <span class="n">get_output_metadata</span><span class="p">,</span>
     <span class="n">parse_graph_io</span><span class="p">,</span>
     <span class="n">prepare_inputs</span><span class="p">,</span>
     <span class="n">set_log_level</span><span class="p">,</span>
@@ -549,6 +556,7 @@
     <span class="n">custom_engine_cache</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">BaseEngineCache</span><span class="p">]</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">CUSTOM_ENGINE_CACHE</span><span class="p">,</span>
     <span class="n">use_explicit_typing</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">USE_EXPLICIT_TYPING</span><span class="p">,</span>
     <span class="n">use_fp32_acc</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">USE_FP32_ACC</span><span class="p">,</span>
+    <span class="n">enable_weight_streaming</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">ENABLE_WEIGHT_STREAMING</span><span class="p">,</span>
     <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Compile an ExportedProgram module for NVIDIA GPUs using TensorRT</span>
@@ -621,6 +629,7 @@
 <span class="sd">        custom_engine_cache (Optional[BaseEngineCache]): Engine cache instance to use for saving and loading engines. Users can provide their own engine cache by inheriting from BaseEngineCache. If used, engine_cache_dir and engine_cache_size will be ignored.</span>
 <span class="sd">        use_explicit_typing (bool): This flag enables strong typing in TensorRT compilation which respects the precisions set in the Pytorch model. This is useful when users have mixed precision graphs.</span>
 <span class="sd">        use_fp32_acc (bool): This option inserts cast to FP32 nodes around matmul layers and TensorRT ensures the accumulation of matmul happens in FP32. Use this only when FP16 precision is configured in enabled_precisions.</span>
+<span class="sd">        enable_weight_streaming (bool): Enable weight streaming.</span>
 <span class="sd">        **kwargs: Any,</span>
 <span class="sd">    Returns:</span>
 <span class="sd">        torch.fx.GraphModule: Compiled FX Module, when run it will execute via TensorRT</span>
@@ -674,6 +683,10 @@
 <span class="s2">                     This flag inserts casts around matmul layers and ensures TensorRT executes the matmul layers in FP16 with FP32 accumulation.&quot;</span>
         <span class="p">)</span>
 
+    <span class="k">if</span> <span class="n">enable_weight_streaming</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">use_explicit_typing</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">AssertionError</span><span class="p">(</span>
+            <span class="s2">&quot;When enable_weight_streaming is enabled, it requires use_explicit_typing to be set to True&quot;</span>
+        <span class="p">)</span>
     <span class="c1"># Aliasing inputs to arg_inputs for better understanding</span>
     <span class="k">if</span> <span class="ow">not</span> <span class="n">arg_inputs</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">inputs</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">AssertionError</span><span class="p">(</span><span class="s2">&quot;&#39;arg_inputs&#39; and &#39;inputs&#39; should not both be None.&quot;</span><span class="p">)</span>
@@ -701,16 +714,6 @@
         <span class="k">raise</span> <span class="ne">AssertionError</span><span class="p">(</span>
             <span class="sa">f</span><span class="s2">&quot;Input graph should be an ExportedProgram but got type </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">exported_program</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span>
         <span class="p">)</span>
-    <span class="n">exported_program</span> <span class="o">=</span> <span class="n">pre_export_lowering</span><span class="p">(</span><span class="n">exported_program</span><span class="p">)</span>
-    <span class="n">exported_program</span> <span class="o">=</span> <span class="n">exported_program</span><span class="o">.</span><span class="n">run_decompositions</span><span class="p">(</span>
-        <span class="n">get_decompositions</span><span class="p">(</span><span class="n">enable_experimental_decompositions</span><span class="p">)</span>
-    <span class="p">)</span>
-    <span class="n">gm</span> <span class="o">=</span> <span class="n">exported_program</span><span class="o">.</span><span class="n">module</span><span class="p">()</span>
-    <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Input graph: &quot;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="p">))</span>
-
-    <span class="c1"># Apply lowering on the graph module</span>
-    <span class="n">gm</span> <span class="o">=</span> <span class="n">post_lowering</span><span class="p">(</span><span class="n">gm</span><span class="p">,</span> <span class="n">use_fp32_acc</span><span class="o">=</span><span class="n">use_fp32_acc</span><span class="p">)</span>
-    <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Lowered Input graph: &quot;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="p">))</span>
 
     <span class="n">engine_cache</span> <span class="o">=</span> <span class="kc">None</span>
     <span class="k">if</span> <span class="n">cache_built_engines</span> <span class="ow">or</span> <span class="n">reuse_cached_engines</span><span class="p">:</span>
@@ -760,10 +763,23 @@
         <span class="s2">&quot;reuse_cached_engines&quot;</span><span class="p">:</span> <span class="n">reuse_cached_engines</span><span class="p">,</span>
         <span class="s2">&quot;use_explicit_typing&quot;</span><span class="p">:</span> <span class="n">use_explicit_typing</span><span class="p">,</span>
         <span class="s2">&quot;use_fp32_acc&quot;</span><span class="p">:</span> <span class="n">use_fp32_acc</span><span class="p">,</span>
+        <span class="s2">&quot;enable_weight_streaming&quot;</span><span class="p">:</span> <span class="n">enable_weight_streaming</span><span class="p">,</span>
     <span class="p">}</span>
 
     <span class="n">settings</span> <span class="o">=</span> <span class="n">CompilationSettings</span><span class="p">(</span><span class="o">**</span><span class="n">compilation_options</span><span class="p">)</span>
     <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Compilation Settings: </span><span class="si">%s</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">settings</span><span class="p">)</span>
+    <span class="n">exported_program</span> <span class="o">=</span> <span class="n">pre_export_lowering</span><span class="p">(</span><span class="n">exported_program</span><span class="p">,</span> <span class="n">settings</span><span class="p">)</span>
+    <span class="n">exported_program</span> <span class="o">=</span> <span class="n">exported_program</span><span class="o">.</span><span class="n">run_decompositions</span><span class="p">(</span>
+        <span class="n">get_decompositions</span><span class="p">(</span><span class="n">enable_experimental_decompositions</span><span class="p">)</span>
+    <span class="p">)</span>
+
+    <span class="n">gm</span> <span class="o">=</span> <span class="n">exported_program</span><span class="o">.</span><span class="n">module</span><span class="p">()</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Input graph: &quot;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="p">))</span>
+
+    <span class="c1"># Apply lowering on the graph module</span>
+    <span class="n">gm</span> <span class="o">=</span> <span class="n">post_lowering</span><span class="p">(</span><span class="n">gm</span><span class="p">,</span> <span class="n">settings</span><span class="p">)</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Lowered Input graph: &quot;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="p">))</span>
+
     <span class="n">trt_gm</span> <span class="o">=</span> <span class="n">compile_module</span><span class="p">(</span>
         <span class="n">gm</span><span class="p">,</span> <span class="n">trt_arg_inputs</span><span class="p">,</span> <span class="n">trt_kwarg_inputs</span><span class="p">,</span> <span class="n">settings</span><span class="p">,</span> <span class="n">engine_cache</span>
     <span class="p">)</span>
@@ -854,6 +870,7 @@
                 <span class="n">verbose</span><span class="o">=</span><span class="n">settings</span><span class="o">.</span><span class="n">debug</span><span class="p">,</span>
                 <span class="n">min_block_size</span><span class="o">=</span><span class="n">settings</span><span class="o">.</span><span class="n">min_block_size</span><span class="p">,</span>
                 <span class="n">torch_executed_ops</span><span class="o">=</span><span class="n">settings</span><span class="o">.</span><span class="n">torch_executed_ops</span><span class="p">,</span>
+                <span class="n">require_full_compilation</span><span class="o">=</span><span class="n">settings</span><span class="o">.</span><span class="n">require_full_compilation</span><span class="p">,</span>
             <span class="p">)</span>
         <span class="k">except</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">passes</span><span class="o">.</span><span class="n">splitter_base</span><span class="o">.</span><span class="n">FxNetSplitterInternalError</span><span class="p">:</span>
             <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>
@@ -872,6 +889,7 @@
             <span class="n">verbose</span><span class="o">=</span><span class="n">settings</span><span class="o">.</span><span class="n">debug</span><span class="p">,</span>
             <span class="n">min_block_size</span><span class="o">=</span><span class="n">settings</span><span class="o">.</span><span class="n">min_block_size</span><span class="p">,</span>
             <span class="n">torch_executed_ops</span><span class="o">=</span><span class="n">settings</span><span class="o">.</span><span class="n">torch_executed_ops</span><span class="p">,</span>
+            <span class="n">require_full_compilation</span><span class="o">=</span><span class="n">settings</span><span class="o">.</span><span class="n">require_full_compilation</span><span class="p">,</span>
         <span class="p">)</span>
 
     <span class="n">dryrun_tracker</span><span class="o">.</span><span class="n">unsupported_ops</span> <span class="o">=</span> <span class="n">supported_ops</span><span class="o">.</span><span class="n">unsupported_operators</span>
@@ -879,6 +897,12 @@
     <span class="c1"># The global partitioner leaves non-TRT nodes as-is</span>
     <span class="k">if</span> <span class="ow">not</span> <span class="n">settings</span><span class="o">.</span><span class="n">use_fast_partitioner</span><span class="p">:</span>
         <span class="n">dryrun_tracker</span><span class="o">.</span><span class="n">to_run_in_torch</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">parse_non_trt_nodes</span><span class="p">(</span><span class="n">partitioned_module</span><span class="p">))</span>
+
+    <span class="n">submodule_node_dict</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">partitioned_module</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">nodes</span><span class="p">:</span>
+        <span class="k">if</span> <span class="s2">&quot;_run_on_acc&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">node</span><span class="o">.</span><span class="n">name</span><span class="p">:</span>
+            <span class="k">continue</span>
+        <span class="n">submodule_node_dict</span><span class="p">[</span><span class="n">node</span><span class="o">.</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">node</span>
 
     <span class="c1"># Store TRT replicas of Torch subgraphs</span>
     <span class="n">trt_modules</span> <span class="o">=</span> <span class="p">{}</span>
@@ -898,6 +922,26 @@
                 <span class="nb">str</span><span class="p">(</span><span class="n">submodule</span><span class="o">.</span><span class="n">graph</span><span class="p">),</span>
             <span class="p">)</span>
             <span class="k">continue</span>
+
+        <span class="k">if</span> <span class="n">name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">submodule_node_dict</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;node_name: </span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2"> does not exist in the submodule node dictionary&quot;</span>
+            <span class="p">)</span>
+
+        <span class="c1"># set the submodule metadata back to the parent trt_module_node</span>
+        <span class="n">metadata_list</span> <span class="o">=</span> <span class="n">get_output_metadata</span><span class="p">(</span><span class="n">submodule</span><span class="p">)</span>
+        <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">metadata_list</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span>
+        <span class="n">metadata_keys</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;val&quot;</span><span class="p">,</span> <span class="s2">&quot;tensor_meta&quot;</span><span class="p">]</span>
+        <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">metadata_keys</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">key</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">submodule_node_dict</span><span class="p">[</span><span class="n">name</span><span class="p">]</span><span class="o">.</span><span class="n">meta</span><span class="p">:</span>
+                <span class="n">meta_val_list</span> <span class="o">=</span> <span class="p">[</span>
+                    <span class="n">metadata</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="k">for</span> <span class="n">metadata</span> <span class="ow">in</span> <span class="n">metadata_list</span> <span class="k">if</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">metadata</span>
+                <span class="p">]</span>
+                <span class="n">submodule_node_dict</span><span class="p">[</span><span class="n">name</span><span class="p">]</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">meta_val_list</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;Updated metadata for node: </span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2"> with its corresponding submodule outputs&quot;</span>
+                <span class="p">)</span>
+                <span class="k">break</span>
 
         <span class="n">subgraph_data</span> <span class="o">=</span> <span class="n">PerSubgraphData</span><span class="p">()</span>
         <span class="n">subgraph_data</span><span class="o">.</span><span class="n">subgraph_name</span> <span class="o">=</span> <span class="n">name</span>
@@ -1003,6 +1047,7 @@
     <span class="n">timing_cache_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">TIMING_CACHE_PATH</span><span class="p">,</span>
     <span class="n">use_explicit_typing</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">USE_EXPLICIT_TYPING</span><span class="p">,</span>
     <span class="n">use_fp32_acc</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">USE_FP32_ACC</span><span class="p">,</span>
+    <span class="n">enable_weight_streaming</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">ENABLE_WEIGHT_STREAMING</span><span class="p">,</span>
     <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bytes</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Convert an ExportedProgram to a serialized TensorRT engine</span>
@@ -1063,6 +1108,7 @@
 <span class="sd">        timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation</span>
 <span class="sd">        use_explicit_typing (bool): This flag enables strong typing in TensorRT compilation which respects the precisions set in the Pytorch model. This is useful when users have mixed precision graphs.</span>
 <span class="sd">        use_fp32_acc (bool): This option inserts cast to FP32 nodes around matmul layers and TensorRT ensures the accumulation of matmul happens in FP32. Use this only when FP16 precision is configured in enabled_precisions.</span>
+<span class="sd">        enable_weight_streaming (bool): Enable weight streaming.</span>
 <span class="sd">    Returns:</span>
 <span class="sd">        bytes: Serialized TensorRT engine, can either be saved to a file or deserialized via TensorRT APIs</span>
 <span class="sd">    &quot;&quot;&quot;</span>
@@ -1138,9 +1184,13 @@
         <span class="s2">&quot;timing_cache_path&quot;</span><span class="p">:</span> <span class="n">timing_cache_path</span><span class="p">,</span>
         <span class="s2">&quot;use_explicit_typing&quot;</span><span class="p">:</span> <span class="n">use_explicit_typing</span><span class="p">,</span>
         <span class="s2">&quot;use_fp32_acc&quot;</span><span class="p">:</span> <span class="n">use_fp32_acc</span><span class="p">,</span>
+        <span class="s2">&quot;enable_weight_streaming&quot;</span><span class="p">:</span> <span class="n">enable_weight_streaming</span><span class="p">,</span>
     <span class="p">}</span>
 
-    <span class="n">exported_program</span> <span class="o">=</span> <span class="n">pre_export_lowering</span><span class="p">(</span><span class="n">exported_program</span><span class="p">)</span>
+    <span class="n">settings</span> <span class="o">=</span> <span class="n">CompilationSettings</span><span class="p">(</span><span class="o">**</span><span class="n">compilation_options</span><span class="p">)</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Compilation Settings: </span><span class="si">%s</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">settings</span><span class="p">)</span>
+
+    <span class="n">exported_program</span> <span class="o">=</span> <span class="n">pre_export_lowering</span><span class="p">(</span><span class="n">exported_program</span><span class="p">,</span> <span class="n">settings</span><span class="p">)</span>
     <span class="c1"># Decompose the exported program</span>
     <span class="n">exported_program</span> <span class="o">=</span> <span class="n">exported_program</span><span class="o">.</span><span class="n">run_decompositions</span><span class="p">(</span>
         <span class="n">get_decompositions</span><span class="p">(</span><span class="n">enable_experimental_decompositions</span><span class="p">)</span>
@@ -1149,11 +1199,8 @@
     <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Input graph: &quot;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="p">))</span>
 
     <span class="c1"># Apply lowering on the graph module</span>
-    <span class="n">gm</span> <span class="o">=</span> <span class="n">post_lowering</span><span class="p">(</span><span class="n">gm</span><span class="p">)</span>
+    <span class="n">gm</span> <span class="o">=</span> <span class="n">post_lowering</span><span class="p">(</span><span class="n">gm</span><span class="p">,</span> <span class="n">settings</span><span class="p">)</span>
     <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Lowered Input graph: &quot;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="p">))</span>
-
-    <span class="n">settings</span> <span class="o">=</span> <span class="n">CompilationSettings</span><span class="p">(</span><span class="o">**</span><span class="n">compilation_options</span><span class="p">)</span>
-    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Compilation Settings: </span><span class="si">%s</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">settings</span><span class="p">)</span>
 
     <span class="c1"># Configure user compilation settings to converters.</span>
     <span class="n">CONVERTERS</span><span class="o">.</span><span class="n">set_compilation_settings</span><span class="p">(</span><span class="n">settings</span><span class="p">)</span>

@@ -343,6 +343,15 @@ def convert_method_to_trt_engine(
         enabled_precisions if enabled_precisions is not None else {torch.float}
     )
 
+    if not arg_inputs and not inputs:
+        raise AssertionError("'arg_inputs' and 'inputs' should not both be None.")
+
+    elif arg_inputs and inputs:
+        raise AssertionError(
+            "'arg_inputs' and 'inputs' should not be used at the same time."
+        )
+    arg_inputs = arg_inputs or inputs
+
     module_type = _parse_module_type(module)
     target_ir = _get_target_fe(module_type, ir)
     if target_ir == _IRType.ts:
@@ -366,15 +375,6 @@ def convert_method_to_trt_engine(
         )
     elif target_ir == _IRType.dynamo:
         # Prepare torch and torchtrt inputs
-        if not arg_inputs and not inputs:
-            raise AssertionError("'arg_inputs' and 'inputs' should not both be None.")
-
-        elif arg_inputs and inputs:
-            raise AssertionError(
-                "'arg_inputs' and 'inputs' should not be used at the same time."
-            )
-        arg_inputs = arg_inputs or inputs
-
         if kwarg_inputs is None:
             kwarg_inputs = {}
 
@@ -502,6 +502,10 @@ def save(
                 "Provided model is a torch.jit.ScriptModule but the output_format specified is exported_program. Please verify the output_format"
             )
         else:
+            if arg_inputs is not None:
+                logger.warning(
+                    "Provided model is a torch.jit.ScriptModule, inputs or arg_inputs is not necessary during save."
+                )
             torch.jit.save(module, file_path)
     elif module_type == _ModuleType.ep:
         if output_format == "torchscript":
@@ -509,12 +513,13 @@ def save(
                 "Provided model is a torch.export.ExportedProgram but the output_format specified is torchscript. Please verify the output_format"
             )
         else:
+            if arg_inputs is not None:
+                logger.warning(
+                    "Provided model is a torch.export.ExportedProgram, inputs or arg_inputs is not necessary during save, it uses the inputs or arg_inputs provided during export and compile"
+                )
             torch.export.save(module, file_path)
     elif module_type == _ModuleType.fx:
-        if arg_inputs is None:
-            raise ValueError(
-                "Provided model is a torch.fx.GraphModule however the inputs are empty. Please provide valid torch.tensors as inputs to trace and save the model"
-            )
+
         # The module type is torch.fx.GraphModule
         if output_format == "torchscript":
             module_ts = torch.jit.trace(
@@ -525,11 +530,19 @@ def save(
             if not retrace:
                 from torch_tensorrt.dynamo._exporter import export
 
-                exp_program = export(module, arg_inputs, kwarg_inputs)
+                if arg_inputs is not None:
+                    logger.warning(
+                        "Provided model is a torch.fx.GraphModule and retrace is False, inputs or arg_inputs is not necessary during save."
+                    )
+                exp_program = export(module)
                 torch.export.save(exp_program, file_path)
             else:
                 from torch._higher_order_ops.torchbind import enable_torchbind_tracing
 
+                if arg_inputs is None:
+                    raise ValueError(
+                        "Provided model is a torch.fx.GraphModule and retrace is True, however the inputs or arg_inputs are empty. Please provide valid torch.tensors as inputs or arg_inputs to trace and save the model"
+                    )
                 with enable_torchbind_tracing():
                     exp_program = torch.export.export(
                         module, tuple(arg_inputs), kwargs=kwarg_inputs, strict=False
