@@ -26,9 +26,13 @@ class TestCrossCompileSaveForWindows(TestCase):
         model = Add().eval().cuda()
         inputs = [torch.randn(2, 3).cuda(), torch.randn(2, 3).cuda()]
         trt_ep_path = os.path.join(tempfile.gettempdir(), "trt.ep")
+        compile_spec = {
+            "inputs": inputs,
+            "min_block_size": 1,
+        }
         try:
             torch_tensorrt.cross_compile_for_windows(
-                model, file_path=trt_ep_path, inputs=inputs
+                model, file_path=trt_ep_path, **compile_spec
             )
         except Exception as e:
             pytest.fail(f"unexpected exception raised: {e}")
@@ -47,9 +51,13 @@ class TestCrossCompileSaveForWindows(TestCase):
         inputs = (torch.randn(2, 3).cuda(), torch.randn(2, 3).cuda())
         trt_ep_path = os.path.join(tempfile.gettempdir(), "trt.ep")
         exp_program = torch.export.export(model, inputs)
+        compile_spec = {
+            "inputs": inputs,
+            "min_block_size": 1,
+        }
         try:
             trt_gm = torch_tensorrt.dynamo.cross_compile_for_windows(
-                exp_program, inputs=inputs
+                exp_program, **compile_spec
             )
             torch_tensorrt.dynamo.save_cross_compiled_exported_program(
                 trt_gm, file_path=trt_ep_path

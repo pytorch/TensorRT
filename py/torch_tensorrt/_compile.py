@@ -12,7 +12,6 @@ from torch_tensorrt._enums import dtype
 from torch_tensorrt._features import ENABLED_FEATURES
 from torch_tensorrt._Input import Input
 from torch_tensorrt.dynamo import _defaults
-from torch_tensorrt.dynamo._exporter import replace_execute_engine_no_op_node
 from torch_tensorrt.fx import InputTensorSpec
 from torch_tensorrt.fx.lower import compile as fx_compile
 from torch_tensorrt.fx.utils import LowerPrecision
@@ -33,6 +32,9 @@ if ENABLED_FEATURES.dynamo_frontend:
     )
     from torch_tensorrt.dynamo._compiler import (
         cross_compile_for_windows as dynamo_cross_compile_for_windows,
+    )
+    from torch_tensorrt.dynamo._compiler import (
+        load_cross_compiled_exported_program as dynamo_load_cross_compiled_exported_program,
     )
     from torch_tensorrt.dynamo._compiler import (
         save_cross_compiled_exported_program as dynamo_save_cross_compiled_exported_program,
@@ -530,28 +532,7 @@ def load_cross_compiled_exported_program(file_path: str = "") -> Any:
     Raises:
         ValueError: If the api is not called in windows or there is no file or the file is a valid ExportedProgram file
     """
-    if not file_path:
-        raise ValueError("File path cannot be empty. Please provide a valid file path")
-
-    if platform.system() != "Windows" or platform.machine() != "AMD64":
-        raise ValueError(
-            "cross runtime compiled model for windows can only be loaded in Windows system"
-        )
-
-    try:
-        logger.debug(f"Loading the provided file {file_path} using torch.export.load()")
-        # TODO: think about how to handle the torch.jit.load route?
-        exp_program = torch.export.load(file_path)
-    except Exception as e:
-        logger.info(
-            f"Loading the provided file {file_path} via torch.export.load() failed with the following error: {e}",
-            exc_info=True,
-        )
-        raise ValueError(
-            f"cross_load the file {file_path} doesn't correspond to a valid ExportedProgram. Please verify the file path."
-        )
-
-    return replace_execute_engine_no_op_node(exp_program)
+    return dynamo_load_cross_compiled_exported_program(file_path)
 
 
 def load(file_path: str = "") -> Any:

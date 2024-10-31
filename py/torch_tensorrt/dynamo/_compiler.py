@@ -20,6 +20,7 @@ from torch_tensorrt.dynamo._DryRunTracker import (
     parse_non_trt_nodes,
 )
 from torch_tensorrt.dynamo._engine_cache import BaseEngineCache, DiskEngineCache
+from torch_tensorrt.dynamo._exporter import replace_execute_engine_no_op_node
 from torch_tensorrt.dynamo.conversion import (
     CompilationSettings,
     UnsupportedOperatorException,
@@ -83,8 +84,6 @@ def cross_compile_for_windows(
     dryrun: bool = _defaults.DRYRUN,
     hardware_compatible: bool = _defaults.HARDWARE_COMPATIBLE,
     timing_cache_path: str = _defaults.TIMING_CACHE_PATH,
-    engine_cache_dir: str = _defaults.ENGINE_CACHE_DIR,
-    engine_cache_size: int = _defaults.ENGINE_CACHE_SIZE,
     use_explicit_typing: bool = _defaults.USE_EXPLICIT_TYPING,
     use_fp32_acc: bool = _defaults.USE_FP32_ACC,
     enable_weight_streaming: bool = _defaults.ENABLE_WEIGHT_STREAMING,
@@ -993,3 +992,37 @@ def save_cross_compiled_exported_program(
     exp_program = export(gm, cross_compile_flag=True)
     torch.export.save(exp_program, file_path)
     logger.debug(f"successfully saved the module for windows at {file_path}")
+
+
+def load_cross_compiled_exported_program(file_path: str = "") -> Any:
+    """
+    Load an ExportedProgram file in Windows which was previously cross compiled in Linux
+
+    Arguments:
+        file_path (str): Path to file on the disk
+
+    Raises:
+        ValueError: If the api is not called in windows or there is no file or the file is a valid ExportedProgram file
+    """
+    if not file_path:
+        raise ValueError("File path cannot be empty. Please provide a valid file path")
+
+    if platform.system() != "Windows" or platform.machine() != "AMD64":
+        raise ValueError(
+            "cross runtime compiled model for windows can only be loaded in Windows system"
+        )
+
+    try:
+        logger.debug(f"Loading the provided file {file_path} using torch.export.load()")
+        # TODO: think about how to handle the torch.jit.load route?
+        exp_program = torch.export.load(file_path)
+    except Exception as e:
+        logger.info(
+            f"Loading the provided file {file_path} via torch.export.load() failed with the following error: {e}",
+            exc_info=True,
+        )
+        raise ValueError(
+            f"cross_load the file {file_path} doesn't correspond to a valid ExportedProgram. Please verify the file path."
+        )
+
+    return replace_execute_engine_no_op_node(exp_program)

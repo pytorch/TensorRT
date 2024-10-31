@@ -1,7 +1,7 @@
 import base64
 import copy
 import operator
-from typing import Any, Dict, Sequence, Tuple, cast, Optional
+from typing import Any, Dict, Optional, Sequence, Tuple, cast
 
 import torch
 from torch._guards import detect_fake_mode
@@ -438,7 +438,11 @@ def inline_trt_modules_for_windows(gm: torch.fx.GraphModule) -> torch.fx.GraphMo
         trt_module_node = trt_module_node[0]
         assert trt_module_node.args
 
-        num_outputs = len(trt_module.output_shapes)
+        if "val" not in trt_module_node.meta:
+            raise ValueError(
+                f"trt_module_node: {trt_module_node.name} does not have the metadata which should be set during dynamo compile_module step."
+            )
+        num_outputs = len(trt_module_node.meta["val"])
         # Insert a call_function node to perform inference on TRT engine
         with gm.graph.inserting_before(trt_module_node):
             engine_info = trt_module._pack_engine_info()
@@ -449,20 +453,8 @@ def inline_trt_modules_for_windows(gm: torch.fx.GraphModule) -> torch.fx.GraphMo
                 torch.ops.tensorrt.no_op_placeholder_for_execute_engine.default,
                 (trt_module_node.args, *engine_info),
             )
-
-            trt_node.meta["val"] = []
             assert num_outputs > 0
-            # Generate meta data for TRT node (a FakeTensor with corresponding output shape)
-            for idx in range(num_outputs):
-                trt_node.meta["val"].append(
-                    cast(
-                        FakeTensor,
-                        torch.empty_strided(
-                            tuple(trt_module.output_shapes[idx]),
-                            tuple([1] * len(trt_module.output_shapes[idx])),
-                        ),
-                    )
-                )
+            trt_node.meta["val"] = trt_module_node.meta["val"]
 
         if num_outputs == 1:
             # Insert getitem nodes as outputs (for export serialization to work)
