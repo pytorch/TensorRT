@@ -1,73 +1,105 @@
 import base64
-from typing import Any, List
+from collections import defaultdict
+from typing import Any, Dict, List
 
 import tensorrt as trt
 import torch
-from torch_tensorrt.dynamo.utils import contains_sym_int, unwrap_tensor_shape
+from torch_tensorrt.dynamo.utils import input_is_dynamic, unwrap_tensor_shape
 from torch_tensorrt.logging import TRT_LOGGER
 
 
 @torch.library.register_fake("tensorrt::execute_engine")  # type: ignore
-def fake_tensorrt_execute_engine(inputs: List[torch.Tensor], trt_engine: Any) -> Any:
-    # This will call the FakeTRTEngine.__call__ method which runs inference on real TRT engine and inputs and returns the outputs
-    # The output should be fake tensors as per general understanding but we are returning real tensors as outputs here which works.
-    return trt_engine.wrapped_obj(inputs)
+def fake_tensorrt_execute_engine(
+    inputs: List[torch.Tensor], fake_trt_engine: Any
+) -> Any:
+    """
+    We infer outputs using the TRT engine and inputs and return fake tensors in this meta kernel.
+    """
+
+    # Get the TRT engine from the fake TRTEngine object
+    serialized_state = fake_trt_engine.wrapped_obj.state_dict
+
+    # TODO: generalize index
+    serialized_engine = base64.b64decode(serialized_state["serialized_engine"])
+
+    # Store input/output names for shape inference
+    # TODO: generalize index
+    input_names = serialized_state["in_binding_names"]
+    output_names = serialized_state["out_binding_names"]
+    assert len(input_names) == len(
+        inputs
+    ), f"Number of inputs serialized in TRTEngine {len(input_names)} doesn't match with the number of inputs found during meta kernel execution {len(inputs)} for execute_engine op"
+
+    # Deserialize the TRT engine
+    runtime = trt.Runtime(TRT_LOGGER)
+    engine = runtime.deserialize_cuda_engine(serialized_engine)
+    context = engine.create_execution_context()
+
+    # Here's what we are doing
+    # 1) Check if inputs are dynamic (they have sym ints in their shapes)
+    # 2) For dynamic inputs, we gather min_input_shape and max_input shape for all inputs
+    # 3) For the above min and max input shape, capture the corresponding min and max output shape using TensorRT's set/get shapes mechanism
+    # 4) Create a new symbolic fake tensor using min and max output shape for each output and return them
+    # 5) For static inputs, the output shape will be static and we won't need to create sym ints
+    is_dynamic_execution = input_is_dynamic(inputs)
+    if is_dynamic_execution:
+        modes = ["min", "max"]
+    else:
+        modes = ["opt"]
+
+    outputs_mode_dict = defaultdict(list)
+    for mode in modes:
+        for input_idx, input in enumerate(inputs):
+            # Using TensorRT's infer shape mechanism to infer output shapes
+            input_shape = unwrap_tensor_shape(input, mode=mode)
+            context.set_input_shape(input_names[input_idx], input_shape)
+
+        for output_name in output_names:
+            output_shape = context.get_tensor_shape(output_name)
+            outputs_mode_dict[mode].append(output_shape)
+
+    if {"min", "max"}.issubset(outputs_mode_dict):
+        assert len(outputs_mode_dict["min"]) == len(outputs_mode_dict["max"])
+        num_outputs = len(outputs_mode_dict["min"])
+    elif "opt" in outputs_mode_dict:
+        num_outputs = len(outputs_mode_dict["opt"])
+
+    assert (
+        len(output_names) == num_outputs
+    ), f"Number of outputs serialized in TRTEngine {len(output_names)} doesn't match with the number of outputs found during meta kernel execution {num_outputs} for execute_engine op"
+
+    fake_outputs = []
+    for out_idx in range(num_outputs):
+        output_shape = []
+        if is_dynamic_execution:
+            output_min_shape = outputs_mode_dict["min"][out_idx]
+            output_max_shape = outputs_mode_dict["max"][out_idx]
+            # create output symbolic shape
+            ctx = torch._custom_ops.get_ctx()
+            output_shape = []
+            for min_val, max_val in zip(output_min_shape, output_max_shape):
+                if min_val != max_val:
+                    output_sym_int = ctx.new_dynamic_size(min=min_val, max=max_val)
+                    output_shape.append(output_sym_int)
+                else:
+                    output_shape.append(min_val)
+        else:
+            output_shape.extend(outputs_mode_dict["opt"][out_idx])
+
+        fake_outputs.append(input.new_empty(output_shape))
+
+    return fake_outputs
 
 
-# namespace::class_name
 @torch._library.register_fake_class("tensorrt::Engine")
 class FakeTRTEngine:
-    def __init__(self, engine_info: List[Any]):
-        self.engine = torch.classes.tensorrt.Engine(engine_info)
+    def __init__(self, state_dict: Dict[str, Any]) -> None:
+        self.state_dict = state_dict
 
     @classmethod
     def __obj_unflatten__(cls, flattened_tq: Any) -> Any:
-        engine_info = [info[1] for info in flattened_tq]
-        engine_info[3] = base64.b64decode(engine_info[3])  # decode engine
-        engine_info[4] = str(engine_info[4][0])  # input names
-        engine_info[5] = str(engine_info[5][0])  # output names
-        engine_info[6] = str(int(engine_info[6]))  # hw compatible
-        return cls(engine_info)
+        state_dict = {}
+        for key, val in flattened_tq:
+            state_dict[key] = val
 
-    def __call__(self, inputs: List[torch.Tensor]) -> Any:
-
-        serialized_state = self.engine.__getstate__()
-        serialized_engine = base64.b64decode(serialized_state[0][3])
-        input_name = serialized_state[0][4]
-        output_name = serialized_state[0][5]
-
-        runtime = trt.Runtime(TRT_LOGGER)
-        engine = runtime.deserialize_cuda_engine(serialized_engine)
-        context = engine.create_execution_context()
-
-        fake_outputs = []
-        for input in inputs:
-            if contains_sym_int(input.shape):
-                # Using TensorRT's infer shape mechanism to infer output shapes
-                input_min_shape = unwrap_tensor_shape(input, mode="min")
-                context.set_input_shape(input_name, input_min_shape)
-                output_min_shape = context.get_tensor_shape(output_name)
-
-                input_max_shape = unwrap_tensor_shape(input, mode="max")
-                context.set_input_shape(input_name, input_max_shape)
-                output_max_shape = context.get_tensor_shape(output_name)
-
-                ctx = torch._custom_ops.get_ctx()
-
-                # create output symbolic shape
-                output_shape = []
-                for min_val, max_val in zip(output_min_shape, output_max_shape):
-                    if min_val != max_val:
-                        output_sym_int = ctx.new_dynamic_size(min=min_val, max=max_val)
-                        output_shape.append(output_sym_int)
-                    else:
-                        output_shape.append(min_val)
-
-            else:
-                input_shape = unwrap_tensor_shape(input)
-                context.set_input_shape(input_name, input_shape)
-                output_shape = context.get_tensor_shape(output_name)
-
-            fake_outputs.append(input.new_empty(output_shape))
-
-        return fake_outputs
+        return cls(state_dict)

@@ -124,13 +124,23 @@ def cosine_similarity(gt_tensor: torch.Tensor, pred_tensor: torch.Tensor) -> flo
     return res
 
 
-def input_is_dynamic(inputs: Sequence[Union[Input, torch.Tensor]]) -> bool:
+def input_is_dynamic(inputs: Sequence[Union[Input, torch.Tensor, FakeTensor]]) -> bool:
     """
-    Return true if the provided inputs are `torch_tensorrt.Input` objects and have dynamic shapes.
+    Return true if any of inputs have dynamic shapes. Supported types are torch_tensorrt.Input | torch.Tensor
     """
-    return not any(isinstance(input, torch.Tensor) for input in inputs) and any(
-        input.shape_mode == Input._ShapeMode.DYNAMIC for input in inputs
-    )
+    for input in inputs:
+        if isinstance(input, torch.Tensor):
+            if contains_sym_int(input.shape):
+                return True
+        elif isinstance(input, Input):
+            if input.shape_mode == Input._ShapeMode.DYNAMIC:
+                return True
+        else:
+            raise AssertionError(
+                f"Invalid input type ({type(input)}) found. Supported types are torch_tensorrt.Input | torch.Tensor"
+            )
+
+    return False
 
 
 def get_torch_tensor(
@@ -405,9 +415,9 @@ def get_graph_io_attrs(
             metadata = node.meta["val"]
             if isinstance(metadata, (tuple, list)):
                 for tensor in metadata:
-                    graph_io_attrs.append(attr_fn(tensor))
+                    graph_io_attrs.append(attr_fn(tensor))  # type: ignore
             else:
-                graph_io_attrs.append(attr_fn(metadata))
+                graph_io_attrs.append(attr_fn(metadata))  # type: ignore
 
     return graph_io_attrs
 

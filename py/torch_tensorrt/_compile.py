@@ -542,12 +542,10 @@ def save(
                     raise ValueError(
                         "Provided model is a torch.fx.GraphModule and retrace is True, however the inputs or arg_inputs are empty. Please provide valid torch.tensors as inputs or arg_inputs to trace and save the model"
                     )
-                dyn_batch = torch.export.Dim("x_0", min=1, max=6)
                 exp_program = torch.export.export(
                     module,
                     tuple(arg_inputs),
                     kwargs=kwarg_inputs,
                     strict=False,
-                    dynamic_shapes=({0: dyn_batch},),
                 )
                 torch.export.save(exp_program, file_path)
