@@ -366,6 +366,11 @@ class DispatchTestCase(TRTTestCase):
                 tuple(torch_export_inputs),
                 dynamic_shapes=torch_export_dynamic_shapes,
             )
+            if enable_passes:
+                exported_program = pre_export_lowering(exported_program, settings)
+                exported_program = exported_program.run_decompositions(
+                    get_decompositions(False)
+                )
             fx_module = exported_program.module()
         else:
             fx_module = torch.fx.symbolic_trace(mod)
