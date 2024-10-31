@@ -143,9 +143,9 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         self.engine = None
         self.weight_name_map = weight_name_map
         self.target_platform = Platform.current_platform()
-        self.runtime_states = TorchTRTRuntimeStates(
-            torch_tensorrt.runtime.get_cudagraphs_mode(), False
-        )
+        # Check if CUDA graph capture is enabled in the parent node
+        self.cudagraphs_parent_module = False
+        self.cudagraphs_enabled = False
         self.pre_allocated_outputs: List[torch.Tensor] = []
         self.use_pre_allocated_outputs = False
 
@@ -418,7 +418,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                                     This could happen if the input tensor addresses/shapes haven't been configured correctly"
                         )
 
-            with nvtx.annotate(f"ProcessOutputs", color="red"):
+            with nvtx.annotate("ProcessOutputs", color="red"):
                 # create output tensors
                 outputs: List[torch.Tensor] = []
                 if not self.persistent_output_buffer or shape_changed:
@@ -498,15 +498,13 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
 
                 self._caller_stream.wait_stream(self._engine_stream)
 
-            if self.persistent_output_buffer:
-                if len(self._output_buffers) == 1:
-                    return self._output_buffers[0]
+            if self.use_pre_allocated_outputs:
+                with nvtx.annotate("ProcessOutputs:2", color="red"):
+                    self.pre_allocated_outputs = self.create_output_tensors()
 
-                return self._output_buffers
-            else:
-                if cudagraphs_enabled:
-                    for idx, o in enumerate(outputs):
-                        o.copy_(self._output_buffers[idx])
+            if cudagraphs_enabled:
+                for idx, o in enumerate(outputs):
+                    o.copy_(self._output_buffers[idx])
 
             if len(outputs) == 1:
                 return outputs[0]

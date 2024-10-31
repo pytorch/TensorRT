@@ -906,7 +906,8 @@ def compile_module(
 
     dryrun_stats_display(dryrun_tracker, settings.dryrun)
 
-    if len(trt_modules) > 1:
+    # if len(trt_modules) > 1:
+    if True:
         # Capture/replay a series of CUDA operations in subgraphs in a wrapped runtime module.
         partitioned_module = WrapperTorchTensorRTModule(
             partitioned_module, dryrun_tracker.output_dtypes
