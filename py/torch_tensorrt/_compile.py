@@ -34,6 +34,9 @@ if ENABLED_FEATURES.dynamo_frontend:
     from torch_tensorrt.dynamo._compiler import (
         cross_compile_for_windows as dynamo_cross_compile_for_windows,
     )
+    from torch_tensorrt.dynamo._compiler import (
+        save_cross_compiled_exported_program as dynamo_save_cross_compiled_exported_program,
+    )
     from torch_tensorrt.dynamo._tracer import trace as dynamo_trace
 
 logger = logging.getLogger(__name__)
@@ -42,7 +45,6 @@ __all__ = [
     "compile",
     "cross_compile_for_windows",
     "load_cross_compiled_exported_program",
-    "save_cross_compiled_exported_program",
     "convert_method_to_trt_engine",
     "save",
     "load",
@@ -382,13 +384,14 @@ def cross_compile_for_windows(
     logger.debug("successfully exported the module")
 
     # Compile and save the module
-    dynamo_cross_compile_for_windows(
+    trt_gm = dynamo_cross_compile_for_windows(
         exp_program,
-        file_path,
         arg_inputs=torchtrt_arg_inputs,
         enabled_precisions=enabled_precisions_set,
         **kwargs,
     )
+
+    dynamo_save_cross_compiled_exported_program(trt_gm, file_path)
     logger.debug("successfully compiled and saved the module for windows")
 
 
@@ -693,13 +696,3 @@ def save(
                         module, tuple(arg_inputs), kwargs=kwarg_inputs, strict=False
                     )
                     torch.export.save(exp_program, file_path)
-
-
-
-def save_cross_compiled_exported_program(
-    gm: torch.fx.GraphModule,
-    file_path: str,
-) -> None:
-    from torch_tensorrt.dynamo._exporter import export
-    exp_program = export(gm, cross_compile_flag=True)
-    torch.export.save(exp_program, file_path)

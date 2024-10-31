@@ -50,24 +50,51 @@ logger = logging.getLogger(__name__)
 
 def cross_compile_for_windows(
     exported_program: ExportedProgram,
-    file_path: str,
     inputs: Optional[Sequence[Sequence[Any]]] = None,
     *,
     arg_inputs: Optional[Sequence[Sequence[Any]]] = None,
     kwarg_inputs: Optional[dict[Any, Any]] = None,
+    device: Optional[Union[Device, torch.device, str]] = _defaults.DEVICE,
+    disable_tf32: bool = _defaults.DISABLE_TF32,
+    assume_dynamic_shape_support: bool = _defaults.ASSUME_DYNAMIC_SHAPE_SUPPORT,
+    sparse_weights: bool = _defaults.SPARSE_WEIGHTS,
     enabled_precisions: Union[
         Set[Union[torch.dtype, dtype]], Tuple[Union[torch.dtype, dtype]]
     ] = _defaults.ENABLED_PRECISIONS,
+    engine_capability: EngineCapability = _defaults.ENGINE_CAPABILITY,
+    make_refittable: bool = _defaults.MAKE_REFITTABLE,
+    debug: bool = _defaults.DEBUG,
+    num_avg_timing_iters: int = _defaults.NUM_AVG_TIMING_ITERS,
+    workspace_size: int = _defaults.WORKSPACE_SIZE,
+    dla_sram_size: int = _defaults.DLA_SRAM_SIZE,
+    dla_local_dram_size: int = _defaults.DLA_LOCAL_DRAM_SIZE,
+    dla_global_dram_size: int = _defaults.DLA_GLOBAL_DRAM_SIZE,
+    truncate_double: bool = _defaults.TRUNCATE_DOUBLE,
+    require_full_compilation: bool = _defaults.REQUIRE_FULL_COMPILATION,
+    min_block_size: int = _defaults.MIN_BLOCK_SIZE,
+    torch_executed_ops: Optional[Collection[Target]] = None,
+    torch_executed_modules: Optional[List[str]] = None,
+    pass_through_build_failures: bool = _defaults.PASS_THROUGH_BUILD_FAILURES,
+    max_aux_streams: Optional[int] = _defaults.MAX_AUX_STREAMS,
+    version_compatible: bool = _defaults.VERSION_COMPATIBLE,
+    optimization_level: Optional[int] = _defaults.OPTIMIZATION_LEVEL,
+    use_fast_partitioner: bool = _defaults.USE_FAST_PARTITIONER,
+    enable_experimental_decompositions: bool = _defaults.ENABLE_EXPERIMENTAL_DECOMPOSITIONS,
+    dryrun: bool = _defaults.DRYRUN,
+    hardware_compatible: bool = _defaults.HARDWARE_COMPATIBLE,
+    timing_cache_path: str = _defaults.TIMING_CACHE_PATH,
+    engine_cache_dir: str = _defaults.ENGINE_CACHE_DIR,
+    engine_cache_size: int = _defaults.ENGINE_CACHE_SIZE,
+    use_explicit_typing: bool = _defaults.USE_EXPLICIT_TYPING,
+    use_fp32_acc: bool = _defaults.USE_FP32_ACC,
+    enable_weight_streaming: bool = _defaults.ENABLE_WEIGHT_STREAMING,
     **kwargs: Any,
-) -> None:
+) -> torch.fx.GraphModule:
 
     if platform.system() != "Linux" or platform.architecture()[0] != "64bit":
         raise RuntimeError(
             f"Cross compile for windows is only supported on x86-64 Linux architecture, current platform: {platform.system()=}, {platform.architecture()[0]=}"
         )
-
-    if not file_path:
-        raise ValueError("File path cannot be empty. Please provide a valid file path")
 
     # enable cross compile for windows
     kwargs["enable_cross_compile_for_windows"] = True
@@ -89,19 +116,142 @@ def cross_compile_for_windows(
             )
             kwargs[key] = False
 
-    trt_gm = compile(
-        exported_program,
-        inputs=inputs,
-        arg_inputs=arg_inputs,
-        kwarg_inputs=kwarg_inputs,
-        enabled_precisions=enabled_precisions,
-        **kwargs,
+    if debug:
+        set_log_level(logger.parent, logging.DEBUG)
+
+    if "truncate_long_and_double" in kwargs.keys():
+        if truncate_double is not _defaults.TRUNCATE_DOUBLE:
+            raise ValueError(
+                'Provided configuration for "truncate_double" and deprecated API "truncate_long_and_double", please only use "truncate_double"'
+            )
+        else:
+            truncate_double = kwargs["truncate_long_and_double"]
+            warnings.warn(
+                'Compiler option "truncate_long_and_double" is deprecated in favor of "truncate_double" as int64 is now natively supported, this option will be removed in the next version',
+                DeprecationWarning,
+                stacklevel=2,
+            )
+
+    if "refit" in kwargs.keys():
+        warnings.warn(
+            "Refit is deprecated. Please use make_refittable=True if you want to enable refitting of the engine.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        if make_refittable:
+            raise ValueError("Use flag make_refittable only. Flag refit is deprecated.")
+        else:
+            make_refittable = kwargs["refit"]
+
+    engine_capability = EngineCapability._from(engine_capability)
+
+    if torch_executed_modules is not None and torch_executed_modules:
+        logger.warning(
+            f"Detected torch_executed_modules was non-empty: {torch_executed_modules}"
+            "\nThis feature is unimplemented in Torch-TRT Dynamo currently."
+        )
+
+    if use_explicit_typing:
+        if len(enabled_precisions) != 1 or not any(
+            x in enabled_precisions for x in {torch.float32, dtype.f32}
+        ):
+            raise AssertionError(
+                f"When use_explicit_typing is enabled, only torch.float32 is allowed in the enabled_precisions but found {enabled_precisions}"
+            )
+
+    if use_fp32_acc:
+        logger.debug(
+            "FP32 accumulation for matmul layers is enabled. This option should only be enabled if the model already has FP16 weights and has no effect if it has FP32 weights. \
+                     This flag inserts casts around matmul layers and ensures TensorRT executes the matmul layers in FP16 with FP32 accumulation."
+        )
+
+    if enable_weight_streaming and not use_explicit_typing:
+        raise AssertionError(
+            "When enable_weight_streaming is enabled, it requires use_explicit_typing to be set to True"
+        )
+    # Aliasing inputs to arg_inputs for better understanding
+    if not arg_inputs and not inputs:
+        raise AssertionError("'arg_inputs' and 'inputs' should not both be None.")
+
+    elif arg_inputs and inputs:
+        raise AssertionError(
+            "'arg_inputs' and 'inputs' should not be used at the same time."
+        )
+
+    arg_inputs = inputs or arg_inputs
+
+    if kwarg_inputs is None:
+        kwarg_inputs = {}
+
+    if not isinstance(arg_inputs, collections.abc.Sequence):
+        arg_inputs = [arg_inputs]  # type: ignore
+
+    # Prepare torch_trt inputs
+    trt_arg_inputs: Sequence[Input] = prepare_inputs(arg_inputs)
+    trt_kwarg_inputs: Optional[dict[Any, Any]] = prepare_inputs(kwarg_inputs)
+    device = to_torch_tensorrt_device(device)
+    enabled_precisions = {dtype._from(p) for p in enabled_precisions}
+
+    compilation_options = {
+        "enabled_precisions": (
+            enabled_precisions if enabled_precisions else _defaults.ENABLED_PRECISIONS
+        ),
+        "debug": debug,
+        "device": device,
+        "assume_dynamic_shape_support": assume_dynamic_shape_support,
+        "workspace_size": workspace_size,
+        "min_block_size": min_block_size,
+        "torch_executed_ops": (
+            torch_executed_ops if torch_executed_ops is not None else set()
+        ),
+        "pass_through_build_failures": pass_through_build_failures,
+        "max_aux_streams": max_aux_streams,
+        "version_compatible": version_compatible,
+        "optimization_level": optimization_level,
+        "use_python_runtime": False,
+        "truncate_double": truncate_double,
+        "use_fast_partitioner": use_fast_partitioner,
+        "num_avg_timing_iters": num_avg_timing_iters,
+        "enable_experimental_decompositions": enable_experimental_decompositions,
+        "require_full_compilation": require_full_compilation,
+        "disable_tf32": disable_tf32,
+        "sparse_weights": sparse_weights,
+        "make_refittable": make_refittable,
+        "engine_capability": engine_capability,
+        "dla_sram_size": dla_sram_size,
+        "dla_local_dram_size": dla_local_dram_size,
+        "dla_global_dram_size": dla_global_dram_size,
+        "dryrun": dryrun,
+        "hardware_compatible": hardware_compatible,
+        "timing_cache_path": timing_cache_path,
+        "lazy_engine_init": False,
+        "cache_built_engines": False,
+        "reuse_cached_engines": False,
+        "enable_cross_compile_for_windows": True,
+        "enable_weight_streaming": enable_weight_streaming,
+    }
+
+    settings = CompilationSettings(**compilation_options)
+    logger.info("Compilation Settings: %s\n", settings)
+    exported_program = pre_export_lowering(exported_program, settings)
+    exported_program = exported_program.run_decompositions(
+        get_decompositions(enable_experimental_decompositions)
     )
 
-    from torch_tensorrt import save_cross_compiled_exported_program
+    gm = exported_program.module()
+    logger.debug("Input graph: " + str(gm.graph))
 
-    save_cross_compiled_exported_program(trt_gm, file_path)
-    logger.debug(f"successfully saved the module for windows at {file_path}")
+    # Apply lowering on the graph module
+    gm = post_lowering(gm, settings)
+    logger.debug("Lowered Input graph: " + str(gm.graph))
+
+    trt_gm = compile_module(
+        gm,
+        trt_arg_inputs,
+        trt_kwarg_inputs,
+        settings,
+    )
+    return trt_gm
 
 
 def compile(
@@ -149,7 +299,6 @@ def compile(
     use_explicit_typing: bool = _defaults.USE_EXPLICIT_TYPING,
     use_fp32_acc: bool = _defaults.USE_FP32_ACC,
     enable_weight_streaming: bool = _defaults.ENABLE_WEIGHT_STREAMING,
-    enable_cross_compile_for_windows: bool = _defaults.ENABLE_CROSS_COMPILE_FOR_WINDOWS,
     **kwargs: Any,
 ) -> torch.fx.GraphModule:
     """Compile an ExportedProgram module for NVIDIA GPUs using TensorRT
@@ -254,6 +403,11 @@ def compile(
         else:
             make_refittable = kwargs["refit"]
 
+    if "enable_cross_compile_for_windows" in kwargs.keys():
+        raise ValueError(
+            "Please use cross_compile_for_windows() api if you want to cross compile the module in Linux for inferencing in Windows."
+        )
+
     engine_capability = EngineCapability._from(engine_capability)
 
     if torch_executed_modules is not None and torch_executed_modules:
@@ -354,7 +508,7 @@ def compile(
         "lazy_engine_init": lazy_engine_init,
         "cache_built_engines": cache_built_engines,
         "reuse_cached_engines": reuse_cached_engines,
-        "enable_cross_compile_for_windows": enable_cross_compile_for_windows,
+        "enable_cross_compile_for_windows": False,
         "enable_weight_streaming": enable_weight_streaming,
     }
 
@@ -818,3 +972,24 @@ def convert_exported_program_to_serialized_trt_engine(
 
     serialized_engine: bytes = interpreter_result.serialized_engine
     return serialized_engine
+
+
+def save_cross_compiled_exported_program(
+    gm: torch.fx.GraphModule,
+    file_path: str,
+) -> None:
+    """
+    Save cross compiled exported program to disk.
+
+    Arguments:
+        module (torch.fx.GraphModule): Cross compiled Torch-TensorRT module
+        file_path (str): the file path where the exported program will be saved to disk
+    """
+    if not file_path:
+        raise ValueError("File path cannot be empty. Please provide a valid file path")
+
+    from torch_tensorrt.dynamo._exporter import export
+
+    exp_program = export(gm, cross_compile_flag=True)
+    torch.export.save(exp_program, file_path)
+    logger.debug(f"successfully saved the module for windows at {file_path}")

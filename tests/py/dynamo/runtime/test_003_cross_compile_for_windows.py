@@ -15,7 +15,7 @@ class TestCrossCompileSaveForWindows(TestCase):
 
     @unittest.skipIf(
         platform.system() != "Linux" or platform.architecture()[0] != "64bit",
-        "Cross compile for windows can only be enabled on linux 64 AMD platform",
+        "Cross compile for windows can only be enabled on linux x86-64 platform",
     )
     @pytest.mark.unit
     def test_cross_compile_for_windows(self):
@@ -35,7 +35,7 @@ class TestCrossCompileSaveForWindows(TestCase):
 
     @unittest.skipIf(
         platform.system() != "Linux" or platform.architecture()[0] != "64bit",
-        "Cross compile for windows can only be enabled on linux 64 AMD platform",
+        "Cross compile for windows can only be enabled on linux x86-64 platform",
     )
     @pytest.mark.unit
     def test_dynamo_cross_compile_for_windows(self):
@@ -48,8 +48,11 @@ class TestCrossCompileSaveForWindows(TestCase):
         trt_ep_path = os.path.join(tempfile.gettempdir(), "trt.ep")
         exp_program = torch.export.export(model, inputs)
         try:
-            torch_tensorrt.dynamo.cross_compile_for_windows(
-                exp_program, file_path=trt_ep_path, inputs=inputs
+            trt_gm = torch_tensorrt.dynamo.cross_compile_for_windows(
+                exp_program, inputs=inputs
+            )
+            torch_tensorrt.dynamo.save_cross_compiled_exported_program(
+                trt_gm, file_path=trt_ep_path
             )
         except Exception as e:
             pytest.fail(f"unexpected exception raised: {e}")
