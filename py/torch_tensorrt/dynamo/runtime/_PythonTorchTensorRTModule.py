@@ -109,7 +109,8 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         # Check if CUDA graph capture is enabled in the parent node
         self.cudagraphs_parent_module = False
         self.cudagraphs_enabled = False
-        self.persistent_output_buffer = False
+        self.pre_allocated_outputs: List[torch.Tensor] = []
+        self.use_pre_allocated_outputs = False
 
         if self.serialized_engine is not None and not self.settings.lazy_engine_init:
             self.setup_engine()
@@ -174,7 +175,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
             self.engine.get_tensor_shape(input_name) for input_name in self.input_names
         ]
         self.output_dtypes = [
-            dtype._from(self.engine.get_tensor_dtype(output_name))
+            dtype._from(self.engine.get_tensor_dtype(output_name)).to(torch.dtype)
             for output_name in self.output_names
         ]
         self.output_shapes = [
@@ -234,6 +235,19 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
     def __del__(self) -> None:
         if self.cudagraph:
             self.cudagraph.reset()
+
+    def create_output_tensors(self) -> List[torch.Tensor]:
+        # create output tensors
+        outputs: List[torch.Tensor] = []
+
+        for o, _ in enumerate(self.output_names):
+            output = torch.empty(
+                size=self.output_shapes[o],
+                dtype=self.output_dtypes[o],
+                device=torch.cuda.current_device(),
+            )
+            outputs.append(output)
+        return outputs
 
     def forward(self, *inputs: torch.Tensor) -> torch.Tensor | Tuple[torch.Tensor, ...]:
         # Ensure inputs are available in all scopes and cast symbolic integers to Tensors
@@ -350,50 +364,41 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                             self.context.set_tensor_address(
                                 input_name, contiguous_inputs[i].data_ptr()
                             )
-
-                # Check if input shapes can be inferred.
-                uninferred_input_names = self.context.infer_shapes()
-                if uninferred_input_names:
-                    logger.warning(
-                        f"The shapes of the inputs: {uninferred_input_names} cannot be inferred and could lead to undefined behavior. \
-                                This could happen if the input tensor addresses/shapes haven't been configured correctly"
-                    )
-
-            with nvtx.annotate("ProcessOutputs", color="red"):
-                # create output tensors
-                outputs: List[torch.Tensor] = []
-                if not self.persistent_output_buffer or shape_changed:
-                    # Create and keep persistent output buffer as long as its shape does not change
-                    self._output_buffers = []
-                    for o, output_name in enumerate(self.output_names):
-                        shape = tuple(self.context.get_tensor_shape(output_name))
-                        if DYNAMIC_DIM in shape:
-                            raise ValueError(
-                                "Encountered dynamic output shapes during runtime. This could mean the network has data-dependent output shapes which is not currently supported."
-                            )
-
-                        output = torch.empty(
-                            size=shape,
-                            dtype=self.output_dtypes[o].to(torch.dtype),
-                            device=torch.cuda.current_device(),
+                if shape_changed:
+                    # Check if input shapes can be inferred.
+                    uninferred_input_names = self.context.infer_shapes()
+                    if uninferred_input_names:
+                        logger.warning(
+                            f"The shapes of the inputs: {uninferred_input_names} cannot be inferred and could lead to undefined behavior. \
+                                    This could happen if the input tensor addresses/shapes haven't been configured correctly"
                         )
-                        if self.persistent_output_buffer:
-                            self.context.set_tensor_address(
-                                output_name, output.data_ptr()
-                            )
-                            self._output_buffers.append(output)
-                        else:
-                            outputs.append(output)
-                            if need_cudagraphs_record:
-                                self._output_buffers[o] = outputs[o].clone()
-                            if cudagraphs_enabled:
-                                self.context.set_tensor_address(
-                                    output_name, self._output_buffers[o].data_ptr()
-                                )
-                            else:
-                                self.context.set_tensor_address(
-                                    output_name, outputs[o].data_ptr()
-                                )
+
+            with nvtx.annotate("ProcessOutputs:1", color="red"):
+                if not self.use_pre_allocated_outputs or shape_changed:
+                    self.output_shapes = [
+                        tuple(self.context.get_tensor_shape(output_name))
+                        for output_name in self.output_names
+                    ]
+                    if DYNAMIC_DIM in self.output_shapes:
+                        raise ValueError(
+                            "Encountered dynamic output shapes during runtime. This could mean the network has data-dependent output shapes which is not currently supported."
+                        )
+                    outputs = self.create_output_tensors()
+                else:
+                    outputs = self.pre_allocated_outputs
+
+                for o, output_name in enumerate(self.output_names):
+                    if need_cudagraphs_record:
+                        self._output_buffers[o] = outputs[o].clone()
+                    if cudagraphs_enabled:
+                        self.context.set_tensor_address(
+                            output_name, self._output_buffers[o].data_ptr()
+                        )
+                    else:
+                        self.context.set_tensor_address(
+                            output_name, outputs[o].data_ptr()
+                        )
+
             with nvtx.annotate("TensorRTRuntime", color="red"):
                 self._caller_stream = torch.cuda.current_stream()
                 if (
@@ -439,15 +444,13 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
 
                 self._caller_stream.wait_stream(self._engine_stream)
 
-            if self.persistent_output_buffer:
-                if len(self._output_buffers) == 1:
-                    return self._output_buffers[0]
+            if self.use_pre_allocated_outputs:
+                with nvtx.annotate("ProcessOutputs:2", color="red"):
+                    self.pre_allocated_outputs = self.create_output_tensors()
 
-                return self._output_buffers
-            else:
-                if cudagraphs_enabled:
-                    for idx, o in enumerate(outputs):
-                        o.copy_(self._output_buffers[idx])
+            if cudagraphs_enabled:
+                for idx, o in enumerate(outputs):
+                    o.copy_(self._output_buffers[idx])
 
             if len(outputs) == 1:
                 return outputs[0]
