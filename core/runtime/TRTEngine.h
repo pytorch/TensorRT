@@ -80,7 +80,7 @@ struct TRTEngine : torch::CustomClassHolder {
   void enable_profiling();
   void disable_profiling();
   std::string get_engine_layer_info();
-  std::shared_ptr<nvinfer1::IExecutionContext> create_execution_context();
+
   void dump_engine_layer_info_to_file(const std::string& path);
   void dump_engine_layer_info();
   int64_t get_device_memory_budget();

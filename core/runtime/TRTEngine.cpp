@@ -248,13 +248,6 @@ void TRTEngine::enable_profiling() {
   exec_ctx->setProfiler(trt_engine_profiler.get());
 }
 
-std::shared_ptr<nvinfer1::IExecutionContext> TRTEngine::create_execution_context() {
-  exec_ctx.reset();
-  exec_ctx = make_trt(cuda_engine->createExecutionContext());
-  auto inspector = cuda_engine->createEngineInspector();
-  return exec_ctx;
-}
-
 std::string TRTEngine::get_engine_layer_info() {
   auto inspector = cuda_engine->createEngineInspector();
   return inspector->getEngineInformation(nvinfer1::LayerInformationFormat::kJSON);

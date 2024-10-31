@@ -354,7 +354,7 @@ def extract_var_range_info(symbolic_integer: torch.SymInt) -> Dict[str, int]:
 
 
 def unwrap_tensor_shape(
-    tensor: Union[torch.Tensor, FakeTensor, torch.SymInt]
+    tensor: Union[torch.Tensor, FakeTensor, torch.SymInt], mode: Optional[str] = ""
 ) -> Sequence[Union[int, Tuple[int, int]]]:
     """
     This is a helper function used to print/return the shape of the tensor.
@@ -368,10 +368,13 @@ def unwrap_tensor_shape(
         tensor_shape.append(tensor)
     elif isinstance(tensor, torch.SymInt):
         min_max_opt = extract_var_range_info(tensor)
-        tensor_shape.append((min_max_opt["min"], min_max_opt["max"]))
+        if mode:
+            tensor_shape.append(min_max_opt[mode])
+        else:
+            tensor_shape.append((min_max_opt["min"], min_max_opt["max"]))
     elif isinstance(tensor, (torch.Tensor, FakeTensor)):
         for dimension in tensor.shape:
-            tensor_shape.extend(unwrap_tensor_shape(dimension))
+            tensor_shape.extend(unwrap_tensor_shape(dimension, mode=mode))
 
     return tuple(tensor_shape)
 
