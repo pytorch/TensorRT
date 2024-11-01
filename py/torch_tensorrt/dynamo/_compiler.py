@@ -175,27 +175,6 @@ def cross_compile_for_windows(
             f"Cross compile for windows is only supported on x86-64 Linux architecture, current platform: {platform.system()=}, {platform.architecture()[0]=}"
         )
 
-    # enable cross compile for windows
-    kwargs["enable_cross_compile_for_windows"] = True
-
-    # disable the following settings is not supported for cross compilation for windows feature
-    unsupported_settings = [
-        use_python_runtime,
-        lazy_engine_init,
-        cache_built_engines,
-        reuse_cached_engines,
-    ]
-    # disable these settings if anything is turned on
-    for idx, value in enumerate(unsupported_settings):
-        if value:
-            unsupported_settings[idx] = False
-    (
-        use_python_runtime,
-        lazy_engine_init,
-        cache_built_engines,
-        reuse_cached_engines,
-    ) = unsupported_settings
-
     if debug:
         set_log_level(logger.parent, logging.DEBUG)
 
@@ -304,12 +283,27 @@ def cross_compile_for_windows(
         "dryrun": dryrun,
         "hardware_compatible": hardware_compatible,
         "timing_cache_path": timing_cache_path,
-        "lazy_engine_init": False,
-        "cache_built_engines": False,
-        "reuse_cached_engines": False,
+        "lazy_engine_init": lazy_engine_init,
+        "cache_built_engines": cache_built_engines,
+        "reuse_cached_engines": reuse_cached_engines,
         "enable_cross_compile_for_windows": True,
         "enable_weight_streaming": enable_weight_streaming,
     }
+
+    # disable the following settings is not supported for cross compilation for windows feature
+    unsupported_settings = (
+        "use_python_runtime",
+        "lazy_engine_init",
+        "cache_built_engines",
+        "reuse_cached_engines",
+    )
+    # disable these settings if anything is turned on
+    for key, value in compilation_options.items():
+        if key in unsupported_settings and value:
+            compilation_options[key] = False
+            logger.warning(
+                f"arg: {key} is not supported for cross compilation for windows feature, hence it is disabled."
+            )
 
     settings = CompilationSettings(**compilation_options)
     logger.info("Compilation Settings: %s\n", settings)
