@@ -92,7 +92,7 @@ jobs:
       TENSORRT_VERSION: ${{ matrix.tensorrt.version }}
       TENSORRT_URLS: ${{ matrix.tensorrt.urls }}
       TENSORRT_SHA256: ${{ matrix.tensorrt.sha256 }}
-    name: build_tensorrt${{ matrix.tensorrt.version }}_py${{matrix.python_version}}_cu${{matrix.desired_cuda}}
+    name: build_tensorrt${{ matrix.tensorrt.version }}_py${{matrix.python_version}}_${{matrix.desired_cuda}}
     runs-on: ${{ matrix.validation_runner }}
     container:
       image: ${{ matrix.container_image }}
@@ -213,7 +213,7 @@ jobs:
         continue-on-error: true
         uses: actions/upload-artifact@v3
         with:
-          name: ${{ env.ARTIFACT_NAME }}
+          name: torch_tensorrt_${{env.TENSORRT_VERSION}}_py${{env.PYTHON_VERSION}}_${{env.CU_VERSION}}
           path: ${{ inputs.repository }}/dist
 
 concurrency:

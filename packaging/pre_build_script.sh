@@ -21,6 +21,13 @@ pip install --force-reinstall --pre ${TORCH_TORCHVISION} --index-url ${INDEX_URL
 export TORCH_BUILD_NUMBER=$(python -c "import torch, urllib.parse as ul; print(ul.quote_plus(torch.__version__))")
 export TORCH_INSTALL_PATH=$(python -c "import torch, os; print(os.path.dirname(torch.__file__))")
 
+# replace current tensorrt version to the upgraded tensorrt version
+current_version="10.3.0"
+sed -i -e "s/tensorrt-cu12==${current_version}/tensorrt-cu12==${TENSORRT_VERSION}/g" \
+         -e "s/tensorrt-cu12-bindings==${current_version}/tensorrt-cu12-bindings==${TENSORRT_VERSION}/g" \
+         -e "s/tensorrt-cu12-libs==${current_version}/tensorrt-cu12-libs==${TENSORRT_VERSION}/g" \
+         pyproject.toml
+
 if [[ "${CU_VERSION::4}" < "cu12" ]]; then
   # replace dependencies from tensorrt-cu12-bindings/libs to tensorrt-cu11-bindings/libs
   sed -i -e "s/tensorrt-cu12==/tensorrt-${CU_VERSION::4}==/g" \
