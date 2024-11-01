@@ -530,7 +530,7 @@ def load_cross_compiled_exported_program(file_path: str = "") -> Any:
         file_path (str): Path to file on the disk
 
     Raises:
-        ValueError: If the api is not called in windows or there is no file or the file is a valid ExportedProgram file
+        ValueError: If the api is not called in windows or there is no file or the file is not a valid ExportedProgram file
     """
     return dynamo_load_cross_compiled_exported_program(file_path)
 

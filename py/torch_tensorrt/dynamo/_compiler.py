@@ -79,17 +79,97 @@ def cross_compile_for_windows(
     max_aux_streams: Optional[int] = _defaults.MAX_AUX_STREAMS,
     version_compatible: bool = _defaults.VERSION_COMPATIBLE,
     optimization_level: Optional[int] = _defaults.OPTIMIZATION_LEVEL,
+    use_python_runtime: bool = _defaults.USE_PYTHON_RUNTIME,
     use_fast_partitioner: bool = _defaults.USE_FAST_PARTITIONER,
     enable_experimental_decompositions: bool = _defaults.ENABLE_EXPERIMENTAL_DECOMPOSITIONS,
     dryrun: bool = _defaults.DRYRUN,
     hardware_compatible: bool = _defaults.HARDWARE_COMPATIBLE,
     timing_cache_path: str = _defaults.TIMING_CACHE_PATH,
+    lazy_engine_init: bool = _defaults.LAZY_ENGINE_INIT,
+    cache_built_engines: bool = _defaults.CACHE_BUILT_ENGINES,
+    reuse_cached_engines: bool = _defaults.REUSE_CACHED_ENGINES,
+    engine_cache_dir: str = _defaults.ENGINE_CACHE_DIR,
+    engine_cache_size: int = _defaults.ENGINE_CACHE_SIZE,
+    custom_engine_cache: Optional[BaseEngineCache] = _defaults.CUSTOM_ENGINE_CACHE,
     use_explicit_typing: bool = _defaults.USE_EXPLICIT_TYPING,
     use_fp32_acc: bool = _defaults.USE_FP32_ACC,
     enable_weight_streaming: bool = _defaults.ENABLE_WEIGHT_STREAMING,
     **kwargs: Any,
 ) -> torch.fx.GraphModule:
+    """Compile an ExportedProgram module using TensorRT in Linux for Inference in Windows
 
+    Takes an exported program and a set of settings to configure the compiler
+    and it will convert methods to AOT graphs which call equivalent TensorRT engines
+
+    Arguments:
+        exported_program (torch.export.ExportedProgram): Source module, running torch.export on a ``torch.nn.Module``
+        inputs (Tuple[Any, ...]): List of specifications of input shape, dtype and memory layout for inputs to the module. This argument is required. Input Sizes can be specified as torch sizes, tuples or lists. dtypes can be specified using
+            torch datatypes or torch_tensorrt datatypes and you can use either torch devices or the torch_tensorrt device type enum
+            to select device type.
+
+                .. code-block:: py
+
+                    inputs=[
+                        torch_tensorrt.Input((1, 3, 224, 224)), # Static NCHW input shape for input #1
+                        torch_tensorrt.Input(
+                            min_shape=(1, 224, 224, 3),
+                            opt_shape=(1, 512, 512, 3),
+                            max_shape=(1, 1024, 1024, 3),
+                            dtype=torch.int32
+                            format=torch.channel_last
+                        ), # Dynamic input shape for input #2
+                        torch.randn((1, 3, 224, 244)) # Use an example tensor and let torch_tensorrt infer settings
+                    ]
+
+    Keyword Arguments:
+        arg_inputs (Tuple[Any, ...]): Same as inputs. Alias for better understanding with kwarg_inputs.
+        kwarg_inputs (dict[Any, ...]): Optional, kwarg inputs to the module forward function.
+        device (Union(torch_tensorrt.Device, torch.device, dict)): Target device for TensorRT engines to run on ::
+
+            device=torch_tensorrt.Device("dla:1", allow_gpu_fallback=True)
+
+        disable_tf32 (bool): Force FP32 layers to use traditional as FP32 format vs the default behavior of rounding the inputs to 10-bit mantissas before multiplying, but accumulates the sum using 23-bit mantissas
+        assume_dynamic_shape_support (bool): Setting this to true enables the converters work for both dynamic and static shapes. Default: False
+        sparse_weights (bool): Enable sparsity for convolution and fully connected layers.
+        enabled_precision (Set(Union(torch.dtype, torch_tensorrt.dtype))): The set of datatypes that TensorRT can use when selecting kernels
+        refit (bool): Enable refitting
+        debug (bool): Enable debuggable engine
+        capability (torch_tensorrt.EngineCapability): Restrict kernel selection to safe gpu kernels or safe dla kernels
+        num_avg_timing_iters (int): Number of averaging timing iterations used to select kernels
+        workspace_size (int): Maximum size of workspace given to TensorRT
+        dla_sram_size (int): Fast software managed RAM used by DLA to communicate within a layer.
+        dla_local_dram_size (int): Host RAM used by DLA to share intermediate tensor data across operations
+        dla_global_dram_size (int): Host RAM used by DLA to store weights and metadata for execution
+        truncate_double (bool): Truncate weights provided in double (float64) to float32
+        calibrator (Union(torch_tensorrt._C.IInt8Calibrator, tensorrt.IInt8Calibrator)): Calibrator object which will provide data to the PTQ system for INT8 Calibration
+        require_full_compilation (bool): Require modules to be compiled end to end or return an error as opposed to returning a hybrid graph where operations that cannot be run in TensorRT are run in PyTorch
+        min_block_size (int): The minimum number of contiguous TensorRT convertible operations in order to run a set of operations in TensorRT
+        torch_executed_ops (Collection[Target]): Set of aten operators that must be run in PyTorch. An error will be thrown if this set is not empty but ``require_full_compilation`` is True
+        torch_executed_modules (List[str]): List of modules that must be run in PyTorch. An error will be thrown if this list is not empty but ``require_full_compilation`` is True
+        pass_through_build_failures (bool): Error out if there are issues during compilation (only applicable to torch.compile workflows)
+        max_aux_stream (Optional[int]): Maximum streams in the engine
+        version_compatible (bool): Build the TensorRT engines compatible with future versions of TensorRT (Restrict to lean runtime operators to provide version forward compatibility for the engines)
+        optimization_level: (Optional[int]): Setting a higher optimization level allows TensorRT to spend longer engine building time searching for more optimization options. The resulting engine may have better performance compared to an engine built with a lower optimization level. The default optimization level is 3. Valid values include integers from 0 to the maximum optimization level, which is currently 5. Setting it to be greater than the maximum level results in identical behavior to the maximum level.
+        use_python_runtime: (bool): Return a graph using a pure Python runtime, reduces options for serialization
+        use_fast_partitioner: (bool): Use the adjacency based partitioning scheme instead of the global partitioner. Adjacency partitioning is faster but may not be optimal. Use the global paritioner (``False``) if looking for best performance
+        enable_experimental_decompositions (bool): Use the full set of operator decompositions. These decompositions may not be tested but serve to make the graph easier to convert to TensorRT, potentially increasing the amount of graphs run in TensorRT.
+        dryrun (bool): Toggle for "Dryrun" mode, running everything except conversion to TRT and logging outputs
+        hardware_compatible (bool): Build the TensorRT engines compatible with GPU architectures other than that of the GPU on which the engine was built (currently works for NVIDIA Ampere and newer)
+        timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation
+        lazy_engine_init (bool): Defer setting up engines until the compilation of all engines is complete. Can allow larger models with multiple graph breaks to compile but can lead to oversubscription of GPU memory at runtime.
+        cache_built_engines (bool): Whether to save the compiled TRT engines to storage
+        reuse_cached_engines (bool): Whether to load the compiled TRT engines from storage
+        engine_cache_dir (Optional[str]): Directory to store the cached TRT engines
+        engine_cache_size (Optional[int]): Maximum hard-disk space (bytes) to use for the engine cache, default is 1GB. If the cache exceeds this size, the oldest engines will be removed by default
+        custom_engine_cache (Optional[BaseEngineCache]): Engine cache instance to use for saving and loading engines. Users can provide their own engine cache by inheriting from BaseEngineCache. If used, engine_cache_dir and engine_cache_size will be ignored.
+        use_explicit_typing (bool): This flag enables strong typing in TensorRT compilation which respects the precisions set in the Pytorch model. This is useful when users have mixed precision graphs.
+        use_fp32_acc (bool): This option inserts cast to FP32 nodes around matmul layers and TensorRT ensures the accumulation of matmul happens in FP32. Use this only when FP16 precision is configured in enabled_precisions.
+        enable_weight_streaming (bool): Enable weight streaming.
+        **kwargs: Any,
+    Returns:
+        torch.fx.GraphModule: Compiled FX Module, when run it will execute via TensorRT
+
+    """
     if platform.system() != "Linux" or platform.architecture()[0] != "64bit":
         raise RuntimeError(
             f"Cross compile for windows is only supported on x86-64 Linux architecture, current platform: {platform.system()=}, {platform.architecture()[0]=}"
@@ -99,21 +179,22 @@ def cross_compile_for_windows(
     kwargs["enable_cross_compile_for_windows"] = True
 
     # disable the following settings is not supported for cross compilation for windows feature
-    unsupported_settings = {
-        "use_python_runtime",
-        "lazy_engine_init",
-        "cache_built_engines",
-        "reuse_cached_engines",
-        "custom_engine_cache",
-    }
+    unsupported_settings = [
+        use_python_runtime,
+        lazy_engine_init,
+        cache_built_engines,
+        reuse_cached_engines,
+    ]
     # disable these settings if anything is turned on
-    kwarg_key_sets = set(kwargs.keys())
-    for key in unsupported_settings.intersection(kwarg_key_sets):
-        if kwargs.get(key):
-            logger.warning(
-                f"arg: {key} is not supported for cross compilation for windows feature, it is ignored."
-            )
-            kwargs[key] = False
+    for idx, value in enumerate(unsupported_settings):
+        if value:
+            unsupported_settings[idx] = False
+    (
+        use_python_runtime,
+        lazy_engine_init,
+        cache_built_engines,
+        reuse_cached_engines,
+    ) = unsupported_settings
 
     if debug:
         set_log_level(logger.parent, logging.DEBUG)
@@ -507,6 +588,8 @@ def compile(
         "lazy_engine_init": lazy_engine_init,
         "cache_built_engines": cache_built_engines,
         "reuse_cached_engines": reuse_cached_engines,
+        "use_explicit_typing": use_explicit_typing,
+        "use_fp32_acc": use_fp32_acc,
         "enable_cross_compile_for_windows": False,
         "enable_weight_streaming": enable_weight_streaming,
     }
