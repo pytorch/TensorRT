@@ -29,6 +29,11 @@ TENSORRT_VERSIONS_DICT = {
             "strip_prefix": "TensorRT-10.5.0.18",
             "sha256": "e6436f4164db4e44d727354dccf7d93755efb70d6fbfd6fa95bdfeb2e7331b24",
         },
+        "10.6.0": {
+            "urls": "https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.6.0/zip/TensorRT-10.6.0.26.Windows.win10.cuda-12.6.zip",
+            "strip_prefix": "TensorRT-10.6.0.26",
+            "sha256": "6c6d92c108a1b3368423e8f69f08d31269830f1e4c9da43b37ba34a176797254",
+        },
     },
     "linux": {
         "10.4.0": {
@@ -39,6 +44,11 @@ TENSORRT_VERSIONS_DICT = {
         "10.5.0": {
             "urls": "https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.5.0/tars/TensorRT-10.5.0.18.Linux.x86_64-gnu.cuda-12.6.tar.gz",
             "strip_prefix": "TensorRT-10.5.0.18",
+            "sha256": "f404d379d639552a3e026cd5267213bd6df18a4eb899d6e47815bbdb34854958",
+        },
+        "10.6.0": {
+            "urls": "https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.6.0/tars/TensorRT-10.6.0.26.Linux.x86_64-gnu.cuda-12.6.tar.gz",
+            "strip_prefix": "TensorRT-10.6.0.26",
             "sha256": "f404d379d639552a3e026cd5267213bd6df18a4eb899d6e47815bbdb34854958",
         },
     },

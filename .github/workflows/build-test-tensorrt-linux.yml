@@ -67,7 +67,6 @@ jobs:
       package-name: ${{ matrix.package-name }}
       smoke-test-script: ${{ matrix.smoke-test-script }}
       trigger-event: ${{ github.event_name }}
-      upload-artifact: torch_tensorrt_${{ needs.generate-tensorrt-matrix.outputs.matrix.tensorrt.version }}_py${{ needs.generate-tensorrt-matrix.outputs.matrix.python_version }}_${{ needs.generate-tensorrt-matrix.outputs.matrix.desired_cuda }}
 
   tests-py-torchscript-fe:
     name: Test torchscript frontend [Python]
