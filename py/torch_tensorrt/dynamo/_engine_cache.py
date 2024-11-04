@@ -1,5 +1,4 @@
 import copy
-import hashlib
 import io
 import logging
 import os
@@ -11,7 +10,6 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import torch
 from torch._inductor.codecache import sha256_hash
-from torch.fx.experimental.proxy_tensor import unset_fake_temporarily
 from torch_tensorrt._Input import Input
 from torch_tensorrt.dynamo._settings import (
     _SETTINGS_TO_BE_ENGINE_INVARIANT,
@@ -50,21 +48,38 @@ class BaseEngineCache(ABC):
 
         Args:
             gm (torch.fx.GraphModule): GraphModule to hash
+            input_specs (Sequence[Input]): input specs for the GraphModule
+            settings (CompilationSettings): compilation settings for the GraphModule
 
         Returns:
             str: hash value of the GraphModule
         """
-        # parameters are set to 0
-        with unset_fake_temporarily():
-            new_gm = copy.deepcopy(gm)
-            for name, param in new_gm.named_parameters():
-                param.data.zero_()
 
-            # TODO: This hash function is slow, reported in https://github.com/pytorch/TensorRT/issues/3249
-            # Waiting for a fix from PyTorch team
-            # graph_hash = FxGraphCachePickler.get_hash(new_gm)
-            graph_str = str(new_gm.graph)
-            graph_hash = hashlib.sha256(graph_str.encode()).hexdigest()
+        def canonicalize_graph(graph: torch.fx.Graph) -> str:
+            """Canonicalize the graph to a string for isomorphic graph comparison
+
+            Args:
+                graph (torch.fx.Graph): graph to canonicalize
+
+            Returns:
+                str: canonicalized graph string
+            """
+            canonical_nodes = []
+            input_counter = 0
+
+            for node in graph.nodes:
+                if node.op == "placeholder":
+                    canonical_nodes.append(f"placeholder_input_{input_counter}")
+                    input_counter += 1
+                else:
+                    canonical_nodes.append(f"{node.op}_{node.target}")
+
+            return " ".join(canonical_nodes)
+
+        graph_str = canonicalize_graph(gm.graph)
+        _LOGGER.debug(f"graph_str:\n {graph_str}")
+
+        graph_hash = sha256_hash(graph_str.encode())
 
         input_spec_strs = [str(i) for i in input_specs]
         with io.BytesIO() as stream:

@@ -376,7 +376,6 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         np_map: the map from weight name to np values in INetworkDefinition
         state_dict: state of the graph module
         """
-        network_weight = np_map[weight_name]
         network_weight = torch.from_numpy(np_map[weight_name]).cuda()
         for sd_w_name, sd_weight in state_dict.items():
             if TRTInterpreter.check_weight_equal(sd_weight, network_weight):
@@ -465,6 +464,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             sd = {k: v.reshape(-1) for k, v in self.module.state_dict().items()}
         weight_name_map: dict[str, Any] = {}
         np_map = {}
+        constant_mapping = {}
         net = self.ctx.net
         for i in range(net.num_layers):
             layer = net[i]
@@ -501,8 +501,12 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                         elif "running_var" in suffix:
                             # Linear layer weight
                             sd_weight_name = f"{sd_weight_name}.running_var"
-                        else:
+                        elif "bias" in suffix:
                             sd_weight_name = f"{sd_weight_name}.bias"
+                        else:
+                            # Save the constant weights for future fast refit
+                            sd_weight_name = f"{sd_weight_name}.unknown"
+                            constant_mapping[engine_weight_name] = weight
                     elif layer_type == "SCALE":
                         # Batch norm needs all weights to calculate scale and shift
                         sd_weight_name = [f"{sd_weight_name}.{n}" for n in torch_attr]
@@ -523,12 +527,19 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                 weight_name_map[engine_weight_name] = TRTInterpreter.find_weight(
                     engine_weight_name, np_map, sd
                 )
+                if (
+                    weight_name_map[engine_weight_name] != ""
+                    and engine_weight_name in constant_mapping
+                ):
+                    # If the weight is found in state_dict, remove it from constant_mapping
+                    del constant_mapping[engine_weight_name]
 
             weight_name_map[engine_weight_name] = [
                 weight_name_map[engine_weight_name],
                 np_map[engine_weight_name].dtype,
             ]
 
+        weight_name_map["constant_mapping"] = constant_mapping
         self.weight_name_map = weight_name_map
 
         del np_map, sd
@@ -570,7 +581,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                 cached_data = self.engine_cache.check(hash_val)
                 if cached_data is not None:  # hit the cache
                     (
-                        weight_stripped_serialized_engine,
+                        serialized_engine,
                         self._input_names,
                         self._output_names,
                         cached_engine_input_specs,
@@ -604,9 +615,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                     # refit the cached engine with the new graph module
                     if not self.compilation_settings.strip_engine_weights:
                         runtime = trt.Runtime(TRT_LOGGER)
-                        engine = runtime.deserialize_cuda_engine(
-                            weight_stripped_serialized_engine
-                        )
+                        engine = runtime.deserialize_cuda_engine(serialized_engine)
 
                         from torch_tensorrt.dynamo._refit import (
                             _refit_single_trt_engine_with_gm,
@@ -619,16 +628,18 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                             settings=self.compilation_settings,
                             weight_name_map=self.weight_name_map,
                         )
+                        serialized_engine = engine.serialize()
 
-                        # EXCLUDE_WEIGHTS flag must be cleared
-                        serialization_config = engine.create_serialization_config()
-                        serialization_config.clear_flag(
-                            trt.SerializationFlag.EXCLUDE_WEIGHTS
-                        )
-                        serialized_engine = engine.serialize_with_config(
-                            serialization_config
-                        )
-                        # As of now, the engine becomes non-refittable because when EXCLUDE_WEIGHTS flag is cleared, the REFIT flag is also cleared by TRT to make the plan file smaller
+                        # TODO: Waiting for TRT's feature to load the weight-stripped engine
+                        # # EXCLUDE_WEIGHTS flag must be cleared
+                        # serialization_config = engine.create_serialization_config()
+                        # serialization_config.clear_flag(
+                        #     trt.SerializationFlag.EXCLUDE_WEIGHTS
+                        # )
+                        # serialized_engine = engine.serialize_with_config(
+                        #     serialization_config
+                        # )
+                        # # As of now, the engine becomes non-refittable because when EXCLUDE_WEIGHTS flag is cleared, the REFIT flag is also cleared by TRT to make the plan file smaller
 
                     with io.BytesIO() as engine_bytes:
                         engine_bytes.write(serialized_engine)
@@ -678,24 +689,23 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                 self.engine_cache is not None
                 and self.compilation_settings.cache_built_engines
             ):
-                # Cache the weight-stripped engine
-                if self.compilation_settings.strip_engine_weights:
-                    weight_stripped_serialized_engine = serialized_engine
-                else:
-                    # set EXCLUDE_WEIGHTS flag to strip weights
-                    runtime = trt.Runtime(TRT_LOGGER)
-                    engine = runtime.deserialize_cuda_engine(serialized_engine)
+                # TODO: Waiting for TRT's feature to cache the weight-stripped engine
+                # if not self.compilation_settings.strip_engine_weights:
+                #     # set EXCLUDE_WEIGHTS flag to strip weights
+                #     runtime = trt.Runtime(TRT_LOGGER)
+                #     engine = runtime.deserialize_cuda_engine(serialized_engine)
 
-                    serialization_config = engine.create_serialization_config()
-                    serialization_config.set_flag(trt.SerializationFlag.EXCLUDE_WEIGHTS)
-                    weight_stripped_serialized_engine = engine.serialize_with_config(
-                        serialization_config
-                    )
+                #     serialization_config = engine.create_serialization_config()
+                #     serialization_config.set_flag(trt.SerializationFlag.EXCLUDE_WEIGHTS)
+                #     serialized_engine = engine.serialize_with_config(
+                #         serialization_config
+                #     )
 
+                # Cache weighted engine for now
                 self.engine_cache.insert(
                     hash_val,
                     (
-                        weight_stripped_serialized_engine,
+                        serialized_engine,
                         self._input_names,
                         self._output_names,
                         self.input_specs,

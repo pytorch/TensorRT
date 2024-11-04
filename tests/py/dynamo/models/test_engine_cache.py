@@ -390,7 +390,6 @@ class TestEngineCache(TestCase):
                     "reuse_cached_engines": reuse_cached_engines,
                     "engine_cache_dir": engine_cache_dir,
                     "engine_cache_size": 1 << 30,  # 1GB
-                    "torch_executed_ops": {"torch.ops.aten.relu.default"},
                 },
             )
             results.append(compiled_model(*inputs))  # trigger the compilation
@@ -453,7 +452,6 @@ class TestEngineCache(TestCase):
                     "cache_built_engines": cache_built_engines,
                     "reuse_cached_engines": reuse_cached_engines,
                     "custom_engine_cache": custom_engine_cache,
-                    "torch_executed_ops": {"torch.ops.aten.relu.default"},
                 },
             )
             results.append(compiled_model(*inputs))  # trigger the compilation
@@ -482,16 +480,58 @@ class TestEngineCache(TestCase):
             for h, count in custom_engine_cache.hashes.items()
         ]
 
-    def test_torch_compile_change_input_shape(self):
+    def test_torch_trt_compile_change_input_shape(self):
         # Custom Engine Cache
         model = models.resnet18(pretrained=True).eval().to("cuda")
-        engine_cache_dir = "/tmp/test_torch_compile_change_input_shape"
+        engine_cache_dir = "/tmp/test_torch_trt_compile_change_input_shape"
         if os.path.exists(engine_cache_dir):
             shutil.rmtree(engine_cache_dir)
 
         custom_engine_cache = MyEngineCache(engine_cache_dir)
         for i in range(3):
             inputs = [torch.rand((4 * (i + 1), 3, 224, 224)).to("cuda")]
+            compiled_model = torch_trt.compile(
+                model,
+                inputs=inputs,
+                **{
+                    "use_python_runtime": True,
+                    "enabled_precisions": {torch.float},
+                    "debug": False,
+                    "min_block_size": 1,
+                    "cache_built_engines": True,
+                    "reuse_cached_engines": True,
+                    "custom_engine_cache": custom_engine_cache,
+                },
+            )
+            compiled_model(*inputs)
+        [
+            assertions.assertTrue(
+                count == 0, f"Unintended cache hit for entry ({h}, hit: {count})"
+            )
+            for h, count in custom_engine_cache.hashes.items()
+        ]
+
+    def test_torch_compile_graph_break(self):
+        class MyModel(torch.nn.Module):
+            def forward(self, x):
+                x = x + x
+                x = x + x
+                x = torch.ops.aten.relu.default(x)
+                x = x + x
+                x = x + x
+                x = torch.ops.aten.relu.default(x)
+                x = x + x
+                x = x + x
+                return x
+
+        model = MyModel().eval().cuda()
+        engine_cache_dir = "/tmp/test_torch_compile_graph_break"
+        if os.path.exists(engine_cache_dir):
+            shutil.rmtree(engine_cache_dir)
+
+        custom_engine_cache = MyEngineCache(engine_cache_dir)
+        inputs = [torch.rand((3, 3, 224, 224)).to("cuda")]
+        for i in range(3):
             compiled_model = torch.compile(
                 model,
                 backend="tensorrt",
@@ -506,10 +546,12 @@ class TestEngineCache(TestCase):
                     "torch_executed_ops": {"torch.ops.aten.relu.default"},
                 },
             )
+            compiled_model(*inputs)
 
         [
             assertions.assertTrue(
-                count == 0, f"Unintended cache hit for entry ({h}, hit: {count})"
+                count == 2,
+                f"cache was not hit exactly twice for entry ({h}, hit: {count})",
             )
             for h, count in custom_engine_cache.hashes.items()
         ]

@@ -156,9 +156,26 @@ def _refit_single_trt_engine_with_gm(
             if torch_device.type == "cuda"
             else trt.TensorLocation.HOST
         )
+
+        constant_mapping: dict[str, Any] = weight_name_map.pop(
+            "constant_mapping", {}
+        )  # type: ignore
         mapping = construct_refit_mapping_from_weight_name_map(
             weight_name_map, new_gm.state_dict()
         )
+        constant_mapping_with_type = {}
+
+        for constant_name, val in constant_mapping.items():
+            np_weight_type = val.dtype
+            val_tensor = torch.from_numpy(val).cuda()
+            trt_dtype = dtype.try_from(np_weight_type).to(trt.DataType)
+            torch_dtype = dtype.try_from(np_weight_type).to(torch.dtype)
+            constant_mapping_with_type[constant_name] = (
+                val_tensor.clone().reshape(-1).contiguous().to(torch_dtype),
+                trt_dtype,
+            )
+
+        mapping.update(constant_mapping_with_type)
 
         # Debug Use
         # correct = construct_refit_mapping(new_gm, input_list, settings)
