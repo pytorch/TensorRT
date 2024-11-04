@@ -35,6 +35,7 @@ typedef enum {
 
 std::string base64_encode(const std::string& in);
 std::string base64_decode(const std::string& in);
+std::string serialize_bindings(const std::vector<std::string>& bindings);
 
 c10::optional<RTDevice> get_most_compatible_device(
     const RTDevice& target_device,

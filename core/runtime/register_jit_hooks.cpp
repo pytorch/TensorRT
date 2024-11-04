@@ -94,30 +94,7 @@ static auto TORCHTRT_UNUSED TRTEngineTSRegistrtion =
         .def_property("streamable_device_memory_budget", &TRTEngine::get_streamable_device_memory_budget)
         .def_property("automatic_device_memory_budget", &TRTEngine::get_automatic_device_memory_budget)
         .def_pickle(
-            [](const c10::intrusive_ptr<TRTEngine>& self) -> std::vector<std::string> {
-              // Serialize TensorRT engine
-              auto serialized_trt_engine = make_trt(self->cuda_engine->serialize());
-
-              // Adding device info related meta data to the serialized file
-              auto trt_engine = std::string((const char*)serialized_trt_engine->data(), serialized_trt_engine->size());
-
-              std::vector<std::string> serialize_info;
-              serialize_info.resize(SERIALIZATION_LEN);
-
-              serialize_info[ABI_TARGET_IDX] = ABI_VERSION;
-              serialize_info[NAME_IDX] = self->name;
-              serialize_info[DEVICE_IDX] = self->device_info.serialize();
-              serialize_info[ENGINE_IDX] = base64_encode(trt_engine);
-              serialize_info[INPUT_BINDING_NAMES_IDX] = serialize_bindings(self->in_binding_names);
-              serialize_info[OUTPUT_BINDING_NAMES_IDX] = serialize_bindings(self->out_binding_names);
-              serialize_info[HW_COMPATIBLE_IDX] = self->hardware_compatible ? "1" : "0";
-              serialize_info[SERIALIZED_METADATA_IDX] = self->serialized_metadata;
-              serialize_info[TARGET_PLATFORM_IDX] = self->target_platform.serialize();
-              LOG_DEBUG("Serialized Hardware Compatibility: " << (self->hardware_compatible ? "Enabled" : "Disabled"));
-              LOG_DEBUG("Serialized Target Platform: " << self->target_platform);
-
-              return serialize_info;
-            },
+            [](const c10::intrusive_ptr<TRTEngine>& self) -> std::vector<std::string> { return self->serialize(); },
             [](std::vector<std::string> serialized_info) -> c10::intrusive_ptr<TRTEngine> {
               serialized_info[ENGINE_IDX] = base64_decode(serialized_info[ENGINE_IDX]);
               TRTEngine::verify_serialization_fmt(serialized_info);

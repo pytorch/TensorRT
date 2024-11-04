@@ -29,8 +29,15 @@ def fake_tensorrt_execute_engine(
     ), f"Number of inputs serialized in TRTEngine {len(input_names)} doesn't match with the number of inputs found during meta kernel execution {len(inputs)} for execute_engine op"
 
     # Deserialize the TRT engine
-    runtime = trt.Runtime(TRT_LOGGER)
-    engine = runtime.deserialize_cuda_engine(serialized_engine)
+    # TODO: Probably unsafe deserialization. Should we expose infer shape mechanism through TRTEngine class ?
+    try:
+        runtime = trt.Runtime(TRT_LOGGER)
+        engine = runtime.deserialize_cuda_engine(serialized_engine)
+    except Exception as e:
+        raise AssertionError(
+            "TRT engine deserialization failed during meta kernel execution. Please verify if the environment in which you are exporting is same as the one in which you compiled"
+        )
+
     context = engine.create_execution_context()
 
     # Here's what we are doing
@@ -109,6 +116,7 @@ class FakeTRTEngine:
 
     @classmethod
     def __obj_unflatten__(cls, flattened_tq: Any) -> Any:
+        breakpoint()
         state_dict = {}
         for key, val in flattened_tq:
             state_dict[key] = val

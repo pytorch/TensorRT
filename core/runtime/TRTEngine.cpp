@@ -355,20 +355,42 @@ void TRTEngine::verify_serialization_fmt(const std::vector<std::string>& seriali
 }
 
 FlattenedState TRTEngine::__obj_flatten__() {
-  // Serialize TensorRT engine
-  auto serialized_trt_engine = make_trt(this->cuda_engine->serialize());
-  auto trt_engine = std::string((const char*)serialized_trt_engine->data(), serialized_trt_engine->size());
+  // This method would be called by meta kernel of this custom class and it only needs to return a tuple
+  std::vector<std::string> serialized_info = this->serialize();
 
   return std::tuple(
-      std::tuple("version", ABI_VERSION),
-      std::tuple("name", this->name),
-      std::tuple("device_info", this->device_info.serialize()),
-      std::tuple("serialized_engine", base64_encode(trt_engine)),
-      std::tuple("in_binding_names", this->in_binding_names),
-      std::tuple("out_binding_names", this->out_binding_names),
-      std::tuple("hardware_compatible", this->hardware_compatible),
-      std::tuple("serialized_metadata", this->serialized_metadata),
-      std::tuple("target_platform", this->target_platform.serialize()));
+      std::tuple("version", serialized_info[ABI_TARGET_IDX]),
+      std::tuple("name", serialized_info[NAME_IDX]),
+      std::tuple("device_info", serialized_info[DEVICE_IDX]),
+      std::tuple("serialized_engine", serialized_info[ENGINE_IDX]),
+      std::tuple("in_binding_names", serialized_info[INPUT_BINDING_NAMES_IDX]),
+      std::tuple("out_binding_names", serialized_info[OUTPUT_BINDING_NAMES_IDX]),
+      std::tuple("hardware_compatible", serialized_info[HW_COMPATIBLE_IDX]),
+      std::tuple("serialized_metadata", serialized_info[SERIALIZED_METADATA_IDX]),
+      std::tuple("target_platform", serialized_info[TARGET_PLATFORM_IDX]));
+}
+
+std::vector<std::string> TRTEngine::serialize() {
+  // Serialize TensorRT engine
+  auto serialized_trt_engine = make_trt(this->cuda_engine->serialize());
+
+  // Adding device info related meta data to the serialized file
+  auto trt_engine = std::string((const char*)serialized_trt_engine->data(), serialized_trt_engine->size());
+
+  std::vector<std::string> serialized_info;
+  serialized_info.resize(SERIALIZATION_LEN);
+
+  serialized_info[ABI_TARGET_IDX] = ABI_VERSION;
+  serialized_info[NAME_IDX] = this->name;
+  serialized_info[DEVICE_IDX] = this->device_info.serialize();
+  serialized_info[ENGINE_IDX] = base64_encode(trt_engine);
+  serialized_info[INPUT_BINDING_NAMES_IDX] = serialize_bindings(this->in_binding_names);
+  serialized_info[OUTPUT_BINDING_NAMES_IDX] = serialize_bindings(this->out_binding_names);
+  serialized_info[HW_COMPATIBLE_IDX] = this->hardware_compatible ? "1" : "0";
+  serialized_info[SERIALIZED_METADATA_IDX] = this->serialized_metadata;
+  serialized_info[TARGET_PLATFORM_IDX] = this->target_platform.serialize();
+
+  return serialized_info;
 }
 
 } // namespace runtime

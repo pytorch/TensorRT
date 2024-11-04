@@ -92,6 +92,7 @@ struct TRTEngine : torch::CustomClassHolder {
 
   // Serde re-export functionality
   FlattenedState __obj_flatten__();
+  std::vector<std::string> serialize();
 
   // CUDAGraph-Related Functionality
   at::cuda::CUDAGraph cudagraph = {};
