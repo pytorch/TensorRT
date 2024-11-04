@@ -9,7 +9,7 @@ build_wheel() {
 }
 
 patch_wheel() {
-    python -m auditwheel repair  $(cat ${PROJECT_DIR}/py/ci/soname_excludes.params) --plat manylinux_2_34_x86_64 dist/torch_tensorrt-*-$3-linux_x86_64.whl
+    python -m auditwheel repair  $(cat py/ci/soname_excludes.params) --only-plat dist/torch_tensorrt-*-$3-linux_x86_64.whl
     pip install --no-cache-dir wheelhouse/*.whl
 }
 
