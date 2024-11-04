@@ -1,4 +1,4 @@
-name: Build and test Torch-TensorRT on Linux
+name: Build and test Torch-TensorRT on Linux with specified tensorRT version
 
 on:
   pull_request:
@@ -67,7 +67,7 @@ jobs:
       package-name: ${{ matrix.package-name }}
       smoke-test-script: ${{ matrix.smoke-test-script }}
       trigger-event: ${{ github.event_name }}
-      upload-artifact: torch_tensorrt_${{ matrix.tensorrt.version }}_py${{ matrix.python_version }}_${{ matrix.desired_cuda }}
+      upload-artifact: torch_tensorrt_${{ needs.generate-tensorrt-matrix.outputs.matrix.tensorrt.version }}_py${{ needs.generate-tensorrt-matrix.outputs.matrix.python_version }}_${{ needs.generate-tensorrt-matrix.outputs.matrix.desired_cuda }}
 
   tests-py-torchscript-fe:
     name: Test torchscript frontend [Python]
@@ -83,14 +83,14 @@ jobs:
             smoke-test-script: packaging/smoke_test_script.sh
     uses: ./.github/workflows/linux-test.yml
     with:
-      job-name: tests-py-torchscript-fe
+      job-name: tests-py-torchscript-fe-tensorrt-${{ needs.generate-tensorrt-matrix.outputs.matrix.tensorrt.version }}-py${{ needs.generate-tensorrt-matrix.outputs.matrix.python_version }}
       repository: "pytorch/tensorrt"
       ref: ""
       test-infra-repository: pytorch/test-infra
       test-infra-ref: main
       build-matrix: ${{ needs.generate-tensorrt-matrix.outputs.matrix }}
       pre-script: ${{ matrix.pre-script }}
-      download-artifact: torch_tensorrt_${{ matrix.tensorrt.version }}_py${{ matrix.python_version }}_${{ matrix.desired_cuda }}
+      download-artifact: ${{ needs.generate-tensorrt-matrix.outputs.matrix.tensorrt.version }}_py${{ needs.generate-tensorrt-matrix.outputs.matrix.python_version }}_${{ needs.generate-tensorrt-matrix.outputs.matrix.desired_cuda }}
       script: |
         export USE_HOST_DEPS=1
         export CI_BUILD=1

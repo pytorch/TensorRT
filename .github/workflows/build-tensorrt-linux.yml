@@ -1,4 +1,4 @@
-name: Build Torch-TensorRT wheel on Linux
+name: Build Torch-TensorRT wheel on Linux with specified tensorRT version
 
 on:
   workflow_call:
