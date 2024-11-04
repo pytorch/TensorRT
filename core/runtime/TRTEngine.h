@@ -88,6 +88,7 @@ struct TRTEngine : torch::CustomClassHolder {
   int64_t get_streamable_device_memory_budget();
   int64_t get_automatic_device_memory_budget();
   std::vector<at::Tensor> infer_outputs(std::vector<std::vector<int64_t>> input_shapes);
+  void set_pre_allocated_outputs(bool enable);
   friend std::ostream& operator<<(std::ostream& os, const TRTEngine& engine);
   static const char BINDING_DELIM = '%';
 
@@ -102,6 +103,9 @@ struct TRTEngine : torch::CustomClassHolder {
   std::vector<at::Tensor> input_buffers = {};
   std::vector<at::Tensor> output_buffers = {};
   std::string shape_key;
+  bool cudagraphs_enabled = false;
+  bool use_pre_allocated_outputs = true;
+  std::vector<at::Tensor> pre_allocated_outputs;
 
   // TODO: Implement a call method
   // c10::List<at::Tensor> Run(c10::List<at::Tensor> inputs);

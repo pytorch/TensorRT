@@ -108,6 +108,9 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         self.engine = None
         self.weight_name_map = weight_name_map
         self.target_platform = Platform.current_platform()
+        self.cudagraphs_enabled = False
+        self.pre_allocated_outputs: List[torch.Tensor] = []
+        self.use_pre_allocated_outputs = False
 
         if self.serialized_engine is not None and not self.settings.lazy_engine_init:
             self.setup_engine()
@@ -172,7 +175,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
             self.engine.get_tensor_shape(input_name) for input_name in self.input_names
         ]
         self.output_dtypes = [
-            dtype._from(self.engine.get_tensor_dtype(output_name))
+            dtype._from(self.engine.get_tensor_dtype(output_name)).to(torch.dtype)
             for output_name in self.output_names
         ]
         self.output_shapes = [
@@ -233,6 +236,19 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         if self.cudagraph:
             self.cudagraph.reset()
 
+    def create_output_tensors(self) -> List[torch.Tensor]:
+        # create output tensors
+        outputs: List[torch.Tensor] = []
+
+        for o, _ in enumerate(self.output_names):
+            output = torch.empty(
+                size=self.output_shapes[o],
+                dtype=self.output_dtypes[o],
+                device=torch.cuda.current_device(),
+            )
+            outputs.append(output)
+        return outputs
+
     def forward(self, *inputs: torch.Tensor) -> torch.Tensor | Tuple[torch.Tensor, ...]:
         # Ensure inputs are available in all scopes and cast symbolic integers to Tensors
         contiguous_inputs: List[torch.Tensor] = [
@@ -248,11 +264,17 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
             self._check_initialized()
 
             cudagraphs_enabled = torch_tensorrt.runtime.get_cudagraphs_mode()
-            need_cudagraphs_record = (
-                cudagraphs_enabled and not self.cudagraphs_validate_shapes(inputs)
-            )
+            shape_changed = self.validate_input_shapes(inputs)
+            # Cudagraphs record is required if cudagraphs_enabled is toggled to True regardless of shape change
+            if not self.cudagraphs_enabled and cudagraphs_enabled:
+                need_cudagraphs_record = True
+            else:
+                need_cudagraphs_record = cudagraphs_enabled and shape_changed
+            self.cudagraphs_enabled = cudagraphs_enabled
 
             if need_cudagraphs_record:
+                if self.cudagraph:
+                    self.cudagraph.reset()
                 self._input_buffers = [None] * len(self.input_names)
                 self._output_buffers = [None] * len(self.output_names)
 
@@ -260,7 +282,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                 self.cudagraph.reset()
                 self.cudagraph = None
 
-            # If in safe mode, check at each iteration for for whether a switch is required
+            # If in safe mode, check at each iteration for whether a switch is required
             if (
                 torch_tensorrt.runtime._multi_device_safe_mode._PY_RT_MULTI_DEVICE_SAFE_MODE
             ):
@@ -351,14 +373,14 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                             self.context.set_tensor_address(
                                 input_name, contiguous_inputs[i].data_ptr()
                             )
-
-                # Check if input shapes can be inferred.
-                uninferred_input_names = self.context.infer_shapes()
-                if uninferred_input_names:
-                    logger.warning(
-                        f"The shapes of the inputs: {uninferred_input_names} cannot be inferred and could lead to undefined behavior. \
-                                This could happen if the input tensor addresses/shapes haven't been configured correctly"
-                    )
+                if shape_changed:
+                    # Check if input shapes can be inferred.
+                    uninferred_input_names = self.context.infer_shapes()
+                    if uninferred_input_names:
+                        logger.warning(
+                            f"The shapes of the inputs: {uninferred_input_names} cannot be inferred and could lead to undefined behavior. \
+                                    This could happen if the input tensor addresses/shapes haven't been configured correctly"
+                        )
 
             with (
                 torch.autograd.profiler.record_function(
@@ -367,24 +389,20 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                 if self.profiling_enabled
                 else nullcontext()
             ):
-                # create output tensors
-                outputs: List[torch.Tensor] = []
-
-                for o, output_name in enumerate(self.output_names):
-                    shape = tuple(self.context.get_tensor_shape(output_name))
-
-                    if DYNAMIC_DIM in shape:
+                if not self.use_pre_allocated_outputs or shape_changed:
+                    self.output_shapes = [
+                        tuple(self.context.get_tensor_shape(output_name))
+                        for output_name in self.output_names
+                    ]
+                    if DYNAMIC_DIM in self.output_shapes:
                         raise ValueError(
                             "Encountered dynamic output shapes during runtime. This could mean the network has data-dependent output shapes which is not currently supported."
                         )
+                    outputs = self.create_output_tensors()
+                else:
+                    outputs = self.pre_allocated_outputs
 
-                    output = torch.empty(
-                        size=shape,
-                        dtype=self.output_dtypes[o].to(torch.dtype),
-                        device=torch.cuda.current_device(),
-                    )
-
-                    outputs.append(output)
+                for o, output_name in enumerate(self.output_names):
 
                     if need_cudagraphs_record:
                         self._output_buffers[o] = outputs[o].clone()
@@ -445,6 +463,9 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
 
                 self._caller_stream.wait_stream(self._engine_stream)
 
+            if self.use_pre_allocated_outputs:
+                self.pre_allocated_outputs = self.create_output_tensors()
+
             if cudagraphs_enabled:
                 for idx, o in enumerate(outputs):
                     o.copy_(self._output_buffers[idx])
@@ -486,10 +507,9 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         )
         return engine_json
 
-    def cudagraphs_validate_shapes(self, inputs: Sequence[torch.Tensor]) -> bool:
+    def validate_input_shapes(self, inputs: Sequence[torch.Tensor]) -> bool:
         """
-        Validates the input shapes of the forward function
-        versus the version currently active for the
+        Validates the input shapes of the forward function has changed
         """
         # Representation of input shapes to a given model
         # Shapes are concatenated as so:
@@ -499,10 +519,8 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         # If the new shape key differs from the existing one,
         # invalidate the old shape key and remove the CUDAGraph
         if new_shape_key != self.shape_key:
-            logger.debug(f"Resetting Cudagraph on new shape key {new_shape_key}")
+            logger.debug(f"Input shape changed {self.shape_key} -> {new_shape_key}")
             self.shape_key = new_shape_key
-            if self.cudagraph:
-                self.cudagraph.reset()
-            return False
+            return True
 
-        return True
+        return False

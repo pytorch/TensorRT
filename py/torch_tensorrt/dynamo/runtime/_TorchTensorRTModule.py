@@ -208,6 +208,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         if self.engine is not None:
             return
         self.engine = torch.classes.tensorrt.Engine(self._pack_engine_info())
+        self.engine.set_pre_allocated_outputs(True)
 
     def encode_metadata(self, metadata: Any) -> str:
         metadata = copy.deepcopy(metadata)

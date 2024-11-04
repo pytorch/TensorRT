@@ -5,6 +5,7 @@
 #include "torch/csrc/jit/runtime/custom_operator.h"
 #include "torch/torch.h"
 
+#include <ATen/record_function.h>
 #include "core/runtime/TRTEngineProfiler.h"
 #include "core/runtime/runtime.h"
 #include "core/util/prelude.h"
@@ -60,9 +61,8 @@ RTDevice select_rt_device(const RTDevice& engine_device, const RTDevice& curr_de
   return new_target_device_opt.value();
 }
 
-bool _cudagraphs_validate_shapes(std::vector<at::Tensor> inputs, c10::intrusive_ptr<TRTEngine> compiled_engine) {
-  // Validate whether the current input shapes to the engine
-  // invalidate the existing cudagraphs object
+bool _validate_shapes(std::vector<at::Tensor> inputs, c10::intrusive_ptr<TRTEngine> compiled_engine) {
+  // Validate whether the current input shapes to the engine has changed
 
   // Populate the shape key for the inputs
   // x: (3, 4), y: (4, 5) --> Key: (3,4)(4,5)
@@ -83,15 +83,32 @@ bool _cudagraphs_validate_shapes(std::vector<at::Tensor> inputs, c10::intrusive_
 
   auto new_shape_key = new_shape_key_ss.str();
 
-  // Compare the shape key to the original key and invalidate shapes if they do not match
+  // Compare the shape key to the original key
   if (new_shape_key != compiled_engine->shape_key) {
-    LOG_DEBUG("Resetting Cudagraph on New Shape Key " << new_shape_key);
+    LOG_DEBUG("Input shape changed " << compiled_engine->shape_key << " -> " << new_shape_key);
     compiled_engine->shape_key = new_shape_key;
-    compiled_engine->cudagraph.reset();
-    return false;
+    return true;
   }
 
-  return true;
+  return false;
+}
+
+std::vector<at::Tensor> create_output_tensors(c10::intrusive_ptr<TRTEngine> compiled_engine) {
+  std::vector<at::Tensor> outputs(compiled_engine->num_io.second);
+  for (auto output_indices : compiled_engine->out_binding_map) {
+    // out_binding_map stores TRT_IDX: PYT_IDX
+    auto pyt_idx = output_indices.second;
+
+    std::string name = compiled_engine->out_binding_names[pyt_idx];
+    auto out_shape = compiled_engine->exec_ctx->getTensorShape(name.c_str());
+    LOG_DEBUG("Output Name: " << name << " Shape: " << out_shape);
+
+    auto dims = core::util::toVec(out_shape);
+    auto type = util::TRTDataTypeToScalarType(compiled_engine->exec_ctx->getEngine().getTensorDataType(name.c_str()));
+    outputs[pyt_idx] = std::move(at::empty(dims, {at::kCUDA}).to(type).contiguous());
+  }
+
+  return outputs;
 }
 
 std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intrusive_ptr<TRTEngine> compiled_engine) {
@@ -116,10 +133,15 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
     compiled_engine->cudagraph.enable_debug_mode();
   }
 
-  // Whether cudagraphs needs to record the graph on this pass
-  bool need_cudagraphs_record = (CUDAGRAPHS_MODE && (!_cudagraphs_validate_shapes(inputs, compiled_engine)));
+  bool shape_changed = _validate_shapes(inputs, compiled_engine);
 
-  if (!CUDAGRAPHS_MODE) {
+  // Whether cudagraphs needs to record the graph on this pass
+  // Cudagraphs record is required if cudagraphs_enabled is switched to True regardless of shape change
+  bool need_cudagraphs_record =
+      (((!compiled_engine->cudagraphs_enabled) && CUDAGRAPHS_MODE) || (CUDAGRAPHS_MODE && shape_changed));
+  compiled_engine->cudagraphs_enabled = CUDAGRAPHS_MODE;
+
+  if (!CUDAGRAPHS_MODE || shape_changed) {
     compiled_engine->cudagraph.reset();
   }
 
@@ -180,6 +202,7 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
 
   { // Input Setup
     std::unique_ptr<torch::autograd::profiler::RecordProfile> input_profiler_guard;
+    RECORD_FUNCTION("process input", std::vector<c10::IValue>());
     if (compiled_engine->profile_execution) {
       input_profiler_guard =
           std::make_unique<torch::autograd::profiler::RecordProfile>(compiled_engine->input_profile_path);
@@ -261,23 +284,20 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
 
   { // Output Setup
     std::unique_ptr<torch::autograd::profiler::RecordProfile> output_profiler_guard;
+    RECORD_FUNCTION("process output", std::vector<c10::IValue>());
     if (compiled_engine->profile_execution) {
       output_profiler_guard =
           std::make_unique<torch::autograd::profiler::RecordProfile>(compiled_engine->output_profile_path);
     }
+    if ((false == compiled_engine->use_pre_allocated_outputs) || shape_changed) {
+      outputs = create_output_tensors(compiled_engine);
+    } else {
+      outputs = compiled_engine->pre_allocated_outputs;
+    }
 
     for (auto output_indices : compiled_engine->out_binding_map) {
-      // out_binding_map stores TRT_IDX: PYT_IDX
       auto pyt_idx = output_indices.second;
-
       std::string name = compiled_engine->out_binding_names[pyt_idx];
-      auto out_shape = compiled_engine->exec_ctx->getTensorShape(name.c_str());
-      LOG_DEBUG("Output Name: " << name << " Shape: " << out_shape);
-
-      auto dims = core::util::toVec(out_shape);
-      auto type = util::TRTDataTypeToScalarType(compiled_engine->exec_ctx->getEngine().getTensorDataType(name.c_str()));
-      outputs[pyt_idx] = std::move(at::empty(dims, {at::kCUDA}).to(type).contiguous());
-
       if (need_cudagraphs_record) {
         // If we are recording the cuda graph then we need to update the persistent output buffer
         compiled_engine->output_buffers[pyt_idx] = std::move(outputs[pyt_idx].clone());
@@ -310,6 +330,7 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
   }
 
   { // Engine Execution (execute on engine stream)
+    RECORD_FUNCTION("Trt runtime", std::vector<c10::IValue>());
     c10::cuda::CUDAStreamGuard stream_guard(compiled_engine->engine_stream);
 
     std::unique_ptr<torch::autograd::profiler::RecordProfile> enqueue_profiler_guard;
@@ -343,6 +364,11 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
       compiled_engine->cudagraph.replay(); // Has a cudaDeviceSynchronize internally
     }
   } // End engine exeuction (resets to caller stream)
+
+  // Create output buffer for next execution of graph or trt context.
+  if (compiled_engine->use_pre_allocated_outputs) {
+    compiled_engine->pre_allocated_outputs = create_output_tensors(compiled_engine);
+  }
 
   // Block caller stream until engine execution is complete
   at::cuda::CUDAEvent trt_exec_complete;
