@@ -49,6 +49,10 @@ on:
         description: "Prevents a job from failing when a step fails. Set to true to allow a job to pass when exec script step fails."
         default: false
         type: boolean
+      download-artifact:
+        description: 'Name of the artifacts to be downloaded'
+        default: ''
+        type: string
       upload-artifact:
         description: 'Name to give artifacts uploaded from ${RUNNER_ARTIFACT_DIR}'
         default: ''
@@ -112,9 +116,16 @@ jobs:
           repository: ${{ inputs.repository  }}
           script: ${{ inputs.pre-script }}
       - name: Download artifacts
+        if: ${{ inputs.download-artifact == '' }}
         uses: actions/download-artifact@v3
         with:
           name: ${{ env.ARTIFACT_NAME }}
+          path: /opt/torch-tensorrt-builds/
+      - name: Download artifacts
+        if: ${{ inputs.download-artifact != '' }}
+        uses: actions/download-artifact@v3
+        with:
+          name: ${{ inputs.download-artifact }}
           path: /opt/torch-tensorrt-builds/
       # - name: Install torch and torch-tensorrt
       #   if: ${{ inputs.pre-script != '' }}

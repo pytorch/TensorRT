@@ -70,6 +70,10 @@ on:
         required: false
         type: boolean
         default: true
+      upload-artifact:
+        description: 'Name to give artifacts uploaded from ${inputs.repository}/dist'
+        default: ''
+        type: string
 
 permissions:
   id-token: write
@@ -213,7 +217,7 @@ jobs:
         continue-on-error: true
         uses: actions/upload-artifact@v3
         with:
-          name: torch_tensorrt_${{env.TENSORRT_VERSION}}_py${{env.PYTHON_VERSION}}_${{env.CU_VERSION}}
+          name: ${{ inputs.upload-artifact }}
           path: ${{ inputs.repository }}/dist
 
 concurrency:
