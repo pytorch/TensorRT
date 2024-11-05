@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import logging
+from contextlib import nullcontext
 from tempfile import tempdir
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
-import nvtx
 import tensorrt as trt
 import torch
 import torch_tensorrt
@@ -144,10 +144,8 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         self.weight_name_map = weight_name_map
         self.target_platform = Platform.current_platform()
         # Check if CUDA graph capture is enabled in the parent node
-        self.cudagraphs_parent_module = False
+        self.cudagraphs_enabled_parent_module = False
         self.cudagraphs_enabled = False
-        self.pre_allocated_outputs: List[torch.Tensor] = []
-        self.use_pre_allocated_outputs = False
 
         if self.serialized_engine is not None and not self.settings.lazy_engine_init:
             self.setup_engine()
@@ -346,21 +344,28 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
             (i.contiguous() if isinstance(i, torch.Tensor) else torch.tensor(i).cuda())
             for i in inputs
         ]
-        with nvtx.annotate("Forward", color="red"):
-            self._check_initialized()
-            cudagraphs_enabled = torch_tensorrt.runtime.get_cudagraphs_mode() and not self.cudagraphs_disabled
 
-            cudagraphs_enabled = torch_tensorrt.runtime.get_cudagraphs_mode()
-            shape_changed = self.validate_input_shapes(inputs)
-            need_cudagraphs_record, can_use_pre_allocated_outputs = (
-                self.runtime_states.validate_states(
-                    cudagraphs_enabled, self.use_pre_allocated_outputs, shape_changed
-                )
+        with (
+            torch.autograd.profiler.record_function("PythonTorchTensorRTModule:Forward")
+            if self.profiling_enabled
+            else nullcontext()
+        ):
+            self._check_initialized()
+
+            cudagraphs_enabled = (
+                torch_tensorrt.runtime.get_cudagraphs_mode()
+                and not self.cudagraphs_enabled_parent_module
             )
+            # Cudagraphs record is required if cudagraphs_enabled is switched to True regardless of shape change
+            if not self.cudagraphs_enabled and cudagraphs_enabled:
+                need_cudagraphs_record = True
+            else:
+                need_cudagraphs_record = (
+                    cudagraphs_enabled and not self.cudagraphs_validate_shapes(inputs)
+                )
+            self.cudagraphs_enabled = cudagraphs_enabled
 
             if need_cudagraphs_record:
-                if self.cudagraph:
-                    self.cudagraph.reset()
                 self._input_buffers = [None] * len(self.input_names)
                 self._output_buffers = [None] * len(self.output_names)
 
@@ -400,7 +405,13 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                     ]
                     logger.warning(f"Moved all input Tensors to cuda:{device_id}")
 
-            with nvtx.annotate("ProcessInputs", color="red"):
+            with (
+                torch.autograd.profiler.record_function(
+                    "PythonTorchTensorRTModule:ProcessInputs"
+                )
+                if self.profiling_enabled
+                else nullcontext()
+            ):
                 assert len(contiguous_inputs) == len(
                     self.input_names
                 ), f"Wrong number of inputs, expect {len(self.input_names)} get {len(contiguous_inputs)}."
@@ -418,41 +429,32 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                                     This could happen if the input tensor addresses/shapes haven't been configured correctly"
                         )
 
-            with nvtx.annotate("ProcessOutputs", color="red"):
-                # create output tensors
-                outputs: List[torch.Tensor] = []
-                if not self.persistent_output_buffer or shape_changed:
-                    # Create and keep persistent output buffer as long as its shape does not change
-                    self._output_buffers = []
-                    for o, output_name in enumerate(self.output_names):
-                        shape = tuple(self.context.get_tensor_shape(output_name))
-                        if DYNAMIC_DIM in shape:
-                            raise ValueError(
-                                "Encountered dynamic output shapes during runtime. This could mean the network has data-dependent output shapes which is not currently supported."
-                            )
-
-                        output = torch.empty(
-                            size=shape,
-                            dtype=self.output_dtypes[o].to(torch.dtype),
-                            device=torch.cuda.current_device(),
+            with nvtx.annotate("ProcessOutputs:1", color="red"):
+                if not self.use_pre_allocated_outputs or shape_changed:
+                    self.output_shapes = [
+                        tuple(self.context.get_tensor_shape(output_name))
+                        for output_name in self.output_names
+                    ]
+                    if DYNAMIC_DIM in self.output_shapes:
+                        raise ValueError(
+                            "Encountered dynamic output shapes during runtime. This could mean the network has data-dependent output shapes which is not currently supported."
                         )
-                        if self.persistent_output_buffer:
-                            self.context.set_tensor_address(
-                                output_name, output.data_ptr()
-                            )
-                            self._output_buffers.append(output)
-                        else:
-                            outputs.append(output)
-                            if need_cudagraphs_record:
-                                self._output_buffers[o] = outputs[o].clone()
-                            if cudagraphs_enabled:
-                                self.context.set_tensor_address(
-                                    output_name, self._output_buffers[o].data_ptr()
-                                )
-                            else:
-                                self.context.set_tensor_address(
-                                    output_name, outputs[o].data_ptr()
-                                )
+                    outputs = self.create_output_tensors()
+                else:
+                    outputs = self.pre_allocated_outputs
+
+                for o, output_name in enumerate(self.output_names):
+                    if need_cudagraphs_record:
+                        self._output_buffers[o] = outputs[o].clone()
+                    if cudagraphs_enabled:
+                        self.context.set_tensor_address(
+                            output_name, self._output_buffers[o].data_ptr()
+                        )
+                    else:
+                        self.context.set_tensor_address(
+                            output_name, outputs[o].data_ptr()
+                        )
+
             with nvtx.annotate("TensorRTRuntime", color="red"):
                 self._caller_stream = torch.cuda.current_stream()
                 if (
@@ -461,27 +463,23 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                 ):
                     self._engine_stream = torch.cuda.Stream()
 
-                with nvtx.annotate("wait_stream", color="green"):
-                    self._engine_stream.wait_stream(self._caller_stream)
+                self._engine_stream.wait_stream(self._caller_stream)
 
                 with torch.cuda.stream(self._engine_stream):
+
                     if cudagraphs_enabled:
                         if need_cudagraphs_record:
-                            with nvtx.annotate("CUDAGraph", color="green"):
-                                self.cudagraph = torch.cuda.CUDAGraph()
+                            self.cudagraph = torch.cuda.CUDAGraph()
 
                             if self.profiling_enabled:
                                 self.cudagraph.enable_debug_mode()
-                            with nvtx.annotate("torch.cuda.graph", color="green"):
-                                with torch.cuda.graph(
-                                    self.cudagraph, stream=self._engine_stream
-                                ):
-                                    with nvtx.annotate(
-                                        "execute_async_v3", color="green"
-                                    ):
-                                        self.context.execute_async_v3(
-                                            self._engine_stream.cuda_stream
-                                        )
+
+                            with torch.cuda.graph(
+                                self.cudagraph, stream=self._engine_stream
+                            ):
+                                self.context.execute_async_v3(
+                                    self._engine_stream.cuda_stream
+                                )
 
                             if self.profiling_enabled:
                                 import tempfile
@@ -490,17 +488,13 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                                     self.cudagraph.debug_dump(
                                         f"{tempdir}/{self.name}_cudagraph.dot"
                                     )
-                        with nvtx.annotate("replay", color="green"):
-                            self.cudagraph.replay()  # type: ignore
+
+                        self.cudagraph.replay()  # type: ignore
 
                     else:
                         self.context.execute_async_v3(self._engine_stream.cuda_stream)
 
                 self._caller_stream.wait_stream(self._engine_stream)
-
-            if self.use_pre_allocated_outputs:
-                with nvtx.annotate("ProcessOutputs:2", color="red"):
-                    self.pre_allocated_outputs = self.create_output_tensors()
 
             if cudagraphs_enabled:
                 for idx, o in enumerate(outputs):
@@ -543,9 +537,10 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         )
         return engine_json
 
-    def validate_input_shapes(self, inputs: Sequence[torch.Tensor]) -> bool:
+    def cudagraphs_validate_shapes(self, inputs: Sequence[torch.Tensor]) -> bool:
         """
-        Validates the input shapes of the forward function has changed
+        Validates the input shapes of the forward function
+        versus the version currently active for the
         """
         # Representation of input shapes to a given model
         # Shapes are concatenated as so:
@@ -555,8 +550,10 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         # If the new shape key differs from the existing one,
         # invalidate the old shape key and remove the CUDAGraph
         if new_shape_key != self.shape_key:
-            logger.debug(f"Input shape changed {self.shape_key} -> {new_shape_key}")
+            logger.debug(f"Resetting Cudagraph on new shape key {new_shape_key}")
             self.shape_key = new_shape_key
-            return True
+            if self.cudagraph:
+                self.cudagraph.reset()
+            return False
 
-        return False
+        return True

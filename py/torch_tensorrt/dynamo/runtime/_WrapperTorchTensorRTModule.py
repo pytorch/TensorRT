@@ -41,7 +41,7 @@ class WrapperTorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         # Disable cudagrphs in submodules as it will be enabled in wrapper
         for name, rt_mod in self.original_module.named_children():
             if "_run_on_acc" in name:
-                rt_mod.cudagraphs_parent_module = True
+                rt_mod.cudagraphs_enabled_parent_module = True
 
         # TODO: check if only torch needs warm up.
         with unset_fake_temporarily():
