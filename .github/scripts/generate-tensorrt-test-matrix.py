@@ -66,7 +66,7 @@ def main(args: list[str]) -> None:
 
     options = parser.parse_args(args)
     if options.matrix == "":
-        raise Exception(f"--matrix is empty, please provide the matrix json str")
+        raise Exception("--matrix is empty, please provide the matrix json str")
 
     matrix_dict = json.loads(options.matrix)
     includes = matrix_dict["include"]
