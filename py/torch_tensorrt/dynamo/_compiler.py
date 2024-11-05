@@ -477,7 +477,10 @@ def compile(
         else:
             make_refittable = kwargs["refit"]
 
-    if "enable_cross_compile_for_windows" in kwargs.keys() and kwargs["enable_cross_compile_for_windows"]:
+    if (
+        "enable_cross_compile_for_windows" in kwargs.keys()
+        and kwargs["enable_cross_compile_for_windows"]
+    ):
         raise ValueError(
             "Please use cross_compile_for_windows() api if you want to cross compile the module in Linux for inferencing in Windows."
         )

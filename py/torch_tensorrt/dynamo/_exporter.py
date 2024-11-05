@@ -57,10 +57,7 @@ def transform(
     gm = copy.deepcopy(gm)
 
     # Inline TensorRT submodules
-    if cross_compile_flag:
-        inline_trt_modules_for_windows(gm)
-    else:
-        inline_trt_modules(gm)
+    inline_trt_modules(gm, cross_compile_flag)
 
     # Inline pytorch submodules
     inline_torch_modules(gm)
@@ -359,7 +356,9 @@ def create_trt_exp_program(
     return trt_exp_program
 
 
-def inline_trt_modules(gm: torch.fx.GraphModule) -> torch.fx.GraphModule:
+def inline_trt_modules(
+    gm: torch.fx.GraphModule, cross_compile_flag: Optional[bool] = False
+) -> torch.fx.GraphModule:
     """
     Replace TRT submodules with trt engine nodes.
     """
@@ -382,25 +381,36 @@ def inline_trt_modules(gm: torch.fx.GraphModule) -> torch.fx.GraphModule:
         num_outputs = len(trt_module_node.meta["val"])
         # Insert a call_function node to perform inference on TRT engine
         with gm.graph.inserting_before(trt_module_node):
-            engine_name = f"{name}_engine"
-            setattr(gm, engine_name, trt_module.engine)
-            engine_node = gm.graph.get_attr(engine_name)
+            if not cross_compile_flag:
+                # for the normal workflow: use the execute_engine node
+                engine_name = f"{name}_engine"
+                setattr(gm, engine_name, trt_module.engine)
+                engine_node = gm.graph.get_attr(engine_name)
 
-            trt_node = gm.graph.call_function(
-                torch.ops.tensorrt.execute_engine.default,
-                (trt_module_node.args, engine_node),
-            )
+                trt_node = gm.graph.call_function(
+                    torch.ops.tensorrt.execute_engine.default,
+                    (trt_module_node.args, engine_node),
+                )
+                # meta["val"] should be a lighter version of a tensor. For eg: it should be a FakeTensor (with output shape and dtype properties)
+                # Lighter version of a custom_obj is not defined clearly. meta["val"] does not have any type expectations but
+                # for custom object nodes, it should be CustomObjArgument
+                engine_node.meta["val"] = CustomObjArgument(
+                    name=engine_node.name, class_fqn=""
+                )
+            else:
+                # for the cross compile for windows workflow: use the no_op_placeholder node
+                engine_info = trt_module._pack_engine_info()
+                engine_bytes = engine_info[ENGINE_IDX]
+                engine_info[ENGINE_IDX] = base64.b64encode(engine_bytes).decode("utf-8")
+                # insert the no_placeholder node in the graph which should be replaced to the actual execute_engine node while load in the windows
+                trt_node = gm.graph.call_function(
+                    torch.ops.tensorrt.no_op_placeholder_for_execute_engine.default,
+                    (trt_module_node.args, *engine_info),
+                )
             # set trt_node.meta with trt_module_node.meta
             assert num_outputs > 0
             trt_node.meta["val"] = trt_module_node.meta["val"]
 
-            # meta["val"] should be a lighter version of a tensor. For eg: it should be a FakeTensor (with output shape and dtype properties)
-            # Lighter version of a custom_obj is not defined clearly. meta["val"] does not have any type expectations but
-            # for custom object nodes, it should be CustomObjArgument
-            engine_node.meta["val"] = CustomObjArgument(
-                name=engine_node.name, class_fqn=""
-            )
-
         if num_outputs == 1:
             # Insert getitem nodes as outputs (for export serialization to work)
             with gm.graph.inserting_after(trt_node):
@@ -419,60 +429,6 @@ def inline_trt_modules(gm: torch.fx.GraphModule) -> torch.fx.GraphModule:
         # Erase the TRT submodule (call_module) node.
         gm.graph.erase_node(trt_module_node)
 
-    return gm
-
-
-def inline_trt_modules_for_windows(gm: torch.fx.GraphModule) -> torch.fx.GraphModule:
-    """
-    Replace TRT submodules with trt engine nodes.
-    """
-    for name, _ in gm.named_children():
-        if "_run_on_acc" not in name:
-            continue
-        # Get the TRT submodule
-        trt_module = getattr(gm, name)
-
-        # Ensure the trt module node in the main graph (gm) has inputs
-        trt_module_node = [node for node in gm.graph.nodes if node.name == name]
-        assert trt_module_node
-        trt_module_node = trt_module_node[0]
-        assert trt_module_node.args
-
-        if "val" not in trt_module_node.meta:
-            raise ValueError(
-                f"trt_module_node: {trt_module_node.name} does not have the metadata which should be set during dynamo compile_module step."
-            )
-        num_outputs = len(trt_module_node.meta["val"])
-        # Insert a call_function node to perform inference on TRT engine
-        with gm.graph.inserting_before(trt_module_node):
-            engine_info = trt_module._pack_engine_info()
-            engine_bytes = engine_info[ENGINE_IDX]
-            engine_info[ENGINE_IDX] = base64.b64encode(engine_bytes).decode("utf-8")
-            # insert the no_placeholder node in the graph which should be replaced to the actual execute_engine node while load in the windows
-            trt_node = gm.graph.call_function(
-                torch.ops.tensorrt.no_op_placeholder_for_execute_engine.default,
-                (trt_module_node.args, *engine_info),
-            )
-            assert num_outputs > 0
-            trt_node.meta["val"] = trt_module_node.meta["val"]
-
-        if num_outputs == 1:
-            # Insert getitem nodes as outputs (for export serialization to work)
-            with gm.graph.inserting_after(trt_node):
-                getitem_output = gm.graph.call_function(operator.getitem, (trt_node, 0))
-                getitem_output.meta["val"] = trt_node.meta["val"]
-            trt_module_node.replace_all_uses_with(getitem_output)
-        else:
-            # Multiple outputs case:
-            # Replace uses of submodule with the trt_node.
-            # getitem nodes are already added inherently by the partitioner
-            trt_module_node.replace_all_uses_with(trt_node)
-            getitem_nodes = trt_node.users
-            for idx, getitem_node in enumerate(getitem_nodes):
-                getitem_node.meta["val"] = trt_node.meta["val"][idx]
-
-        # Erase the TRT submodule (call_module) node.
-        gm.graph.erase_node(trt_module_node)
     return gm
 
 
