@@ -1,7 +1,6 @@
-name: Build and test Torch-TensorRT on Linux with specified tensorRT version
+name: Build and Test Torch-TensorRT on Linux with Future TensorRT Versions
 
 on:
-  pull_request:
   workflow_dispatch:
 
 permissions:
