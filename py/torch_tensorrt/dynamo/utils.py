@@ -6,6 +6,7 @@ from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 import numpy as np
+import sympy
 import tensorrt as trt
 import torch
 from torch._subclasses.fake_tensor import FakeTensor
@@ -326,9 +327,7 @@ def contains_sym_int(tensor: torch.Tensor) -> bool:
     return any(isinstance(dim, torch.SymInt) for dim in tensor)
 
 
-def extract_var_range_info(
-    symbolic_integer: torch.SymInt, opt_optional: Optional[bool] = False
-) -> Dict[str, int]:
+def extract_var_range_info(symbolic_integer: torch.SymInt) -> Dict[str, int]:
     """
     This function returns the min, max, opt values of a symbolic integer.
     """
@@ -350,13 +349,8 @@ def extract_var_range_info(
     min_max_opt = {}
     min_max_opt["min"] = min_val
     min_max_opt["max"] = max_val
-    try:
+    if isinstance(var_val, sympy.core.numbers.Integer):
         min_max_opt["opt"] = int(var_val)
-    except Exception as e:
-        logger.warning(f"Failed to get the opt value for {node=}: {e=}")
-        if not opt_optional:
-            raise ValueError(f"Failed to get the opt value for {node=}: {e=}")
-
     return min_max_opt
 
 
@@ -374,7 +368,7 @@ def unwrap_tensor_shape(
     if isinstance(tensor, int):
         tensor_shape.append(tensor)
     elif isinstance(tensor, torch.SymInt):
-        min_max_opt = extract_var_range_info(tensor, opt_optional=True)
+        min_max_opt = extract_var_range_info(tensor)
         tensor_shape.append((min_max_opt["min"], min_max_opt["max"]))
     elif isinstance(tensor, (torch.Tensor, FakeTensor)):
         for dimension in tensor.shape:
