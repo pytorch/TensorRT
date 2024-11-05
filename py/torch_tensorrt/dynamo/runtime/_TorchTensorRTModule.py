@@ -132,6 +132,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         self.weight_name_map = weight_name_map
         self.serialized_engine = serialized_engine
         self.engine = None
+        self.cudagraphs_enabled_parent_module = False
 
         if (
             serialized_engine
@@ -195,6 +196,9 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
             logger.warning("Weight streaming is disabled")
 
         return budget_bytes
+
+    def set_cudagraphs_enabled_parent_module(self, enable: bool) -> None:
+        self.engine.set_cudagraphs_enabled_parent_module(enable)
 
     def setup_engine(self) -> None:
         """

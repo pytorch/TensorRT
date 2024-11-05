@@ -216,6 +216,10 @@ TRTEngine::TRTEngine(
   LOG_DEBUG(*this);
 }
 
+void TRTEngine::set_cudagraphs_enabled_parent_module(bool enable) {
+  cudagraphs_enabled_parent_module = enable;
+}
+
 TRTEngine::~TRTEngine() {
   trt_engine_profiler.reset();
   exec_ctx.reset();

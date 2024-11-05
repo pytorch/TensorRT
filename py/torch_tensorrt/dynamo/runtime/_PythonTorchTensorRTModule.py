@@ -186,6 +186,9 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         logger.debug(f"Weight streaming budget set to {budget_bytes}B")
         return self._set_device_memory_budget(budget_bytes)
 
+    def set_cudagraphs_enabled_parent_module(self, enable: bool) -> None:
+        self.cudagraphs_enabled_parent_module = enable
+
     def setup_engine(self) -> None:
         assert (
             self.target_platform == Platform.current_platform()
