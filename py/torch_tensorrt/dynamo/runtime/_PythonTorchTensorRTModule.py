@@ -110,7 +110,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         self.target_platform = Platform.current_platform()
         self.cudagraphs_enabled = False
         self.pre_allocated_outputs: List[torch.Tensor] = []
-        self.use_pre_allocated_outputs = False
+        self.use_pre_allocated_outputs = True
 
         if self.serialized_engine is not None and not self.settings.lazy_engine_init:
             self.setup_engine()
@@ -248,6 +248,9 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
             )
             outputs.append(output)
         return outputs
+
+    def set_output_opt(self, enable: bool) -> None:
+        self.use_pre_allocated_outputs = enable
 
     def forward(self, *inputs: torch.Tensor) -> torch.Tensor | Tuple[torch.Tensor, ...]:
         # Ensure inputs are available in all scopes and cast symbolic integers to Tensors

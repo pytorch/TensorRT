@@ -5,7 +5,6 @@
 #include "torch/csrc/jit/runtime/custom_operator.h"
 #include "torch/torch.h"
 
-#include <ATen/record_function.h>
 #include "core/runtime/TRTEngineProfiler.h"
 #include "core/runtime/runtime.h"
 #include "core/util/prelude.h"
@@ -202,7 +201,6 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
 
   { // Input Setup
     std::unique_ptr<torch::autograd::profiler::RecordProfile> input_profiler_guard;
-    RECORD_FUNCTION("process input", std::vector<c10::IValue>());
     if (compiled_engine->profile_execution) {
       input_profiler_guard =
           std::make_unique<torch::autograd::profiler::RecordProfile>(compiled_engine->input_profile_path);
@@ -284,7 +282,6 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
 
   { // Output Setup
     std::unique_ptr<torch::autograd::profiler::RecordProfile> output_profiler_guard;
-    RECORD_FUNCTION("process output", std::vector<c10::IValue>());
     if (compiled_engine->profile_execution) {
       output_profiler_guard =
           std::make_unique<torch::autograd::profiler::RecordProfile>(compiled_engine->output_profile_path);
@@ -330,7 +327,6 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
   }
 
   { // Engine Execution (execute on engine stream)
-    RECORD_FUNCTION("Trt runtime", std::vector<c10::IValue>());
     c10::cuda::CUDAStreamGuard stream_guard(compiled_engine->engine_stream);
 
     std::unique_ptr<torch::autograd::profiler::RecordProfile> enqueue_profiler_guard;

@@ -319,10 +319,6 @@ int64_t TRTEngine::get_automatic_device_memory_budget() {
   return cuda_engine->getWeightStreamingAutomaticBudget();
 }
 
-void TRTEngine::set_pre_allocated_outputs(bool enable) {
-  use_pre_allocated_outputs = enable;
-}
-
 std::string TRTEngine::to_str() const {
   // clang-format off
   std::stringstream ss;
