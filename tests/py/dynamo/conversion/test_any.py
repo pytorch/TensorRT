@@ -191,7 +191,7 @@ class TestAnyConverterDynamic(DispatchTestCase):
             (
                 "3d_dynamic_float",
                 (2, 1, 1),
-                (2, 2, 1),
+                (2, 2, 2),
                 (3, 2, 4),
                 torch.float,
             ),
@@ -234,7 +234,7 @@ class TestAnyConverterDynamic(DispatchTestCase):
             (
                 "3d_dynamic_dim_float",
                 (2, 1, 1),
-                (2, 2, 1),
+                (2, 2, 2),
                 (3, 2, 4),
                 torch.float,
                 2,
@@ -252,7 +252,7 @@ class TestAnyConverterDynamic(DispatchTestCase):
             (
                 "3d_dynamic_dim_bool",
                 (2, 1, 1),
-                (2, 2, 1),
+                (2, 2, 2),
                 (3, 2, 4),
                 torch.bool,
                 0,
@@ -285,7 +285,7 @@ class TestAnyConverterDynamic(DispatchTestCase):
             (
                 "3d_dynamic_dims_float",
                 (2, 1, 1),
-                (2, 2, 1),
+                (2, 2, 2),
                 (3, 2, 4),
                 torch.float,
                 [1, 2],
