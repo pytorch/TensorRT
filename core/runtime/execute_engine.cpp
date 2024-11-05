@@ -113,11 +113,16 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
     LOG_INFO("" << log_info);
     compiled_engine->cudagraph.enable_debug_mode();
   }
+  bool cudagraphs_enabled = (!compiled_engine->cudagraphs_enabled_parent_module && CUDAGRAPHS_MODE);
 
   // Whether cudagraphs needs to record the graph on this pass
-  bool need_cudagraphs_record = (CUDAGRAPHS_MODE && (!_cudagraphs_validate_shapes(inputs, compiled_engine)));
+  // Cudagraphs record is required if cudagraphs_enabled is switched to True regardless of shape change
+  bool need_cudagraphs_record =
+      (((!compiled_engine->cudagraphs_enabled) && cudagraphs_enabled) ||
+       (cudagraphs_enabled && (!_cudagraphs_validate_shapes(inputs, compiled_engine))));
+  compiled_engine->cudagraphs_enabled = cudagraphs_enabled;
 
-  if (!CUDAGRAPHS_MODE) {
+  if (!cudagraphs_enabled) {
     compiled_engine->cudagraph.reset();
   }
 
@@ -211,7 +216,7 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
             compiled_engine->exec_ctx->setTensorAddress(name.c_str(), inputShapeTensorValues.back().data()),
             "Error while setting the tensor address for shape inputs");
 
-        if (CUDAGRAPHS_MODE) {
+        if (cudagraphs_enabled) {
           // @peri044 I dont know if this makes sense since they are supposed to be GPU buffers
           compiled_engine->input_buffers[i] = input_cpu;
         }
@@ -231,7 +236,7 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
         TORCHTRT_CHECK(
             compiled_engine->exec_ctx->setInputShape(name.c_str(), dims), "Error while setting the input shape");
 
-        if (CUDAGRAPHS_MODE) {
+        if (cudagraphs_enabled) {
           // If using CUDAGraphs copy formatted input to the corresponding persistent input buffer
           compiled_engine->input_buffers[i].copy_(formatted_inputs.back(), true);
           TORCHTRT_CHECK(
@@ -281,7 +286,7 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
         compiled_engine->output_buffers[pyt_idx] = std::move(outputs[pyt_idx].clone());
       }
 
-      if (CUDAGRAPHS_MODE) {
+      if (cudagraphs_enabled) {
         TORCHTRT_CHECK(
             compiled_engine->exec_ctx->setTensorAddress(
                 name.c_str(), compiled_engine->output_buffers[pyt_idx].data_ptr()),
@@ -324,7 +329,7 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
     caller_exec_complete.record(compiled_engine->caller_stream);
     caller_exec_complete.block(compiled_engine->engine_stream);
 
-    if (!CUDAGRAPHS_MODE) {
+    if (!cudagraphs_enabled) {
       // Direct execution uses the caller buffers directly
       compiled_engine->exec_ctx->enqueueV3(compiled_engine->engine_stream);
     } else {
@@ -350,7 +355,7 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
   trt_exec_complete.record(compiled_engine->engine_stream);
   trt_exec_complete.block(compiled_engine->caller_stream);
 
-  if (CUDAGRAPHS_MODE) {
+  if (cudagraphs_enabled) {
     // If in CUDAGraph mode, results need to be copied to the result buffers (on caller stream)
     for (size_t o = 0; o < compiled_engine->output_buffers.size(); o++) {
       outputs[o].copy_(compiled_engine->output_buffers[o], false);
