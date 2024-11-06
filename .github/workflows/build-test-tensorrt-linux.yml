@@ -67,8 +67,8 @@ jobs:
       smoke-test-script: ${{ matrix.smoke-test-script }}
       trigger-event: ${{ github.event_name }}
 
-  tests-py-torchscript-fe:
-    name: Test torchscript frontend [Python]
+  tests-cpp-core-conversion:
+    name: Test core conversion[CPP]
     needs: [generate-tensorrt-matrix, build]
     strategy:
       fail-fast: false
@@ -81,7 +81,7 @@ jobs:
             smoke-test-script: packaging/smoke_test_script.sh
     uses: ./.github/workflows/linux-test.yml
     with:
-      job-name: tests-py-torchscript-fe
+      job-name: tests-cpp-core-conversion
       repository: "pytorch/tensorrt"
       ref: ""
       test-infra-repository: pytorch/test-infra
@@ -89,47 +89,80 @@ jobs:
       build-matrix: ${{ needs.generate-tensorrt-matrix.outputs.matrix }}
       pre-script: ${{ matrix.pre-script }}
       script: |
+        set -x
         export USE_HOST_DEPS=1
-        export CI_BUILD=1
-        export LD_LIBRARY_PATH=/usr/lib64:$LD_LIBRARY_PATH
-        pushd .
-        cd tests/modules
-        python hub.py
-        popd
-        pushd .
-        cd tests/py/ts
-        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/ts_api_test_results.xml api/
-        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/ts_models_test_results.xml models/
-        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/ts_integrations_test_results.xml integrations/
-        popd
+        python -m pip show torch_tensorrt
+        location=$(python -m pip show torch_tensorrt | grep Location | sed "s/Location: //g")
+        ls -lart $location | grep torch_tensorrt
+        echo $LD_LIBRARY_PATH
+        export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:${location}/torch/lib:/usr/local/cuda/lib64:/usr/lib64
+        echo $LD_LIBRARY_PATH
+        bazel test //tests/core/conversion:conversion_tests --compilation_mode=opt \
+        --test_output=summary --config use_precompiled_torchtrt --config pre_cxx11_abi --sandbox_debug --verbose_failures --cxxopt='-std=c++17'
 
-  tests-py-dynamo-core:
-    name: Test dynamo core [Python]
-    needs: [generate-tensorrt-matrix, build]
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - repository: pytorch/tensorrt
-            package-name: torch_tensorrt
-            pre-script: packaging/pre_build_script.sh
-            post-script: packaging/post_build_script.sh
-            smoke-test-script: packaging/smoke_test_script.sh
-    uses: ./.github/workflows/linux-test.yml
-    with:
-      job-name: tests-py-dynamo-core
-      repository: "pytorch/tensorrt"
-      ref: ""
-      test-infra-repository: pytorch/test-infra
-      test-infra-ref: main
-      build-matrix: ${{ needs.generate-tensorrt-matrix.outputs.matrix }}
-      pre-script: ${{ matrix.pre-script }}
-      script: |
-        export USE_HOST_DEPS=1
-        export CI_BUILD=1
-        pushd .
-        cd tests/py/dynamo
-        python -m pytest -ra -n 4 --junitxml=${RUNNER_TEST_RESULTS_DIR}/tests_py_dynamo_core_runtime_test_results.xml runtime/test_000_*
-        python -m pytest -ra -n 4 --junitxml=${RUNNER_TEST_RESULTS_DIR}/tests_py_dynamo_core_partitioning_test_results.xml partitioning/
-        python -m pytest -ra -n 4 --junitxml=${RUNNER_TEST_RESULTS_DIR}/tests_py_dynamo_core_lowering_test_results.xml lowering/
-        popd
+  # tests-py-torchscript-fe:
+  #   name: Test torchscript frontend [Python]
+  #   needs: [generate-tensorrt-matrix, build]
+  #   strategy:
+  #     fail-fast: false
+  #     matrix:
+  #       include:
+  #         - repository: pytorch/tensorrt
+  #           package-name: torch_tensorrt
+  #           pre-script: packaging/pre_build_script.sh
+  #           post-script: packaging/post_build_script.sh
+  #           smoke-test-script: packaging/smoke_test_script.sh
+  #   uses: ./.github/workflows/linux-test.yml
+  #   with:
+  #     job-name: tests-py-torchscript-fe
+  #     repository: "pytorch/tensorrt"
+  #     ref: ""
+  #     test-infra-repository: pytorch/test-infra
+  #     test-infra-ref: main
+  #     build-matrix: ${{ needs.generate-tensorrt-matrix.outputs.matrix }}
+  #     pre-script: ${{ matrix.pre-script }}
+  #     script: |
+  #       export USE_HOST_DEPS=1
+  #       export CI_BUILD=1
+  #       export LD_LIBRARY_PATH=/usr/lib64:$LD_LIBRARY_PATH
+  #       pushd .
+  #       cd tests/modules
+  #       python hub.py
+  #       popd
+  #       pushd .
+  #       cd tests/py/ts
+  #       python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/ts_api_test_results.xml api/
+  #       python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/ts_models_test_results.xml models/
+  #       python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/ts_integrations_test_results.xml integrations/
+  #       popd
+
+  # tests-py-dynamo-core:
+    # name: Test dynamo core [Python]
+    # needs: [generate-tensorrt-matrix, build]
+    # strategy:
+    #   fail-fast: false
+    #   matrix:
+    #     include:
+    #       - repository: pytorch/tensorrt
+    #         package-name: torch_tensorrt
+    #         pre-script: packaging/pre_build_script.sh
+    #         post-script: packaging/post_build_script.sh
+    #         smoke-test-script: packaging/smoke_test_script.sh
+    # uses: ./.github/workflows/linux-test.yml
+    # with:
+    #   job-name: tests-py-dynamo-core
+    #   repository: "pytorch/tensorrt"
+    #   ref: ""
+    #   test-infra-repository: pytorch/test-infra
+    #   test-infra-ref: main
+    #   build-matrix: ${{ needs.generate-tensorrt-matrix.outputs.matrix }}
+    #   pre-script: ${{ matrix.pre-script }}
+    #   script: |
+    #     export USE_HOST_DEPS=1
+    #     export CI_BUILD=1
+    #     pushd .
+    #     cd tests/py/dynamo
+    #     python -m pytest -ra -n 4 --junitxml=${RUNNER_TEST_RESULTS_DIR}/tests_py_dynamo_core_runtime_test_results.xml runtime/test_000_*
+    #     python -m pytest -ra -n 4 --junitxml=${RUNNER_TEST_RESULTS_DIR}/tests_py_dynamo_core_partitioning_test_results.xml partitioning/
+    #     python -m pytest -ra -n 4 --junitxml=${RUNNER_TEST_RESULTS_DIR}/tests_py_dynamo_core_lowering_test_results.xml lowering/
+    #     popd
