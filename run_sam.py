@@ -2,12 +2,10 @@ import argparse
 import timeit
 from typing import Tuple
 
-import modelopt.torch.quantization as mtq
 import numpy as np
 import pandas as pd
 import torch
 import torch_tensorrt
-from modelopt.torch.quantization.utils import export_torch_mode
 from PIL import Image
 from sam2.sam2_image_predictor import SAM2ImagePredictor
 
@@ -104,6 +102,8 @@ def build_model(args):
             pyt_model = pyt_model.half()
             full_model = ImageEncoder(pyt_model).eval().cuda()
         elif args.precision == "fp8":
+            import modelopt.torch.quantization as mtq
+
             full_model = ImageEncoder(pyt_model).eval().cuda()
             input_tensor = torch.randn((1, 3, 1024, 1024), dtype=torch.float32).cuda()
 
@@ -113,8 +113,6 @@ def build_model(args):
 
             quant_cfg = mtq.FP8_DEFAULT_CFG
             mtq.quantize(full_model, quant_cfg, forward_loop=calibrate_loop)
-            breakpoint()
-            print("done")
         else:
             full_model = ImageEncoder(pyt_model).eval().cuda()
 
@@ -184,10 +182,8 @@ if __name__ == "__main__":
     pyt_model, predictor = build_model(args)
 
     input_image = build_input(args, "./truck.jpg", predictor)
-
-    trt_model = compile_with_torchtrt(pyt_model, (input_image,), args)
-
     pyt_results = record_perf(pyt_model, "Torch", [input_image], args.precision, 3, 1)
+    trt_model = compile_with_torchtrt(pyt_model, (input_image,), args)
     trt_results = record_perf(
         trt_model, "TensorRT", [input_image], args.precision, 3, 1
     )
