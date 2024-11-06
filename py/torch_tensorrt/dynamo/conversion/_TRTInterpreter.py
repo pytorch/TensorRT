@@ -547,7 +547,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         torch.cuda.empty_cache()
 
     def _insert_engine_to_cache(self, hash_val: str, serialized_engine: bytes) -> None:
-        # TODO: Waiting for TRT's feature to cache the weight-stripped engine
+        # TODO: @Evan is waiting for TRT's feature to cache the weight-stripped engine
         # if not self.compilation_settings.strip_engine_weights:
         #     # set EXCLUDE_WEIGHTS flag to strip weights
         #     runtime = trt.Runtime(TRT_LOGGER)
@@ -624,7 +624,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                 )
                 serialized_engine = engine.serialize()
 
-                # TODO: Waiting for TRT's feature to load the weight-stripped engine
+                # TODO: @Evan is waiting for TRT's feature to load the weight-stripped engine
                 # # EXCLUDE_WEIGHTS flag must be cleared
                 # serialization_config = engine.create_serialization_config()
                 # serialization_config.clear_flag(

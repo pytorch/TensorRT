@@ -94,13 +94,13 @@ class TestWeightStrippedEngine(TestCase):
         )
         gm2_output = gm2(*example_inputs)
 
-        # 3. Compile with torch.compile using tensorrt backend
-        gm3 = torch.compile(
-            pyt_model,
-            backend="tensorrt",
-            options=settings,
-        )
-        gm3_output = gm3(*example_inputs)
+        # 3. Compile with torch.compile using tensorrt backend, which is not supported to set strip_engine_weights=True
+        # gm3 = torch.compile(
+        #     pyt_model,
+        #     backend="tensorrt",
+        #     options=settings,
+        # )
+        # gm3_output = gm3(*example_inputs)
 
         assertions.assertEqual(
             gm1_output.sum(), 0, msg="gm1_output should be all zeros"
@@ -108,10 +108,6 @@ class TestWeightStrippedEngine(TestCase):
 
         assertions.assertEqual(
             gm2_output.sum(), 0, msg="gm2_output should be all zeros"
-        )
-
-        assertions.assertEqual(
-            gm3_output.sum(), 0, msg="gm3_output should be all zeros"
         )
 
     def test_weight_stripped_engine_sizes(self):

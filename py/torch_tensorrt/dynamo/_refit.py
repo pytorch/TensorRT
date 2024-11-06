@@ -466,16 +466,13 @@ def refit_module_weights(
         serialization_config = engine.create_serialization_config()
         serialization_config.clear_flag(trt.SerializationFlag.EXCLUDE_WEIGHTS)
         serialized_engine = engine.serialize_with_config(serialization_config)
-        engine = runtime.deserialize_cuda_engine(serialized_engine)
 
-        if isinstance(compiled_submodule, PythonTorchTensorRTModule):
-            compiled_submodule.engine = engine
-
-        if isinstance(compiled_submodule, TorchTensorRTModule):
-            new_engine_info = list(engine_info)
-            new_engine_info[ENGINE_IDX] = bytes(serialized_engine)
-            refitted_engine = torch.classes.tensorrt.Engine(tuple(new_engine_info))
-            compiled_submodule.engine = refitted_engine
+        if isinstance(
+            compiled_submodule, (PythonTorchTensorRTModule, TorchTensorRTModule)
+        ):
+            compiled_submodule.engine = None  # Clear the engine for TorchTensorRTModule, otherwise it won't be updated
+            compiled_submodule.serialized_engine = bytes(serialized_engine)
+            compiled_submodule.setup_engine()
 
         elif inline_module:
             new_engine_info = list(engine_info)
