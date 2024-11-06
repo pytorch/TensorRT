@@ -10,8 +10,6 @@ from enum import IntEnum
 
 logger = logging.getLogger("CustomPlugin")
 
-
-
 _numpy_to_plugin_field_type = {
     np.dtype('int32'): trt.PluginFieldType.INT32,
     np.dtype('int16'): trt.PluginFieldType.INT16,
@@ -22,7 +20,6 @@ _numpy_to_plugin_field_type = {
     np.dtype('float64'): trt.PluginFieldType.FLOAT64,
     np.dtype('float16'): trt.PluginFieldType.FLOAT16
 }
-
 
 _built_in_to_plugin_field_type = {
     int: trt.PluginFieldType.INT64,
@@ -225,18 +222,59 @@ class CustomPlugin(trt.IPluginV3, trt.IPluginV3OneCore, trt.IPluginV3OneBuild, t
 
 
 class PluginCreator(trt.IPluginCreatorV3One):  # type: ignore[misc]
-    def __init__(self, plugin_name : str, plugin_field_names : trt.PluginFieldCollection):
-        super().__init__()
+    def __init__(self, plugin_name : str, plugin_namespace : str, attrs):
+        trt.IPluginCreatorV3One.__init__(self)  
 
         self.name = plugin_name
-        self.plugin_namespace = ""
+        self.plugin_namespace = plugin_namespace
         self.plugin_version = "1"
-        self.field_names = plugin_field_names
+        
+        field_names = []
+        for name, (builtin, type_) in attrs.items():
+            if builtin:
+                if type_ is str:
+                    field_names.append(
+                        trt.PluginField(name, b"", trt.PluginFieldType.CHAR)
+                    )
+                elif type_ is bytes:
+                    field_names.append(
+                        trt.PluginField(name, b"", trt.PluginFieldType.UNKNOWN)
+                    )
+                else:
+                    field_names.append(
+                        trt.PluginField(
+                            name, np.array([]), _built_in_to_plugin_field_type[type_]
+                        )
+                    )
+            else:
+                field_names.append(
+                    trt.PluginField(
+                        name, np.array([]), _numpy_to_plugin_field_type[np.dtype(type_)]
+                    )
+                )
+
+        self.field_names = trt.PluginFieldCollection(field_names)
 
     def create_plugin(
-        self, name: str, field_collection: trt.PluginFieldCollection_
+        self, name: str, fc, phase
     ) -> CustomPlugin:
-        return CustomPlugin(field_collection)
+
+        
+        attrs = {}
+        # for f in fc:
+        #     if f.name not in desc.input_attrs:
+        #         raise AssertionError(
+        #             f"Unexpected attribute {f.name} provided to create_plugin. Expected one of {desc.input_attrs.keys()}."
+        #         )
+
+        #     if _is_numpy_array(desc.input_attrs[f.name]):
+        #         attrs[f.name] = f.data.astype(_infer_numpy_type(desc.input_attrs[f.name]))
+        #     else:
+        #         attrs[f.name] = desc.input_attrs[f.name](f.data)
+                
+        custom_plugin = CustomPlugin(name, attrs, fc)
+        
+        return custom_plugin
 
 
 # Looks like deserilaize required? Not found in the example here: https://github.com/NVIDIA/TensorRT/blob/main/samples/python/python_plugin/circ_pad_plugin_multi_tactic.py
