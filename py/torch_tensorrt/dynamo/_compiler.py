@@ -223,8 +223,8 @@ def compile(
             "When enable_weight_streaming is enabled, it requires use_explicit_typing to be set to True"
         )
     # Aliasing inputs to arg_inputs for better understanding
-    if not arg_inputs and not inputs:
-        raise AssertionError("'arg_inputs' and 'inputs' should not both be None.")
+    if not arg_inputs and not kwarg_inputs and not inputs:
+        raise AssertionError("'arg_inputs', 'kwarg_inputs' and 'inputs' should not all be None.")
 
     elif arg_inputs and inputs:
         raise AssertionError(
