@@ -11,6 +11,8 @@ from modelopt.torch.quantization.utils import export_torch_mode
 from PIL import Image
 from sam2.sam2_image_predictor import SAM2ImagePredictor
 
+from sam_components import ImageEncoder
+
 # Github issue related to SAM
 # https://github.com/pytorch/pytorch/issues/115534
 
@@ -34,12 +36,8 @@ def recordStats(backend, timings, precision, batch_size=1, compile_time_s=None):
     stats = {
         "Backend": backend,
         "Precision": precision,
-        # "Batch size": batch_size,
         "Median(FPS)": speed_med,
-        # "Mean(FPS)": speed_mean,
         "Median-Latency(ms)": time_med * 1000,
-        # "Mean-Latency(ms)": time_mean * 1000,
-        # "Latency-StdDev(ms)": time_std * 1000,
     }
     results.append(stats)
 
@@ -96,53 +94,29 @@ def infer(
         )
 
 
-class MyModule(torch.nn.Module):
-    def __init__(self, module):
-        super().__init__()
-        self.module = module
-        self._bb_feat_sizes = [
-            (256, 256),
-            (128, 128),
-            (64, 64),
-        ]
-
-    def forward(self, torch_img: torch.Tensor):
-        backbone_out = self.module.forward_image(torch_img)
-        _, vision_feats, _, _ = self.module._prepare_backbone_features(backbone_out)
-        # Add no_mem_embed, which is added to the lowest rest feat. map during training on videos
-        if self.module.directly_add_no_mem_embed:
-            vision_feats[-1] = vision_feats[-1] + self.module.no_mem_embed
-
-        feats = [
-            feat.permute(1, 2, 0).view(1, -1, *feat_size)
-            for feat, feat_size in zip(vision_feats[::-1], self._bb_feat_sizes[::-1])
-        ][::-1]
-        image_features = {"image_embed": feats[-1], "high_res_feats": feats[:-1]}
-        return image_features
-
-
 def build_model(args):
 
     # Predictor
     predictor = SAM2ImagePredictor.from_pretrained("facebook/sam2-hiera-small")
     pyt_model = predictor.model
-    if args.precision == "fp16":
-        pyt_model = pyt_model.half()
-        full_model = MyModule(pyt_model).eval().cuda()
-    elif args.precision == "fp8":
-        full_model = MyModule(pyt_model).eval().cuda()
-        input_tensor = torch.randn((1, 3, 1024, 1024), dtype=torch.float32).cuda()
+    if args.mode == "encoder":
+        if args.precision == "fp16":
+            pyt_model = pyt_model.half()
+            full_model = ImageEncoder(pyt_model).eval().cuda()
+        elif args.precision == "fp8":
+            full_model = ImageEncoder(pyt_model).eval().cuda()
+            input_tensor = torch.randn((1, 3, 1024, 1024), dtype=torch.float32).cuda()
 
-        def calibrate_loop(model):
-            """Simple calibration function for testing."""
-            model(input_tensor)
+            def calibrate_loop(model):
+                """Simple calibration function for testing."""
+                model(input_tensor)
 
-        quant_cfg = mtq.FP8_DEFAULT_CFG
-        mtq.quantize(full_model, quant_cfg, forward_loop=calibrate_loop)
-        breakpoint()
-        print("done")
-    else:
-        full_model = MyModule(pyt_model).eval().cuda()
+            quant_cfg = mtq.FP8_DEFAULT_CFG
+            mtq.quantize(full_model, quant_cfg, forward_loop=calibrate_loop)
+            breakpoint()
+            print("done")
+        else:
+            full_model = ImageEncoder(pyt_model).eval().cuda()
 
     return full_model, predictor
 
@@ -169,8 +143,9 @@ def compile_with_torchtrt(model, inputs, args):
     if args.precision == "fp16":
         precision = torch.float16
 
-    # ep = torch.export.export(model, inputs)
-    ep = torch.export._trace._export(
+    from torch.export._trace import _export
+
+    ep = _export(
         model,
         inputs,
         strict=False,
@@ -194,8 +169,14 @@ if __name__ == "__main__":
     arg_parser.add_argument(
         "--precision",
         type=str,
-        default="fp32",
+        default="fp16",
         help="Precision of the model to compile for TensorRT",
+    )
+    arg_parser.add_argument(
+        "--mode",
+        type=str,
+        default="encoder",
+        help="Supported options include encoder | prediction_head",
     )
 
     args = arg_parser.parse_args()
