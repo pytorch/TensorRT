@@ -42,6 +42,7 @@ class TestConvolutionConverter(DispatchTestCase):
             TestModule(),
             inputs,
             use_dynamo_tracer=True,
+            enable_passes=True,
         )
 
     def test_conv1d_with_dynamic_shape(
@@ -75,6 +76,7 @@ class TestConvolutionConverter(DispatchTestCase):
             TestModule(),
             input_specs,
             use_dynamo_tracer=True,
+            enable_passes=True,
         )
 
     @parameterized.expand(
@@ -119,6 +121,7 @@ class TestConvolutionConverter(DispatchTestCase):
             TestModule(),
             inputs,
             use_dynamo_tracer=True,
+            enable_passes=True,
         )
 
     # Testing with (-1, -1, -1, -1) results into Error:
@@ -144,6 +147,7 @@ class TestConvolutionConverter(DispatchTestCase):
             TestModule(),
             input_specs,
             use_dynamo_tracer=True,
+            enable_passes=True,
         )
 
     @parameterized.expand(
@@ -182,6 +186,7 @@ class TestConvolutionConverter(DispatchTestCase):
             TestModule(),
             inputs,
             use_dynamo_tracer=True,
+            enable_passes=True,
         )
 
     # Testing with (-1, -1, -1, -1, -1) results into Error:
@@ -207,6 +212,7 @@ class TestConvolutionConverter(DispatchTestCase):
             TestModule(),
             input_specs,
             use_dynamo_tracer=True,
+            enable_passes=True,
         )
 
 
