@@ -26,6 +26,7 @@ Getting Started
    :hidden:
 
    getting_started/installation
+   getting_started/jetpack
    getting_started/quick_start
 
 User Guide
