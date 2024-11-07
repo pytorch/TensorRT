@@ -277,7 +277,7 @@ def embedding_bag_validator(
     node: Node, settings: Optional[CompilationSettings] = None
 ) -> bool:
     # Embedding bag op is not refitable
-    if not settings or not settings.immutable_weights:
+    if settings and not settings.immutable_weights:
         return False
 
     if not one_user_validator(node):
@@ -944,7 +944,7 @@ def aten_ops_slice(
 
 def refit_validator(node: Node, settings: Optional[CompilationSettings] = None) -> bool:
     # cumsum op is not refitable
-    if not settings or not settings.immutable_weights:
+    if settings and not settings.immutable_weights:
         return False
     return True
 
