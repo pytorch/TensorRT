@@ -5,18 +5,25 @@ import copy
 import json
 import sys
 
+# please update the cuda version you want to test with the future tensorRT version here
+# channel: nightly if the future tensorRT version test workflow is triggered from the main branch or your personal branch
+# channel: test if the future tensorRT version test workflow is triggered from the release branch(release/2.5 etc....)
 CUDA_VERSIONS_DICT = {
     "nightly": ["cu124"],
     "test": ["cu121", "cu124"],
     "release": ["cu121", "cu124"],
 }
 
+# please update the python version you want to test with the future tensorRT version here
+# channel: nightly if the future tensorRT version test workflow is triggered from the main branch or your personal branch
+# channel: test if the future tensorRT version test workflow is triggered from the release branch(release/2.5 etc....)
 PYTHON_VERSIONS_DICT = {
     "nightly": ["3.9"],
     "test": ["3.9", "3.10", "3.11", "3.12"],
     "release": ["3.9", "3.10", "3.11", "3.12"],
 }
 
+# please update the future tensorRT version you want to test here
 TENSORRT_VERSIONS_DICT = {
     "windows": {
         "10.4.0": {
