@@ -2,7 +2,7 @@
 # networkx library issue: https://discuss.pytorch.org/t/installing-pytorch-under-python-3-8-question-about-networkx-version/196740
 expecttest==0.1.6
 networkx==2.8.8
-numpy<2.0.0
+numpy
 parameterized>=0.2.0
 pytest>=8.2.1
 pytest-xdist>=3.6.1
