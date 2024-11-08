@@ -12,6 +12,7 @@ from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion import impl
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
 from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
+    ConverterPriority,
     dynamo_tensorrt_converter,
     has_static_shapes_in_args,
 )
@@ -953,6 +954,7 @@ def refit_validator(node: Node, settings: Optional[CompilationSettings] = None) 
     torch.ops.aten.cumsum.default,
     capability_validator=refit_validator,
     supports_dynamic_shapes=True,
+    priority=ConverterPriority.HIGH,
 )
 @enforce_tensor_types(
     {
