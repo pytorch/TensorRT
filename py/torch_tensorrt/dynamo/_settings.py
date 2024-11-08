@@ -13,6 +13,7 @@ from torch_tensorrt.dynamo._defaults import (
     DLA_LOCAL_DRAM_SIZE,
     DLA_SRAM_SIZE,
     DRYRUN,
+    ENABLE_CROSS_COMPILE_FOR_WINDOWS,
     ENABLE_EXPERIMENTAL_DECOMPOSITIONS,
     ENABLE_WEIGHT_STREAMING,
     ENABLED_PRECISIONS,
@@ -88,6 +89,8 @@ class CompilationSettings:
         strip_engine_weights (bool): Whether to strip the engine weights
         immutable_weights (bool): Build non-refittable engines. This is useful for some layers that are not refittable. If this argument is set to true, `strip_engine_weights` and `refit_identical_engine_weights` will be ignored
         enable_weight_streaming (bool): Enable weight streaming.
+        enable_cross_compile_for_windows (bool): By default this is False means TensorRT engines can only be executed on the same platform where they were built.
+            True will enable cross-platform compatibility which allows the engine to be built on Linux and run on Windows
     """
 
     enabled_precisions: Set[dtype] = field(default_factory=lambda: ENABLED_PRECISIONS)
@@ -127,6 +130,7 @@ class CompilationSettings:
     strip_engine_weights: bool = STRIP_ENGINE_WEIGHTS
     immutable_weights: bool = IMMUTABLE_WEIGHTS
     enable_weight_streaming: bool = ENABLE_WEIGHT_STREAMING
+    enable_cross_compile_for_windows: bool = ENABLE_CROSS_COMPILE_FOR_WINDOWS
 
 
 _SETTINGS_TO_BE_ENGINE_INVARIANT = (
