@@ -11,9 +11,9 @@ from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
     dynamo_tensorrt_converter,
 )
 from torch_tensorrt.fx.types import TRTTensor
-from plugin import PluginCreator
+from torch_tensorrt.dynamo.conversion.plugin import PluginCreator
 import tensorrt as trt
-from converter_utils import get_trt_tensor
+from torch_tensorrt.dynamo.conversion.converter_utils import get_trt_tensor
 
 logger = logging.getLogger(__name__)
 
@@ -31,11 +31,11 @@ def torchtrt_ex_elementwise_add(
     # return torch.add(args)
     
     # How to retrieve a plugin if it is defined elsewhere (e.g. linked library)
-    plugin_creator = PluginCreator("elementwise_add_plugin")
+    plugin_creator = PluginCreator("elementwise_add_plugin", plugin_namespace="", attrs={})
     TRT_PLUGIN_REGISTRY.register_creator(plugin_creator, "")    
     
     plugin_creator = TRT_PLUGIN_REGISTRY.get_plugin_creator(
-        type=plugin_creator, version="1", plugin_namespace=""
+        type="elementwise_add_plugin", version="1", plugin_namespace=""
     )
     assert plugin_creator, f"Unable to find elementwise_add_plugin creator"
 
@@ -63,14 +63,16 @@ def torchtrt_ex_elementwise_add(
     
     lhs_dtype = None
     rhs_dtype = None
+    lhs_val = args[0]
+    rhs_val = args[1]
     
     lhs_val = get_trt_tensor(ctx, lhs_val, f"{name}_lhs", lhs_dtype)
     rhs_val = get_trt_tensor(ctx, rhs_val, f"{name}_rhs", rhs_dtype)
 
-    layer = ctx.net.add_plugin_v2(
-        [lhs_val, rhs_val], plugin
+    layer = ctx.net.add_plugin_v3(
+        [lhs_val, rhs_val], [], plugin
     )  # Add the plugin to the network being constructed
-    layer.name = f"automatic-{name}"
+    # layer.name = f"automatic-{name}"
     return layer.get_output(0)
 
 

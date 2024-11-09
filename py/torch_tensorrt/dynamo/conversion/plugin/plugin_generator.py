@@ -7,6 +7,8 @@ import logging
 
 
 from enum import IntEnum
+from typing import List
+
 
 logger = logging.getLogger("CustomPlugin")
 
@@ -62,6 +64,7 @@ class CustomPlugin(trt.IPluginV3, trt.IPluginV3OneCore, trt.IPluginV3OneBuild, t
         self.attrs = attrs
         
         self.tactic = None
+        
 
         # <GENERATE CODE FOR TAKING A FIELD COLLECTION CONTAINING THE NON TENSOR INPUTS AND SETTING AN ATTR> 
         # ex.
@@ -76,7 +79,7 @@ class CustomPlugin(trt.IPluginV3, trt.IPluginV3OneCore, trt.IPluginV3OneBuild, t
     def get_capability_interface(self, type):
         return self
 
-    def get_output_datatypes(
+    def get_output_data_types(
         self, input_types: List[trt.DataType]
     ) -> trt.DataType:
         # WE CAN USE THE FAKE TENSOR IMPLEMENTATION TO FIGURE OUT THE EXPECTED OUTPUT DATA TYPE 
@@ -91,18 +94,19 @@ class CustomPlugin(trt.IPluginV3, trt.IPluginV3OneCore, trt.IPluginV3OneBuild, t
 
     def get_output_shapes(
         self,
-        output_index: int,
         inputs: List[trt.DimsExprs],
+        shape_inputs,
         exprBuilder: trt.IExprBuilder,
     ) -> trt.DimsExprs:
         
+        print(inputs)
 
     #    WE NEED TO FIND A WAY TO GO FROM FAKE TENSOR IMPL TO CONSTRUCTING A DIMSEXPR 
     #    THIS IS SOLVED IN SHAPE PROP IN PYTORCH WHERE SHAPE PROP CAN GIVE SYMINTS THAT ENCODE THE 
     #    SHAPE MAP. 
-        output_shape = trt.DimsExprs(inputs[0])
+        output_dims = trt.DimsExprs(inputs[0])
 
-        return [output_shape]
+        return [output_dims]
     
     def get_fields_to_serialize(self):
         # should be passed in as another argument
@@ -139,13 +143,15 @@ class CustomPlugin(trt.IPluginV3, trt.IPluginV3OneCore, trt.IPluginV3OneBuild, t
     def configure_plugin(self, inp, out):
         pass
 
-    # def on_shape_change(self, inp, out):
-    #     X_dims = inp[0].dims
-    #     self.X_shape = np.zeros((len(X_dims),))
-    #     for i in range(len(X_dims)):
-    #         self.X_shape[i] = X_dims[i]
+    def on_shape_change(self, inp, out):
+        return
+        X_dims = inp[0].dims
+        self.X_shape = np.zeros((len(X_dims),))
+        for i in range(len(X_dims)):
+            self.X_shape[i] = X_dims[i]
 
     def supports_format_combination(self, pos, in_out, num_inputs):
+        return 
         assert num_inputs == 1
         assert pos < len(in_out)
 
@@ -198,7 +204,7 @@ class CustomPlugin(trt.IPluginV3, trt.IPluginV3OneCore, trt.IPluginV3OneBuild, t
         input_torch_0 = torch.as_tensor(input_data[0], device='cuda')
         input_torch_1 = torch.as_tensor(input_data[1], device='cuda')
 
-        output = torch.add(input_torch_0, input_torch_1)
+        output = torch.ops.torchtrt_ex.elementwise_add(input_torch_0, input_torch_1)
 
         cp.copyto(output_data, output)
 
@@ -212,8 +218,8 @@ class CustomPlugin(trt.IPluginV3, trt.IPluginV3OneCore, trt.IPluginV3OneBuild, t
     def set_tactic(self, tactic):
         self.tactic = Tactic(tactic)
 
-        if self.phase == trt.TensorRTPhase.RUNTIME:
-            logger.info(f"Best tactic chosen: {self.tactic}")
+        # if self.phase == trt.TensorRTPhase.RUNTIME:
+        #     logger.info(f"Best tactic chosen: {self.tactic}")
 
     def clone(self):
         cloned_plugin = CustomPlugin(self.plugin_name, self.attrs)
@@ -256,7 +262,7 @@ class PluginCreator(trt.IPluginCreatorV3One):  # type: ignore[misc]
         self.field_names = trt.PluginFieldCollection(field_names)
 
     def create_plugin(
-        self, name: str, fc, phase
+        self, name: str, field_collection, phase=None
     ) -> CustomPlugin:
 
         
@@ -272,7 +278,7 @@ class PluginCreator(trt.IPluginCreatorV3One):  # type: ignore[misc]
         #     else:
         #         attrs[f.name] = desc.input_attrs[f.name](f.data)
                 
-        custom_plugin = CustomPlugin(name, attrs, fc)
+        custom_plugin = CustomPlugin(name, attrs)
         
         return custom_plugin
 
@@ -284,5 +290,5 @@ class PluginCreator(trt.IPluginCreatorV3One):  # type: ignore[misc]
     #     deserialized.__dict__.update(dict)
     #     return deserialized
 
-TRT_PLUGIN_REGISTRY = trt.get_plugin_registry()
-TRT_PLUGIN_REGISTRY.register_creator(CircularPaddingPluginCreator(), "") 
+# TRT_PLUGIN_REGISTRY = trt.get_plugin_registry()
+# TRT_PLUGIN_REGISTRY.register_creator(CircularPaddingPluginCreator(), "") 
