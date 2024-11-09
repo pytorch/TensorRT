@@ -32,5 +32,5 @@ def slice(
     )
     if dynamic_shape:
         layer.set_input(2, shape)
-    set_layer_name(layer, target, name)
+    set_layer_name(layer, target, name, source_ir)
     return layer.get_output(0)
