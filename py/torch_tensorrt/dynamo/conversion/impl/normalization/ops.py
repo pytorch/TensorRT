@@ -217,9 +217,9 @@ def group_norm(
     group: int,
     eps: float,
 ) -> Tuple[TRTTensor, torch.Tensor, torch.Tensor]:
-    assert (
-        len(input.shape) >= 3
-    ), f"Expected at least 3 dimensions for input tensor but got {len(input.shape)}"
+    rank = len(input.shape)
+
+    assert rank >= 3, f"Expected at least 3 dimensions for input tensor but got {rank}"
 
     assert (
         C == input.shape[1]
@@ -228,7 +228,7 @@ def group_norm(
     weight_one = get_trt_tensor(ctx, 1.0, f"{name}_weight_one", input.dtype)
     bias_zero = get_trt_tensor(ctx, 0.0, f"{name}_bias_zero", input.dtype)
 
-    shape = [1, group] + [1] * (len(input.shape) - 2)
+    shape = [1, group] + [1] * (rank - 2)
 
     expanded_weight_one = impl.slice.expand(
         ctx, target, source_ir, f"{name}_expand_weight_one", weight_one, shape
@@ -237,7 +237,7 @@ def group_norm(
         ctx, target, source_ir, f"{name}_expand_bias_zero", bias_zero, shape
     )
 
-    axes = get_axes_for_reduce_op([i for i in range(2, len(input.shape))])
+    axes = get_axes_for_reduce_op([i for i in range(1 if group == 1 else 2, rank)])
 
     # INormalizationLayer scales the normalized output per-group, but PyTorch scales the normalized output per-channel,
     # hence causing diverse result. Let TensorRT does no-op for scaling here, and do scaling ourselves later
