@@ -13,7 +13,6 @@ from .remove_assert_scalar import remove_assert_scalar
 from .remove_detach import remove_detach
 from .remove_input_alias_fixing_clones import remove_input_alias_fixing_clones
 from .repair_input_as_output import repair_input_as_output
-from .replace_full_like_with_full import replace_full_like_with_full
 from .replace_max_pool_with_indices import replace_max_pool_with_indices
 from .view_to_reshape import view_to_reshape
 
@@ -25,7 +24,6 @@ ATEN_POST_LOWERING_PASSES = DynamoPassManager.build_from_passlist(
         lower_linear,
         fuse_prims_broadcast,
         replace_max_pool_with_indices,
-        replace_full_like_with_full,
         view_to_reshape,
         remove_assert_scalar,
         accumulate_fp32_matmul,

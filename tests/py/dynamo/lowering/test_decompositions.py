@@ -434,11 +434,13 @@ class TestLowering(TestCase):
                 super().__init__(*args, **kwargs)
 
             def forward(self, x):
-                y = torch.full_like(x, 2.0)
-                return y
+                c = torch.ops.aten.add(x, x)
+                y = torch.ops.aten.full_like.default(c, 2)
+                d = y + c
+                return d
 
         # Operations expected to be removed in the traced graph after decompositions
-        expected_ops = {torch.ops.aten.full.default}
+        expected_ops = {torch.ops.aten.add.Tensor}
         unexpected_ops = {torch.ops.aten.full_like.default}
 
         inputs = [torch.randn(3, 3, dtype=torch.float32).cuda()]
