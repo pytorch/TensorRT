@@ -230,10 +230,10 @@ def group_norm(
 
     shape = [1, group] + [1] * (rank - 2)
 
-    expanded_weight_one = impl.slice.expand(
+    weight_one = impl.slice.expand(
         ctx, target, source_ir, f"{name}_expand_weight_one", weight_one, shape
     )
-    expanded_bias_zero = impl.slice.expand(
+    bias_zero = impl.slice.expand(
         ctx, target, source_ir, f"{name}_expand_bias_zero", bias_zero, shape
     )
 
@@ -241,9 +241,7 @@ def group_norm(
 
     # INormalizationLayer scales the normalized output per-group, but PyTorch scales the normalized output per-channel,
     # hence causing diverse result. Let TensorRT does no-op for scaling here, and do scaling ourselves later
-    layer = ctx.net.add_normalization(
-        input, expanded_weight_one, expanded_bias_zero, axes
-    )
+    layer = ctx.net.add_normalization(input, weight_one, bias_zero, axes)
     layer.epsilon = eps
     layer.num_groups = group
     set_layer_name(layer, target, name, source_ir)
