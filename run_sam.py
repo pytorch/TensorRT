@@ -1,7 +1,5 @@
 import argparse
 import timeit
-from typing import Tuple
-
 import numpy as np
 import pandas as pd
 import torch
@@ -9,13 +7,12 @@ import torch_tensorrt
 from PIL import Image
 from sam2.sam2_image_predictor import SAM2ImagePredictor
 
-from sam_components import ImageEncoder
+from sam_components import ImageEncoder, HeadModule, SAM2FullModel
 
 # Github issue related to SAM
 # https://github.com/pytorch/pytorch/issues/115534
 
 WARMUP_ITER = 10
-
 
 def recordStats(backend, timings, precision, batch_size=1, compile_time_s=None):
     """
@@ -66,104 +63,139 @@ def record_perf(
     with torch.no_grad():
         for i in range(iterations):
             start_time = timeit.default_timer()
-            _ = model(*input_tensors)
+            out = model(*input_tensors)
             torch.cuda.synchronize()
             end_time = timeit.default_timer()
             timings.append(end_time - start_time)
 
     results = recordStats(
-        "Torch-TensorRT " + backend, timings, precision, batch_size, compile_time_s
+        backend, timings, precision, batch_size, compile_time_s
     )
 
+    return results, out
+
+
+def evaluate_optimization_accuracy(original_output, optimized_output, precision, cos_sim_tol=0.99):
+    results = []
+
+    def compute_cosine_similarity(orig, opt, convert_dtype=None):
+        """Compute cosine similarity, with optional dtype conversion."""
+        if convert_dtype:
+            orig, opt = orig.to(convert_dtype), opt.to(convert_dtype)
+
+        # Calculate cosine similarity and prevent NaN by adding a small epsilon to denominators
+        cosine_similarity = torch.nn.functional.cosine_similarity(
+            orig.flatten() + 1e-8, opt.flatten() + 1e-8, dim=0
+        ).item()
+        
+        return cosine_similarity
+
+    for key, orig in original_output.items():
+        opt = optimized_output[key]
+
+        if isinstance(orig, list) and isinstance(opt, list):  # Lists (e.g., high_res_feats)
+            for i, (orig_feat, opt_feat) in enumerate(zip(orig, opt)):
+                label = f"{key}[{i}]"
+                
+                # Compute original cosine similarity
+                original_cosine = compute_cosine_similarity(orig_feat, opt_feat)
+                result = {"Element": label, "Cosine Similarity (Original)": original_cosine}
+                
+                # Additional cosine similarity for dtype conversion based on precision
+                if precision == "fp16" and orig_feat.dtype == torch.float16:
+                    converted_cosine = compute_cosine_similarity(orig_feat, opt_feat, convert_dtype=torch.float32)
+                    result["Cosine Similarity (Converted to torch.float32)"] = converted_cosine
+                elif precision == "fp32" and orig_feat.dtype == torch.float32:
+                    converted_cosine = compute_cosine_similarity(orig_feat, opt_feat, convert_dtype=torch.float16)
+                    result["Cosine Similarity (Converted to torch.float16)"] = converted_cosine
+
+                results.append(result)
+
+        else:  # Single tensors (e.g., image_embed)
+            label = key
+            
+            # Compute original cosine similarity
+            original_cosine = compute_cosine_similarity(orig, opt)
+            result = {"Element": label, "Cosine Similarity (Original)": original_cosine}
+
+            # Additional cosine similarity for dtype conversion based on precision
+            if precision == "fp16" and orig.dtype == torch.float16:
+                converted_cosine = compute_cosine_similarity(orig, opt, convert_dtype=torch.float32)
+                result["Cosine Similarity (Converted to torch.float32)"] = converted_cosine
+            elif precision == "fp32" and orig.dtype == torch.float32:
+                converted_cosine = compute_cosine_similarity(orig, opt, convert_dtype=torch.float16)
+                result["Cosine Similarity (Converted to torch.float16)"] = converted_cosine
+
+            results.append(result)
+    
     return results
 
 
-def infer(
-    predictor, image, input_point, input_label, mode="enc", multimask_output=True
-):
-
-    if mode == "enc":
-        predictor.set_image(image)
-    elif mode == "head":
-        masks, scores, logits = predictor.predict(
-            point_coords=input_point,
-            point_labels=input_label,
-            multimask_output=multimask_output,
-        )
 
 
 def build_model(args):
-
-    # Predictor
     predictor = SAM2ImagePredictor.from_pretrained("facebook/sam2-hiera-small")
-    pyt_model = predictor.model
+    model = predictor.model.eval().cuda()
+    
+    image = Image.open("./truck.jpg").convert("RGB")
+    predictor.set_image(image)
+
+    if args.precision == "fp16":
+        model = model.half()
+
     if args.mode == "encoder":
-        if args.precision == "fp16":
-            pyt_model = pyt_model.half()
-            full_model = ImageEncoder(pyt_model).eval().cuda()
-        elif args.precision == "fp8":
-            import modelopt.torch.quantization as mtq
-
-            full_model = ImageEncoder(pyt_model).eval().cuda()
-            input_tensor = torch.randn((1, 3, 1024, 1024), dtype=torch.float32).cuda()
-
-            def calibrate_loop(model):
-                """Simple calibration function for testing."""
-                model(input_tensor)
-
-            quant_cfg = mtq.FP8_DEFAULT_CFG
-            mtq.quantize(full_model, quant_cfg, forward_loop=calibrate_loop)
-        else:
-            full_model = ImageEncoder(pyt_model).eval().cuda()
-
-    return full_model, predictor
-
+        return ImageEncoder(model).eval().cuda(), predictor
+    elif args.mode == "head":
+        return HeadModule(model).eval().cuda(), predictor
+    elif args.mode == "all":
+        return SAM2FullModel(model).eval().cuda(), predictor
 
 def build_input(args, file_path, predictor):
-
     # Raw input
-    image = Image.open(file_path)
-    image = np.array(image.convert("RGB"))
-    input_point = np.array([[500, 375]])
-    input_label = np.array([1])
-    # pre process
-    input_image = predictor._transforms(image)
-    input_image = input_image[None, ...].to("cuda:0")
+    image = Image.open(file_path).convert("RGB")
+    input_image = predictor._transforms(np.array(image))[None, ...].to("cuda:0")
+    point_coords = torch.tensor([[500, 375]], dtype=torch.float).unsqueeze(0).to("cuda:0")
+    point_labels = torch.tensor([1], dtype=torch.int).unsqueeze(0).to("cuda:0")
+    mask_input = torch.zeros(1, 1, 256, 256).to("cuda:0")
+
     if args.precision == "fp16":
         input_image = input_image.half()
+        point_coords = point_coords.half()
+        mask_input = mask_input.half()
 
-    return input_image
+    if args.mode == "encoder":
+        return (input_image,)
+    elif args.mode == "head":
+        image_embedding = predictor.get_image_embedding().to("cuda:0").half()
+        high_res_features = [feat.to("cuda:0").half() for feat in predictor._features["high_res_feats"]]
 
+        return (image_embedding, point_coords, point_labels, mask_input, high_res_features)
+    elif args.mode == "all":
+        return (input_image, point_coords, point_labels, mask_input)
 
-def compile_with_torchtrt(model, inputs, args):
+def compile_with_torchtrt(model, inputs, precision):
+    # from torch.export._trace import _export
+    # ep = _export(
+    #     model,
+    #     inputs,
+    #     strict=False,
+    #     allow_complex_guards_as_runtime_asserts=True,
+    # )
+    ep = torch.export.export(model, inputs, strict=False)
 
-    precision = torch.float32
-    if args.precision == "fp16":
-        precision = torch.float16
-
-    from torch.export._trace import _export
-
-    ep = _export(
-        model,
-        inputs,
-        strict=False,
-        allow_complex_guards_as_runtime_asserts=True,
-    )
     with torch_tensorrt.logging.debug():
         trt_gm = torch_tensorrt.dynamo.compile(
             ep,
-            inputs=[input_image],
+            inputs=inputs, 
             debug=True,
             min_block_size=1,
-            enabled_precisions={precision},
+            enabled_precisions={torch.float16 if precision == "fp16" else torch.float32},
         )
 
     return trt_gm
 
-
 if __name__ == "__main__":
     arg_parser = argparse.ArgumentParser(description="Run inference on SAM")
-    # The following options are manual user provided settings
     arg_parser.add_argument(
         "--precision",
         type=str,
@@ -173,22 +205,27 @@ if __name__ == "__main__":
     arg_parser.add_argument(
         "--mode",
         type=str,
-        default="encoder",
+        choices=["encoder", "head", "all"],
+        default="head",
         help="Supported options include encoder | prediction_head",
     )
-
     args = arg_parser.parse_args()
 
     pyt_model, predictor = build_model(args)
+    inputs = build_input(args, "./truck.jpg", predictor)
 
-    input_image = build_input(args, "./truck.jpg", predictor)
-    pyt_results = record_perf(pyt_model, "Torch", [input_image], args.precision, 3, 1)
-    trt_model = compile_with_torchtrt(pyt_model, (input_image,), args)
-    trt_results = record_perf(
-        trt_model, "TensorRT", [input_image], args.precision, 3, 1
-    )
+    # PyTorch 
+    pyt_results, pyt_out = record_perf(pyt_model, "Torch", inputs, args.precision, 10, 1)
+
+    # Torch-TensorRT 
+    trt_model = compile_with_torchtrt(pyt_model, inputs, args.precision)
+    trt_results, trt_out = record_perf(trt_model, "TensorRT", inputs, args.precision, 10, 1)
 
     print("==================================")
-    print(pd.DataFrame(pyt_results))
+    print("PyTorch Results:", pd.DataFrame(pyt_results))
     print("==================================")
-    print(pd.DataFrame(trt_results))
+    print("TensorRT Results:", pd.DataFrame(trt_results))
+
+    # numerical accuracy
+    accuracy_results = evaluate_optimization_accuracy(pyt_out, trt_out, args.precision)
+    print("Cosine Similarity Results:", pd.DataFrame(accuracy_results))
