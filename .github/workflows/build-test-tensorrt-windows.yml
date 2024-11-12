@@ -50,7 +50,8 @@ jobs:
       - name: Substitute runner
         id: substitute
         run: |
-          echo matrix="$(echo '${{ needs.generate-tensorrt-matrix.outputs.matrix }}' | sed -e 's/windows.g4dn.xlarge/windows.g5.4xlarge.nvidia.gpu/g')" >> ${GITHUB_OUTPUT}
+          # echo matrix="$(echo '${{ needs.generate-tensorrt-matrix.outputs.matrix }}' | sed -e 's/windows.g4dn.xlarge/windows.g5.4xlarge.nvidia.gpu/g')" >> ${GITHUB_OUTPUT}
+          echo matrix="$(echo '${{ needs.generate-tensorrt-matrix.outputs.matrix }}')" >> ${GITHUB_OUTPUT}
 
   build:
     needs: substitute-runner
