@@ -50,7 +50,7 @@ jobs:
       - name: Substitute runner
         id: substitute
         run: |
-          echo matrix="$(echo '${{ needs.generate-tensorrt-matrix.outputs.matrix }}' | sed -e 's/windows.g4dn.xlarge/windows.g6.4xlarge.nvidia.gpu/g')" >> ${GITHUB_OUTPUT}
+          echo matrix="$(echo '${{ needs.generate-tensorrt-matrix.outputs.matrix }}' | sed -e 's/windows.g4dn.xlarge/windows.g5.4xlarge.nvidia.gpu/g')" >> ${GITHUB_OUTPUT}
 
   build:
     needs: substitute-runner
@@ -102,6 +102,9 @@ jobs:
         export CI_BUILD=1
         pushd .
         cd tests/modules
+        python -c "import torch; print(torch.cuda.is_available())"
+        python -c "import torch; print(torch.cuda.get_device_name(0))"
+        python -c "import torch; print(torch.cuda.get_device_properties(0))"
         python hub.py
         popd
         pushd .
@@ -321,5 +324,5 @@ jobs:
   #       popd
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref_name }}-${{ inputs.repository }}-${{ github.event_name == 'workflow_dispatch' }}-${{ inputs.job-name }}
-  cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref_name }}-${{ inputs.repository }}-${{ github.event_name == 'workflow_dispatch' }}-${{ inputs.job-name }}-2
+  cancel-in-progress: false

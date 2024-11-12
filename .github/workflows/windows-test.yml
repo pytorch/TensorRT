@@ -55,7 +55,7 @@ jobs:
       PYTHONUTF8: 1
       DOWNLOAD_ARTIFACT_NAME: pytorch_tensorrt_${{ matrix.tensorrt.version }}_${{ matrix.python_version }}_${{ matrix.desired_cuda }}_win_amd64
     name: ${{ inputs.job-name }}-${{ matrix.tensorrt.version }}-${{ matrix.python_version }}-${{ matrix.desired_cuda }}
-    runs-on: windows.8xlarge.nvidia.gpu.nonephemeral
+    runs-on: windows.4xlarge.nvidia.gpu
     defaults:
       run:
         shell: bash -l {0}
