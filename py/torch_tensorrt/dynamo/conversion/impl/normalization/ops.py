@@ -152,7 +152,7 @@ def batch_norm(
     return output
 
 
-def layer_norm(
+def native_layer_norm(
     ctx: ConversionContext,
     target: Target,
     source_ir: Optional[SourceIR],
