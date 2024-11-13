@@ -51,7 +51,7 @@ def torchtrt_ex_elementwise_add(
     # return layer.get_output(0)
     field_configs = trt.PluginFieldCollection([])
     
-    plugin = plugin_creator.create_plugin(name=name, field_collection=field_configs)
+    plugin = plugin_creator.create_plugin(name="elementwise_add_plugin", field_collection=field_configs)
     assert plugin, "Unable to create CircularPaddingPlugin"
     
     # input_tensor = args[
@@ -65,6 +65,15 @@ def torchtrt_ex_elementwise_add(
     rhs_dtype = None
     lhs_val = args[0]
     rhs_val = args[1]
+    
+    if isinstance(lhs_val, TRTTensor):
+        lhs_dtype = lhs_val.dtype
+        # is_lhs_trt_tensor = True
+    if isinstance(rhs_val, TRTTensor):
+        rhs_dtype = rhs_val.dtype
+        # is_rhs_trt_tensor = True
+        
+    print(lhs_dtype)
     
     lhs_val = get_trt_tensor(ctx, lhs_val, f"{name}_lhs", lhs_dtype)
     rhs_val = get_trt_tensor(ctx, rhs_val, f"{name}_rhs", rhs_dtype)
