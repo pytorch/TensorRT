@@ -123,7 +123,7 @@ def register_nccl_ops(logger_file_name):
         group = trt.PluginField(
             "group", np.array(group, dtype=np.int32), trt.PluginFieldType.INT32
         )
-        p_dtype = trt.float16
+        p_dtype = trt.float32
         pf_type = trt.PluginField(
             "type_id", np.array([int(p_dtype)], np.int32), trt.PluginFieldType.INT32
         )
@@ -151,9 +151,8 @@ def register_nccl_ops(logger_file_name):
         counter = 0
         strategy = AllReduceStrategy.NCCL
         config = AllReduceConfig(0)
-
-        world_size = dist.get_world_size()
-        group = list(range(world_size))
+        _world_size = int(os.environ["WORLD_SIZE"])
+        group = list(range(_world_size))
         group = trt.PluginField(
             "group", np.array(group, dtype=np.int32), trt.PluginFieldType.INT32
         )

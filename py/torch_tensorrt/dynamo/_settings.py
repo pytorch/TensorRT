@@ -30,6 +30,7 @@ from torch_tensorrt.dynamo._defaults import (
     SPARSE_WEIGHTS,
     TIMING_CACHE_PATH,
     TRUNCATE_DOUBLE,
+    USE_AOT_JOINT_EXPORT,
     USE_EXPLICIT_TYPING,
     USE_FAST_PARTITIONER,
     USE_FP32_ACC,
@@ -84,6 +85,7 @@ class CompilationSettings:
         use_strong_typing (bool): This flag enables strong typing in TensorRT compilation which respects the precisions set in the Pytorch model. This is useful when users have mixed precision graphs.
         use_fp32_acc (bool): This option inserts cast to FP32 nodes around matmul layers and TensorRT ensures the accumulation of matmul happens in FP32. Use this only when FP16 precision is configured in enabled_precisions.
         enable_weight_streaming (bool): Enable weight streaming.
+        use_aot_joint_export (bool): Use aot_export_joint_simple, else wrap backend with AOT_autograd
     """
 
     enabled_precisions: Set[dtype] = field(default_factory=lambda: ENABLED_PRECISIONS)
@@ -121,6 +123,7 @@ class CompilationSettings:
     use_explicit_typing: bool = USE_EXPLICIT_TYPING
     use_fp32_acc: bool = USE_FP32_ACC
     enable_weight_streaming: bool = ENABLE_WEIGHT_STREAMING
+    use_aot_joint_export: bool = USE_AOT_JOINT_EXPORT
 
 
 _SETTINGS_TO_BE_ENGINE_INVARIANT = (

@@ -43,6 +43,7 @@ CUSTOM_ENGINE_CACHE = None
 USE_EXPLICIT_TYPING = False
 USE_FP32_ACC = False
 ENABLE_WEIGHT_STREAMING = False
+USE_AOT_JOINT_EXPORT = True
 
 
 def default_device() -> Device:
