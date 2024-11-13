@@ -18,15 +18,33 @@ torchrun --nproc_per_node=2 tensor_parallel_llama2.py
 3. Tensor parallel distributed inference using nccl ops plugin
 
  apt install libmpich-dev
+
  apt install libopenmpi-dev
+
+ #For python3.10
+
  pip install tensorrt-llm
+
+ For other python versions, you need to load the libnvinfer_plugin_tensorrt_llm.so. Please set that in the environment variable export trtllm_env={lib_path}. For example, we have already set the variable in initialize_distributed_env(). Note that won't work while running example, since it needs to be preset for the converter library to get.
+
  #then pip install the tensorrt and torch version compatible with installed torchTRT
+
  mpirun -n 2 --allow-run-as-root python tensor_parallel_simple_example.py
+
+ #For other python
 
 4. Tensor parallel distributed llama3 inference using nccl ops plugin
 
  apt install libmpich-dev
+
  apt install libopenmpi-dev
+
+#For python3.10
+
  pip install tensorrt-llm
+
+ For other python versions, you need to load the libnvinfer_plugin_tensorrt_llm.so
+
  #then pip install the tensorrt and torch version compatible with installed torchTRT
+
  mpirun -n 2 --allow-run-as-root python tensor_parallel_llama3.py

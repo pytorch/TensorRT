@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import functools
 import logging
 import unittest
 from typing import Any, Callable, Sequence
 
 import torch
 import torch._dynamo as td
+from torch._dynamo.backends.common import aot_autograd
 from torch._dynamo.utils import detect_fake_mode
 from torch._functorch.aot_autograd import aot_export_joint_simple
 from torch_tensorrt.dynamo import CompilationSettings
@@ -49,7 +51,19 @@ def aot_torch_tensorrt_aten_backend(
     gm: torch.fx.GraphModule, sample_inputs: Sequence[Any], **kwargs: Any
 ) -> torch.nn.Module:
     settings, engine_cache = parse_dynamo_kwargs(kwargs)
-    return _pretraced_backend(gm, sample_inputs, settings, engine_cache)
+    if settings.use_aot_joint_export:
+        return _pretraced_backend(gm, sample_inputs, settings, engine_cache)
+    logger.debug("Wrapping the backend with aot_autograd\n")
+    _pretraced_backend_autograd = functools.partial(
+        _pretraced_backend, settings=settings, engine_cache=engine_cache
+    )
+    settings_aot_autograd = {}
+    settings_aot_autograd["decompostions"] = get_decompositions(
+        settings.enable_experimental_decompositions
+    )
+    return aot_autograd(fw_compiler=_pretraced_backend_autograd)(
+        gm, sample_inputs, **settings_aot_autograd
+    )
 
 
 def _pretraced_backend(
@@ -90,14 +104,15 @@ def _pretraced_backend(
             remove_detach(gm, settings)
 
             # Invoke AOTAutograd to translate operators to aten
-            gm = aot_export_joint_simple(
-                gm,
-                sample_inputs,
-                trace_joint=False,
-                decompositions=get_decompositions(
-                    settings.enable_experimental_decompositions
-                ),
-            )
+            if settings.use_aot_joint_export:
+                gm = aot_export_joint_simple(
+                    gm,
+                    sample_inputs,
+                    trace_joint=False,
+                    decompositions=get_decompositions(
+                        settings.enable_experimental_decompositions
+                    ),
+                )
 
             logger.debug("Post-AOT Autograd graph:\n" + str(gm.graph))
 
