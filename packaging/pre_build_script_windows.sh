@@ -1,8 +1,10 @@
-set -exou pipefail
+set -x
 
 pip install -U numpy packaging pyyaml setuptools wheel
 
 choco install bazelisk -y
+
+echo TENSORRT_VERSION=${TENSORRT_VERSION}
 
 if [[ ${TENSORRT_VERSION} != "" ]]; then
   # this is the upgraded TensorRT version, replace current tensorrt version to the upgrade tensorRT version in the pyproject.toml
