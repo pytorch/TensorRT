@@ -19,8 +19,8 @@ from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
     dynamo_tensorrt_converter,
 )
 from torch_tensorrt.dynamo.lowering.passes.fuse_distributed_ops import (
-    custom_fused_all_gather_op,
-    custom_fused_reduce_scatter_op,
+    tensorrt_fused_nccl_all_gather_op,
+    tensorrt_fused_nccl_reduce_scatter_op,
 )
 from torch_tensorrt.dynamo.types import TRTTensor
 from torch_tensorrt.fx.converters.converter_utils import set_layer_name
@@ -105,7 +105,7 @@ def register_nccl_ops(logger_file_name):
             f"Plugin Name: {plugin_creator.name}, Namespace: {plugin_creator.plugin_namespace}, Version: {plugin_creator.plugin_version}"
         )
 
-    @dynamo_tensorrt_converter(custom_fused_all_gather_op)
+    @dynamo_tensorrt_converter(tensorrt_fused_nccl_all_gather_op)
     def insert_nccl_gather_op(
         ctx: ConversionContext,
         target: Target,
@@ -118,12 +118,18 @@ def register_nccl_ops(logger_file_name):
             "AllGather", "1", "tensorrt_llm"
         )
         assert allgather_plg_creator is not None
-        _world_size = int(os.environ["WORLD_SIZE"])
+        _world_size = os.environ.get("WORLD_SIZE")
+        if _world_size is not None:
+            _world_size = int(_world_size)
+        else:
+            raise RuntimeError(
+                f"The WORLD_SIZE env variable is not set in distributed environment"
+            )
         group = list(range(_world_size))
         group = trt.PluginField(
             "group", np.array(group, dtype=np.int32), trt.PluginFieldType.INT32
         )
-        p_dtype = trt.float16
+        p_dtype = trt.float32
         pf_type = trt.PluginField(
             "type_id", np.array([int(p_dtype)], np.int32), trt.PluginFieldType.INT32
         )
@@ -133,7 +139,7 @@ def register_nccl_ops(logger_file_name):
         set_layer_name(layer, target, name)
         return layer.get_output(0)
 
-    @dynamo_tensorrt_converter(custom_fused_reduce_scatter_op)
+    @dynamo_tensorrt_converter(tensorrt_fused_nccl_reduce_scatter_op)
     def insert_nccl_reduce_scatter_plugin(
         ctx: ConversionContext,
         target: Target,
@@ -151,9 +157,14 @@ def register_nccl_ops(logger_file_name):
         counter = 0
         strategy = AllReduceStrategy.NCCL
         config = AllReduceConfig(0)
-
-        world_size = dist.get_world_size()
-        group = list(range(world_size))
+        _world_size = os.environ.get("WORLD_SIZE")
+        if _world_size is not None:
+            _world_size = int(_world_size)
+        else:
+            raise RuntimeError(
+                f"The WORLD_SIZE env variable is not set in distributed environment"
+            )
+        group = list(range(_world_size))
         group = trt.PluginField(
             "group", np.array(group, dtype=np.int32), trt.PluginFieldType.INT32
         )

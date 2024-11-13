@@ -12,13 +12,13 @@ from torch_tensorrt.dynamo.lowering.passes.pass_utils import (
 logger = logging.getLogger(__name__)
 
 
-def custom_fused_all_gather_op(args0, args1, args2):
+def tensorrt_fused_nccl_all_gather_op(args0, args1, args2):
     return torch.ops._c10d_functional.wait_tensor.default(
         torch.ops._c10d_functional.all_gather_into_tensor.default(args0, args1, args2)
     )
 
 
-def custom_fused_reduce_scatter_op(args0, args1, args2, args3):
+def tensorrt_fused_nccl_reduce_scatter_op(args0, args1, args2, args3):
     return torch.ops._c10d_functional.wait_tensor.default(
         torch.ops._c10d_functional.reduce_scatter_tensor.default(
             args0, args1, args2, args3
@@ -44,10 +44,10 @@ def fuse_distributed_ops(
             wait_tensor_node = list(node.users)[0]
             fused_op = None
             if node.target == torch.ops._c10d_functional.all_gather_into_tensor.default:
-                fused_op = custom_fused_all_gather_op
+                fused_op = tensorrt_fused_nccl_all_gather_op
                 fused_op_args = (node.args[0], node.args[1], node.args[2])
             else:
-                fused_op = custom_fused_reduce_scatter_op
+                fused_op = tensorrt_fused_nccl_reduce_scatter_op
                 fused_op_args = (node.args[0], node.args[1], node.args[2], node.args[3])
             with gm.graph.inserting_after(wait_tensor_node):
                 fused_node = gm.graph.create_node(

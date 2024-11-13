@@ -48,6 +48,7 @@ with torch.no_grad():
             "use_python_runtime": True,
             "workspace_size": 1 << 33,
             "debug": False,
+            "use_aot_joint_export": False,
         },
         dynamic=False,
     )
