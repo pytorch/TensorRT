@@ -1,11 +1,9 @@
 import base64
 from collections import defaultdict
-from typing import Any, Dict, List
+from typing import Any, List
 
-import tensorrt as trt
 import torch
 from torch_tensorrt.dynamo.utils import input_is_dynamic, unwrap_tensor_shape
-from torch_tensorrt.logging import TRT_LOGGER
 
 
 @torch.library.register_fake("tensorrt::execute_engine")  # type: ignore
@@ -15,31 +13,6 @@ def fake_tensorrt_execute_engine(
     """
     We infer outputs using the TRT engine and inputs and return fake tensors in this meta kernel.
     """
-
-    # Get the TRT engine from the fake TRTEngine object
-    serialized_state = fake_trt_engine.wrapped_obj.state_dict
-
-    serialized_engine = base64.b64decode(serialized_state["serialized_engine"])
-
-    # Store input/output names for shape inference
-    input_names = serialized_state["in_binding_names"]
-    output_names = serialized_state["out_binding_names"]
-    assert len(input_names) == len(
-        inputs
-    ), f"Number of inputs serialized in TRTEngine {len(input_names)} doesn't match with the number of inputs found during meta kernel execution {len(inputs)} for execute_engine op"
-
-    # Deserialize the TRT engine
-    # TODO: Probably unsafe deserialization. Should we expose infer shape mechanism through TRTEngine class ?
-    try:
-        runtime = trt.Runtime(TRT_LOGGER)
-        engine = runtime.deserialize_cuda_engine(serialized_engine)
-    except Exception as e:
-        raise AssertionError(
-            "TRT engine deserialization failed during meta kernel execution. Please verify if the environment in which you are exporting is same as the one in which you compiled"
-        )
-
-    context = engine.create_execution_context()
-
     # Here's what we are doing
     # 1) Check if inputs are dynamic (they have sym ints in their shapes)
     # 2) For dynamic inputs, we gather min_input_shape and max_input shape for all inputs
@@ -52,27 +25,20 @@ def fake_tensorrt_execute_engine(
     else:
         modes = ["opt"]
 
+    # Get the TRTEngine class and infer output shapes based on input shapes
+    trt_engine = fake_trt_engine.wrapped_obj.engine
     outputs_mode_dict = defaultdict(list)
     for mode in modes:
-        for input_idx, input in enumerate(inputs):
-            # Using TensorRT's infer shape mechanism to infer output shapes
-            input_shape = unwrap_tensor_shape(input, mode=mode)
+        input_shapes = [unwrap_tensor_shape(input, mode=mode) for input in inputs]
+        proxy_outputs = trt_engine.infer_outputs(input_shapes)
+        outputs_mode_dict[mode].extend(proxy_outputs)
 
-            context.set_input_shape(input_names[input_idx], input_shape)
-
-        for output_name in output_names:
-            output_shape = context.get_tensor_shape(output_name)
-            outputs_mode_dict[mode].append(output_shape)
-
+    # Store the number of outputs
     if {"min", "max"}.issubset(outputs_mode_dict):
         assert len(outputs_mode_dict["min"]) == len(outputs_mode_dict["max"])
         num_outputs = len(outputs_mode_dict["min"])
     elif "opt" in outputs_mode_dict:
         num_outputs = len(outputs_mode_dict["opt"])
-
-    assert (
-        len(output_names) == num_outputs
-    ), f"Number of outputs serialized in TRTEngine {len(output_names)} doesn't match with the number of outputs found during meta kernel execution {num_outputs} for execute_engine op"
 
     fake_outputs = []
     for out_idx in range(num_outputs):
@@ -82,12 +48,11 @@ def fake_tensorrt_execute_engine(
             # Note: We can't establish a relationship b/w incoming input symbolic shape (eg: s0)
             # and TensorRT's output shape (represented as unbacked u0). This situation doesn't seem
             # to affect compilation results / serialization during our testing.
-            output_min_shape = outputs_mode_dict["min"][out_idx]
-            output_opt_shape = outputs_mode_dict["opt"][out_idx]
-            output_max_shape = outputs_mode_dict["max"][out_idx]
+            output_min_shape = outputs_mode_dict["min"][out_idx].size()
+            output_opt_shape = outputs_mode_dict["opt"][out_idx].size()
+            output_max_shape = outputs_mode_dict["max"][out_idx].size()
 
             ctx = torch._custom_ops.get_ctx()
-            output_shape = []
             for min_val, opt_val, max_val in zip(
                 output_min_shape, output_opt_shape, output_max_shape
             ):
@@ -102,26 +67,27 @@ def fake_tensorrt_execute_engine(
                 else:
                     output_shape.append(min_val)
         else:
-            output_shape.extend(outputs_mode_dict["opt"][out_idx])
+            output_shape.extend(outputs_mode_dict["opt"][out_idx].size())
 
-        fake_outputs.append(input.new_empty(output_shape))
+        fake_outputs.append(
+            torch.empty(output_shape, dtype=outputs_mode_dict["opt"][out_idx].dtype)
+        )
 
     return fake_outputs
 
 
 @torch._library.register_fake_class("tensorrt::Engine")
 class FakeTRTEngine:
-    def __init__(self, state_dict: Dict[str, Any]) -> None:
-        self.state_dict = state_dict
+    def __init__(self, engine_info: List[str]) -> None:
+        self.engine = torch.classes.tensorrt.Engine(engine_info)
 
     @classmethod
     def __obj_unflatten__(cls, flattened_tq: Any) -> Any:
-        breakpoint()
-        state_dict = {}
-        for key, val in flattened_tq:
-            state_dict[key] = val
+        engine_idx = torch.ops.tensorrt.ENGINE_IDX()
+        engine_info = [info[1] for info in flattened_tq]
+        engine_info[engine_idx] = base64.b64decode(engine_info[engine_idx])
 
-        return cls(state_dict)
+        return cls(engine_info)
 
     def enable_profiling(self) -> Any:
         pass
@@ -154,6 +120,9 @@ class FakeTRTEngine:
         pass
 
     def automatic_device_memory_budget_getter(self) -> Any:
+        pass
+
+    def infer_outputs(self, input_shapes: List[Any]) -> Any:
         pass
 
     def __setstate__(self, serialized_state: List[str]) -> Any:

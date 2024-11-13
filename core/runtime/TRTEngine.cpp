@@ -8,6 +8,7 @@
 
 #include "core/runtime/runtime.h"
 #include "core/util/prelude.h"
+#include "torch/torch.h"
 
 namespace torch_tensorrt {
 namespace core {
@@ -251,6 +252,28 @@ void TRTEngine::enable_profiling() {
 std::string TRTEngine::get_engine_layer_info() {
   auto inspector = cuda_engine->createEngineInspector();
   return inspector->getEngineInformation(nvinfer1::LayerInformationFormat::kJSON);
+}
+
+std::vector<at::Tensor> TRTEngine::infer_outputs(std::vector<std::vector<int64_t>> input_shapes) {
+  std::vector<at::Tensor> outputs;
+  TORCHTRT_CHECK(
+      (in_binding_names.size() == input_shapes.size()),
+      "The number of input shapes provided doesn't match with the number of input names registered.");
+  // Set all input shapes
+  for (size_t i = 0; i < input_shapes.size(); i++) {
+    exec_ctx->setInputShape(in_binding_names[i].c_str(), core::util::toDims(input_shapes[i]));
+  }
+  for (size_t i = 0; i < out_binding_names.size(); i++) {
+    auto output_shape = core::util::toVec(exec_ctx->getTensorShape(out_binding_names[i].c_str()));
+    auto output_dtype =
+        core::util::TRTDataTypeToScalarType(cuda_engine->getTensorDataType(out_binding_names[i].c_str()));
+    auto output_tensor = torch::empty(output_shape, torch::dtype(output_dtype));
+    outputs.push_back(output_tensor);
+  }
+  TORCHTRT_CHECK(
+      (out_binding_names.size() == outputs.size()),
+      "The number of output shapes inferred doesn't match with the number of output names registered.");
+  return outputs;
 }
 
 void TRTEngine::set_profiling_paths() {

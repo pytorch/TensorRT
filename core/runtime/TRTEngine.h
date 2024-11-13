@@ -24,9 +24,9 @@ using FlattenedState = std::tuple<
     std::tuple<std::string, std::string>, // name
     std::tuple<std::string, std::string>, // device
     std::tuple<std::string, std::string>, // engine
-    std::tuple<std::string, std::vector<std::string>>, // input binding names
-    std::tuple<std::string, std::vector<std::string>>, // output binding names
-    std::tuple<std::string, bool>, // HW compatibility
+    std::tuple<std::string, std::string>, // input binding names
+    std::tuple<std::string, std::string>, // output binding names
+    std::tuple<std::string, std::string>, // HW compatibility
     std::tuple<std::string, std::string>, // serialized metadata
     std::tuple<std::string, std::string>>; // Platform
 
@@ -87,6 +87,7 @@ struct TRTEngine : torch::CustomClassHolder {
   bool set_device_memory_budget(int64_t budget);
   int64_t get_streamable_device_memory_budget();
   int64_t get_automatic_device_memory_budget();
+  std::vector<at::Tensor> infer_outputs(std::vector<std::vector<int64_t>> input_shapes);
   friend std::ostream& operator<<(std::ostream& os, const TRTEngine& engine);
   static const char BINDING_DELIM = '%';
 
