@@ -946,6 +946,9 @@ def aten_ops_slice(
 def refit_validator(node: Node, settings: Optional[CompilationSettings] = None) -> bool:
     # cumsum op is not refitable
     if settings and not settings.immutable_weights:
+        print("TEST::: cumsum op is not mutable")
+        print("settings.immutable_weights:", settings.immutable_weights)
+        print("settings:", settings)
         return False
     return True
 
