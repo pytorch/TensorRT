@@ -6,6 +6,7 @@ from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 import numpy as np
+import sympy
 import tensorrt as trt
 import torch
 from torch._subclasses.fake_tensor import FakeTensor
@@ -352,14 +353,14 @@ def extract_var_range_info(symbolic_integer: torch.SymInt) -> Dict[str, int]:
         shape_env.var_to_val
     )
     assert var_range, var_val
-    min_val, max_val, opt_val = int(var_range.lower), int(var_range.upper), int(var_val)
+    min_val, max_val = int(var_range.lower), int(var_range.upper)
     # Torchdynamo 0/1 specialization outlier
     min_val = 1 if min_val == 2 else min_val
     min_max_opt = {}
     min_max_opt["min"] = min_val
     min_max_opt["max"] = max_val
-    min_max_opt["opt"] = opt_val
-
+    if isinstance(var_val, sympy.core.numbers.Integer):
+        min_max_opt["opt"] = int(var_val)
     return min_max_opt
 
 

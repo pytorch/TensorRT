@@ -58,7 +58,7 @@ class TestAsinhConverter(DispatchTestCase):
             (
                 "3d_dim_dtype_float",
                 (1, 1, 1),
-                (1, 2, 3),
+                (2, 2, 3),
                 (3, 3, 3),
                 torch.float,
                 torch.float,
@@ -66,7 +66,7 @@ class TestAsinhConverter(DispatchTestCase):
             (
                 "3d_dim_dtype_int32",
                 (1, 1, 1),
-                (1, 2, 4),
+                (2, 2, 4),
                 (2, 3, 5),
                 torch.int32,
                 torch.float,

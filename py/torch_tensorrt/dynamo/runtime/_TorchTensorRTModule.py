@@ -132,7 +132,11 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         self.serialized_engine = serialized_engine
         self.engine = None
 
-        if serialized_engine and not self.settings.lazy_engine_init:
+        if (
+            serialized_engine
+            and not self.settings.lazy_engine_init
+            and not self.settings.enable_cross_compile_for_windows
+        ):
             self.setup_engine()
 
     def _pack_engine_info(self) -> List[str | bytes]:
@@ -144,16 +148,16 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         metadata = {"settings": self.settings, "weight_name_map": self.weight_name_map}
         target_platform = (
             Platform.current_platform()
+            if not self.settings.enable_cross_compile_for_windows
+            else Platform.WIN_X86_64
         )  # Change to match target for engine
 
         engine_info: List[str | bytes] = [""] * SERIALIZATION_LEN
-
         engine_info[ABI_TARGET_IDX] = torch.ops.tensorrt.ABI_VERSION()
         engine_info[NAME_IDX] = (
             self.name + "_engine" if self.name != "" else "tensorrt_engine"
         )
         engine_info[DEVICE_IDX] = target_device._to_serialized_rt_device()
-
         assert self.serialized_engine
         engine_info[ENGINE_IDX] = self.serialized_engine
 
@@ -202,10 +206,8 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         """
         if self.engine is not None:
             return
-
         self.engine = torch.classes.tensorrt.Engine(self._pack_engine_info())
 
-    @staticmethod
     def encode_metadata(self, metadata: Any) -> str:
         metadata = copy.deepcopy(metadata)
         dumped_metadata = pickle.dumps(metadata)
@@ -294,6 +296,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
             (i if isinstance(i, torch.Tensor) else torch.tensor(i).cuda())
             for i in inputs
         ]
+
         outputs: List[torch.Tensor] = torch.ops.tensorrt.execute_engine(
             list(input_tensors), self.engine
         )
