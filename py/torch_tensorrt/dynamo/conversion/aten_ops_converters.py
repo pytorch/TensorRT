@@ -175,14 +175,14 @@ def aten_ops_layer_norm(
         0: (TRTTensor,),
     }
 )
-def aten_ops_group_norm(
+def aten_ops_native_group_norm(
     ctx: ConversionContext,
     target: Target,
     args: Tuple[Argument, ...],
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    return impl.normalization.group_norm(
+    return impl.normalization.native_group_norm(
         ctx,
         target,
         SourceIR.ATEN,

@@ -203,7 +203,7 @@ def layer_norm(
     return layer_norm.get_output(0)
 
 
-def group_norm(
+def native_group_norm(
     ctx: ConversionContext,
     target: Target,
     source_ir: Optional[SourceIR],
