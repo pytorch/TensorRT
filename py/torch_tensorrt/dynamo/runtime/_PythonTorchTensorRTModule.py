@@ -249,7 +249,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
             outputs.append(output)
         return outputs
 
-    def set_output_opt(self, enable: bool) -> None:
+    def set_pre_allocated_outputs(self, enable: bool) -> None:
         self.use_pre_allocated_outputs = enable
 
     def forward(self, *inputs: torch.Tensor) -> torch.Tensor | Tuple[torch.Tensor, ...]:

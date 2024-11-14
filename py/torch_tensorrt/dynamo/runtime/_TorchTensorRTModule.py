@@ -208,7 +208,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         if self.engine is not None:
             return
         self.engine = torch.classes.tensorrt.Engine(self._pack_engine_info())
-        self.set_output_opt(True)
+        self.set_pre_allocated_outputs(False)
 
     def encode_metadata(self, metadata: Any) -> str:
         metadata = copy.deepcopy(metadata)
@@ -273,7 +273,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         self.input_binding_names = state[2]
         self.output_binding_names = state[3]
 
-    def set_output_opt(self, enable: bool) -> None:
+    def set_pre_allocated_outputs(self, enable: bool) -> None:
         self.engine.use_pre_allocated_outputs = enable
 
     def forward(self, *inputs: Any) -> torch.Tensor | Tuple[torch.Tensor, ...]:

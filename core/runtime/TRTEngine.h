@@ -102,7 +102,7 @@ struct TRTEngine : torch::CustomClassHolder {
   at::cuda::CUDAStream caller_stream = c10::cuda::getDefaultCUDAStream();
   std::vector<at::Tensor> input_buffers = {};
   std::vector<at::Tensor> output_buffers = {};
-  std::string shape_key;
+  std::string shape_key = "None";
   bool cudagraphs_enabled = false;
   bool use_pre_allocated_outputs = true;
   std::vector<at::Tensor> pre_allocated_outputs;
