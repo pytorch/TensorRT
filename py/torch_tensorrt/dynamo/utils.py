@@ -125,13 +125,23 @@ def cosine_similarity(gt_tensor: torch.Tensor, pred_tensor: torch.Tensor) -> flo
     return res
 
 
-def input_is_dynamic(inputs: Sequence[Union[Input, torch.Tensor]]) -> bool:
+def input_is_dynamic(inputs: Sequence[Union[Input, torch.Tensor, FakeTensor]]) -> bool:
     """
-    Return true if the provided inputs are `torch_tensorrt.Input` objects and have dynamic shapes.
+    Return true if any of inputs have dynamic shapes. Supported types are torch_tensorrt.Input | torch.Tensor
     """
-    return not any(isinstance(input, torch.Tensor) for input in inputs) and any(
-        input.shape_mode == Input._ShapeMode.DYNAMIC for input in inputs
-    )
+    for input in inputs:
+        if isinstance(input, torch.Tensor):
+            if contains_sym_int(input.shape):
+                return True
+        elif isinstance(input, Input):
+            if input.shape_mode == Input._ShapeMode.DYNAMIC:
+                return True
+        else:
+            raise AssertionError(
+                f"Invalid input type ({type(input)}) found. Supported types are torch_tensorrt.Input | torch.Tensor"
+            )
+
+    return False
 
 
 def get_torch_tensor(
@@ -355,7 +365,7 @@ def extract_var_range_info(symbolic_integer: torch.SymInt) -> Dict[str, int]:
 
 
 def unwrap_tensor_shape(
-    tensor: Union[torch.Tensor, FakeTensor, torch.SymInt]
+    tensor: Union[torch.Tensor, FakeTensor, torch.SymInt], mode: Optional[str] = ""
 ) -> Sequence[Union[int, Tuple[int, int]]]:
     """
     This is a helper function used to print/return the shape of the tensor.
@@ -369,10 +379,13 @@ def unwrap_tensor_shape(
         tensor_shape.append(tensor)
     elif isinstance(tensor, torch.SymInt):
         min_max_opt = extract_var_range_info(tensor)
-        tensor_shape.append((min_max_opt["min"], min_max_opt["max"]))
+        if mode:
+            tensor_shape.append(min_max_opt[mode])
+        else:
+            tensor_shape.append((min_max_opt["min"], min_max_opt["max"]))
     elif isinstance(tensor, (torch.Tensor, FakeTensor)):
         for dimension in tensor.shape:
-            tensor_shape.extend(unwrap_tensor_shape(dimension))
+            tensor_shape.extend(unwrap_tensor_shape(dimension, mode=mode))
 
     return tuple(tensor_shape)
 
@@ -403,9 +416,9 @@ def get_graph_io_attrs(
             metadata = node.meta["val"]
             if isinstance(metadata, (tuple, list)):
                 for tensor in metadata:
-                    graph_io_attrs.append(attr_fn(tensor))
+                    graph_io_attrs.append(attr_fn(tensor))  # type: ignore
             else:
-                graph_io_attrs.append(attr_fn(metadata))
+                graph_io_attrs.append(attr_fn(metadata))  # type: ignore
 
     return graph_io_attrs
 
