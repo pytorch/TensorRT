@@ -32,11 +32,11 @@ class HeadModule(torch.nn.Module):
         self.module = module
 
 
-    def forward(self, image_embedding, point_coords, point_labels, mask_input, high_res_features):
+    def forward(self, image_embedding, point_coords, point_labels, high_res_features):
         sparse_embeddings, dense_embeddings = self.module.sam_prompt_encoder(
             points=(point_coords, point_labels),
             boxes=None, 
-            masks=mask_input, 
+            masks=None, 
         )
 
         batched_mode = point_coords.shape[0] > 1
@@ -69,7 +69,7 @@ class SAM2FullModel(torch.nn.Module):
         
         self._bb_feat_sizes = [(256, 256), (128, 128), (64, 64)]
 
-    def forward(self, image, point_coords, point_labels, mask_input):
+    def forward(self, image, point_coords, point_labels):
         backbone_out = self.image_encoder(image)
         _, vision_feats, _, _ = self._prepare_backbone_features(backbone_out)
 
@@ -88,7 +88,7 @@ class SAM2FullModel(torch.nn.Module):
         ]
 
         sparse_embeddings, dense_embeddings = self.prompt_encoder(
-            points=(point_coords, point_labels), boxes=None, masks=mask_input
+            points=(point_coords, point_labels), boxes=None, masks=None
         )
         
         low_res_masks, iou_predictions, _, _ = self.mask_decoder(
