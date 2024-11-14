@@ -155,7 +155,7 @@ def evaluate_optimization_accuracy(
 
 
 def build_model(args):
-    predictor = SAM2ImagePredictor.from_pretrained("facebook/sam2-hiera-small")
+    predictor = SAM2ImagePredictor.from_pretrained("facebook/sam2-hiera-large")
     model = predictor.model.eval().cuda()
 
     image = Image.open("./truck.jpg").convert("RGB")
