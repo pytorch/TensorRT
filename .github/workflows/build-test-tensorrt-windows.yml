@@ -1,7 +1,6 @@
 name: Build and Test Torch-TensorRT on Windows with Future TensorRT Versions
 
 on:
-  pull_request:
   workflow_dispatch:
 
 permissions:
