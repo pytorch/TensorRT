@@ -1,17 +1,13 @@
-name: Build and test Windows wheels
+name: Build and Test Torch-TensorRT on Windows with Future TensorRT Versions
 
 on:
   pull_request:
-  push:
-    branches:
-      - main
-      - nightly
-      - release/*
-    tags:
-      # NOTE: Binary build pipelines should only get triggered on release candidate builds
-      # Release candidate tags look like: v1.11.0-rc1
-      - v[0-9]+.[0-9]+.[0-9]+-rc[0-9]+
   workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+  packages: write
 
 jobs:
   generate-matrix:
@@ -24,8 +20,29 @@ jobs:
       with-rocm: false
       with-cpu: false
 
+  generate-tensorrt-matrix:
+    needs: [generate-matrix]
+    outputs:
+      matrix: ${{ steps.generate.outputs.matrix }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+      - uses: actions/checkout@v3
+        with:
+          repository: pytorch/tensorrt
+      - name: Generate tensorrt matrix
+        id: generate
+        run: |
+          set -eou pipefail
+          MATRIX_BLOB=${{ toJSON(needs.generate-matrix.outputs.matrix) }}
+          MATRIX_BLOB="$(python3 .github/scripts/generate-tensorrt-test-matrix.py --matrix "${MATRIX_BLOB}")"
+          echo "${MATRIX_BLOB}"
+          echo "matrix=${MATRIX_BLOB}" >> "${GITHUB_OUTPUT}"
+
   substitute-runner:
-    needs: generate-matrix
+    needs: generate-tensorrt-matrix
     outputs:
       matrix: ${{ steps.substitute.outputs.matrix }}
     runs-on: ubuntu-latest
@@ -33,13 +50,11 @@ jobs:
       - name: Substitute runner
         id: substitute
         run: |
-          echo matrix="$(echo '${{ needs.generate-matrix.outputs.matrix }}' | sed -e 's/windows.g4dn.xlarge/windows.g5.4xlarge.nvidia.gpu/g')" >> ${GITHUB_OUTPUT}
+          echo matrix="$(echo '${{ needs.generate-tensorrt-matrix.outputs.matrix }}' | sed -e 's/windows.g4dn.xlarge/windows.g5.4xlarge.nvidia.gpu/g')" >> ${GITHUB_OUTPUT}
 
   build:
     needs: substitute-runner
-    permissions:
-      id-token: write
-      contents: read
+    name: Build torch-tensorrt whl package
     strategy:
       fail-fast: false
       matrix:
@@ -49,8 +64,7 @@ jobs:
             env-script: packaging/vc_env_helper.bat
             smoke-test-script: packaging/smoke_test_windows.py
             package-name: torch_tensorrt
-    name: Build torch-tensorrt whl package
-    uses: pytorch/test-infra/.github/workflows/build_wheels_windows.yml@main
+    uses: ./.github/workflows/build-tensorrt-windows.yml
     with:
       repository: ${{ matrix.repository }}
       ref: ""
