@@ -46,7 +46,7 @@ class WrapperTorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
             if "_run_on_acc" in name:
                 rt_mod.set_cudagraphs_enabled_parent_module(True)
 
-        # TODO: check if only torch needs warm up.
+        # Warm up is necessary to ensure that memory allocations and initializations are not recorded in cuda graphs
         with unset_fake_temporarily():
             inputs_tensor = [spec.torch_tensor.cuda() for spec in self.inputs]
             s = torch.cuda.Stream()
@@ -256,7 +256,6 @@ class WrapperTorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
                 self._caller_stream.wait_stream(self._engine_stream)
 
             if cudagraphs_enabled:
-                # TODO: submodule to return list only
                 if isinstance(self._output_buffers, (list, tuple)):
                     output_buffers = self._output_buffers
                 else:

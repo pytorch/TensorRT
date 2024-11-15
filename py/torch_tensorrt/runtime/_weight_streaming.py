@@ -3,6 +3,9 @@ from typing import Any
 
 import torch
 from torch_tensorrt.dynamo.runtime import PythonTorchTensorRTModule, TorchTensorRTModule
+from torch_tensorrt.dynamo.runtime._WrapperTorchTensorRTModule import (
+    WrapperTorchTensorRTModule,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -12,9 +15,14 @@ class _WeightStreamingContextManager(object):
     Helper class used to setup weight streaming budget
     """
 
-    def __init__(self, module: torch.fx.GraphModule) -> None:
+    def __init__(
+        self, module: torch.fx.GraphModule | WrapperTorchTensorRTModule
+    ) -> None:
         rt_mods = []
         self.current_device_budget = 0
+
+        if isinstance(module, WrapperTorchTensorRTModule):
+            module = module.original_module
         for name, rt_mod in module.named_children():
             if "_run_on_acc" in name and isinstance(
                 rt_mod, (PythonTorchTensorRTModule, TorchTensorRTModule)
