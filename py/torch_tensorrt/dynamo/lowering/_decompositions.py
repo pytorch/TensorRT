@@ -412,7 +412,6 @@ def get_decompositions(
         return {**CORE_ATEN_DECOMPOSITIONS_FILTERED, **TORCH_TRT_DECOMPOSITIONS}
     else:
         # changes made here due to torch2.6 changes https://github.com/pytorch/pytorch/pull/135080
-        # changes made here due to torch2.6 changes https://github.com/pytorch/pytorch/pull/140085
         decomp_table = default_decompositions()
         DECOMP_TABLE_FILTERED: Dict[OpOverload, Callable[[Any], Any]] = {
             decomp: decomp_table[decomp]
