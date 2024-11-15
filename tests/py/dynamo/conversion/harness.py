@@ -3,16 +3,20 @@
 import logging
 import time
 import unittest
-from typing import Callable, List, Optional, Tuple
+from typing import Any, Callable, List, Optional, Sequence, Tuple
 
 import torch
 import torch_tensorrt
+from torch.fx.experimental.proxy_tensor import unset_fake_temporarily
 from torch.fx.passes.shape_prop import ShapeProp
 from torch.testing._internal.common_utils import TestCase
 from torch_tensorrt import Input
+from torch_tensorrt._Device import Device
 from torch_tensorrt._enums import dtype
 from torch_tensorrt.dynamo import _defaults
+from torch_tensorrt.dynamo._defaults import default_device
 from torch_tensorrt.dynamo._settings import CompilationSettings
+from torch_tensorrt.dynamo._tracer import get_dynamic_shapes_args
 
 # Use interpreter, input spec, and test case from fx_ts_compat to test Dynamo Converter Registry
 from torch_tensorrt.dynamo.conversion import TRTInterpreter
@@ -26,6 +30,129 @@ from torch_tensorrt.dynamo.runtime import PythonTorchTensorRTModule
 from torch_tensorrt.dynamo.utils import ATOL, RTOL, get_model_device, get_torch_inputs
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
+
+
+# this method is only used in our converter test to infer the module output dtypes via dummy inference
+# which is due to fx.symbolic_trace does not have the meta['val'] info in the node
+# TODO: lan to remove this once our converter test is moved from fx.symbolic_trace to dynamo trace
+def infer_module_output_dtypes_for_test(
+    module: torch.fx.GraphModule,
+    inputs: Sequence[Input],
+    device: Device,
+    kwarg_inputs: Optional[dict[str, Any]] = None,
+    truncate_double: bool = False,
+) -> List[dtype]:
+    """
+    This function performs model inference to determine the output dtypes
+    and truncates them accordingly. inputs can be either arg_inputs or flattened input list.
+    If it is flattened list, kwarg_inputs should be None, as it is already included in the flattened input.
+    """
+    # TODO: We can also determine output dtypes from the module.graph based on node metadata.
+    # However, our converter tests use fx.symbolic_trace which sometimes does not provide metadata,
+    # so we stick to the model inference approach currently.
+    with unset_fake_temporarily():
+        # Get the device on which the model exists
+        # For large models, this can be done on CPU to save GPU memory allocation for TRT.
+        device = get_model_device(module)
+        torch_inputs = get_torch_inputs(inputs, device)
+        if kwarg_inputs is None:
+            kwarg_inputs = {}
+        torch_kwarg_inputs = get_torch_inputs(kwarg_inputs, device)
+        module_outputs = module(*torch_inputs, **torch_kwarg_inputs)
+        if not isinstance(module_outputs, (list, tuple)):
+            module_outputs = [module_outputs]
+
+    # Int64 outputs can sometimes be generated from within other operators
+    # such as aten.sum - such outputs can be truncated
+    output_dtypes = []
+    for output in module_outputs:
+        output_ = output
+        # We don't need to check if output is nested here because the input module will be flattened
+        if not isinstance(output, torch.Tensor):
+            if isinstance(output, str):
+                raise ValueError(
+                    f"Received an output type {type(output)} that's not in the acceptable datatypes (https://pytorch.org/docs/stable/tensor_attributes.html#torch.dtype)"
+                )
+            else:
+                output_ = torch.tensor(output)
+
+        if truncate_double and output_.dtype == dtype.float64:
+            output_dtypes.append(dtype.float32)
+        else:
+            output_dtypes.append(dtype._from(output_.dtype))
+
+    return output_dtypes
+
+
+# this is to enable dynamo tracer as True in the converter test files batch by batch
+def get_use_dynamo_tracer(use_dynamo_tracer: Any) -> bool:
+    # if in our converter tests we specifically set use_dynamo_tracer field, honor it
+    if use_dynamo_tracer is not None and isinstance(use_dynamo_tracer, bool):
+        return use_dynamo_tracer
+    # if in our converter tests, we did not specify use_dynamo_tracer field
+    import inspect
+    import os
+    import re
+
+    filename = os.path.basename(inspect.stack()[2].filename)
+    # enable converter test files which starts with test_a*.py to use dynamo tracer
+    pattern = re.compile("^test_([a])+")
+    if pattern.match(filename):
+        return True
+    else:
+        return False
+
+
+# this method is only used in our converter test to infer the module output dtypes via dummy inference
+# which is due to fx.symbolic_trace does not have the meta['val'] info in the node
+# TODO: lan to remove this once our converter test is moved from fx.symbolic_trace to dynamo trace
+def infer_module_output_dtypes_for_test(
+    module: torch.fx.GraphModule,
+    inputs: Sequence[Input],
+    device: Device,
+    kwarg_inputs: Optional[dict[str, Any]] = None,
+    truncate_double: bool = False,
+) -> List[dtype]:
+    """
+    This function performs model inference to determine the output dtypes
+    and truncates them accordingly. inputs can be either arg_inputs or flattened input list.
+    If it is flattened list, kwarg_inputs should be None, as it is already included in the flattened input.
+    """
+    # TODO: We can also determine output dtypes from the module.graph based on node metadata.
+    # However, our converter tests use fx.symbolic_trace which sometimes does not provide metadata,
+    # so we stick to the model inference approach currently.
+    with unset_fake_temporarily():
+        # Get the device on which the model exists
+        # For large models, this can be done on CPU to save GPU memory allocation for TRT.
+        device = get_model_device(module)
+        torch_inputs = get_torch_inputs(inputs, device)
+        if kwarg_inputs is None:
+            kwarg_inputs = {}
+        torch_kwarg_inputs = get_torch_inputs(kwarg_inputs, device)
+        module_outputs = module(*torch_inputs, **torch_kwarg_inputs)
+        if not isinstance(module_outputs, (list, tuple)):
+            module_outputs = [module_outputs]
+
+    # Int64 outputs can sometimes be generated from within other operators
+    # such as aten.sum - such outputs can be truncated
+    output_dtypes = []
+    for output in module_outputs:
+        output_ = output
+        # We don't need to check if output is nested here because the input module will be flattened
+        if not isinstance(output, torch.Tensor):
+            if isinstance(output, str):
+                raise ValueError(
+                    f"Received an output type {type(output)} that's not in the acceptable datatypes (https://pytorch.org/docs/stable/tensor_attributes.html#torch.dtype)"
+                )
+            else:
+                output_ = torch.tensor(output)
+
+        if truncate_double and output_.dtype == dtype.float64:
+            output_dtypes.append(dtype.float32)
+        else:
+            output_dtypes.append(dtype._from(output_.dtype))
+
+    return output_dtypes
 
 
 def fetch_attr(mod, target):
@@ -224,14 +351,26 @@ class DispatchTestCase(TRTTestCase):
         enable_passes: bool,
         propagate_shapes: bool = False,
         settings: CompilationSettings = CompilationSettings(),
+        torch_export_dynamic_shapes: Optional[Any] = None,
     ):
         mod = mod.eval()
         if use_dynamo_tracer:
-            exported_program = torch_tensorrt.dynamo.trace(mod, tuple(original_inputs))
-            exported_program = pre_export_lowering(exported_program, settings)
-            exported_program = exported_program.run_decompositions(
-                get_decompositions(False)
+            if torch_export_dynamic_shapes is None:
+                torch_export_dynamic_shapes = get_dynamic_shapes_args(
+                    mod, original_inputs
+                )
+            device = default_device()
+            torch_export_inputs = get_torch_inputs(original_inputs, device)
+            exported_program = torch.export.export(
+                mod,
+                tuple(torch_export_inputs),
+                dynamic_shapes=torch_export_dynamic_shapes,
             )
+            if enable_passes:
+                exported_program = pre_export_lowering(exported_program, settings)
+                exported_program = exported_program.run_decompositions(
+                    get_decompositions(False)
+                )
             fx_module = exported_program.module()
         else:
             fx_module = torch.fx.symbolic_trace(mod)
@@ -260,13 +399,15 @@ class DispatchTestCase(TRTTestCase):
         atol=ATOL,
         precision=dtype.f32,
         check_dtype=True,
-        use_dynamo_tracer=False,
+        use_dynamo_tracer=None,
         enable_passes=False,
         propagate_shapes=False,
         int32_reqd=False,
         make_refittable=False,
     ):
-
+        # TODO: lan to remove this and set use_dynamo_traccer to True by default
+        # once all the converter test files are moved to use_dynamo_tracer
+        use_dynamo_tracer = get_use_dynamo_tracer(use_dynamo_tracer)
         # Previous instance of the interpreter auto-casted 64-bit inputs
         # We replicate this behavior here
         compilation_settings = CompilationSettings(
@@ -313,12 +454,18 @@ class DispatchTestCase(TRTTestCase):
 
         output_dtypes = None
         if check_dtype:
-            output_dtypes = infer_module_output_dtypes(
-                mod,
-                input_specs,
-                compilation_settings.device,
-                truncate_double=compilation_settings.truncate_double,
-            )
+            if use_dynamo_tracer:
+                output_dtypes = infer_module_output_dtypes(
+                    mod,
+                    truncate_double=compilation_settings.truncate_double,
+                )
+            else:
+                output_dtypes = infer_module_output_dtypes_for_test(
+                    mod,
+                    input_specs,
+                    compilation_settings.device,
+                    truncate_double=compilation_settings.truncate_double,
+                )
 
         _LOGGER.debug(f"Compilation settings: {compilation_settings}")
         _LOGGER.debug(f"Inputs: {input_specs}")
@@ -388,21 +535,24 @@ class DispatchTestCase(TRTTestCase):
         rtol=RTOL,
         atol=ATOL,
         output_dtypes=None,
-        use_dynamo_tracer=False,
+        use_dynamo_tracer=None,
         enable_passes=False,
         use_example_tensors=True,
         pyt_inputs=None,
         propagate_shapes=False,
         check_dtype=True,
         make_refittable=False,
+        torch_export_dynamic_shapes=None,
     ):
+        # TODO: lan to remove this and set use_dynamo_traccer to True by default
+        # once all the converter test files are moved to use_dynamo_tracer
+        use_dynamo_tracer = get_use_dynamo_tracer(use_dynamo_tracer)
 
         # Previous instance of the interpreter auto-casted 64-bit inputs
         # We replicate this behavior here
         compilation_settings = CompilationSettings(
             truncate_double=True, make_refittable=make_refittable
         )
-
         mod = self.generate_graph(
             mod,
             input_specs,
@@ -410,15 +560,22 @@ class DispatchTestCase(TRTTestCase):
             enable_passes=enable_passes,
             propagate_shapes=propagate_shapes,
             settings=compilation_settings,
+            torch_export_dynamic_shapes=torch_export_dynamic_shapes,
         )
 
         if check_dtype:
-            output_dtypes = infer_module_output_dtypes(
-                mod,
-                input_specs,
-                compilation_settings.device,
-                truncate_double=compilation_settings.truncate_double,
-            )
+            if use_dynamo_tracer:
+                output_dtypes = infer_module_output_dtypes(
+                    mod,
+                    truncate_double=compilation_settings.truncate_double,
+                )
+            else:
+                output_dtypes = infer_module_output_dtypes_for_test(
+                    mod,
+                    input_specs,
+                    compilation_settings.device,
+                    truncate_double=compilation_settings.truncate_double,
+                )
 
         interp = TRTInterpreter(
             mod,
