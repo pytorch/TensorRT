@@ -1,0 +1,115 @@
+module(
+    name = "torch_tensorrt",
+    repo_name = "org_pytorch_tensorrt",
+    version = "${BUILD_VERSION}"
+)
+
+bazel_dep(name = "googletest", version = "1.14.0")
+bazel_dep(name = "platforms", version = "0.0.10")
+bazel_dep(name = "rules_cc", version = "0.0.9")
+bazel_dep(name = "rules_python", version = "0.34.0")
+
+python = use_extension("@rules_python//python/extensions:python.bzl", "python")
+python.toolchain(
+    ignore_root_user_error = True,
+    python_version = "3.11",
+)
+
+bazel_dep(name = "rules_pkg", version = "1.0.1")
+git_override(
+    module_name = "rules_pkg",
+    commit = "17c57f4",
+    remote = "https://github.com/narendasan/rules_pkg",
+)
+
+local_repository = use_repo_rule("@bazel_tools//tools/build_defs/repo:local.bzl", "local_repository")
+
+# External dependency for torch_tensorrt if you already have precompiled binaries.
+local_repository(
+    name = "torch_tensorrt",
+    path = "/opt/conda/lib/python3.8/site-packages/torch_tensorrt",
+)
+
+
+new_local_repository = use_repo_rule("@bazel_tools//tools/build_defs/repo:local.bzl", "new_local_repository")
+
+# CUDA should be installed on the system locally
+new_local_repository(
+    name = "cuda",
+    build_file = "@//third_party/cuda:BUILD",
+    path = "${CUDA_HOME}",
+)
+
+new_local_repository(
+    name = "cuda_win",
+    build_file = "@//third_party/cuda:BUILD",
+    path = "${CUDA_HOME}",
+)
+
+
+http_archive = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+
+#############################################################################################################
+# Tarballs and fetched dependencies (default - use in cases when building from precompiled bin and tarballs)
+#############################################################################################################
+
+http_archive(
+    name = "libtorch",
+    build_file = "@//third_party/libtorch:BUILD",
+    strip_prefix = "libtorch",
+    urls = ["https://download.pytorch.org/libtorch/${CHANNEL}/${CU_VERSION}/libtorch-cxx11-abi-shared-with-deps-latest.zip"],
+)
+
+# Download these tarballs manually from the NVIDIA website
+# Either place them in the distdir directory in third_party and use the --distdir flag
+# or modify the urls to "file:///<PATH TO TARBALL>/<TARBALL NAME>.tar.gz
+
+http_archive(
+    name = "tensorrt",
+    build_file = "@//third_party/tensorrt/archive:BUILD",
+    sha256 = "${TENSORRT_SHA256}",
+    strip_prefix = "${TENSORRT_STRIP_PREFIX}",
+    urls = [
+        "${TENSORRT_URLS}",
+    ],
+)
+
+http_archive(
+    name = "tensorrt_win",
+    build_file = "@//third_party/tensorrt/archive:BUILD",
+    sha256 = "${TENSORRT_SHA256}",
+    strip_prefix = "${TENSORRT_STRIP_PREFIX}",
+    urls = [
+        "${TENSORRT_URLS}",
+    ],
+)
+
+
+####################################################################################
+# Locally installed dependencies (use in cases of custom dependencies or aarch64)
+####################################################################################
+
+# NOTE: In the case you are using just the pre-cxx11-abi path or just the cxx11 abi path
+# with your local libtorch, just point deps at the same path to satisfy bazel.
+
+# NOTE: NVIDIA's aarch64 PyTorch (python) wheel file uses the CXX11 ABI unlike PyTorch's standard
+# x86_64 python distribution. If using NVIDIA's version just point to the root of the package
+# for both versions here and do not use --config=pre-cxx11-abi
+
+new_local_repository(
+    name = "libtorch_win",
+    path = "${TORCH_INSTALL_PATH}",
+    build_file = "third_party/libtorch/BUILD"
+)
+
+new_local_repository(
+    name = "libtorch_pre_cxx11_abi",
+    path = "${TORCH_INSTALL_PATH}",
+    build_file = "third_party/libtorch/BUILD"
+)
+
+#new_local_repository(
+#   name = "tensorrt",
+#   path = "/usr/",
+#   build_file = "@//third_party/tensorrt/local:BUILD"
+#)

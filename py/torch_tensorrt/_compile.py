@@ -666,14 +666,15 @@ def save(
                 exp_program = export(module)
                 torch.export.save(exp_program, file_path)
             else:
-                from torch._higher_order_ops.torchbind import enable_torchbind_tracing
 
                 if arg_inputs is None:
                     raise ValueError(
                         "Provided model is a torch.fx.GraphModule and retrace is True, however the inputs or arg_inputs are empty. Please provide valid torch.tensors as inputs or arg_inputs to trace and save the model"
                     )
-                with enable_torchbind_tracing():
-                    exp_program = torch.export.export(
-                        module, tuple(arg_inputs), kwargs=kwarg_inputs, strict=False
-                    )
-                    torch.export.save(exp_program, file_path)
+                exp_program = torch.export.export(
+                    module,
+                    tuple(arg_inputs),
+                    kwargs=kwarg_inputs,
+                    strict=False,
+                )
+                torch.export.save(exp_program, file_path)
