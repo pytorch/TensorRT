@@ -231,7 +231,6 @@ class TestEngineCache(TestCase):
             )
             end.record()
             torch.cuda.synchronize()
-            torch._dynamo.reset()
             times.append(start.elapsed_time(end))
             results.append(trt_gm(*inputs))
 
@@ -396,7 +395,6 @@ class TestEngineCache(TestCase):
                     "reuse_cached_engines": reuse_cached_engines,
                     "engine_cache_dir": engine_cache_dir,
                     "engine_cache_size": 1 << 30,  # 1GB
-                    "torch_executed_ops": {"torch.ops.aten.relu.default"},
                 },
             )
             results.append(compiled_model(*inputs))  # trigger the compilation
@@ -441,7 +439,6 @@ class TestEngineCache(TestCase):
         start = torch.cuda.Event(enable_timing=True)
         end = torch.cuda.Event(enable_timing=True)
         for i in range(3):
-            # remove timing cache and reset dynamo for engine caching messurement
             if i == 0:
                 cache_built_engines = False
                 reuse_cached_engines = False
@@ -462,7 +459,6 @@ class TestEngineCache(TestCase):
                     "cache_built_engines": cache_built_engines,
                     "reuse_cached_engines": reuse_cached_engines,
                     "custom_engine_cache": custom_engine_cache,
-                    "torch_executed_ops": {"torch.ops.aten.relu.default"},
                 },
             )
             results.append(compiled_model(*inputs))  # trigger the compilation
