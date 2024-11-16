@@ -945,16 +945,13 @@ def aten_ops_slice(
 def refit_validator(node: Node, settings: Optional[CompilationSettings] = None) -> bool:
     # cumsum op is not refitable
     if settings and not settings.immutable_weights:
-        print("TEST::: cumsum op is not mutable")
-        print("settings.immutable_weights:", settings.immutable_weights)
-        print("settings:", settings)
         return False
     return True
 
 
 @dynamo_tensorrt_converter(
     torch.ops.aten.cumsum.default,
-    # capability_validator=refit_validator,
+    capability_validator=refit_validator,
     supports_dynamic_shapes=True,
 )
 @enforce_tensor_types(
@@ -1018,7 +1015,6 @@ def zero_output_validator(
     torch.ops.aten.as_strided.default,
     capability_validator=zero_output_validator,
 )
-@dynamo_tensorrt_converter(torch.ops.aten.as_strided.default)
 def aten_ops_as_strided(
     ctx: ConversionContext,
     target: Target,
@@ -2066,7 +2062,6 @@ def aten_ops_div(
 @dynamo_tensorrt_converter(
     torch.ops.aten.pow.Tensor_Scalar, supports_dynamic_shapes=True
 )
-@dynamo_tensorrt_converter(operator.pow, supports_dynamic_shapes=True)
 def aten_ops_pow(
     ctx: ConversionContext,
     target: Target,
@@ -3336,7 +3331,6 @@ def aten_ops_copy(
 @dynamo_tensorrt_converter(
     torch.ops.aten.remainder.Tensor, supports_dynamic_shapes=True
 )
-@dynamo_tensorrt_converter(operator.mod, supports_dynamic_shapes=True)
 @enforce_tensor_types(
     {
         0: (TRTTensor,),
