@@ -7,6 +7,7 @@ from typing import List, Optional, Sequence, Tuple
 
 import torch
 import torch_tensorrt
+from torch._subclasses.fake_tensor import FakeTensorMode
 from torch.fx.experimental.proxy_tensor import unset_fake_temporarily
 from torch_tensorrt.dynamo import partitioning
 from torch_tensorrt.dynamo.conversion import DYNAMIC_DIM
@@ -17,17 +18,28 @@ logger = logging.getLogger(__name__)
 
 
 class WrapperTorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
-    """This Wrapper runtime module to record/replay cuda graph in sub modules"""
+    """This Wrapper runtime module is to record/replay whole cuda graph in sub modules
+
+    Args:
+        original_module: Unmodified FX GraphModule
+        compiled_module: Complied fx graphModule that will be wrapped
+        output_shapes: Shapes of output Tensors of the graph
+        output_dtypes: Output data types of the graph
+    Returns:
+        Output tensor or tensor list
+    """
 
     def __init__(
         self,
         original_module: torch.nn.Module,
+        compiled_module: torch.nn.Module,
         output_shapes: List[torch.Size],
         output_dtypes: List[torch.dtype],
     ):
         super(WrapperTorchTensorRTModule, self).__init__()
         self.original_module = original_module
-        self.inputs = partitioning.construct_submodule_inputs(original_module)
+        self.compiled_module = compiled_module
+        self.inputs = partitioning.construct_submodule_inputs(compiled_module)
         self.output_shapes = output_shapes
         self.output_dtypes = output_dtypes
 
@@ -42,9 +54,9 @@ class WrapperTorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         self.input_is_dynamic = input_is_dynamic(self.inputs)
 
         # Disable cudagrphs in submodules as it will be enabled in wrapper
-        for name, rt_mod in self.original_module.named_children():
+        for name, rt_mod in self.compiled_module.named_children():
             if "_run_on_acc" in name:
-                rt_mod.set_cudagraphs_enabled_parent_module(True)
+                rt_mod.set_whole_cudagraphs(True)
 
         # Warm up is necessary to ensure that memory allocations and initializations are not recorded in cuda graphs
         with unset_fake_temporarily():
@@ -53,7 +65,7 @@ class WrapperTorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
             s.wait_stream(torch.cuda.current_stream())
             with torch.cuda.stream(s):
                 for _ in range(3):
-                    self.original_module(*inputs_tensor)
+                    self.compiled_module(*inputs_tensor)
             torch.cuda.current_stream().wait_stream(s)
 
     def validate_input_shapes(self, inputs: Sequence[torch.Tensor]) -> bool:
@@ -71,7 +83,9 @@ class WrapperTorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
             self.shape_key = new_shape_key
 
             if self.input_is_dynamic:
-                tmp_outputs = self.original_module(*inputs)
+                with FakeTensorMode() as mode:
+                    fake_inputs = [mode.from_tensor(input) for input in inputs]
+                    tmp_outputs = self.original_module(*fake_inputs)
                 if not isinstance(tmp_outputs, (list, tuple)):
                     tmp_outputs = [tmp_outputs]
                 self.output_shapes = [tuple(output.shape) for output in tmp_outputs]
@@ -237,7 +251,7 @@ class WrapperTorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
                             with torch.cuda.graph(
                                 self.cudagraph, stream=self._engine_stream
                             ):
-                                self._output_buffers = self.original_module(
+                                self._output_buffers = self.compiled_module(
                                     *self._input_buffers
                                 )
 
@@ -251,7 +265,7 @@ class WrapperTorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
                         self.cudagraph.replay()  # type: ignore
 
                     else:
-                        outputs = self.original_module(*inputs)
+                        outputs = self.compiled_module(*inputs)
 
                 self._caller_stream.wait_stream(self._engine_stream)
 
