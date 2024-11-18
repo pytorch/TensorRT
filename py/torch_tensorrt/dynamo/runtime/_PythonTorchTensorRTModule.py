@@ -108,7 +108,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         self.engine = None
         self.weight_name_map = weight_name_map
         self.target_platform = Platform.current_platform()
-        self.cudagraphs_enabled = False
+        self.prev_cudagraphs_enabled = False
         self.pre_allocated_outputs: List[torch.Tensor] = []
         self.use_pre_allocated_outputs = True
 
@@ -269,11 +269,11 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
             cudagraphs_enabled = torch_tensorrt.runtime.get_cudagraphs_mode()
             shape_changed = self.validate_input_shapes(inputs)
             # Cudagraphs record is required if cudagraphs_enabled is toggled to True regardless of shape change
-            if not self.cudagraphs_enabled and cudagraphs_enabled:
+            if not self.prev_cudagraphs_enabled and cudagraphs_enabled:
                 need_cudagraphs_record = True
             else:
                 need_cudagraphs_record = cudagraphs_enabled and shape_changed
-            self.cudagraphs_enabled = cudagraphs_enabled
+            self.prev_cudagraphs_enabled = cudagraphs_enabled
 
             if need_cudagraphs_record:
                 if self.cudagraph:
