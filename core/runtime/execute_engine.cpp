@@ -201,14 +201,14 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
     LOG_INFO("" << log_info);
     compiled_engine->cudagraph.enable_debug_mode();
   }
-  bool cudagraphs_enabled = (!compiled_engine->cudagraphs_enabled_parent_module && CUDAGRAPHS_MODE);
+  bool cudagraphs_enabled = (!compiled_engine->whole_cudagraphs && CUDAGRAPHS_MODE);
 
   // Whether cudagraphs needs to record the graph on this pass
   // Cudagraphs record is required if cudagraphs_enabled is switched to True regardless of shape change
-  bool need_cudagraphs_record =
-      (((!compiled_engine->cudagraphs_enabled) && cudagraphs_enabled) ||
-       (cudagraphs_enabled && (!_cudagraphs_validate_shapes(inputs, compiled_engine))));
-  compiled_engine->cudagraphs_enabled = cudagraphs_enabled;
+  bool need_cudagraphs_record = cudagraphs_enabled &&
+      ((!compiled_engine->prev_cudagraphs_enabled) || (!_cudagraphs_validate_shapes(inputs, compiled_engine)));
+
+  compiled_engine->prev_cudagraphs_enabled = cudagraphs_enabled;
 
   if (!cudagraphs_enabled) {
     compiled_engine->cudagraph.reset();

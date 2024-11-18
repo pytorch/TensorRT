@@ -87,7 +87,7 @@ static auto TORCHTRT_UNUSED TRTEngineTSRegistrtion =
         .def("dump_engine_layer_info_to_file", &TRTEngine::dump_engine_layer_info_to_file)
         .def("dump_engine_layer_info", &TRTEngine::dump_engine_layer_info)
         .def("get_engine_layer_info", &TRTEngine::get_engine_layer_info)
-        .def("set_cudagraphs_enabled_parent_module", &TRTEngine::set_cudagraphs_enabled_parent_module)
+        .def("set_whole_cudagraphs", &TRTEngine::set_whole_cudagraphs)
         .def("infer_outputs", &TRTEngine::infer_outputs)
         .def_readwrite("use_pre_allocated_outputs", &TRTEngine::use_pre_allocated_outputs)
         .def_property(

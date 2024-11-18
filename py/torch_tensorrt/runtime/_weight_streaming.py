@@ -22,7 +22,7 @@ class _WeightStreamingContextManager(object):
         self.current_device_budget = 0
 
         if isinstance(module, WrapperTorchTensorRTModule):
-            module = module.original_module
+            module = module.compiled_module
         for name, rt_mod in module.named_children():
             if "_run_on_acc" in name and isinstance(
                 rt_mod, (PythonTorchTensorRTModule, TorchTensorRTModule)

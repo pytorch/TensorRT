@@ -145,8 +145,9 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         self.weight_name_map = weight_name_map
         self.target_platform = Platform.current_platform()
         # Check if CUDA graph capture is enabled in the parent node
-        self.cudagraphs_enabled_parent_module = False
-        self.cudagraphs_enabled = False
+        self.whole_cudagraphs = False
+        # Previous cuda graphs state
+        self.prev_cudagraphs_enabled = False
 
         if self.serialized_engine is not None and not self.settings.lazy_engine_init:
             self.setup_engine()
@@ -187,8 +188,8 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         logger.debug(f"Weight streaming budget set to {budget_bytes}B")
         return self._set_device_memory_budget(budget_bytes)
 
-    def set_cudagraphs_enabled_parent_module(self, enable: bool) -> None:
-        self.cudagraphs_enabled_parent_module = enable
+    def set_whole_cudagraphs(self, enable: bool) -> None:
+        self.whole_cudagraphs = enable
 
     def setup_engine(self) -> None:
         assert (
@@ -358,16 +359,14 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
 
             cudagraphs_enabled = (
                 torch_tensorrt.runtime.get_cudagraphs_mode()
-                and not self.cudagraphs_enabled_parent_module
+                and not self.whole_cudagraphs
             )
             # Cudagraphs record is required if cudagraphs_enabled is switched to True regardless of shape change
-            if not self.cudagraphs_enabled and cudagraphs_enabled:
-                need_cudagraphs_record = True
-            else:
-                need_cudagraphs_record = (
-                    cudagraphs_enabled and not self.cudagraphs_validate_shapes(inputs)
-                )
-            self.cudagraphs_enabled = cudagraphs_enabled
+            need_cudagraphs_record = cudagraphs_enabled and (
+                (not self.prev_cudagraphs_enabled)
+                or (not self.cudagraphs_validate_shapes(inputs))
+            )
+            self.prev_cudagraphs_enabled = cudagraphs_enabled
 
             if need_cudagraphs_record:
                 self._input_buffers = [None] * len(self.input_names)

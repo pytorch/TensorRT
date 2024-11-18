@@ -114,7 +114,7 @@ struct TRTEngine : torch::CustomClassHolder {
   bool set_device_memory_budget(int64_t budget);
   int64_t get_streamable_device_memory_budget();
   int64_t get_automatic_device_memory_budget();
-  void set_cudagraphs_enabled_parent_module(bool enable);
+  void set_whole_cudagraphs(bool enable);
   std::vector<at::Tensor> infer_outputs(std::vector<std::vector<int64_t>> input_shapes);
   void set_pre_allocated_outputs(bool enable);
   TorchTRTRuntimeStates runtime_states;
@@ -132,8 +132,8 @@ struct TRTEngine : torch::CustomClassHolder {
   std::vector<at::Tensor> input_buffers = {};
   std::vector<at::Tensor> output_buffers = {};
   std::string shape_key;
-  bool cudagraphs_enabled = false;
-  bool cudagraphs_enabled_parent_module = false;
+  bool prev_cudagraphs_enabled = false;
+  bool whole_cudagraphs = false;
   // TODO: Implement a call method
   // c10::List<at::Tensor> Run(c10::List<at::Tensor> inputs);
 

@@ -598,7 +598,7 @@ def save(
                 This flag is experimental for now.
     """
     if isinstance(module, WrapperTorchTensorRTModule):
-        module = module.original_module
+        module = module.compiled_module
     module_type = _parse_module_type(module)
     accepted_formats = {"exported_program", "torchscript"}
     if arg_inputs is not None and not all(

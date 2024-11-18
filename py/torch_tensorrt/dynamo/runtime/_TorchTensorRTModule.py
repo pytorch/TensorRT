@@ -197,8 +197,8 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
 
         return budget_bytes
 
-    def set_cudagraphs_enabled_parent_module(self, enable: bool) -> None:
-        self.engine.set_cudagraphs_enabled_parent_module(enable)
+    def set_whole_cudagraphs(self, enable: bool) -> None:
+        self.engine.set_whole_cudagraphs(enable)
 
     def setup_engine(self) -> None:
         """

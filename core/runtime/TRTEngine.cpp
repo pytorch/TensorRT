@@ -216,8 +216,8 @@ TRTEngine::TRTEngine(
   LOG_DEBUG(*this);
 }
 
-void TRTEngine::set_cudagraphs_enabled_parent_module(bool enable) {
-  cudagraphs_enabled_parent_module = enable;
+void TRTEngine::set_whole_cudagraphs(bool enable) {
+  whole_cudagraphs = enable;
 }
 
 TRTEngine::~TRTEngine() {
