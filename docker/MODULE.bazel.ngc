@@ -56,18 +56,18 @@ http_archive = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "ht
 
 new_local_repository(
     name = "libtorch",
-    path = "/usr/local/lib/python3.12/dist-packages/torch/",
+    path = "/opt/python/cp312-cp312/lib/python3.12/site-packages/torch/",
     build_file = "third_party/libtorch/BUILD"
 )
 
 new_local_repository(
     name = "libtorch_pre_cxx11_abi",
-    path = "/usr/local/lib/python3.12/dist-packages/torch/",
+    path = "/opt/python/cp312-cp312/lib/python3.12/site-packages",
     build_file = "third_party/libtorch/BUILD"
 )
 
 new_local_repository(
    name = "tensorrt",
-   path = "/usr/",
+   path = "/usr/local/cuda",
    build_file = "@//third_party/tensorrt/local:BUILD"
 )
