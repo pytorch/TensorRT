@@ -458,7 +458,6 @@ def scaled_dot_product_attention_decomposition(
     attn_weight = query @ key.transpose(-2, -1) * scale_factor
     attn_weight = attn_weight + attn_bias
     attn_weight = torch.softmax(attn_weight, dim=-1)
-    attn_weight = torch.dropout(attn_weight, dropout_p, train=True)
     return attn_weight @ value
 
 
