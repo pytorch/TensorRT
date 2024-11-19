@@ -1695,7 +1695,8 @@ class TestLowering(TestCase):
         if attn:
             inputs += [torch.rand(2, 4, 8, 8, dtype=torch.half, device="cuda")]
 
-        fx_graph = torch.fx.symbolic_trace(TestModule())
+        exported_program = torch.export.export(TestModule(), tuple(inputs))
+        fx_graph = exported_program.module()
         unexpected_ops_seen, _ = lower_graph_testing(
             fx_graph, inputs, unexpected_ops=unexpected_ops, min_block_size=1
         )
@@ -1709,12 +1710,8 @@ class TestLowering(TestCase):
         torch._dynamo.reset()
 
         # Validate that the results between Torch and Torch-TRT are similar
-        optimized_model = torch_tensorrt.compile(
-            fx_graph,
-            "dynamo",
-            inputs,
-            enabled_precisions={torch.half},
-            min_block_size=1,
+        optimized_model = torch_tensorrt.dynamo.compile(
+            exported_program, inputs, enabled_precisions={torch.half}, min_block_size=1
         )
         optimized_model_results = optimized_model(*inputs).detach().cpu()
         torch_model_results = fx_graph(*inputs).detach().cpu()
@@ -1760,7 +1757,8 @@ class TestLowering(TestCase):
             torch.rand(2, 4, 8, 16, dtype=torch.half, device="cuda"),
         ]
 
-        fx_graph = torch.fx.symbolic_trace(TestModule())
+        exported_program = torch.export.export(TestModule(), tuple(inputs))
+        fx_graph = exported_program.module()
         unexpected_ops_seen, _ = lower_graph_testing(
             fx_graph, inputs, unexpected_ops=unexpected_ops, min_block_size=1
         )
@@ -1774,12 +1772,8 @@ class TestLowering(TestCase):
         torch._dynamo.reset()
 
         # Validate that the results between Torch and Torch-TRT are similar
-        optimized_model = torch_tensorrt.compile(
-            fx_graph,
-            "dynamo",
-            inputs,
-            enabled_precisions={torch.half},
-            min_block_size=1,
+        optimized_model = torch_tensorrt.dynamo.compile(
+            exported_program, inputs, enabled_precisions={torch.half}, min_block_size=1
         )
         optimized_model_results = optimized_model(*inputs).detach().cpu()
         torch_model_results = fx_graph(*inputs).detach().cpu()
@@ -1829,7 +1823,8 @@ class TestLowering(TestCase):
         if attn:
             inputs += [torch.rand(2, 4, 8, 8, dtype=torch.half, device="cuda")]
 
-        fx_graph = torch.fx.symbolic_trace(TestModule())
+        exported_program = torch.export.export(TestModule(), tuple(inputs))
+        fx_graph = exported_program.module()
         unexpected_ops_seen, _ = lower_graph_testing(
             fx_graph, inputs, unexpected_ops=unexpected_ops, min_block_size=1
         )
@@ -1843,12 +1838,8 @@ class TestLowering(TestCase):
         torch._dynamo.reset()
 
         # Validate that the results between Torch and Torch-TRT are similar
-        optimized_model = torch_tensorrt.compile(
-            fx_graph,
-            "dynamo",
-            inputs,
-            enabled_precisions={torch.half},
-            min_block_size=1,
+        optimized_model = torch_tensorrt.dynamo.compile(
+            exported_program, inputs, enabled_precisions={torch.half}, min_block_size=1
         )
         optimized_model_results = optimized_model(*inputs).detach().cpu()
         torch_model_results = fx_graph(*inputs).detach().cpu()
@@ -1898,7 +1889,8 @@ class TestLowering(TestCase):
         if attn:
             inputs += [torch.rand(2, 4, 8, 8, dtype=torch.half, device="cuda")]
 
-        fx_graph = torch.fx.symbolic_trace(TestModule())
+        exported_program = torch.export.export(TestModule(), tuple(inputs))
+        fx_graph = exported_program.module()
         unexpected_ops_seen, _ = lower_graph_testing(
             fx_graph, inputs, unexpected_ops=unexpected_ops, min_block_size=1
         )
@@ -1912,12 +1904,8 @@ class TestLowering(TestCase):
         torch._dynamo.reset()
 
         # Validate that the results between Torch and Torch-TRT are similar
-        optimized_model = torch_tensorrt.compile(
-            fx_graph,
-            "dynamo",
-            inputs,
-            enabled_precisions={torch.half},
-            min_block_size=1,
+        optimized_model = torch_tensorrt.dynamo.compile(
+            exported_program, inputs, enabled_precisions={torch.half}, min_block_size=1
         )
         optimized_model_results = optimized_model(*inputs).detach().cpu()
         torch_model_results = fx_graph(*inputs).detach().cpu()
