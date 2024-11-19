@@ -400,6 +400,26 @@ def log_softmax_decomposition(
     )
 
 
+@register_torch_trt_decomposition(aten.instance_norm, registry=TORCH_TRT_DECOMPOSITIONS)
+def instance_norm_decomposition(
+    input: torch.Tensor,
+    weight: Optional[torch.Tensor],
+    bias: Optional[torch.Tensor],
+    running_mean: Optional[torch.Tensor],
+    running_var: Optional[torch.Tensor],
+    use_input_stats: bool,
+    momentum: float,
+    eps: float,
+    cudnn_enabled: bool,
+) -> torch.Tensor:
+    if use_input_stats:
+        return torch.nn.functional.group_norm(input, input.shape[1], weight, bias, eps)
+    else:
+        return torch.nn.functional.batch_norm(
+            input, running_mean, running_var, weight, bias, False, momentum, eps
+        )
+
+
 def get_decompositions(
     enable_experimental_decompositions: bool = False,
 ) -> Dict[OpOverload, Callable[[Any], Any]]:
