@@ -33,6 +33,10 @@ typedef enum {
   SERIALIZATION_LEN, // NEVER USED FOR DATA, USED TO DETERMINE LENGTH OF SERIALIZED INFO
 } SerializedInfoIndex;
 
+std::string base64_encode(const std::string& in);
+std::string base64_decode(const std::string& in);
+std::string serialize_bindings(const std::vector<std::string>& bindings);
+
 c10::optional<RTDevice> get_most_compatible_device(
     const RTDevice& target_device,
     const RTDevice& curr_device = RTDevice(),
