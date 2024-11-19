@@ -12,7 +12,7 @@ bazel_dep(name = "rules_python", version = "0.34.0")
 python = use_extension("@rules_python//python/extensions:python.bzl", "python")
 python.toolchain(
     ignore_root_user_error = True,
-    python_version = "3.11",
+    python_version = "3.12",
 )
 
 bazel_dep(name = "rules_pkg", version = "1.0.1")
@@ -23,6 +23,12 @@ git_override(
 )
 
 local_repository = use_repo_rule("@bazel_tools//tools/build_defs/repo:local.bzl", "local_repository")
+
+# External dependency for torch_tensorrt if you already have precompiled binaries.
+local_repository(
+    name = "torch_tensorrt",
+    path = "/usr/local/lib/python3.12/dist-packages/torch_tensorrt/",
+)
 
 new_local_repository = use_repo_rule("@bazel_tools//tools/build_defs/repo:local.bzl", "new_local_repository")
 
@@ -50,13 +56,13 @@ http_archive = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "ht
 
 new_local_repository(
     name = "libtorch",
-    path = "/usr/local/lib/python3.10/dist-packages/torch/",
+    path = "/usr/local/lib/python3.12/dist-packages/torch/",
     build_file = "third_party/libtorch/BUILD"
 )
 
 new_local_repository(
     name = "libtorch_pre_cxx11_abi",
-    path = "/usr/local/lib/python3.10/dist-packages/torch/",
+    path = "/usr/local/lib/python3.12/dist-packages/torch/",
     build_file = "third_party/libtorch/BUILD"
 )
 
