@@ -437,7 +437,6 @@ def scaled_dot_product_attention_decomposition(
 ) -> torch.Tensor:
     L, S = query.size(-2), key.size(-2)
     device = query.device
-    scale_factor = 1 / math.sqrt(query.size(-1)) if scale is None else scale
     attn_bias = torch.zeros(L, S, dtype=query.dtype, device=device)
 
     if is_causal:
@@ -455,7 +454,14 @@ def scaled_dot_product_attention_decomposition(
         key = key.repeat_interleave(query.size(-3) // key.size(-3), -3)
         value = value.repeat_interleave(query.size(-3) // value.size(-3), -3)
 
-    attn_weight = query @ key.transpose(-2, -1) * scale_factor
+    attn_weight = query @ key.transpose(-2, -1)
+
+    if scale is None:
+        scale = torch.sqrt(torch.scalar_tensor(query.size(-1), dtype=torch.int))
+        attn_weight = attn_weight / scale
+    else:
+        attn_weight = attn_weight * scale
+
     attn_weight = attn_weight + attn_bias
     attn_weight = torch.softmax(attn_weight, dim=-1)
     return attn_weight @ value

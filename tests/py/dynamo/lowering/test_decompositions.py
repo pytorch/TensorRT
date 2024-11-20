@@ -8,6 +8,7 @@ from torch.testing._internal.common_cuda import (
     PLATFORM_SUPPORTS_FLASH_ATTENTION,
 )
 from torch.testing._internal.common_utils import TestCase, run_tests
+from torch_tensorrt.dynamo.utils import ATOL, RTOL
 
 from ..testing_utilities import DECIMALS_OF_AGREEMENT, lower_graph_testing
 
@@ -1710,20 +1711,122 @@ class TestLowering(TestCase):
         torch._dynamo.reset()
 
         # Validate that the results between Torch and Torch-TRT are similar
-        optimized_model = torch_tensorrt.dynamo.compile(
+        trt_model = torch_tensorrt.dynamo.compile(
             exported_program, inputs, enabled_precisions={torch.half}, min_block_size=1
         )
-        optimized_model_results = optimized_model(*inputs).detach().cpu()
-        torch_model_results = fx_graph(*inputs).detach().cpu()
-
-        max_diff = float(
-            torch.max(torch.abs(optimized_model_results - torch_model_results))
+        trt_output = trt_model(*inputs).detach().cpu()
+        torch_output = fx_graph(*inputs).detach().cpu()
+        torch.testing.assert_close(
+            trt_output,
+            torch_output,
+            rtol=RTOL,
+            atol=ATOL,
+            msg="Scaled_dot_product_attention TRT outputs don't match with the original model.",
         )
-        self.assertAlmostEqual(
-            max_diff,
-            0,
-            DECIMALS_OF_AGREEMENT - 1,
-            "Scaled_dot_product_attention TRT outputs don't match with the original model.",
+
+    @parameterized.expand(
+        [
+            (True, False, None, False),
+            (False, True, 0.123, True),
+        ]
+    )
+    def test_lowering_scaled_dot_product_attention_with_dynamic_shape(
+        self, attn, is_causal, scale, enable_gqa
+    ):
+        class TestModule(torch.nn.Module):
+            def forward(self, query, key, value, attn_mask=None):
+                return torch.ops.aten.scaled_dot_product_attention.default(
+                    query,
+                    key,
+                    value,
+                    attn_mask,
+                    0.0,
+                    is_causal,
+                    scale=scale,
+                    enable_gqa=enable_gqa,
+                )
+
+        example_inputs = [
+            torch.zeros(2, 2, 16, 16, dtype=torch.half, device="cuda"),
+            torch.zeros(2, 2, 16, 16, dtype=torch.half, device="cuda"),
+            torch.zeros(2, 2, 16, 16, dtype=torch.half, device="cuda"),
+        ]
+        if attn:
+            example_inputs += [
+                torch.zeros(2, 2, 16, 16, dtype=torch.half, device="cuda")
+            ]
+
+        dim0 = torch.export.Dim("dim0", min=2, max=8)
+        dim1 = torch.export.Dim("dim1", min=2, max=8)
+        _dim2 = torch.export.Dim("dim2", min=16 // 8, max=64 // 8)
+        _dim3 = torch.export.Dim("dim3", min=16 // 8, max=64 // 8)
+        dim2 = _dim2 * 8
+        dim3 = _dim3 * 8
+
+        dynamic_shapes = {
+            "query": {0: dim0, 1: dim1, 2: dim2, 3: dim3},
+            "key": {0: dim0, 1: dim1, 2: dim2, 3: dim3},
+            "value": {0: dim0, 1: dim1, 2: dim2, 3: dim3},
+        }
+        if attn:
+            dynamic_shapes["attn_mask"] = {0: dim0, 1: dim1, 2: dim2, 3: dim3}
+
+        exported_program = torch.export.export(
+            TestModule(), tuple(example_inputs), dynamic_shapes=dynamic_shapes
+        )
+        fx_graph = exported_program.module()
+
+        inputs = [
+            torch_tensorrt.Input(
+                min_shape=(2, 2, 16, 16),
+                opt_shape=(4, 4, 32, 32),
+                max_shape=(8, 8, 64, 64),
+                dtype=torch.half,
+            ),
+            torch_tensorrt.Input(
+                min_shape=(2, 2, 16, 16),
+                opt_shape=(4, 4, 32, 32),
+                max_shape=(8, 8, 64, 64),
+                dtype=torch.half,
+            ),
+            torch_tensorrt.Input(
+                min_shape=(2, 2, 16, 16),
+                opt_shape=(4, 4, 32, 32),
+                max_shape=(8, 8, 64, 64),
+                dtype=torch.half,
+            ),
+        ]
+        if attn:
+            inputs += [
+                torch_tensorrt.Input(
+                    min_shape=(2, 2, 16, 16),
+                    opt_shape=(4, 4, 32, 32),
+                    max_shape=(8, 8, 64, 64),
+                    dtype=torch.half,
+                )
+            ]
+
+        trt_model = torch_tensorrt.dynamo.compile(
+            exported_program, inputs, enabled_precisions={torch.half}, min_block_size=1
+        )
+
+        # Validate that the results between Torch and Torch-TRT are similar
+        inputs = [
+            torch.rand(8, 8, 64, 64, dtype=torch.half, device="cuda"),
+            torch.rand(8, 8, 64, 64, dtype=torch.half, device="cuda"),
+            torch.rand(8, 8, 64, 64, dtype=torch.half, device="cuda"),
+        ]
+        if attn:
+            inputs += [torch.rand(8, 8, 64, 64, dtype=torch.half, device="cuda")]
+
+        trt_output = trt_model(*inputs).detach().cpu()
+        torch_output = fx_graph(*inputs).detach().cpu()
+        torch.testing.assert_close(
+            trt_output,
+            torch_output,
+            rtol=RTOL,
+            atol=ATOL,
+            msg="Scaled_dot_product_attention_with_dynamic_shape TRT outputs don't match with the original model.",
         )
 
     @parameterized.expand(
@@ -1772,20 +1875,17 @@ class TestLowering(TestCase):
         torch._dynamo.reset()
 
         # Validate that the results between Torch and Torch-TRT are similar
-        optimized_model = torch_tensorrt.dynamo.compile(
+        trt_model = torch_tensorrt.dynamo.compile(
             exported_program, inputs, enabled_precisions={torch.half}, min_block_size=1
         )
-        optimized_model_results = optimized_model(*inputs).detach().cpu()
-        torch_model_results = fx_graph(*inputs).detach().cpu()
-
-        max_diff = float(
-            torch.max(torch.abs(optimized_model_results - torch_model_results))
-        )
-        self.assertAlmostEqual(
-            max_diff,
-            0,
-            DECIMALS_OF_AGREEMENT - 1,
-            "Scaled_dot_product_flash_attention TRT outputs don't match with the original model.",
+        trt_output = trt_model(*inputs).detach().cpu()
+        torch_output = fx_graph(*inputs).detach().cpu()
+        torch.testing.assert_close(
+            trt_output,
+            torch_output,
+            rtol=RTOL,
+            atol=ATOL,
+            msg="Scaled_dot_product_flash_attention TRT outputs don't match with the original model.",
         )
 
     @parameterized.expand(
@@ -1838,20 +1938,17 @@ class TestLowering(TestCase):
         torch._dynamo.reset()
 
         # Validate that the results between Torch and Torch-TRT are similar
-        optimized_model = torch_tensorrt.dynamo.compile(
+        trt_model = torch_tensorrt.dynamo.compile(
             exported_program, inputs, enabled_precisions={torch.half}, min_block_size=1
         )
-        optimized_model_results = optimized_model(*inputs).detach().cpu()
-        torch_model_results = fx_graph(*inputs).detach().cpu()
-
-        max_diff = float(
-            torch.max(torch.abs(optimized_model_results - torch_model_results))
-        )
-        self.assertAlmostEqual(
-            max_diff,
-            0,
-            DECIMALS_OF_AGREEMENT - 1,
-            "Scaled_dot_product_efficient_attention TRT outputs don't match with the original model.",
+        trt_output = trt_model(*inputs).detach().cpu()
+        torch_output = fx_graph(*inputs).detach().cpu()
+        torch.testing.assert_close(
+            trt_output,
+            torch_output,
+            rtol=RTOL,
+            atol=ATOL,
+            msg="Scaled_dot_product_efficient_attention TRT outputs don't match with the original model.",
         )
 
     @parameterized.expand(
@@ -1904,20 +2001,17 @@ class TestLowering(TestCase):
         torch._dynamo.reset()
 
         # Validate that the results between Torch and Torch-TRT are similar
-        optimized_model = torch_tensorrt.dynamo.compile(
+        trt_model = torch_tensorrt.dynamo.compile(
             exported_program, inputs, enabled_precisions={torch.half}, min_block_size=1
         )
-        optimized_model_results = optimized_model(*inputs).detach().cpu()
-        torch_model_results = fx_graph(*inputs).detach().cpu()
-
-        max_diff = float(
-            torch.max(torch.abs(optimized_model_results - torch_model_results))
-        )
-        self.assertAlmostEqual(
-            max_diff,
-            0,
-            DECIMALS_OF_AGREEMENT - 1,
-            "Scaled_dot_product_cudnn_attention TRT outputs don't match with the original model.",
+        trt_output = trt_model(*inputs).detach().cpu()
+        torch_output = fx_graph(*inputs).detach().cpu()
+        torch.testing.assert_close(
+            trt_output,
+            torch_output,
+            rtol=RTOL,
+            atol=ATOL,
+            msg="Scaled_dot_product_cudnn_attention TRT outputs don't match with the original model.",
         )
 
 
