@@ -31,11 +31,11 @@ Sign up and login with your key (follow the instructions
 
 ::
 
-   # YY.MM is the yy:mm for the publishing tag for NVIDIA's Pytorch
+   # <xx.xx> is the yy:mm for the publishing tag for NVIDIA's Pytorch
    # container; eg. 24.08
    # NOTE: Use the publishing tag for both the PyTorch container and the Triton Containers
 
-   docker run -it --gpus all -v ${PWD}:/scratch_space nvcr.io/nvidia/pytorch:YY.MM-py3
+   docker run -it --gpus all -v ${PWD}:/scratch_space nvcr.io/nvidia/pytorch:<xx.xx>-py3
    cd /scratch_space
 
 With the container we can export the model in to the correct directory in our Triton model repository. This export script uses the **Dynamo** frontend for Torch-TensorRT to compile the PyTorch model to TensorRT. Then we save the model using **TorchScript** as a serialization format which is supported by Triton.
@@ -68,7 +68,7 @@ You can run the script with the following command (from ``//examples/triton``)
 
 ::
 
-  docker run --gpus all -it --rm -v ${PWD}:/triton_example nvcr.io/nvidia/pytorch:YY.MM-py3 python /triton_example/export.py
+  docker run --gpus all -it --rm -v ${PWD}:/triton_example nvcr.io/nvidia/pytorch:YY.XX-py3 python /triton_example/export.py
 
 This will save the serialized TorchScript version of the ResNet model in the right directory in the model repository.
 
@@ -142,7 +142,7 @@ with the docker command below. Refer `this page <https://catalog.ngc.nvidia.com/
 This should spin up a Triton Inference server. Next step, building a simple
 http client to query the server.
 
-Step 3: Building a Triton Client to Query the Servers
+Step 3: Building a Triton Client to Query the Server
 ----------------------------------------------------
 
 Before proceeding, make sure to have a sample image on hand. If you don't
