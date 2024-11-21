@@ -3,6 +3,7 @@ from collections import defaultdict
 from typing import Any, List
 
 import torch
+from torch._library.fake_class_registry import FakeScriptObject
 from torch_tensorrt.dynamo.utils import input_is_dynamic, unwrap_tensor_shape
 
 
@@ -137,6 +138,9 @@ class FakeTRTEngine:
         pass
 
     def infer_outputs(self, input_shapes: List[Any]) -> Any:
+        pass
+
+    def set_whole_cudagraphs(self) -> Any:
         pass
 
     def __setstate__(self, serialized_state: List[str]) -> Any:

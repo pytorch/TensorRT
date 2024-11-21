@@ -189,6 +189,11 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         return self._set_device_memory_budget(budget_bytes)
 
     def set_whole_cudagraphs(self, enable: bool) -> None:
+        """
+        When the global CUDA graphs mode is enabled, the parent wrapper module handles all
+        CUDA graph recording and replay. Therefore, any child modules must disable their
+        own CUDA graph functionality to avoid conflicts.
+        """
         self.whole_cudagraphs = enable
 
     def setup_engine(self) -> None:
@@ -349,7 +354,8 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
             (i.contiguous() if isinstance(i, torch.Tensor) else torch.tensor(i).cuda())
             for i in inputs
         ]
-
+        # TODO: calculate output shape under fakeTensorMode
+        # fake_mode = detect_fake_mode(*inputs)
         with (
             torch.autograd.profiler.record_function("PythonTorchTensorRTModule:Forward")
             if self.profiling_enabled

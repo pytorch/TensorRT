@@ -31,13 +31,11 @@ class WrapperTorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
 
     def __init__(
         self,
-        original_module: torch.nn.Module,
         compiled_module: torch.nn.Module,
         output_shapes: List[torch.Size],
         output_dtypes: List[torch.dtype],
     ):
         super(WrapperTorchTensorRTModule, self).__init__()
-        self.original_module = original_module
         self.compiled_module = compiled_module
         self.inputs = partitioning.construct_submodule_inputs(compiled_module)
         self.output_shapes = output_shapes
@@ -48,7 +46,7 @@ class WrapperTorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         self.cudagraph: Optional[torch.cuda.CUDAGraph] = None
         self.shape_key: Optional[str] = None
         self.profiling_enabled = False
-        self.cudagraphs_enabled = False
+        self.prev_cudagraphs_enabled = False
         self._caller_stream: Optional[torch.cuda.Stream] = None
         self._engine_stream: Optional[torch.cuda.Stream] = None
         self.input_is_dynamic = input_is_dynamic(self.inputs)
@@ -57,20 +55,27 @@ class WrapperTorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         for name, rt_mod in self.compiled_module.named_children():
             if "_run_on_acc" in name:
                 rt_mod.set_whole_cudagraphs(True)
+        self.warm_up()
 
-        # Warm up is necessary to ensure that memory allocations and initializations are not recorded in cuda graphs
-        with unset_fake_temporarily():
-            inputs_tensor = [spec.torch_tensor.cuda() for spec in self.inputs]
-            s = torch.cuda.Stream()
-            s.wait_stream(torch.cuda.current_stream())
-            with torch.cuda.stream(s):
-                for _ in range(3):
-                    self.compiled_module(*inputs_tensor)
-            torch.cuda.current_stream().wait_stream(s)
+    def warm_up(self) -> None:
+        """
+        Warm up is necessary to ensure that memory allocations and initializations
+        are not recorded in cuda graphs
+        """
+        with torch_tensorrt.logging.errors():
+            with unset_fake_temporarily():
+                inputs_tensor = [spec.torch_tensor.cuda() for spec in self.inputs]
+                s = torch.cuda.Stream()
+                s.wait_stream(torch.cuda.current_stream())
+                with torch.cuda.stream(s):
+                    for _ in range(3):
+                        self.compiled_module(*inputs_tensor)
+                torch.cuda.current_stream().wait_stream(s)
 
     def validate_input_shapes(self, inputs: Sequence[torch.Tensor]) -> bool:
         """
         Validates the input shapes of the forward function has changed
+        And infer output shapes if dynamic input shape has changed.
         """
         # Representation of input shapes to a given model
         # Shapes are concatenated as so:
@@ -83,13 +88,12 @@ class WrapperTorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
             self.shape_key = new_shape_key
 
             if self.input_is_dynamic:
-                with FakeTensorMode() as mode:
-                    fake_inputs = [mode.from_tensor(input) for input in inputs]
-                    tmp_outputs = self.original_module(*fake_inputs)
+                with FakeTensorMode(allow_non_fake_inputs=True):
+                    tmp_outputs = self.compiled_module(*inputs)
                 if not isinstance(tmp_outputs, (list, tuple)):
                     tmp_outputs = [tmp_outputs]
                 self.output_shapes = [tuple(output.shape) for output in tmp_outputs]
-
+                print("self.output_shapes ", self.output_shapes)
             return True
 
         return False
@@ -114,11 +118,10 @@ class WrapperTorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
             shape_changed = self.validate_input_shapes(inputs)
             cudagraphs_enabled = torch_tensorrt.runtime.get_cudagraphs_mode()
             # Cudagraphs record is required if cudagraphs_enabled is toggled to True regardless of shape change
-            if not self.cudagraphs_enabled and cudagraphs_enabled:
-                need_cudagraphs_record = True
-            else:
-                need_cudagraphs_record = cudagraphs_enabled and shape_changed
-            self.cudagraphs_enabled = cudagraphs_enabled
+            need_cudagraphs_record = cudagraphs_enabled and (
+                (not self.prev_cudagraphs_enabled) or shape_changed
+            )
+            self.prev_cudagraphs_enabled = cudagraphs_enabled
 
             if need_cudagraphs_record:
                 if self.cudagraph:
@@ -282,4 +285,5 @@ class WrapperTorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
 
                 return outputs
             else:
+
                 return outputs

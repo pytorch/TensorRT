@@ -132,7 +132,6 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         self.weight_name_map = weight_name_map
         self.serialized_engine = serialized_engine
         self.engine = None
-        self.cudagraphs_enabled_parent_module = False
 
         if (
             serialized_engine
@@ -198,6 +197,11 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         return budget_bytes
 
     def set_whole_cudagraphs(self, enable: bool) -> None:
+        """
+        When the global CUDA graphs mode is enabled, the parent wrapper module handles all
+        CUDA graph recording and replay. Therefore, any child modules must disable their
+        own CUDA graph functionality to avoid conflicts.
+        """
         self.engine.set_whole_cudagraphs(enable)
 
     def setup_engine(self) -> None:
