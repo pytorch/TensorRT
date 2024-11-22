@@ -119,7 +119,7 @@ jobs:
         export CI_BUILD=1
         pushd .
         cd tests/py/dynamo
-        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/dynamo_converters_test_results.xml -n 2 conversion/
+        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/dynamo_converters_test_results.xml -n 1 conversion/
         popd
 
   tests-py-dynamo-fe:
