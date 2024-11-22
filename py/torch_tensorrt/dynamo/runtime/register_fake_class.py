@@ -26,7 +26,7 @@ def fake_tensorrt_execute_engine(
         modes = ["opt"]
 
     # Get the TRTEngine class and infer output shapes based on input shapes
-    trt_engine = fake_trt_engine.wrapped_obj.engine
+    trt_engine = fake_trt_engine.real_obj
     outputs_mode_dict = defaultdict(list)
     for mode in modes:
         input_shapes = [unwrap_tensor_shape(input, mode=mode) for input in inputs]
@@ -79,7 +79,7 @@ def fake_tensorrt_execute_engine(
 @torch._library.register_fake_class("tensorrt::Engine")
 class FakeTRTEngine:
     def __init__(self, engine_info: List[str]) -> None:
-        self.engine = torch.classes.tensorrt.Engine(engine_info)
+        self.engine_info = engine_info
 
     @classmethod
     def __obj_unflatten__(cls, flattened_tq: Any) -> Any:
@@ -126,4 +126,7 @@ class FakeTRTEngine:
         pass
 
     def __setstate__(self, serialized_state: List[str]) -> Any:
+        pass
+
+    def __getstate__(self) -> Any:
         pass
