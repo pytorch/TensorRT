@@ -282,13 +282,3 @@ class PluginCreator(trt.IPluginCreatorV3One):  # type: ignore[misc]
         
         return custom_plugin
 
-
-# Looks like deserilaize required? Not found in the example here: https://github.com/NVIDIA/TensorRT/blob/main/samples/python/python_plugin/circ_pad_plugin_multi_tactic.py
-    # def deserialize_plugin(self, name: str, data: bytes) -> CircularPaddingPlugin:
-    #     dict = pkl.loads(data)
-    #     deserialized = <PLUGIN CLASS>()
-    #     deserialized.__dict__.update(dict)
-    #     return deserialized
-
-# TRT_PLUGIN_REGISTRY = trt.get_plugin_registry()
-# TRT_PLUGIN_REGISTRY.register_creator(CircularPaddingPluginCreator(), "") 
