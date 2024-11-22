@@ -411,13 +411,24 @@ class TestWeightStrippedEngine(TestCase):
         )
 
     def test_different_args_dont_share_cached_engine(self):
-        pyt_model = models.resnet18(pretrained=True).eval().to("cuda")
+        class MyModel(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.conv = torch.nn.Conv2d(3, 4, 3, stride=1, bias=True)
+                self.relu = torch.nn.ReLU()
+
+            def forward(self, x):
+                out = self.conv(x)
+                out = self.relu(out)
+                return out
+
+        pyt_model = MyModel().eval().to("cuda")
 
         engine_cache_dir = "/tmp/test_different_args_dont_share_cached_engine"
         if os.path.exists(engine_cache_dir):
             shutil.rmtree(engine_cache_dir)
 
-        inputs = [torch.rand((128, 3, 224, 224)).to("cuda")]
+        inputs = [torch.rand((4, 3, 32, 32)).to("cuda")]
 
         for i in range(2):
             if i == 0:
