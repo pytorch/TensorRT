@@ -1689,12 +1689,12 @@ class TestLowering(TestCase):
         unexpected_ops = {torch.ops.aten.scaled_dot_product_attention.default}
 
         inputs = [
-            torch.rand(2, 4, 8, 16, dtype=torch.half, device="cuda"),
-            torch.rand(2, 4, 8, 16, dtype=torch.half, device="cuda"),
-            torch.rand(2, 4, 8, 16, dtype=torch.half, device="cuda"),
+            torch.rand(1, 3, 8, 16, dtype=torch.half, device="cuda"),
+            torch.rand(1, 3, 8, 16, dtype=torch.half, device="cuda"),
+            torch.rand(1, 3, 8, 16, dtype=torch.half, device="cuda"),
         ]
         if attn:
-            inputs += [torch.rand(2, 4, 8, 8, dtype=torch.half, device="cuda")]
+            inputs += [torch.rand(1, 3, 8, 8, dtype=torch.half, device="cuda")]
 
         exported_program = torch.export.export(TestModule(), tuple(inputs))
         fx_graph = exported_program.module()
@@ -1714,11 +1714,9 @@ class TestLowering(TestCase):
         trt_model = torch_tensorrt.dynamo.compile(
             exported_program, inputs, enabled_precisions={torch.half}, min_block_size=1
         )
-        trt_output = trt_model(*inputs).detach().cpu()
-        torch_output = fx_graph(*inputs).detach().cpu()
         torch.testing.assert_close(
-            trt_output,
-            torch_output,
+            trt_model(*inputs),
+            fx_graph(*inputs),
             rtol=RTOL,
             atol=ATOL,
             msg="Scaled_dot_product_attention TRT outputs don't match with the original model.",
@@ -1747,19 +1745,19 @@ class TestLowering(TestCase):
                 )
 
         example_inputs = [
-            torch.zeros(2, 2, 16, 16, dtype=torch.half, device="cuda"),
-            torch.zeros(2, 2, 16, 16, dtype=torch.half, device="cuda"),
-            torch.zeros(2, 2, 16, 16, dtype=torch.half, device="cuda"),
+            torch.zeros(2, 2, 16, 32, dtype=torch.half, device="cuda"),
+            torch.zeros(2, 2, 16, 32, dtype=torch.half, device="cuda"),
+            torch.zeros(2, 2, 16, 32, dtype=torch.half, device="cuda"),
         ]
         if attn:
             example_inputs += [
                 torch.zeros(2, 2, 16, 16, dtype=torch.half, device="cuda")
             ]
 
-        dim0 = torch.export.Dim("dim0", min=2, max=8)
+        dim0 = torch.export.Dim("dim0", min=2, max=4)
         dim1 = torch.export.Dim("dim1", min=2, max=8)
         _dim2 = torch.export.Dim("dim2", min=16 // 8, max=64 // 8)
-        _dim3 = torch.export.Dim("dim3", min=16 // 8, max=64 // 8)
+        _dim3 = torch.export.Dim("dim3", min=32 // 8, max=128 // 8)
         dim2 = _dim2 * 8
         dim3 = _dim3 * 8
 
@@ -1769,7 +1767,7 @@ class TestLowering(TestCase):
             "value": {0: dim0, 1: dim1, 2: dim2, 3: dim3},
         }
         if attn:
-            dynamic_shapes["attn_mask"] = {0: dim0, 1: dim1, 2: dim2, 3: dim3}
+            dynamic_shapes["attn_mask"] = {0: dim0, 1: dim1, 2: dim2, 3: dim2}
 
         exported_program = torch.export.export(
             TestModule(), tuple(example_inputs), dynamic_shapes=dynamic_shapes
@@ -1778,21 +1776,21 @@ class TestLowering(TestCase):
 
         inputs = [
             torch_tensorrt.Input(
-                min_shape=(2, 2, 16, 16),
-                opt_shape=(4, 4, 32, 32),
-                max_shape=(8, 8, 64, 64),
+                min_shape=(2, 2, 16, 32),
+                opt_shape=(3, 4, 32, 64),
+                max_shape=(4, 8, 64, 128),
                 dtype=torch.half,
             ),
             torch_tensorrt.Input(
-                min_shape=(2, 2, 16, 16),
-                opt_shape=(4, 4, 32, 32),
-                max_shape=(8, 8, 64, 64),
+                min_shape=(2, 2, 16, 32),
+                opt_shape=(3, 4, 32, 64),
+                max_shape=(4, 8, 64, 128),
                 dtype=torch.half,
             ),
             torch_tensorrt.Input(
-                min_shape=(2, 2, 16, 16),
-                opt_shape=(4, 4, 32, 32),
-                max_shape=(8, 8, 64, 64),
+                min_shape=(2, 2, 16, 32),
+                opt_shape=(3, 4, 32, 64),
+                max_shape=(4, 8, 64, 128),
                 dtype=torch.half,
             ),
         ]
@@ -1800,8 +1798,8 @@ class TestLowering(TestCase):
             inputs += [
                 torch_tensorrt.Input(
                     min_shape=(2, 2, 16, 16),
-                    opt_shape=(4, 4, 32, 32),
-                    max_shape=(8, 8, 64, 64),
+                    opt_shape=(3, 4, 32, 32),
+                    max_shape=(4, 8, 64, 64),
                     dtype=torch.half,
                 )
             ]
@@ -1812,18 +1810,16 @@ class TestLowering(TestCase):
 
         # Validate that the results between Torch and Torch-TRT are similar
         inputs = [
-            torch.rand(8, 8, 64, 64, dtype=torch.half, device="cuda"),
-            torch.rand(8, 8, 64, 64, dtype=torch.half, device="cuda"),
-            torch.rand(8, 8, 64, 64, dtype=torch.half, device="cuda"),
+            torch.rand(4, 8, 64, 128, dtype=torch.half, device="cuda"),
+            torch.rand(4, 8, 64, 128, dtype=torch.half, device="cuda"),
+            torch.rand(4, 8, 64, 128, dtype=torch.half, device="cuda"),
         ]
         if attn:
-            inputs += [torch.rand(8, 8, 64, 64, dtype=torch.half, device="cuda")]
+            inputs += [torch.rand(4, 8, 64, 64, dtype=torch.half, device="cuda")]
 
-        trt_output = trt_model(*inputs).detach().cpu()
-        torch_output = fx_graph(*inputs).detach().cpu()
         torch.testing.assert_close(
-            trt_output,
-            torch_output,
+            trt_model(*inputs),
+            fx_graph(*inputs),
             rtol=RTOL,
             atol=ATOL,
             msg="Scaled_dot_product_attention_with_dynamic_shape TRT outputs don't match with the original model.",
@@ -1855,9 +1851,9 @@ class TestLowering(TestCase):
         unexpected_ops = {torch.ops.aten._scaled_dot_product_flash_attention.default}
 
         inputs = [
-            torch.rand(2, 4, 8, 16, dtype=torch.half, device="cuda"),
-            torch.rand(2, 4, 8, 16, dtype=torch.half, device="cuda"),
-            torch.rand(2, 4, 8, 16, dtype=torch.half, device="cuda"),
+            torch.rand(1, 3, 8, 16, dtype=torch.half, device="cuda"),
+            torch.rand(1, 3, 8, 16, dtype=torch.half, device="cuda"),
+            torch.rand(1, 3, 8, 16, dtype=torch.half, device="cuda"),
         ]
 
         exported_program = torch.export.export(TestModule(), tuple(inputs))
@@ -1878,11 +1874,9 @@ class TestLowering(TestCase):
         trt_model = torch_tensorrt.dynamo.compile(
             exported_program, inputs, enabled_precisions={torch.half}, min_block_size=1
         )
-        trt_output = trt_model(*inputs).detach().cpu()
-        torch_output = fx_graph(*inputs).detach().cpu()
         torch.testing.assert_close(
-            trt_output,
-            torch_output,
+            trt_model(*inputs),
+            fx_graph(*inputs),
             rtol=RTOL,
             atol=ATOL,
             msg="Scaled_dot_product_flash_attention TRT outputs don't match with the original model.",
@@ -1916,12 +1910,12 @@ class TestLowering(TestCase):
         }
 
         inputs = [
-            torch.rand(2, 4, 8, 16, dtype=torch.half, device="cuda"),
-            torch.rand(2, 4, 8, 16, dtype=torch.half, device="cuda"),
-            torch.rand(2, 4, 8, 16, dtype=torch.half, device="cuda"),
+            torch.rand(1, 3, 8, 16, dtype=torch.half, device="cuda"),
+            torch.rand(1, 3, 8, 16, dtype=torch.half, device="cuda"),
+            torch.rand(1, 3, 8, 16, dtype=torch.half, device="cuda"),
         ]
         if attn:
-            inputs += [torch.rand(2, 4, 8, 8, dtype=torch.half, device="cuda")]
+            inputs += [torch.rand(1, 3, 8, 8, dtype=torch.half, device="cuda")]
 
         exported_program = torch.export.export(TestModule(), tuple(inputs))
         fx_graph = exported_program.module()
@@ -1941,11 +1935,9 @@ class TestLowering(TestCase):
         trt_model = torch_tensorrt.dynamo.compile(
             exported_program, inputs, enabled_precisions={torch.half}, min_block_size=1
         )
-        trt_output = trt_model(*inputs).detach().cpu()
-        torch_output = fx_graph(*inputs).detach().cpu()
         torch.testing.assert_close(
-            trt_output,
-            torch_output,
+            trt_model(*inputs),
+            fx_graph(*inputs),
             rtol=RTOL,
             atol=ATOL,
             msg="Scaled_dot_product_efficient_attention TRT outputs don't match with the original model.",
@@ -1979,12 +1971,12 @@ class TestLowering(TestCase):
         unexpected_ops = {torch.ops.aten._scaled_dot_product_cudnn_attention.default}
 
         inputs = [
-            torch.rand(2, 4, 8, 16, dtype=torch.half, device="cuda"),
-            torch.rand(2, 4, 8, 16, dtype=torch.half, device="cuda"),
-            torch.rand(2, 4, 8, 16, dtype=torch.half, device="cuda"),
+            torch.rand(1, 3, 8, 16, dtype=torch.half, device="cuda"),
+            torch.rand(1, 3, 8, 16, dtype=torch.half, device="cuda"),
+            torch.rand(1, 3, 8, 16, dtype=torch.half, device="cuda"),
         ]
         if attn:
-            inputs += [torch.rand(2, 4, 8, 8, dtype=torch.half, device="cuda")]
+            inputs += [torch.rand(1, 3, 8, 8, dtype=torch.half, device="cuda")]
 
         exported_program = torch.export.export(TestModule(), tuple(inputs))
         fx_graph = exported_program.module()
@@ -2004,11 +1996,9 @@ class TestLowering(TestCase):
         trt_model = torch_tensorrt.dynamo.compile(
             exported_program, inputs, enabled_precisions={torch.half}, min_block_size=1
         )
-        trt_output = trt_model(*inputs).detach().cpu()
-        torch_output = fx_graph(*inputs).detach().cpu()
         torch.testing.assert_close(
-            trt_output,
-            torch_output,
+            trt_model(*inputs),
+            fx_graph(*inputs),
             rtol=RTOL,
             atol=ATOL,
             msg="Scaled_dot_product_cudnn_attention TRT outputs don't match with the original model.",
