@@ -1804,11 +1804,13 @@ class TestLowering(TestCase):
                 )
             ]
 
+        torch._dynamo.reset()
+
+        # Validate that the results between Torch and Torch-TRT are similar
         trt_model = torch_tensorrt.dynamo.compile(
             exported_program, inputs, enabled_precisions={torch.half}, min_block_size=1
         )
 
-        # Validate that the results between Torch and Torch-TRT are similar
         inputs = [
             torch.rand(4, 8, 64, 128, dtype=torch.half, device="cuda"),
             torch.rand(4, 8, 64, 128, dtype=torch.half, device="cuda"),
