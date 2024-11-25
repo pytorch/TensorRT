@@ -23,6 +23,40 @@ from torch_tensorrt.runtime._utils import (
 logger = logging.getLogger(__name__)
 
 
+class TorchTRTRuntimeStates:
+    def __init__(self, cudagraphs_enabled: bool, pre_allocated_outputs_enabled: bool):
+        self.prev_cudagraphs_enabled = cudagraphs_enabled
+        self.prev_pre_allocated_outputs_enabled = pre_allocated_outputs_enabled
+
+    def validate_states(
+        self,
+        cudagraphs_enabled: bool,
+        pre_allocated_outputs_enabled: bool,
+        shape_changed: bool,
+    ) -> Tuple[bool, bool]:
+        # Evaluates whether certain conditions are met to enable CUDA Graph recording or to reuse pre-allocated outputs
+        # based on the current and previous states, as well as input shape has changed
+        need_cudagraphs_record = False
+        can_use_pre_allocated_outputs = False
+
+        # Cudagraphs record is required if cudagraphs_enabled is switched to True regardless of shape change
+        if cudagraphs_enabled and (not self.prev_cudagraphs_enabled or shape_changed):
+            need_cudagraphs_record = True
+
+        # Pre-allocated output can be used when previous and current state are true without shape change
+        if (
+            self.prev_pre_allocated_outputs_enabled
+            and pre_allocated_outputs_enabled
+            and (not shape_changed)
+        ):
+            can_use_pre_allocated_outputs = True
+
+        self.prev_cudagraphs_enabled = cudagraphs_enabled
+        self.prev_pre_allocated_outputs_enabled = pre_allocated_outputs_enabled
+
+        return need_cudagraphs_record, can_use_pre_allocated_outputs
+
+
 class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
     """PythonTorchTensorRTModule is a PyTorch module which encompasses an arbitrary TensorRT Engine.
 
@@ -108,7 +142,9 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         self.engine = None
         self.weight_name_map = weight_name_map
         self.target_platform = Platform.current_platform()
-        self.prev_cudagraphs_enabled = False
+        self.runtime_states = TorchTRTRuntimeStates(
+            torch_tensorrt.runtime.get_cudagraphs_mode(), False
+        )
         self.pre_allocated_outputs: List[torch.Tensor] = []
         self.use_pre_allocated_outputs = False
 
@@ -319,13 +355,11 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
 
             cudagraphs_enabled = torch_tensorrt.runtime.get_cudagraphs_mode()
             shape_changed = self.validate_input_shapes(inputs)
-            # Cudagraphs record is required if cudagraphs_enabled is toggled to True regardless of shape change
-            if not self.prev_cudagraphs_enabled and cudagraphs_enabled:
-                need_cudagraphs_record = True
-            else:
-                need_cudagraphs_record = cudagraphs_enabled and shape_changed
-
-            self.prev_cudagraphs_enabled = cudagraphs_enabled
+            need_cudagraphs_record, can_use_pre_allocated_outputs = (
+                self.runtime_states.validate_states(
+                    cudagraphs_enabled, self.use_pre_allocated_outputs, shape_changed
+                )
+            )
 
             if need_cudagraphs_record:
                 if self.cudagraph:
@@ -400,7 +434,9 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                 if self.profiling_enabled
                 else nullcontext()
             ):
-                if not self.use_pre_allocated_outputs or shape_changed:
+                if can_use_pre_allocated_outputs:
+                    outputs = self.pre_allocated_outputs
+                else:
                     self.output_shapes = [
                         tuple(self.context.get_tensor_shape(output_name))
                         for output_name in self.output_names
@@ -410,8 +446,6 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                             "Encountered dynamic output shapes during runtime. This could mean the network has data-dependent output shapes which is not currently supported."
                         )
                     outputs = self.create_output_tensors()
-                else:
-                    outputs = self.pre_allocated_outputs
 
                 for o, output_name in enumerate(self.output_names):
 

@@ -205,10 +205,9 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
   bool shape_changed = _validate_shapes(inputs, compiled_engine);
 
   // Whether cudagraphs needs to record the graph on this pass
-  // Cudagraphs record is required if cudagraphs_enabled is switched to True regardless of shape change
-  bool need_cudagraphs_record =
-      (((!compiled_engine->prev_cudagraphs_enabled) && CUDAGRAPHS_MODE) || (CUDAGRAPHS_MODE && shape_changed));
-  compiled_engine->prev_cudagraphs_enabled = CUDAGRAPHS_MODE;
+  RuntimeStates states = compiled_engine->runtime_states.validate_states(
+      CUDAGRAPHS_MODE, compiled_engine->use_pre_allocated_outputs, shape_changed);
+  bool need_cudagraphs_record = states.need_cudagraphs_record;
 
   if (!CUDAGRAPHS_MODE || shape_changed) {
     compiled_engine->cudagraph.reset();
@@ -291,10 +290,10 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
       output_profiler_guard =
           std::make_unique<torch::autograd::profiler::RecordProfile>(compiled_engine->output_profile_path);
     }
-    if (!compiled_engine->use_pre_allocated_outputs || shape_changed) {
-      outputs = create_output_tensors(compiled_engine);
-    } else {
+    if (states.can_use_pre_allocated_outputs) {
       outputs = compiled_engine->pre_allocated_outputs;
+    } else {
+      outputs = create_output_tensors(compiled_engine);
     }
 
     for (auto output_indices : compiled_engine->out_binding_map) {

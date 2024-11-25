@@ -30,6 +30,37 @@ using FlattenedState = std::tuple<
     std::tuple<std::string, std::string>, // serialized metadata
     std::tuple<std::string, std::string>>; // Platform
 
+struct RuntimeStates {
+  bool need_cudagraphs_record;
+  bool can_use_pre_allocated_outputs;
+};
+
+struct TorchTRTRuntimeStates {
+  // Previous runtime states
+  bool prev_cudagraphs_enabled, prev_pre_allocated_outputs_enabled;
+
+  // Evaluates whether certain conditions are met to enable CUDA Graph recording or to reuse pre-allocated outputs
+  // based on the current and previous states, as well as input shape has changed
+  RuntimeStates validate_states(bool cudagraphs_enabled, bool pre_allocated_outputs_enabled, bool shape_changed) {
+    bool need_cudagraphs_record = false;
+    bool can_use_pre_allocated_outputs = false;
+
+    // Cudagraphs record is required if cudagraphs_enabled is switched to True regardless of shape change
+    if (cudagraphs_enabled && (!prev_cudagraphs_enabled || shape_changed)) {
+      need_cudagraphs_record = true;
+    }
+    // Pre-allocated output can be used when previous and current state are true without shape change
+    if (prev_pre_allocated_outputs_enabled && pre_allocated_outputs_enabled && !shape_changed) {
+      can_use_pre_allocated_outputs = true;
+    }
+    prev_cudagraphs_enabled = cudagraphs_enabled;
+    prev_pre_allocated_outputs_enabled = pre_allocated_outputs_enabled;
+
+    RuntimeStates values = {need_cudagraphs_record, can_use_pre_allocated_outputs};
+    return values;
+  }
+};
+
 struct TRTEngine : torch::CustomClassHolder {
   // Each engine needs it's own runtime object
   std::shared_ptr<nvinfer1::IRuntime> rt;
@@ -89,6 +120,7 @@ struct TRTEngine : torch::CustomClassHolder {
   int64_t get_automatic_device_memory_budget();
   std::vector<at::Tensor> infer_outputs(std::vector<std::vector<int64_t>> input_shapes);
   void set_pre_allocated_outputs(bool enable);
+  TorchTRTRuntimeStates runtime_states;
   friend std::ostream& operator<<(std::ostream& os, const TRTEngine& engine);
   static const char BINDING_DELIM = '%';
 
@@ -103,8 +135,7 @@ struct TRTEngine : torch::CustomClassHolder {
   std::vector<at::Tensor> input_buffers = {};
   std::vector<at::Tensor> output_buffers = {};
   std::string shape_key = "None";
-  bool prev_cudagraphs_enabled = false;
-  bool use_pre_allocated_outputs = true;
+  bool use_pre_allocated_outputs = false;
   std::vector<at::Tensor> pre_allocated_outputs;
 
   // TODO: Implement a call method
