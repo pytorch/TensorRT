@@ -79,7 +79,15 @@ def fake_tensorrt_execute_engine(
 @torch._library.register_fake_class("tensorrt::Engine")
 class FakeTRTEngine:
     def __init__(self, engine_info: List[str]) -> None:
-        self.engine_info = engine_info
+        self.version = engine_info[torch.ops.tensorrt.ABI_TARGET_IDX()]
+        self.name = engine_info[torch.ops.tensorrt.NAME_IDX()]
+        self.device_info = engine_info[torch.ops.tensorrt.DEVICE_IDX()]
+        self.serialized_engine = engine_info[torch.ops.tensorrt.ENGINE_IDX()]
+        self.in_binding_names = engine_info[torch.ops.tensorrt.INPUT_BINDING_NAMES_IDX()]
+        self.out_binding_names = engine_info[torch.ops.tensorrt.OUTPUT_BINDING_NAMES_IDX()]
+        self.hardware_compatible = engine_info[torch.ops.tensorrt.HW_COMPATIBLE_IDX()]
+        self.serialized_metadata = engine_info[torch.ops.tensorrt.SERIALIZED_METADATA_IDX()]
+        self.target_platform = engine_info[torch.ops.tensorrt.TARGET_PLATFORM_IDX()]
 
     @classmethod
     def __obj_unflatten__(cls, flattened_tq: Any) -> Any:
