@@ -10,6 +10,7 @@ from torch_tensorrt.dynamo.conversion import impl
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
 from torch_tensorrt.dynamo.conversion.converter_utils import (
     SourceIR,
+    cast_trt_tensor,
     extend_attr_to_tuple,
     get_trt_tensor,
     to_numpy,
@@ -52,7 +53,7 @@ def convNd(
     # Process bias terms
     if isinstance(bias, (torch.Tensor, np.ndarray)):
         # Transform the bias constant into a Numpy array
-        bias = to_numpy(bias)
+        bias = to_numpy(bias, dtype=input.dtype)
 
     elif isinstance(bias, TRTTensor):
         bias = get_trt_tensor(ctx, bias, f"{name}_bias")
@@ -73,7 +74,7 @@ def convNd(
 
     elif isinstance(weight, (torch.Tensor, np.ndarray)):
         # Transform the weight constant into a Numpy array
-        weight = to_numpy(weight)
+        weight = to_numpy(weight, dtype=input.dtype)
 
         # Append new dimension (unsqueeze) if the convolution is 1d
         if is_conv1d:
@@ -92,13 +93,14 @@ def convNd(
         kernel=trt.Weights() if isinstance(weight, TRTTensor) else weight,
         bias=trt.Weights() if isinstance(bias, TRTTensor) else bias,
     )
-
     # If the weight is a TRTTensor, set it as an input of the layer
     if isinstance(weight, TRTTensor):
+        weight = cast_trt_tensor(ctx, weight, input.dtype, name)
         conv_layer.set_input(1, weight)
 
     # If the bias is a TRTTensor, set it as an input of the layer
     if isinstance(bias, TRTTensor):
+        bias = cast_trt_tensor(ctx, bias, input.dtype, name)
         conv_layer.set_input(2, bias)
 
     # Cast certain fields to tuples, in accordance with TRT requirements

@@ -239,9 +239,7 @@ class TestLazyEngineInit(TestCase):
         trt_mod = torchtrt.compile(model, **compile_spec)
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            torch_tensorrt.save(
-                trt_mod, os.path.join(tmpdir, "tmp_trt_mod.ep"), inputs=[input]
-            )
+            torch_tensorrt.save(trt_mod, os.path.join(tmpdir, "tmp_trt_mod.ep"))
             new_trt_mod = torch.export.load(os.path.join(tmpdir, "tmp_trt_mod.ep"))
 
         loaded_trt_mod = new_trt_mod.module()

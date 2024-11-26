@@ -66,7 +66,7 @@ jobs:
 
   tests-py-torchscript-fe:
     name: Test torchscript frontend [Python]
-    needs: [generate-matrix, build]
+    needs: [substitute-runner, build]
     strategy:
       fail-fast: false
       matrix:
@@ -80,7 +80,7 @@ jobs:
       ref: ""
       test-infra-repository: pytorch/test-infra
       test-infra-ref: main
-      build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
+      build-matrix: ${{ needs.substitute-runner.outputs.matrix }}
       pre-script: packaging/driver_upgrade.bat
       script: |
         export USE_HOST_DEPS=1
@@ -98,7 +98,7 @@ jobs:
 
   tests-py-dynamo-converters:
     name: Test dynamo converters [Python]
-    needs: [generate-matrix, build]
+    needs: [substitute-runner, build]
     strategy:
       fail-fast: false
       matrix:
@@ -112,7 +112,7 @@ jobs:
       ref: ""
       test-infra-repository: pytorch/test-infra
       test-infra-ref: main
-      build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
+      build-matrix: ${{ needs.substitute-runner.outputs.matrix }}
       pre-script: packaging/driver_upgrade.bat
       script: |
         export USE_HOST_DEPS=1
@@ -124,7 +124,7 @@ jobs:
 
   tests-py-dynamo-fe:
     name: Test dynamo frontend [Python]
-    needs: [generate-matrix, build]
+    needs: [substitute-runner, build]
     strategy:
       fail-fast: false
       matrix:
@@ -138,7 +138,7 @@ jobs:
       ref: ""
       test-infra-repository: pytorch/test-infra
       test-infra-ref: main
-      build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
+      build-matrix: ${{ needs.substitute-runner.outputs.matrix }}
       pre-script: packaging/driver_upgrade.bat
       script: |
         export USE_HOST_DEPS=1
@@ -150,7 +150,7 @@ jobs:
 
   tests-py-dynamo-serde:
     name: Test dynamo export serde [Python]
-    needs: [generate-matrix, build]
+    needs: [substitute-runner, build]
     strategy:
       fail-fast: false
       matrix:
@@ -164,7 +164,7 @@ jobs:
       ref: ""
       test-infra-repository: pytorch/test-infra
       test-infra-ref: main
-      build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
+      build-matrix: ${{ needs.substitute-runner.outputs.matrix }}
       pre-script: packaging/driver_upgrade.bat
       script: |
         export USE_HOST_DEPS=1
@@ -172,11 +172,12 @@ jobs:
         pushd .
         cd tests/py/dynamo
         python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/export_serde_test_results.xml --ir dynamo models/test_export_serde.py
+        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/reexport_test_results.xml --ir dynamo models/test_reexport.py
         popd
 
   tests-py-torch-compile-be:
     name: Test torch compile backend [Python]
-    needs: [generate-matrix, build]
+    needs: [substitute-runner, build]
     strategy:
       fail-fast: false
       matrix:
@@ -190,7 +191,7 @@ jobs:
       ref: ""
       test-infra-repository: pytorch/test-infra
       test-infra-ref: main
-      build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
+      build-matrix: ${{ needs.substitute-runner.outputs.matrix }}
       pre-script: packaging/driver_upgrade.bat
       script: |
         export USE_HOST_DEPS=1
@@ -204,7 +205,7 @@ jobs:
 
   tests-py-dynamo-core:
     name: Test dynamo core [Python]
-    needs: [generate-matrix, build]
+    needs: [substitute-runner, build]
     strategy:
       fail-fast: false
       matrix:
@@ -218,7 +219,7 @@ jobs:
       ref: ""
       test-infra-repository: pytorch/test-infra
       test-infra-ref: main
-      build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
+      build-matrix: ${{ needs.substitute-runner.outputs.matrix }}
       pre-script: packaging/driver_upgrade.bat
       script: |
         export USE_HOST_DEPS=1
@@ -232,7 +233,7 @@ jobs:
 
   tests-py-dynamo-cudagraphs:
     name: Test dynamo cudagraphs [Python]
-    needs: [generate-matrix, build]
+    needs: [substitute-runner, build]
     strategy:
       fail-fast: false
       matrix:
@@ -246,7 +247,7 @@ jobs:
       ref: ""
       test-infra-repository: pytorch/test-infra
       test-infra-ref: main
-      build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
+      build-matrix: ${{ needs.substitute-runner.outputs.matrix }}
       pre-script: packaging/driver_upgrade.bat
       script: |
         export USE_HOST_DEPS=1
@@ -259,7 +260,7 @@ jobs:
 
   tests-py-core:
     name: Test core [Python]
-    needs: [generate-matrix, build]
+    needs: [substitute-runner, build]
     strategy:
       fail-fast: false
       matrix:
@@ -273,7 +274,7 @@ jobs:
       ref: ""
       test-infra-repository: pytorch/test-infra
       test-infra-ref: main
-      build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
+      build-matrix: ${{ needs.substitute-runner.outputs.matrix }}
       pre-script: packaging/driver_upgrade.bat
       script: |
         export USE_HOST_DEPS=1

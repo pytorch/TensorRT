@@ -56,6 +56,7 @@ class TestArangeConverter(DispatchTestCase):
             use_example_tensors=False,
             check_dtype=False,
             pyt_inputs=[pyt_input],
+            use_dynamo_tracer=False,
         )
 
 

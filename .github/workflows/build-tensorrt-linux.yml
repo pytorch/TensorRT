@@ -1,0 +1,222 @@
+name: Build Torch-TensorRT wheel on Linux with Future TensorRT Versions
+
+on:
+  workflow_call:
+    inputs:
+      repository:
+        description: 'Repository to checkout, defaults to ""'
+        default: ""
+        type: string
+      ref:
+        description: 'Reference to checkout, defaults to "nightly"'
+        default: "nightly"
+        type: string
+      test-infra-repository:
+        description: "Test infra repository to use"
+        default: "pytorch/test-infra"
+        type: string
+      test-infra-ref:
+        description: "Test infra reference to use"
+        default: ""
+        type: string
+      build-matrix:
+        description: "Build matrix to utilize"
+        default: ""
+        type: string
+      pre-script:
+        description: "Pre script to run prior to build"
+        default: ""
+        type: string
+      post-script:
+        description: "Post script to run prior to build"
+        default: ""
+        type: string
+      smoke-test-script:
+        description: "Script for Smoke Test for a specific domain"
+        default: ""
+        type: string
+      env-var-script:
+        description: "Script that sets Domain-Specific Environment Variables"
+        default: ""
+        type: string
+      package-name:
+        description: "Name of the actual python package that is imported"
+        default: ""
+        type: string
+      trigger-event:
+        description: "Trigger Event in caller that determines whether or not to upload"
+        default: ""
+        type: string
+      cache-path:
+        description: "The path(s) on the runner to cache or restore. The path is relative to repository."
+        default: ""
+        type: string
+      cache-key:
+        description: "The key created when saving a cache and the key used to search for a cache."
+        default: ""
+        type: string
+      architecture:
+        description: Architecture to build for x86_64 for default Linux, or aarch64 for Linux aarch64 builds
+        required: false
+        type: string
+        default: x86_64
+      submodules:
+        description: Works as stated in actions/checkout, but the default value is recursive
+        required: false
+        type: string
+        default: recursive
+      setup-miniconda:
+        description: Set to true if setup-miniconda is needed
+        required: false
+        type: boolean
+        default: true
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(inputs.build-matrix) }}
+    env:
+      PYTHON_VERSION: ${{ matrix.python_version }}
+      PACKAGE_TYPE: wheel
+      REPOSITORY: ${{ inputs.repository }}
+      REF: ${{ inputs.ref }}
+      CU_VERSION: ${{ matrix.desired_cuda }}
+      UPLOAD_TO_BASE_BUCKET: ${{ matrix.upload_to_base_bucket }}
+      ARCH: ${{ inputs.architecture }}
+      TENSORRT_STRIP_PREFIX: ${{ matrix.tensorrt.strip_prefix }}
+      TENSORRT_VERSION: ${{ matrix.tensorrt.version }}
+      TENSORRT_URLS: ${{ matrix.tensorrt.urls }}
+      TENSORRT_SHA256: ${{ matrix.tensorrt.sha256 }}
+      UPLOAD_ARTIFACT_NAME: pytorch_tensorrt_${{ matrix.tensorrt.version }}_${{ matrix.python_version }}_${{ matrix.desired_cuda }}_${{ inputs.architecture }}
+    name: build_tensorrt${{ matrix.tensorrt.version }}_py${{matrix.python_version}}_${{matrix.desired_cuda}}
+    runs-on: ${{ matrix.validation_runner }}
+    container:
+      image: ${{ matrix.container_image }}
+      options: ${{ matrix.gpu_arch_type == 'cuda' && '--gpus all' || ' ' }}
+    # If a build is taking longer than 120 minutes on these runners we need
+    # to have a conversation
+    timeout-minutes: 120
+
+    steps:
+      - name: Clean workspace
+        shell: bash -l {0}
+        run: |
+          set -x
+          echo "::group::Cleanup debug output"
+          rm -rf "${GITHUB_WORKSPACE}"
+          mkdir -p "${GITHUB_WORKSPACE}"
+          if [[ "${{ inputs.architecture }}" = "aarch64" ]]; then
+            rm -rf "${RUNNER_TEMP}/*"
+          fi
+          echo "::endgroup::"
+      - uses: actions/checkout@v3
+        with:
+          # Support the use case where we need to checkout someone's fork
+          repository: ${{ inputs.test-infra-repository }}
+          ref: ${{ inputs.test-infra-ref }}
+          path: test-infra
+      - uses: actions/checkout@v3
+        if: ${{ env.ARCH == 'aarch64' }}
+        with:
+          # Support the use case where we need to checkout someone's fork
+          repository: "pytorch/builder"
+          ref: "main"
+          path: builder
+      - name: Set linux aarch64 CI
+        if: ${{ inputs.architecture == 'aarch64' }}
+        shell: bash -l {0}
+        env:
+          DESIRED_PYTHON: ${{ matrix.python_version }}
+        run: |
+          set +e
+          # TODO: This is temporary aarch64 setup script, this should be integrated into aarch64 docker.
+          ${GITHUB_WORKSPACE}/builder/aarch64_linux/aarch64_ci_setup.sh
+          echo "/opt/conda/bin" >> $GITHUB_PATH
+          set -e
+      - uses: ./test-infra/.github/actions/set-channel
+      - name: Set PYTORCH_VERSION
+        if: ${{ env.CHANNEL == 'test' }}
+        run: |
+          # When building RC, set the version to be the current candidate version,
+          # otherwise, leave it alone so nightly will pick up the latest
+          echo "PYTORCH_VERSION=${{ matrix.stable_version }}" >> "${GITHUB_ENV}"
+      - uses: ./test-infra/.github/actions/setup-binary-builds
+        env:
+          PLATFORM: ${{ inputs.architecture == 'aarch64'  && 'linux-aarch64' || ''}}
+        with:
+          repository: ${{ inputs.repository }}
+          ref: ${{ inputs.ref }}
+          submodules: ${{ inputs.submodules }}
+          setup-miniconda: ${{ inputs.setup-miniconda }}
+          python-version: ${{ env.PYTHON_VERSION }}
+          cuda-version: ${{ env.CU_VERSION }}
+          arch: ${{ env.ARCH }}
+      - name: Combine Env Var and Build Env Files
+        if: ${{ inputs.env-var-script != '' }}
+        working-directory: ${{ inputs.repository }}
+        shell: bash -l {0}
+        run: |
+          cat "${{ inputs.env-var-script }}" >> "${BUILD_ENV_FILE}"
+      - name: Install torch dependency
+        shell: bash -l {0}
+        run: |
+          set -x
+          # shellcheck disable=SC1090
+          source "${BUILD_ENV_FILE}"
+          # shellcheck disable=SC2086
+          ${CONDA_RUN} ${PIP_INSTALL_TORCH}
+      - name: Run Pre-Script with Caching
+        if: ${{ inputs.pre-script != '' }}
+        uses: ./test-infra/.github/actions/run-script-with-cache
+        with:
+          cache-path: ${{ inputs.cache-path }}
+          cache-key: ${{ inputs.cache-key }}
+          repository: ${{ inputs.repository  }}
+          script: ${{ inputs.pre-script }}
+      - name: Build clean
+        working-directory: ${{ inputs.repository }}
+        shell: bash -l {0}
+        run: |
+          set -x
+          source "${BUILD_ENV_FILE}"
+          ${CONDA_RUN} python setup.py clean
+      - name: Build the wheel (bdist_wheel)
+        working-directory: ${{ inputs.repository }}
+        shell: bash -l {0}
+        run: |
+          set -x
+          source "${BUILD_ENV_FILE}"
+          ${CONDA_RUN} python setup.py bdist_wheel
+
+      - name: Run Post-Script
+        if: ${{ inputs.post-script != '' }}
+        uses: ./test-infra/.github/actions/run-script-with-cache
+        with:
+          repository: ${{ inputs.repository  }}
+          script: ${{ inputs.post-script }}
+      - name: Smoke Test
+        shell: bash -l {0}
+        env:
+          PACKAGE_NAME: ${{ inputs.package-name }}
+          SMOKE_TEST_SCRIPT: ${{ inputs.smoke-test-script }}
+        run: |
+          set -x
+          source "${BUILD_ENV_FILE}"
+          # TODO: add smoke test for the auditwheel tarball built
+
+      # NB: Only upload to GitHub after passing smoke tests
+      - name: Upload wheel to GitHub
+        continue-on-error: true
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ env.UPLOAD_ARTIFACT_NAME }}
+          path: ${{ inputs.repository }}/dist
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref_name }}-${{ inputs.repository }}-${{ github.event_name == 'workflow_dispatch' }}-${{ inputs.job-name }}
+  cancel-in-progress: true

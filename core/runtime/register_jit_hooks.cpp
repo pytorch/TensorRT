@@ -7,7 +7,6 @@
 namespace torch_tensorrt {
 namespace core {
 namespace runtime {
-namespace {
 
 std::string serialize_bindings(const std::vector<std::string>& bindings) {
   std::stringstream ss;
@@ -66,6 +65,7 @@ std::string base64_decode(const std::string& in) {
   return out;
 }
 
+namespace {
 // TODO: Implement a call method
 // c10::List<at::Tensor> TRTEngine::Run(c10::List<at::Tensor> inputs) {
 //     auto input_vec = inputs.vec();
@@ -80,37 +80,22 @@ static auto TORCHTRT_UNUSED TRTEngineTSRegistrtion =
         // TODO: .def("run", &TRTEngine::Run)
         .def("__str__", &TRTEngine::to_str)
         .def("__repr__", &TRTEngine::to_str)
+        .def("__obj_flatten__", &TRTEngine::__obj_flatten__)
         .def("enable_profiling", &TRTEngine::enable_profiling)
         .def("disable_profiling", &TRTEngine::disable_profiling)
         .def_readwrite("profile_path_prefix", &TRTEngine::profile_path_prefix)
         .def("dump_engine_layer_info_to_file", &TRTEngine::dump_engine_layer_info_to_file)
         .def("dump_engine_layer_info", &TRTEngine::dump_engine_layer_info)
         .def("get_engine_layer_info", &TRTEngine::get_engine_layer_info)
+        .def("infer_outputs", &TRTEngine::infer_outputs)
+        .def_property(
+            "device_memory_budget",
+            &TRTEngine::get_device_memory_budget,
+            &TRTEngine::set_device_memory_budget)
+        .def_property("streamable_device_memory_budget", &TRTEngine::get_streamable_device_memory_budget)
+        .def_property("automatic_device_memory_budget", &TRTEngine::get_automatic_device_memory_budget)
         .def_pickle(
-            [](const c10::intrusive_ptr<TRTEngine>& self) -> std::vector<std::string> {
-              // Serialize TensorRT engine
-              auto serialized_trt_engine = make_trt(self->cuda_engine->serialize());
-
-              // Adding device info related meta data to the serialized file
-              auto trt_engine = std::string((const char*)serialized_trt_engine->data(), serialized_trt_engine->size());
-
-              std::vector<std::string> serialize_info;
-              serialize_info.resize(SERIALIZATION_LEN);
-
-              serialize_info[ABI_TARGET_IDX] = ABI_VERSION;
-              serialize_info[NAME_IDX] = self->name;
-              serialize_info[DEVICE_IDX] = self->device_info.serialize();
-              serialize_info[ENGINE_IDX] = base64_encode(trt_engine);
-              serialize_info[INPUT_BINDING_NAMES_IDX] = serialize_bindings(self->in_binding_names);
-              serialize_info[OUTPUT_BINDING_NAMES_IDX] = serialize_bindings(self->out_binding_names);
-              serialize_info[HW_COMPATIBLE_IDX] = self->hardware_compatible ? "1" : "0";
-              serialize_info[SERIALIZED_METADATA_IDX] = self->serialized_metadata;
-              serialize_info[TARGET_PLATFORM_IDX] = self->target_platform.serialize();
-              LOG_DEBUG("Serialized Hardware Compatibility: " << (self->hardware_compatible ? "Enabled" : "Disabled"));
-              LOG_DEBUG("Serialized Target Platform: " << self->target_platform);
-
-              return serialize_info;
-            },
+            [](const c10::intrusive_ptr<TRTEngine>& self) -> std::vector<std::string> { return self->serialize(); },
             [](std::vector<std::string> serialized_info) -> c10::intrusive_ptr<TRTEngine> {
               serialized_info[ENGINE_IDX] = base64_decode(serialized_info[ENGINE_IDX]);
               TRTEngine::verify_serialization_fmt(serialized_info);
@@ -118,7 +103,7 @@ static auto TORCHTRT_UNUSED TRTEngineTSRegistrtion =
             });
 
 TORCH_LIBRARY(tensorrt, m) {
-  m.def("execute_engine", execute_engine);
+  m.def("execute_engine(Tensor[] input_tensors, __torch__.torch.classes.tensorrt.Engine engine) -> Tensor[]");
   m.def("SERIALIZED_ENGINE_BINDING_DELIM", []() -> std::string { return std::string(1, TRTEngine::BINDING_DELIM); });
   m.def("SERIALIZED_RT_DEVICE_DELIM", []() -> std::string { return DEVICE_INFO_DELIM; });
   m.def("ABI_VERSION", []() -> std::string { return ABI_VERSION; });
@@ -163,6 +148,10 @@ TORCH_LIBRARY(tensorrt, m) {
     auto it = get_platform_name_map().find(get_current_platform()._platform);
     return it->second;
   });
+}
+
+TORCH_LIBRARY_IMPL(tensorrt, CompositeExplicitAutograd, m) {
+  m.impl("execute_engine", execute_engine);
 }
 
 } // namespace

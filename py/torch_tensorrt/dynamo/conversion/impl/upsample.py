@@ -18,14 +18,14 @@ def upsample(
     source_ir: Optional[SourceIR],
     name: str,
     input: TRTTensor,
-    size: Sequence[int],
+    size: Optional[Sequence[int]],
     scale_factor: Optional[Sequence[float]],
     mode: str,
     align_corners: bool,
 ) -> TRTTensor:
     layer = ctx.net.add_resize(input)
 
-    if scale_factor is not None and all(s is not None for s in scale_factor):
+    if scale_factor is not None:
         layer.scales = [1.0, 1.0] + list(scale_factor)
     else:
         shape = list(input.shape)[:2] + list(size)

@@ -6,6 +6,7 @@ from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 import numpy as np
+import sympy
 import tensorrt as trt
 import torch
 from torch._subclasses.fake_tensor import FakeTensor
@@ -124,13 +125,23 @@ def cosine_similarity(gt_tensor: torch.Tensor, pred_tensor: torch.Tensor) -> flo
     return res
 
 
-def input_is_dynamic(inputs: Sequence[Union[Input, torch.Tensor]]) -> bool:
+def input_is_dynamic(inputs: Sequence[Union[Input, torch.Tensor, FakeTensor]]) -> bool:
     """
-    Return true if the provided inputs are `torch_tensorrt.Input` objects and have dynamic shapes.
+    Return true if any of inputs have dynamic shapes. Supported types are torch_tensorrt.Input | torch.Tensor
     """
-    return not any(isinstance(input, torch.Tensor) for input in inputs) and any(
-        input.shape_mode == Input._ShapeMode.DYNAMIC for input in inputs
-    )
+    for input in inputs:
+        if isinstance(input, torch.Tensor):
+            if contains_sym_int(input.shape):
+                return True
+        elif isinstance(input, Input):
+            if input.shape_mode == Input._ShapeMode.DYNAMIC:
+                return True
+        else:
+            raise AssertionError(
+                f"Invalid input type ({type(input)}) found. Supported types are torch_tensorrt.Input | torch.Tensor"
+            )
+
+    return False
 
 
 def get_torch_tensor(
@@ -342,19 +353,19 @@ def extract_var_range_info(symbolic_integer: torch.SymInt) -> Dict[str, int]:
         shape_env.var_to_val
     )
     assert var_range, var_val
-    min_val, max_val, opt_val = int(var_range.lower), int(var_range.upper), int(var_val)
+    min_val, max_val = int(var_range.lower), int(var_range.upper)
     # Torchdynamo 0/1 specialization outlier
     min_val = 1 if min_val == 2 else min_val
     min_max_opt = {}
     min_max_opt["min"] = min_val
     min_max_opt["max"] = max_val
-    min_max_opt["opt"] = opt_val
-
+    if isinstance(var_val, sympy.core.numbers.Integer):
+        min_max_opt["opt"] = int(var_val)
     return min_max_opt
 
 
 def unwrap_tensor_shape(
-    tensor: Union[torch.Tensor, FakeTensor, torch.SymInt]
+    tensor: Union[torch.Tensor, FakeTensor, torch.SymInt], mode: Optional[str] = ""
 ) -> Sequence[Union[int, Tuple[int, int]]]:
     """
     This is a helper function used to print/return the shape of the tensor.
@@ -368,10 +379,13 @@ def unwrap_tensor_shape(
         tensor_shape.append(tensor)
     elif isinstance(tensor, torch.SymInt):
         min_max_opt = extract_var_range_info(tensor)
-        tensor_shape.append((min_max_opt["min"], min_max_opt["max"]))
+        if mode:
+            tensor_shape.append(min_max_opt[mode])
+        else:
+            tensor_shape.append((min_max_opt["min"], min_max_opt["max"]))
     elif isinstance(tensor, (torch.Tensor, FakeTensor)):
         for dimension in tensor.shape:
-            tensor_shape.extend(unwrap_tensor_shape(dimension))
+            tensor_shape.extend(unwrap_tensor_shape(dimension, mode=mode))
 
     return tuple(tensor_shape)
 
@@ -402,9 +416,9 @@ def get_graph_io_attrs(
             metadata = node.meta["val"]
             if isinstance(metadata, (tuple, list)):
                 for tensor in metadata:
-                    graph_io_attrs.append(attr_fn(tensor))
+                    graph_io_attrs.append(attr_fn(tensor))  # type: ignore
             else:
-                graph_io_attrs.append(attr_fn(metadata))
+                graph_io_attrs.append(attr_fn(metadata))  # type: ignore
 
     return graph_io_attrs
 
@@ -661,3 +675,76 @@ def get_flat_args_with_check(
     flat_args_with_path, received_spec = pytree.tree_flatten_with_path((args, kwargs))
     flat_args = tuple(x[1] for x in flat_args_with_path)
     return flat_args, received_spec
+
+
+def get_metadata(
+    gm: torch.fx.GraphModule, target_op: torch._ops.OpOverload
+) -> List[Any]:
+    """
+    Return the list which has the metadata of all the target_op nodes present in the graph.
+    """
+    return [node.meta for node in gm.graph.nodes if node.target == target_op]
+
+
+def set_metadata(
+    gm: torch.fx.GraphModule, target_op: torch._ops.OpOverload, metadata: List[Any]
+) -> None:
+    """
+    Return the list which has the metadata of all the target_op nodes present in the graph.
+    """
+    target_nodes = [node for node in gm.graph.nodes if node.target == target_op]
+    assert len(target_nodes) == len(metadata)
+    for idx, node in enumerate(target_nodes):
+        node.meta = metadata[idx]
+
+
+def flatten_nodes(nodes: Any) -> List[torch.fx.node.Node]:
+    ret = []
+    if isinstance(nodes, torch.fx.node.Node):
+        ret.append(nodes)
+    elif isinstance(nodes, (tuple, list)):
+        for node in nodes:
+            ret.extend(flatten_nodes(node))
+    else:
+        raise ValueError(
+            f"expect torch.fx.node.Node or a tuple/list of torch.fx.node.Node type, got unexpected types: {type(nodes)=}"
+        )
+    return ret
+
+
+def get_output_metadata(
+    gm: torch.fx.GraphModule,
+) -> List[Any]:
+    outputs = [node for node in gm.graph.nodes if node.op == "output"]
+    assert len(outputs) > 0
+    outputs = outputs[0].args
+    nodes = flatten_nodes(outputs)
+    assert len(nodes) > 0
+    return [node.meta for node in nodes]
+
+
+def get_output_dtypes(output: Any, truncate_doulbe: bool = False) -> List[dtype]:
+    output_dtypes = []
+    if isinstance(output, torch.fx.node.Node):
+        if "val" in output.meta:
+            output_meta = output.meta["val"]
+            if isinstance(output_meta, (FakeTensor, torch.Tensor)):
+                if truncate_doulbe and output_meta.dtype == torch.float64:
+                    output_dtypes.append(dtype.float32)
+                else:
+                    output_dtypes.append(dtype._from(output_meta.dtype))
+        elif "tensor_meta" in output.meta:
+            output_meta = output.meta["tensor_meta"]
+            output_dtypes.append(dtype._from(output_meta.dtype))
+        else:
+            raise ValueError(
+                f"node.name={output.name}: metadata does not exist, expect metadata exists for each output node"
+            )
+    elif isinstance(output, (tuple, list)):
+        for ele in output:
+            output_dtypes.extend(get_output_dtypes(ele))
+    else:
+        raise ValueError(
+            f"got unexpected type {type(output)}, expected type is a torch.fx.node.Node or a tuple/list of torch.fx.node.Node"
+        )
+    return output_dtypes

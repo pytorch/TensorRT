@@ -498,7 +498,7 @@ class MutableTorchTensorRTModule(object):
     def load(path: str) -> Any:
         # When the model get saved, init_finished is set to False.
         # Class is restored to MutableTorchTensorRTModule, and some attribute is deleted
-        module = torch.load(path)
+        module = torch.load(path, weights_only=False)
         module.pytorch_model = _make_refit_change_trigger(
             module.original_model, module.refit_state
         )

@@ -1,3 +1,5 @@
+import unittest
+
 import torch
 import torch.nn as nn
 from parameterized import parameterized
@@ -141,7 +143,7 @@ class TestAtan2Converter(DispatchTestCase):
             (
                 "3d_dim_dtype_float",
                 (1, 1, 1),
-                (1, 2, 3),
+                (2, 2, 3),
                 (3, 3, 3),
                 torch.float,
                 torch.float,
@@ -149,7 +151,7 @@ class TestAtan2Converter(DispatchTestCase):
             (
                 "3d_dim_dtype_int32",
                 (1, 1, 1),
-                (1, 2, 4),
+                (2, 2, 4),
                 (2, 3, 5),
                 torch.int32,
                 torch.float,
@@ -182,10 +184,17 @@ class TestAtan2Converter(DispatchTestCase):
         )
 
 
+# torch.ops.aten.atan2.out will be decomposed/partitioned into core aten ops which torch_tensorrt supported in run_on_acc and
+# non supported ops in run_on_gpu in dynamo tracer, it works via torch_tensorrt.dynamo.compile workflow
+# but it won't be valid for our converter test framework, so skip it here.
+@unittest.skip("skip torch.ops.aten.atan2.out converter test")
 class TestAtan2OutConverter(DispatchTestCase):
     @parameterized.expand(
         [
-            ((10,), (5,), torch.float),
+            # dynamo trace does not allow output to be in a different shape
+            # raise Unsupported(msg, case_name=case_name)
+            # torch._dynamo.exc.Unsupported: out variants with resizing on graph inputs
+            ((5,), (5,), torch.float),
             ((10,), (10,), torch.float),
         ]
     )
@@ -220,7 +229,7 @@ class TestAtan2OutConverter(DispatchTestCase):
             (
                 "3d_dim_dtype_float",
                 (1, 1, 1),
-                (1, 2, 3),
+                (2, 2, 3),
                 (3, 3, 3),
                 torch.float,
                 torch.float,
@@ -255,7 +264,10 @@ class TestAtan2OutConverter(DispatchTestCase):
             ),
         ]
         self.run_test_with_dynamic_shape(
-            atan2(), input_specs, output_dtypes=[output_type]
+            atan2(),
+            input_specs,
+            output_dtypes=[output_type],
+            use_dynamo_tracer=False,
         )
 
 

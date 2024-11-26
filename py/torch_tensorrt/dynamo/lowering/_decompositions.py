@@ -4,8 +4,8 @@ from typing import Any, Callable, Dict, List, Optional
 
 import torch
 from torch._decomp import register_decomposition
-from torch._export.utils import _decomp_table_to_post_autograd_aten
 from torch._ops import OpOverload
+from torch.export import default_decompositions
 from torch_tensorrt.dynamo._defaults import default_device
 from torch_tensorrt.dynamo.conversion.converter_utils import get_positive_dim
 from torch_tensorrt.dynamo.utils import to_torch_device
@@ -400,6 +400,26 @@ def log_softmax_decomposition(
     )
 
 
+@register_torch_trt_decomposition(aten.instance_norm, registry=TORCH_TRT_DECOMPOSITIONS)
+def instance_norm_decomposition(
+    input: torch.Tensor,
+    weight: Optional[torch.Tensor],
+    bias: Optional[torch.Tensor],
+    running_mean: Optional[torch.Tensor],
+    running_var: Optional[torch.Tensor],
+    use_input_stats: bool,
+    momentum: float,
+    eps: float,
+    cudnn_enabled: bool,
+) -> torch.Tensor:
+    if use_input_stats:
+        return torch.nn.functional.group_norm(input, input.shape[1], weight, bias, eps)
+    else:
+        return torch.nn.functional.batch_norm(
+            input, running_mean, running_var, weight, bias, False, momentum, eps
+        )
+
+
 def get_decompositions(
     enable_experimental_decompositions: bool = False,
 ) -> Dict[OpOverload, Callable[[Any], Any]]:
@@ -412,8 +432,15 @@ def get_decompositions(
         return {**CORE_ATEN_DECOMPOSITIONS_FILTERED, **TORCH_TRT_DECOMPOSITIONS}
     else:
         # changes made here due to torch2.6 changes https://github.com/pytorch/pytorch/pull/135080
+        decomp_table = default_decompositions()
+        DECOMP_TABLE_FILTERED: Dict[OpOverload, Callable[[Any], Any]] = {
+            decomp: decomp_table[decomp]
+            for decomp in decomp_table
+            if decomp not in torch_disabled_decompositions
+        }
+
         return {
             **ENABLED_TORCH_DECOMPOSITIONS,
-            **_decomp_table_to_post_autograd_aten(),
+            **DECOMP_TABLE_FILTERED,
             **TORCH_TRT_DECOMPOSITIONS,
         }

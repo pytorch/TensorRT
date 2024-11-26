@@ -19,6 +19,17 @@ namespace torch_tensorrt {
 namespace core {
 namespace runtime {
 
+using FlattenedState = std::tuple<
+    std::tuple<std::string, std::string>, // ABI_VERSION
+    std::tuple<std::string, std::string>, // name
+    std::tuple<std::string, std::string>, // device
+    std::tuple<std::string, std::string>, // engine
+    std::tuple<std::string, std::string>, // input binding names
+    std::tuple<std::string, std::string>, // output binding names
+    std::tuple<std::string, std::string>, // HW compatibility
+    std::tuple<std::string, std::string>, // serialized metadata
+    std::tuple<std::string, std::string>>; // Platform
+
 struct TRTEngine : torch::CustomClassHolder {
   // Each engine needs it's own runtime object
   std::shared_ptr<nvinfer1::IRuntime> rt;
@@ -69,10 +80,20 @@ struct TRTEngine : torch::CustomClassHolder {
   void enable_profiling();
   void disable_profiling();
   std::string get_engine_layer_info();
+
   void dump_engine_layer_info_to_file(const std::string& path);
   void dump_engine_layer_info();
+  int64_t get_device_memory_budget();
+  bool set_device_memory_budget(int64_t budget);
+  int64_t get_streamable_device_memory_budget();
+  int64_t get_automatic_device_memory_budget();
+  std::vector<at::Tensor> infer_outputs(std::vector<std::vector<int64_t>> input_shapes);
   friend std::ostream& operator<<(std::ostream& os, const TRTEngine& engine);
   static const char BINDING_DELIM = '%';
+
+  // Serde re-export functionality
+  FlattenedState __obj_flatten__();
+  std::vector<std::string> serialize();
 
   // CUDAGraph-Related Functionality
   at::cuda::CUDAGraph cudagraph = {};

@@ -132,7 +132,11 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         self.serialized_engine = serialized_engine
         self.engine = None
 
-        if serialized_engine and not self.settings.lazy_engine_init:
+        if (
+            serialized_engine
+            and not self.settings.lazy_engine_init
+            and not self.settings.enable_cross_compile_for_windows
+        ):
             self.setup_engine()
 
     def _pack_engine_info(self) -> List[str | bytes]:
@@ -144,16 +148,16 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         metadata = {"settings": self.settings, "weight_name_map": self.weight_name_map}
         target_platform = (
             Platform.current_platform()
+            if not self.settings.enable_cross_compile_for_windows
+            else Platform.WIN_X86_64
         )  # Change to match target for engine
 
         engine_info: List[str | bytes] = [""] * SERIALIZATION_LEN
-
         engine_info[ABI_TARGET_IDX] = torch.ops.tensorrt.ABI_VERSION()
         engine_info[NAME_IDX] = (
             self.name + "_engine" if self.name != "" else "tensorrt_engine"
         )
         engine_info[DEVICE_IDX] = target_device._to_serialized_rt_device()
-
         assert self.serialized_engine
         engine_info[ENGINE_IDX] = self.serialized_engine
 
@@ -168,6 +172,28 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         engine_info[TARGET_PLATFORM_IDX] = target_platform._to_serialized_rt_platform()
 
         return engine_info
+
+    def get_streamable_device_memory_budget(self) -> Any:
+        return self.engine.streamable_device_memory_budget
+
+    def get_automatic_device_memory_budget(self) -> Any:
+        return self.engine.automatic_device_memory_budget
+
+    def get_device_memory_budget(self) -> Any:
+        return self.engine.device_memory_budget
+
+    def set_device_memory_budget(self, budget_bytes: int) -> int:
+        # Disable weight streaming for invalid budget size
+        if budget_bytes < 0:
+            budget_bytes = self.get_streamable_device_memory_budget()
+        self.engine.device_memory_budget = budget_bytes
+        if self.engine.device_memory_budget != budget_bytes:
+            logger.error(f"Failed to set weight streaming budget to {budget_bytes}")
+            budget_bytes = self.engine.device_memory_budget
+        if self.get_streamable_device_memory_budget() == budget_bytes:
+            logger.warning("Weight streaming is disabled")
+
+        return budget_bytes
 
     def setup_engine(self) -> None:
         """

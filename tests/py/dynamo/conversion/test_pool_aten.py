@@ -36,6 +36,7 @@ class TestPoolConverter(DispatchTestCase):
             TestModule(),
             inputs,
             use_dynamo_tracer=True,
+            enable_passes=True,
         )
 
     @parameterized.expand(
@@ -146,7 +147,9 @@ class TestPoolConverter(DispatchTestCase):
             ),
         ]
 
-        self.run_test_with_dynamic_shape(pool1d(), input_specs, use_dynamo_tracer=True)
+        self.run_test_with_dynamic_shape(
+            pool1d(), input_specs, use_dynamo_tracer=True, enable_passes=True
+        )
 
     @parameterized.expand(
         [

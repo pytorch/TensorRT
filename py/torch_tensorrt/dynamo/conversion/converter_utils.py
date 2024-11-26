@@ -505,6 +505,13 @@ def enforce_tensor_types(
                         _LOGGER.debug(
                             f"Freezing tensor {name}_constant_{index} to TRT IConstantLayer"
                         )
+                        # If the candidate is a scalar Numpy array, handle it accordingly
+                        if isinstance(candidate, np.ndarray) and candidate.shape == ():
+                            _LOGGER.debug(
+                                f"Scalar numpy detected at {name}_constant_{index}, adding rank (1,)"
+                            )
+                            # Convert the scalar to a 1D array (with a single element)
+                            candidate = np.expand_dims(candidate, axis=0)
                         new_value = get_trt_tensor(
                             ctx, candidate, name + f"_constant_{index}"
                         )

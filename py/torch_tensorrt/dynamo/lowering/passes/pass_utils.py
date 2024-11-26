@@ -1,4 +1,4 @@
-from typing import Any, List
+from typing import List
 
 import torch
 
@@ -29,24 +29,3 @@ def get_tensor_placeholders(
     ]
 
     return placeholders
-
-
-def get_metadata(
-    gm: torch.fx.GraphModule, target_op: Any
-) -> List[torch._ops.OpOverload]:
-    """
-    Return the list which has the metadata of all the target_op nodes present in the graph.
-    """
-    return [node.meta for node in gm.graph.nodes if node.target == target_op]
-
-
-def set_metadata(
-    gm: torch.fx.GraphModule, target_op: Any, metadata: List[torch._ops.OpOverload]
-) -> None:
-    """
-    Return the list which has the metadata of all the target_op nodes present in the graph.
-    """
-    target_nodes = [node for node in gm.graph.nodes if node.target == target_op]
-    assert len(target_nodes) == len(metadata)
-    for idx, node in enumerate(target_nodes):
-        node.meta = metadata[idx]

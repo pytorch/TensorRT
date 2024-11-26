@@ -1587,6 +1587,75 @@ class TestLowering(TestCase):
             f"Log_softmax TRT outputs don't match with the original model.",
         )
 
+    @parameterized.expand(
+        [
+            ((1, 3, 5), True),
+            ((1, 3, 5), False),
+            ((2, 4, 6, 8), True),
+            ((2, 4, 6, 8), False),
+            ((3, 6, 9, 12, 15), True),
+            ((3, 6, 9, 12, 15), False),
+        ]
+    )
+    def test_lowering_instance_norm(self, shape, use_input_stats):
+        class TestModule(torch.nn.Module):
+            def forward(self, input, weight, bias, running_mean=None, running_var=None):
+                return torch.ops.aten.instance_norm.default(
+                    input,
+                    weight,
+                    bias,
+                    running_mean,
+                    running_var,
+                    use_input_stats,
+                    0.1,
+                    1e-05,
+                    True,
+                )
+
+        # Operations expected to be removed in the traced graph after decompositions
+        unexpected_ops = {torch.ops.aten.instance_norm.default}
+
+        inputs = [
+            torch.randn(shape, device="cuda"),
+            torch.randn(shape[1], device="cuda"),
+            torch.randn(shape[1], device="cuda"),
+        ]
+        if not use_input_stats:
+            inputs += [
+                torch.randn(shape[1], device="cuda"),
+                torch.rand(shape[1], device="cuda"),
+            ]
+
+        fx_graph = torch.fx.symbolic_trace(TestModule())
+        unexpected_ops_seen, _ = lower_graph_testing(
+            fx_graph, inputs, unexpected_ops=unexpected_ops, min_block_size=1
+        )
+
+        self.assertEqual(
+            len(unexpected_ops_seen),
+            0,
+            f"The following unexpected ops were encountered: {unexpected_ops_seen}",
+        )
+
+        torch._dynamo.reset()
+
+        # Validate that the results between Torch and Torch-TRT are similar
+        optimized_model = torch_tensorrt.compile(
+            fx_graph, "dynamo", inputs, min_block_size=1
+        )
+        optimized_model_results = optimized_model(*inputs).detach().cpu()
+        torch_model_results = fx_graph(*inputs).detach().cpu()
+
+        max_diff = float(
+            torch.max(torch.abs(optimized_model_results - torch_model_results))
+        )
+        self.assertAlmostEqual(
+            max_diff,
+            0,
+            DECIMALS_OF_AGREEMENT,
+            "Instance_norm TRT outputs don't match with the original model.",
+        )
+
 
 if __name__ == "__main__":
     run_tests()
