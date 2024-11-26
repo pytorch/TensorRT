@@ -3,7 +3,6 @@ from collections import defaultdict
 from typing import Any, List
 
 import torch
-from torch._library.fake_class_registry import FakeScriptObject
 from torch_tensorrt.dynamo.utils import input_is_dynamic, unwrap_tensor_shape
 
 
@@ -27,12 +26,7 @@ def fake_tensorrt_execute_engine(
         modes = ["opt"]
 
     # Get the TRTEngine class and infer output shapes based on input shapes
-    # If fake_trt_engine is not FakeScriptObject, assumes that it is the real object
-    if isinstance(fake_trt_engine, FakeScriptObject):
-        trt_engine = fake_trt_engine.wrapped_obj.engine
-    else:
-        trt_engine = fake_trt_engine
-
+    trt_engine = fake_trt_engine.wrapped_obj.engine
     outputs_mode_dict = defaultdict(list)
     for mode in modes:
         input_shapes = [unwrap_tensor_shape(input, mode=mode) for input in inputs]
@@ -129,9 +123,6 @@ class FakeTRTEngine:
         pass
 
     def infer_outputs(self, input_shapes: List[Any]) -> Any:
-        pass
-
-    def set_whole_cudagraphs(self) -> Any:
         pass
 
     def __setstate__(self, serialized_state: List[str]) -> Any:

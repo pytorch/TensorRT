@@ -7,11 +7,8 @@ from typing import List, Optional, Sequence, Tuple
 
 import torch
 import torch_tensorrt
-from torch._subclasses.fake_tensor import FakeTensorMode
 from torch.fx.experimental.proxy_tensor import unset_fake_temporarily
 from torch_tensorrt.dynamo import partitioning
-from torch_tensorrt.dynamo.conversion import DYNAMIC_DIM
-from torch_tensorrt.dynamo.utils import input_is_dynamic
 from torch_tensorrt.runtime._utils import _is_switch_required, _select_rt_device
 
 logger = logging.getLogger(__name__)
@@ -21,10 +18,7 @@ class WrapperTorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
     """This Wrapper runtime module is to record/replay whole cuda graph in sub modules
 
     Args:
-        original_module: Unmodified FX GraphModule
         compiled_module: Complied fx graphModule that will be wrapped
-        output_shapes: Shapes of output Tensors of the graph
-        output_dtypes: Output data types of the graph
     Returns:
         Output tensor or tensor list
     """
@@ -32,14 +26,10 @@ class WrapperTorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
     def __init__(
         self,
         compiled_module: torch.nn.Module,
-        output_shapes: List[torch.Size],
-        output_dtypes: List[torch.dtype],
     ):
         super(WrapperTorchTensorRTModule, self).__init__()
         self.compiled_module = compiled_module
         self.inputs = partitioning.construct_submodule_inputs(compiled_module)
-        self.output_shapes = output_shapes
-        self.output_dtypes = output_dtypes
 
         self._input_buffers: List[torch.Tensor] = []
         self._output_buffers: List[torch.Tensor] = []
@@ -49,7 +39,6 @@ class WrapperTorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         self.prev_cudagraphs_enabled = False
         self._caller_stream: Optional[torch.cuda.Stream] = None
         self._engine_stream: Optional[torch.cuda.Stream] = None
-        self.input_is_dynamic = input_is_dynamic(self.inputs)
 
         # Disable cudagrphs in submodules as it will be enabled in wrapper
         for name, rt_mod in self.compiled_module.named_children():
@@ -82,18 +71,9 @@ class WrapperTorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         # x: (3, 4), y: (4, 5) --> Key: (3,4)(4,5)
         new_shape_key = "".join(str(tuple(t.shape)).replace(" ", "") for t in inputs)
 
-        # If the new shape key differs from the existing one, infer new output shape
         if new_shape_key != self.shape_key:
             logger.debug(f"Input shape changed {self.shape_key} -> {new_shape_key}")
             self.shape_key = new_shape_key
-
-            if self.input_is_dynamic:
-                with FakeTensorMode(allow_non_fake_inputs=True):
-                    tmp_outputs = self.compiled_module(*inputs)
-                if not isinstance(tmp_outputs, (list, tuple)):
-                    tmp_outputs = [tmp_outputs]
-                self.output_shapes = [tuple(output.shape) for output in tmp_outputs]
-                print("self.output_shapes ", self.output_shapes)
             return True
 
         return False
@@ -128,7 +108,6 @@ class WrapperTorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
                     self.cudagraph.reset()
 
                 self._input_buffers = [None] * len(self.inputs)
-                self._output_buffers = [None] * len(self.output_shapes)
 
             if not cudagraphs_enabled and self.cudagraph:
                 self.cudagraph.reset()
@@ -204,32 +183,6 @@ class WrapperTorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
 
             with (
                 torch.autograd.profiler.record_function(
-                    "WrapperTorchTensorRTModule:ProcessOutputs"
-                )
-                if self.profiling_enabled
-                else nullcontext()
-            ):
-                # create output tensors
-                outputs: List[torch.Tensor] = []
-
-                for o, shape in enumerate(self.output_shapes):
-                    if DYNAMIC_DIM in shape:
-                        raise ValueError(
-                            "Encountered dynamic output shapes during runtime. This could mean the network has data-dependent output shapes which is not currently supported."
-                        )
-
-                    output = torch.empty(
-                        size=shape,
-                        dtype=self.output_dtypes[o],
-                        device=torch.cuda.current_device(),
-                    )
-
-                    outputs.append(output)
-
-                    if need_cudagraphs_record:
-                        self._output_buffers[o] = outputs[o].clone()
-            with (
-                torch.autograd.profiler.record_function(
                     "WrapperTorchTensorRTModule:TensorRTRuntime"
                 )
                 if self.profiling_enabled
@@ -277,13 +230,10 @@ class WrapperTorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
                     output_buffers = self._output_buffers
                 else:
                     output_buffers = [self._output_buffers]
-                for idx, o in enumerate(outputs):
-                    o.copy_(output_buffers[idx])
-
+                outputs = [output.clone() for output in output_buffers]
                 if len(outputs) == 1:
                     return outputs[0]
 
                 return outputs
             else:
-
                 return outputs
