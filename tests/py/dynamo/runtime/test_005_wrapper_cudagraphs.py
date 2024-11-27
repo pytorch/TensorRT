@@ -49,7 +49,7 @@ class TestWrapperCudagraphs(TestCase):
 
         ref_out_list = []
         trt_out_list = []
-
+        wrapped_module = WrapperTorchTensorRTModule(optimized_model)
         for enable_cuda_graphs in [False, True]:
             for i in range(len(input_list)):
                 # Toggles cuda graph at all index in TRIALS
@@ -57,9 +57,15 @@ class TestWrapperCudagraphs(TestCase):
                     cuda_graphs = enable_cuda_graphs
                 else:
                     cuda_graphs = not enable_cuda_graphs
-                torchtrt.runtime.set_cudagraphs_mode(cuda_graphs)
 
-                trt_out_list.append(optimized_model(*input_list[i]))
+                if cuda_graphs:
+                    torchtrt.runtime._cudagraphs._PY_RT_CUDAGRAPHS = (
+                        torchtrt.runtime._cudagraphs.CudaGraphsMode.WHOLE_GRAPH_CUDAGRAPHS
+                    )
+                else:
+                    torchtrt.runtime.set_cudagraphs_mode(False)
+
+                trt_out_list.append(wrapped_module(*input_list[i]))
                 ref_out_list.append(fx_graph(*input_list[i]))
 
         for optimized_model_results, torch_model_results in zip(
@@ -113,6 +119,7 @@ class TestWrapperCudagraphs(TestCase):
             for j in [128, 128, 222, 222, 224]:
                 input_list.append(torch.randn((i, 3, j, 224)).cuda())
 
+        wrapped_module = WrapperTorchTensorRTModule(optimized_model)
         for enable_cuda_graphs in [False, True]:
             for i in range(len(input_list)):
                 # Toggles cuda graph at all index in TRIALS
@@ -120,10 +127,15 @@ class TestWrapperCudagraphs(TestCase):
                     cuda_graphs = enable_cuda_graphs
                 else:
                     cuda_graphs = not enable_cuda_graphs
-                torchtrt.runtime.set_cudagraphs_mode(cuda_graphs)
 
+                if cuda_graphs:
+                    torchtrt.runtime._cudagraphs._PY_RT_CUDAGRAPHS = (
+                        torchtrt.runtime._cudagraphs.CudaGraphsMode.WHOLE_GRAPH_CUDAGRAPHS
+                    )
+                else:
+                    torchtrt.runtime.set_cudagraphs_mode(False)
+                trt_out_list.append(wrapped_module(input_list[i]))
                 trt_out_list.append(fx_graph(input_list[i]))
-                ref_out_list.append(optimized_model(input_list[i]))
 
         for optimized_model_results, torch_model_results in zip(
             trt_out_list, ref_out_list
@@ -182,9 +194,12 @@ class TestWrapperCudagraphs(TestCase):
             use_python_runtime=use_python_runtime,
         )
 
-        torchtrt.runtime.set_cudagraphs_mode(True)
+        wrapped_module = WrapperTorchTensorRTModule(optimized_model)
+        torchtrt.runtime._cudagraphs._PY_RT_CUDAGRAPHS = (
+            torchtrt.runtime._cudagraphs.CudaGraphsMode.WHOLE_GRAPH_CUDAGRAPHS
+        )
         for i in range(TRIALS):
-            trt_out_list.append(optimized_model(*input_list[i]))
+            trt_out_list.append(wrapped_module(*input_list[i]))
             ref_out_list.append(fx_graph(*input_list[i]))
 
         for optimized_model_results, torch_model_results in zip(
@@ -207,20 +222,9 @@ class TestWrapperCudagraphs(TestCase):
         ]
     )
     def test_wrapper_cudagraphs_api(self, _, use_python_runtime):
-        """
-        3 api draft
-        """
-
         class SampleModel(torch.nn.Module):
-            def __init__(self):
-                super().__init__()
-                self.conv = torch.nn.Conv1d(64, 6, 3)
-                self.relu = torch.nn.ReLU()
-
             def forward(self, x):
-                out = 1 + self.conv(x)
-                out = self.relu(out)
-                return out
+                return torch.relu((x + 2) * 0.5)
 
         model = SampleModel().eval().cuda()
         input_list = []
@@ -232,25 +236,6 @@ class TestWrapperCudagraphs(TestCase):
             input_list.append(input)
         fx_graph = torch.fx.symbolic_trace(model)
 
-        # 1. Compiler option: enable_wrapper_module=True
-        optimized_model = torchtrt.compile(
-            fx_graph,
-            inputs=input_list[0],
-            ir="dynamo",
-            min_block_size=1,
-            cache_built_engines=False,
-            reuse_cached_engines=False,
-            torch_executed_ops={"torch.ops.aten.convolution.default"},
-            use_python_runtime=use_python_runtime,
-            enable_wrapper_module=True,
-        )
-
-        with torchtrt.runtime.enable_cudagraphs():
-            for i in range(TRIALS):
-                trt_out_list.append(optimized_model(*input_list[i]))
-                ref_out_list.append(fx_graph(*input_list[i]))
-
-        # Compiler again to generate normal module
         optimized_model = torchtrt.compile(
             fx_graph,
             inputs=input_list[0],
@@ -261,22 +246,8 @@ class TestWrapperCudagraphs(TestCase):
             torch_executed_ops={"torch.ops.aten.convolution.default"},
             use_python_runtime=use_python_runtime,
         )
-        # This is current cuda runtime api
-        with torchtrt.runtime.enable_cudagraphs():
-            for i in range(TRIALS):
-                trt_out_list.append(optimized_model(*input_list[i]))
-                ref_out_list.append(fx_graph(*input_list[i]))
 
-        # 2. Optional parameter in existing cuda runtime api
-        # WrapperTorchTensorRTModule can be simplified to have only cuda graph path
         with torchtrt.runtime.enable_cudagraphs(optimized_model) as wrapped_module:
-            for i in range(TRIALS):
-                trt_out_list.append(wrapped_module(*input_list[i]))
-                ref_out_list.append(fx_graph(*input_list[i]))
-
-        # 3. Use Wrapper module directly
-        wrapped_module = WrapperTorchTensorRTModule(optimized_model)
-        with torchtrt.runtime.enable_cudagraphs():
             for i in range(TRIALS):
                 trt_out_list.append(wrapped_module(*input_list[i]))
                 ref_out_list.append(fx_graph(*input_list[i]))
