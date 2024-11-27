@@ -196,14 +196,6 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
 
         return budget_bytes
 
-    def set_whole_cudagraphs(self, enable: bool) -> None:
-        """
-        When the global CUDA graphs mode is enabled, the parent wrapper module handles all
-        CUDA graph recording and replay. Therefore, any child modules must disable their
-        own CUDA graph functionality to avoid conflicts.
-        """
-        self.engine.set_whole_cudagraphs(enable)
-
     def setup_engine(self) -> None:
         """
         Setup engine for a module which has deferred engine setup.

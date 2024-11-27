@@ -144,8 +144,6 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         self.engine = None
         self.weight_name_map = weight_name_map
         self.target_platform = Platform.current_platform()
-        # Check if CUDA graph capture is enabled in the parent node
-        self.whole_cudagraphs = False
         # Previous cuda graphs state
         self.prev_cudagraphs_enabled = False
 
@@ -187,14 +185,6 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         # Set automatic weight streaming budget as default when context is created
         logger.debug(f"Weight streaming budget set to {budget_bytes}B")
         return self._set_device_memory_budget(budget_bytes)
-
-    def set_whole_cudagraphs(self, enable: bool) -> None:
-        """
-        When the global CUDA graphs mode is enabled, the parent wrapper module handles all
-        CUDA graph recording and replay. Therefore, any child modules must disable their
-        own CUDA graph functionality to avoid conflicts.
-        """
-        self.whole_cudagraphs = enable
 
     def setup_engine(self) -> None:
         assert (
@@ -361,10 +351,8 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         ):
             self._check_initialized()
 
-            cudagraphs_enabled = (
-                torch_tensorrt.runtime.get_cudagraphs_mode()
-                and not self.whole_cudagraphs
-            )
+            cudagraphs_enabled = torch_tensorrt.runtime.get_cudagraphs_mode()
+
             # Cudagraphs record is required if cudagraphs_enabled is switched to True regardless of shape change
             need_cudagraphs_record = cudagraphs_enabled and (
                 (not self.prev_cudagraphs_enabled)

@@ -216,10 +216,6 @@ TRTEngine::TRTEngine(
   LOG_DEBUG(*this);
 }
 
-void TRTEngine::set_whole_cudagraphs(bool enable) {
-  whole_cudagraphs = enable;
-}
-
 TRTEngine::~TRTEngine() {
   trt_engine_profiler.reset();
   exec_ctx.reset();

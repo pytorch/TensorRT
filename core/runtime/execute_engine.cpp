@@ -201,7 +201,7 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
     LOG_INFO("" << log_info);
     compiled_engine->cudagraph.enable_debug_mode();
   }
-  bool cudagraphs_enabled = (!compiled_engine->whole_cudagraphs && CUDAGRAPHS_MODE);
+  bool cudagraphs_enabled = (CUDAGRAPHS_MODE == SUBGRAPH_CUDAGRAPHS);
 
   // Whether cudagraphs needs to record the graph on this pass
   // Cudagraphs record is required if cudagraphs_enabled is switched to True regardless of shape change
