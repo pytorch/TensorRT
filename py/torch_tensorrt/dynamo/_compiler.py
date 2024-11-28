@@ -216,7 +216,7 @@ def cross_compile_for_windows(
         )
         if immutable_weights:
             raise ValueError(
-                "Use flag `immutable_weights` only. Flag `refit` is deprecated."
+                "Use flag `immutable_weights` only. Flag `make_refittable` is deprecated."
             )
         else:
             immutable_weights = not kwargs["make_refittable"]
@@ -527,7 +527,7 @@ def compile(
         )
         if immutable_weights:
             raise ValueError(
-                "Use flag `immutable_weights` only. Flag `refit` is deprecated."
+                "Use flag `immutable_weights` only. Flag `make_refittable` is deprecated."
             )
         else:
             immutable_weights = not kwargs["make_refittable"]
@@ -1047,7 +1047,7 @@ def convert_exported_program_to_serialized_trt_engine(
         )
         if immutable_weights:
             raise ValueError(
-                "Use flag `immutable_weights` only. Flag `refit` is deprecated."
+                "Use flag `immutable_weights` only. Flag `make_refittable` is deprecated."
             )
         else:
             immutable_weights = not kwargs["make_refittable"]
