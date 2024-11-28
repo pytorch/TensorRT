@@ -234,7 +234,7 @@ class TestWeightStrippedEngine(TestCase):
             debug=False,
             min_block_size=1,
             immutable_weights=False,
-            strip_engine_weights=False,  # engine cache will save the stripped engine even if this is False
+            strip_engine_weights=False,
             refit_identical_engine_weights=True,
             cache_built_engines=True,
             reuse_cached_engines=True,
