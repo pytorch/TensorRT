@@ -291,6 +291,8 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             # non-refittable engine
             if self.compilation_settings.strip_engine_weights:
                 _LOGGER.warning("strip_engine_weights will be ignored.")
+            if self.compilation_settings.refit_identical_engine_weights:
+                _LOGGER.warning("refit_identical_engine_weights will be ignored.")
         else:
             # refittable engine
             if self.compilation_settings.refit_identical_engine_weights:
@@ -496,16 +498,15 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                     suffix = sd_weight_name_list[-1]
                     # Retrieve each weight name(s) in state_dict
                     if layer_type == "CONSTANT":
-                        if "embedding" in suffix:
-                            sd_weight_name = f"{sd_weight_name}.weight"
-                        elif "weight" in suffix or "mm_other" in suffix:
-                            # Linear layer weight
+                        if (
+                            "embedding" in suffix
+                            or "weight" in suffix
+                            or "mm_other" in suffix
+                        ):
                             sd_weight_name = f"{sd_weight_name}.weight"
                         elif "running_mean" in suffix:
-                            # Linear layer weight
                             sd_weight_name = f"{sd_weight_name}.running_mean"
                         elif "running_var" in suffix:
-                            # Linear layer weight
                             sd_weight_name = f"{sd_weight_name}.running_var"
                         elif "bias" in suffix:
                             sd_weight_name = f"{sd_weight_name}.bias"

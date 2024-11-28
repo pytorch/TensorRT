@@ -92,6 +92,8 @@ def cross_compile_for_windows(
     custom_engine_cache: Optional[BaseEngineCache] = _defaults.CUSTOM_ENGINE_CACHE,
     use_explicit_typing: bool = _defaults.USE_EXPLICIT_TYPING,
     use_fp32_acc: bool = _defaults.USE_FP32_ACC,
+    refit_identical_engine_weights: bool = _defaults.REFIT_IDENTICAL_ENGINE_WEIGHTS,
+    strip_engine_weights: bool = _defaults.STRIP_ENGINE_WEIGHTS,
     immutable_weights: bool = _defaults.IMMUTABLE_WEIGHTS,
     enable_weight_streaming: bool = _defaults.ENABLE_WEIGHT_STREAMING,
     **kwargs: Any,
@@ -163,6 +165,8 @@ def cross_compile_for_windows(
         custom_engine_cache (Optional[BaseEngineCache]): Engine cache instance to use for saving and loading engines. Users can provide their own engine cache by inheriting from BaseEngineCache. If used, engine_cache_dir and engine_cache_size will be ignored.
         use_explicit_typing (bool): This flag enables strong typing in TensorRT compilation which respects the precisions set in the Pytorch model. This is useful when users have mixed precision graphs.
         use_fp32_acc (bool): This option inserts cast to FP32 nodes around matmul layers and TensorRT ensures the accumulation of matmul happens in FP32. Use this only when FP16 precision is configured in enabled_precisions.
+        refit_identical_engine_weights (bool): Refit engines with identical weights. This is useful when the same model is compiled multiple times with different inputs and the weights are the same. This will save time by reusing the same engine for different inputs.
+        strip_engine_weights (bool): Strip engine weights from the serialized engine. This is useful when the engine is to be deployed in an environment where the weights are not required.
         immutable_weights (bool): Build non-refittable engines. This is useful for some layers that are not refittable. If this argument is set to true, `strip_engine_weights` and `refit_identical_engine_weights` will be ignored.
         enable_weight_streaming (bool): Enable weight streaming.
         **kwargs: Any,
@@ -193,16 +197,43 @@ def cross_compile_for_windows(
 
     if "refit" in kwargs.keys():
         warnings.warn(
-            "`refit` is deprecated. Engines are refittable by default. Please set immutable_weights=True to build a non-refittable engine whose weights will be fixed.",
+            "`refit` is deprecated. Please set `immutable_weights=True` to build a non-refittable engine whose weights will be fixed.",
             DeprecationWarning,
             stacklevel=2,
         )
+        if immutable_weights:
+            raise ValueError(
+                "Use flag `immutable_weights` only. Flag `refit` is deprecated."
+            )
+        else:
+            immutable_weights = not kwargs["refit"]
 
     if "make_refittable" in kwargs.keys():
         warnings.warn(
-            "`make_refittable` is deprecated. Engines are refittable by default. Please set immutable_weights=True to build a non-refittable engine whose weights will be fixed.",
+            "`make_refittable` is deprecated. Please set `immutable_weights=True` to build a non-refittable engine whose weights will be fixed.",
             DeprecationWarning,
             stacklevel=2,
+        )
+        if immutable_weights:
+            raise ValueError(
+                "Use flag `immutable_weights` only. Flag `refit` is deprecated."
+            )
+        else:
+            immutable_weights = not kwargs["make_refittable"]
+
+    if refit_identical_engine_weights:
+        if immutable_weights:
+            raise ValueError(
+                "`immutable_weights` must be False when `refit_identical_engine_weights` is True."
+            )
+
+    if (
+        not immutable_weights
+        and not refit_identical_engine_weights
+        and enable_weight_streaming
+    ):
+        raise ValueError(
+            "TensorRT's `REFIT` flag is not compatible with `enable_weight_streaming=True` for now. This issue was reported on https://github.com/pytorch/TensorRT/issues/3305"
         )
 
     engine_capability = EngineCapability._from(engine_capability)
@@ -288,6 +319,8 @@ def cross_compile_for_windows(
         "lazy_engine_init": lazy_engine_init,
         "cache_built_engines": cache_built_engines,
         "reuse_cached_engines": reuse_cached_engines,
+        "refit_identical_engine_weights": refit_identical_engine_weights,
+        "strip_engine_weights": strip_engine_weights,
         "immutable_weights": immutable_weights,
         "enable_cross_compile_for_windows": True,
         "enable_weight_streaming": enable_weight_streaming,
@@ -475,16 +508,43 @@ def compile(
 
     if "refit" in kwargs.keys():
         warnings.warn(
-            "`refit` is deprecated. Engines are refittable by default. Please set immutable_weights=True to build a non-refittable engine whose weights will be fixed.",
+            "`refit` is deprecated. Please set `immutable_weights=True` to build a non-refittable engine whose weights will be fixed.",
             DeprecationWarning,
             stacklevel=2,
         )
+        if immutable_weights:
+            raise ValueError(
+                "Use flag `immutable_weights` only. Flag `refit` is deprecated."
+            )
+        else:
+            immutable_weights = not kwargs["refit"]
 
     if "make_refittable" in kwargs.keys():
         warnings.warn(
-            "`make_refittable` is deprecated. Engines are refittable by default. Please set immutable_weights=True to build a non-refittable engine whose weights will be fixed.",
+            "`make_refittable` is deprecated. Please set `immutable_weights=True` to build a non-refittable engine whose weights will be fixed.",
             DeprecationWarning,
             stacklevel=2,
+        )
+        if immutable_weights:
+            raise ValueError(
+                "Use flag `immutable_weights` only. Flag `refit` is deprecated."
+            )
+        else:
+            immutable_weights = not kwargs["make_refittable"]
+
+    if refit_identical_engine_weights:
+        if immutable_weights:
+            raise ValueError(
+                "`immutable_weights` must be False when `refit_identical_engine_weights` is True."
+            )
+
+    if (
+        not immutable_weights
+        and not refit_identical_engine_weights
+        and enable_weight_streaming
+    ):
+        raise ValueError(
+            "TensorRT's `REFIT` flag is not compatible with `enable_weight_streaming=True` for now. This issue was reported on https://github.com/pytorch/TensorRT/issues/3305"
         )
 
     if (
@@ -965,17 +1025,46 @@ def convert_exported_program_to_serialized_trt_engine(
                 DeprecationWarning,
                 stacklevel=2,
             )
+
     if "refit" in kwargs.keys():
         warnings.warn(
-            "`refit` is deprecated. Engines are refittable by default. Please set immutable_weights=True to build a non-refittable engine whose weights will be fixed.",
+            "`refit` is deprecated. Please set `immutable_weights=True` to build a non-refittable engine whose weights will be fixed.",
             DeprecationWarning,
             stacklevel=2,
         )
+        if immutable_weights:
+            raise ValueError(
+                "Use flag `immutable_weights` only. Flag `refit` is deprecated."
+            )
+        else:
+            immutable_weights = not kwargs["refit"]
+
     if "make_refittable" in kwargs.keys():
         warnings.warn(
-            "`make_refittable` is deprecated. Engines are refittable by default. Please set immutable_weights=True to build a non-refittable engine whose weights will be fixed.",
+            "`make_refittable` is deprecated. Please set `immutable_weights=True` to build a non-refittable engine whose weights will be fixed.",
             DeprecationWarning,
             stacklevel=2,
+        )
+        if immutable_weights:
+            raise ValueError(
+                "Use flag `immutable_weights` only. Flag `refit` is deprecated."
+            )
+        else:
+            immutable_weights = not kwargs["make_refittable"]
+
+    if refit_identical_engine_weights:
+        if immutable_weights:
+            raise ValueError(
+                "`immutable_weights` must be False when `refit_identical_engine_weights` is True."
+            )
+
+    if (
+        not immutable_weights
+        and not refit_identical_engine_weights
+        and enable_weight_streaming
+    ):
+        raise ValueError(
+            "TensorRT's `REFIT` flag is not compatible with `enable_weight_streaming=True` for now. This issue was reported on https://github.com/pytorch/TensorRT/issues/3305"
         )
 
     if arg_inputs is None and inputs is None:

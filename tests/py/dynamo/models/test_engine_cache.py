@@ -74,7 +74,7 @@ class TestHashFunction(TestCase):
             ),
         )
         settings1 = CompilationSettings(
-            cache_built_engines=True, reuse_cached_engines=True
+            immutable_weights=False, cache_built_engines=True, reuse_cached_engines=True
         )
         hash1 = BaseEngineCache.get_hash(exp_program1.module(), input_specs1, settings1)
 
@@ -89,7 +89,7 @@ class TestHashFunction(TestCase):
             ),
         )
         settings2 = CompilationSettings(
-            cache_built_engines=True, reuse_cached_engines=True
+            immutable_weights=False, cache_built_engines=True, reuse_cached_engines=True
         )
         hash2 = BaseEngineCache.get_hash(exp_program2.module(), input_specs2, settings2)
 
@@ -111,7 +111,7 @@ class TestHashFunction(TestCase):
             ),
         )
         settings1 = CompilationSettings(
-            cache_built_engines=True, reuse_cached_engines=True
+            immutable_weights=False, cache_built_engines=True, reuse_cached_engines=True
         )
         hash1 = BaseEngineCache.get_hash(exp_program1.module(), input_specs1, settings1)
 
@@ -126,7 +126,7 @@ class TestHashFunction(TestCase):
             ),
         )
         settings2 = CompilationSettings(
-            cache_built_engines=True, reuse_cached_engines=True
+            immutable_weights=False, cache_built_engines=True, reuse_cached_engines=True
         )
         hash2 = BaseEngineCache.get_hash(exp_program2.module(), input_specs2, settings2)
 
@@ -148,6 +148,7 @@ class TestHashFunction(TestCase):
             ),
         )
         settings1 = CompilationSettings(
+            immutable_weights=False,
             cache_built_engines=True,
             reuse_cached_engines=True,
             enabled_precisions={torch.float32},
@@ -165,6 +166,7 @@ class TestHashFunction(TestCase):
             ),
         )
         settings2 = CompilationSettings(
+            immutable_weights=False,
             cache_built_engines=True,
             reuse_cached_engines=True,
             enabled_precisions={torch.float32, torch.float16},
@@ -223,6 +225,7 @@ class TestEngineCache(TestCase):
                 enabled_precisions={torch.float},
                 debug=False,
                 min_block_size=1,
+                immutable_weights=False,
                 cache_built_engines=cache_built_engines,
                 reuse_cached_engines=reuse_cached_engines,
                 engine_cache_dir=engine_cache_dir,
@@ -286,6 +289,7 @@ class TestEngineCache(TestCase):
                 enabled_precisions={torch.float},
                 debug=False,
                 min_block_size=1,
+                immutable_weights=False,
                 cache_built_engines=cache_built_engines,
                 reuse_cached_engines=reuse_cached_engines,
                 custom_engine_cache=custom_engine_cache,
@@ -332,6 +336,7 @@ class TestEngineCache(TestCase):
                 enabled_precisions={torch.float},
                 debug=False,
                 min_block_size=1,
+                immutable_weights=False,
                 cache_built_engines=True,
                 reuse_cached_engines=True,
             )
@@ -386,6 +391,7 @@ class TestEngineCache(TestCase):
                     "enabled_precisions": {torch.float},
                     "debug": False,
                     "min_block_size": 1,
+                    "immutable_weights": False,
                     "cache_built_engines": cache_built_engines,
                     "reuse_cached_engines": reuse_cached_engines,
                     "engine_cache_dir": engine_cache_dir,
@@ -449,6 +455,7 @@ class TestEngineCache(TestCase):
                     "enabled_precisions": {torch.float},
                     "debug": False,
                     "min_block_size": 1,
+                    "immutable_weights": False,
                     "cache_built_engines": cache_built_engines,
                     "reuse_cached_engines": reuse_cached_engines,
                     "custom_engine_cache": custom_engine_cache,
@@ -498,6 +505,7 @@ class TestEngineCache(TestCase):
                     "enabled_precisions": {torch.float},
                     "debug": False,
                     "min_block_size": 1,
+                    "immutable_weights": False,
                     "cache_built_engines": True,
                     "reuse_cached_engines": True,
                     "custom_engine_cache": custom_engine_cache,
@@ -540,6 +548,7 @@ class TestEngineCache(TestCase):
                     "enabled_precisions": {torch.float},
                     "debug": False,
                     "min_block_size": 1,
+                    "immutable_weights": False,
                     "cache_built_engines": True,
                     "reuse_cached_engines": True,
                     "custom_engine_cache": custom_engine_cache,
@@ -628,6 +637,7 @@ class TestEngineCache(TestCase):
             enabled_precisions={torch.float},
             debug=False,
             min_block_size=1,
+            immutable_weights=False,
             cache_built_engines=False,
             reuse_cached_engines=False,
             strip_engine_weights=False,
@@ -858,6 +868,7 @@ class TestEngineCache(TestCase):
             enabled_precisions={torch.float32},
             debug=False,
             min_block_size=1,
+            immutable_weights=False,
             truncate_double=True,
             device=DEVICE,
             disable_tf32=True,

@@ -285,6 +285,10 @@ def refit_module_weights(
 
     assert settings is not None
 
+    assert (
+        not settings.immutable_weights
+    ), "Refitting is not enabled. Please recompile the engine with immutable_weights=False."
+
     if settings.debug:
         set_log_level(logger.parent, logging.DEBUG)
 

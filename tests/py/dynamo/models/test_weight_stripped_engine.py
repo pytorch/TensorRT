@@ -26,6 +26,7 @@ class TestWeightStrippedEngine(TestCase):
             "enabled_precisions": {torch.float},
             "debug": False,
             "min_block_size": 1,
+            "immutable_weights": False,
             "strip_engine_weights": False,
             "refit_identical_engine_weights": False,
         }
@@ -76,6 +77,7 @@ class TestWeightStrippedEngine(TestCase):
             "enabled_precisions": {torch.float},
             "debug": False,
             "min_block_size": 1,
+            "immutable_weights": False,
             "strip_engine_weights": True,
             "refit_identical_engine_weights": False,
         }
@@ -117,12 +119,14 @@ class TestWeightStrippedEngine(TestCase):
         weight_included_engine = convert_exported_program_to_serialized_trt_engine(
             exp_program,
             example_inputs,
+            immutable_weights=False,
             strip_engine_weights=False,
             refit_identical_engine_weights=False,
         )
         weight_stripped_engine = convert_exported_program_to_serialized_trt_engine(
             exp_program,
             example_inputs,
+            immutable_weights=False,
             strip_engine_weights=True,
             refit_identical_engine_weights=False,
         )
@@ -130,6 +134,7 @@ class TestWeightStrippedEngine(TestCase):
             convert_exported_program_to_serialized_trt_engine(
                 exp_program,
                 example_inputs,
+                immutable_weights=False,
                 strip_engine_weights=True,
                 refit_identical_engine_weights=True,
             )
@@ -162,6 +167,7 @@ class TestWeightStrippedEngine(TestCase):
             enabled_precisions={torch.float},
             debug=False,
             min_block_size=1,
+            immutable_weights=False,
             strip_engine_weights=True,
             refit_identical_engine_weights=False,
         )
@@ -187,6 +193,7 @@ class TestWeightStrippedEngine(TestCase):
                 "enabled_precisions": {torch.float},
                 "debug": False,
                 "min_block_size": 1,
+                "immutable_weights": False,
                 "cache_built_engines": False,
                 "reuse_cached_engines": False,
                 "refit_identical_engine_weights": False,
@@ -226,6 +233,7 @@ class TestWeightStrippedEngine(TestCase):
             enabled_precisions={torch.float},
             debug=False,
             min_block_size=1,
+            immutable_weights=False,
             strip_engine_weights=False,  # engine cache will save the stripped engine even if this is False
             refit_identical_engine_weights=True,
             cache_built_engines=True,
@@ -291,6 +299,7 @@ class TestWeightStrippedEngine(TestCase):
                 enabled_precisions={torch.float},
                 debug=False,
                 min_block_size=1,
+                immutable_weights=False,
                 cache_built_engines=cache_built_engines,
                 reuse_cached_engines=reuse_cached_engines,
                 engine_cache_dir=engine_cache_dir,
@@ -371,6 +380,7 @@ class TestWeightStrippedEngine(TestCase):
                     "enabled_precisions": {torch.float},
                     "debug": False,
                     "min_block_size": 1,
+                    "immutable_weights": False,
                     "cache_built_engines": cache_built_engines,
                     "reuse_cached_engines": reuse_cached_engines,
                     "engine_cache_dir": engine_cache_dir,
@@ -444,6 +454,7 @@ class TestWeightStrippedEngine(TestCase):
                     "enabled_precisions": {torch.float},
                     "debug": False,
                     "min_block_size": 1,
+                    "immutable_weights": False,
                     "cache_built_engines": True,
                     "reuse_cached_engines": True,
                     "engine_cache_dir": engine_cache_dir,
@@ -478,6 +489,7 @@ class TestWeightStrippedEngine(TestCase):
             ir="dynamo",
             inputs=tuple(inputs),
             min_block_size=1,
+            immutable_weights=False,
             use_python_runtime=True,
             strip_engine_weights=True,
             refit_identical_engine_weights=False,
@@ -517,6 +529,7 @@ class TestWeightStrippedEngine(TestCase):
                 use_python_runtime=use_python_runtime,
                 debug=False,
                 min_block_size=1,
+                immutable_weights=False,
                 strip_engine_weights=True,
                 refit_identical_engine_weights=False,
             )
@@ -549,6 +562,7 @@ class TestWeightStrippedEngine(TestCase):
             enabled_precisions={torch.float},
             debug=False,
             min_block_size=1,
+            immutable_weights=False,
             strip_engine_weights=True,
             refit_identical_engine_weights=True,
         )

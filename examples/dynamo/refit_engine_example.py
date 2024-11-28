@@ -46,7 +46,10 @@ inputs = [torch.rand((1, 3, 224, 224)).to("cuda")]
 # Make a refittable Compilation Program
 # ---------------------------------------
 #
-# The inital step is to compile a module and save it as with a normal.
+# The inital step is to compile a module and save it as with a normal. Note that there is an
+# additional parameter `immutable_weights` that is set to `False`. This parameter is used to
+# indicate that the engine being built should support weight refitting later. Engines built without
+# these setttings will not be able to be refit.
 #
 # In this case we are going to compile a ResNet18 model with randomly initialized weights and save it.
 
@@ -66,6 +69,8 @@ trt_gm = torch_trt.dynamo.compile(
     debug=debug,
     min_block_size=min_block_size,
     torch_executed_ops=torch_executed_ops,
+    immutable_weights=False,
+    reuse_cached_engines=False,
 )  # Output is a torch.fx.GraphModule
 
 # Save the graph module as an exported program

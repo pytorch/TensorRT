@@ -148,6 +148,7 @@ class TestEmbeddingBagConverter(DispatchTestCase):
             precision=weight.dtype,
             enable_passes=True,
             propagate_shapes=True,
+            immutable_weights=True,
         )
 
     @parameterized.expand(
@@ -345,6 +346,7 @@ class TestEmbeddingBagConverter(DispatchTestCase):
             precision=weight.dtype,
             enable_passes=True,
             propagate_shapes=True,
+            immutable_weights=True,
         )
 
     @parameterized.expand(
@@ -409,6 +411,7 @@ class TestEmbeddingBagConverter(DispatchTestCase):
             precision=weight.dtype,
             enable_passes=True,
             propagate_shapes=True,
+            immutable_weights=True,
         )
 
     @parameterized.expand(
@@ -490,6 +493,7 @@ class TestEmbeddingBagConverter(DispatchTestCase):
             min_block_size=1,
             cache_built_engines=False,
             reuse_cached_engines=False,
+            immutable_weights=True,
         )
         # use the inputs with different shape to inference:
         if per_sample_weights is None:
