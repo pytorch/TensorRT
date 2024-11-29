@@ -73,14 +73,26 @@ trt_model = torch_tensorrt.compile(
 #        Note: Some of the above nodes may be supported, but were not included in a TRT graph by the partitioner
 
 # %%
+# trt module with cuda graphs
+# ----------------------------------
+#
+# When CUDA Graphs are applied to a TensorRT model that contains graph breaks, each break introduces additional
+# overhead. This occurs because graph breaks prevent the entire model from being executed as a single, continuous
+# optimized unit. As a result, some of the performance benefits typically provided by CUDA Graphs, such as reduced
+# kernel launch overhead and improved execution efficiency, may be diminished.
+with torch_tensorrt.runtime.enable_cudagraphs():
+    trt_model(input)
+
+# %%
 # Running wrapped module with cuda graphs
 # ----------------------------------
 #
-# Please note that initializing with wrapper module involve warm-up phase where the module
-# is executed several times. This ensures that memory allocations and initializations are
-# not recorded in CUDA Graphs.
-# When using the TensorRT module within a CUDA Graph context manager, a wrapped_module is returned.
-# This module captures the execution graph, allowing for efficient replay during subsequent
-# inferences by reducing kernel launch overheads and improving performance.
+# Using a wrapped runtime module with CUDA Graphs allows you to encapsulate sequences of operations into graphs
+# that can be executed efficiently, even in the presence of graph breaks. When a CUDA Graph context manager is
+# used with the TensorRT module as a positional argument, it returns a wrapped_module. This module captures the
+# execution graph, enabling efficient replay during subsequent inferences by reducing kernel launch overheads
+# and improving performance. Note that initializing with the wrapper module involves a warm-up phase where the
+# module is executed several times. This warm-up ensures that memory allocations and initializations are not
+# recorded in CUDA Graphs, which helps maintain consistent execution paths and optimize performance.
 with torch_tensorrt.runtime.enable_cudagraphs(trt_model) as wrapped_module:
     wrapped_module(input)
