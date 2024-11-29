@@ -137,7 +137,7 @@ struct TRTEngine : torch::CustomClassHolder {
 
   void set_profiling_paths();
 #ifndef NDEBUG
-  bool profile_execution = false;
+  bool profile_execution = true;
 #else
   bool profile_execution = false;
 #endif
