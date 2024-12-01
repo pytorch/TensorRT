@@ -141,11 +141,15 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         self.engine = None
         self.weight_name_map = weight_name_map
         self.target_platform = Platform.current_platform()
+<<<<<<< HEAD
         self.runtime_states = TorchTRTRuntimeStates(
             torch_tensorrt.runtime.get_cudagraphs_mode(), False
         )
         self.pre_allocated_outputs: List[torch.Tensor] = []
         self.use_pre_allocated_outputs = False
+=======
+        self.has_context_changed = False
+>>>>>>> 7bb66dac4 (fix: Record cudagraphs when weight streaming budget has changed)
 
         if self.serialized_engine is not None and not self.settings.lazy_engine_init:
             self.setup_engine()
@@ -165,6 +169,9 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
             del self.context
         budget_bytes = self._set_device_memory_budget(budget_bytes)
         self.context = self.engine.create_execution_context()
+        # Indicates to reevaluate the runtime settings
+        self.has_context_changed = True
+
         return budget_bytes
 
     def _set_device_memory_budget(self, budget_bytes: int) -> int:
@@ -353,11 +360,16 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
             self._check_initialized()
 
             cudagraphs_enabled = torch_tensorrt.runtime.get_cudagraphs_mode()
+<<<<<<< HEAD
             shape_changed = self.validate_input_shapes(inputs)
             need_cudagraphs_record, can_use_pre_allocated_outputs = (
                 self.runtime_states.validate_states(
                     cudagraphs_enabled, self.use_pre_allocated_outputs, shape_changed
                 )
+=======
+            need_cudagraphs_record = cudagraphs_enabled and (
+                not self.cudagraphs_validate_shapes(inputs) or self.has_context_changed
+>>>>>>> 7bb66dac4 (fix: Record cudagraphs when weight streaming budget has changed)
             )
 
             if need_cudagraphs_record:
@@ -366,11 +378,18 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                 self._input_buffers = [None] * len(self.input_names)
                 self._output_buffers = [None] * len(self.output_names)
 
-            if not cudagraphs_enabled and self.cudagraph:
+            if self.cudagraph and (not cudagraphs_enabled or self.has_context_changed):
                 self.cudagraph.reset()
                 self.cudagraph = None
 
+<<<<<<< HEAD
             # If in safe mode, check at each iteration for whether a switch is required
+=======
+            # Reset the flag
+            self.has_context_changed = False
+
+            # If in safe mode, check at each iteration for for whether a switch is required
+>>>>>>> 7bb66dac4 (fix: Record cudagraphs when weight streaming budget has changed)
             if (
                 torch_tensorrt.runtime._multi_device_safe_mode._PY_RT_MULTI_DEVICE_SAFE_MODE
             ):

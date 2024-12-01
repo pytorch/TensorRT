@@ -310,6 +310,9 @@ bool TRTEngine::set_device_memory_budget(int64_t budget) {
   if (profile_execution) {
     enable_profiling();
   }
+  // Indicates to reevaluate the runtime settings
+  has_context_changed = true;
+
   return result;
 }
 
