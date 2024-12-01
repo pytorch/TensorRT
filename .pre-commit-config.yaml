@@ -23,10 +23,10 @@ repos:
   - repo: https://github.com/keith/pre-commit-buildifier
     rev: 6.4.0
     hooks:
-    -   id: buildifier
+      - id: buildifier
         args:
           - --warnings=all
-    -   id: buildifier-lint
+      - id: buildifier-lint
   - repo: https://github.com/abravalheri/validate-pyproject
     rev: v0.16
     hooks:
@@ -37,9 +37,9 @@ repos:
       - id: isort
         name: isort (python)
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: 'v1.9.0'
+    rev: "v1.9.0"
     hooks:
-    -   id: mypy
+      - id: mypy
         exclude: "^py/torch_tensorrt/fx|^examples|^tests|^py/torch_tensorrt/dynamo/_experimental|^tools|^docs|noxfile.py|setup.py|versions.py"
   - repo: https://github.com/astral-sh/ruff-pre-commit
     # Ruff version.
@@ -57,13 +57,13 @@ repos:
       - id: typos
   - repo: https://github.com/astral-sh/uv-pre-commit
     # uv version.
-    rev: 0.4.10
+    rev: 0.5.5
     hooks:
       # Update the uv lockfile
       - id: uv-lock
   - repo: local
     hooks:
-    -   id: dont-commit-upstream
+      - id: dont-commit-upstream
         name: NVIDIA-INTERNAL check
         entry: "!NVIDIA-INTERNAL"
         exclude: "^.pre-commit-config.yaml"

@@ -8,7 +8,7 @@ requires = [
     "cffi>=1.15.1",
     "typing-extensions>=4.7.0",
     "future>=0.18.3",
-    "tensorrt-cu12==10.3.0",
+    "tensorrt-cu12==10.6.0",
     "torch>=2.6.0.dev,<2.7.0",
     "pybind11==2.6.2",
     "numpy",
@@ -55,14 +55,31 @@ keywords = [
 ]
 dependencies = [
     "torch>=2.6.0.dev,<2.7.0",
-    "tensorrt-cu12==10.3.0",
-    "tensorrt-cu12-bindings==10.3.0",
-    "tensorrt-cu12-libs==10.3.0",
+    "tensorrt-cu12==10.6.0",
+    "tensorrt-cu12-bindings==10.6.0",
+    "tensorrt-cu12-libs==10.6.0",
     "packaging>=23",
     "numpy",
     "typing-extensions>=4.7.0",
 ]
+
 dynamic = ["version"]
+
+[dependency-groups]
+dev = [
+    "pre-commit>=2.20.0",
+    "black>=22.6.0",
+    "clang-format==14.0.6",
+    "typos",
+    "mypy",
+    "isort",
+    "ruff",
+    "pytest",
+    "pytest-xdist",
+    "parameterized>=0.2.0",
+    "expecttest==0.1.6",
+    "pyyaml",
+]
 
 [project.optional-dependencies]
 torchvision = [
@@ -83,29 +100,54 @@ package-dir = { "" = "py" }
 include-package-data = false
 
 [tool.uv]
-dev-dependencies = [
-    "pre-commit>=2.20.0",
-    "black>=22.6.0",
-    "clang-format==14.0.6",
-    "typos",
-    "mypy",
-    "isort",
-    "ruff",
-    "pytest",
-    "pytest-xdist",
-    "parameterized>=0.2.0",
-    "expecttest==0.1.6",
-    "pyyaml",
-]
-
 environments = ["sys_platform == 'linux'", "sys_platform == 'windows'"]
 
-extra-index-url = [
-    "https://download.pytorch.org/whl/nightly/cu124", # We are going to define the dev enviorment as latest supported CUDA, and allow CI to handle the others, change as needed
+prerelease = "if-necessary-or-explicit"
+
+
+[tool.uv.sources]
+torch = [
+    { index = "pytorch-nightly-cu126"},
+]
+torchvision = [
+     { index = "pytorch-nightly-cu126"},
 ]
 
-prerelease = "if-necessary-or-explicit"
-index-strategy = "unsafe-best-match"
+[[tool.uv.index]]
+name = "pytorch-nightly-cu126"
+url = "https://download.pytorch.org/whl/nightly/cu126"
+explicit = false
+
+# [[tool.uv.index]]
+# name = "pytorch-nightly-cu124"
+# url = "https://download.pytorch.org/whl/nightly/cu124"
+# explicit = true
+
+# [[tool.uv.index]]
+# name = "pytorch-nightly-cu118"
+# url = "https://download.pytorch.org/whl/nightly/cu118"
+# explicit = true
+
+# [[tool.uv.index]]
+# name = "pytorch-test-cu124"
+# url = "https://download.pytorch.org/whl/test/cu124"
+# explicit = false
+
+# [[tool.uv.index]]
+# name = "pytorch-test-cu118"
+# url = "https://download.pytorch.org/whl/test/cu118"
+# explicit = false
+
+# [[tool.uv.index]]
+# name = "pytorch-release-cu124"
+# url = "https://download.pytorch.org/whl/cu124"
+# explicit = false
+
+# [[tool.uv.index]]
+# name = "pytorch-release-cu118"
+# url = "https://download.pytorch.org/whl/cu118"
+# explicit = false
+
 
 [tool.ruff]
 # NOTE: Synchoronize the ignores with .flake8
