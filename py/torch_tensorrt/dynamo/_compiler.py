@@ -685,6 +685,8 @@ def compile_module(
         )
 
     breakpoint()
+    import time 
+    start = time.time()
     # Skip partitioning if the whole graph is supported to reduce partitioning overhead
     if num_supported_ops == total_ops:
         gm_inputs = partitioning.construct_submodule_inputs(gm)
@@ -695,6 +697,8 @@ def compile_module(
                 name="whole_graph",
                 engine_cache=engine_cache,
             )
+        end = time.time()
+        logger.info(f"Conversion time: {end - start} seconds")
         breakpoint()
         return trt_module
 
