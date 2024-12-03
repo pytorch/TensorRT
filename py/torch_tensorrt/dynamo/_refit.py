@@ -177,10 +177,6 @@ def _refit_single_trt_engine_with_gm(
 
         mapping.update(constant_mapping_with_type)
 
-        # Debug Use
-        # correct = construct_refit_mapping(new_gm, input_list, settings)
-        # comparison = {k: (np.allclose(correct[k][0], mapping[k][0].cpu().numpy(), 1e-2, 1e-2), correct[k][0], mapping[k][0]) for k in mapping if k in correct}
-
         for layer_name in weight_list:
             if layer_name not in mapping:
                 logger.warning(f"{layer_name} is not found in weight mapping.")
