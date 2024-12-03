@@ -32,32 +32,48 @@ using FlattenedState = std::tuple<
 
 struct RuntimeStates {
   bool need_cudagraphs_record;
+  bool need_cudagraphs_reset;
   bool can_use_pre_allocated_outputs;
 };
 
 struct TorchTRTRuntimeStates {
   // Previous runtime states
-  bool prev_cudagraphs_enabled, prev_pre_allocated_outputs_enabled;
+  bool prev_cudagraphs_enabled = false;
+  bool prev_pre_allocated_outputs_enabled = false;
+  // Indicates to reevaluate the runtime settings as context has changed
+  bool has_context_changed = false;
 
-  // Evaluates whether certain conditions are met to enable CUDA Graph recording or to reuse pre-allocated outputs
+  // Evaluates whether certain conditions are met to enable CUDA Graph recording/reset or to reuse pre-allocated outputs
   // based on the current and previous states, as well as input shape has changed
   RuntimeStates validate_states(bool cudagraphs_enabled, bool pre_allocated_outputs_enabled, bool shape_changed) {
     bool need_cudagraphs_record = false;
     bool can_use_pre_allocated_outputs = false;
+    bool need_cudagraphs_reset = false;
 
     // Cudagraphs record is required if cudagraphs_enabled is switched to True regardless of shape change
-    if (cudagraphs_enabled && (!prev_cudagraphs_enabled || shape_changed)) {
+    // If context is changed by runtime setting like weight streaming, it needs cuda graphs record
+    if (cudagraphs_enabled && (!prev_cudagraphs_enabled || shape_changed || has_context_changed)) {
       need_cudagraphs_record = true;
     }
     // Pre-allocated output can be used when previous and current state are true without shape change
     if (prev_pre_allocated_outputs_enabled && pre_allocated_outputs_enabled && !shape_changed) {
       can_use_pre_allocated_outputs = true;
     }
+
+    if (!cudagraphs_enabled || shape_changed || has_context_changed) {
+      need_cudagraphs_reset = true;
+    }
+
+    // Reset the flag
+    has_context_changed = false;
     prev_cudagraphs_enabled = cudagraphs_enabled;
     prev_pre_allocated_outputs_enabled = pre_allocated_outputs_enabled;
 
-    RuntimeStates values = {need_cudagraphs_record, can_use_pre_allocated_outputs};
+    RuntimeStates values = {need_cudagraphs_record, need_cudagraphs_reset, can_use_pre_allocated_outputs};
     return values;
+  }
+  void set_context_changed() {
+    has_context_changed = true;
   }
 };
 

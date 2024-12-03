@@ -205,9 +205,8 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
   // Whether cudagraphs needs to record the graph on this pass
   RuntimeStates states = compiled_engine->runtime_states.validate_states(
       CUDAGRAPHS_MODE, compiled_engine->use_pre_allocated_outputs, shape_changed);
-  bool need_cudagraphs_record = states.need_cudagraphs_record;
 
-  if (!CUDAGRAPHS_MODE || shape_changed) {
+  if (states.need_cudagraphs_reset) {
     compiled_engine->cudagraph.reset();
   }
 
@@ -269,7 +268,7 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
           std::make_unique<torch::autograd::profiler::RecordProfile>(compiled_engine->input_profile_path);
     }
 
-    setup_input_tensors(inputs, compiled_engine, need_cudagraphs_record);
+    setup_input_tensors(inputs, compiled_engine, states.need_cudagraphs_record);
 
     // Check if input shapes can be inferred.
     int32_t const io_size{compiled_engine->cuda_engine->getNbIOTensors()};
@@ -297,7 +296,7 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
     for (auto output_indices : compiled_engine->out_binding_map) {
       auto pyt_idx = output_indices.second;
       std::string name = compiled_engine->out_binding_names[pyt_idx];
-      if (need_cudagraphs_record) {
+      if (states.need_cudagraphs_record) {
         // If we are recording the cuda graph then we need to update the persistent output buffer
         compiled_engine->output_buffers[pyt_idx] = std::move(outputs[pyt_idx].clone());
       }
@@ -349,7 +348,7 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
       // Direct execution uses the caller buffers directly
       compiled_engine->exec_ctx->enqueueV3(compiled_engine->engine_stream);
     } else {
-      if (need_cudagraphs_record) {
+      if (states.need_cudagraphs_record) {
         // If cudagraphs needs to record a graph, capture the enqueueV3 call in a graph
         c10::cuda::CUDAStream recording_stream = compiled_engine->engine_stream;
         compiled_engine->cudagraph.capture_begin();
