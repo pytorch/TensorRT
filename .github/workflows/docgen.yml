@@ -46,7 +46,9 @@ jobs:
       - name: Generate New Docs
         run: |
           cd docsrc
-          yum install -y doxygen pandoc
+          dnf clean all
+          dnf update 
+          dnf install -y doxygen pandoc
           python3 -m pip install -r requirements.txt
           python3 -c "import torch_tensorrt; print(torch_tensorrt.__version__)"
           make html
