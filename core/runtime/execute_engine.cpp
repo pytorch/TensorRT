@@ -176,6 +176,10 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
     }
   }
 
+  // nvinfer1::IExecutionContext::enqueue is not thread safe and we need a mutex for it.
+  // setTensorAddress should be in same scope to prevent inconsistent state.
+  std::unique_lock<std::mutex> lock(compiled_engine->mu);
+
   { // Input Setup
     std::unique_ptr<torch::autograd::profiler::RecordProfile> input_profiler_guard;
     if (compiled_engine->profile_execution) {
@@ -306,9 +310,6 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
     // Create a new stream if the engine stream is the default stream
     compiled_engine->engine_stream = c10::cuda::getStreamFromPool(false, current_device_id);
   }
-
-  // nvinfer1::IExecutionContext::enqueue is not thread safe and we need a mutex for it.
-  std::unique_lock<std::mutex> lock(compiled_engine->mu);
 
   { // Engine Execution (execute on engine stream)
     c10::cuda::CUDAStreamGuard stream_guard(compiled_engine->engine_stream);
