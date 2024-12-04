@@ -17,9 +17,9 @@ jobs:
       image: docker.io/pytorch/manylinux2_28-builder:cuda12.6
       options: --gpus all
     env:
-      CUDA_HOME: /usr/local/cuda-12.4
-      VERSION_SUFFIX: cu124
-      CU_VERSION: cu124
+      CUDA_HOME: /usr/local/cuda-12.6
+      VERSION_SUFFIX: cu126
+      CU_VERSION: cu126
       CHANNEL: nightly
       CI_BUILD: 1
     steps:
