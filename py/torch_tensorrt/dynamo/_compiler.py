@@ -642,7 +642,7 @@ def compile_module(
     num_supported_ops, total_ops = partitioning.get_graph_converter_support(
         gm, settings.debug, settings.torch_executed_ops
     )
-    
+
     dryrun_tracker.total_ops_in_graph = total_ops
     dryrun_tracker.supported_ops_in_graph = num_supported_ops
     dryrun_tracker.compilation_settings = settings
@@ -684,24 +684,6 @@ def compile_module(
             "Some nodes do not have metadata (shape and dtype information). This could lead to problems sometimes if the graph has PyTorch and TensorRT segments."
         )
 
-    breakpoint()
-    import time 
-    start = time.time()
-    # Skip partitioning if the whole graph is supported to reduce partitioning overhead
-    if num_supported_ops == total_ops:
-        gm_inputs = partitioning.construct_submodule_inputs(gm)
-        trt_module = convert_module(
-                gm,
-                gm_inputs,
-                settings=settings,
-                name="whole_graph",
-                engine_cache=engine_cache,
-            )
-        end = time.time()
-        logger.info(f"Conversion time: {end - start} seconds")
-        breakpoint()
-        return trt_module
-
     # Partition module into components that can be TRT-accelerated
     fast_partitioner_failed = False
     # If specified, try using the fast partitioner and fall back to the global one on failure
@@ -714,6 +696,7 @@ def compile_module(
                 min_block_size=settings.min_block_size,
                 torch_executed_ops=settings.torch_executed_ops,
                 require_full_compilation=settings.require_full_compilation,
+                skip_fusion=(num_supported_ops == total_ops),
             )
 
         except torch.fx.passes.splitter_base.FxNetSplitterInternalError:
