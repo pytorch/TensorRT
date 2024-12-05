@@ -48,7 +48,7 @@ jobs:
           cd docsrc
           dnf clean all
           dnf update 
-          dnf install -y doxygen pandoc --allowerasing
+          dnf install -y doxygen pandoc --allowerasing --nobest
           python3 -m pip install -r requirements.txt
           python3 -c "import torch_tensorrt; print(torch_tensorrt.__version__)"
           make html
