@@ -79,6 +79,9 @@ jobs:
           repository: ${{ inputs.test-infra-repository }}
           ref: ${{ inputs.test-infra-ref }}
       - uses: ./.github/actions/set-channel
+      - uses: actions/checkout@v4
+        with:
+          repository: pytorch/tensorrt
       - name: Generate test matrix
         id: generate
         env:
