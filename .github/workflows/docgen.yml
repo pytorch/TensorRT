@@ -50,7 +50,7 @@ jobs:
                   dnf makecache --refresh
                   dnf install yum-utils -y
                   dnf config-manager --set-enabled powertools
-                  dnf update --skip-broken --nobest
+                  dnf update --skip-broken --nobest -y
                   dnf install -y doxygen pandoc
                   python3 -m pip install -r requirements.txt
                   python3 -c "import torch_tensorrt; print(torch_tensorrt.__version__)"
