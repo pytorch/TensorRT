@@ -14,12 +14,12 @@ jobs:
     if: ${{ ! contains(github.actor, 'pytorchbot') }}
     environment: pytorchbot-env
     container:
-      image: docker.io/pytorch/manylinux-builder:cuda12.4
+      image: docker.io/pytorch/manylinux2_28-builder:cuda12.6
       options: --gpus all
     env:
-      CUDA_HOME: /usr/local/cuda-12.4
-      VERSION_SUFFIX: cu124
-      CU_VERSION: cu124
+      CUDA_HOME: /usr/local/cuda-12.6
+      VERSION_SUFFIX: cu126
+      CU_VERSION: cu126
       CHANNEL: nightly
       CI_BUILD: 1
     steps:
@@ -46,7 +46,9 @@ jobs:
       - name: Generate New Docs
         run: |
           cd docsrc
-          yum install -y doxygen pandoc
+          dnf clean all
+          dnf update 
+          dnf install -y doxygen pandoc --allowerasing --nobest
           python3 -m pip install -r requirements.txt
           python3 -c "import torch_tensorrt; print(torch_tensorrt.__version__)"
           make html
