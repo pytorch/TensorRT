@@ -98,7 +98,9 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
   LOG_DEBUG(
       "Attempting to run engine (ID: " << compiled_engine->name
                                        << "); Hardware Compatible: " << compiled_engine->hardware_compatible);
-
+  // nvinfer1::IExecutionContext::enqueue is not thread safe and we need a mutex for it.
+  // Other IExecutionContext methods and runtime states should be in same scope as well
+  std::unique_lock<std::mutex> lock(compiled_engine->mu);
   if (compiled_engine->profile_execution) {
     std::stringstream ss;
     ss << "Execution profiling is enabled, find results here:" << std::endl;
@@ -175,10 +177,6 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
       }
     }
   }
-
-  // nvinfer1::IExecutionContext::enqueue is not thread safe and we need a mutex for it.
-  // setTensorAddress should be in same scope to prevent inconsistent state.
-  std::unique_lock<std::mutex> lock(compiled_engine->mu);
 
   { // Input Setup
     std::unique_ptr<torch::autograd::profiler::RecordProfile> input_profiler_guard;
