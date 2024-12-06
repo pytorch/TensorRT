@@ -7,6 +7,7 @@ on:
       - main
       - nightly
       - release/*
+  workflow_dispatch:
 
 # If pushes to main are made in rapid succession,
 # cancel existing docker builds and use newer commits
