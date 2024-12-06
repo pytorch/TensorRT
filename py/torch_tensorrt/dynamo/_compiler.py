@@ -696,7 +696,9 @@ def compile_module(
                 min_block_size=settings.min_block_size,
                 torch_executed_ops=settings.torch_executed_ops,
                 require_full_compilation=settings.require_full_compilation,
+                skip_fusion=(num_supported_ops == total_ops),
             )
+
         except torch.fx.passes.splitter_base.FxNetSplitterInternalError:
             logger.error(
                 "Partitioning failed on the subgraph with fast partition. See trace above. "
@@ -717,7 +719,7 @@ def compile_module(
             require_full_compilation=settings.require_full_compilation,
         )
 
-    dryrun_tracker.unsupported_ops = supported_ops.unsupported_operators
+    # dryrun_tracker.unsupported_ops = supported_ops.unsupported_operators
 
     # The global partitioner leaves non-TRT nodes as-is
     if not settings.use_fast_partitioner:
