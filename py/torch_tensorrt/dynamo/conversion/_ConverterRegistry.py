@@ -18,7 +18,6 @@ from typing import (
     cast,
 )
 
-import tensorrt as trt
 import torch
 from torch import SymBool, SymFloat, SymInt
 from torch._ops import OpOverloadPacket
@@ -26,6 +25,8 @@ from torch.fx.node import Argument, Node, Target, _get_qualified_name
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
 from torch_tensorrt.fx.converter_registry import CONVERTERS as FX_CONVERTERS
+
+import tensorrt as trt
 
 logger = logging.getLogger(__name__)
 
@@ -440,25 +441,33 @@ class ConverterRegistry:
         ):
             if key in registry:
                 converters = registry[key]
-
                 if isinstance(converters, (list, tuple)):
-                    for candidate in converters:
+                    logger.debug(f"Converter options for {key}: {len(converters)}")
+                    for i, candidate in enumerate(converters):
                         # We enable the converter under 4 conditions
                         # 1) capability validator is True
                         # 2) Assume dynamic_shape support is True
                         # 3) Node only has static shaped inputs
                         # 4) Node has dynamic inputs and the converter has supports_dynamic_shapes=True
-                        if candidate.capability_validator(
+                        if is_valid := candidate.capability_validator(
                             node, self.compilation_settings
                         ) and (
                             assume_dynamic_shape_support
                             or not node_has_dynamic_shapes(node)
                             or candidate.supports_dynamic_shapes
                         ):
+                            logger.debug(
+                                f"Selecting converter option {i} for converting {key}"
+                            )
                             return (
                                 candidate.converter_implementation,
                                 calling_convention,
                             )
+                        else:
+                            logger.debug(
+                                f"Skipping option {i} for {key}: (validator: {is_valid}, supports dynamic shapes: {candidate.supports_dynamic_shapes})"
+                            )
+                            continue
                 else:
                     # Assuming FX converters don't have dynamic shapes supported
                     if not node_has_dynamic_shapes(node):

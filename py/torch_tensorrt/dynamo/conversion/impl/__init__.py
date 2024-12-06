@@ -1,6 +1,4 @@
-from torch_tensorrt.fx.converters.impl import convolution
-
-from . import (
+from torch_tensorrt.dynamo.conversion.impl import (
     activation,
     addmm,
     arange,
