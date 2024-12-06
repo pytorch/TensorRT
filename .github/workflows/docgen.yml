@@ -5,64 +5,67 @@ name: Generate Docs
 # Controls when the action will run. Triggers the workflow on push or pull request
 # events but only for the master branch
 on:
-  push:
-    branches: [ main ]
+    push:
+        branches: [main]
 
 jobs:
-  build-docs:
-    runs-on: linux.g5.4xlarge.nvidia.gpu
-    if: ${{ ! contains(github.actor, 'pytorchbot') }}
-    environment: pytorchbot-env
-    container:
-      image: docker.io/pytorch/manylinux2_28-builder:cuda12.6
-      options: --gpus all
-    env:
-      CUDA_HOME: /usr/local/cuda-12.6
-      VERSION_SUFFIX: cu126
-      CU_VERSION: cu126
-      CHANNEL: nightly
-      CI_BUILD: 1
-    steps:
-      - uses: actions/checkout@v3
-        with:
-          ref: ${{github.head_ref}}
-          token: ${{ secrets.GH_PYTORCHBOT_TOKEN }}
-      - name: Select Python / CUDA
-        run: |
-          git config --global --add safe.directory /__w/TensorRT/TensorRT
-          echo "/opt/python/cp311-cp311/bin/" >> $GITHUB_PATH
+    build-docs:
+        runs-on: linux.g5.4xlarge.nvidia.gpu
+        if: ${{ ! contains(github.actor, 'pytorchbot') }}
+        environment: pytorchbot-env
+        container:
+            image: docker.io/pytorch/manylinux2_28-builder:cuda12.6
+            options: --gpus all
+        env:
+            CUDA_HOME: /usr/local/cuda-12.6
+            VERSION_SUFFIX: cu126
+            CU_VERSION: cu126
+            CHANNEL: nightly
+            CI_BUILD: 1
+        steps:
+            - uses: actions/checkout@v3
+              with:
+                  ref: ${{github.head_ref}}
+                  token: ${{ secrets.GH_PYTORCHBOT_TOKEN }}
+            - name: Select Python / CUDA
+              run: |
+                  git config --global --add safe.directory /__w/TensorRT/TensorRT
+                  echo "/opt/python/cp311-cp311/bin/" >> $GITHUB_PATH
 
-      - name: Install base deps
-        run: |
-          python3 -m pip install pip --upgrade
-          python3 -m pip install pyyaml numpy torch --pre --extra-index-url https://download.pytorch.org/whl/nightly/cu124
-          ./packaging/pre_build_script.sh
-      - name: Get HEAD SHA
-        id: vars
-        run: echo "sha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
-      - name: Build Python Package
-        run: |
-          python3 -m pip install --pre . --extra-index-url https://download.pytorch.org/whl/nightly/cu124
-      - name: Generate New Docs
-        run: |
-          cd docsrc
-          dnf clean all
-          dnf update 
-          dnf install -y doxygen pandoc --allowerasing
-          python3 -m pip install -r requirements.txt
-          python3 -c "import torch_tensorrt; print(torch_tensorrt.__version__)"
-          make html
-          cd ..
-      - uses: stefanzweifel/git-auto-commit-action@v4
-        with:
-        # Required
-          commit_message: "docs: [Automated] Regenerating documenation for ${{ steps.vars.outputs.sha }}"
-          commit_options: "--no-verify --signoff"
-          file_pattern: docs/
-          commit_user_name: Torch-TensorRT Github Bot
-          commit_user_email: torch-tensorrt.github.bot@nvidia.com
-          commit_author: Torch-TensorRT Github Bot <torch-tensorrt.github.bot@nvidia.com>
+            - name: Install base deps
+              run: |
+                  python3 -m pip install pip --upgrade
+                  python3 -m pip install pyyaml numpy torch --pre --extra-index-url https://download.pytorch.org/whl/nightly/cu124
+                  ./packaging/pre_build_script.sh
+            - name: Get HEAD SHA
+              id: vars
+              run: echo "sha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+            - name: Build Python Package
+              run: |
+                  python3 -m pip install --pre . --extra-index-url https://download.pytorch.org/whl/nightly/cu124
+            - name: Generate New Docs
+              run: |
+                  cd docsrc
+                  dnf clean all
+                  dnf makecache --refresh
+                  dnf install yum-utils -y
+                  dnf config-manager --set-enabled powertools
+                  dnf update --skip-broken --nobest -y
+                  dnf install -y doxygen pandoc
+                  python3 -m pip install -r requirements.txt
+                  python3 -c "import torch_tensorrt; print(torch_tensorrt.__version__)"
+                  make html
+                  cd ..
+            - uses: stefanzweifel/git-auto-commit-action@v4
+              with:
+                  # Required
+                  commit_message: "docs: [Automated] Regenerating documenation for ${{ steps.vars.outputs.sha }}"
+                  commit_options: "--no-verify --signoff"
+                  file_pattern: docs/
+                  commit_user_name: Torch-TensorRT Github Bot
+                  commit_user_email: torch-tensorrt.github.bot@nvidia.com
+                  commit_author: Torch-TensorRT Github Bot <torch-tensorrt.github.bot@nvidia.com>
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref_name }}
-  cancel-in-progress: true
+    group: ${{ github.workflow }}-${{ github.ref_name }}
+    cancel-in-progress: true
