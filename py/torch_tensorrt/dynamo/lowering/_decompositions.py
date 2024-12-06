@@ -4,8 +4,11 @@ from typing import Any, Callable, Dict, List, Optional
 
 import torch
 from torch._decomp import register_decomposition
+from torch._export.utils import (
+    _collect_all_valid_cia_ops_for_aten_namespace,
+    _get_decomp_for_cia,
+)
 from torch._ops import OpOverload
-from torch.export import default_decompositions
 from torch_tensorrt.dynamo._defaults import default_device
 from torch_tensorrt.dynamo.conversion.converter_utils import get_positive_dim
 from torch_tensorrt.dynamo.utils import to_torch_device
@@ -432,7 +435,10 @@ def get_decompositions(
         return {**CORE_ATEN_DECOMPOSITIONS_FILTERED, **TORCH_TRT_DECOMPOSITIONS}
     else:
         # changes made here due to torch2.6 changes https://github.com/pytorch/pytorch/pull/135080
-        decomp_table = default_decompositions()
+        decomp_table = {}
+        for op in _collect_all_valid_cia_ops_for_aten_namespace():
+            decomp_table[op] = _get_decomp_for_cia(op)
+
         DECOMP_TABLE_FILTERED: Dict[OpOverload, Callable[[Any], Any]] = {
             decomp: decomp_table[decomp]
             for decomp in decomp_table
