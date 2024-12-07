@@ -106,7 +106,6 @@ def test_base_full_compile_multiple_outputs(ir):
 
     exp_program = torchtrt.dynamo.trace(model, **compile_spec)
     trt_module = torchtrt.dynamo.compile(exp_program, **compile_spec)
-    torchtrt.save(trt_module, trt_ep_path)
 
     # Reexport
     trt_exp_program = torch.export.export(trt_module, (input,), strict=False)
