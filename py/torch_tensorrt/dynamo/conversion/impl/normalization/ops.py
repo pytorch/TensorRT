@@ -152,23 +152,25 @@ def batch_norm(
     return output
 
 
-def layer_norm(
+def native_layer_norm(
     ctx: ConversionContext,
     target: Target,
     source_ir: Optional[SourceIR],
     name: str,
     input: TRTTensor,
     normalized_shape: List[int],
-    weight: Optional[Union[torch.Tensor, np.ndarray]],
-    bias: Optional[Union[torch.Tensor, np.ndarray]],
+    weight: Optional[Union[TRTTensor, torch.Tensor, np.ndarray]],
+    bias: Optional[Union[TRTTensor, torch.Tensor, np.ndarray]],
     eps: float,
-    cudnn_enable: bool,
-    return_mean_rstd: bool,
-) -> Union[TRTTensor, Tuple[TRTTensor, torch.Tensor, torch.Tensor]]:
+) -> Tuple[TRTTensor, torch.Tensor, torch.Tensor]:
     dims = list(range(len(input.shape) - len(normalized_shape), len(input.shape)))
     axes = get_axes_for_reduce_op(dims)
-    weight = get_trt_tensor(ctx, weight, f"{name}_weight")
-    bias = get_trt_tensor(ctx, bias, f"{name}_bias")
+
+    weight = get_trt_tensor(
+        ctx, weight if weight is not None else 1.0, f"{name}_weight"
+    )
+    bias = get_trt_tensor(ctx, bias if bias is not None else 0.0, f"{name}_bias")
+
     # Cast weight and bias to have same dtype as input
     weight = cast_trt_tensor(
         ctx, weight, input.dtype, f"{name}_weight_cast", target, source_ir
@@ -176,32 +178,23 @@ def layer_norm(
     bias = cast_trt_tensor(
         ctx, bias, input.dtype, f"{name}_bias_cast", target, source_ir
     )
+
     if tuple(input.shape) != tuple(weight.shape):
         weight = impl.slice.expand(
             ctx, target, source_ir, f"{name}_expand_weight", weight, input.shape
         )
+
     if tuple(input.shape) != tuple(bias.shape):
         bias = impl.slice.expand(
             ctx, target, source_ir, f"{name}_expand_bias", bias, input.shape
         )
-    strongly_typed_network = False
-    if ctx.net.get_flag(trt.NetworkDefinitionCreationFlag.STRONGLY_TYPED):
-        weight = cast_trt_tensor(ctx, weight, input.dtype, name)
-        bias = cast_trt_tensor(ctx, bias, input.dtype, name)
-        strongly_typed_network = True
 
-    layer_norm = ctx.net.add_normalization(input, weight, bias, axes)
-    layer_norm.epsilon = eps
-    # compute_precision ignored for strongly typed network.
-    if not strongly_typed_network:
-        layer_norm.compute_precision = input.dtype
-    set_layer_name(layer_norm, target, f"{name}_layer_norm", source_ir)
+    layer = ctx.net.add_normalization(input, weight, bias, axes)
+    layer.epsilon = eps
+    set_layer_name(layer, target, name, source_ir)
 
-    if return_mean_rstd:
-        # return fake mean and rstd for now
-        return layer_norm.get_output(0), None, None
-
-    return layer_norm.get_output(0)
+    # return fake mean and rstd for now
+    return layer.get_output(0), None, None
 
 
 def native_group_norm(
