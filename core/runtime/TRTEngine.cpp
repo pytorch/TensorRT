@@ -99,6 +99,9 @@ TRTEngine::TRTEngine(
   exec_ctx = make_trt(cuda_engine->createExecutionContext());
   TORCHTRT_CHECK((exec_ctx.get() != nullptr), "Unable to create TensorRT execution context");
 
+  runtime_states.prev_cudagraphs_enabled = CUDAGRAPHS_MODE;
+  runtime_states.prev_pre_allocated_outputs_enabled = false;
+
   if (_in_binding_names.size() == 0 && _out_binding_names.size() == 0) {
     uint64_t inputs = 0;
     uint64_t outputs = 0;
@@ -307,6 +310,9 @@ bool TRTEngine::set_device_memory_budget(int64_t budget) {
   if (profile_execution) {
     enable_profiling();
   }
+
+  runtime_states.set_context_changed();
+
   return result;
 }
 
