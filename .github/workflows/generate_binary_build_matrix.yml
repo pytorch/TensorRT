@@ -1,0 +1,112 @@
+name: Generates the binary build matrix
+
+on:
+  workflow_call:
+    inputs:
+      package-type:
+        description: "Package type to build from (wheel, conda, libtorch)"
+        default: "wheel"
+        type: string
+      os:
+        description: "Operating system to generate for (linux, windows, macos, macos-arm64)"
+        default: "linux"
+        type: string
+      channel:
+        description: "Channel to use (nightly, test, release, all)"
+        default: ""
+        type: string
+      test-infra-repository:
+        description: "Test infra repository to use"
+        default: "pytorch/test-infra"
+        type: string
+      test-infra-ref:
+        description: "Test infra reference to use"
+        default: "main"
+        type: string
+      with-cuda:
+        description: "Build with Cuda?"
+        default: "enable"
+        type: string
+      with-rocm:
+        description: "Build with Rocm?"
+        default: "enable"
+        type: string
+      with-cpu:
+        description: "Build with CPU?"
+        default: "enable"
+        type: string
+      with-xpu:
+        description: "Build with XPU?"
+        default: "disable"
+        type: string
+      use-only-dl-pytorch-org:
+        description: "Use only download.pytorch.org when generating wheel install command?"
+        default: "false"
+        type: string
+      build-python-only:
+        description: "Generate binary build matrix for a python only package (i.e. only one python version)"
+        default: "disable"
+        type: string
+      python-versions:
+        description: "A JSON-encoded list of python versions to build. An empty list means building all supported versions"
+        default: "[]"
+        type: string
+      use_split_build:
+        description: |
+          [Experimental] Build a libtorch only wheel and build pytorch such that
+          are built from the libtorch wheel.
+        required: false
+        type: boolean
+        default: false
+
+    outputs:
+      matrix:
+        description: "Generated build matrix"
+        value: ${{ jobs.generate.outputs.matrix }}
+
+jobs:
+  generate:
+    outputs:
+      matrix: ${{ steps.generate.outputs.matrix }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - name: Checkout test-infra repository
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.test-infra-repository }}
+          ref: ${{ inputs.test-infra-ref }}
+      - uses: ./.github/actions/set-channel
+      - uses: actions/checkout@v4
+        with:
+          repository: pytorch/tensorrt
+      - name: Generate test matrix
+        id: generate
+        env:
+          PACKAGE_TYPE: ${{ inputs.package-type }}
+          OS: ${{ inputs.os }}
+          CHANNEL: ${{ inputs.channel != '' && inputs.channel || env.CHANNEL }}
+          WITH_CUDA: ${{ inputs.with-cuda }}
+          WITH_ROCM: ${{ inputs.with-rocm }}
+          WITH_CPU: ${{ inputs.with-cpu }}
+          WITH_XPU: ${{ inputs.with-xpu }}
+          # limit pull request builds to one version of python unless ciflow/binaries/all is applied to the workflow
+          # should not affect builds that are from events that are not the pull_request event
+          LIMIT_PR_BUILDS: ${{ github.event_name == 'pull_request' && !contains( github.event.pull_request.labels.*.name, 'ciflow/binaries/all') }}
+          # This is used when testing release binaries only from download.pytorch.org.
+          # In cases when pipy binaries are not published yet.
+          USE_ONLY_DL_PYTORCH_ORG: ${{ inputs.use-only-dl-pytorch-org }}
+          BUILD_PYTHON_ONLY: ${{ inputs.build-python-only }}
+          USE_SPLIT_BUILD: ${{ inputs.use_split_build }}
+          PYTHON_VERSIONS: ${{ inputs.python-versions }}
+        run: |
+          set -eou pipefail
+          MATRIX_BLOB="$(python3 .github/scripts/generate_binary_build_matrix.py)"
+          echo "${MATRIX_BLOB}"
+          echo "matrix=${MATRIX_BLOB}" >> "${GITHUB_OUTPUT}"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}-${{ inputs.package-type }}-${{ inputs.os }}-${{ inputs.test-infra-repository }}-${{ inputs.test-infra-ref }}
+  cancel-in-progress: true
