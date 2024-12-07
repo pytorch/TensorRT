@@ -16,6 +16,7 @@ from torch_tensorrt.dynamo._defaults import (
     ENABLE_CROSS_COMPILE_FOR_WINDOWS,
     ENABLE_EXPERIMENTAL_DECOMPOSITIONS,
     ENABLE_WEIGHT_STREAMING,
+    ENABLE_WRAPPER_MODULE,
     ENABLED_PRECISIONS,
     ENGINE_CAPABILITY,
     HARDWARE_COMPATIBLE,
@@ -125,6 +126,7 @@ class CompilationSettings:
     use_fp32_acc: bool = USE_FP32_ACC
     enable_weight_streaming: bool = ENABLE_WEIGHT_STREAMING
     enable_cross_compile_for_windows: bool = ENABLE_CROSS_COMPILE_FOR_WINDOWS
+    enable_wrapper_module: bool = ENABLE_WRAPPER_MODULE
 
 
 _SETTINGS_TO_BE_ENGINE_INVARIANT = (
