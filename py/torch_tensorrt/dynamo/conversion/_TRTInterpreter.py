@@ -291,7 +291,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             builder_config.set_flag(trt.BuilderFlag.REFIT)
 
         if strict_type_constraints:
-            builder_config.set_flag(trt.BuilderFlag.STRICT_TYPES)
+            builder_config.set_flag(trt.BuilderFlag.OBEY_PRECISION_CONSTRAINTS)
 
         if self.optimization_profiles is not None:
             if len(self.optimization_profiles) > 0:
