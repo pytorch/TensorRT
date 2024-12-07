@@ -83,10 +83,16 @@ class FakeTRTEngine:
         self.name = engine_info[torch.ops.tensorrt.NAME_IDX()]
         self.device_info = engine_info[torch.ops.tensorrt.DEVICE_IDX()]
         self.serialized_engine = engine_info[torch.ops.tensorrt.ENGINE_IDX()]
-        self.in_binding_names = engine_info[torch.ops.tensorrt.INPUT_BINDING_NAMES_IDX()]
-        self.out_binding_names = engine_info[torch.ops.tensorrt.OUTPUT_BINDING_NAMES_IDX()]
+        self.in_binding_names = engine_info[
+            torch.ops.tensorrt.INPUT_BINDING_NAMES_IDX()
+        ]
+        self.out_binding_names = engine_info[
+            torch.ops.tensorrt.OUTPUT_BINDING_NAMES_IDX()
+        ]
         self.hardware_compatible = engine_info[torch.ops.tensorrt.HW_COMPATIBLE_IDX()]
-        self.serialized_metadata = engine_info[torch.ops.tensorrt.SERIALIZED_METADATA_IDX()]
+        self.serialized_metadata = engine_info[
+            torch.ops.tensorrt.SERIALIZED_METADATA_IDX()
+        ]
         self.target_platform = engine_info[torch.ops.tensorrt.TARGET_PLATFORM_IDX()]
 
     @classmethod
