@@ -928,6 +928,30 @@ def aten_ops_slice(
     )
 
 
+@dynamo_tensorrt_converter(torch.ops.aten.chunk.default)
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+    }
+)
+def aten_ops_chunk(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.slice.chunk(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        args[1],
+        args_bounds_check(args, 2, 0),
+    )
+
+
 def refit_validator(node: Node, settings: CompilationSettings = None) -> bool:
     # cumsum op is not refitable
     if settings and settings.make_refittable:
