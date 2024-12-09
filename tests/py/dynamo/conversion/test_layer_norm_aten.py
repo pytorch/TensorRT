@@ -22,7 +22,7 @@ class TestNativeLayerNormConverter(DispatchTestCase):
                 )[0]
 
         inputs = [torch.randn(input_shape)]
-        self.run_test(LayerNorm(), inputs, use_dynamo_tracer=True)
+        self.run_test(LayerNorm(), inputs, use_dynamo_tracer=True, enable_passes=True)
 
     @parameterized.expand(
         [
@@ -44,7 +44,7 @@ class TestNativeLayerNormConverter(DispatchTestCase):
             torch.randn(normalized_shape),
             torch.randn(normalized_shape),
         ]
-        self.run_test(LayerNorm(), inputs, use_dynamo_tracer=True)
+        self.run_test(LayerNorm(), inputs, use_dynamo_tracer=True, enable_passes=True)
 
     def test_layernorm_with_dynamic_shape(self):
         class LayerNorm(torch.nn.Module):
@@ -65,7 +65,7 @@ class TestNativeLayerNormConverter(DispatchTestCase):
         ]
 
         self.run_test_with_dynamic_shape(
-            LayerNorm(), input_specs, use_dynamo_tracer=True
+            LayerNorm(), input_specs, use_dynamo_tracer=True, enable_passes=True
         )
 
     def test_layernorm_with_dynamic_shape_1(self):
@@ -87,7 +87,7 @@ class TestNativeLayerNormConverter(DispatchTestCase):
         ]
 
         self.run_test_with_dynamic_shape(
-            LayerNorm(), input_specs, use_dynamo_tracer=True
+            LayerNorm(), input_specs, use_dynamo_tracer=True, enable_passes=True
         )
 
 
