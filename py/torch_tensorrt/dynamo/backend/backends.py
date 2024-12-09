@@ -80,7 +80,8 @@ def _pretraced_backend(
             repair_input_aliasing(gm, settings)
 
             # Remove sym_int placeholders and inputs
-            remove_sym_nodes(gm, settings)
+            remove_sym_nodes(gm, sample_inputs, settings)
+
             torch_inputs = [
                 input for input in sample_inputs if isinstance(input, torch.Tensor)
             ]
@@ -91,7 +92,7 @@ def _pretraced_backend(
             # Invoke AOTAutograd to translate operators to aten
             gm = aot_export_joint_simple(
                 gm,
-                torch_inputs,
+                sample_inputs,
                 trace_joint=False,
                 decompositions=get_decompositions(
                     settings.enable_experimental_decompositions
