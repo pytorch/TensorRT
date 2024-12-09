@@ -67,6 +67,7 @@ Tutorials
 * :ref:`custom_kernel_plugins`
 * :ref:`mutable_torchtrt_module_example`
 * :ref:`weight_streaming_example`
+* :ref:`pre_allocated_output_example`
 
 .. toctree::
    :caption: Tutorials
@@ -84,6 +85,7 @@ Tutorials
    tutorials/_rendered_examples/dynamo/custom_kernel_plugins
    tutorials/_rendered_examples/dynamo/mutable_torchtrt_module_example
    tutorials/_rendered_examples/dynamo/weight_streaming_example
+   tutorials/_rendered_examples/dynamo/pre_allocated_output_example
 
 Dynamo Frontend
 ----------------
