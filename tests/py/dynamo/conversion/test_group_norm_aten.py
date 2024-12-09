@@ -15,7 +15,7 @@ class TestNativeGroupNormConverter(DispatchTestCase):
                 )[0]
 
         inputs = [torch.randn(3, 6, 224)]
-        self.run_test(GroupNorm(), inputs, use_dynamo_tracer=True)
+        self.run_test(GroupNorm(), inputs, use_dynamo_tracer=True, enable_passes=True)
 
     def test_groupnorm_2d(self):
         class GroupNorm(torch.nn.Module):
@@ -25,7 +25,7 @@ class TestNativeGroupNormConverter(DispatchTestCase):
                 )[0]
 
         inputs = [torch.randn(3, 6, 224, 224), torch.ones(6), torch.zeros(6)]
-        self.run_test(GroupNorm(), inputs, use_dynamo_tracer=True)
+        self.run_test(GroupNorm(), inputs, use_dynamo_tracer=True, enable_passes=True)
 
     def test_groupnorm_sd(self):
         class GroupNorm(torch.nn.Module):
@@ -39,7 +39,13 @@ class TestNativeGroupNormConverter(DispatchTestCase):
             torch.randn(320, dtype=torch.half),
             torch.randn(320, dtype=torch.half),
         ]
-        self.run_test(GroupNorm(), inputs, precision=torch.half, use_dynamo_tracer=True)
+        self.run_test(
+            GroupNorm(),
+            inputs,
+            precision=torch.half,
+            use_dynamo_tracer=True,
+            enable_passes=True,
+        )
 
     @parameterized.expand(
         [
