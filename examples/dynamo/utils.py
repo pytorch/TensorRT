@@ -51,14 +51,7 @@ def generate(model, input_seq, max_tokens, eos_token_id):
     )
 
     while True:
-        outputs = model(
-            input_seq,
-            past_key_values=None,
-            position_ids=None,
-            attention_mask=None,
-            use_cache=False,
-            token_type_ids=None,
-        )
+        outputs = model(input_seq)
         logits = outputs.logits
         next_token_logits = logits[:, -1, :]
         next_tokens = torch.argmax(next_token_logits, dim=-1)
