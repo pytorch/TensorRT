@@ -8,7 +8,7 @@ requires = [
     "cffi>=1.15.1",
     "typing-extensions>=4.7.0",
     "future>=0.18.3",
-    #"tensorrt-cu12==10.3.0",
+    "tensorrt-cu12==10.3.0",
     "torch>=2.6.0.dev,<2.7.0",
     "pybind11==2.6.2",
     "numpy",
@@ -55,9 +55,9 @@ keywords = [
 ]
 dependencies = [
     "torch>=2.6.0.dev,<2.7.0",
-    #"tensorrt-cu12==10.3.0",
-    #"tensorrt-cu12-bindings==10.3.0",
-    #"tensorrt-cu12-libs==10.3.0",
+    "tensorrt-cu12==10.3.0",
+    "tensorrt-cu12-bindings==10.3.0",
+    "tensorrt-cu12-libs==10.3.0",
     "packaging>=23",
     "numpy",
     "typing-extensions>=4.7.0",
