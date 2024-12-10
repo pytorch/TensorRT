@@ -107,6 +107,8 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         self.engine = None
         self.weight_name_map = weight_name_map
         self.target_platform = Platform.current_platform()
+        # Previous cuda graphs state
+        self.prev_cudagraphs_enabled = False
 
         if self.serialized_engine is not None and not self.settings.lazy_engine_init:
             self.setup_engine()
@@ -171,7 +173,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
             self.engine.get_tensor_shape(input_name) for input_name in self.input_names
         ]
         self.output_dtypes = [
-            dtype._from(self.engine.get_tensor_dtype(output_name))
+            dtype._from(self.engine.get_tensor_dtype(output_name)).to(torch.dtype)
             for output_name in self.output_names
         ]
         self.output_shapes = [
@@ -238,7 +240,6 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
             (i.contiguous() if isinstance(i, torch.Tensor) else torch.tensor(i).cuda())
             for i in inputs
         ]
-
         with (
             torch.autograd.profiler.record_function("PythonTorchTensorRTModule:Forward")
             if self.profiling_enabled
@@ -247,9 +248,12 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
             self._check_initialized()
 
             cudagraphs_enabled = torch_tensorrt.runtime.get_cudagraphs_mode()
-            need_cudagraphs_record = (
-                cudagraphs_enabled and not self.cudagraphs_validate_shapes(inputs)
+            shape_changed = self.cudagraphs_validate_shapes(inputs)
+            # Cudagraphs record is required if cudagraphs_enabled is switched to True regardless of shape change
+            need_cudagraphs_record = cudagraphs_enabled and (
+                (not self.prev_cudagraphs_enabled) or (not shape_changed)
             )
+            self.prev_cudagraphs_enabled = cudagraphs_enabled
 
             if need_cudagraphs_record:
                 self._input_buffers = [None] * len(self.input_names)
@@ -259,7 +263,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                 self.cudagraph.reset()
                 self.cudagraph = None
 
-            # If in safe mode, check at each iteration for for whether a switch is required
+            # If in safe mode, check at each iteration for whether a switch is required
             if (
                 torch_tensorrt.runtime._multi_device_safe_mode._PY_RT_MULTI_DEVICE_SAFE_MODE
             ):
@@ -379,7 +383,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
 
                     output = torch.empty(
                         size=shape,
-                        dtype=self.output_dtypes[o].to(torch.dtype),
+                        dtype=self.output_dtypes[o],
                         device=torch.cuda.current_device(),
                     )
 

@@ -12,6 +12,9 @@ from torch_tensorrt._enums import dtype
 from torch_tensorrt._features import ENABLED_FEATURES
 from torch_tensorrt._Input import Input
 from torch_tensorrt.dynamo import _defaults
+from torch_tensorrt.dynamo.runtime._CudaGraphsTorchTensorRTModule import (
+    CudaGraphsTorchTensorRTModule,
+)
 from torch_tensorrt.fx import InputTensorSpec
 from torch_tensorrt.fx.lower import compile as fx_compile
 from torch_tensorrt.fx.utils import LowerPrecision
@@ -586,7 +589,7 @@ def save(
     Save the model to disk in the specified output format.
 
     Arguments:
-        module (Optional(torch.jit.ScriptModule | torch.export.ExportedProgram | torch.fx.GraphModule)): Compiled Torch-TensorRT module
+        module (Optional(torch.jit.ScriptModule | torch.export.ExportedProgram | torch.fx.GraphModule | CudaGraphsTorchTensorRTModule)): Compiled Torch-TensorRT module
         inputs (torch.Tensor): Torch input tensors
         arg_inputs (Tuple[Any, ...]): Same as inputs. Alias for better understanding with kwarg_inputs.
         kwarg_inputs (dict[Any, ...]): Optional, kwarg inputs to the module forward function.
@@ -594,6 +597,8 @@ def save(
         retrace (bool): When the module type is a fx.GraphModule, this option re-exports the graph using torch.export.export(strict=False) to save it.
                 This flag is experimental for now.
     """
+    if isinstance(module, CudaGraphsTorchTensorRTModule):
+        module = module.compiled_module
     module_type = _parse_module_type(module)
     accepted_formats = {"exported_program", "torchscript"}
     if arg_inputs is not None and not all(
