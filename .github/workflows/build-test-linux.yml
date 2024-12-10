@@ -88,6 +88,7 @@ jobs:
             post-script: packaging/post_build_script.sh
             smoke-test-script: packaging/smoke_test_script.sh
     uses: ./.github/workflows/linux-test.yml
+    if: ${{ needs.build.result == 'success' }}
     with:
       job-name: tests-py-torchscript-fe
       repository: "pytorch/tensorrt"
@@ -137,7 +138,7 @@ jobs:
         export CI_BUILD=1
         pushd .
         cd tests/py/dynamo
-        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/dynamo_converters_test_results.xml -n 8 conversion/
+        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/dynamo_converters_test_results.xml -n 4 conversion/
         popd
 
   tests-py-dynamo-fe:

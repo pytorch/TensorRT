@@ -403,7 +403,7 @@ class DispatchTestCase(TRTTestCase):
         enable_passes=False,
         propagate_shapes=False,
         int32_reqd=False,
-        make_refittable=False,
+        immutable_weights=True,
     ):
         # TODO: lan to remove this and set use_dynamo_traccer to True by default
         # once all the converter test files are moved to use_dynamo_tracer
@@ -414,7 +414,7 @@ class DispatchTestCase(TRTTestCase):
             enabled_precisions={dtype._from(precision)},
             truncate_double=True,
             debug=True,
-            make_refittable=make_refittable,
+            immutable_weights=immutable_weights,
         )
 
         mod = self.generate_graph(
@@ -498,7 +498,7 @@ class DispatchTestCase(TRTTestCase):
         output_dtypes=None,
         use_dynamo_tracer=False,
         enable_passes=False,
-        make_refittable=False,
+        immutable_weights=True,
     ):
 
         # Previous instance of the interpreter auto-casted 64-bit inputs
@@ -507,7 +507,7 @@ class DispatchTestCase(TRTTestCase):
             enabled_precisions={dtype._from(precision)},
             truncate_double=True,
             debug=True,
-            make_refittable=make_refittable,
+            immutable_weights=immutable_weights,
         )
 
         mod = self.generate_graph(
@@ -541,7 +541,7 @@ class DispatchTestCase(TRTTestCase):
         pyt_inputs=None,
         propagate_shapes=False,
         check_dtype=True,
-        make_refittable=False,
+        immutable_weights=True,
         torch_export_dynamic_shapes=None,
     ):
         # TODO: lan to remove this and set use_dynamo_traccer to True by default
@@ -551,7 +551,8 @@ class DispatchTestCase(TRTTestCase):
         # Previous instance of the interpreter auto-casted 64-bit inputs
         # We replicate this behavior here
         compilation_settings = CompilationSettings(
-            truncate_double=True, make_refittable=make_refittable
+            truncate_double=True,
+            immutable_weights=immutable_weights,
         )
         mod = self.generate_graph(
             mod,
