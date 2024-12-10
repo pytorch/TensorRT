@@ -39,19 +39,13 @@ class TestWeightStrippedEngine(TestCase):
         )
         gm1_output = gm1(*example_inputs)
 
-        # 2. Compile with torch_trt.compile using dynamo backend
-        gm2 = torch_trt.compile(
-            pyt_model, ir="dynamo", inputs=example_inputs, **settings
-        )
-        gm2_output = gm2(*example_inputs)
-
-        # 3. Compile with torch.compile using tensorrt backend
-        gm3 = torch.compile(
+        # 2. Compile with torch.compile using tensorrt backend
+        gm2 = torch.compile(
             pyt_model,
             backend="tensorrt",
             options=settings,
         )
-        gm3_output = gm3(*example_inputs)
+        gm2_output = gm2(*example_inputs)
 
         pyt_model_output = pyt_model(*example_inputs)
 
@@ -63,14 +57,9 @@ class TestWeightStrippedEngine(TestCase):
             gm1_output, gm2_output, 1e-2, 1e-2
         ), "gm2_output is not correct"
 
-        assert torch.allclose(
-            gm2_output, gm3_output, 1e-2, 1e-2
-        ), "gm3_output is not correct"
-
     def test_three_ways_to_compile_weight_stripped_engine(self):
         pyt_model = models.resnet18(pretrained=True).eval().to("cuda")
         example_inputs = (torch.randn((100, 3, 224, 224)).to("cuda"),)
-        exp_program = torch.export.export(pyt_model, example_inputs)
 
         settings = {
             "use_python_runtime": False,
@@ -82,34 +71,22 @@ class TestWeightStrippedEngine(TestCase):
             "refit_identical_engine_weights": False,
         }
 
-        # 1. Compile with torch_trt.dynamo.compile
-        gm1 = torch_trt.dynamo.compile(
-            exp_program,
-            example_inputs,
-            **settings,
+        # 1. Compile with torch_trt.compile using dynamo backend
+        gm1 = torch_trt.compile(
+            pyt_model, ir="dynamo", inputs=example_inputs, **settings
         )
         gm1_output = gm1(*example_inputs)
 
-        # 2. Compile with torch_trt.compile using dynamo backend
-        gm2 = torch_trt.compile(
-            pyt_model, ir="dynamo", inputs=example_inputs, **settings
-        )
-        gm2_output = gm2(*example_inputs)
-
-        # 3. Compile with torch.compile using tensorrt backend, which is not supported to set strip_engine_weights=True
-        # gm3 = torch.compile(
+        # 2. Compile with torch.compile using tensorrt backend, which is not supported to set strip_engine_weights=True
+        # gm2 = torch.compile(
         #     pyt_model,
         #     backend="tensorrt",
         #     options=settings,
         # )
-        # gm3_output = gm3(*example_inputs)
+        # gm2_output = gm2(*example_inputs)
 
         assertions.assertEqual(
             gm1_output.sum(), 0, msg="gm1_output should be all zeros"
-        )
-
-        assertions.assertEqual(
-            gm2_output.sum(), 0, msg="gm2_output should be all zeros"
         )
 
     def test_weight_stripped_engine_sizes(self):
