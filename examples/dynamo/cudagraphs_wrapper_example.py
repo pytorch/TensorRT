@@ -36,12 +36,20 @@ input = torch.randn((1, 3, 224, 224)).to("cuda")
 # Compiler options
 # ----------------------------------
 #
-# The 'torch_executed_ops' compiler option is used to demonstrate graph breaks for this example.
+# The 'torch_executed_ops' compiler option is used to demonstrate the module with graph breaks for this example.
 # debug=True compiler option provides detailed insights into the compilation process and helps
 # pinpoint where graph breaks occur
 
 # Create a TensorRT-compiled model
 trt_model = torch_tensorrt.compile(
+    model,
+    ir="dynamo",
+    inputs=[input],
+    min_block_size=1,
+    pass_through_build_failures=True,
+)
+
+trt_model_with_graph_break = torch_tensorrt.compile(
     model,
     ir="dynamo",
     inputs=[input],
@@ -76,17 +84,18 @@ trt_model = torch_tensorrt.compile(
 # trt module with cuda graphs
 # ----------------------------------
 #
-# When CUDA Graphs are applied to a TensorRT model that contains graph breaks, each break introduces additional
-# overhead. This occurs because graph breaks prevent the entire model from being executed as a single, continuous
-# optimized unit. As a result, some of the performance benefits typically provided by CUDA Graphs, such as reduced
-# kernel launch overhead and improved execution efficiency, may be diminished.
-with torch_tensorrt.runtime.enable_cudagraphs():
-    trt_model(input)
+
+with torch_tensorrt.runtime.enable_cudagraphs(trt_model) as cudagraphs_module:
+    cudagraphs_module(input)
 
 # %%
 # Running wrapped module with cuda graphs
 # ----------------------------------
 #
+# When CUDA Graphs are applied to a TensorRT model that contains graph breaks, each break introduces additional
+# overhead. This occurs because graph breaks prevent the entire model from being executed as a single, continuous
+# optimized unit. As a result, some of the performance benefits typically provided by CUDA Graphs, such as reduced
+# kernel launch overhead and improved execution efficiency, may be diminished.
 # Using a wrapped runtime module with CUDA Graphs allows you to encapsulate sequences of operations into graphs
 # that can be executed efficiently, even in the presence of graph breaks. When a CUDA Graph context manager is
 # used with the TensorRT module as a positional argument, it returns a wrapped_module. This module captures the
@@ -94,5 +103,9 @@ with torch_tensorrt.runtime.enable_cudagraphs():
 # and improving performance. Note that initializing with the wrapper module involves a warm-up phase where the
 # module is executed several times. This warm-up ensures that memory allocations and initializations are not
 # recorded in CUDA Graphs, which helps maintain consistent execution paths and optimize performance.
-with torch_tensorrt.runtime.enable_cudagraphs(trt_model) as wrapped_module:
-    wrapped_module(input)
+with torch_tensorrt.runtime.enable_cudagraphs(
+    trt_model_with_graph_break
+) as cudagraphs_module:
+    cudagraphs_module(input)
+
+# %%

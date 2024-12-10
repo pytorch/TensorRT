@@ -22,7 +22,20 @@ class TestCudagraphsPython(TestCase):
         self.assertFalse(torch_tensorrt.runtime.get_cudagraphs_mode())
 
     def test_cudagraphs_context(self):
-        with torch_tensorrt.runtime.enable_cudagraphs():
+        class SampleModel(torch.nn.Module):
+            def forward(self, input):
+                return torch.ops.aten.abs.default(input)
+
+        model = SampleModel().eval().cuda()
+        inputs = [torch.randn((2, 3), dtype=torch.float).cuda()]
+        optimized_model = torch_tensorrt.compile(
+            model,
+            "torch_compile",
+            inputs,
+            min_block_size=1,
+            use_python_runtime=True,
+        )
+        with torch_tensorrt.runtime.enable_cudagraphs(optimized_model) as _:
             self.assertTrue(torch_tensorrt.runtime.get_cudagraphs_mode())
         self.assertFalse(torch_tensorrt.runtime.get_cudagraphs_mode())
 
@@ -49,9 +62,11 @@ class TestCudagraphsPython(TestCase):
 
         result_samples = []
         torch_results_samples = []
-        with torch_tensorrt.runtime.enable_cudagraphs():
+        with torch_tensorrt.runtime.enable_cudagraphs(
+            optimized_model
+        ) as cudagraphs_module:
             for i in inputs:
-                result_samples.append(optimized_model(i).detach().cpu())
+                result_samples.append(cudagraphs_module(i).detach().cpu())
                 torch_results_samples.append(fx_graph(i).detach().cpu())
 
         for i, (optimized_model_results, torch_model_results) in enumerate(
@@ -92,9 +107,11 @@ class TestCudagraphsPython(TestCase):
 
         result_samples = []
         torch_results_samples = []
-        with torch_tensorrt.runtime.enable_cudagraphs():
+        with torch_tensorrt.runtime.enable_cudagraphs(
+            optimized_model
+        ) as cudagraphs_module:
             for i in inputs:
-                result_samples.append(optimized_model(i).detach().cpu())
+                result_samples.append(cudagraphs_module(i).detach().cpu())
                 torch_results_samples.append(fx_graph(i).detach().cpu())
 
         for i, (optimized_model_results, torch_model_results) in enumerate(
@@ -140,9 +157,11 @@ class TestCudagraphsPython(TestCase):
 
         result_samples = []
         torch_results_samples = []
-        with torch_tensorrt.runtime.enable_cudagraphs():
+        with torch_tensorrt.runtime.enable_cudagraphs(
+            optimized_model
+        ) as cudagraphs_module:
             for i in inputs:
-                result_samples.append(optimized_model(i).detach().cpu())
+                result_samples.append(cudagraphs_module(i).detach().cpu())
                 torch_results_samples.append(fx_graph(i).detach().cpu())
 
         for i, (optimized_model_results, torch_model_results) in enumerate(

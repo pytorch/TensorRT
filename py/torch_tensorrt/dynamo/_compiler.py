@@ -36,9 +36,6 @@ from torch_tensorrt.dynamo.lowering import (
     post_lowering,
     pre_export_lowering,
 )
-from torch_tensorrt.dynamo.runtime._WrapperTorchTensorRTModule import (
-    WrapperTorchTensorRTModule,
-)
 from torch_tensorrt.dynamo.utils import (
     get_flat_args_with_check,
     get_output_metadata,
@@ -376,7 +373,6 @@ def compile(
     use_explicit_typing: bool = _defaults.USE_EXPLICIT_TYPING,
     use_fp32_acc: bool = _defaults.USE_FP32_ACC,
     enable_weight_streaming: bool = _defaults.ENABLE_WEIGHT_STREAMING,
-    enable_wrapper_module: bool = _defaults.ENABLE_WRAPPER_MODULE,
     **kwargs: Any,
 ) -> torch.fx.GraphModule:
     """Compile an ExportedProgram module for NVIDIA GPUs using TensorRT
@@ -593,7 +589,6 @@ def compile(
         "use_fp32_acc": use_fp32_acc,
         "enable_cross_compile_for_windows": False,
         "enable_weight_streaming": enable_weight_streaming,
-        "enable_wrapper_module": enable_wrapper_module,
     }
 
     settings = CompilationSettings(**compilation_options)
@@ -836,10 +831,6 @@ def compile_module(
         settings.use_fast_partitioner = True
 
     dryrun_stats_display(dryrun_tracker, settings.dryrun)
-
-    if settings.enable_wrapper_module:
-        # Capture/replay a series of CUDA operations in subgraphs in a wrapped runtime module.
-        partitioned_module = WrapperTorchTensorRTModule(partitioned_module)
 
     return partitioned_module
 
