@@ -133,7 +133,6 @@ def aten_ops_batch_norm_legit_no_training(
 
 @dynamo_tensorrt_converter(
     torch.ops.aten.native_layer_norm.default,
-    capability_validator=one_user_validator,
     supports_dynamic_shapes=True,
 )
 @enforce_tensor_types(
