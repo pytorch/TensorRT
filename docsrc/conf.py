@@ -93,7 +93,7 @@ html_css_files = [
 sphinx_gallery_conf = {
     "examples_dirs": "../examples",
     "gallery_dirs": "tutorials/_rendered_examples/",
-    "ignore_pattern": "utils.py",
+    "ignore_pattern": r"(triton/\w*.py)|(utils.py)",
 }
 
 # Setup the breathe extension
