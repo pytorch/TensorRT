@@ -3,8 +3,8 @@ from typing import Any
 
 import torch
 from torch_tensorrt.dynamo.runtime import PythonTorchTensorRTModule, TorchTensorRTModule
-from torch_tensorrt.dynamo.runtime._WrapperTorchTensorRTModule import (
-    WrapperTorchTensorRTModule,
+from torch_tensorrt.dynamo.runtime._CudaGraphsTorchTensorRTModule import (
+    CudaGraphsTorchTensorRTModule,
 )
 
 logger = logging.getLogger(__name__)
@@ -16,12 +16,12 @@ class _WeightStreamingContextManager(object):
     """
 
     def __init__(
-        self, module: torch.fx.GraphModule | WrapperTorchTensorRTModule
+        self, module: torch.fx.GraphModule | CudaGraphsTorchTensorRTModule
     ) -> None:
         rt_mods = []
         self.current_device_budget = 0
 
-        if isinstance(module, WrapperTorchTensorRTModule):
+        if isinstance(module, CudaGraphsTorchTensorRTModule):
             module = module.compiled_module
         for name, rt_mod in module.named_children():
             if "_run_on_acc" in name and isinstance(

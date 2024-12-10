@@ -11,7 +11,7 @@ from torch_tensorrt.dynamo import partitioning
 logger = logging.getLogger(__name__)
 
 
-class WrapperTorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
+class CudaGraphsTorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
     """This Wrapper runtime module is to record/replay whole cuda graph in sub modules
 
     Args:
@@ -24,7 +24,7 @@ class WrapperTorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         self,
         compiled_module: torch.nn.Module,
     ):
-        super(WrapperTorchTensorRTModule, self).__init__()
+        super(CudaGraphsTorchTensorRTModule, self).__init__()
         self.compiled_module = compiled_module
         self.inputs = partitioning.construct_submodule_inputs(compiled_module)
 

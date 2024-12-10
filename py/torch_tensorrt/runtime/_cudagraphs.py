@@ -3,8 +3,8 @@ from typing import Any
 
 import torch
 import torch_tensorrt
-from torch_tensorrt.dynamo.runtime._WrapperTorchTensorRTModule import (
-    WrapperTorchTensorRTModule,
+from torch_tensorrt.dynamo.runtime._CudaGraphsTorchTensorRTModule import (
+    CudaGraphsTorchTensorRTModule,
 )
 
 
@@ -90,7 +90,7 @@ class _CudagraphsContextManager(object):
             logger.debug(
                 f"{num_torch_module} torch modules are in subgraphs. Using wrapper module for cuda graphs"
             )
-            return WrapperTorchTensorRTModule(self.compiled_module)
+            return CudaGraphsTorchTensorRTModule(self.compiled_module)
         else:
             if num_trt_module > 0:
                 logger.debug(
