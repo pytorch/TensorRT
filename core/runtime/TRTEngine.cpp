@@ -99,6 +99,9 @@ TRTEngine::TRTEngine(
   exec_ctx = make_trt(cuda_engine->createExecutionContext());
   TORCHTRT_CHECK((exec_ctx.get() != nullptr), "Unable to create TensorRT execution context");
 
+  runtime_states.old_cudagraphs = CUDAGRAPHS_MODE;
+  runtime_states.old_pre_allocated_outputs = false;
+
   if (_in_binding_names.size() == 0 && _out_binding_names.size() == 0) {
     uint64_t inputs = 0;
     uint64_t outputs = 0;
