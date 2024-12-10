@@ -88,8 +88,10 @@ optimized_model = torch_tensorrt.compile(
 # Enable/Disable pre-allocated output buffer feature using runtime api
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-# We can enable the pre-allocated output buffer with a context manager
+# Enable pre-allocated output buffer using a context manager
 with torch_tensorrt.runtime.enable_pre_allocated_outputs(optimized_model):
+    out_trt = optimized_model(*inputs)
+    # Subsequent inferences can use the pre-allocated output buffer (no shape change)
     out_trt = optimized_model(*inputs)
 
 # Alternatively, we can enable the feature using a context object

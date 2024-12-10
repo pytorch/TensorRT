@@ -24,14 +24,16 @@ logger = logging.getLogger(__name__)
 
 
 class TorchTRTRuntimeStates:
-    def __init__(self, cudagraphs_enabled: bool, pre_allocated_outputs_enabled: bool):
-        self.prev_cudagraphs_enabled = cudagraphs_enabled
-        self.prev_pre_allocated_outputs_enabled = pre_allocated_outputs_enabled
+    def __init__(self, new_cudagraphs: bool, new_pre_allocated_output: bool):
+        # Indicates whether CUDAGraphs were enabled in the previous execute_engine
+        self.old_cudagraphs = new_cudagraphs
+        # Indicates whether pre-allocated output was enabled in the previous execute_engine
+        self.old_pre_allocated_outputs = new_pre_allocated_output
 
     def validate_states(
         self,
-        cudagraphs_enabled: bool,
-        pre_allocated_outputs_enabled: bool,
+        new_cudagraphs: bool,
+        new_pre_allocated_output: bool,
         shape_changed: bool,
     ) -> Tuple[bool, bool]:
         # Evaluates whether certain conditions are met to enable CUDA Graph recording or to reuse pre-allocated outputs
@@ -40,19 +42,19 @@ class TorchTRTRuntimeStates:
         can_use_pre_allocated_outputs = False
 
         # Cudagraphs record is required if cudagraphs_enabled is switched to True regardless of shape change
-        if cudagraphs_enabled and (not self.prev_cudagraphs_enabled or shape_changed):
+        if new_cudagraphs and (not self.old_cudagraphs or shape_changed):
             need_cudagraphs_record = True
 
         # Pre-allocated output can be used when previous and current state are true without shape change
         if (
-            self.prev_pre_allocated_outputs_enabled
-            and pre_allocated_outputs_enabled
+            self.old_pre_allocated_outputs
+            and new_pre_allocated_output
             and (not shape_changed)
         ):
             can_use_pre_allocated_outputs = True
 
-        self.prev_cudagraphs_enabled = cudagraphs_enabled
-        self.prev_pre_allocated_outputs_enabled = pre_allocated_outputs_enabled
+        self.old_cudagraphs = new_cudagraphs
+        self.old_pre_allocated_outputs = new_pre_allocated_output
 
         return need_cudagraphs_record, can_use_pre_allocated_outputs
 

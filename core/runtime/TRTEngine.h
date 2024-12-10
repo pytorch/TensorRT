@@ -30,34 +30,30 @@ using FlattenedState = std::tuple<
     std::tuple<std::string, std::string>, // serialized metadata
     std::tuple<std::string, std::string>>; // Platform
 
-struct RuntimeStates {
-  bool need_cudagraphs_record;
-  bool can_use_pre_allocated_outputs;
-};
-
 struct TorchTRTRuntimeStates {
-  // Previous runtime states
-  bool prev_cudagraphs_enabled, prev_pre_allocated_outputs_enabled;
+  // Indicates whether CUDAGraphs were enabled in the previous execute_engine
+  bool old_cudagraphs;
+  // Indicates whether pre-allocated output was enabled in the previous execute_engine
+  bool old_pre_allocated_outputs;
 
   // Evaluates whether certain conditions are met to enable CUDA Graph recording or to reuse pre-allocated outputs
   // based on the current and previous states, as well as input shape has changed
-  RuntimeStates validate_states(bool cudagraphs_enabled, bool pre_allocated_outputs_enabled, bool shape_changed) {
+  std::tuple<bool, bool> set_runtime_states(bool new_cudagraphs, bool new_pre_allocated_output, bool shape_changed) {
     bool need_cudagraphs_record = false;
     bool can_use_pre_allocated_outputs = false;
 
     // Cudagraphs record is required if cudagraphs_enabled is switched to True regardless of shape change
-    if (cudagraphs_enabled && (!prev_cudagraphs_enabled || shape_changed)) {
+    if (new_cudagraphs && (!old_cudagraphs || shape_changed)) {
       need_cudagraphs_record = true;
     }
     // Pre-allocated output can be used when previous and current state are true without shape change
-    if (prev_pre_allocated_outputs_enabled && pre_allocated_outputs_enabled && !shape_changed) {
+    if (old_pre_allocated_outputs && new_pre_allocated_output && !shape_changed) {
       can_use_pre_allocated_outputs = true;
     }
-    prev_cudagraphs_enabled = cudagraphs_enabled;
-    prev_pre_allocated_outputs_enabled = pre_allocated_outputs_enabled;
+    old_cudagraphs = new_cudagraphs;
+    old_pre_allocated_outputs = new_pre_allocated_output;
 
-    RuntimeStates values = {need_cudagraphs_record, can_use_pre_allocated_outputs};
-    return values;
+    return {need_cudagraphs_record, can_use_pre_allocated_outputs};
   }
 };
 
