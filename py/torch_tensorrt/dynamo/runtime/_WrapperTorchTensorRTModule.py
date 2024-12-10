@@ -35,17 +35,7 @@ class WrapperTorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         self.prev_cudagraphs_enabled = False
         self._caller_stream: Optional[torch.cuda.Stream] = None
         self._engine_stream: Optional[torch.cuda.Stream] = None
-
-        num_torch_mod = 0
-        for name, _ in self.compiled_module.named_children():
-            if "_run_on_acc" not in name:
-                num_torch_mod += 1
-        if num_torch_mod > 0:
-            self.warm_up()
-        else:
-            logger.warning(
-                "Wrapper runtime module provides no benefit for a graph module that doesn't have graph breaks"
-            )
+        self.warm_up()
 
     def warm_up(self) -> None:
         """

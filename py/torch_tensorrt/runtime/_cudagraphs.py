@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Optional
+from typing import Any
 
 import torch
 import torch_tensorrt
@@ -9,7 +9,9 @@ from torch_tensorrt.dynamo.runtime._WrapperTorchTensorRTModule import (
 
 
 class CudaGraphsMode:
+    # No cuda graphs
     STANDARD = 0
+    # Cuda graphs is applied to TRT module
     SUBGRAPH_CUDAGRAPHS = 1
     # Internal mode to apply cuda graphs for wrapped runtime module
     WHOLE_GRAPH_CUDAGRAPHS = 2
@@ -62,23 +64,45 @@ class _CudagraphsContextManager(object):
     Used to enable cudagraphs as a context manager
     """
 
-    def __init__(self, compiled_module: Optional[torch.nn.Module]) -> None:
+    def __init__(self, compiled_module: torch.nn.Module) -> None:
         global _PY_RT_CUDAGRAPHS
         self.old_mode = _PY_RT_CUDAGRAPHS
         self.compiled_module = compiled_module
 
-    def __enter__(self) -> "_CudagraphsContextManager":
+    def __enter__(self) -> torch.nn.Module:
         global _PY_RT_CUDAGRAPHS
-        if self.compiled_module:
+
+        num_torch_module = 0
+        num_trt_module = 0
+        for name, _ in self.compiled_module.named_children():
+            if "_run_on_acc" in name:
+                num_trt_module += 1
+            elif "_run_on_gpu" in name:
+                num_torch_module += 1
+
+        if num_torch_module > 0:
+            # Set whole cudagraphs mode and returns wrapped module
             _PY_RT_CUDAGRAPHS = CudaGraphsMode.WHOLE_GRAPH_CUDAGRAPHS
             # Set new mode for C++
             if torch_tensorrt.ENABLED_FEATURES.torch_tensorrt_runtime:
                 torch.ops.tensorrt.set_cudagraphs_mode(_PY_RT_CUDAGRAPHS)
+
+            logger.debug(
+                f"{num_torch_module} torch modules are in subgraphs. Using wrapper module for cuda graphs"
+            )
             return WrapperTorchTensorRTModule(self.compiled_module)
         else:
-            # Enable cudagraphs
+            if num_trt_module > 0:
+                logger.debug(
+                    "There is no graph breaks. Using original module for cuda graphs"
+                )
+            else:
+                logger.warning(
+                    "Please consider dynamo if there is graph breaks. Using original module for cuda graphs"
+                )
+            # Enable cudagraphs for TRT submodule
             set_cudagraphs_mode(True)
-            return self
+            return self.compiled_module
 
     def __exit__(self, *args: Any) -> None:
         # Set cudagraphs back to old mode
@@ -86,6 +110,6 @@ class _CudagraphsContextManager(object):
 
 
 def enable_cudagraphs(
-    compiled_module: Optional[torch.nn.Module] = None,
+    compiled_module: torch.nn.Module,
 ) -> _CudagraphsContextManager:
     return _CudagraphsContextManager(compiled_module)

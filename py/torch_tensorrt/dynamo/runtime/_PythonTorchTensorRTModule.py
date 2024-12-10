@@ -352,11 +352,10 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
             self._check_initialized()
 
             cudagraphs_enabled = torch_tensorrt.runtime.get_cudagraphs_mode()
-
+            shape_changed = self.cudagraphs_validate_shapes(inputs)
             # Cudagraphs record is required if cudagraphs_enabled is switched to True regardless of shape change
             need_cudagraphs_record = cudagraphs_enabled and (
-                (not self.prev_cudagraphs_enabled)
-                or (not self.cudagraphs_validate_shapes(inputs))
+                (not self.prev_cudagraphs_enabled) or (not shape_changed)
             )
             self.prev_cudagraphs_enabled = cudagraphs_enabled
 
