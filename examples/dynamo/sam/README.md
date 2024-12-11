@@ -23,12 +23,12 @@ python run_sam.py
 Here is the input image and the predicted masks by Torch-TRT.
 
 <p align="center">
-  <img src="https://github.com/pytorch/TensorRT/blob/sam/examples/dynamo/sam/truck.jpg?raw=true" alt="Input image" width="300" height="300">
-  <img src="https://github.com/pytorch/TensorRT/blob/sam/examples/dynamo/sam/Torch-TRT_output_mask_1.png?raw=true" alt="Predicted mask 1" width="300" height="300">
+  <img src="https://github.com/pytorch/TensorRT/blob/sam/examples/dynamo/sam/truck.jpg?raw=true" alt="Input image" width="400" height="400">
+  <img src="https://github.com/pytorch/TensorRT/blob/sam/examples/dynamo/sam/Torch-TRT_output_mask_1.png?raw=true" alt="Predicted mask 1" width="400" height="400">
 </p>
 <p align="center">
-  <img src="https://github.com/pytorch/TensorRT/blob/sam/examples/dynamo/sam/Torch-TRT_output_mask_2.png?raw=true" alt="Predicted mask 2" width="300" height="300">
-  <img src="https://github.com/pytorch/TensorRT/blob/sam/examples/dynamo/sam/Torch-TRT_output_mask_3.png?raw=true" alt="Predicted mask 3" width="300" height="300">
+  <img src="https://github.com/pytorch/TensorRT/blob/sam/examples/dynamo/sam/Torch-TRT_output_mask_2.png?raw=true" alt="Predicted mask 2" width="400" height="400">
+  <img src="https://github.com/pytorch/TensorRT/blob/sam/examples/dynamo/sam/Torch-TRT_output_mask_3.png?raw=true" alt="Predicted mask 3" width="400" height="400">
 </p>
 
 ## References:
