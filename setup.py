@@ -141,7 +141,9 @@ if "--use-cxx11-abi" in sys.argv:
     CXX11_ABI = True
 
 if (cxx11_abi_env_var := os.environ.get("USE_CXX11_ABI")) is not None:
-    if cxx11_abi_env_var == "1":
+    if (
+        cxx11_abi_env_var == "1" and __cuda_version__ == "12.6"
+    ):  # Only use CXX11_ABI for CUDA 12.6
         CXX11_ABI = True
 
 if platform.uname().processor == "aarch64":

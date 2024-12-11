@@ -1,3 +1,3 @@
 export CI_BUILD="1"
 export RELEASE="1"
-export CXX11_ABI="1"
+export USE_CXX11_ABI="1"
