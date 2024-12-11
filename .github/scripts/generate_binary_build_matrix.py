@@ -152,10 +152,10 @@ def initialize_globals(channel: str, build_python_only: bool) -> None:
         "12.4": "pytorch/manylinux2_28-builder:cuda12.4",
         "12.6": "pytorch/manylinux2_28-builder:cuda12.6",
         **{
-            gpu_arch: f"pytorch/manylinux-builder:rocm{gpu_arch}"
+            gpu_arch: f"pytorch/manylinux2_28-builder:rocm{gpu_arch}"
             for gpu_arch in ROCM_ARCHES
         },
-        CPU: "pytorch/manylinux-builder:cpu",
+        CPU: "pytorch/manylinux2_28-builder:cpu",
         XPU: "pytorch/manylinux2_28-builder:xpu",
         # TODO: Migrate CUDA_AARCH64 image to manylinux2_28_aarch64-builder:cuda12.4
         CPU_AARCH64: "pytorch/manylinux2_28_aarch64-builder:cpu-aarch64",
@@ -163,7 +163,7 @@ def initialize_globals(channel: str, build_python_only: bool) -> None:
     }
     LIBTORCH_CONTAINER_IMAGES = {
         **{
-            (gpu_arch, PRE_CXX11_ABI): f"pytorch/manylinux-builder:cuda{gpu_arch}"
+            (gpu_arch, PRE_CXX11_ABI): f"pytorch/manylinux2_28-builder:cuda{gpu_arch}"
             for gpu_arch in CUDA_ARCHES
         },
         **{
@@ -171,14 +171,14 @@ def initialize_globals(channel: str, build_python_only: bool) -> None:
             for gpu_arch in CUDA_ARCHES
         },
         **{
-            (gpu_arch, PRE_CXX11_ABI): f"pytorch/manylinux-builder:rocm{gpu_arch}"
+            (gpu_arch, PRE_CXX11_ABI): f"pytorch/manylinux2_28-builder:rocm{gpu_arch}"
             for gpu_arch in ROCM_ARCHES
         },
         **{
             (gpu_arch, CXX11_ABI): f"pytorch/libtorch-cxx11-builder:rocm{gpu_arch}"
             for gpu_arch in ROCM_ARCHES
         },
-        (CPU, PRE_CXX11_ABI): "pytorch/manylinux-builder:cpu",
+        (CPU, PRE_CXX11_ABI): "pytorch/manylinux2_28-builder:cpu",
         (CPU, CXX11_ABI): "pytorch/libtorch-cxx11-builder:cpu",
     }
 
