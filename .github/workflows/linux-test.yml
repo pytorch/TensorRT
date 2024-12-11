@@ -43,7 +43,7 @@ on:
         default: true
       script:
         description: 'Script to utilize'
-        default: "python setup.py bdist_wheel"
+        default: "python setup.py bdist_wheel --use-cxx11-abi"
         type: string
       continue-on-error:
         description: "Prevents a job from failing when a step fails. Set to true to allow a job to pass when exec script step fails."
