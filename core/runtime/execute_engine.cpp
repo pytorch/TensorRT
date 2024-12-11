@@ -98,7 +98,9 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
   LOG_DEBUG(
       "Attempting to run engine (ID: " << compiled_engine->name
                                        << "); Hardware Compatible: " << compiled_engine->hardware_compatible);
-
+  // nvinfer1::IExecutionContext::enqueue is not thread safe and we need a mutex for it.
+  // Other IExecutionContext methods and runtime states should be in same scope as well
+  std::unique_lock<std::mutex> lock(compiled_engine->mu);
   if (compiled_engine->profile_execution) {
     std::stringstream ss;
     ss << "Execution profiling is enabled, find results here:" << std::endl;
@@ -306,9 +308,6 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
     // Create a new stream if the engine stream is the default stream
     compiled_engine->engine_stream = c10::cuda::getStreamFromPool(false, current_device_id);
   }
-
-  // nvinfer1::IExecutionContext::enqueue is not thread safe and we need a mutex for it.
-  std::unique_lock<std::mutex> lock(compiled_engine->mu);
 
   { // Engine Execution (execute on engine stream)
     c10::cuda::CUDAStreamGuard stream_guard(compiled_engine->engine_stream);
