@@ -1,3 +1,2 @@
 export CI_BUILD="1"
 export RELEASE="1"
-export D_GLIBCXX_USE_CXX11_ABI="0"
