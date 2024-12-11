@@ -150,7 +150,7 @@ def initialize_globals(channel: str, build_python_only: bool) -> None:
         "11.8": "pytorch/manylinux2_28-builder:cuda11.8",
         "12.1": "pytorch/manylinux2_28-builder:cuda12.1",
         "12.4": "pytorch/manylinux2_28-builder:cuda12.4",
-        "12.6": "pytorch/manylinux-builder:cuda12.6",
+        "12.6": "pytorch/manylinux2_28-builder:cuda12.6",
         **{
             gpu_arch: f"pytorch/manylinux2_28-builder:rocm{gpu_arch}"
             for gpu_arch in ROCM_ARCHES
