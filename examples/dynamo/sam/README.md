@@ -20,14 +20,28 @@ python run_sam.py
 
 ## Inputs and Outputs
 
-Here is the input image and the predicted masks by Torch-TRT.
-
-The output masks are as shown below
+<!-- Here is the input image and the predicted masks by Torch-TRT.
 ![alt text](https://github.com/pytorch/TensorRT/blob/sam/examples/dynamo/sam/truck.jpg?raw=true)
 
+
+The output masks are as shown below
 Mask 1                     |  Mask 2                   |  Mask 3
 :-------------------------:|:-------------------------:|:-------------------------:|
-![](https://github.com/pytorch/TensorRT/blob/sam/examples/dynamo/sam/Torch-TRT_output_mask_1.png?raw=true)  |  ![](https://github.com/pytorch/TensorRT/blob/sam/examples/dynamo/sam/Torch-TRT_output_mask_2.png?raw=true)   ![](https://github.com/pytorch/TensorRT/blob/sam/examples/dynamo/sam/Torch-TRT_output_mask_3.png?raw=true)
+![](https://github.com/pytorch/TensorRT/blob/sam/examples/dynamo/sam/Torch-TRT_output_mask_1.png?raw=true)  |  ![](https://github.com/pytorch/TensorRT/blob/sam/examples/dynamo/sam/Torch-TRT_output_mask_2.png?raw=true)   ![](https://github.com/pytorch/TensorRT/blob/sam/examples/dynamo/sam/Torch-TRT_output_mask_3.png?raw=true) -->
+
+
+# Image Grid Example
+
+Below is a rectangular grid of four images:
+
+<p align="center">
+  <img src="https://github.com/pytorch/TensorRT/blob/sam/examples/dynamo/sam/truck.jpg?raw=true" alt="Input image" width="200" height="200">
+  <img src="https://github.com/pytorch/TensorRT/blob/sam/examples/dynamo/sam/Torch-TRT_output_mask_1.png?raw=true" alt="Predicted mask 1" width="200" height="200">
+</p>
+<p align="center">
+  <img src="https://github.com/pytorch/TensorRT/blob/sam/examples/dynamo/sam/Torch-TRT_output_mask_2.png?raw=true" alt="Predicted mask 2" width="200" height="200">
+  <img src="https://github.com/pytorch/TensorRT/blob/sam/examples/dynamo/sam/Torch-TRT_output_mask_3.png?raw=true" alt="Predicted mask 3" width="200" height="200">
+</p>
 
 ## References:
 
