@@ -66,7 +66,7 @@ TENSORRT_VERSIONS_DICT = {
         "10.7.0": {
             "urls": "https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.7.0/tars/TensorRT-10.7.0.23.Linux.x86_64-gnu.cuda-12.6.tar.gz",
             "strip_prefix": "TensorRT-10.7.0.23",
-            "sha256": "27d0f7e9af657b9fa19bfe9d62376d4de64182ed6274bde04bf143f56d308ec9",
+            "sha256": "d7f16520457caaf97ad8a7e94d802f89d77aedf9f361a255f2c216e2a3a40a11",
         },
     },
 }
