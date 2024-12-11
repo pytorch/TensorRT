@@ -15,7 +15,7 @@ Certain custom modifications are required to ensure the model is exported succes
 ## Model execution
 Run the following script to produce output masks after compiling with Torch-TensorRT
 ```py
-python run_sam.py
+python torch_export_sam2.py
 ```
 
 ## Inputs and Outputs
