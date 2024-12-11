@@ -21,10 +21,10 @@ python run_sam.py
 Here is the input image and the predicted masks by Torch-TRT.
 
 The output masks are as shown below
-![alt text](https://github.com/pytorch/TensorRT/tree/main/examples/dynamo/sam/truck.jpg?raw=true)
+![alt text](https://github.com/pytorch/TensorRT/blob/sam/examples/dynamo/sam/truck.jpg?raw=true)
 
 Mask 1                     |  Mask 2                   |  Mask 3
 :-------------------------:|:-------------------------:|:-------------------------:|
-![](https://github.com/pytorch/TensorRT/tree/main/examples/dynamo/sam/Torch-TRT_output_mask_1.png?raw=true)  |  ![](https://github.com/pytorch/TensorRT/tree/main/examples/dynamo/sam/Torch-TRT_output_mask_2.png?raw=true)   ![](https://github.com/pytorch/TensorRT/tree/main/examples/dynamo/sam/Torch-TRT_output_mask_3.png?raw=true)
+![](https://github.com/pytorch/TensorRT/blob/sam/examples/dynamo/sam/Torch-TRT_output_mask_1.png?raw=true)  |  ![](https://github.com/pytorch/TensorRT/blob/sam/examples/dynamo/sam/Torch-TRT_output_mask_2.png?raw=true)   ![](https://github.com/pytorch/TensorRT/blob/sam/examples/dynamo/sam/Torch-TRT_output_mask_3.png?raw=true)
 
 
