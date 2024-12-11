@@ -1,7 +1,14 @@
-import argparse
-import timeit
+"""
+.. _torch_export_sam2:
 
-# Set 'Agg' backend to avoid displaying windows
+Compiling SAM2 using the dynamo backend
+==========================================================
+
+This script illustrates Torch-TensorRT workflow with dynamo backend on popular SAM2 model."""
+
+# %%
+# Imports and Model Definition
+# ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
@@ -14,13 +21,19 @@ from sam_components import SAM2FullModel
 
 matplotlib.use("Agg")
 
+# %%
+# Define the model and load a a sample image (truck.jpg provided)
+predictor = SAM2ImagePredictor.from_pretrained("facebook/sam2-hiera-large")
+encoder = predictor.model.eval().cuda()
 
-def load_image(file_path):
-    """Load and preprocess an image."""
-    image = Image.open(file_path).convert("RGB")
-    return image
+input_image = Image.open("./truck.jpg").convert("RGB")
+predictor.set_image(input_image)
+
+sam_model = SAM2FullModel(encoder.half()).eval().cuda()
 
 
+# %%
+# Define the postprocessing components which include plotting and visualizing masks and points
 def postprocess_masks(out, predictor, image):
     """Postprocess low-resolution masks and convert them for visualization."""
     orig_hw = (image.size[1], image.size[0])  # (height, width)
@@ -91,19 +104,10 @@ def visualize_masks(
         plt.close()
 
 
-def build_model(args):
-    predictor = SAM2ImagePredictor.from_pretrained("facebook/sam2-hiera-large")
-    model = predictor.model.eval().cuda()
-
-    image = load_image(args.img_path)
-    predictor.set_image(image)
-
-    return SAM2FullModel(model.half()).eval().cuda(), predictor
-
-
-def build_input(args, predictor):
-    # Raw input
-    image = load_image(args.img_path)
+# %%
+# Define the preprocessing components which include applying transformations on the input image
+# and transforming given point coordinates
+def preprocess_inputs(image, predictor):
     w, h = image.size
     orig_hw = [(h, w)]
     input_image = predictor._transforms(np.array(image))[None, ...].to("cuda:0")
@@ -127,69 +131,28 @@ def build_input(args, predictor):
     return (input_image, unnorm_coords, labels)
 
 
-def compile_with_torchtrt(model, inputs, args):
+# %%
+# Preprocess the input and start Torch-TensorRT compilation
+torchtrt_inputs = preprocess_inputs(input_image, predictor)
 
-    ep = torch.export.export(model, inputs, strict=False)
-    trt_gm = torch_tensorrt.dynamo.compile(
-        ep,
-        inputs=inputs,
-        min_block_size=1,
-        enabled_precisions={
-            torch.float16 if args.precision == "fp16" else torch.float32
-        },
-        use_fp32_acc=False if args.no_fp32_acc else True,
-    )
+exp_program = torch.export.export(sam_model, torchtrt_inputs, strict=False)
+trt_model = torch_tensorrt.dynamo.compile(
+    exp_program,
+    inputs=torchtrt_inputs,
+    min_block_size=1,
+    enabled_precisions={torch.float16},
+    use_fp32_acc=True,
+)
+trt_out = trt_model(*torchtrt_inputs)
 
-    return trt_gm
-
-
-if __name__ == "__main__":
-    arg_parser = argparse.ArgumentParser(description="Run inference on SAM")
-    arg_parser.add_argument(
-        "--precision",
-        type=str,
-        default="fp16",
-        help="Precision of the model to compile for TensorRT",
-    )
-    arg_parser.add_argument(
-        "--mode",
-        type=str,
-        choices=["encoder", "head", "all"],
-        default="all",
-        help="Supported options include encoder | prediction_head",
-    )
-    arg_parser.add_argument(
-        "--img_path", type=str, default="./truck.jpg", help="input image path"
-    )
-
-    arg_parser.add_argument(
-        "--save_visualization",
-        action="store_true",
-        default=True,
-        help="Flag to save visualizations",
-    )
-    arg_parser.add_argument(
-        "--no_fp32_acc", action="store_true", help="Flag to save visualizations"
-    )
-
-    args = arg_parser.parse_args()
-
-    pyt_model, predictor = build_model(args)
-    inputs = build_input(args, predictor)
-
-    # Torch-TensorRT
-    trt_model = compile_with_torchtrt(pyt_model, inputs, args)
-    trt_out = trt_model(*inputs)
-
-    # Mask Postprocessing and Visualization
-    if args.save_visualization:
-        raw_image = load_image(args.img_path)
-        trt_masks, trt_scores = postprocess_masks(trt_out, predictor, raw_image)
-        visualize_masks(
-            raw_image,
-            trt_masks,
-            trt_scores,
-            torch.tensor([[500, 375]]),
-            torch.tensor([1]),
-            title_prefix="Torch-TRT",
-        )
+# %%
+# Mask Postprocessing and Visualization
+trt_masks, trt_scores = postprocess_masks(trt_out, predictor, input_image)
+visualize_masks(
+    input_image,
+    trt_masks,
+    trt_scores,
+    torch.tensor([[500, 375]]),
+    torch.tensor([1]),
+    title_prefix="Torch-TRT",
+)
