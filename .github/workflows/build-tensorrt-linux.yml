@@ -191,7 +191,7 @@ jobs:
         run: |
           set -x
           source "${BUILD_ENV_FILE}"
-          ${CONDA_RUN} python setup.py bdist_wheel --use-cxx11-abi
+          ${CONDA_RUN} python setup.py bdist_wheel
 
       - name: Run Post-Script
         if: ${{ inputs.post-script != '' }}
