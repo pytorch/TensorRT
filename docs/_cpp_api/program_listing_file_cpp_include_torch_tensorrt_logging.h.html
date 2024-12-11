@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Program Listing for File logging.h &mdash; Torch-TensorRT v2.6.0.dev0+daffc7c documentation</title>
+  <title>Program Listing for File logging.h &mdash; Torch-TensorRT v2.6.0.dev0+eb8bf25 documentation</title>
   
 
   
@@ -273,7 +273,7 @@
               
               
                 <div class="version">
-                  v2.6.0.dev0+daffc7c
+                  v2.6.0.dev0+eb8bf25
                 </div>
               
             
@@ -468,45 +468,45 @@
   <section id="program-listing-for-file-logging-h">
 <span id="program-listing-file-cpp-include-torch-tensorrt-logging-h"></span><h1>Program Listing for File logging.h<a class="headerlink" href="#program-listing-for-file-logging-h" title="Permalink to this heading">¶</a></h1>
 <p>↰ <a class="reference internal" href="file_cpp_include_torch_tensorrt_logging.h.html#file-cpp-include-torch-tensorrt-logging-h"><span class="std std-ref">Return to documentation for file</span></a> (<code class="docutils literal notranslate"><span class="pre">cpp/include/torch_tensorrt/logging.h</span></code>)</p>
-<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>/*
- * Copyright (c) NVIDIA Corporation.
- * All rights reserved.
- *
- * This library is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree.
- */
-#pragma once
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="cm">/*</span>
+<span class="cm"> * Copyright (c) NVIDIA Corporation.</span>
+<span class="cm"> * All rights reserved.</span>
+<span class="cm"> *</span>
+<span class="cm"> * This library is licensed under the BSD-style license found in the</span>
+<span class="cm"> * LICENSE file in the root directory of this source tree.</span>
+<span class="cm"> */</span>
+<span class="cp">#pragma once</span>
 
-#include &lt;string&gt;
-#include &quot;torch_tensorrt/macros.h&quot;
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;string&gt;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;torch_tensorrt/macros.h&quot;</span>
 
-namespace torch_tensorrt {
-namespace logging {
-enum Level {
-  kINTERNAL_ERROR,
-  kERROR,
-  kWARNING,
-  kINFO,
-  kDEBUG,
-  kGRAPH,
-};
+<span class="k">namespace</span><span class="w"> </span><span class="nn">torch_tensorrt</span><span class="w"> </span><span class="p">{</span>
+<span class="k">namespace</span><span class="w"> </span><span class="nn">logging</span><span class="w"> </span><span class="p">{</span>
+<span class="k">enum</span><span class="w"> </span><span class="nc">Level</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="n">kINTERNAL_ERROR</span><span class="p">,</span>
+<span class="w">  </span><span class="n">kERROR</span><span class="p">,</span>
+<span class="w">  </span><span class="n">kWARNING</span><span class="p">,</span>
+<span class="w">  </span><span class="n">kINFO</span><span class="p">,</span>
+<span class="w">  </span><span class="n">kDEBUG</span><span class="p">,</span>
+<span class="w">  </span><span class="n">kGRAPH</span><span class="p">,</span>
+<span class="p">};</span>
 
-// Are these ones necessary for the user?
-TORCHTRT_API std::string get_logging_prefix();
-TORCHTRT_API void set_logging_prefix(std::string prefix);
+<span class="c1">// Are these ones necessary for the user?</span>
+<span class="n">TORCHTRT_API</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="w"> </span><span class="n">get_logging_prefix</span><span class="p">();</span>
+<span class="n">TORCHTRT_API</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="n">set_logging_prefix</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="w"> </span><span class="n">prefix</span><span class="p">);</span>
 
-TORCHTRT_API void set_reportable_log_level(Level lvl);
+<span class="n">TORCHTRT_API</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="n">set_reportable_log_level</span><span class="p">(</span><span class="n">Level</span><span class="w"> </span><span class="n">lvl</span><span class="p">);</span>
 
-TORCHTRT_API void set_is_colored_output_on(bool colored_output_on);
+<span class="n">TORCHTRT_API</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="n">set_is_colored_output_on</span><span class="p">(</span><span class="kt">bool</span><span class="w"> </span><span class="n">colored_output_on</span><span class="p">);</span>
 
-TORCHTRT_API Level get_reportable_log_level();
+<span class="n">TORCHTRT_API</span><span class="w"> </span><span class="n">Level</span><span class="w"> </span><span class="n">get_reportable_log_level</span><span class="p">();</span>
 
-TORCHTRT_API bool get_is_colored_output_on();
+<span class="n">TORCHTRT_API</span><span class="w"> </span><span class="kt">bool</span><span class="w"> </span><span class="n">get_is_colored_output_on</span><span class="p">();</span>
 
-// Dont know if we want this?
-TORCHTRT_API void log(Level lvl, std::string msg);
-} // namespace logging
-} // namespace torch_tensorrt
+<span class="c1">// Dont know if we want this?</span>
+<span class="n">TORCHTRT_API</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="n">log</span><span class="p">(</span><span class="n">Level</span><span class="w"> </span><span class="n">lvl</span><span class="p">,</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="w"> </span><span class="n">msg</span><span class="p">);</span>
+<span class="p">}</span><span class="w"> </span><span class="c1">// namespace logging</span>
+<span class="p">}</span><span class="w"> </span><span class="c1">// namespace torch_tensorrt</span>
 </pre></div>
 </div>
 </section>

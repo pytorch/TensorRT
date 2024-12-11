@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Torch Export with Cudagraphs &mdash; Torch-TensorRT v2.6.0.dev0+eb8bf25 documentation</title>
+  <title>Serving a Torch-TensorRT model with Triton &mdash; Torch-TensorRT v2.6.0.dev0+eb8bf25 documentation</title>
   
 
   
@@ -39,8 +39,6 @@
   <link rel="stylesheet" href="../../../_static/css/custom.css" type="text/css" />
     <link rel="index" title="Index" href="../../../genindex.html" />
     <link rel="search" title="Search" href="../../../search.html" />
-    <link rel="next" title="Overloading Torch-TensorRT Converters with Custom Converters" href="converter_overloading.html" />
-    <link rel="prev" title="Serving a Torch-TensorRT model with Triton" href="../../serving_torch_tensorrt_with_triton.html" />
   <!-- Google Tag Manager -->
     <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
     new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
@@ -319,18 +317,18 @@
 <li class="toctree-l1"><a class="reference internal" href="../../../user_guide/mixed_precision.html">Compile Mixed Precision models with Torch-TensorRT</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
-<ul class="current">
-<li class="toctree-l1"><a class="reference internal" href="torch_compile_advanced_usage.html">Torch Compile Advanced Usage</a></li>
-<li class="toctree-l1"><a class="reference internal" href="vgg16_ptq.html">Deploy Quantized Models using Torch-TensorRT</a></li>
-<li class="toctree-l1"><a class="reference internal" href="engine_caching_example.html">Engine Caching</a></li>
-<li class="toctree-l1"><a class="reference internal" href="engine_caching_bert_example.html">Engine Caching (BERT)</a></li>
-<li class="toctree-l1"><a class="reference internal" href="refit_engine_example.html">Refitting Torch-TensorRT Programs with New Weights</a></li>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../dynamo/torch_compile_advanced_usage.html">Torch Compile Advanced Usage</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dynamo/vgg16_ptq.html">Deploy Quantized Models using Torch-TensorRT</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dynamo/engine_caching_example.html">Engine Caching</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dynamo/engine_caching_bert_example.html">Engine Caching (BERT)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dynamo/refit_engine_example.html">Refitting Torch-TensorRT Programs with New Weights</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../serving_torch_tensorrt_with_triton.html">Serving a Torch-TensorRT model with Triton</a></li>
-<li class="toctree-l1 current"><a class="current reference internal" href="#">Torch Export with Cudagraphs</a></li>
-<li class="toctree-l1"><a class="reference internal" href="converter_overloading.html">Overloading Torch-TensorRT Converters with Custom Converters</a></li>
-<li class="toctree-l1"><a class="reference internal" href="custom_kernel_plugins.html">Using Custom Kernels within TensorRT Engines with Torch-TensorRT</a></li>
-<li class="toctree-l1"><a class="reference internal" href="mutable_torchtrt_module_example.html">Mutable Torch TensorRT Module</a></li>
-<li class="toctree-l1"><a class="reference internal" href="weight_streaming_example.html">Weight Streaming</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dynamo/torch_export_cudagraphs.html">Torch Export with Cudagraphs</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dynamo/converter_overloading.html">Overloading Torch-TensorRT Converters with Custom Converters</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dynamo/custom_kernel_plugins.html">Using Custom Kernels within TensorRT Engines with Torch-TensorRT</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dynamo/mutable_torchtrt_module_example.html">Mutable Torch TensorRT Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dynamo/weight_streaming_example.html">Weight Streaming</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Dynamo Frontend</span></p>
 <ul>
@@ -352,11 +350,11 @@
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Model Zoo</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="torch_compile_resnet_example.html">Compiling ResNet with dynamic shapes using the <cite>torch.compile</cite> backend</a></li>
-<li class="toctree-l1"><a class="reference internal" href="torch_compile_transformers_example.html">Compiling BERT using the <cite>torch.compile</cite> backend</a></li>
-<li class="toctree-l1"><a class="reference internal" href="torch_compile_stable_diffusion.html">Compiling Stable Diffusion model using the <cite>torch.compile</cite> backend</a></li>
-<li class="toctree-l1"><a class="reference internal" href="torch_export_gpt2.html">Compiling GPT2 using the dynamo backend</a></li>
-<li class="toctree-l1"><a class="reference internal" href="torch_export_llama2.html">Compiling Llama2 using the dynamo backend</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dynamo/torch_compile_resnet_example.html">Compiling ResNet with dynamic shapes using the <cite>torch.compile</cite> backend</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dynamo/torch_compile_transformers_example.html">Compiling BERT using the <cite>torch.compile</cite> backend</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dynamo/torch_compile_stable_diffusion.html">Compiling Stable Diffusion model using the <cite>torch.compile</cite> backend</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dynamo/torch_export_gpt2.html">Compiling GPT2 using the dynamo backend</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dynamo/torch_export_llama2.html">Compiling Llama2 using the dynamo backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../notebooks.html">Legacy notebooks</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Python API Documentation</span></p>
@@ -431,13 +429,13 @@
       </li>
 
         
-      <li>Torch Export with Cudagraphs</li>
+      <li>Serving a Torch-TensorRT model with Triton</li>
     
     
       <li class="pytorch-breadcrumbs-aside">
         
             
-            <a href="../../../_sources/tutorials/_rendered_examples/dynamo/torch_export_cudagraphs.rst.txt" rel="nofollow"><img src="../../../_static/images/view-page-source-icon.svg"></a>
+            <a href="../../../_sources/tutorials/_rendered_examples/triton/index.rst.txt" rel="nofollow"><img src="../../../_static/images/view-page-source-icon.svg"></a>
           
         
       </li>
@@ -467,84 +465,202 @@
             <div role="main" class="main-content" itemscope="itemscope" itemtype="http://schema.org/Article">
              <article itemprop="articleBody" id="pytorch-article" class="pytorch-article">
               
-  <div class="sphx-glr-download-link-note admonition note">
-<p class="admonition-title">Note</p>
-<p><a class="reference internal" href="#sphx-glr-download-tutorials-rendered-examples-dynamo-torch-export-cudagraphs-py"><span class="std std-ref">Go to the end</span></a>
-to download the full example code</p>
-</div>
-<section class="sphx-glr-example-title" id="torch-export-with-cudagraphs">
-<span id="torch-export-cudagraphs"></span><span id="sphx-glr-tutorials-rendered-examples-dynamo-torch-export-cudagraphs-py"></span><h1>Torch Export with Cudagraphs<a class="headerlink" href="#torch-export-with-cudagraphs" title="Permalink to this heading">¶</a></h1>
-<p>This interactive script is intended as an overview of the process by which the Torch-TensorRT Cudagraphs integration can be used in the <cite>ir=”dynamo”</cite> path. The functionality works similarly in the <cite>torch.compile</cite> path as well.</p>
-<section id="imports-and-model-definition">
-<h2>Imports and Model Definition<a class="headerlink" href="#imports-and-model-definition" title="Permalink to this heading">¶</a></h2>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
-<span class="kn">import</span> <span class="nn">torchvision.models</span> <span class="k">as</span> <span class="nn">models</span>
+  <section id="serving-a-torch-tensorrt-model-with-triton">
+<span id="serving-torch-tensorrt-with-triton"></span><span id="sphx-glr-tutorials-rendered-examples-triton"></span><h1>Serving a Torch-TensorRT model with Triton<a class="headerlink" href="#serving-a-torch-tensorrt-model-with-triton" title="Permalink to this heading">¶</a></h1>
+<p>Optimization and deployment go hand in hand in a discussion about Machine
+Learning infrastructure. Once network level optimization are done
+to get the maximum performance, the next step would be to deploy it.</p>
+<p>However, serving this optimized model comes with its own set of considerations
+and challenges like: building an infrastructure to support concurrent model
+executions, supporting clients over HTTP or gRPC and more.</p>
+<p>The <a class="reference external" href="https://github.com/triton-inference-server/server">Triton Inference Server</a>
+solves the aforementioned and more. Let’s discuss step-by-step, the process of
+optimizing a model with Torch-TensorRT, deploying it on Triton Inference
+Server, and building a client to query the model.</p>
+<section id="step-1-optimize-your-model-with-torch-tensorrt">
+<h2>Step 1: Optimize your model with Torch-TensorRT<a class="headerlink" href="#step-1-optimize-your-model-with-torch-tensorrt" title="Permalink to this heading">¶</a></h2>
+<p>Most Torch-TensorRT users will be familiar with this step. For the purpose of
+this demonstration, we will be using a ResNet50 model from Torchhub.</p>
+<p>We will be working in the <code class="docutils literal notranslate"><span class="pre">//examples/triton</span></code> directory which contains the scripts used in this tutorial.</p>
+<p>First pull the <a class="reference external" href="https://catalog.ngc.nvidia.com/orgs/nvidia/containers/pytorch">NGC PyTorch Docker container</a>. You may need to create
+an account and get the API key from <a class="reference external" href="https://ngc.nvidia.com/setup/">here</a>.
+Sign up and login with your key (follow the instructions
+<a class="reference external" href="https://ngc.nvidia.com/setup/api-key">here</a> after signing up).</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="cp"># &lt;xx.xx&gt; is the yy:mm for the publishing tag for NVIDIA&#39;s Pytorch</span>
+<span class="cp"># container; eg. 24.08</span>
+<span class="cp"># NOTE: Use the publishing tag for both the PyTorch container and the Triton Containers</span>
 
-<span class="kn">import</span> <span class="nn">torch_tensorrt</span>
+<span class="n">docker</span><span class="w"> </span><span class="n">run</span><span class="w"> </span><span class="o">-</span><span class="n">it</span><span class="w"> </span><span class="o">--</span><span class="n">gpus</span><span class="w"> </span><span class="n">all</span><span class="w"> </span><span class="o">-</span><span class="n">v</span><span class="w"> </span><span class="n">$</span><span class="p">{</span><span class="n">PWD</span><span class="p">}</span><span class="o">:/</span><span class="n">scratch_space</span><span class="w"> </span><span class="n">nvcr</span><span class="p">.</span><span class="n">io</span><span class="o">/</span><span class="n">nvidia</span><span class="o">/</span><span class="n">pytorch</span><span class="o">:&lt;</span><span class="n">xx</span><span class="p">.</span><span class="n">xx</span><span class="o">&gt;-</span><span class="n">py3</span>
+<span class="n">cd</span><span class="w"> </span><span class="o">/</span><span class="n">scratch_space</span>
 </pre></div>
 </div>
+<p>With the container we can export the model in to the correct directory in our Triton model repository. This export script uses the <strong>Dynamo</strong> frontend for Torch-TensorRT to compile the PyTorch model to TensorRT. Then we save the model using <strong>TorchScript</strong> as a serialization format which is supported by Triton.</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span>import torch
+import torch_tensorrt as torchtrt
+import torchvision
+
+import torch
+import torch_tensorrt
+torch.hub._validate_not_a_forked_repo=lambda a,b,c: True
+
+# load model
+model = torch.hub.load(&#39;pytorch/vision:v0.10.0&#39;, &#39;resnet50&#39;, pretrained=True).eval().to(&quot;cuda&quot;)
+
+# Compile with Torch TensorRT;
+trt_model = torch_tensorrt.compile(model,
+    inputs= [torch_tensorrt.Input((1, 3, 224, 224))],
+    enabled_precisions= {torch_tensorrt.dtype.f16}
+)
+
+ts_trt_model = torch.jit.trace(trt_model, torch.rand(1, 3, 224, 224).to(&quot;cuda&quot;))
+
+# Save the model
+torch.jit.save(ts_trt_model, &quot;/triton_example/model_repository/resnet50/1/model.pt&quot;)
+</pre></div>
+</div>
+<p>You can run the script with the following command (from <code class="docutils literal notranslate"><span class="pre">//examples/triton</span></code>)</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="n">docker</span><span class="w"> </span><span class="n">run</span><span class="w"> </span><span class="o">--</span><span class="n">gpus</span><span class="w"> </span><span class="n">all</span><span class="w"> </span><span class="o">-</span><span class="n">it</span><span class="w"> </span><span class="o">--</span><span class="n">rm</span><span class="w"> </span><span class="o">-</span><span class="n">v</span><span class="w"> </span><span class="n">$</span><span class="p">{</span><span class="n">PWD</span><span class="p">}</span><span class="o">:/</span><span class="n">triton_example</span><span class="w"> </span><span class="n">nvcr</span><span class="p">.</span><span class="n">io</span><span class="o">/</span><span class="n">nvidia</span><span class="o">/</span><span class="n">pytorch</span><span class="o">:</span><span class="n">YY</span><span class="p">.</span><span class="n">XX</span><span class="o">-</span><span class="n">py3</span><span class="w"> </span><span class="n">python</span><span class="w"> </span><span class="o">/</span><span class="n">triton_example</span><span class="o">/</span><span class="k">export</span><span class="p">.</span><span class="n">py</span>
+</pre></div>
+</div>
+<p>This will save the serialized TorchScript version of the ResNet model in the right directory in the model repository.</p>
 </section>
-<section id="compilation-with-torch-tensorrt-compile-using-default-settings">
-<h2>Compilation with <cite>torch_tensorrt.compile</cite> Using Default Settings<a class="headerlink" href="#compilation-with-torch-tensorrt-compile-using-default-settings" title="Permalink to this heading">¶</a></h2>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># We begin by defining and initializing a model</span>
-<span class="n">model</span> <span class="o">=</span> <span class="n">models</span><span class="o">.</span><span class="n">resnet18</span><span class="p">(</span><span class="n">pretrained</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">&quot;cuda&quot;</span><span class="p">)</span>
+<section id="step-2-set-up-triton-inference-server">
+<h2>Step 2: Set Up Triton Inference Server<a class="headerlink" href="#step-2-set-up-triton-inference-server" title="Permalink to this heading">¶</a></h2>
+<p>If you are new to the Triton Inference Server and want to learn more, we
+highly recommend to checking our <a class="reference external" href="https://github.com/triton-inference-server">Github
+Repository</a>.</p>
+<p>To use Triton, we need to make a model repository. A model repository, as the
+name suggests, is a repository of the models the Inference server hosts. While
+Triton can serve models from multiple repositories, in this example, we will
+discuss the simplest possible form of the model repository.</p>
+<p>The structure of this repository should look something like this:</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="n">model_repository</span>
+<span class="o">|</span>
+<span class="o">+--</span><span class="w"> </span><span class="n">resnet50</span>
+<span class="w">    </span><span class="o">|</span>
+<span class="w">    </span><span class="o">+--</span><span class="w"> </span><span class="n">config</span><span class="p">.</span><span class="n">pbtxt</span>
+<span class="w">    </span><span class="o">+--</span><span class="w"> </span><span class="mi">1</span>
+<span class="w">        </span><span class="o">|</span>
+<span class="w">        </span><span class="o">+--</span><span class="w"> </span><span class="n">model</span><span class="p">.</span><span class="n">pt</span>
+</pre></div>
+</div>
+<p>There are two files that Triton requires to serve the model: the model itself
+and a model configuration file which is typically provided in <code class="docutils literal notranslate"><span class="pre">config.pbtxt</span></code>.
+For the model we prepared in step 1, the following configuration can be used:</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="nl">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;resnet50&quot;</span>
+<span class="nl">backend</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;pytorch&quot;</span>
+<span class="nl">max_batch_size</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="mi">0</span>
+<span class="n">input</span><span class="w"> </span><span class="p">[</span>
+<span class="w">  </span><span class="p">{</span>
+<span class="w">    </span><span class="nl">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;x&quot;</span>
+<span class="w">    </span><span class="nl">data_type</span><span class="p">:</span><span class="w"> </span><span class="n">TYPE_FP32</span>
+<span class="w">    </span><span class="nl">dims</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="mi">224</span><span class="p">,</span><span class="w"> </span><span class="mi">224</span><span class="w"> </span><span class="p">]</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="p">]</span>
+<span class="n">output</span><span class="w"> </span><span class="p">[</span>
+<span class="w">  </span><span class="p">{</span>
+<span class="w">    </span><span class="nl">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;output0&quot;</span>
+<span class="w">    </span><span class="nl">data_type</span><span class="p">:</span><span class="w"> </span><span class="n">TYPE_FP32</span>
+<span class="w">    </span><span class="nl">dims</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">1000</span><span class="p">]</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="p">]</span>
+</pre></div>
+</div>
+<p>The <code class="docutils literal notranslate"><span class="pre">config.pbtxt</span></code> file is used to describe the exact model configuration
+with details like the names and shapes of the input and output layer(s),
+datatypes, scheduling and batching details and more. If you are new to Triton,
+we highly encourage you to check out this <a class="reference external" href="https://github.com/triton-inference-server/server/blob/main/docs/model_configuration.md">section of our
+documentation</a>
+for more details.</p>
+<p>With the model repository setup, we can proceed to launch the Triton server
+with the docker command below. Refer <a class="reference external" href="https://catalog.ngc.nvidia.com/orgs/nvidia/containers/tritonserver">this page</a> for the pull tag for the container.</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="cp"># Make sure that the TensorRT version in the Triton container</span>
+<span class="cp"># and TensorRT version in the environment used to optimize the model</span>
+<span class="cp"># are the same. Roughly, like publishing tags should have the same TensorRT version</span>
 
-<span class="c1"># Define sample inputs</span>
-<span class="n">inputs</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">((</span><span class="mi">16</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">))</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
+<span class="n">docker</span><span class="w"> </span><span class="n">run</span><span class="w"> </span><span class="o">--</span><span class="n">gpus</span><span class="w"> </span><span class="n">all</span><span class="w"> </span><span class="o">--</span><span class="n">rm</span><span class="w"> </span><span class="o">-</span><span class="n">p</span><span class="w"> </span><span class="mi">8000</span><span class="o">:</span><span class="mi">8000</span><span class="w"> </span><span class="o">-</span><span class="n">p</span><span class="w"> </span><span class="mi">8001</span><span class="o">:</span><span class="mi">8001</span><span class="w"> </span><span class="o">-</span><span class="n">p</span><span class="w"> </span><span class="mi">8002</span><span class="o">:</span><span class="mi">8002</span><span class="w"> </span><span class="o">-</span><span class="n">v</span><span class="w"> </span><span class="n">$</span><span class="p">{</span><span class="n">PWD</span><span class="p">}</span><span class="o">:/</span><span class="n">triton_example</span><span class="w"> </span><span class="n">nvcr</span><span class="p">.</span><span class="n">io</span><span class="o">/</span><span class="n">nvidia</span><span class="o">/</span><span class="n">tritonserver</span><span class="o">:</span><span class="n">YY</span><span class="p">.</span><span class="n">MM</span><span class="o">-</span><span class="n">py3</span><span class="w"> </span><span class="n">tritonserver</span><span class="w"> </span><span class="o">--</span><span class="n">model</span><span class="o">-</span><span class="n">repository</span><span class="o">=/</span><span class="n">triton_example</span><span class="o">/</span><span class="n">model_repository</span>
 </pre></div>
 </div>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Next, we compile the model using torch_tensorrt.compile</span>
-<span class="c1"># We use the `ir=&quot;dynamo&quot;` flag here, and `ir=&quot;torch_compile&quot;` should</span>
-<span class="c1"># work with cudagraphs as well.</span>
-<span class="n">opt</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span>
-    <span class="n">model</span><span class="p">,</span>
-    <span class="n">ir</span><span class="o">=</span><span class="s2">&quot;dynamo&quot;</span><span class="p">,</span>
-    <span class="n">inputs</span><span class="o">=</span><span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">Input</span><span class="p">(</span>
-        <span class="n">min_shape</span><span class="o">=</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">),</span>
-        <span class="n">opt_shape</span><span class="o">=</span><span class="p">(</span><span class="mi">8</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">),</span>
-        <span class="n">max_shape</span><span class="o">=</span><span class="p">(</span><span class="mi">16</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">),</span>
-        <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float</span><span class="p">,</span>
-        <span class="n">name</span><span class="o">=</span><span class="s2">&quot;x&quot;</span><span class="p">,</span>
-    <span class="p">),</span>
-<span class="p">)</span>
-</pre></div>
-</div>
+<p>This should spin up a Triton Inference server. Next step, building a simple
+http client to query the server.</p>
 </section>
-<section id="inference-using-the-cudagraphs-integration">
-<h2>Inference using the Cudagraphs Integration<a class="headerlink" href="#inference-using-the-cudagraphs-integration" title="Permalink to this heading">¶</a></h2>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># We can enable the cudagraphs API with a context manager</span>
-<span class="k">with</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">runtime</span><span class="o">.</span><span class="n">enable_cudagraphs</span><span class="p">():</span>
-    <span class="n">out_trt</span> <span class="o">=</span> <span class="n">opt</span><span class="p">(</span><span class="n">inputs</span><span class="p">)</span>
-
-<span class="c1"># Alternatively, we can set the cudagraphs mode for the session</span>
-<span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">runtime</span><span class="o">.</span><span class="n">set_cudagraphs_mode</span><span class="p">(</span><span class="kc">True</span><span class="p">)</span>
-<span class="n">out_trt</span> <span class="o">=</span> <span class="n">opt</span><span class="p">(</span><span class="n">inputs</span><span class="p">)</span>
-
-<span class="c1"># We can also turn off cudagraphs mode and perform inference as normal</span>
-<span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">runtime</span><span class="o">.</span><span class="n">set_cudagraphs_mode</span><span class="p">(</span><span class="kc">False</span><span class="p">)</span>
-<span class="n">out_trt</span> <span class="o">=</span> <span class="n">opt</span><span class="p">(</span><span class="n">inputs</span><span class="p">)</span>
+<section id="step-3-building-a-triton-client-to-query-the-server">
+<h2>Step 3: Building a Triton Client to Query the Server<a class="headerlink" href="#step-3-building-a-triton-client-to-query-the-server" title="Permalink to this heading">¶</a></h2>
+<p>Before proceeding, make sure to have a sample image on hand. If you don’t
+have one, download an example image to test inference. In this section, we
+will be going over a very basic client. For a variety of more fleshed out
+examples, refer to the <a class="reference external" href="https://github.com/triton-inference-server/client/tree/main/src/python/examples">Triton Client Repository</a></p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="n">wget</span><span class="w">  </span><span class="o">-</span><span class="n">O</span><span class="w"> </span><span class="n">img1</span><span class="p">.</span><span class="n">jpg</span><span class="w"> </span><span class="s">&quot;https://www.hakaimagazine.com/wp-content/uploads/header-gulf-birds.jpg&quot;</span>
 </pre></div>
 </div>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># If we provide new input shapes, cudagraphs will re-record the graph</span>
-<span class="n">inputs_2</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">((</span><span class="mi">8</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">))</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
-<span class="n">inputs_3</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">((</span><span class="mi">4</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">))</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
-
-<span class="k">with</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">runtime</span><span class="o">.</span><span class="n">enable_cudagraphs</span><span class="p">():</span>
-    <span class="n">out_trt_2</span> <span class="o">=</span> <span class="n">opt</span><span class="p">(</span><span class="n">inputs_2</span><span class="p">)</span>
-    <span class="n">out_trt_3</span> <span class="o">=</span> <span class="n">opt</span><span class="p">(</span><span class="n">inputs_3</span><span class="p">)</span>
+<p>We then need to install dependencies for building a python client. These will
+change from client to client. For a full list of all languages supported by Triton,
+please refer to <a class="reference external" href="https://github.com/triton-inference-server/client">Triton’s client repository</a>.</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="n">pip</span><span class="w"> </span><span class="n">install</span><span class="w"> </span><span class="n">torchvision</span>
+<span class="n">pip</span><span class="w"> </span><span class="n">install</span><span class="w"> </span><span class="n">attrdict</span>
+<span class="n">pip</span><span class="w"> </span><span class="n">install</span><span class="w"> </span><span class="n">nvidia</span><span class="o">-</span><span class="n">pyindex</span>
+<span class="n">pip</span><span class="w"> </span><span class="n">install</span><span class="w"> </span><span class="n">tritonclient</span><span class="p">[</span><span class="n">all</span><span class="p">]</span>
 </pre></div>
 </div>
-<p class="sphx-glr-timing"><strong>Total running time of the script:</strong> ( 0 minutes  0.000 seconds)</p>
-<div class="sphx-glr-footer sphx-glr-footer-example docutils container" id="sphx-glr-download-tutorials-rendered-examples-dynamo-torch-export-cudagraphs-py">
-<div class="sphx-glr-download sphx-glr-download-python docutils container">
-<p><a class="reference download internal" download="" href="../../../_downloads/3d4d74f6636d986f33167154f6553961/torch_export_cudagraphs.py"><code class="xref download docutils literal notranslate"><span class="pre">Download</span> <span class="pre">Python</span> <span class="pre">source</span> <span class="pre">code:</span> <span class="pre">torch_export_cudagraphs.py</span></code></a></p>
+<p>Let’s jump into the client. Firstly, we write a small preprocessing function to
+resize and normalize the query image.</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="k">import</span><span class="w"> </span><span class="n">numpy</span><span class="w"> </span><span class="n">as</span><span class="w"> </span><span class="n">np</span>
+<span class="n">from</span><span class="w"> </span><span class="n">torchvision</span><span class="w"> </span><span class="k">import</span><span class="w"> </span><span class="n">transforms</span>
+<span class="n">from</span><span class="w"> </span><span class="n">PIL</span><span class="w"> </span><span class="k">import</span><span class="w"> </span><span class="n">Image</span>
+<span class="k">import</span><span class="w"> </span><span class="n">tritonclient</span><span class="p">.</span><span class="n">http</span><span class="w"> </span><span class="n">as</span><span class="w"> </span><span class="n">httpclient</span>
+<span class="n">from</span><span class="w"> </span><span class="n">tritonclient</span><span class="p">.</span><span class="n">utils</span><span class="w"> </span><span class="k">import</span><span class="w"> </span><span class="n">triton_to_np_dtype</span>
+
+<span class="cp"># preprocessing function</span>
+<span class="n">def</span><span class="w"> </span><span class="n">rn50_preprocess</span><span class="p">(</span><span class="n">img_path</span><span class="o">=</span><span class="s">&quot;/triton_example/img1.jpg&quot;</span><span class="p">)</span><span class="o">:</span>
+<span class="w">  </span><span class="n">img</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Image</span><span class="p">.</span><span class="n">open</span><span class="p">(</span><span class="n">img_path</span><span class="p">)</span>
+<span class="w">  </span><span class="n">preprocess</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">transforms</span><span class="p">.</span><span class="n">Compose</span><span class="p">(</span>
+<span class="w">      </span><span class="p">[</span>
+<span class="w">          </span><span class="n">transforms</span><span class="p">.</span><span class="n">Resize</span><span class="p">(</span><span class="mi">256</span><span class="p">),</span>
+<span class="w">          </span><span class="n">transforms</span><span class="p">.</span><span class="n">CenterCrop</span><span class="p">(</span><span class="mi">224</span><span class="p">),</span>
+<span class="w">          </span><span class="n">transforms</span><span class="p">.</span><span class="n">ToTensor</span><span class="p">(),</span>
+<span class="w">          </span><span class="n">transforms</span><span class="p">.</span><span class="n">Normalize</span><span class="p">(</span><span class="n">mean</span><span class="o">=</span><span class="p">[</span><span class="mf">0.485</span><span class="p">,</span><span class="w"> </span><span class="mf">0.456</span><span class="p">,</span><span class="w"> </span><span class="mf">0.406</span><span class="p">],</span><span class="w"> </span><span class="n">std</span><span class="o">=</span><span class="p">[</span><span class="mf">0.229</span><span class="p">,</span><span class="w"> </span><span class="mf">0.224</span><span class="p">,</span><span class="w"> </span><span class="mf">0.225</span><span class="p">]),</span>
+<span class="w">      </span><span class="p">]</span>
+<span class="w">  </span><span class="p">)</span>
+<span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="n">preprocess</span><span class="p">(</span><span class="n">img</span><span class="p">).</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">0</span><span class="p">).</span><span class="n">numpy</span><span class="p">()</span>
+
+<span class="w"> </span><span class="n">transformed_img</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rn50_preprocess</span><span class="p">()</span>
+</pre></div>
 </div>
-<div class="sphx-glr-download sphx-glr-download-jupyter docutils container">
-<p><a class="reference download internal" download="" href="../../../_downloads/50cdc517d124443e61b8e11d4bdb29f0/torch_export_cudagraphs.ipynb"><code class="xref download docutils literal notranslate"><span class="pre">Download</span> <span class="pre">Jupyter</span> <span class="pre">notebook:</span> <span class="pre">torch_export_cudagraphs.ipynb</span></code></a></p>
+<p>Building a client requires three basic points. Firstly, we setup a connection
+with the Triton Inference Server.</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="cp"># Setting up client</span>
+<span class="n">client</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">httpclient</span><span class="p">.</span><span class="n">InferenceServerClient</span><span class="p">(</span><span class="n">url</span><span class="o">=</span><span class="s">&quot;localhost:8000&quot;</span><span class="p">)</span>
+</pre></div>
 </div>
+<p>Secondly, we specify the names of the input and output layer(s) of our model. This can be obtained during export and should already be specified in your <code class="docutils literal notranslate"><span class="pre">config.pbtxt</span></code></p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="n">inputs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">httpclient</span><span class="p">.</span><span class="n">InferInput</span><span class="p">(</span><span class="s">&quot;x&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">transformed_img</span><span class="p">.</span><span class="n">shape</span><span class="p">,</span><span class="w"> </span><span class="n">datatype</span><span class="o">=</span><span class="s">&quot;FP32&quot;</span><span class="p">)</span>
+<span class="n">inputs</span><span class="p">.</span><span class="n">set_data_from_numpy</span><span class="p">(</span><span class="n">transformed_img</span><span class="p">,</span><span class="w"> </span><span class="n">binary_data</span><span class="o">=</span><span class="n">True</span><span class="p">)</span>
+
+<span class="n">outputs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">httpclient</span><span class="p">.</span><span class="n">InferRequestedOutput</span><span class="p">(</span><span class="s">&quot;output0&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">binary_data</span><span class="o">=</span><span class="n">True</span><span class="p">,</span><span class="w"> </span><span class="n">class_count</span><span class="o">=</span><span class="mi">1000</span><span class="p">)</span>
+</pre></div>
 </div>
-<p class="sphx-glr-signature"><a class="reference external" href="https://sphinx-gallery.github.io">Gallery generated by Sphinx-Gallery</a></p>
-</section>
+<p>Lastly, we send an inference request to the Triton Inference Server.</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span># Querying the server
+results = client.infer(model_name=&quot;resnet50&quot;, inputs=[inputs], outputs=[outputs])
+inference_output = results.as_numpy(&#39;output0&#39;)
+print(inference_output[:5])
+</pre></div>
+</div>
+<p>The output should look like below:</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span>[b&#39;12.468750:90&#39; b&#39;11.523438:92&#39; b&#39;9.664062:14&#39; b&#39;8.429688:136&#39;
+ b&#39;8.234375:11&#39;]
+</pre></div>
+</div>
+<p>The output format here is <code class="docutils literal notranslate"><span class="pre">&lt;confidence_score&gt;:&lt;classification_index&gt;</span></code>.
+To learn how to map these to the label names and more, refer to Triton Inference Server’s
+<a class="reference external" href="https://github.com/triton-inference-server/server/blob/main/docs/protocol/extension_classification.md">documentation</a>.</p>
+<p>You can try out this client quickly using</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="cp"># Remember to use the same publishing tag for all steps (e.g. 24.08)</span>
+
+<span class="n">docker</span><span class="w"> </span><span class="n">run</span><span class="w"> </span><span class="o">-</span><span class="n">it</span><span class="w"> </span><span class="o">--</span><span class="n">net</span><span class="o">=</span><span class="n">host</span><span class="w"> </span><span class="o">-</span><span class="n">v</span><span class="w"> </span><span class="n">$</span><span class="p">{</span><span class="n">PWD</span><span class="p">}</span><span class="o">:/</span><span class="n">triton_example</span><span class="w"> </span><span class="n">nvcr</span><span class="p">.</span><span class="n">io</span><span class="o">/</span><span class="n">nvidia</span><span class="o">/</span><span class="n">tritonserver</span><span class="o">:</span><span class="n">YY</span><span class="p">.</span><span class="n">MM</span><span class="o">-</span><span class="n">py3</span><span class="o">-</span><span class="n">sdk</span><span class="w"> </span><span class="n">bash</span><span class="w"> </span><span class="o">-</span><span class="n">c</span><span class="w"> </span><span class="s">&quot;pip install torchvision &amp;&amp; python /triton_example/client.py&quot;</span>
+</pre></div>
+</div>
+<div class="sphx-glr-thumbnails"></div></section>
 </section>
 
 
@@ -552,15 +668,6 @@ to download the full example code</p>
              
             </div>
             <footer>
-  
-    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
-      
-        <a href="converter_overloading.html" class="btn btn-neutral float-right" title="Overloading Torch-TensorRT Converters with Custom Converters" accesskey="n" rel="next">Next <img src="../../../_static/images/chevron-right-orange.svg" class="next-page"></a>
-      
-      
-        <a href="../../serving_torch_tensorrt_with_triton.html" class="btn btn-neutral" title="Serving a Torch-TensorRT model with Triton" accesskey="p" rel="prev"><img src="../../../_static/images/chevron-right-orange.svg" class="previous-page"> Previous</a>
-      
-    </div>
   
 
   
@@ -590,10 +697,10 @@ to download the full example code</p>
           <div class="pytorch-right-menu" id="pytorch-right-menu">
             <div class="pytorch-side-scroll" id="pytorch-side-scroll-right">
               <ul>
-<li><a class="reference internal" href="#">Torch Export with Cudagraphs</a><ul>
-<li><a class="reference internal" href="#imports-and-model-definition">Imports and Model Definition</a></li>
-<li><a class="reference internal" href="#compilation-with-torch-tensorrt-compile-using-default-settings">Compilation with <cite>torch_tensorrt.compile</cite> Using Default Settings</a></li>
-<li><a class="reference internal" href="#inference-using-the-cudagraphs-integration">Inference using the Cudagraphs Integration</a></li>
+<li><a class="reference internal" href="#">Serving a Torch-TensorRT model with Triton</a><ul>
+<li><a class="reference internal" href="#step-1-optimize-your-model-with-torch-tensorrt">Step 1: Optimize your model with Torch-TensorRT</a></li>
+<li><a class="reference internal" href="#step-2-set-up-triton-inference-server">Step 2: Set Up Triton Inference Server</a></li>
+<li><a class="reference internal" href="#step-3-building-a-triton-client-to-query-the-server">Step 3: Building a Triton Client to Query the Server</a></li>
 </ul>
 </li>
 </ul>

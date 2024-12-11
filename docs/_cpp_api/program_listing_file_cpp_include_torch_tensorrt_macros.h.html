@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Program Listing for File macros.h &mdash; Torch-TensorRT v2.6.0.dev0+daffc7c documentation</title>
+  <title>Program Listing for File macros.h &mdash; Torch-TensorRT v2.6.0.dev0+eb8bf25 documentation</title>
   
 
   
@@ -273,7 +273,7 @@
               
               
                 <div class="version">
-                  v2.6.0.dev0+daffc7c
+                  v2.6.0.dev0+eb8bf25
                 </div>
               
             
@@ -468,44 +468,44 @@
   <section id="program-listing-for-file-macros-h">
 <span id="program-listing-file-cpp-include-torch-tensorrt-macros-h"></span><h1>Program Listing for File macros.h<a class="headerlink" href="#program-listing-for-file-macros-h" title="Permalink to this heading">¶</a></h1>
 <p>↰ <a class="reference internal" href="file_cpp_include_torch_tensorrt_macros.h.html#file-cpp-include-torch-tensorrt-macros-h"><span class="std std-ref">Return to documentation for file</span></a> (<code class="docutils literal notranslate"><span class="pre">cpp/include/torch_tensorrt/macros.h</span></code>)</p>
-<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>/*
- * Copyright (c) NVIDIA Corporation.
- * All rights reserved.
- *
- * This library is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree.
- */
-#pragma once
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="cm">/*</span>
+<span class="cm"> * Copyright (c) NVIDIA Corporation.</span>
+<span class="cm"> * All rights reserved.</span>
+<span class="cm"> *</span>
+<span class="cm"> * This library is licensed under the BSD-style license found in the</span>
+<span class="cm"> * LICENSE file in the root directory of this source tree.</span>
+<span class="cm"> */</span>
+<span class="cp">#pragma once</span>
 
-#if defined(USE_CMAKE_GENERATED_EXPORT_HEADER)
-#include &lt;torch_tensorrt_export.h&gt;
-#else
-#if defined(__GNUC__)
-#define TORCHTRT_API __attribute__((__visibility__(&quot;default&quot;)))
-#define TORCHTRT_HIDDEN __attribute__((__visibility__(&quot;hidden&quot;)))
-#else
-#define TORCHTRT_API
-#define TORCHTRT_HIDDEN
-#endif // defined(__GNUC__)
-#endif // defined(USE_CMAKE_GENERATED_EXPORT_HEADER)
+<span class="cp">#if defined(USE_CMAKE_GENERATED_EXPORT_HEADER)</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;torch_tensorrt_export.h&gt;</span>
+<span class="cp">#else</span>
+<span class="cp">#if defined(__GNUC__)</span>
+<span class="cp">#define TORCHTRT_API __attribute__((__visibility__(&quot;default&quot;)))</span>
+<span class="cp">#define TORCHTRT_HIDDEN __attribute__((__visibility__(&quot;hidden&quot;)))</span>
+<span class="cp">#else</span>
+<span class="cp">#define TORCHTRT_API</span>
+<span class="cp">#define TORCHTRT_HIDDEN</span>
+<span class="cp">#endif </span><span class="c1">// defined(__GNUC__)</span>
+<span class="cp">#endif </span><span class="c1">// defined(USE_CMAKE_GENERATED_EXPORT_HEADER)</span>
 
-// Does this need to be gaurded or something?
-#define XSTR(x) #x
-#define STR(x) XSTR(x)
+<span class="c1">// Does this need to be gaurded or something?</span>
+<span class="cp">#define XSTR(x) #x</span>
+<span class="cp">#define STR(x) XSTR(x)</span>
 
-#define TORCH_TENSORRT_MAJOR_VERSION 2
-#define TORCH_TENSORRT_MINOR_VERSION 6
-#define TORCH_TENSORRT_PATCH_VERSION 0
-#define TORCH_TENSORRT_VERSION      \
-  STR(TORCH_TENSORRT_MAJOR_VERSION) \
-  &quot;.&quot; STR(TORCH_TENSORRT_MINOR_VERSION) &quot;.&quot; STR(TORCH_TENSORRT_PATCH_VERSION)
+<span class="cp">#define TORCH_TENSORRT_MAJOR_VERSION 2</span>
+<span class="cp">#define TORCH_TENSORRT_MINOR_VERSION 6</span>
+<span class="cp">#define TORCH_TENSORRT_PATCH_VERSION 0</span>
+<span class="cp">#define TORCH_TENSORRT_VERSION      \</span>
+<span class="cp">  STR(TORCH_TENSORRT_MAJOR_VERSION) \</span>
+<span class="cp">  &quot;.&quot; STR(TORCH_TENSORRT_MINOR_VERSION) &quot;.&quot; STR(TORCH_TENSORRT_PATCH_VERSION)</span>
 
-// Setup namespace aliases for ease of use
-namespace torch_tensorrt {
-namespace torchscript {}
-namespace ts = torchscript;
-} // namespace torch_tensorrt
-namespace torchtrt = torch_tensorrt;
+<span class="c1">// Setup namespace aliases for ease of use</span>
+<span class="k">namespace</span><span class="w"> </span><span class="nn">torch_tensorrt</span><span class="w"> </span><span class="p">{</span>
+<span class="k">namespace</span><span class="w"> </span><span class="nn">torchscript</span><span class="w"> </span><span class="p">{}</span>
+<span class="k">namespace</span><span class="w"> </span><span class="nn">ts</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nn">torchscript</span><span class="p">;</span>
+<span class="p">}</span><span class="w"> </span><span class="c1">// namespace torch_tensorrt</span>
+<span class="k">namespace</span><span class="w"> </span><span class="nn">torchtrt</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nn">torch_tensorrt</span><span class="p">;</span>
 </pre></div>
 </div>
 </section>
