@@ -1,2 +1,7 @@
 export CI_BUILD="1"
 export RELEASE="1"
+if [ $CU_VERSION == "cu126" ]; then
+    export USE_CXX11_ABI="1"
+else
+    export USE_CXX11_ABI="0"
+fi
