@@ -558,10 +558,6 @@ def parse_dynamo_kwargs(
 
     engine_cache = None
     if kwargs.get("cache_built_engines") or kwargs.get("reuse_cached_engines"):
-        assert kwargs.get(
-            "make_refittable"
-        ), "Engine caching requires make_refittable to be set to True"
-
         if kwargs.get("custom_engine_cache") is not None:
             engine_cache = kwargs.get("custom_engine_cache")
         else:
