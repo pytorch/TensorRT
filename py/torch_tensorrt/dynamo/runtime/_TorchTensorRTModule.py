@@ -96,6 +96,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         Keyword Arguments:
             name (str): Name for module
             settings (torch_tensorrt.dynamo.CompilationSettings): Settings used to compile engine, assumes engine was built with default compilation settings if object not passed
+            weight_name_map (dict): Mapping of engine weight name to state_dict weight name
 
         Example:
 
