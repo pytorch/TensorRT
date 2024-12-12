@@ -12,6 +12,17 @@ pip install -r ../requirements.txt
 
 Certain custom modifications are required to ensure the model is exported successfully. To apply these changes, please install SAM2 using the following fork : https://github.com/chohk88/sam2/tree/torch-trt (<a href="https://github.com/chohk88/sam2/tree/torch-trt?tab=readme-ov-file#installation">Installation</a>)
 
+These modifications are explained in detail in the [Torch-TensorRT Compatibility Modifications](#torch-tensorrt-compatibility-modifications) section below. 
+
+
+## Torch-TensorRT Compatibility Modifications
+In the custom SAM2 fork, the following modifications have been applied to remove graph breaks and enhance latency performance, ensuring a more efficient Torch-TRT conversion:
+
+- **Consistent Data Types:** Preserves input tensor dtypes, removing forced FP32 conversions.
+- **Masked Operations:** Uses mask-based indexing instead of directly selecting data, improving Torch-TRT compatibility.
+- **Safe Initialization:** Initializes tensors conditionally rather than concatenating to empty tensors.
+- **Standard Functions:** Avoids special contexts and custom LayerNorm, relying on built-in PyTorch functions for better stability.
+
 ## Model execution
 Run the following script to produce output masks after compiling with Torch-TensorRT
 ```py
