@@ -197,7 +197,7 @@ def cross_compile_for_windows(
 
     if "refit" in kwargs.keys():
         warnings.warn(
-            "`refit` is deprecated. Please set `immutable_weights=True` to build a non-refittable engine whose weights will be fixed.",
+            "`refit` is deprecated. Please set `immutable_weights=False` to build a refittable engine whose weights can be refitted.",
             DeprecationWarning,
             stacklevel=2,
         )
@@ -210,7 +210,7 @@ def cross_compile_for_windows(
 
     if "make_refittable" in kwargs.keys():
         warnings.warn(
-            "`make_refittable` is deprecated. Please set `immutable_weights=True` to build a non-refittable engine whose weights will be fixed.",
+            "`make_refittable` is deprecated. Please set `immutable_weights=False` to build a refittable engine whose weights can be refitted",
             DeprecationWarning,
             stacklevel=2,
         )
@@ -508,7 +508,7 @@ def compile(
 
     if "refit" in kwargs.keys():
         warnings.warn(
-            "`refit` is deprecated. Please set `immutable_weights=True` to build a non-refittable engine whose weights will be fixed.",
+            "`refit` is deprecated. Please set `immutable_weights=False` to build a refittable engine whose weights can be refitted",
             DeprecationWarning,
             stacklevel=2,
         )
@@ -521,7 +521,7 @@ def compile(
 
     if "make_refittable" in kwargs.keys():
         warnings.warn(
-            "`make_refittable` is deprecated. Please set `immutable_weights=True` to build a non-refittable engine whose weights will be fixed.",
+            "`make_refittable` is deprecated. Please set `immutable_weights=False` to build a refittable engine whose weights can be refitted",
             DeprecationWarning,
             stacklevel=2,
         )
@@ -1028,7 +1028,7 @@ def convert_exported_program_to_serialized_trt_engine(
 
     if "refit" in kwargs.keys():
         warnings.warn(
-            "`refit` is deprecated. Please set `immutable_weights=True` to build a non-refittable engine whose weights will be fixed.",
+            "`refit` is deprecated. Please set `immutable_weights=False` to build a refittable engine whose weights can be refitted",
             DeprecationWarning,
             stacklevel=2,
         )
@@ -1041,7 +1041,7 @@ def convert_exported_program_to_serialized_trt_engine(
 
     if "make_refittable" in kwargs.keys():
         warnings.warn(
-            "`make_refittable` is deprecated. Please set `immutable_weights=True` to build a non-refittable engine whose weights will be fixed.",
+            "`make_refittable` is deprecated. Please set `immutable_weights=False` to build a refittable engine whose weights can be refitted",
             DeprecationWarning,
             stacklevel=2,
         )
