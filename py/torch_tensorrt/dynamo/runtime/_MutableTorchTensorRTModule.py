@@ -65,7 +65,7 @@ class MutableTorchTensorRTModule(object):
             Union[torch.dtype, dtype]
         ] = _defaults.ENABLED_PRECISIONS,
         engine_capability: EngineCapability = _defaults.ENGINE_CAPABILITY,
-        make_refittable: bool = _defaults.MAKE_REFITTABLE,
+        immutable_weights: bool = _defaults.IMMUTABLE_WEIGHTS,
         debug: bool = _defaults.DEBUG,
         num_avg_timing_iters: int = _defaults.NUM_AVG_TIMING_ITERS,
         workspace_size: int = _defaults.WORKSPACE_SIZE,
@@ -103,7 +103,7 @@ class MutableTorchTensorRTModule(object):
             assume_dynamic_shape_support (bool): Setting this to true enables the converters work for both dynamic and static shapes. Default: False
             sparse_weights (bool): Enable sparsity for convolution and fully connected layers.
             enabled_precision (Set(Union(torch.dtype, torch_tensorrt.dtype))): The set of datatypes that TensorRT can use when selecting kernels
-            refit (bool): Enable refitting
+            immutable_weights (bool): Build non-refittable engines. This is useful for some layers that are not refittable.
             debug (bool): Enable debuggable engine
             capability (torch_tensorrt.EngineCapability): Restrict kernel selection to safe gpu kernels or safe dla kernels
             num_avg_timing_iters (int): Number of averaging timing iterations used to select kernels
@@ -152,8 +152,8 @@ class MutableTorchTensorRTModule(object):
         device = to_torch_tensorrt_device(device)
         enabled_precisions = {dtype._from(p) for p in enabled_precisions}
         assert (
-            make_refittable
-        ), "'make_refittable' has to be True for a MutableTorchTensorRTModule."
+            not immutable_weights
+        ), "`immutable_weights` has to be False for a MutableTorchTensorRTModule."
         compilation_options = {
             "enabled_precisions": (
                 enabled_precisions
@@ -180,7 +180,7 @@ class MutableTorchTensorRTModule(object):
             "require_full_compilation": require_full_compilation,
             "disable_tf32": disable_tf32,
             "sparse_weights": sparse_weights,
-            "make_refittable": make_refittable,
+            "immutable_weights": immutable_weights,
             "engine_capability": engine_capability,
             "dla_sram_size": dla_sram_size,
             "dla_local_dram_size": dla_local_dram_size,
