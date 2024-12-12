@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Engine Caching &mdash; Torch-TensorRT v2.6.0.dev0+daffc7c documentation</title>
+  <title>Engine Caching &mdash; Torch-TensorRT v2.6.0.dev0+d3a8880 documentation</title>
   
 
   
@@ -275,7 +275,7 @@
               
               
                 <div class="version">
-                  v2.6.0.dev0+daffc7c
+                  v2.6.0.dev0+d3a8880
                 </div>
               
             
@@ -529,7 +529,7 @@ engines are saved to disk tied to a hash of their corresponding PyTorch subgraph
 in a subsequent compilation, either as part of this session or a new session, the cache will
 pull the built engine and <strong>refit</strong> the weights which can reduce compilation times by orders of magnitude.
 As such, in order to insert a new engine into the cache (i.e. <code class="docutils literal notranslate"><span class="pre">cache_built_engines=True</span></code>),
-the engine must be refittable (<code class="docutils literal notranslate"><span class="pre">make_refittable=True</span></code>). See <a class="reference internal" href="refit_engine_example.html#refit-engine-example"><span class="std std-ref">Refitting Torch-TensorRT Programs with New Weights</span></a> for more details.</p>
+the engine must be refittable (<code class="docutils literal notranslate"><span class="pre">immutable_weights=False</span></code>). See <a class="reference internal" href="refit_engine_example.html#refit-engine-example"><span class="std std-ref">Refitting Torch-TensorRT Programs with New Weights</span></a> for more details.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span> <span class="nf">torch_compile</span><span class="p">(</span><span class="n">iterations</span><span class="o">=</span><span class="mi">3</span><span class="p">):</span>
     <span class="n">times</span> <span class="o">=</span> <span class="p">[]</span>
     <span class="n">start</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">Event</span><span class="p">(</span><span class="n">enable_timing</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
@@ -561,7 +561,7 @@ the engine must be refittable (<code class="docutils literal notranslate"><span 
                 <span class="s2">&quot;enabled_precisions&quot;</span><span class="p">:</span> <span class="n">enabled_precisions</span><span class="p">,</span>
                 <span class="s2">&quot;debug&quot;</span><span class="p">:</span> <span class="n">debug</span><span class="p">,</span>
                 <span class="s2">&quot;min_block_size&quot;</span><span class="p">:</span> <span class="n">min_block_size</span><span class="p">,</span>
-                <span class="s2">&quot;make_refittable&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+                <span class="s2">&quot;immutable_weights&quot;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
                 <span class="s2">&quot;cache_built_engines&quot;</span><span class="p">:</span> <span class="n">cache_built_engines</span><span class="p">,</span>
                 <span class="s2">&quot;reuse_cached_engines&quot;</span><span class="p">:</span> <span class="n">reuse_cached_engines</span><span class="p">,</span>
             <span class="p">},</span>
@@ -620,7 +620,7 @@ previously built engines and refit the weights.</p>
             <span class="n">enabled_precisions</span><span class="o">=</span><span class="n">enabled_precisions</span><span class="p">,</span>
             <span class="n">debug</span><span class="o">=</span><span class="n">debug</span><span class="p">,</span>
             <span class="n">min_block_size</span><span class="o">=</span><span class="n">min_block_size</span><span class="p">,</span>
-            <span class="n">make_refittable</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+            <span class="n">immutable_weights</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
             <span class="n">cache_built_engines</span><span class="o">=</span><span class="n">cache_built_engines</span><span class="p">,</span>
             <span class="n">reuse_cached_engines</span><span class="o">=</span><span class="n">reuse_cached_engines</span><span class="p">,</span>
             <span class="n">engine_cache_size</span><span class="o">=</span><span class="mi">1</span> <span class="o">&lt;&lt;</span> <span class="mi">30</span><span class="p">,</span>  <span class="c1"># 1GB</span>
@@ -730,7 +730,7 @@ The blob contains a serialized engine, calling spec data, and weight map informa
                 <span class="s2">&quot;enabled_precisions&quot;</span><span class="p">:</span> <span class="n">enabled_precisions</span><span class="p">,</span>
                 <span class="s2">&quot;debug&quot;</span><span class="p">:</span> <span class="n">debug</span><span class="p">,</span>
                 <span class="s2">&quot;min_block_size&quot;</span><span class="p">:</span> <span class="n">min_block_size</span><span class="p">,</span>
-                <span class="s2">&quot;make_refittable&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+                <span class="s2">&quot;immutable_weights&quot;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
                 <span class="s2">&quot;cache_built_engines&quot;</span><span class="p">:</span> <span class="n">cache_built_engines</span><span class="p">,</span>
                 <span class="s2">&quot;reuse_cached_engines&quot;</span><span class="p">:</span> <span class="n">reuse_cached_engines</span><span class="p">,</span>
                 <span class="s2">&quot;custom_engine_cache&quot;</span><span class="p">:</span> <span class="n">engine_cache</span><span class="p">,</span>

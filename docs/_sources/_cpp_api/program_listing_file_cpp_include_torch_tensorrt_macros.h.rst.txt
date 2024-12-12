@@ -8,7 +8,7 @@ Program Listing for File macros.h
 
 .. |exhale_lsh| unicode:: U+021B0 .. UPWARDS ARROW WITH TIP LEFTWARDS
 
-.. code-block:: none
+.. code-block:: cpp
 
    /*
     * Copyright (c) NVIDIA Corporation.

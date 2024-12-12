@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt.dynamo._refit &mdash; Torch-TensorRT v2.6.0.dev0+daffc7c documentation</title>
+  <title>torch_tensorrt.dynamo._refit &mdash; Torch-TensorRT v2.6.0.dev0+d3a8880 documentation</title>
   
 
   
@@ -272,7 +272,7 @@
               
               
                 <div class="version">
-                  v2.6.0.dev0+daffc7c
+                  v2.6.0.dev0+d3a8880
                 </div>
               
             
@@ -621,13 +621,26 @@
             <span class="k">if</span> <span class="n">torch_device</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="s2">&quot;cuda&quot;</span>
             <span class="k">else</span> <span class="n">trt</span><span class="o">.</span><span class="n">TensorLocation</span><span class="o">.</span><span class="n">HOST</span>
         <span class="p">)</span>
+
+        <span class="n">constant_mapping</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="n">weight_name_map</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span>
+            <span class="s2">&quot;constant_mapping&quot;</span><span class="p">,</span> <span class="p">{}</span>
+        <span class="p">)</span>  <span class="c1"># type: ignore</span>
         <span class="n">mapping</span> <span class="o">=</span> <span class="n">construct_refit_mapping_from_weight_name_map</span><span class="p">(</span>
             <span class="n">weight_name_map</span><span class="p">,</span> <span class="n">new_gm</span><span class="o">.</span><span class="n">state_dict</span><span class="p">()</span>
         <span class="p">)</span>
+        <span class="n">constant_mapping_with_type</span> <span class="o">=</span> <span class="p">{}</span>
 
-        <span class="c1"># Debug Use</span>
-        <span class="c1"># correct = construct_refit_mapping(new_gm, input_list, settings)</span>
-        <span class="c1"># comparison = {k: (np.allclose(correct[k][0], mapping[k][0].cpu().numpy(), 1e-2, 1e-2), correct[k][0], mapping[k][0]) for k in mapping if k in correct}</span>
+        <span class="k">for</span> <span class="n">constant_name</span><span class="p">,</span> <span class="n">val</span> <span class="ow">in</span> <span class="n">constant_mapping</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="n">np_weight_type</span> <span class="o">=</span> <span class="n">val</span><span class="o">.</span><span class="n">dtype</span>
+            <span class="n">val_tensor</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">from_numpy</span><span class="p">(</span><span class="n">val</span><span class="p">)</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
+            <span class="n">trt_dtype</span> <span class="o">=</span> <span class="n">dtype</span><span class="o">.</span><span class="n">try_from</span><span class="p">(</span><span class="n">np_weight_type</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">trt</span><span class="o">.</span><span class="n">DataType</span><span class="p">)</span>
+            <span class="n">torch_dtype</span> <span class="o">=</span> <span class="n">dtype</span><span class="o">.</span><span class="n">try_from</span><span class="p">(</span><span class="n">np_weight_type</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span>
+            <span class="n">constant_mapping_with_type</span><span class="p">[</span><span class="n">constant_name</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">val_tensor</span><span class="o">.</span><span class="n">clone</span><span class="p">()</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">contiguous</span><span class="p">()</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">torch_dtype</span><span class="p">),</span>
+                <span class="n">trt_dtype</span><span class="p">,</span>
+            <span class="p">)</span>
+
+        <span class="n">mapping</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">constant_mapping_with_type</span><span class="p">)</span>
 
         <span class="k">for</span> <span class="n">layer_name</span> <span class="ow">in</span> <span class="n">weight_list</span><span class="p">:</span>
             <span class="k">if</span> <span class="n">layer_name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">mapping</span><span class="p">:</span>
@@ -716,7 +729,7 @@
         <span class="p">]</span>
         <span class="k">assert</span> <span class="p">(</span>
             <span class="n">encoded_metadata</span> <span class="o">!=</span> <span class="s2">&quot;&quot;</span>
-        <span class="p">),</span> <span class="s2">&quot;The engine provided is either not refittable or was built with a version of Torch-TensorRT that is too old, please recompile using the latest version with make_refittable=True&quot;</span>
+        <span class="p">),</span> <span class="s2">&quot;The engine provided is either not refittable or was built with a version of Torch-TensorRT that is too old, please recompile using the latest version&quot;</span>
         <span class="n">settings</span> <span class="o">=</span> <span class="n">TorchTensorRTModule</span><span class="o">.</span><span class="n">decode_metadata</span><span class="p">(</span><span class="n">encoded_metadata</span><span class="p">)[</span><span class="s2">&quot;settings&quot;</span><span class="p">]</span>
         <span class="c1"># Handle torch modules</span>
         <span class="n">compiled_submodules_map</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">compiled_submodules</span><span class="p">)</span>
@@ -734,8 +747,8 @@
     <span class="k">assert</span> <span class="n">settings</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
 
     <span class="k">assert</span> <span class="p">(</span>
-        <span class="n">settings</span><span class="o">.</span><span class="n">make_refittable</span>
-    <span class="p">),</span> <span class="s2">&quot;Refitting is not enabled. Please recompile the engine with refit=True.&quot;</span>
+        <span class="ow">not</span> <span class="n">settings</span><span class="o">.</span><span class="n">immutable_weights</span>
+    <span class="p">),</span> <span class="s2">&quot;Refitting is not enabled. Please recompile the engine with immutable_weights=False.&quot;</span>
 
     <span class="k">if</span> <span class="n">settings</span><span class="o">.</span><span class="n">debug</span><span class="p">:</span>
         <span class="n">set_log_level</span><span class="p">(</span><span class="n">logger</span><span class="o">.</span><span class="n">parent</span><span class="p">,</span> <span class="n">logging</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">)</span>
@@ -914,17 +927,21 @@
                     <span class="n">weight_name_map</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
                 <span class="p">)</span>
 
-        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">compiled_submodule</span><span class="p">,</span> <span class="n">TorchTensorRTModule</span><span class="p">):</span>
-            <span class="n">serialized_engine</span> <span class="o">=</span> <span class="nb">bytes</span><span class="p">(</span><span class="n">engine</span><span class="o">.</span><span class="n">serialize</span><span class="p">())</span>
-            <span class="n">new_engine_info</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">engine_info</span><span class="p">)</span>
-            <span class="n">new_engine_info</span><span class="p">[</span><span class="n">ENGINE_IDX</span><span class="p">]</span> <span class="o">=</span> <span class="n">serialized_engine</span>
-            <span class="n">refitted_engine</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">classes</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">Engine</span><span class="p">(</span><span class="nb">tuple</span><span class="p">(</span><span class="n">new_engine_info</span><span class="p">))</span>
-            <span class="n">compiled_submodule</span><span class="o">.</span><span class="n">engine</span> <span class="o">=</span> <span class="n">refitted_engine</span>
+        <span class="c1"># clear EXCLUDE_WEIGHTS flag</span>
+        <span class="n">serialization_config</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">create_serialization_config</span><span class="p">()</span>
+        <span class="n">serialization_config</span><span class="o">.</span><span class="n">clear_flag</span><span class="p">(</span><span class="n">trt</span><span class="o">.</span><span class="n">SerializationFlag</span><span class="o">.</span><span class="n">EXCLUDE_WEIGHTS</span><span class="p">)</span>
+        <span class="n">serialized_engine</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">serialize_with_config</span><span class="p">(</span><span class="n">serialization_config</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span>
+            <span class="n">compiled_submodule</span><span class="p">,</span> <span class="p">(</span><span class="n">PythonTorchTensorRTModule</span><span class="p">,</span> <span class="n">TorchTensorRTModule</span><span class="p">)</span>
+        <span class="p">):</span>
+            <span class="n">compiled_submodule</span><span class="o">.</span><span class="n">engine</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># Clear the engine for TorchTensorRTModule, otherwise it won&#39;t be updated</span>
+            <span class="n">compiled_submodule</span><span class="o">.</span><span class="n">serialized_engine</span> <span class="o">=</span> <span class="nb">bytes</span><span class="p">(</span><span class="n">serialized_engine</span><span class="p">)</span>
+            <span class="n">compiled_submodule</span><span class="o">.</span><span class="n">setup_engine</span><span class="p">()</span>
 
         <span class="k">elif</span> <span class="n">inline_module</span><span class="p">:</span>
-            <span class="n">serialized_engine</span> <span class="o">=</span> <span class="nb">bytes</span><span class="p">(</span><span class="n">engine</span><span class="o">.</span><span class="n">serialize</span><span class="p">())</span>
             <span class="n">new_engine_info</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">engine_info</span><span class="p">)</span>
-            <span class="n">new_engine_info</span><span class="p">[</span><span class="n">ENGINE_IDX</span><span class="p">]</span> <span class="o">=</span> <span class="n">serialized_engine</span>
+            <span class="n">new_engine_info</span><span class="p">[</span><span class="n">ENGINE_IDX</span><span class="p">]</span> <span class="o">=</span> <span class="nb">bytes</span><span class="p">(</span><span class="n">serialized_engine</span><span class="p">)</span>
             <span class="n">refitted_engine</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">classes</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">Engine</span><span class="p">(</span><span class="nb">tuple</span><span class="p">(</span><span class="n">new_engine_info</span><span class="p">))</span>
             <span class="nb">setattr</span><span class="p">(</span><span class="n">compiled_module</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">_engine&quot;</span><span class="p">,</span> <span class="n">refitted_engine</span><span class="p">)</span>
 

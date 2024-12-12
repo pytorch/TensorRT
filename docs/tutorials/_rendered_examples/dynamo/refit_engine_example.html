@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Refitting Torch-TensorRT Programs with New Weights &mdash; Torch-TensorRT v2.6.0.dev0+daffc7c documentation</title>
+  <title>Refitting Torch-TensorRT Programs with New Weights &mdash; Torch-TensorRT v2.6.0.dev0+d3a8880 documentation</title>
   
 
   
@@ -275,7 +275,7 @@
               
               
                 <div class="version">
-                  v2.6.0.dev0+daffc7c
+                  v2.6.0.dev0+d3a8880
                 </div>
               
             
@@ -512,7 +512,7 @@ a previously built engine, trigger refit and short cut recompilation on behalf o
 <section id="make-a-refittable-compilation-program">
 <h2>Make a refittable Compilation Program<a class="headerlink" href="#make-a-refittable-compilation-program" title="Permalink to this heading">¶</a></h2>
 <p>The inital step is to compile a module and save it as with a normal. Note that there is an
-additional parameter <cite>make_refittable</cite> that is set to <cite>True</cite>. This parameter is used to
+additional parameter <cite>immutable_weights</cite> that is set to <cite>False</cite>. This parameter is used to
 indicate that the engine being built should support weight refitting later. Engines built without
 these setttings will not be able to be refit.</p>
 <p>In this case we are going to compile a ResNet18 model with randomly initialized weights and save it.</p>
@@ -532,7 +532,7 @@ these setttings will not be able to be refit.</p>
     <span class="n">debug</span><span class="o">=</span><span class="n">debug</span><span class="p">,</span>
     <span class="n">min_block_size</span><span class="o">=</span><span class="n">min_block_size</span><span class="p">,</span>
     <span class="n">torch_executed_ops</span><span class="o">=</span><span class="n">torch_executed_ops</span><span class="p">,</span>
-    <span class="n">make_refittable</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">immutable_weights</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
     <span class="n">reuse_cached_engines</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
 <span class="p">)</span>  <span class="c1"># Output is a torch.fx.GraphModule</span>
 

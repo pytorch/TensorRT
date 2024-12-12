@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Template Class Int8Calibrator &mdash; Torch-TensorRT v2.6.0.dev0+daffc7c documentation</title>
+  <title>Template Class Int8Calibrator &mdash; Torch-TensorRT v2.6.0.dev0+d3a8880 documentation</title>
   
 
   
@@ -275,7 +275,7 @@
               
               
                 <div class="version">
-                  v2.6.0.dev0+daffc7c
+                  v2.6.0.dev0+d3a8880
                 </div>
               
             
@@ -492,8 +492,8 @@
 <dl class="field-list simple">
 <dt class="field-odd">Template Parameters</dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>Algorithm, :</strong> – class nvinfer1::IInt8Calibrator (Default: nvinfer1::IInt8EntropyCalibrator2) - Algorithm to use </p></li>
-<li><p><strong>DataLoaderUniquePtr, :</strong> – std::unique_ptr&lt;torch::data::DataLoader&gt; - DataLoader type </p></li>
+<li><p><strong>Algorithm</strong> – class nvinfer1::IInt8Calibrator (Default: nvinfer1::IInt8EntropyCalibrator2) - Algorithm to use </p></li>
+<li><p><strong>DataLoaderUniquePtr</strong> – std::unique_ptr&lt;torch::data::DataLoader&gt; - DataLoader type </p></li>
 </ul>
 </dd>
 </dl>
@@ -507,8 +507,8 @@
 <dl class="field-list simple">
 <dt class="field-odd">Parameters</dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>dataloader, :</strong> – std::unqiue_ptr&lt;torch::data::DataLoader&gt; - A unique pointer to the DataLoader, should be what is returned from the make_data_loader factory </p></li>
-<li><p><strong>cache_file_path, :</strong> – const std::string&amp; - A path to store / find the calibration cache </p></li>
+<li><p><strong>dataloader</strong> – std::unqiue_ptr&lt;torch::data::DataLoader&gt; - A unique pointer to the DataLoader, should be what is returned from the make_data_loader factory </p></li>
+<li><p><strong>cache_file_path</strong> – const std::string&amp; - A path to store / find the calibration cache </p></li>
 <li><p><strong>use_cache</strong> – : bool - Whether to use the cache (if it exists) </p></li>
 </ul>
 </dd>
@@ -516,8 +516,8 @@
 </dd></dl>
 
 <dl class="cpp function">
-<dt class="sig sig-object cpp">
-<span class="target" id="classtorch__tensorrt_1_1ptq_1_1Int8Calibrator_1aa5f2d4080cbda5348eb7414c867bbd42"></span><span class="sig-name descname"><span class="pre">inline</span> <span class="pre">int</span> <span class="pre">getBatchSize</span> <span class="pre">()</span> <span class="pre">const</span> <span class="pre">noexceptoverride</span></span></dt>
+<dt class="sig sig-object cpp" id="_CPPv4NK14torch_tensorrt3ptq14Int8Calibrator12getBatchSizeEv">
+<span class="target" id="classtorch__tensorrt_1_1ptq_1_1Int8Calibrator_1a2fb5b5bb33808075d54adfdbc5727573"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">getBatchSize</span></span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="k"><span class="pre">noexcept</span></span><span class="w"> </span><span class="k"><span class="pre">override</span></span><a class="headerlink" href="#_CPPv4NK14torch_tensorrt3ptq14Int8Calibrator12getBatchSizeEv" title="Permalink to this definition">¶</a><br /></dt>
 <dd><p>Get the Batch Size for the next batch (always 1 due to issues with TRT and explicit batch) </p>
 <dl class="field-list simple">
 <dt class="field-odd">Returns</dt>
@@ -527,28 +527,29 @@
 </dd></dl>
 
 <dl class="cpp function">
-<dt class="sig sig-object cpp">
-<span class="target" id="classtorch__tensorrt_1_1ptq_1_1Int8Calibrator_1a198de482876184bc169a92db3089f5c7"></span><span class="sig-name descname"><span class="pre">inline</span> <span class="pre">bool</span> <span class="pre">getBatch</span> <span class="pre">(void</span> <span class="pre">*bindings[],</span> <span class="pre">const</span> <span class="pre">char</span> <span class="pre">*names[],</span> <span class="pre">int</span> <span class="pre">nbBindings)</span> <span class="pre">noexceptoverride</span></span></dt>
+<dt class="sig sig-object cpp" id="_CPPv4N14torch_tensorrt3ptq14Int8Calibrator8getBatchEA_PvA_PKci">
+<span class="target" id="classtorch__tensorrt_1_1ptq_1_1Int8Calibrator_1a52b0ffc4230d610181c7c47fc0faaf23"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="kt"><span class="pre">bool</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">getBatch</span></span></span><span class="sig-paren">(</span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="p"><span class="pre">*</span></span><span class="n sig-param"><span class="pre">bindings</span></span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">]</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="kt"><span class="pre">char</span></span><span class="w"> </span><span class="p"><span class="pre">*</span></span><span class="n sig-param"><span class="pre">names</span></span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">]</span></span>, <span class="kt"><span class="pre">int</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">nbBindings</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">noexcept</span></span><span class="w"> </span><span class="k"><span class="pre">override</span></span><a class="headerlink" href="#_CPPv4N14torch_tensorrt3ptq14Int8Calibrator8getBatchEA_PvA_PKci" title="Permalink to this definition">¶</a><br /></dt>
 <dd><p>Get the next Batch. </p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters</dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>bindings, :</strong> – void*[] - An array of binding pointers (fed in from TensorRT calibrator), these buffers should be filed with batch data for each input </p></li>
-<li><p><strong>names, :</strong> – const char*[] - Names of bindings </p></li>
-<li><p><strong>nbBindings, :</strong> – int - Number of bindings </p></li>
+<li><p><strong>bindings</strong> – void*[] - An array of binding pointers (fed in from TensorRT calibrator), these buffers should be filed with batch data for each input </p></li>
+<li><p><strong>names</strong> – const char*[] - Names of bindings </p></li>
+<li><p><strong>nbBindings</strong> – int - Number of bindings </p></li>
 </ul>
 </dd>
 <dt class="field-even">Returns</dt>
-<dd class="field-even"><p><p>true - There is a new batch for the calibrator to consume </p>
-<p>false - There is not a new batch for the calibrator to consume </p>
-</p>
+<dd class="field-even"><p>true - There is a new batch for the calibrator to consume </p>
+</dd>
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p>false - There is not a new batch for the calibrator to consume </p>
 </dd>
 </dl>
 </dd></dl>
 
 <dl class="cpp function">
-<dt class="sig sig-object cpp">
-<span class="target" id="classtorch__tensorrt_1_1ptq_1_1Int8Calibrator_1af44dbc3600c6eeed0c9368d7bcc600be"></span><span class="sig-name descname"><span class="pre">inline</span> <span class="pre">const</span> <span class="pre">void</span> <span class="pre">*</span> <span class="pre">readCalibrationCache</span> <span class="pre">(size_t</span> <span class="pre">&amp;length)</span> <span class="pre">noexceptoverride</span></span></dt>
+<dt class="sig sig-object cpp" id="_CPPv4N14torch_tensorrt3ptq14Int8Calibrator20readCalibrationCacheER6size_t">
+<span class="target" id="classtorch__tensorrt_1_1ptq_1_1Int8Calibrator_1adb666718fcc006b8e4057625469de6a8"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="p"><span class="pre">*</span></span><span class="sig-name descname"><span class="n"><span class="pre">readCalibrationCache</span></span></span><span class="sig-paren">(</span><span class="n"><span class="pre">size_t</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">length</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">noexcept</span></span><span class="w"> </span><span class="k"><span class="pre">override</span></span><a class="headerlink" href="#_CPPv4N14torch_tensorrt3ptq14Int8Calibrator20readCalibrationCacheER6size_t" title="Permalink to this definition">¶</a><br /></dt>
 <dd><p>Read calibration cache. </p>
 <p>How to read from the calibration cache, only enabled if use_cache is set</p>
 <dl class="field-list simple">
@@ -562,15 +563,15 @@
 </dd></dl>
 
 <dl class="cpp function">
-<dt class="sig sig-object cpp">
-<span class="target" id="classtorch__tensorrt_1_1ptq_1_1Int8Calibrator_1a1d9621d31d815e1af0f4caa3727e075e"></span><span class="sig-name descname"><span class="pre">inline</span> <span class="pre">void</span> <span class="pre">writeCalibrationCache</span> <span class="pre">(const</span> <span class="pre">void</span> <span class="pre">*cache,</span> <span class="pre">size_t</span> <span class="pre">length)</span> <span class="pre">noexceptoverride</span></span></dt>
+<dt class="sig sig-object cpp" id="_CPPv4N14torch_tensorrt3ptq14Int8Calibrator21writeCalibrationCacheEPKv6size_t">
+<span class="target" id="classtorch__tensorrt_1_1ptq_1_1Int8Calibrator_1ae8756c27ffa527d05ba32da03561a417"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">writeCalibrationCache</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="p"><span class="pre">*</span></span><span class="n sig-param"><span class="pre">cache</span></span>, <span class="n"><span class="pre">size_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">length</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">noexcept</span></span><span class="w"> </span><span class="k"><span class="pre">override</span></span><a class="headerlink" href="#_CPPv4N14torch_tensorrt3ptq14Int8Calibrator21writeCalibrationCacheEPKv6size_t" title="Permalink to this definition">¶</a><br /></dt>
 <dd><p>Write calibration cache. </p>
 <p>Write a the calibration cache provided by TensorRT to a specified file</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters</dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>cache, :</strong> – const void* - cache data </p></li>
-<li><p><strong>length, :</strong> – size_t - length of cache </p></li>
+<li><p><strong>cache</strong> – const void* - cache data </p></li>
+<li><p><strong>length</strong> – size_t - length of cache </p></li>
 </ul>
 </dd>
 </dl>
