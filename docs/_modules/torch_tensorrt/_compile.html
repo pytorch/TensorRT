@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt._compile &mdash; Torch-TensorRT v2.6.0.dev0+daffc7c documentation</title>
+  <title>torch_tensorrt._compile &mdash; Torch-TensorRT v2.6.0.dev0+a945aeb documentation</title>
   
 
   
@@ -272,7 +272,7 @@
               
               
                 <div class="version">
-                  v2.6.0.dev0+daffc7c
+                  v2.6.0.dev0+a945aeb
                 </div>
               
             
@@ -1131,17 +1131,18 @@
                 <span class="n">exp_program</span> <span class="o">=</span> <span class="n">export</span><span class="p">(</span><span class="n">module</span><span class="p">)</span>
                 <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">exp_program</span><span class="p">,</span> <span class="n">file_path</span><span class="p">)</span>
             <span class="k">else</span><span class="p">:</span>
-                <span class="kn">from</span> <span class="nn">torch._higher_order_ops.torchbind</span> <span class="kn">import</span> <span class="n">enable_torchbind_tracing</span>
 
                 <span class="k">if</span> <span class="n">arg_inputs</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
                     <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
                         <span class="s2">&quot;Provided model is a torch.fx.GraphModule and retrace is True, however the inputs or arg_inputs are empty. Please provide valid torch.tensors as inputs or arg_inputs to trace and save the model&quot;</span>
                     <span class="p">)</span>
-                <span class="k">with</span> <span class="n">enable_torchbind_tracing</span><span class="p">():</span>
-                    <span class="n">exp_program</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">export</span><span class="p">(</span>
-                        <span class="n">module</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">arg_inputs</span><span class="p">),</span> <span class="n">kwargs</span><span class="o">=</span><span class="n">kwarg_inputs</span><span class="p">,</span> <span class="n">strict</span><span class="o">=</span><span class="kc">False</span>
-                    <span class="p">)</span>
-                    <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">exp_program</span><span class="p">,</span> <span class="n">file_path</span><span class="p">)</span></div>
+                <span class="n">exp_program</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">export</span><span class="p">(</span>
+                    <span class="n">module</span><span class="p">,</span>
+                    <span class="nb">tuple</span><span class="p">(</span><span class="n">arg_inputs</span><span class="p">),</span>
+                    <span class="n">kwargs</span><span class="o">=</span><span class="n">kwarg_inputs</span><span class="p">,</span>
+                    <span class="n">strict</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                <span class="p">)</span>
+                <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">exp_program</span><span class="p">,</span> <span class="n">file_path</span><span class="p">)</span></div>
 </pre></div>
 
              </article>
