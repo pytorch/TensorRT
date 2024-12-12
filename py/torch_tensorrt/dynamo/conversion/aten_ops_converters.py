@@ -183,47 +183,13 @@ def aten_ops_native_group_norm(
         SourceIR.ATEN,
         name,
         input=args[0],
-        weight=args[1],
-        bias=args[2],
+        weight=args_bounds_check(args, 1),
+        bias=args_bounds_check(args, 2),
         N=args[3],
         C=args[4],
         HxW=args[5],
         group=args[6],
         eps=args[7],
-    )
-
-
-@dynamo_tensorrt_converter(
-    torch.ops.aten.group_norm.default,
-    supports_dynamic_shapes=True,
-)
-@dynamo_tensorrt_converter(
-    torch.ops.aten.group_norm,
-    supports_dynamic_shapes=True,
-)
-@enforce_tensor_types(
-    {
-        0: (TRTTensor,),
-    }
-)
-def aten_ops_group_norm(
-    ctx: ConversionContext,
-    target: Target,
-    args: Tuple[Argument, ...],
-    kwargs: Dict[str, Argument],
-    name: str,
-) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    return impl.normalization.group_norm(
-        ctx,
-        target,
-        SourceIR.ATEN,
-        name,
-        input=args[0],
-        num_groups=args[1],
-        weight=args_bounds_check(args, 2, None),
-        bias=args_bounds_check(args, 3, None),
-        eps=args_bounds_check(args, 4, 1e-05),
-        cudnn_enabled=args_bounds_check(args, 5, True),
     )
 
 
