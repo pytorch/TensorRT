@@ -11,8 +11,6 @@ import sympy
 import tensorrt as trt
 import torch
 from torch._subclasses.fake_tensor import FakeTensor
-
-from packaging import version
 from torch_tensorrt._Device import Device
 from torch_tensorrt._enums import dtype
 from torch_tensorrt._features import ENABLED_FEATURES
@@ -21,6 +19,8 @@ from torch_tensorrt.dynamo import _defaults
 from torch_tensorrt.dynamo._defaults import default_device
 from torch_tensorrt.dynamo._engine_cache import BaseEngineCache
 from torch_tensorrt.dynamo._settings import CompilationSettings
+
+from packaging import version
 
 from .types import TRTDataType
 
@@ -718,6 +718,20 @@ def set_metadata(
     assert len(target_nodes) == len(metadata)
     for idx, node in enumerate(target_nodes):
         node.meta = metadata[idx]
+
+
+def copy_metadata(match_and_replacements: List[Any]) -> None:
+    """
+    Copy the metadata from anchor node to the replacement node. This should be used
+    if the anchor node is replaced with only a single replacement node i.e one-one replacement.
+    """
+    for match_and_replacement in match_and_replacements:
+        anchor_node = match_and_replacement.nodes_map[match_and_replacement.anchor]
+        assert (
+            len(match_and_replacement.replacements) == 1
+        ), "Found more than 1 replacements for the anchor node."
+        replacement_node = match_and_replacement.replacements[0]
+        replacement_node.meta = anchor_node.meta
 
 
 def flatten_nodes(nodes: Any) -> List[torch.fx.node.Node]:
