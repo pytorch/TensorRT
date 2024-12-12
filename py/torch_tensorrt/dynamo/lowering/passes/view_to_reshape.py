@@ -6,7 +6,7 @@ from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.lowering.passes.pass_utils import (
     clean_up_graph_after_modifications,
 )
-from torch_tensorrt.dynamo.utils import get_metadata, set_metadata
+from torch_tensorrt.dynamo.utils import copy_metadata
 
 logger = logging.getLogger(__name__)
 
@@ -26,14 +26,14 @@ def view_to_reshape(
     def replacement(input: torch.Tensor, shape: List[torch.SymInt]) -> torch.Tensor:
         return replacement_op(input, shape)
 
-    # Store metadata of the orig_op
-    metadata = get_metadata(gm, orig_op)
-
-    if torch.fx.subgraph_rewriter.replace_pattern(gm, orig, replacement):
+    match_and_replacements = torch.fx.subgraph_rewriter._replace_pattern(
+        gm, orig, replacement
+    )
+    if match_and_replacements:
         gm = clean_up_graph_after_modifications(gm)
         logger.debug(f"Graph after replacing view with reshape:\n{gm.graph}")
 
     # Copy the orig_op's metadata to the replacement op
-    set_metadata(gm, replacement_op, metadata)
+    copy_metadata(match_and_replacements)
 
     return gm
