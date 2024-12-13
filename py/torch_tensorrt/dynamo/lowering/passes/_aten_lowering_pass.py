@@ -7,7 +7,6 @@ from torch_tensorrt.dynamo._settings import CompilationSettings
 from .accumulate_fp32_matmul import accumulate_fp32_matmul
 from .constant_folding import constant_fold
 from .fuse_prims_broadcast import fuse_prims_broadcast
-from .lower_linear import lower_linear
 from .lower_scaled_dot_product_attention import lower_scaled_dot_product_attention
 from .pass_manager import DynamoPassManager
 from .remove_assert_scalar import remove_assert_scalar
@@ -24,7 +23,6 @@ ATEN_POST_LOWERING_PASSES = DynamoPassManager.build_from_passlist(
         constant_fold,
         repair_input_as_output,
         lower_scaled_dot_product_attention,
-        lower_linear,
         fuse_prims_broadcast,
         replace_max_pool_with_indices,
         replace_full_like_with_full,

@@ -2509,26 +2509,6 @@ def aten_ops_convolution(
         )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.linear.default, supports_dynamic_shapes=True)
-@dynamo_tensorrt_converter(torch.ops.aten.linear, supports_dynamic_shapes=True)
-def aten_ops_linear(
-    ctx: ConversionContext,
-    target: Target,
-    args: Tuple[Argument, ...],
-    kwargs: Dict[str, Argument],
-    name: str,
-) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    return impl.linear.linear(
-        ctx,
-        target,
-        SourceIR.ATEN,
-        name,
-        input=args[0],
-        weight=args[1],
-        bias=args_bounds_check(args, 2, None),
-    )
-
-
 @dynamo_tensorrt_converter(torch.ops.aten._cdist_forward.default)
 def aten_ops_cdist_forward(
     ctx: ConversionContext,
