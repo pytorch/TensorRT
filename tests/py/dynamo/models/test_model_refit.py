@@ -1,9 +1,7 @@
 import os
 import tempfile
-import time
 import unittest
 
-import numpy as np
 import pytest
 import tensorrt as trt
 import torch
@@ -57,8 +55,7 @@ def test_mapping():
         enabled_precisions=enabled_precisions,
         debug=debug,
         min_block_size=min_block_size,
-        make_refittable=True,
-        reuse_cached_engines=False,
+        immutable_weights=False,
     )
     settings = trt_gm._run_on_acc_0.settings
     runtime = trt.Runtime(TRT_LOGGER)
@@ -110,8 +107,7 @@ def test_refit_one_engine_with_weightmap():
         enabled_precisions=enabled_precisions,
         debug=debug,
         min_block_size=min_block_size,
-        make_refittable=True,
-        reuse_cached_engines=False,
+        immutable_weights=False,
     )
 
     new_trt_gm = refit_module_weights(
@@ -161,8 +157,7 @@ def test_refit_one_engine_no_map_with_weightmap():
         enabled_precisions=enabled_precisions,
         debug=debug,
         min_block_size=min_block_size,
-        make_refittable=True,
-        reuse_cached_engines=False,
+        immutable_weights=False,
     )
 
     trt_gm._run_on_acc_0.weight_name_map = None
@@ -213,8 +208,7 @@ def test_refit_one_engine_with_wrong_weightmap():
         enabled_precisions=enabled_precisions,
         debug=debug,
         min_block_size=min_block_size,
-        make_refittable=True,
-        reuse_cached_engines=False,
+        immutable_weights=False,
     )
     # Manually Deleted all batch norm layer. This suppose to fail the fast refit
     trt_gm._run_on_acc_0.weight_name_map = {
@@ -271,8 +265,7 @@ def test_refit_one_engine_bert_with_weightmap():
         enabled_precisions=enabled_precisions,
         debug=debug,
         min_block_size=min_block_size,
-        make_refittable=True,
-        reuse_cached_engines=False,
+        immutable_weights=False,
     )
 
     new_trt_gm = refit_module_weights(
@@ -325,8 +318,7 @@ def test_refit_one_engine_inline_runtime__with_weightmap():
         enabled_precisions=enabled_precisions,
         debug=debug,
         min_block_size=min_block_size,
-        make_refittable=True,
-        reuse_cached_engines=False,
+        immutable_weights=False,
     )
     torchtrt.save(trt_gm, trt_ep_path)
     trt_gm = torch.export.load(trt_ep_path)
@@ -372,8 +364,7 @@ def test_refit_one_engine_python_runtime_with_weightmap():
         enabled_precisions=enabled_precisions,
         debug=debug,
         min_block_size=min_block_size,
-        make_refittable=True,
-        reuse_cached_engines=False,
+        immutable_weights=False,
     )
 
     new_trt_gm = refit_module_weights(
@@ -443,7 +434,7 @@ def test_refit_multiple_engine_with_weightmap():
         enabled_precisions=enabled_precisions,
         debug=debug,
         min_block_size=min_block_size,
-        make_refittable=True,
+        immutable_weights=False,
         torch_executed_ops=torch_executed_ops,
         reuse_cached_engines=False,
     )
@@ -494,8 +485,7 @@ def test_refit_one_engine_without_weightmap():
         enabled_precisions=enabled_precisions,
         debug=debug,
         min_block_size=min_block_size,
-        make_refittable=True,
-        reuse_cached_engines=False,
+        immutable_weights=False,
     )
 
     new_trt_gm = refit_module_weights(
@@ -546,8 +536,7 @@ def test_refit_one_engine_bert_without_weightmap():
         enabled_precisions=enabled_precisions,
         debug=debug,
         min_block_size=min_block_size,
-        make_refittable=True,
-        reuse_cached_engines=False,
+        immutable_weights=False,
     )
 
     new_trt_gm = refit_module_weights(
@@ -600,8 +589,7 @@ def test_refit_one_engine_inline_runtime_without_weightmap():
         enabled_precisions=enabled_precisions,
         debug=debug,
         min_block_size=min_block_size,
-        make_refittable=True,
-        reuse_cached_engines=False,
+        immutable_weights=False,
     )
     torchtrt.save(trt_gm, trt_ep_path)
     trt_gm = torch.export.load(trt_ep_path)
@@ -647,8 +635,7 @@ def test_refit_one_engine_python_runtime_without_weightmap():
         enabled_precisions=enabled_precisions,
         debug=debug,
         min_block_size=min_block_size,
-        make_refittable=True,
-        reuse_cached_engines=False,
+        immutable_weights=False,
     )
 
     new_trt_gm = refit_module_weights(
@@ -718,7 +705,7 @@ def test_refit_multiple_engine_without_weightmap():
         enabled_precisions=enabled_precisions,
         debug=debug,
         min_block_size=min_block_size,
-        make_refittable=True,
+        immutable_weights=False,
         torch_executed_ops=torch_executed_ops,
         reuse_cached_engines=False,
     )
@@ -772,7 +759,7 @@ def test_refit_cumsum_fallback():
             enabled_precisions={torch.float},
             debug=True,
             min_block_size=1,
-            make_refittable=True,
+            immutable_weights=False,
         )
 
     num_pyt_segments = len(
