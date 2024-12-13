@@ -444,7 +444,6 @@ packages = [
     "torch_tensorrt.dynamo.lowering.passes",
     "torch_tensorrt.dynamo.partitioning",
     "torch_tensorrt.dynamo.runtime",
-    "torch_tensorrt.dynamo.runtime.meta_ops",
     "torch_tensorrt.dynamo.tools",
     "torch_tensorrt.fx",
     "torch_tensorrt.fx.converters",
@@ -486,6 +485,7 @@ package_dir = {
 }
 
 if not PY_ONLY:
+    packages.append("torch_tensorrt.dynamo.runtime.meta_ops")
     package_dir.update(
         {
             "torch_tensorrt.dynamo.runtime.meta_ops": "py/torch_tensorrt/dynamo/runtime/meta_ops"
