@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt._enums &mdash; Torch-TensorRT v2.6.0.dev0+a945aeb documentation</title>
+  <title>torch_tensorrt._enums &mdash; Torch-TensorRT v2.6.0.dev0+38b1804 documentation</title>
   
 
   
@@ -272,7 +272,7 @@
               
               
                 <div class="version">
-                  v2.6.0.dev0+a945aeb
+                  v2.6.0.dev0+38b1804
                 </div>
               
             
@@ -685,7 +685,7 @@
                 <span class="k">return</span> <span class="n">dtype</span><span class="o">.</span><span class="n">f32</span>
             <span class="k">elif</span> <span class="n">t</span> <span class="o">==</span> <span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">:</span>
                 <span class="k">return</span> <span class="n">dtype</span><span class="o">.</span><span class="n">f64</span>
-            <span class="k">elif</span> <span class="n">t</span> <span class="o">==</span> <span class="n">np</span><span class="o">.</span><span class="n">bool</span><span class="p">:</span>
+            <span class="k">elif</span> <span class="n">t</span> <span class="o">==</span> <span class="n">np</span><span class="o">.</span><span class="n">bool_</span><span class="p">:</span>
                 <span class="k">return</span> <span class="n">dtype</span><span class="o">.</span><span class="n">b</span>
             <span class="c1"># TODO: Consider using ml_dtypes when issues like this are resolved:</span>
             <span class="c1"># https://github.com/pytorch/pytorch/issues/109873</span>
@@ -1849,7 +1849,7 @@
     <span class="k">def</span> <span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
         <span class="k">return</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
 
-    <span class="nd">@needs_torch_tensorrt_runtime</span>
+    <span class="nd">@needs_torch_tensorrt_runtime</span>  <span class="c1"># type: ignore</span>
     <span class="k">def</span> <span class="nf">_to_serialized_rt_platform</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
         <span class="n">val</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">_platform_unknown</span><span class="p">()</span>
 

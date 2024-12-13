@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt.dynamo.runtime._PythonTorchTensorRTModule &mdash; Torch-TensorRT v2.6.0.dev0+a945aeb documentation</title>
+  <title>torch_tensorrt.dynamo.runtime._PythonTorchTensorRTModule &mdash; Torch-TensorRT v2.6.0.dev0+38b1804 documentation</title>
   
 
   
@@ -272,7 +272,7 @@
               
               
                 <div class="version">
-                  v2.6.0.dev0+a945aeb
+                  v2.6.0.dev0+38b1804
                 </div>
               
             
@@ -503,7 +503,7 @@
         <span class="o">*</span><span class="p">,</span>
         <span class="n">name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span><span class="p">,</span>
         <span class="n">settings</span><span class="p">:</span> <span class="n">CompilationSettings</span> <span class="o">=</span> <span class="n">CompilationSettings</span><span class="p">(),</span>
-        <span class="n">weight_name_map</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">weight_name_map</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Takes a name, target device, serialized TensorRT engine, and binding names / order and constructs</span>
 <span class="sd">        a PyTorch ``torch.nn.Module`` around it. Uses TensorRT Python APIs to run the engine</span>
@@ -516,6 +516,7 @@
 <span class="sd">        Keyword Arguments:</span>
 <span class="sd">            name (str): Name for module</span>
 <span class="sd">            settings (torch_tensorrt.dynamo.CompilationSettings): Settings used to compile engine, assumes engine was built with default compilation settings if object not passed</span>
+<span class="sd">            weight_name_map (dict): Mapping of engine weight name to state_dict weight name</span>
 
 <span class="sd">        Example:</span>
 

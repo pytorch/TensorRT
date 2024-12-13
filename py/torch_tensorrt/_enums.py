@@ -220,7 +220,7 @@ class dtype(Enum):
                 return dtype.f32
             elif t == np.float64:
                 return dtype.f64
-            elif t == np.bool:
+            elif t == np.bool_:
                 return dtype.b
             # TODO: Consider using ml_dtypes when issues like this are resolved:
             # https://github.com/pytorch/pytorch/issues/109873
@@ -1384,7 +1384,7 @@ class Platform(Enum):
     def __str__(self) -> str:
         return str(self.name)
 
-    @needs_torch_tensorrt_runtime
+    @needs_torch_tensorrt_runtime  # type: ignore
     def _to_serialized_rt_platform(self) -> str:
         val: str = torch.ops.tensorrt._platform_unknown()
 
