@@ -7,4 +7,4 @@ from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (  # noqa: F401
 )
 
 if torch_tensorrt.ENABLED_FEATURES.torch_tensorrt_runtime:
-    from torch_tensorrt.dynamo.runtime.register_fake_class import *
+    from torch_tensorrt.dynamo.runtime.meta_ops.register_meta_ops.py import *

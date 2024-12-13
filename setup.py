@@ -444,6 +444,7 @@ packages = [
     "torch_tensorrt.dynamo.lowering.passes",
     "torch_tensorrt.dynamo.partitioning",
     "torch_tensorrt.dynamo.runtime",
+    "torch_tensorrt.dynamo.runtime.meta_ops",
     "torch_tensorrt.dynamo.tools",
     "torch_tensorrt.fx",
     "torch_tensorrt.fx.converters",
@@ -483,6 +484,13 @@ package_dir = {
     "torch_tensorrt.fx.tracer.dispatch_tracer": "py/torch_tensorrt/fx/tracer/dispatch_tracer",
     "torch_tensorrt.runtime": "py/torch_tensorrt/runtime",
 }
+
+if not PY_ONLY:
+    package_dir.update(
+        {
+            "torch_tensorrt.dynamo.runtime.meta_ops": "py/torch_tensorrt/dynamo/runtime/meta_ops"
+        }
+    )
 
 package_data = {}
 
