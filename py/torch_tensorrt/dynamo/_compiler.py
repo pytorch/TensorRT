@@ -788,7 +788,7 @@ def compile_module(
             require_full_compilation=settings.require_full_compilation,
         )
 
-    # dryrun_tracker.unsupported_ops = supported_ops.unsupported_operators
+    dryrun_tracker.unsupported_ops = supported_ops.unsupported_operators
 
     # The global partitioner leaves non-TRT nodes as-is
     if not settings.use_fast_partitioner:
