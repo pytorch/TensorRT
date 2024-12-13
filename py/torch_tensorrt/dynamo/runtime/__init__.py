@@ -1,7 +1,10 @@
+import torch_tensorrt
 from torch_tensorrt.dynamo.runtime._PythonTorchTensorRTModule import (  # noqa: F401
     PythonTorchTensorRTModule,
 )
 from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (  # noqa: F401
     TorchTensorRTModule,
 )
-from torch_tensorrt.dynamo.runtime.register_fake_class import *
+
+if torch_tensorrt.ENABLED_FEATURES.torch_tensorrt_runtime:
+    from torch_tensorrt.dynamo.runtime.register_fake_class import *
