@@ -14,10 +14,12 @@ from torch_tensorrt.dynamo import CompilationSettings
 from torch_tensorrt.dynamo._compiler import compile_module
 from torch_tensorrt.dynamo.lowering import (
     get_decompositions,
+    modify_complex_nodes,
     post_lowering,
     remove_detach,
     remove_sym_nodes,
     repair_input_aliasing,
+    replace_complex_placeholder_to_tuple,
 )
 from torch_tensorrt.dynamo.utils import (
     parse_dynamo_kwargs,
@@ -61,9 +63,10 @@ def aot_torch_tensorrt_aten_backend(
     settings_aot_autograd["decompostions"] = get_decompositions(
         settings.enable_experimental_decompositions
     )
-    return aot_autograd(fw_compiler=_pretraced_backend_autograd)(
-        gm, sample_inputs, **settings_aot_autograd
-    )
+    return aot_autograd(
+        fw_compiler=_pretraced_backend_autograd,
+        decompositions=get_decompositions(+settings.enable_experimental_decompositions),
+    )(gm, sample_inputs)
 
 
 def _pretraced_backend(
@@ -103,6 +106,16 @@ def _pretraced_backend(
             # Remove detach nodes
             remove_detach(gm, settings)
 
+            complexInputIndices = []
+            for i, torch_input in enumerate(torch_inputs):
+                if torch_inputs[i].dtype == torch.complex64:
+                    complexInputIndices.append(i)
+                    torch_input_real = torch_inputs[i].real
+                    torch_input_imaginary = torch_inputs[i].imag
+                    torch_inputs[i] = torch.stack(
+                        (torch_input_real, torch_input_imaginary), dim=-1
+                    )
+
             # Invoke AOTAutograd to translate operators to aten
             if settings.use_aot_joint_export:
                 gm = aot_export_joint_simple(
@@ -119,6 +132,10 @@ def _pretraced_backend(
             gm = post_lowering(gm, settings)
 
             logger.debug("Lowered Input graph:\n " + str(gm.graph))
+
+            complex_nodes = find_complex_nodes(gm)
+            replace_complex_placeholder_to_tuple(gm, complexInputIndices)
+            modify_complex_nodes(gm, complex_nodes)
 
             torchtrt_inputs = prepare_inputs(
                 torch_inputs, disable_memory_format_check=True
