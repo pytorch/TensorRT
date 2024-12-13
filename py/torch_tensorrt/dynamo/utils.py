@@ -780,3 +780,38 @@ def get_output_dtypes(output: Any, truncate_doulbe: bool = False) -> List[dtype]
             f"got unexpected type {type(output)}, expected type is a torch.fx.node.Node or a tuple/list of torch.fx.node.Node"
         )
     return output_dtypes
+
+
+def find_complex_nodes(gm: torch.fx.GraphModule):
+    complex_nodes = []
+    complexNodes = {}
+    for node in gm.graph.nodes:
+        if is_node_complex(node):
+            complex_nodes.append(node, complexNodes)
+    return complex_nodes
+
+
+def is_node_complex(node: torch.fx.Node, complexNodes):
+    if node.name in complexNodes:
+        return True
+    if node.op == "call_function" and node.args is not None:
+        if isinstance(node.args[0], (list, tuple)):
+            for eachNode in node.args[0]:
+                if is_node_complex(eachNode):
+                    complexNodes[node.name] = True
+                    return True
+        elif isinstance(node.args[0].meta["val"], (list, tuple)):
+            for eachFakeTensorMeta in node.args[0].meta["val"]:
+                if (
+                    eachFakeTensorMeta.dtype == torch.complex64
+                    or eachFakeTensorMeta.dtype == torch.complex128
+                ):
+                    complexNodes[node.name] = True
+                    return True
+        elif (
+            node.args[0].meta["val"].dtype == torch.complex64
+            or node.args[0].meta["val"].dtype == torch.complex128
+        ):
+            complexNodes[node.name] = True
+            return True
+    return False
