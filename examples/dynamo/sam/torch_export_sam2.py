@@ -23,12 +23,17 @@ matplotlib.use("Agg")
 
 # %%
 # Segment Anything Model 2 is a foundation model towards solving promptable visual segmentation in images and videos.
-# Load the facebook/sam2-hiera-large pretrained model using SAM2ImagePredictor class and load a a sample image (truck.jpg provided)
-predictor = SAM2ImagePredictor.from_pretrained("facebook/sam2-hiera-large")
-encoder = predictor.model.eval().cuda()
+# Load the facebook/sam2-hiera-large pretrained model using SAM2ImagePredictor class.
+# SAM2ImagePredictor class provides utilities to preprocess images, store image features (via set_image function)
+# and predict the masks (via predict function)
 
-input_image = Image.open("./truck.jpg").convert("RGB")
-predictor.set_image(input_image)
+predictor = SAM2ImagePredictor.from_pretrained("facebook/sam2-hiera-large")
+
+# %%
+# To ensure we export the entire model (image encoder and mask predictor) components successfully, we create a
+# standalone module ``SAM2FullModel`` which uses these utilities from ``SAM2ImagePredictor`` class.
+# SAM2Full model performs feature extraction and mask prediction in a single step instead of two step process of
+# SAM2ImagePredictor (SAM2ImagePredictor.set_image and SAM2ImagePredictor.predict)
 
 
 class SAM2FullModel(torch.nn.Module):
@@ -80,11 +85,52 @@ class SAM2FullModel(torch.nn.Module):
         return out
 
 
+# %%
+# Initialize the SAM2FullModel with the pretrained weights. Since we already initialized
+# SAM2ImagePredictor, we can directly use the model from it (predictor.model). We cast the model
+# to FP16 precision for faster performance.
+encoder = predictor.model.eval().cuda()
 sam_model = SAM2FullModel(encoder.half()).eval().cuda()
+
+# %%
+# Load a sample image provided in the repository.
+input_image = Image.open("./truck.jpg").convert("RGB")
+
+# %%
+# Define the preprocessing components which include applying transformations on the input image
+# and transforming given point coordinates. We use the SAM2Transforms available via the SAM2ImagePredictor class.
+# To read more about the transforms, refer to https://github.com/facebookresearch/sam2/blob/main/sam2/utils/transforms.py
+
+
+def preprocess_inputs(image, predictor):
+    w, h = image.size
+    orig_hw = [(h, w)]
+    input_image = predictor._transforms(np.array(image))[None, ...].to("cuda:0")
+
+    point_coords = torch.tensor([[500, 375]], dtype=torch.float).to("cuda:0")
+    point_labels = torch.tensor([1], dtype=torch.int).to("cuda:0")
+
+    point_coords = torch.as_tensor(
+        point_coords, dtype=torch.float, device=predictor.device
+    )
+    unnorm_coords = predictor._transforms.transform_coords(
+        point_coords, normalize=True, orig_hw=orig_hw[0]  # predictor._orig_hw[img_idx]
+    )
+    labels = torch.as_tensor(point_labels, dtype=torch.int, device=predictor.device)
+    if len(unnorm_coords.shape) == 2:
+        unnorm_coords, labels = unnorm_coords[None, ...], labels[None, ...]
+
+    input_image = input_image.half()
+    unnorm_coords = unnorm_coords.half()
+
+    return (input_image, unnorm_coords, labels)
 
 
 # %%
-# Define the postprocessing components which include plotting and visualizing masks and points
+# Define the postprocessing components which include plotting and visualizing masks and points.
+# We use the SAM2Transforms to post process these masks and sort them via confidence score.
+
+
 def postprocess_masks(out, predictor, image):
     """Postprocess low-resolution masks and convert them for visualization."""
     orig_hw = (image.size[1], image.size[0])  # (height, width)
@@ -156,36 +202,13 @@ def visualize_masks(
 
 
 # %%
-# Define the preprocessing components which include applying transformations on the input image
-# and transforming given point coordinates
-def preprocess_inputs(image, predictor):
-    w, h = image.size
-    orig_hw = [(h, w)]
-    input_image = predictor._transforms(np.array(image))[None, ...].to("cuda:0")
-
-    point_coords = torch.tensor([[500, 375]], dtype=torch.float).to("cuda:0")
-    point_labels = torch.tensor([1], dtype=torch.int).to("cuda:0")
-
-    point_coords = torch.as_tensor(
-        point_coords, dtype=torch.float, device=predictor.device
-    )
-    unnorm_coords = predictor._transforms.transform_coords(
-        point_coords, normalize=True, orig_hw=orig_hw[0]  # predictor._orig_hw[img_idx]
-    )
-    labels = torch.as_tensor(point_labels, dtype=torch.int, device=predictor.device)
-    if len(unnorm_coords.shape) == 2:
-        unnorm_coords, labels = unnorm_coords[None, ...], labels[None, ...]
-
-    input_image = input_image.half()
-    unnorm_coords = unnorm_coords.half()
-
-    return (input_image, unnorm_coords, labels)
-
-
-# %%
-# Preprocess the input and start Torch-TensorRT compilation
+# Preprocess the inputs
+# torchtrt_inputs contain (input_image, unnormalized_coordinates and labels)
 torchtrt_inputs = preprocess_inputs(input_image, predictor)
 
+# %%
+# Export the model in non-strict mode and perform Torch-TensorRT compilation in FP16 precision.
+# We enable FP32 matmul accumulation using use_fp32_acc=True to preserve accuracy with the original Pytorch model.
 exp_program = torch.export.export(sam_model, torchtrt_inputs, strict=False)
 trt_model = torch_tensorrt.dynamo.compile(
     exp_program,
@@ -197,7 +220,9 @@ trt_model = torch_tensorrt.dynamo.compile(
 trt_out = trt_model(*torchtrt_inputs)
 
 # %%
-# Mask Postprocessing and Visualization
+# Post process the outputs of Torch-TensorRT and visualize the masks using the post processing
+# components provided above. The outputs should be stored in your current directory.
+# You can also view them at https://github.com/pytorch/TensorRT/tree/sam/examples/dynamo/sam#sam2-inference-results-with-torch-tensorrt
 trt_masks, trt_scores = postprocess_masks(trt_out, predictor, input_image)
 visualize_masks(
     input_image,
