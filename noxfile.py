@@ -258,12 +258,11 @@ def run_dynamo_runtime_tests(session):
     tests = [
         "runtime",
     ]
-    skip_tests = "-k not hw_compat"
     for test in tests:
         if USE_HOST_DEPS:
-            session.run_always("pytest", test, skip_tests, env={"PYTHONPATH": PYT_PATH})
+            session.run_always("pytest", test, env={"PYTHONPATH": PYT_PATH})
         else:
-            session.run_always("pytest", test, skip_tests)
+            session.run_always("pytest", test)
 
 
 def run_dynamo_model_compile_tests(session):
@@ -333,6 +332,7 @@ def run_int8_accuracy_tests(session):
     tests = [
         "ptq/test_ptq_to_backend.py",
         "ptq/test_ptq_dataloader_calibrator.py",
+        "qat/",
     ]
     for test in tests:
         if USE_HOST_DEPS:
@@ -473,6 +473,7 @@ def run_l1_int8_accuracy_tests(session):
         install_deps(session)
         install_torch_trt(session)
     train_model(session)
+    finetune_model(session)
     run_int8_accuracy_tests(session)
     cleanup(session)
 

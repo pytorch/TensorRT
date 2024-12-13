@@ -1,13 +1,3 @@
-#if defined(__GNUC__) && !defined(__clang__)
-#if __GNUC__ >= 13
-#include <cstdint>
-#endif
-#elif defined(__clang__)
-#if __clang_major__ >= 13
-#include <cstdint>
-#endif
-#endif
-
 #include "core/util/Exception.h"
 
 #include <iostream>
