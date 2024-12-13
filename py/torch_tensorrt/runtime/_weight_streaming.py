@@ -1,5 +1,5 @@
 import logging
-from typing import Any
+from typing import Any, Union
 
 import torch
 from torch_tensorrt.dynamo.runtime import PythonTorchTensorRTModule, TorchTensorRTModule
@@ -16,7 +16,7 @@ class _WeightStreamingContextManager(object):
     """
 
     def __init__(
-        self, module: torch.fx.GraphModule | CudaGraphsTorchTensorRTModule
+        self, module: Union[torch.fx.GraphModule, CudaGraphsTorchTensorRTModule]
     ) -> None:
         rt_mods = []
         self.current_device_budget = 0
