@@ -141,7 +141,7 @@ Model Zoo
 
 .. toctree::
    :caption: Model Zoo
-   :maxdepth: 3
+   :maxdepth: 4
    :hidden:
    
    tutorials/_rendered_examples/dynamo/torch_compile_resnet_example

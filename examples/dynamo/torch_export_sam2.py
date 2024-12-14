@@ -4,11 +4,29 @@
 Compiling SAM2 using the dynamo backend
 ==========================================================
 
-This script illustrates Torch-TensorRT workflow with dynamo backend on popular SAM2 model."""
+This example illustrates the state of the art model `Segment Anything Model 2 (SAM2) <https://arxiv.org/pdf/2408.00714>`_ optimized using
+Torch-TensorRT.
+
+**Segment Anything Model 2** is a foundation model towards solving promptable visual segmentation in images and videos.
+Install the following dependencies before compilation
+
+.. code-block:: python
+
+    pip install -r requirements.txt
+
+Certain custom modifications are required to ensure the model is exported successfully. To apply these changes, please install SAM2 using the `following fork <https://github.com/chohk88/sam2/tree/torch-trt>`_ (`Installation instructions <https://github.com/chohk88/sam2/tree/torch-trt?tab=readme-ov-file#installation>`_)
+
+In the custom SAM2 fork, the following modifications have been applied to remove graph breaks and enhance latency performance, ensuring a more efficient Torch-TRT conversion:
+
+- **Consistent Data Types:** Preserves input tensor dtypes, removing forced FP32 conversions.
+- **Masked Operations:** Uses mask-based indexing instead of directly selecting data, improving Torch-TRT compatibility.
+- **Safe Initialization:** Initializes tensors conditionally rather than concatenating to empty tensors.
+- **Standard Functions:** Avoids special contexts and custom LayerNorm, relying on built-in PyTorch functions for better stability.
+"""
 
 # %%
-# Imports and Model Definition
-# ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+# Import the following libraries
+# -----------------------------
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
@@ -22,18 +40,19 @@ from sam_components import SAM2FullModel
 matplotlib.use("Agg")
 
 # %%
-# Segment Anything Model 2 is a foundation model towards solving promptable visual segmentation in images and videos.
-# Load the facebook/sam2-hiera-large pretrained model using SAM2ImagePredictor class.
-# SAM2ImagePredictor class provides utilities to preprocess images, store image features (via set_image function)
-# and predict the masks (via predict function)
+# Define the SAM2 model
+# -----------------------------
+# Load the ``facebook/sam2-hiera-large`` pretrained model using ``SAM2ImagePredictor`` class.
+# ``SAM2ImagePredictor`` class provides utilities to preprocess images, store image features (via ``set_image`` function)
+# and predict the masks (via ``predict`` function)
 
 predictor = SAM2ImagePredictor.from_pretrained("facebook/sam2-hiera-large")
 
 # %%
 # To ensure we export the entire model (image encoder and mask predictor) components successfully, we create a
 # standalone module ``SAM2FullModel`` which uses these utilities from ``SAM2ImagePredictor`` class.
-# SAM2Full model performs feature extraction and mask prediction in a single step instead of two step process of
-# SAM2ImagePredictor (SAM2ImagePredictor.set_image and SAM2ImagePredictor.predict)
+# ``SAM2FullModel`` performs feature extraction and mask prediction in a single step instead of two step process of
+# ``SAM2ImagePredictor`` (set_image and predict functions)
 
 
 class SAM2FullModel(torch.nn.Module):
@@ -86,8 +105,10 @@ class SAM2FullModel(torch.nn.Module):
 
 
 # %%
-# Initialize the SAM2FullModel with the pretrained weights. Since we already initialized
-# SAM2ImagePredictor, we can directly use the model from it (predictor.model). We cast the model
+# Initialize the SAM2 model with pretrained weights
+# --------------------------------------------------
+# Initialize the ``SAM2FullModel`` with the pretrained weights. Since we already initialized
+# ``SAM2ImagePredictor``, we can directly use the model from it (``predictor.model``). We cast the model
 # to FP16 precision for faster performance.
 encoder = predictor.model.eval().cuda()
 sam_model = SAM2FullModel(encoder.half()).eval().cuda()
@@ -97,8 +118,24 @@ sam_model = SAM2FullModel(encoder.half()).eval().cuda()
 input_image = Image.open("./truck.jpg").convert("RGB")
 
 # %%
-# Define the preprocessing components which include applying transformations on the input image
-# and transforming given point coordinates. We use the SAM2Transforms available via the SAM2ImagePredictor class.
+# Load an input image
+# --------------------------------------------------
+# Here's the input image we are going to use
+#
+# .. image:: ./truck.jpg
+#
+input_image = Image.open("./truck.jpg").convert("RGB")
+
+# In addition to the input image, we also provide prompts as inputs which are
+# used to predict the masks. The prompts can be a box, point as well as masks from
+# previous iteration of prediction. We use a point as a prompt in this demo similar to
+# the `original notebook in the SAM2 repository<https://github.com/facebookresearch/sam2/blob/main/notebooks/image_predictor_example.ipynb>`_
+
+# %%
+# Preprocessing components
+# -------------------------
+# The following functions implement preprocessing components which apply transformations on the input image
+# and transform given point coordinates. We use the SAM2Transforms available via the SAM2ImagePredictor class.
 # To read more about the transforms, refer to https://github.com/facebookresearch/sam2/blob/main/sam2/utils/transforms.py
 
 
@@ -114,7 +151,7 @@ def preprocess_inputs(image, predictor):
         point_coords, dtype=torch.float, device=predictor.device
     )
     unnorm_coords = predictor._transforms.transform_coords(
-        point_coords, normalize=True, orig_hw=orig_hw[0]  # predictor._orig_hw[img_idx]
+        point_coords, normalize=True, orig_hw=orig_hw[0]
     )
     labels = torch.as_tensor(point_labels, dtype=torch.int, device=predictor.device)
     if len(unnorm_coords.shape) == 2:
@@ -127,7 +164,9 @@ def preprocess_inputs(image, predictor):
 
 
 # %%
-# Define the postprocessing components which include plotting and visualizing masks and points.
+# Post Processing components
+# ---------------------------
+# The following functions implement postprocessing components which include plotting and visualizing masks and points.
 # We use the SAM2Transforms to post process these masks and sort them via confidence score.
 
 
@@ -203,12 +242,16 @@ def visualize_masks(
 
 # %%
 # Preprocess the inputs
-# torchtrt_inputs contain (input_image, unnormalized_coordinates and labels)
+# ----------------------
+# Preprocess the inputs. In the following snippet, ``torchtrt_inputs`` contains (input_image, unnormalized_coordinates and labels)
+# The unnormalized_coordinates is the representation of the point and the label (= 1 in this demo) represents foreground point.
 torchtrt_inputs = preprocess_inputs(input_image, predictor)
 
 # %%
+# Torch-TensorRT compilation
+# ---------------------------
 # Export the model in non-strict mode and perform Torch-TensorRT compilation in FP16 precision.
-# We enable FP32 matmul accumulation using use_fp32_acc=True to preserve accuracy with the original Pytorch model.
+# We enable FP32 matmul accumulation using ``use_fp32_acc=True`` to preserve accuracy with the original Pytorch model.
 exp_program = torch.export.export(sam_model, torchtrt_inputs, strict=False)
 trt_model = torch_tensorrt.dynamo.compile(
     exp_program,
@@ -220,9 +263,11 @@ trt_model = torch_tensorrt.dynamo.compile(
 trt_out = trt_model(*torchtrt_inputs)
 
 # %%
+# Output visualization
+# ---------------------------
 # Post process the outputs of Torch-TensorRT and visualize the masks using the post processing
 # components provided above. The outputs should be stored in your current directory.
-# You can also view them at https://github.com/pytorch/TensorRT/tree/sam/examples/dynamo/sam#sam2-inference-results-with-torch-tensorrt
+
 trt_masks, trt_scores = postprocess_masks(trt_out, predictor, input_image)
 visualize_masks(
     input_image,
@@ -232,3 +277,20 @@ visualize_masks(
     torch.tensor([1]),
     title_prefix="Torch-TRT",
 )
+
+# %%
+# The predicted masks are as shown below
+#    .. image:: sam_mask1.png
+#       :width: 50%
+#
+#    .. image:: sam_mask2.png
+#       :width: 50%
+#
+#    .. image:: sam_mask3.png
+#       :width: 50%
+
+# %%
+# References
+# ---------------------------
+# - `SAM 2: Segment Anything in Images and Videos <https://arxiv.org/pdf/2408.00714>`_
+# - `SAM 2 Github Repository <https://github.com/facebookresearch/sam2/tree/main>`_
