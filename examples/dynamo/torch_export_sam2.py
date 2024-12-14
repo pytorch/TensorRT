@@ -43,7 +43,7 @@ matplotlib.use("Agg")
 # Define the SAM2 model
 # -----------------------------
 # Load the ``facebook/sam2-hiera-large`` pretrained model using ``SAM2ImagePredictor`` class.
-# ``SAM2ImagePredictor`` class provides utilities to preprocess images, store image features (via ``set_image`` function)
+# ``SAM2ImagePredictor`` provides utilities to preprocess images, store image features (via ``set_image`` function)
 # and predict the masks (via ``predict`` function)
 
 predictor = SAM2ImagePredictor.from_pretrained("facebook/sam2-hiera-large")
@@ -126,10 +126,11 @@ input_image = Image.open("./truck.jpg").convert("RGB")
 #
 input_image = Image.open("./truck.jpg").convert("RGB")
 
+# %%
 # In addition to the input image, we also provide prompts as inputs which are
 # used to predict the masks. The prompts can be a box, point as well as masks from
 # previous iteration of prediction. We use a point as a prompt in this demo similar to
-# the `original notebook in the SAM2 repository<https://github.com/facebookresearch/sam2/blob/main/notebooks/image_predictor_example.ipynb>`_
+# the `original notebook in the SAM2 repository <https://github.com/facebookresearch/sam2/blob/main/notebooks/image_predictor_example.ipynb>`_
 
 # %%
 # Preprocessing components

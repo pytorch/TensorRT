@@ -141,7 +141,7 @@ Model Zoo
 
 .. toctree::
    :caption: Model Zoo
-   :maxdepth: 4
+   :maxdepth: 3
    :hidden:
    
    tutorials/_rendered_examples/dynamo/torch_compile_resnet_example
@@ -151,7 +151,7 @@ Model Zoo
    tutorials/_rendered_examples/distributed_inference/data_parallel_stable_diffusion
    tutorials/_rendered_examples/dynamo/torch_export_gpt2
    tutorials/_rendered_examples/dynamo/torch_export_llama2
-   tutorials/_rendered_examples/dynamo/sam/torch_export_sam2
+   tutorials/_rendered_examples/dynamo/torch_export_sam2
    tutorials/notebooks
 
 Python API Documentation
