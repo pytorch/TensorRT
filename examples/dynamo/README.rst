@@ -17,5 +17,6 @@ Model Zoo
 * :ref:`torch_compile_resnet`: Compiling a ResNet model using the Torch Compile Frontend for ``torch_tensorrt.compile``
 * :ref:`torch_compile_transformer`: Compiling a Transformer model using ``torch.compile``
 * :ref:`torch_compile_stable_diffusion`: Compiling a Stable Diffusion model using ``torch.compile``
+* :ref:`_torch_compile_gpt2`: Compiling a GPT2 model using ``torch.compile``
 * :ref:`_torch_export_gpt2`: Compiling a GPT2 model using AOT workflow (`ir=dynamo`)
 * :ref:`_torch_export_llama2`: Compiling a Llama2 model using AOT workflow (`ir=dynamo`)
