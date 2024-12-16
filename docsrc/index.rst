@@ -136,6 +136,7 @@ Model Zoo
 * :ref:`torch_compile_stable_diffusion`
 * :ref:`torch_export_gpt2`
 * :ref:`torch_export_llama2`
+* :ref:`torch_export_sam2`
 * :ref:`notebooks`
 
 .. toctree::
@@ -150,6 +151,7 @@ Model Zoo
    tutorials/_rendered_examples/distributed_inference/data_parallel_stable_diffusion
    tutorials/_rendered_examples/dynamo/torch_export_gpt2
    tutorials/_rendered_examples/dynamo/torch_export_llama2
+   tutorials/_rendered_examples/dynamo/torch_export_sam2
    tutorials/notebooks
 
 Python API Documentation
