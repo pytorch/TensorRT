@@ -82,6 +82,7 @@ Tutorials
    tutorials/_rendered_examples/dynamo/torch_export_cudagraphs
    tutorials/_rendered_examples/dynamo/converter_overloading
    tutorials/_rendered_examples/dynamo/custom_kernel_plugins
+   tutorials/_rendered_examples/dynamo/auto_generate_converters
    tutorials/_rendered_examples/dynamo/mutable_torchtrt_module_example
    tutorials/_rendered_examples/dynamo/weight_streaming_example
 
@@ -143,7 +144,7 @@ Model Zoo
    :caption: Model Zoo
    :maxdepth: 3
    :hidden:
-   
+
    tutorials/_rendered_examples/dynamo/torch_compile_resnet_example
    tutorials/_rendered_examples/dynamo/torch_compile_transformers_example
    tutorials/_rendered_examples/dynamo/torch_compile_stable_diffusion
