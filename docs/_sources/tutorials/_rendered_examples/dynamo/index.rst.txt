@@ -170,6 +170,23 @@ Model Zoo
 
 .. raw:: html
 
+    <div class="sphx-glr-thumbcontainer" tooltip="The TensorRT runtime module acts as a wrapper around a PyTorch model (or subgraph) that has bee...">
+
+.. only:: html
+
+  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_pre_allocated_output_example_thumb.png
+    :alt:
+
+  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_pre_allocated_output_example.py`
+
+.. raw:: html
+
+      <div class="sphx-glr-thumbnail-title">Pre-allocated output buffer</div>
+    </div>
+
+
+.. raw:: html
+
     <div class="sphx-glr-thumbcontainer" tooltip="We are going to demonstrate how we can easily use Mutable Torch TensorRT Module to compile, int...">
 
 .. only:: html
@@ -371,6 +388,7 @@ Model Zoo
    /tutorials/_rendered_examples/dynamo/torch_compile_gpt2
    /tutorials/_rendered_examples/dynamo/torch_compile_advanced_usage
    /tutorials/_rendered_examples/dynamo/engine_caching_bert_example
+   /tutorials/_rendered_examples/dynamo/pre_allocated_output_example
    /tutorials/_rendered_examples/dynamo/mutable_torchtrt_module_example
    /tutorials/_rendered_examples/dynamo/torch_compile_resnet_example
    /tutorials/_rendered_examples/dynamo/torch_export_gpt2
