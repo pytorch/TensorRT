@@ -25,7 +25,7 @@ torchrun --nproc_per_node=2 tensor_parallel_llama2.py
 
  pip install tensorrt-llm
 
- For other python versions, you need to load the libnvinfer_plugin_tensorrt_llm.so. Please set that in the environment variable export trtllm_env={lib_path}. For example, we have already set the variable in initialize_distributed_env(). Note that won't work while running example, since it needs to be preset for the converter library to get.
+ For other python versions, you need to load the libnvinfer_plugin_tensorrt_llm.so. Please set that in the environment variable export TRTLLM_PLUGINS_PATH={lib_path}. For example, we have already set the variable in initialize_distributed_env(). You can replace this with your TRTLLM_PLUGINS_PATH and unset it there
 
  #then pip install the tensorrt and torch version compatible with installed torchTRT
 
