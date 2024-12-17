@@ -243,6 +243,7 @@ def run_dynamo(model, input_tensors, params, precision, batch_size):
         " batch_size : ",
         batch_size,
     )
+    model = model.to("cuda:0")
     if params["is_text_llm"]:
         return run_hf_dynamo(model, input_tensors, params, precision, batch_size)
 
@@ -255,6 +256,13 @@ def run_dynamo(model, input_tensors, params, precision, batch_size):
         min_block_size=params.get("min_block_size", 1),
         debug=False,
         truncate_long_and_double=params.get("truncate", False),
+        immutable_weights=params.get("immutable_weights", True),
+        strip_engine_weights=params.get("strip_engine_weights", False),
+        refit_identical_engine_weights=params.get(
+            "refit_identical_engine_weights", False
+        ),
+        cache_built_engines=params.get("cache_built_engines", False),
+        reuse_cached_engines=params.get("reuse_cached_engines", False),
     )
     end_compile = timeit.default_timer()
     compile_time_s = end_compile - start_compile
@@ -584,6 +592,31 @@ if __name__ == "__main__":
         "--report",
         type=str,
         help="Path of the output file where performance summary is written.",
+    )
+    arg_parser.add_argument(
+        "--immutable_weights",
+        action="store_true",
+        help="Build non-refittable engines. This is useful for some layers that are not refittable. If this argument is set to true, `strip_engine_weights` and `refit_identical_engine_weights` will be ignored.",
+    )
+    arg_parser.add_argument(
+        "--strip_engine_weights",
+        action="store_true",
+        help="Strip engine weights from the serialized engine. This is useful when the engine is to be deployed in an environment where the weights are not required.",
+    )
+    arg_parser.add_argument(
+        "--refit_identical_engine_weights",
+        action="store_true",
+        help="Refit engines with identical weights. This is useful when the same model is compiled multiple times with different inputs and the weights are the same. This will save time by reusing the same engine for different inputs.",
+    )
+    arg_parser.add_argument(
+        "--cache_built_engines",
+        action="store_true",
+        help="Whether to save the compiled TRT engines to storage.",
+    )
+    arg_parser.add_argument(
+        "--reuse_cached_engines",
+        action="store_true",
+        help="Whether to load the compiled TRT engines from storage.",
     )
     args = arg_parser.parse_args()
 
