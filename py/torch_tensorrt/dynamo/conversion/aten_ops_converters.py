@@ -1,10 +1,12 @@
 # mypy: disallow-untyped-decorators=False
 
+import ctypes
 import logging
 import operator
 from typing import Any, Callable, Dict, Optional, Sequence, Tuple, Union
 
 import numpy as np
+import tensorrt as trt
 import torch
 from torch.fx.node import Argument, Node, Target
 from torch_tensorrt.dynamo._settings import CompilationSettings
@@ -19,6 +21,11 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     enforce_tensor_types,
     get_positive_dim,
     is_only_operator_on_placeholder,
+    plugin_lib_path,
+)
+from torch_tensorrt.dynamo.lowering.passes.fuse_distributed_ops import (
+    tensorrt_fused_nccl_all_gather_op,
+    tensorrt_fused_nccl_reduce_scatter_op,
 )
 from torch_tensorrt.dynamo.types import TRTTensor
 
@@ -3558,3 +3565,55 @@ def aten_ops_full(
         fill_value=args[1],
         dtype=kwargs.get("dtype", None),
     )
+
+
+try:
+    import tensorrt_llm as trt_llm
+except (ImportError, AssertionError) as e:
+    _LOGGER.warning("tensorrt_llm is not installed. Please install tensorrt_llm", e)
+    # note this is for Linux only
+    plugin_lib_path = plugin_lib_path()
+    handle = ctypes.CDLL(plugin_lib_path)
+    try:
+        handle.initTrtLlmPlugins.argtypes = [ctypes.c_void_p, ctypes.c_char_p]
+        handle.initTrtLlmPlugins.restype = ctypes.c_bool
+    except AttributeError as e_1:
+        _LOGGER.warning("TensorRT-LLM Plugin is unavailable")
+    try:
+        TRT_LLM_PLUGIN_NAMESPACE = "tensorrt_llm"
+        assert handle.initTrtLlmPlugins(None, TRT_LLM_PLUGIN_NAMESPACE.encode("utf-8"))
+    except Exception as e_2:
+        _LOGGER.warning("Exception happened in initializing TensorRT-LLM plugins", e)
+else:
+
+    @dynamo_tensorrt_converter(tensorrt_fused_nccl_all_gather_op)
+    def insert_nccl_gather_op(
+        ctx: ConversionContext,
+        target: Target,
+        args: Tuple[Argument, ...],
+        kwargs: Dict[str, Argument],
+        name: str,
+    ) -> Union[TRTTensor, Sequence[TRTTensor]]:
+        return impl.distributed.gather_op(
+            ctx,
+            target,
+            SourceIR.ATEN,
+            name,
+            args[0],
+        )
+
+    @dynamo_tensorrt_converter(tensorrt_fused_nccl_reduce_scatter_op)
+    def insert_nccl_reduce_scatter_plugin(
+        ctx: ConversionContext,
+        target: Target,
+        args: Tuple[Argument, ...],
+        kwargs: Dict[str, Argument],
+        name: str,
+    ) -> Union[TRTTensor, Sequence[TRTTensor]]:
+        return impl.distributed.gather_op(
+            ctx,
+            target,
+            SourceIR.ATEN,
+            name,
+            args[0],
+        )

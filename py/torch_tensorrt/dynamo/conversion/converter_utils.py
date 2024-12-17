@@ -1,6 +1,7 @@
 import collections
 import functools
 import logging
+from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union, overload
 
 import numpy as np
@@ -913,3 +914,9 @@ def set_layer_name(
         else f"{source_ir}_ops.{target.__name__}"
     )
     layer.name = f"[{layer.type.name}]-[{target_name}]-[{name}]"
+
+
+def plugin_lib_path() -> str:
+    project_dir = Path(__file__).parent.parent.parent.parent.absolute()
+    dyn_lib = "libnvinfer_plugin_tensorrt_llm.so"
+    return str(project_dir.joinpath("libs", dyn_lib))

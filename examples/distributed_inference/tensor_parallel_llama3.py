@@ -13,19 +13,19 @@ from torch.distributed._tensor import Replicate, Shard
 from torch.distributed.algorithms._checkpoint.checkpoint_wrapper import (
     checkpoint_wrapper,
 )
-from torch.distributed.device_mesh import DeviceMesh, init_device_mesh
 
-_rank = int(os.environ["RANK"])
-_world_size = int(os.environ["WORLD_SIZE"])
-tp_size = 2
+from TensorRT.examples.distributed_inference.tensor_parallel_initialize_dist import (
+    initialize_distributed_env,
+)
 
-logger = logging.getLogger()
-logger.setLevel(logging.INFO)
-fh = logging.FileHandler(f"./tensor_parallel_log_{_rank}.log", mode="w")
-fh.setLevel(logging.INFO)
-logger.addHandler(fh)
+device_mesh, _world_size, _rank, logger = initialize_distributed_env(
+    "./tensor_parallel_llama3"
+)
 
-tp_mesh = init_device_mesh(device_type="cuda", mesh_shape=(_world_size,))
+logger.info(f"Starting PyTorch TP example on rank {_rank}.")
+assert (
+    _world_size % 2 == 0
+), f"TP examples require even number of GPUs, but got {_world_size} gpus"
 
 model_args = ModelArgs(
     vocab_size=32000,
@@ -38,7 +38,7 @@ model_args = ModelArgs(
 )
 
 with torch.no_grad():
-    model = ParallelTransformer(model_args, tp_mesh)
+    model = ParallelTransformer(model_args, device_mesh)
     torch.manual_seed(0)
     inp = torch.randint(32000, (8, 256), device="cuda")
     python_result = model(inp)
@@ -53,7 +53,7 @@ with torch.no_grad():
             "use_python_runtime": True,
             "workspace_size": 1 << 33,
             "debug": False,
-            "timing_cache_path": "/opt/file/cache/timing_cache_llama.bin",
+            "use_aot_joint_export": False,
         },
         dynamic=False,
     )
