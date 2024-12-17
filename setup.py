@@ -486,14 +486,6 @@ package_dir = {
     "torch_tensorrt.runtime": "py/torch_tensorrt/runtime",
 }
 
-if not PY_ONLY:
-    packages.append("torch_tensorrt.dynamo.runtime.meta_ops")
-    package_dir.update(
-        {
-            "torch_tensorrt.dynamo.runtime.meta_ops": "py/torch_tensorrt/dynamo/runtime/meta_ops"
-        }
-    )
-
 package_data = {}
 
 if not (PY_ONLY or NO_TS):
@@ -601,13 +593,12 @@ if not (PY_ONLY or NO_TS):
         )
     ]
 
-    packages += [
-        "torch_tensorrt.ts",
-    ]
+    packages += ["torch_tensorrt.ts", "torch_tensorrt.dynamo.runtime.meta_ops"]
 
     package_dir.update(
         {
             "torch_tensorrt.ts": "py/torch_tensorrt/ts",
+            "torch_tensorrt.dynamo.runtime.meta_ops": "py/torch_tensorrt/dynamo/runtime/meta_ops",
         }
     )
 
