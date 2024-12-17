@@ -183,47 +183,13 @@ def aten_ops_native_group_norm(
         SourceIR.ATEN,
         name,
         input=args[0],
-        weight=args[1],
-        bias=args[2],
+        weight=args_bounds_check(args, 1),
+        bias=args_bounds_check(args, 2),
         N=args[3],
         C=args[4],
         HxW=args[5],
         group=args[6],
         eps=args[7],
-    )
-
-
-@dynamo_tensorrt_converter(
-    torch.ops.aten.group_norm.default,
-    supports_dynamic_shapes=True,
-)
-@dynamo_tensorrt_converter(
-    torch.ops.aten.group_norm,
-    supports_dynamic_shapes=True,
-)
-@enforce_tensor_types(
-    {
-        0: (TRTTensor,),
-    }
-)
-def aten_ops_group_norm(
-    ctx: ConversionContext,
-    target: Target,
-    args: Tuple[Argument, ...],
-    kwargs: Dict[str, Argument],
-    name: str,
-) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    return impl.normalization.group_norm(
-        ctx,
-        target,
-        SourceIR.ATEN,
-        name,
-        input=args[0],
-        num_groups=args[1],
-        weight=args_bounds_check(args, 2, None),
-        bias=args_bounds_check(args, 3, None),
-        eps=args_bounds_check(args, 4, 1e-05),
-        cudnn_enabled=args_bounds_check(args, 5, True),
     )
 
 
@@ -2781,38 +2747,6 @@ def aten_ops_max_pool(
         padding=args_bounds_check(args, 3, replacement=0),
         dilation=args_bounds_check(args, 4, replacement=1),
         ceil_mode=args_bounds_check(args, 5, replacement=False),
-    )
-
-
-def attention_validator(
-    node: Node, settings: Optional[CompilationSettings] = None
-) -> bool:
-    # Currently, `attn_mask` is not supported
-    return args_bounds_check(node.args, 3) is None
-
-
-@dynamo_tensorrt_converter(
-    torch.nn.functional.scaled_dot_product_attention,
-    capability_validator=attention_validator,
-    supports_dynamic_shapes=True,
-)
-def tensorrt_scaled_dot_product_attention(
-    ctx: ConversionContext,
-    target: Target,
-    args: Tuple[Argument, ...],
-    kwargs: Dict[str, Argument],
-    name: str,
-) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    return impl.attention.scaled_dot_product_attention(
-        ctx,
-        target,
-        SourceIR.TORCHTRT_LOWERED,
-        name,
-        args[0],
-        args[1],
-        args[2],
-        args_bounds_check(args, 5, False),
-        kwargs.get("scale", None),
     )
 
 
