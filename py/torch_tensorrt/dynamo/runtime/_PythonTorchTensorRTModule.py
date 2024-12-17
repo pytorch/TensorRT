@@ -30,7 +30,7 @@ class TorchTRTRuntimeStates:
         # Indicates whether pre-allocated output was enabled in the previous execute_engine
         self.old_pre_allocated_outputs = new_pre_allocated_output
 
-    def validate_states(
+    def set_runtime_states(
         self,
         new_cudagraphs: bool,
         new_pre_allocated_output: bool,
@@ -144,8 +144,11 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         self.engine = None
         self.weight_name_map = weight_name_map
         self.target_platform = Platform.current_platform()
-        # Previous cuda graphs state
-        self.prev_cudagraphs_enabled = False
+        self.runtime_states = TorchTRTRuntimeStates(
+            torch_tensorrt.runtime.get_cudagraphs_mode(), False
+        )
+        self.pre_allocated_outputs: List[torch.Tensor] = []
+        self.use_pre_allocated_outputs = False
 
         if self.serialized_engine is not None and not self.settings.lazy_engine_init:
             self.setup_engine()
@@ -352,14 +355,16 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
             self._check_initialized()
 
             cudagraphs_enabled = torch_tensorrt.runtime.get_cudagraphs_mode()
-            shape_changed = self.cudagraphs_validate_shapes(inputs)
-            # Cudagraphs record is required if cudagraphs_enabled is switched to True regardless of shape change
-            need_cudagraphs_record = cudagraphs_enabled and (
-                (not self.prev_cudagraphs_enabled) or (not shape_changed)
+            shape_changed = self.validate_input_shapes(inputs)
+            need_cudagraphs_record, can_use_pre_allocated_outputs = (
+                self.runtime_states.set_runtime_states(
+                    cudagraphs_enabled, self.use_pre_allocated_outputs, shape_changed
+                )
             )
-            self.prev_cudagraphs_enabled = cudagraphs_enabled
 
             if need_cudagraphs_record:
+                if self.cudagraph:
+                    self.cudagraph.reset()
                 self._input_buffers = [None] * len(self.input_names)
                 self._output_buffers = [None] * len(self.output_names)
 
@@ -423,8 +428,16 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                                     This could happen if the input tensor addresses/shapes haven't been configured correctly"
                         )
 
-            with nvtx.annotate("ProcessOutputs:1", color="red"):
-                if not self.use_pre_allocated_outputs or shape_changed:
+            with (
+                torch.autograd.profiler.record_function(
+                    "PythonTorchTensorRTModule:ProcessOutputs"
+                )
+                if self.profiling_enabled
+                else nullcontext()
+            ):
+                if can_use_pre_allocated_outputs:
+                    outputs = self.pre_allocated_outputs
+                else:
                     self.output_shapes = [
                         tuple(self.context.get_tensor_shape(output_name))
                         for output_name in self.output_names
@@ -434,12 +447,12 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                             "Encountered dynamic output shapes during runtime. This could mean the network has data-dependent output shapes which is not currently supported."
                         )
                     outputs = self.create_output_tensors()
-                else:
-                    outputs = self.pre_allocated_outputs
 
                 for o, output_name in enumerate(self.output_names):
+
                     if need_cudagraphs_record:
                         self._output_buffers[o] = outputs[o].clone()
+
                     if cudagraphs_enabled:
                         self.context.set_tensor_address(
                             output_name, self._output_buffers[o].data_ptr()
@@ -449,7 +462,13 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                             output_name, outputs[o].data_ptr()
                         )
 
-            with nvtx.annotate("TensorRTRuntime", color="red"):
+            with (
+                torch.autograd.profiler.record_function(
+                    "PythonTorchTensorRTModule:TensorRTRuntime"
+                )
+                if self.profiling_enabled
+                else nullcontext()
+            ):
                 self._caller_stream = torch.cuda.current_stream()
                 if (
                     self._engine_stream == torch.cuda.default_stream()
@@ -489,6 +508,9 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                         self.context.execute_async_v3(self._engine_stream.cuda_stream)
 
                 self._caller_stream.wait_stream(self._engine_stream)
+
+            if self.use_pre_allocated_outputs:
+                self.pre_allocated_outputs = self.create_output_tensors()
 
             if cudagraphs_enabled:
                 for idx, o in enumerate(outputs):
@@ -531,10 +553,9 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         )
         return engine_json
 
-    def cudagraphs_validate_shapes(self, inputs: Sequence[torch.Tensor]) -> bool:
+    def validate_input_shapes(self, inputs: Sequence[torch.Tensor]) -> bool:
         """
-        Validates the input shapes of the forward function
-        versus the version currently active for the
+        Validates the input shapes of the forward function has changed
         """
         # Representation of input shapes to a given model
         # Shapes are concatenated as so:
@@ -544,10 +565,8 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         # If the new shape key differs from the existing one,
         # invalidate the old shape key and remove the CUDAGraph
         if new_shape_key != self.shape_key:
-            logger.debug(f"Resetting Cudagraph on new shape key {new_shape_key}")
+            logger.debug(f"Input shape changed {self.shape_key} -> {new_shape_key}")
             self.shape_key = new_shape_key
-            if self.cudagraph:
-                self.cudagraph.reset()
-            return False
+            return True
 
-        return True
+        return False

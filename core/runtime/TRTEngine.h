@@ -130,8 +130,10 @@ struct TRTEngine : torch::CustomClassHolder {
   at::cuda::CUDAStream caller_stream = c10::cuda::getDefaultCUDAStream();
   std::vector<at::Tensor> input_buffers = {};
   std::vector<at::Tensor> output_buffers = {};
-  std::string shape_key;
-  bool prev_cudagraphs_enabled = false;
+  std::string shape_key = "None";
+  bool use_pre_allocated_outputs = false;
+  std::vector<at::Tensor> pre_allocated_outputs;
+
   // TODO: Implement a call method
   // c10::List<at::Tensor> Run(c10::List<at::Tensor> inputs);
 

@@ -47,7 +47,7 @@ opt = torch_tensorrt.compile(
 
 # We can enable the cudagraphs API with a context manager
 with torch_tensorrt.runtime.enable_cudagraphs(opt) as cudagraphs_module:
-    out_trt = opt(inputs)
+    out_trt = cudagraphs_module(inputs)
 
 # Alternatively, we can set the cudagraphs mode for the session
 torch_tensorrt.runtime.set_cudagraphs_mode(True)
