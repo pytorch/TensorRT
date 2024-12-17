@@ -1,11 +1,10 @@
 import time
 
 import tensorrt as trt
-import tensorrt_llm
 import torch
 import torch.nn as nn
 import torch_tensorrt
-from tensor_parallel_nccl_ops import register_nccl_ops
+from tensor_parallel_initialize_dist import initialize_distributed_env
 from torch.distributed._tensor import Shard
 from torch.distributed.tensor.parallel import (
     ColwiseParallel,
@@ -13,9 +12,10 @@ from torch.distributed.tensor.parallel import (
     parallelize_module,
 )
 
-device_mesh, _world_size, _rank, logger = register_nccl_ops(
+device_mesh, _world_size, _rank, logger = initialize_distributed_env(
     "./tensor_parallel_simple_example"
 )
+import tensorrt_llm
 
 """
 This example copies some code from https://github.com/pytorch/examples/blob/main/distributed/tensor_parallelism/tensor_parallel_example.py
