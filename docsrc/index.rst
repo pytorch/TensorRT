@@ -82,6 +82,7 @@ Tutorials
    tutorials/_rendered_examples/dynamo/torch_export_cudagraphs
    tutorials/_rendered_examples/dynamo/converter_overloading
    tutorials/_rendered_examples/dynamo/custom_kernel_plugins
+   tutorials/_rendered_examples/dynamo/auto_generate_converters
    tutorials/_rendered_examples/dynamo/mutable_torchtrt_module_example
    tutorials/_rendered_examples/dynamo/weight_streaming_example
 
@@ -134,22 +135,26 @@ Model Zoo
 * :ref:`torch_compile_resnet`
 * :ref:`torch_compile_transformer`
 * :ref:`torch_compile_stable_diffusion`
+* :ref:`torch_compile_gpt2`
 * :ref:`torch_export_gpt2`
 * :ref:`torch_export_llama2`
+* :ref:`torch_export_sam2`
 * :ref:`notebooks`
 
 .. toctree::
    :caption: Model Zoo
    :maxdepth: 3
    :hidden:
-   
+
    tutorials/_rendered_examples/dynamo/torch_compile_resnet_example
    tutorials/_rendered_examples/dynamo/torch_compile_transformers_example
    tutorials/_rendered_examples/dynamo/torch_compile_stable_diffusion
    tutorials/_rendered_examples/distributed_inference/data_parallel_gpt2
    tutorials/_rendered_examples/distributed_inference/data_parallel_stable_diffusion
+   tutorials/_rendered_examples/dynamo/torch_compile_gpt2
    tutorials/_rendered_examples/dynamo/torch_export_gpt2
    tutorials/_rendered_examples/dynamo/torch_export_llama2
+   tutorials/_rendered_examples/dynamo/torch_export_sam2
    tutorials/notebooks
 
 Python API Documentation

@@ -1,71 +1,71 @@
 exclude: ^.github/actions/assigner/dist
 repos:
-  - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.5.0
-    hooks:
-      - id: check-yaml
-      - id: trailing-whitespace
-        exclude: ^docs
-      - id: check-added-large-files
-        args:
-          - --maxkb=1000
-      - id: check-vcs-permalinks
-      - id: check-merge-conflict
-      - id: mixed-line-ending
-        args:
-          - --fix=lf
-        exclude: ^docs
-  - repo: https://github.com/pre-commit/mirrors-clang-format
-    rev: v14.0.6
-    hooks:
-      - id: clang-format
-        types_or: [c++, c, cuda]
-  - repo: https://github.com/keith/pre-commit-buildifier
-    rev: 6.4.0
-    hooks:
-    -   id: buildifier
-        args:
-          - --warnings=all
-    -   id: buildifier-lint
-  - repo: https://github.com/abravalheri/validate-pyproject
-    rev: v0.16
-    hooks:
-      - id: validate-pyproject
-  - repo: https://github.com/pycqa/isort
-    rev: 5.13.2
-    hooks:
-      - id: isort
-        name: isort (python)
-  - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: 'v1.9.0'
-    hooks:
-    -   id: mypy
-        exclude: "^py/torch_tensorrt/fx|^examples|^tests|^py/torch_tensorrt/dynamo/_experimental|^tools|^docs|noxfile.py|setup.py|versions.py"
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    # Ruff version.
-    rev: v0.3.3
-    hooks:
-      - id: ruff
-  - repo: https://github.com/psf/black
-    rev: 24.3.0
-    hooks:
-      - id: black
-        exclude: ^examples/custom_converters/elu_converter/setup.py|^docs
-  - repo: https://github.com/crate-ci/typos
-    rev: v1.22.9
-    hooks:
-      - id: typos
-  - repo: https://github.com/astral-sh/uv-pre-commit
-    # uv version.
-    rev: 0.4.10
-    hooks:
-      # Update the uv lockfile
-      - id: uv-lock
-  - repo: local
-    hooks:
-    -   id: dont-commit-upstream
-        name: NVIDIA-INTERNAL check
-        entry: "!NVIDIA-INTERNAL"
-        exclude: "^.pre-commit-config.yaml"
-        language: pygrep
-        types: [text]
+    - repo: https://github.com/pre-commit/pre-commit-hooks
+      rev: v4.5.0
+      hooks:
+          - id: check-yaml
+          - id: trailing-whitespace
+            exclude: ^docs
+          - id: check-added-large-files
+            args:
+                - --maxkb=1000
+          - id: check-vcs-permalinks
+          - id: check-merge-conflict
+          - id: mixed-line-ending
+            args:
+                - --fix=lf
+            exclude: ^docs
+    - repo: https://github.com/pre-commit/mirrors-clang-format
+      rev: v14.0.6
+      hooks:
+          - id: clang-format
+            types_or: [c++, c, cuda]
+    - repo: https://github.com/keith/pre-commit-buildifier
+      rev: 6.4.0
+      hooks:
+          - id: buildifier
+            args:
+                - --warnings=all
+          - id: buildifier-lint
+    - repo: https://github.com/abravalheri/validate-pyproject
+      rev: v0.23
+      hooks:
+          - id: validate-pyproject
+    - repo: https://github.com/pycqa/isort
+      rev: 5.13.2
+      hooks:
+          - id: isort
+            name: isort (python)
+    - repo: https://github.com/pre-commit/mirrors-mypy
+      rev: "v1.9.0"
+      hooks:
+          - id: mypy
+            exclude: "^py/torch_tensorrt/fx|^examples|^tests|^py/torch_tensorrt/dynamo/_experimental|^tools|^docs|noxfile.py|setup.py|versions.py"
+    - repo: https://github.com/astral-sh/ruff-pre-commit
+      # Ruff version.
+      rev: v0.3.3
+      hooks:
+          - id: ruff
+    - repo: https://github.com/psf/black
+      rev: 24.3.0
+      hooks:
+          - id: black
+            exclude: ^examples/custom_converters/elu_converter/setup.py|^docs
+    - repo: https://github.com/crate-ci/typos
+      rev: v1.22.9
+      hooks:
+          - id: typos
+    - repo: https://github.com/astral-sh/uv-pre-commit
+      # uv version.
+      rev: 0.5.5
+      hooks:
+          # Update the uv lockfile
+          - id: uv-lock
+    - repo: local
+      hooks:
+          - id: dont-commit-upstream
+            name: NVIDIA-INTERNAL check
+            entry: "!NVIDIA-INTERNAL"
+            exclude: "^.pre-commit-config.yaml"
+            language: pygrep
+            types: [text]
