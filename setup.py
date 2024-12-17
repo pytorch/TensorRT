@@ -593,13 +593,12 @@ if not (PY_ONLY or NO_TS):
         )
     ]
 
-    packages += [
-        "torch_tensorrt.ts",
-    ]
+    packages += ["torch_tensorrt.ts", "torch_tensorrt.dynamo.runtime.meta_ops"]
 
     package_dir.update(
         {
             "torch_tensorrt.ts": "py/torch_tensorrt/ts",
+            "torch_tensorrt.dynamo.runtime.meta_ops": "py/torch_tensorrt/dynamo/runtime/meta_ops",
         }
     )
 
