@@ -13,7 +13,6 @@ from . import (
     embedding,
     full,
     grid,
-    linear,
     matmul,
     normalization,
     pad,
