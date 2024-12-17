@@ -5,6 +5,7 @@ import operator
 from typing import Any, Callable, Dict, Optional, Sequence, Tuple, Union
 
 import numpy as np
+import tensorrt as trt
 import torch
 from torch.fx.node import Argument, Node, Target
 from torch_tensorrt.dynamo._settings import CompilationSettings
@@ -20,6 +21,11 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     enforce_tensor_types,
     get_positive_dim,
     is_only_operator_on_placeholder,
+    load_tensorrt_llm,
+)
+from torch_tensorrt.dynamo.lowering.passes.fuse_distributed_ops import (
+    tensorrt_fused_nccl_all_gather_op,
+    tensorrt_fused_nccl_reduce_scatter_op,
 )
 from torch_tensorrt.dynamo.types import TRTTensor
 
@@ -3585,3 +3591,41 @@ def aten_ops_full(
         fill_value=args[1],
         dtype=kwargs.get("dtype", None),
     )
+
+
+if load_tensorrt_llm():
+
+    @dynamo_tensorrt_converter(tensorrt_fused_nccl_all_gather_op)
+    def insert_nccl_gather_op(
+        ctx: ConversionContext,
+        target: Target,
+        args: Tuple[Argument, ...],
+        kwargs: Dict[str, Argument],
+        name: str,
+    ) -> Union[TRTTensor, Sequence[TRTTensor]]:
+        return impl.distributed.gather_op(
+            ctx,
+            target,
+            SourceIR.ATEN,
+            name,
+            [args[0]],
+        )
+
+    @dynamo_tensorrt_converter(tensorrt_fused_nccl_reduce_scatter_op)
+    def insert_nccl_reduce_scatter_plugin(
+        ctx: ConversionContext,
+        target: Target,
+        args: Tuple[Argument, ...],
+        kwargs: Dict[str, Argument],
+        name: str,
+    ) -> Union[TRTTensor, Sequence[TRTTensor]]:
+        return impl.distributed.reduce_scatter_op(
+            ctx,
+            target,
+            SourceIR.ATEN,
+            name,
+            [args[0]],
+        )
+
+else:
+    _LOGGER.warning("Unable to load the TRT-LLM plugins")

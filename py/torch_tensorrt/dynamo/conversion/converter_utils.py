@@ -1,6 +1,8 @@
 import collections
+import ctypes
 import functools
 import logging
+import os
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union, overload
 
 import numpy as np
@@ -919,3 +921,71 @@ def args_bounds_check(
     args: Tuple[Argument, ...], i: int, replacement: Optional[Any] = None
 ) -> Any:
     return args[i] if len(args) > i and args[i] is not None else replacement
+
+
+def load_tensorrt_llm() -> bool:
+    """
+    Attempts to load the TensorRT-LLM plugin and initialize it.
+
+    Returns:
+        bool: True if the plugin was successfully loaded and initialized, False otherwise.
+    """
+    try:
+        import tensorrt_llm as trt_llm
+
+        _LOGGER.info("TensorRT_LLM successfully imported.")
+        return True
+    except (ImportError, AssertionError) as e_import_error:
+        _LOGGER.warning(
+            "TensorRT_LLM is not installed. Please install TensorRT_LLM or set TRTLLM_PLUGINS_PATH",
+            exc_info=e_import_error,
+        )
+
+        # Check for environment variable for the plugin library path
+        plugin_lib_path = os.environ.get("TRTLLM_PLUGINS_PATH")
+        if not plugin_lib_path:
+            _LOGGER.warning(
+                "Please specify a valid path for TRTLLM_PLUGINS_PATH libnvinfer_plugin_tensorrt_llm.so when using distributed examples in examples/distributed_inference."
+            )
+            return False
+
+        _LOGGER.info(f"Plugin lib path found: {plugin_lib_path}")
+        try:
+            # Load the shared library
+            handle = ctypes.CDLL(plugin_lib_path)
+            _LOGGER.info(f"Successfully loaded plugin library: {plugin_lib_path}")
+        except OSError as e_os_error:
+            _LOGGER.error(
+                f"Failed to load the shared library at {plugin_lib_path}. "
+                f"Ensure the path is correct and the library is compatible.",
+                exc_info=e_os_error,
+            )
+            return False
+
+        try:
+            # Configure plugin initialization arguments
+            handle.initTrtLlmPlugins.argtypes = [ctypes.c_void_p, ctypes.c_char_p]
+            handle.initTrtLlmPlugins.restype = ctypes.c_bool
+        except AttributeError as e_plugin_unavailable:
+            _LOGGER.warning(
+                "TensorRT-LLM Plugin initialization function is unavailable.",
+                exc_info=e_plugin_unavailable,
+            )
+            return False
+
+        try:
+            # Initialize the plugin
+            TRT_LLM_PLUGIN_NAMESPACE = "tensorrt_llm"
+            if handle.initTrtLlmPlugins(None, TRT_LLM_PLUGIN_NAMESPACE.encode("utf-8")):
+                _LOGGER.info("TensorRT-LLM Plugin successfully initialized.")
+                return True
+            else:
+                _LOGGER.warning("TensorRT-LLM Plugin initialization failed.")
+                return False
+        except Exception as e_initialization_error:
+            _LOGGER.warning(
+                "Exception occurred during TensorRT-LLM plugin initialization.",
+                exc_info=e_initialization_error,
+            )
+            return False
+    return False

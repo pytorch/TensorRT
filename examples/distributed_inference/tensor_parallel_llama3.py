@@ -5,9 +5,8 @@ import os
 import time
 
 import torch
-import torch_tensorrt
 from llama3_model import ModelArgs, ParallelTransformer
-from tensor_parallel_nccl_ops import register_nccl_ops
+from tensor_parallel_initialize_dist import initialize_distributed_env
 from torch.distributed._composable.fsdp import MixedPrecisionPolicy
 from torch.distributed._composable.fsdp.fully_shard import fully_shard
 from torch.distributed._tensor import Replicate, Shard
@@ -15,7 +14,11 @@ from torch.distributed.algorithms._checkpoint.checkpoint_wrapper import (
     checkpoint_wrapper,
 )
 
-device_mesh, _world_size, _rank, logger = register_nccl_ops("./tensor_parallel_llama3")
+device_mesh, _world_size, _rank, logger = initialize_distributed_env(
+    "./tensor_parallel_llama3"
+)
+# Import should be after initialization of the TRT-LLM plugin .so path
+import tensorrt_llm
 
 logger.info(f"Starting PyTorch TP example on rank {_rank}.")
 assert (
