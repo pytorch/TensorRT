@@ -13,6 +13,10 @@ TRIALS = 5
 
 
 class TestCudagraphsPython(TestCase):
+    def tearDown(self):
+        # Reset to default cuda graph mode after each test
+        torch_tensorrt.runtime.set_cudagraphs_mode(False)
+
     def test_cudagraphs_on(self):
         torch_tensorrt.runtime.set_cudagraphs_mode(True)
         self.assertTrue(torch_tensorrt.runtime.get_cudagraphs_mode())

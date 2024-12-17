@@ -23,6 +23,42 @@ from torch_tensorrt.runtime._utils import (
 logger = logging.getLogger(__name__)
 
 
+class TorchTRTRuntimeStates:
+    def __init__(self, new_cudagraphs: bool, new_pre_allocated_output: bool):
+        # Indicates whether CUDAGraphs were enabled in the previous execute_engine
+        self.old_cudagraphs = new_cudagraphs
+        # Indicates whether pre-allocated output was enabled in the previous execute_engine
+        self.old_pre_allocated_outputs = new_pre_allocated_output
+
+    def validate_states(
+        self,
+        new_cudagraphs: bool,
+        new_pre_allocated_output: bool,
+        shape_changed: bool,
+    ) -> Tuple[bool, bool]:
+        # Evaluates whether certain conditions are met to enable CUDA Graph recording or to reuse pre-allocated outputs
+        # based on the current and previous states, as well as input shape has changed
+        need_cudagraphs_record = False
+        can_use_pre_allocated_outputs = False
+
+        # Cudagraphs record is required if cudagraphs_enabled is switched to True regardless of shape change
+        if new_cudagraphs and (not self.old_cudagraphs or shape_changed):
+            need_cudagraphs_record = True
+
+        # Pre-allocated output can be used when previous and current state are true without shape change
+        if (
+            self.old_pre_allocated_outputs
+            and new_pre_allocated_output
+            and (not shape_changed)
+        ):
+            can_use_pre_allocated_outputs = True
+
+        self.old_cudagraphs = new_cudagraphs
+        self.old_pre_allocated_outputs = new_pre_allocated_output
+
+        return need_cudagraphs_record, can_use_pre_allocated_outputs
+
+
 class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
     """PythonTorchTensorRTModule is a PyTorch module which encompasses an arbitrary TensorRT Engine.
 
@@ -108,6 +144,11 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         self.engine = None
         self.weight_name_map = weight_name_map
         self.target_platform = Platform.current_platform()
+        self.runtime_states = TorchTRTRuntimeStates(
+            torch_tensorrt.runtime.get_cudagraphs_mode(), False
+        )
+        self.pre_allocated_outputs: List[torch.Tensor] = []
+        self.use_pre_allocated_outputs = False
 
         if self.serialized_engine is not None and not self.settings.lazy_engine_init:
             self.setup_engine()
@@ -172,7 +213,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
             self.engine.get_tensor_shape(input_name) for input_name in self.input_names
         ]
         self.output_dtypes = [
-            dtype._from(self.engine.get_tensor_dtype(output_name))
+            dtype._from(self.engine.get_tensor_dtype(output_name)).to(torch.dtype)
             for output_name in self.output_names
         ]
         self.output_shapes = [
@@ -233,6 +274,73 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         if self.cudagraph:
             self.cudagraph.reset()
 
+    def setup_input_tensors(
+        self,
+        contiguous_inputs: List[torch.Tensor],
+        cudagraphs_enabled: bool,
+        need_cudagraphs_record: bool,
+    ) -> None:
+        for i, input_name in enumerate(self.input_names):
+            if not contiguous_inputs[i].is_cuda:
+                logger.warning(
+                    f"Detected input {input_name} of engine {self.engine.name} is not on a cuda device. "
+                    "This tensor is being moved by the runtime but for performance considerations, "
+                    "ensure your inputs are all on GPU and open an issue here "
+                    "(https://github.com/pytorch/TensorRT/issues) if this warning persists."
+                )
+                contiguous_inputs = (
+                    contiguous_inputs[:i]
+                    + [contiguous_inputs[i].cuda()]
+                    + contiguous_inputs[i + 1 :]
+                )
+
+            assert (
+                contiguous_inputs[i].dtype == self.input_dtypes[i]
+            ), f"Dtype mismatch for {i}th input({input_name}). Expect {self.input_dtypes[i]}, got {contiguous_inputs[i].dtype}."
+
+            if need_cudagraphs_record:
+                # If cudagraphs is enabled, this memory is reserved for future cudagraph runs
+                # Clone is required to avoid re-using user-provided GPU memory
+                self._input_buffers[i] = contiguous_inputs[i].clone()
+
+            # For shape tensors, we use CPU pointers and for data tensors, we use GPU pointers
+            # as per TensorRT requirements
+            if self.engine.is_shape_inference_io(input_name):
+                # Shape tensor inputs are casted to int64 explicitly
+                # Currently Torch CPU pointers are not working; numpy pointers are used instead
+                # to refer to underlying memory
+                inputs_cpu = contiguous_inputs[i].cpu().to(torch.int64).numpy().copy()
+                self.context.set_tensor_address(input_name, inputs_cpu.ctypes.data)
+            else:
+                self.context.set_input_shape(
+                    input_name, tuple(contiguous_inputs[i].shape)
+                )
+                if cudagraphs_enabled:
+                    self._input_buffers[i].copy_(contiguous_inputs[i])
+                    self.context.set_tensor_address(
+                        input_name, self._input_buffers[i].data_ptr()
+                    )
+                else:
+                    self.context.set_tensor_address(
+                        input_name, contiguous_inputs[i].data_ptr()
+                    )
+
+    def create_output_tensors(self) -> List[torch.Tensor]:
+        # create output tensors
+        outputs: List[torch.Tensor] = []
+
+        for o, _ in enumerate(self.output_names):
+            output = torch.empty(
+                size=self.output_shapes[o],
+                dtype=self.output_dtypes[o],
+                device=torch.cuda.current_device(),
+            )
+            outputs.append(output)
+        return outputs
+
+    def set_pre_allocated_outputs(self, enable: bool) -> None:
+        self.use_pre_allocated_outputs = enable
+
     def forward(self, *inputs: torch.Tensor) -> torch.Tensor | Tuple[torch.Tensor, ...]:
         # Ensure inputs are available in all scopes and cast symbolic integers to Tensors
         contiguous_inputs: List[torch.Tensor] = [
@@ -248,11 +356,16 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
             self._check_initialized()
 
             cudagraphs_enabled = torch_tensorrt.runtime.get_cudagraphs_mode()
-            need_cudagraphs_record = (
-                cudagraphs_enabled and not self.cudagraphs_validate_shapes(inputs)
+            shape_changed = self.validate_input_shapes(inputs)
+            need_cudagraphs_record, can_use_pre_allocated_outputs = (
+                self.runtime_states.validate_states(
+                    cudagraphs_enabled, self.use_pre_allocated_outputs, shape_changed
+                )
             )
 
             if need_cudagraphs_record:
+                if self.cudagraph:
+                    self.cudagraph.reset()
                 self._input_buffers = [None] * len(self.input_names)
                 self._output_buffers = [None] * len(self.output_names)
 
@@ -260,7 +373,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                 self.cudagraph.reset()
                 self.cudagraph = None
 
-            # If in safe mode, check at each iteration for for whether a switch is required
+            # If in safe mode, check at each iteration for whether a switch is required
             if (
                 torch_tensorrt.runtime._multi_device_safe_mode._PY_RT_MULTI_DEVICE_SAFE_MODE
             ):
@@ -303,62 +416,18 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                     self.input_names
                 ), f"Wrong number of inputs, expect {len(self.input_names)} get {len(contiguous_inputs)}."
 
-                for i, input_name in enumerate(self.input_names):
-                    if not contiguous_inputs[i].is_cuda:
+                self.setup_input_tensors(
+                    contiguous_inputs, cudagraphs_enabled, need_cudagraphs_record
+                )
+
+                if shape_changed:
+                    # Check if input shapes can be inferred.
+                    uninferred_input_names = self.context.infer_shapes()
+                    if uninferred_input_names:
                         logger.warning(
-                            f"Detected input {input_name} of engine {self.engine.name} is not on a cuda device. "
-                            "This tensor is being moved by the runtime but for performance considerations, "
-                            "ensure your inputs are all on GPU and open an issue here "
-                            "(https://github.com/pytorch/TensorRT/issues) if this warning persists."
+                            f"The shapes of the inputs: {uninferred_input_names} cannot be inferred and could lead to undefined behavior. \
+                                    This could happen if the input tensor addresses/shapes haven't been configured correctly"
                         )
-                        contiguous_inputs = (
-                            contiguous_inputs[:i]
-                            + [contiguous_inputs[i].cuda()]
-                            + contiguous_inputs[i + 1 :]
-                        )
-
-                    assert (
-                        contiguous_inputs[i].dtype == self.input_dtypes[i]
-                    ), f"Dtype mismatch for {i}th input({input_name}). Expect {self.input_dtypes[i]}, got {contiguous_inputs[i].dtype}."
-
-                    if need_cudagraphs_record:
-                        # If cudagraphs is enabled, this memory is reserved for future cudagraph runs
-                        # Clone is required to avoid re-using user-provided GPU memory
-                        self._input_buffers[i] = contiguous_inputs[i].clone()
-
-                    # For shape tensors, we use CPU pointers and for data tensors, we use GPU pointers
-                    # as per TensorRT requirements
-                    if self.engine.is_shape_inference_io(input_name):
-                        # Shape tensor inputs are casted to int64 explicitly
-                        # Currently Torch CPU pointers are not working; numpy pointers are used instead
-                        # to refer to underlying memory
-                        inputs_cpu = (
-                            contiguous_inputs[i].cpu().to(torch.int64).numpy().copy()
-                        )
-                        self.context.set_tensor_address(
-                            input_name, inputs_cpu.ctypes.data
-                        )
-                    else:
-                        self.context.set_input_shape(
-                            input_name, tuple(contiguous_inputs[i].shape)
-                        )
-                        if cudagraphs_enabled:
-                            self._input_buffers[i].copy_(contiguous_inputs[i])
-                            self.context.set_tensor_address(
-                                input_name, self._input_buffers[i].data_ptr()
-                            )
-                        else:
-                            self.context.set_tensor_address(
-                                input_name, contiguous_inputs[i].data_ptr()
-                            )
-
-                # Check if input shapes can be inferred.
-                uninferred_input_names = self.context.infer_shapes()
-                if uninferred_input_names:
-                    logger.warning(
-                        f"The shapes of the inputs: {uninferred_input_names} cannot be inferred and could lead to undefined behavior. \
-                                This could happen if the input tensor addresses/shapes haven't been configured correctly"
-                    )
 
             with (
                 torch.autograd.profiler.record_function(
@@ -367,24 +436,20 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                 if self.profiling_enabled
                 else nullcontext()
             ):
-                # create output tensors
-                outputs: List[torch.Tensor] = []
-
-                for o, output_name in enumerate(self.output_names):
-                    shape = tuple(self.context.get_tensor_shape(output_name))
-
-                    if DYNAMIC_DIM in shape:
+                if can_use_pre_allocated_outputs:
+                    outputs = self.pre_allocated_outputs
+                else:
+                    self.output_shapes = [
+                        tuple(self.context.get_tensor_shape(output_name))
+                        for output_name in self.output_names
+                    ]
+                    if DYNAMIC_DIM in self.output_shapes:
                         raise ValueError(
                             "Encountered dynamic output shapes during runtime. This could mean the network has data-dependent output shapes which is not currently supported."
                         )
+                    outputs = self.create_output_tensors()
 
-                    output = torch.empty(
-                        size=shape,
-                        dtype=self.output_dtypes[o].to(torch.dtype),
-                        device=torch.cuda.current_device(),
-                    )
-
-                    outputs.append(output)
+                for o, output_name in enumerate(self.output_names):
 
                     if need_cudagraphs_record:
                         self._output_buffers[o] = outputs[o].clone()
@@ -445,6 +510,9 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
 
                 self._caller_stream.wait_stream(self._engine_stream)
 
+            if self.use_pre_allocated_outputs:
+                self.pre_allocated_outputs = self.create_output_tensors()
+
             if cudagraphs_enabled:
                 for idx, o in enumerate(outputs):
                     o.copy_(self._output_buffers[idx])
@@ -486,10 +554,9 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         )
         return engine_json
 
-    def cudagraphs_validate_shapes(self, inputs: Sequence[torch.Tensor]) -> bool:
+    def validate_input_shapes(self, inputs: Sequence[torch.Tensor]) -> bool:
         """
-        Validates the input shapes of the forward function
-        versus the version currently active for the
+        Validates the input shapes of the forward function has changed
         """
         # Representation of input shapes to a given model
         # Shapes are concatenated as so:
@@ -499,10 +566,8 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         # If the new shape key differs from the existing one,
         # invalidate the old shape key and remove the CUDAGraph
         if new_shape_key != self.shape_key:
-            logger.debug(f"Resetting Cudagraph on new shape key {new_shape_key}")
+            logger.debug(f"Input shape changed {self.shape_key} -> {new_shape_key}")
             self.shape_key = new_shape_key
-            if self.cudagraph:
-                self.cudagraph.reset()
-            return False
+            return True
 
-        return True
+        return False

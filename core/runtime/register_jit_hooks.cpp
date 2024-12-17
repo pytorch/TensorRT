@@ -88,6 +88,7 @@ static auto TORCHTRT_UNUSED TRTEngineTSRegistrtion =
         .def("dump_engine_layer_info", &TRTEngine::dump_engine_layer_info)
         .def("get_engine_layer_info", &TRTEngine::get_engine_layer_info)
         .def("infer_outputs", &TRTEngine::infer_outputs)
+        .def_readwrite("use_pre_allocated_outputs", &TRTEngine::use_pre_allocated_outputs)
         .def_property(
             "device_memory_budget",
             &TRTEngine::get_device_memory_budget,
