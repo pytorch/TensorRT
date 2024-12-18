@@ -7,10 +7,9 @@ from torch.testing._internal.common_cuda import (
     PLATFORM_SUPPORTS_CUDNN_ATTENTION,
     PLATFORM_SUPPORTS_FLASH_ATTENTION,
 )
+from testing_utilities import DECIMALS_OF_AGREEMENT, lower_graph_testing
 from torch.testing._internal.common_utils import TestCase, run_tests
 from torch_tensorrt.dynamo.utils import ATOL, RTOL
-
-from ..testing_utilities import DECIMALS_OF_AGREEMENT, lower_graph_testing
 
 
 class TestLowering(TestCase):
@@ -434,16 +433,81 @@ class TestLowering(TestCase):
                 super().__init__(*args, **kwargs)
 
             def forward(self, x):
-                y = torch.full_like(x, 2.0)
-                return y
+                c = torch.ops.aten.add(x, x)
+                y = torch.ops.aten.full_like.default(c, 2)
+                d = y + c
+                return d
 
         # Operations expected to be removed in the traced graph after decompositions
-        expected_ops = {torch.ops.aten.full.default}
+        expected_ops = {torch.ops.aten.add.Tensor}
         unexpected_ops = {torch.ops.aten.full_like.default}
 
         inputs = [torch.randn(3, 3, dtype=torch.float32).cuda()]
 
         fx_graph = torch.fx.symbolic_trace(FullLike())
+        unexpected_ops_seen, expected_ops_unseen = lower_graph_testing(
+            fx_graph,
+            inputs,
+            expected_ops=expected_ops,
+            unexpected_ops=unexpected_ops,
+            min_block_size=1,
+        )
+
+        self.assertEqual(
+            len(unexpected_ops_seen),
+            0,
+            f"The following unexpected ops were encountered: {unexpected_ops_seen}",
+        )
+
+        self.assertEqual(
+            len(expected_ops_unseen),
+            0,
+            f"The following expected ops were not encountered: {expected_ops_unseen}",
+        )
+
+        torch._dynamo.reset()
+
+        # Validate that the results between Torch and Torch-TRT are similar
+        optimized_model = torch_tensorrt.compile(
+            fx_graph,
+            "torch_compile",
+            inputs,
+            min_block_size=1,
+            truncate_double=True,
+            pass_through_build_failures=True,
+        )
+        optimized_model_results = optimized_model(*inputs).detach().cpu()
+        torch_model_results = fx_graph(*inputs).detach().cpu()
+
+        max_diff = float(
+            torch.max(torch.abs(optimized_model_results - torch_model_results))
+        )
+        self.assertAlmostEqual(
+            max_diff,
+            0,
+            DECIMALS_OF_AGREEMENT,
+            f"FullLike TRT outputs don't match with the original model.",
+        )
+
+    def test_lowering_full_like_to_full_dynamic_module(self):
+        class FullLike(torch.nn.Module):
+            def __init__(self, *args, **kwargs) -> None:
+                super().__init__(*args, **kwargs)
+
+            def forward(self, x):
+                c = torch.ops.aten.add(x, x)
+                y = torch.ops.aten.full_like.default(c, 2)
+                d = y + c
+                return d
+
+        # Operations expected to be removed in the traced graph after decompositions
+        expected_ops = {torch.ops.aten.add.Tensor}
+        unexpected_ops = {torch.ops.aten.full_like.default}
+
+        inputs = [torch.randn(3, 3, dtype=torch.float32).cuda()]
+        torch._dynamo.mark_dynamic(inputs[0], 0, min=1, max=3)
+        fx_graph = torch.fx.symbolic_trace(FullLike())
+
         unexpected_ops_seen, expected_ops_unseen = lower_graph_testing(
             fx_graph,
             inputs,
