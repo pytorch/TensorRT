@@ -243,7 +243,6 @@ def run_dynamo(model, input_tensors, params, precision, batch_size):
         " batch_size : ",
         batch_size,
     )
-    model = model.to("cuda:0")
     if params["is_text_llm"]:
         return run_hf_dynamo(model, input_tensors, params, precision, batch_size)
 
@@ -638,9 +637,9 @@ if __name__ == "__main__":
     # Load PyTorch Model, if provided
     if len(model_name_torch) > 0 and os.path.exists(model_name_torch):
         print("Loading user provided torch model: ", model_name_torch)
-        model_torch = torch.load(model_name_torch).eval()
+        model_torch = torch.load(model_name_torch).cuda().eval()
     elif model_name_torch in BENCHMARK_MODELS:
-        model_torch = BENCHMARK_MODELS[model_name_torch]["model"].eval()
+        model_torch = BENCHMARK_MODELS[model_name_torch]["model"].cuda().eval()
 
     # If neither model type was provided
     if (model is None) and (model_torch is None):
