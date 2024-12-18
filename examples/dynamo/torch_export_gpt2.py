@@ -57,24 +57,22 @@ pyt_gen_tokens = generate(model, input_ids, MAX_TOKENS, tokenizer.eos_token_id)
 # 2) Enable use_explicit_typing=True. Certain layers are explicitly casted to FP32 within the pytorch model and this flag respects this behavior during TRT compilation
 # 3) Enable use_fp32_acc=True. This ensures all the matmuls are accumulated in FP32 precision (similar to PyTorch)
 gpt2_ep = export_llm(model, input_ids, max_seq_len=1024)
-with torch_tensorrt.logging.debug():
-    trt_model = torch_tensorrt.dynamo.compile(
-        gpt2_ep,
-        inputs=[input_ids],
-        enabled_precisions={torch.float32},
-        truncate_double=True,
-        device=DEVICE,
-        disable_tf32=True,
-        use_explicit_typing=True,
-        use_fp32_acc=True,
-        debug=True,
-    )
+trt_model = torch_tensorrt.dynamo.compile(
+    gpt2_ep,
+    inputs=[input_ids],
+    enabled_precisions={torch.float32},
+    truncate_double=True,
+    device=DEVICE,
+    disable_tf32=True,
+    use_explicit_typing=True,
+    use_fp32_acc=True,
+)
 
-    # Auto-regressive generation loop for greedy decoding using TensorRT model
-    # We use a custom generate function which is very similar to the huggingface one.
-    # Move inputs to GPU
-    input_ids = input_ids.to(DEVICE)
-    trt_gen_tokens = generate(trt_model, input_ids, MAX_TOKENS, tokenizer.eos_token_id)
+# Auto-regressive generation loop for greedy decoding using TensorRT model
+# We use a custom generate function which is very similar to the huggingface one.
+# Move inputs to GPU
+input_ids = input_ids.to(DEVICE)
+trt_gen_tokens = generate(trt_model, input_ids, MAX_TOKENS, tokenizer.eos_token_id)
 
 # %%
 # Decode the output sentences of PyTorch and TensorRT
