@@ -549,6 +549,18 @@ def scaled_dot_product_cudnn_attention_decomposition(
     return attn, None, None, None, 0, 0, None, None, None
 
 
+@register_torch_trt_decomposition(
+    torch.ops.aten.full_like, registry=TORCH_TRT_DECOMPOSITIONS
+)
+def full_like_decomposition(*args, **kwargs) -> torch.Tensor:
+    input = args[0]
+    shape = args[0].shape
+    fill_value = args[1]
+    kwargs["dtype"] = input.dtype
+    kwargs["device"] = to_torch_device(default_device())
+    return torch.full(shape, fill_value, dtype=kwargs["dtype"], device=kwargs["device"])
+
+
 def get_decompositions(
     enable_experimental_decompositions: bool = False,
 ) -> Dict[OpOverload, Callable[[Any], Any]]:

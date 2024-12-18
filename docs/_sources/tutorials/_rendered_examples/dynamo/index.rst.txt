@@ -51,23 +51,6 @@ Model Zoo
 
 .. raw:: html
 
-    <div class="sphx-glr-thumbcontainer" tooltip="This interactive script is intended as an overview of the process by which the Torch-TensorRT C...">
-
-.. only:: html
-
-  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_torch_export_cudagraphs_thumb.png
-    :alt:
-
-  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_torch_export_cudagraphs.py`
-
-.. raw:: html
-
-      <div class="sphx-glr-thumbnail-title">Torch Export with Cudagraphs</div>
-    </div>
-
-
-.. raw:: html
-
     <div class="sphx-glr-thumbcontainer" tooltip="Cross runtime compilation for windows example =================================================...">
 
 .. only:: html
@@ -153,6 +136,23 @@ Model Zoo
 
 .. raw:: html
 
+    <div class="sphx-glr-thumbcontainer" tooltip="This interactive script is intended as an overview of the process by which the Torch-TensorRT C...">
+
+.. only:: html
+
+  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_torch_export_cudagraphs_thumb.png
+    :alt:
+
+  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_torch_export_cudagraphs.py`
+
+.. raw:: html
+
+      <div class="sphx-glr-thumbnail-title">Torch Export with Cudagraphs</div>
+    </div>
+
+
+.. raw:: html
+
     <div class="sphx-glr-thumbcontainer" tooltip="Small caching example on BERT.">
 
 .. only:: html
@@ -165,6 +165,23 @@ Model Zoo
 .. raw:: html
 
       <div class="sphx-glr-thumbnail-title">Engine Caching (BERT)</div>
+    </div>
+
+
+.. raw:: html
+
+    <div class="sphx-glr-thumbcontainer" tooltip="The TensorRT runtime module acts as a wrapper around a PyTorch model (or subgraph) that has bee...">
+
+.. only:: html
+
+  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_pre_allocated_output_example_thumb.png
+    :alt:
+
+  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_pre_allocated_output_example.py`
+
+.. raw:: html
+
+      <div class="sphx-glr-thumbnail-title">Pre-allocated output buffer</div>
     </div>
 
 
@@ -364,13 +381,14 @@ Model Zoo
    :hidden:
 
    /tutorials/_rendered_examples/dynamo/torch_compile_stable_diffusion
-   /tutorials/_rendered_examples/dynamo/torch_export_cudagraphs
    /tutorials/_rendered_examples/dynamo/cross_runtime_compilation_for_windows
    /tutorials/_rendered_examples/dynamo/refit_engine_example
    /tutorials/_rendered_examples/dynamo/torch_compile_transformers_example
    /tutorials/_rendered_examples/dynamo/torch_compile_gpt2
    /tutorials/_rendered_examples/dynamo/torch_compile_advanced_usage
+   /tutorials/_rendered_examples/dynamo/torch_export_cudagraphs
    /tutorials/_rendered_examples/dynamo/engine_caching_bert_example
+   /tutorials/_rendered_examples/dynamo/pre_allocated_output_example
    /tutorials/_rendered_examples/dynamo/mutable_torchtrt_module_example
    /tutorials/_rendered_examples/dynamo/torch_compile_resnet_example
    /tutorials/_rendered_examples/dynamo/torch_export_gpt2

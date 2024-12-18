@@ -6,6 +6,7 @@ import numpy as np
 import tensorrt as trt
 import torch
 from torch.fx.node import Target
+
 from torch_tensorrt.dynamo.conversion import impl
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
 from torch_tensorrt.dynamo.conversion.converter_utils import (
@@ -68,10 +69,9 @@ def convNd(
         weight = get_trt_tensor(ctx, weight, f"{name}_weight")
         # Append new dimension (unsqueeze) if the convolution is 1d
         if is_conv1d:
-            input = impl.unsqueeze.unsqueeze(
-                ctx, target, source_ir, name + "_unsqueeze_weight", weight, -1
+            weight = impl.unsqueeze.unsqueeze(
+                ctx, target, source_ir, weight.name + "_unsqueeze_conv1d", weight, -1
             )
-
     elif isinstance(weight, (torch.Tensor, np.ndarray)):
         # Transform the weight constant into a Numpy array
         weight = to_numpy(weight, dtype=input.dtype)
