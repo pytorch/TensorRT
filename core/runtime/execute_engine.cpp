@@ -94,6 +94,7 @@ bool _validate_shapes(std::vector<at::Tensor> inputs, c10::intrusive_ptr<TRTEngi
 void setup_input_tensors(
     std::vector<at::Tensor> inputs,
     c10::intrusive_ptr<TRTEngine> compiled_engine,
+    bool cudagraphs_enabled,
     bool need_cudagraphs_record) {
   // this is a buffer to store shape tensor input addresses throughout the runtime scope
   std::list<std::vector<int64_t>> inputShapeTensorValues;
@@ -127,7 +128,7 @@ void setup_input_tensors(
           compiled_engine->exec_ctx->setTensorAddress(name.c_str(), inputShapeTensorValues.back().data()),
           "Error while setting the tensor address for shape inputs");
 
-      if (CUDAGRAPHS_MODE) {
+      if (cudagraphs_enabled) {
         // @peri044 I dont know if this makes sense since they are supposed to be GPU buffers
         compiled_engine->input_buffers[i] = input_cpu;
       }
@@ -147,7 +148,7 @@ void setup_input_tensors(
       TORCHTRT_CHECK(
           compiled_engine->exec_ctx->setInputShape(name.c_str(), dims), "Error while setting the input shape");
 
-      if (CUDAGRAPHS_MODE) {
+      if (cudagraphs_enabled) {
         // If using CUDAGraphs copy formatted input to the corresponding persistent input buffer
         compiled_engine->input_buffers[i].copy_(formatted_inputs.back(), true);
         TORCHTRT_CHECK(
@@ -201,17 +202,17 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
     LOG_INFO("" << log_info);
     compiled_engine->cudagraph.enable_debug_mode();
   }
-
+  bool cudagraphs_enabled = (CUDAGRAPHS_MODE == SUBGRAPH_CUDAGRAPHS);
   bool shape_changed = _validate_shapes(inputs, compiled_engine);
 
   // Whether cudagraphs needs to record the graph on this pass
   auto result = compiled_engine->runtime_states.set_runtime_states(
-      CUDAGRAPHS_MODE, compiled_engine->use_pre_allocated_outputs, shape_changed);
+      cudagraphs_enabled, compiled_engine->use_pre_allocated_outputs, shape_changed);
 
   bool need_cudagraphs_record = std::get<0>(result);
   bool can_use_pre_allocated_outputs = std::get<1>(result);
 
-  if (!CUDAGRAPHS_MODE || shape_changed) {
+  if (!cudagraphs_enabled || shape_changed) {
     compiled_engine->cudagraph.reset();
   }
 
@@ -273,8 +274,7 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
           std::make_unique<torch::autograd::profiler::RecordProfile>(compiled_engine->input_profile_path);
     }
 
-    setup_input_tensors(inputs, compiled_engine, need_cudagraphs_record);
-
+    setup_input_tensors(inputs, compiled_engine, cudagraphs_enabled, need_cudagraphs_record);
     // Check if input shapes can be inferred.
     int32_t const io_size{compiled_engine->cuda_engine->getNbIOTensors()};
     std::vector<char const*> names(io_size);
@@ -306,7 +306,7 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
         compiled_engine->output_buffers[pyt_idx] = std::move(outputs[pyt_idx].clone());
       }
 
-      if (CUDAGRAPHS_MODE) {
+      if (cudagraphs_enabled) {
         TORCHTRT_CHECK(
             compiled_engine->exec_ctx->setTensorAddress(
                 name.c_str(), compiled_engine->output_buffers[pyt_idx].data_ptr()),
@@ -346,7 +346,7 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
     caller_exec_complete.record(compiled_engine->caller_stream);
     caller_exec_complete.block(compiled_engine->engine_stream);
 
-    if (!CUDAGRAPHS_MODE) {
+    if (!cudagraphs_enabled) {
       // Direct execution uses the caller buffers directly
       compiled_engine->exec_ctx->enqueueV3(compiled_engine->engine_stream);
     } else {
@@ -377,7 +377,7 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
   trt_exec_complete.record(compiled_engine->engine_stream);
   trt_exec_complete.block(compiled_engine->caller_stream);
 
-  if (CUDAGRAPHS_MODE) {
+  if (cudagraphs_enabled) {
     // If in CUDAGraph mode, results need to be copied to the result buffers (on caller stream)
     for (size_t o = 0; o < compiled_engine->output_buffers.size(); o++) {
       outputs[o].copy_(compiled_engine->output_buffers[o], false);

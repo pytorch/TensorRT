@@ -30,7 +30,7 @@ class TorchTRTRuntimeStates:
         # Indicates whether pre-allocated output was enabled in the previous execute_engine
         self.old_pre_allocated_outputs = new_pre_allocated_output
 
-    def validate_states(
+    def set_runtime_states(
         self,
         new_cudagraphs: bool,
         new_pre_allocated_output: bool,
@@ -347,7 +347,6 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
             (i.contiguous() if isinstance(i, torch.Tensor) else torch.tensor(i).cuda())
             for i in inputs
         ]
-
         with (
             torch.autograd.profiler.record_function("PythonTorchTensorRTModule:Forward")
             if self.profiling_enabled
@@ -358,7 +357,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
             cudagraphs_enabled = torch_tensorrt.runtime.get_cudagraphs_mode()
             shape_changed = self.validate_input_shapes(inputs)
             need_cudagraphs_record, can_use_pre_allocated_outputs = (
-                self.runtime_states.validate_states(
+                self.runtime_states.set_runtime_states(
                     cudagraphs_enabled, self.use_pre_allocated_outputs, shape_changed
                 )
             )

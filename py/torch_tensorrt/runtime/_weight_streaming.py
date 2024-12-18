@@ -1,8 +1,11 @@
 import logging
-from typing import Any
+from typing import Any, Union
 
 import torch
 from torch_tensorrt.dynamo.runtime import PythonTorchTensorRTModule, TorchTensorRTModule
+from torch_tensorrt.dynamo.runtime._CudaGraphsTorchTensorRTModule import (
+    CudaGraphsTorchTensorRTModule,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -12,9 +15,14 @@ class _WeightStreamingContextManager(object):
     Helper class used to setup weight streaming budget
     """
 
-    def __init__(self, module: torch.fx.GraphModule) -> None:
+    def __init__(
+        self, module: Union[torch.fx.GraphModule, CudaGraphsTorchTensorRTModule]
+    ) -> None:
         rt_mods = []
         self.current_device_budget = 0
+
+        if isinstance(module, CudaGraphsTorchTensorRTModule):
+            module = module.compiled_module
         for name, rt_mod in module.named_children():
             if "_run_on_acc" in name and isinstance(
                 rt_mod, (PythonTorchTensorRTModule, TorchTensorRTModule)
