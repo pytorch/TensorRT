@@ -86,7 +86,7 @@ Cudagraphs can accelerate certain models by reducing kernel overheads, as docume
     torch_tensorrt.runtime.set_cudagraphs_mode(False)
 
     # Enables Cudagraphs Mode, then resets the mode to its prior setting
-    with torch_tensorrt.runtime.enable_cudagraphs():
+    with torch_tensorrt.runtime.enable_cudagraphs(trt_module):
         ...
 
 In the current implementation, use of a new input shape (for instance in dynamic shape 

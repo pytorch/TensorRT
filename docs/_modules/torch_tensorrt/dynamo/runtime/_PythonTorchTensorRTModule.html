@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt.dynamo.runtime._PythonTorchTensorRTModule &mdash; Torch-TensorRT v2.6.0.dev0+a47e590 documentation</title>
+  <title>torch_tensorrt.dynamo.runtime._PythonTorchTensorRTModule &mdash; Torch-TensorRT v2.6.0.dev0+092be2a documentation</title>
   
 
   
@@ -272,7 +272,7 @@
               
               
                 <div class="version">
-                  v2.6.0.dev0+a47e590
+                  v2.6.0.dev0+092be2a
                 </div>
               
             
@@ -499,7 +499,7 @@
         <span class="c1"># Indicates whether pre-allocated output was enabled in the previous execute_engine</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">old_pre_allocated_outputs</span> <span class="o">=</span> <span class="n">new_pre_allocated_output</span>
 
-    <span class="k">def</span> <span class="nf">validate_states</span><span class="p">(</span>
+    <span class="k">def</span> <span class="nf">set_runtime_states</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">new_cudagraphs</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span>
         <span class="n">new_pre_allocated_output</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span>
@@ -816,7 +816,6 @@
             <span class="p">(</span><span class="n">i</span><span class="o">.</span><span class="n">contiguous</span><span class="p">()</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">)</span> <span class="k">else</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="n">i</span><span class="p">)</span><span class="o">.</span><span class="n">cuda</span><span class="p">())</span>
             <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">inputs</span>
         <span class="p">]</span>
-
         <span class="k">with</span> <span class="p">(</span>
             <span class="n">torch</span><span class="o">.</span><span class="n">autograd</span><span class="o">.</span><span class="n">profiler</span><span class="o">.</span><span class="n">record_function</span><span class="p">(</span><span class="s2">&quot;PythonTorchTensorRTModule:Forward&quot;</span><span class="p">)</span>
             <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">profiling_enabled</span>
@@ -827,7 +826,7 @@
             <span class="n">cudagraphs_enabled</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">runtime</span><span class="o">.</span><span class="n">get_cudagraphs_mode</span><span class="p">()</span>
             <span class="n">shape_changed</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">validate_input_shapes</span><span class="p">(</span><span class="n">inputs</span><span class="p">)</span>
             <span class="n">need_cudagraphs_record</span><span class="p">,</span> <span class="n">can_use_pre_allocated_outputs</span> <span class="o">=</span> <span class="p">(</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">runtime_states</span><span class="o">.</span><span class="n">validate_states</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">runtime_states</span><span class="o">.</span><span class="n">set_runtime_states</span><span class="p">(</span>
                     <span class="n">cudagraphs_enabled</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">use_pre_allocated_outputs</span><span class="p">,</span> <span class="n">shape_changed</span>
                 <span class="p">)</span>
             <span class="p">)</span>

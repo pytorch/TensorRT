@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt._compile &mdash; Torch-TensorRT v2.6.0.dev0+a47e590 documentation</title>
+  <title>torch_tensorrt._compile &mdash; Torch-TensorRT v2.6.0.dev0+092be2a documentation</title>
   
 
   
@@ -272,7 +272,7 @@
               
               
                 <div class="version">
-                  v2.6.0.dev0+a47e590
+                  v2.6.0.dev0+092be2a
                 </div>
               
             
@@ -481,6 +481,9 @@
 <span class="kn">from</span> <span class="nn">torch_tensorrt._features</span> <span class="kn">import</span> <span class="n">ENABLED_FEATURES</span>
 <span class="kn">from</span> <span class="nn">torch_tensorrt._Input</span> <span class="kn">import</span> <span class="n">Input</span>
 <span class="kn">from</span> <span class="nn">torch_tensorrt.dynamo</span> <span class="kn">import</span> <span class="n">_defaults</span>
+<span class="kn">from</span> <span class="nn">torch_tensorrt.dynamo.runtime._CudaGraphsTorchTensorRTModule</span> <span class="kn">import</span> <span class="p">(</span>
+    <span class="n">CudaGraphsTorchTensorRTModule</span><span class="p">,</span>
+<span class="p">)</span>
 <span class="kn">from</span> <span class="nn">torch_tensorrt.fx</span> <span class="kn">import</span> <span class="n">InputTensorSpec</span>
 <span class="kn">from</span> <span class="nn">torch_tensorrt.fx.lower</span> <span class="kn">import</span> <span class="nb">compile</span> <span class="k">as</span> <span class="n">fx_compile</span>
 <span class="kn">from</span> <span class="nn">torch_tensorrt.fx.utils</span> <span class="kn">import</span> <span class="n">LowerPrecision</span>
@@ -1055,7 +1058,7 @@
 <span class="sd">    Save the model to disk in the specified output format.</span>
 
 <span class="sd">    Arguments:</span>
-<span class="sd">        module (Optional(torch.jit.ScriptModule | torch.export.ExportedProgram | torch.fx.GraphModule)): Compiled Torch-TensorRT module</span>
+<span class="sd">        module (Optional(torch.jit.ScriptModule | torch.export.ExportedProgram | torch.fx.GraphModule | CudaGraphsTorchTensorRTModule)): Compiled Torch-TensorRT module</span>
 <span class="sd">        inputs (torch.Tensor): Torch input tensors</span>
 <span class="sd">        arg_inputs (Tuple[Any, ...]): Same as inputs. Alias for better understanding with kwarg_inputs.</span>
 <span class="sd">        kwarg_inputs (dict[Any, ...]): Optional, kwarg inputs to the module forward function.</span>
@@ -1063,6 +1066,8 @@
 <span class="sd">        retrace (bool): When the module type is a fx.GraphModule, this option re-exports the graph using torch.export.export(strict=False) to save it.</span>
 <span class="sd">                This flag is experimental for now.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">module</span><span class="p">,</span> <span class="n">CudaGraphsTorchTensorRTModule</span><span class="p">):</span>
+        <span class="n">module</span> <span class="o">=</span> <span class="n">module</span><span class="o">.</span><span class="n">compiled_module</span>
     <span class="n">module_type</span> <span class="o">=</span> <span class="n">_parse_module_type</span><span class="p">(</span><span class="n">module</span><span class="p">)</span>
     <span class="n">accepted_formats</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;exported_program&quot;</span><span class="p">,</span> <span class="s2">&quot;torchscript&quot;</span><span class="p">}</span>
     <span class="k">if</span> <span class="n">arg_inputs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="ow">not</span> <span class="nb">all</span><span class="p">(</span>

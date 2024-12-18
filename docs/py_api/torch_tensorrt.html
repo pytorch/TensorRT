@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt &mdash; Torch-TensorRT v2.6.0.dev0+a47e590 documentation</title>
+  <title>torch_tensorrt &mdash; Torch-TensorRT v2.6.0.dev0+092be2a documentation</title>
   
 
   
@@ -275,7 +275,7 @@
               
               
                 <div class="version">
-                  v2.6.0.dev0+a47e590
+                  v2.6.0.dev0+092be2a
                 </div>
               
             
@@ -573,7 +573,7 @@ to select device type.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters</dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>module</strong> (<em>Optional</em><em>(</em><em>torch.jit.ScriptModule</em><em> | </em><em>torch.export.ExportedProgram</em><em> | </em><em>torch.fx.GraphModule</em><em>)</em>) – Compiled Torch-TensorRT module</p></li>
+<li><p><strong>module</strong> (<em>Optional</em><em>(</em><em>torch.jit.ScriptModule</em><em> | </em><em>torch.export.ExportedProgram</em><em> | </em><em>torch.fx.GraphModule</em><em> | </em><em>CudaGraphsTorchTensorRTModule</em><em>)</em>) – Compiled Torch-TensorRT module</p></li>
 <li><p><strong>inputs</strong> (<em>torch.Tensor</em>) – Torch input tensors</p></li>
 <li><p><strong>arg_inputs</strong> (<em>Tuple</em><em>[</em><em>Any</em><em>, </em><em>...</em><em>]</em>) – Same as inputs. Alias for better understanding with kwarg_inputs.</p></li>
 <li><p><strong>kwarg_inputs</strong> (<em>dict</em><em>[</em><em>Any</em><em>, </em><em>...</em><em>]</em>) – Optional, kwarg inputs to the module forward function.</p></li>

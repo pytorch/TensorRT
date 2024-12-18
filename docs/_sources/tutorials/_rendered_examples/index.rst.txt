@@ -63,23 +63,6 @@ Model Zoo
 
 .. raw:: html
 
-    <div class="sphx-glr-thumbcontainer" tooltip="This interactive script is intended as an overview of the process by which the Torch-TensorRT C...">
-
-.. only:: html
-
-  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_torch_export_cudagraphs_thumb.png
-    :alt:
-
-  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_torch_export_cudagraphs.py`
-
-.. raw:: html
-
-      <div class="sphx-glr-thumbnail-title">Torch Export with Cudagraphs</div>
-    </div>
-
-
-.. raw:: html
-
     <div class="sphx-glr-thumbcontainer" tooltip="Cross runtime compilation for windows example =================================================...">
 
 .. only:: html
@@ -160,6 +143,23 @@ Model Zoo
 .. raw:: html
 
       <div class="sphx-glr-thumbnail-title">Torch Compile Advanced Usage</div>
+    </div>
+
+
+.. raw:: html
+
+    <div class="sphx-glr-thumbcontainer" tooltip="This interactive script is intended as an overview of the process by which the Torch-TensorRT C...">
+
+.. only:: html
+
+  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_torch_export_cudagraphs_thumb.png
+    :alt:
+
+  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_torch_export_cudagraphs.py`
+
+.. raw:: html
+
+      <div class="sphx-glr-thumbnail-title">Torch Export with Cudagraphs</div>
     </div>
 
 
