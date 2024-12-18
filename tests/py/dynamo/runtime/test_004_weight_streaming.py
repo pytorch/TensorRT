@@ -1,3 +1,7 @@
+import itertools
+import os
+import unittest
+
 import torch
 import torch_tensorrt as torchtrt
 from parameterized import parameterized
@@ -235,6 +239,171 @@ class TestWeightStreamingPython(TestCase):
             equal_nan=True,
             check_dtype=True,
         )
+
+        torch._dynamo.reset()
+
+    @parameterized.expand(
+        [
+            ("python_runtime", True),
+            ("cpp_runtime", False),
+        ]
+    )
+    def test_weight_streaming_cudagraphs(self, _, use_python_runtime):
+        model = SampleModel().eval().cuda()
+        input = [torch.randn(*INPUT_SIZE, dtype=torch.float32).cuda()]
+        fx_graph = torch.fx.symbolic_trace(model)
+
+        optimized_model = torchtrt.compile(
+            fx_graph,
+            inputs=input,
+            ir="dynamo",
+            min_block_size=1,
+            cache_built_engines=False,
+            reuse_cached_engines=False,
+            torch_executed_ops={"torch.ops.aten.convolution.default"},
+            use_python_runtime=use_python_runtime,
+            use_explicit_typing=True,
+            enable_weight_streaming=True,
+        )
+
+        with torchtrt.runtime.enable_cudagraphs(optimized_model) as cudagraphs_module:
+            with torchtrt.runtime.weight_streaming(
+                cudagraphs_module
+            ) as weight_streaming_ctx:
+                streamable_budget = weight_streaming_ctx.total_device_budget
+
+                requested_budget = int(streamable_budget * 0.7)
+                weight_streaming_ctx.device_budget = requested_budget
+                for _ in range(4):
+                    cudagraphs_module(*input)
+
+                requested_budget = int(streamable_budget * 0.5)
+                weight_streaming_ctx.device_budget = requested_budget
+                for _ in range(4):
+                    out = cudagraphs_module(*input)
+
+        ref = model(*input)
+        torch.testing.assert_close(
+            out.cpu(),
+            ref.cpu(),
+            rtol=5e-03,
+            atol=5e-03,
+            equal_nan=True,
+            check_dtype=True,
+        )
+        torch._dynamo.reset()
+
+    @parameterized.expand(
+        [
+            ("python_runtime", True),
+            ("cpp_runtime", False),
+        ]
+    )
+    @unittest.skipIf(
+        os.environ.get("CI_BUILD") == "1",
+        "Skipping test due to CI resource constraints",
+    )
+    def test_runtime_state_change(self, _, use_python_runtime):
+        class SampleModel(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.layer1 = torch.nn.Linear(100, 128)
+                self.layer2 = torch.nn.Linear(128, 64)
+                self.relu = torch.nn.ReLU()
+
+            def forward(self, x):
+                out = self.layer1(x)
+                out = self.relu((out + 2.0) * 0.05)
+                out = self.layer2(out)
+                return out
+
+        inputs = torchtrt.Input(
+            min_shape=(1, 100),
+            opt_shape=(64, 100),
+            max_shape=(128, 100),
+            dtype=torch.float,
+            name="x",
+        )
+        model = SampleModel().eval().cuda()
+        fx_graph = torch.fx.symbolic_trace(model)
+
+        input_list = []
+        input_list.append(torch.randn((8, 100)).cuda())
+        input_list.append(torch.randn((12, 100)).cuda())
+        input_list.append(torch.randn((12, 100)).cuda())
+        input_list.append(torch.randn((8, 100)).cuda())
+        input_list.append(torch.randn((8, 100)).cuda())
+
+        optimized_model = torchtrt.compile(
+            fx_graph,
+            "dynamo",
+            inputs,
+            min_block_size=1,
+            pass_through_build_failures=True,
+            use_explicit_typing=True,
+            enable_weight_streaming=True,
+            torch_executed_ops={"torch.ops.aten.mul.Tensor"},
+            use_python_runtime=use_python_runtime,
+        )
+
+        # List of tuples representing different configurations for three features:
+        # Cuda graphs, pre-allocated output buffer, weight streaming change
+        states = list(itertools.product((True, False), repeat=3))
+        # Create pairs of configurations representing an initial state and a changed state
+        states_permutations = itertools.permutations(states, 2)
+
+        def test_trt_model(enable_weight_streaming, optimized_model, input_list):
+            # Test dynamic input shapes and weight streaming adjustments during inference.
+            out_list = []
+            weight_streaming_ctx = torchtrt.runtime.weight_streaming(optimized_model)
+            streamable_budget = weight_streaming_ctx.total_device_budget
+            if enable_weight_streaming:
+                weight_streaming_ctx.device_budget = int(streamable_budget * 0.8)
+            else:
+                weight_streaming_ctx.device_budget = streamable_budget
+            for i in range(len(input_list)):
+                if enable_weight_streaming and i == 4:
+                    weight_streaming_ctx.device_budget = int(streamable_budget * 0.6)
+                out_list.append(optimized_model(input_list[i]))
+            return out_list
+
+        ref_out_list = []
+        for i in range(len(input_list)):
+            ref_out_list.append(fx_graph(input_list[i]))
+
+        pre_allocated_output_ctx = torchtrt.runtime.enable_pre_allocated_outputs(
+            optimized_model
+        )
+
+        for init_state, changed_state in states_permutations:
+            for cuda_graphs, pre_allocated_output, weight_streaming in [
+                init_state,
+                changed_state,
+            ]:
+                pre_allocated_output_ctx.set_pre_allocated_output(pre_allocated_output)
+                if cuda_graphs:
+                    with torchtrt.runtime.enable_cudagraphs(
+                        optimized_model
+                    ) as cudagraphs_module:
+                        trt_out_list = test_trt_model(
+                            weight_streaming, cudagraphs_module, input_list
+                        )
+                else:
+                    trt_out_list = test_trt_model(
+                        weight_streaming, optimized_model, input_list
+                    )
+
+                for torch_model_results, optimized_model_results in zip(
+                    ref_out_list, trt_out_list
+                ):
+                    torch.testing.assert_close(
+                        torch_model_results,
+                        optimized_model_results,
+                        rtol=5e-03,
+                        atol=5e-03,
+                        equal_nan=True,
+                        check_dtype=True,
+                    )
 
         torch._dynamo.reset()
 
