@@ -378,6 +378,7 @@ dependencies = [
     { name = "markupsafe", marker = "sys_platform == 'linux' or sys_platform == 'windows'" },
 ]
 wheels = [
+    { url = "https://download.pytorch.org/whl/nightly/Jinja2-3.1.4-py3-none-any.whl" },
     { url = "https://download.pytorch.org/whl/nightly/jinja2-3.1.4-py3-none-any.whl" },
 ]
 
@@ -630,15 +631,6 @@ wheels = [
     { url = "https://download.pytorch.org/whl/nightly/cu126/nvidia_cusparselt_cu12-0.6.3-py3-none-manylinux2014_aarch64.whl" },
     { url = "https://download.pytorch.org/whl/nightly/cu126/nvidia_cusparselt_cu12-0.6.3-py3-none-manylinux2014_x86_64%20(1).whl" },
     { url = "https://download.pytorch.org/whl/nightly/cu126/nvidia_cusparselt_cu12-0.6.3-py3-none-manylinux2014_x86_64.whl" },
-]
-
-[[package]]
-name = "nvidia-cusparselt-cu12"
-version = "0.6.2"
-source = { registry = "https://download.pytorch.org/whl/nightly/cu124" }
-wheels = [
-    { url = "https://download.pytorch.org/whl/nightly/cu124/nvidia_cusparselt_cu12-0.6.2-py3-none-manylinux2014_aarch64.whl" },
-    { url = "https://download.pytorch.org/whl/nightly/cu124/nvidia_cusparselt_cu12-0.6.2-py3-none-manylinux2014_x86_64.whl" },
 ]
 
 [[package]]
