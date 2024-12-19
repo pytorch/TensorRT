@@ -2730,6 +2730,38 @@ def aten_ops_max_pool(
     )
 
 
+def attention_validator(
+    node: Node, settings: Optional[CompilationSettings] = None
+) -> bool:
+    # Currently, `attn_mask` is not supported
+    return args_bounds_check(node.args, 3) is None
+
+
+@dynamo_tensorrt_converter(
+    torch.nn.functional.scaled_dot_product_attention,
+    capability_validator=attention_validator,
+    supports_dynamic_shapes=True,
+)
+def tensorrt_scaled_dot_product_attention(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.attention.scaled_dot_product_attention(
+        ctx,
+        target,
+        SourceIR.TORCHTRT_LOWERED,
+        name,
+        args[0],
+        args[1],
+        args[2],
+        args_bounds_check(args, 5, False),
+        kwargs.get("scale", None),
+    )
+
+
 @dynamo_tensorrt_converter(torch.ops.aten.reshape.default, supports_dynamic_shapes=True)
 @dynamo_tensorrt_converter(torch.ops.aten.view.default, supports_dynamic_shapes=True)
 @enforce_tensor_types(
