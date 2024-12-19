@@ -47,7 +47,7 @@ RUN TENSORRT_MAJOR_VERSION=`echo ${TENSORRT_VERSION} | cut -d '.' -f 1` && \
                        libnvonnxparsers-dev=${TENSORRT_VERSION}.*
 
 # Setup Bazel via Bazelisk
-RUN wget -q https://github.com/bazelbuild/bazelisk/releases/download/v1.17.0/bazelisk-linux-amd64 -O /usr/bin/bazel &&\
+RUN wget -q https://github.com/bazelbuild/bazelisk/releases/download/v1.25.0/bazelisk-linux-amd64 -O /usr/bin/bazel &&\
     chmod a+x /usr/bin/bazel
 
 # Build Torch-TensorRT in an auxiliary container
