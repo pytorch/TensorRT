@@ -1,8 +1,6 @@
 tensorboard>=1.14.0
 protobuf==3.20.*
 nvidia-pyindex
---extra-index-url https://pypi.nvidia.com
-pytorch-quantization
 tqdm
 nvidia-modelopt
---extra-index-url https://pypi.nvidia.com
+

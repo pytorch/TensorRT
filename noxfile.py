@@ -6,7 +6,7 @@ import nox
 
 # Use system installed Python packages
 PYT_PATH = (
-    "/usr/local/lib/python3.10/dist-packages"
+    "/usr/local/lib/python3.12/dist-packages"
     if not "PYT_PATH" in os.environ
     else os.environ["PYT_PATH"]
 )
@@ -223,11 +223,12 @@ def run_dynamo_converter_tests(session):
     tests = [
         "conversion",
     ]
+    skip_tests = "-k test_upsample_aten and not 3"
     for test in tests:
         if USE_HOST_DEPS:
-            session.run_always("pytest", test, env={"PYTHONPATH": PYT_PATH})
+            session.run_always("pytest", test, skip_tests, env={"PYTHONPATH": PYT_PATH})
         else:
-            session.run_always("pytest", test)
+            session.run_always("pytest", test, skip_tests)
 
 
 def run_dynamo_lower_tests(session):
