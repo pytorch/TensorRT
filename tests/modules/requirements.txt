@@ -1,2 +1,4 @@
 timm==0.9.12
 transformers==4.40.2
+pytest>=8.2.1
+pytest-xdist>=3.6.1

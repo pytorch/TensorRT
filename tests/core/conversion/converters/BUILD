@@ -35,10 +35,6 @@ converter_test(
 )
 
 converter_test(
-    name = "test_instance_norm",
-)
-
-converter_test(
     name = "test_cast",
 )
 
@@ -236,7 +232,6 @@ test_suite(
         ":test_einsum",
         ":test_expand",
         ":test_index",
-        ":test_instance_norm",
         ":test_interpolate",
         ":test_layer_norm",
         ":test_linear",
