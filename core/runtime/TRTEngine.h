@@ -35,25 +35,37 @@ struct TorchTRTRuntimeStates {
   bool old_cudagraphs;
   // Indicates whether pre-allocated output was enabled in the previous execute_engine
   bool old_pre_allocated_outputs;
+  // Indicates whether context has changed
+  bool context_changed;
 
-  // Evaluates whether certain conditions are met to enable CUDA Graph recording or to reuse pre-allocated outputs
+  // Evaluates whether certain conditions are met to enable CUDA Graph recording/reset or to reuse pre-allocated outputs
   // based on the current and previous states, as well as input shape has changed
-  std::tuple<bool, bool> set_runtime_states(bool new_cudagraphs, bool new_pre_allocated_output, bool shape_changed) {
+  std::tuple<bool, bool, bool> set_runtime_states(
+      bool new_cudagraphs,
+      bool new_pre_allocated_output,
+      bool shape_changed) {
     bool need_cudagraphs_record = false;
     bool can_use_pre_allocated_outputs = false;
+    bool need_cudagraphs_reset = false;
 
     // Cudagraphs record is required if cudagraphs_enabled is switched to True regardless of shape change
-    if (new_cudagraphs && (!old_cudagraphs || shape_changed)) {
+    if (new_cudagraphs && (!old_cudagraphs || shape_changed || context_changed)) {
       need_cudagraphs_record = true;
     }
     // Pre-allocated output can be used when previous and current state are true without shape change
     if (old_pre_allocated_outputs && new_pre_allocated_output && !shape_changed) {
       can_use_pre_allocated_outputs = true;
     }
+    if (!new_cudagraphs || shape_changed || context_changed) {
+      need_cudagraphs_reset = true;
+    }
+
     old_cudagraphs = new_cudagraphs;
     old_pre_allocated_outputs = new_pre_allocated_output;
+    // Reset flag
+    context_changed = false;
 
-    return {need_cudagraphs_record, can_use_pre_allocated_outputs};
+    return {need_cudagraphs_record, can_use_pre_allocated_outputs, need_cudagraphs_reset};
   }
 };
 

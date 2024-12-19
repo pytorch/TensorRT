@@ -24,25 +24,33 @@ logger = logging.getLogger(__name__)
 
 
 class TorchTRTRuntimeStates:
-    def __init__(self, new_cudagraphs: bool, new_pre_allocated_output: bool):
+    def __init__(self, new_cudagraphs: bool):
         # Indicates whether CUDAGraphs were enabled in the previous execute_engine
         self.old_cudagraphs = new_cudagraphs
         # Indicates whether pre-allocated output was enabled in the previous execute_engine
-        self.old_pre_allocated_outputs = new_pre_allocated_output
+        self.old_pre_allocated_outputs = False
+        # Indicates whether context has changed
+        self.context_changed = False
 
     def set_runtime_states(
         self,
         new_cudagraphs: bool,
         new_pre_allocated_output: bool,
         shape_changed: bool,
-    ) -> Tuple[bool, bool]:
-        # Evaluates whether certain conditions are met to enable CUDA Graph recording or to reuse pre-allocated outputs
+    ) -> Tuple[bool, bool, bool]:
+        # Evaluates whether certain conditions are met to enable CUDA Graph recording or to use pre-allocated outputs
         # based on the current and previous states, as well as input shape has changed
         need_cudagraphs_record = False
         can_use_pre_allocated_outputs = False
+        need_cudagraphs_reset = False
 
-        # Cudagraphs record is required if cudagraphs_enabled is switched to True regardless of shape change
-        if new_cudagraphs and (not self.old_cudagraphs or shape_changed):
+        # CUDA Graph recording is needed if CUDA graphs is enabled and:
+        # - CUDA graphs were previously disabled
+        # - or the shape has changed
+        # - or the execution context has changed (e.g., weight streaming)
+        if new_cudagraphs and (
+            not self.old_cudagraphs or shape_changed or self.context_changed
+        ):
             need_cudagraphs_record = True
 
         # Pre-allocated output can be used when previous and current state are true without shape change
@@ -53,10 +61,19 @@ class TorchTRTRuntimeStates:
         ):
             can_use_pre_allocated_outputs = True
 
+        if not new_cudagraphs or shape_changed or self.context_changed:
+            need_cudagraphs_reset = True
+
         self.old_cudagraphs = new_cudagraphs
         self.old_pre_allocated_outputs = new_pre_allocated_output
+        # reset flag
+        self.context_changed = False
 
-        return need_cudagraphs_record, can_use_pre_allocated_outputs
+        return (
+            need_cudagraphs_record,
+            can_use_pre_allocated_outputs,
+            need_cudagraphs_reset,
+        )
 
 
 class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
@@ -145,7 +162,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         self.weight_name_map = weight_name_map
         self.target_platform = Platform.current_platform()
         self.runtime_states = TorchTRTRuntimeStates(
-            torch_tensorrt.runtime.get_cudagraphs_mode(), False
+            torch_tensorrt.runtime.get_cudagraphs_mode()
         )
         self.pre_allocated_outputs: List[torch.Tensor] = []
         self.use_pre_allocated_outputs = False
@@ -168,6 +185,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
             del self.context
         budget_bytes = self._set_device_memory_budget(budget_bytes)
         self.context = self.engine.create_execution_context()
+        self.runtime_states.context_changed = True
         return budget_bytes
 
     def _set_device_memory_budget(self, budget_bytes: int) -> int:
@@ -200,7 +218,6 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         if self.settings.enable_weight_streaming:
             self.set_default_device_memory_budget()
         self.context = self.engine.create_execution_context()
-
         assert self.engine.num_io_tensors == (
             len(self.input_names) + len(self.output_names)
         )
@@ -356,21 +373,21 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
 
             cudagraphs_enabled = torch_tensorrt.runtime.get_cudagraphs_mode()
             shape_changed = self.validate_input_shapes(inputs)
-            need_cudagraphs_record, can_use_pre_allocated_outputs = (
-                self.runtime_states.set_runtime_states(
-                    cudagraphs_enabled, self.use_pre_allocated_outputs, shape_changed
-                )
+            (
+                need_cudagraphs_record,
+                can_use_pre_allocated_outputs,
+                need_cudagraphs_reset,
+            ) = self.runtime_states.set_runtime_states(
+                cudagraphs_enabled, self.use_pre_allocated_outputs, shape_changed
             )
 
-            if need_cudagraphs_record:
-                if self.cudagraph:
-                    self.cudagraph.reset()
-                self._input_buffers = [None] * len(self.input_names)
-                self._output_buffers = [None] * len(self.output_names)
-
-            if not cudagraphs_enabled and self.cudagraph:
+            if need_cudagraphs_reset and self.cudagraph:
                 self.cudagraph.reset()
                 self.cudagraph = None
+
+            if need_cudagraphs_record:
+                self._input_buffers = [None] * len(self.input_names)
+                self._output_buffers = [None] * len(self.output_names)
 
             # If in safe mode, check at each iteration for whether a switch is required
             if (
