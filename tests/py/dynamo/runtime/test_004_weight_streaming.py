@@ -41,12 +41,10 @@ class TestWeightStreamingPython(TestCase):
     def test_weight_streaming_default(self, _, use_python_runtime):
         model = SampleModel().eval().cuda()
         input = [torch.randn(*INPUT_SIZE, dtype=torch.float32).cuda()]
-        fx_graph = torch.fx.symbolic_trace(model)
-
-        optimized_model = torchtrt.compile(
-            fx_graph,
+        exp_program = torch.export.export(model, tuple(input))
+        optimized_model = torchtrt.dynamo.compile(
+            exp_program,
             inputs=input,
-            ir="dynamo",
             min_block_size=1,
             cache_built_engines=False,
             reuse_cached_engines=False,
@@ -94,12 +92,10 @@ class TestWeightStreamingPython(TestCase):
     def test_weight_streaming_manual(self, _, use_python_runtime):
         model = SampleModel().eval().cuda()
         input = [torch.randn(*INPUT_SIZE, dtype=torch.float32).cuda()]
-        fx_graph = torch.fx.symbolic_trace(model)
-
-        optimized_model = torchtrt.compile(
-            fx_graph,
+        exp_program = torch.export.export(model, tuple(input))
+        optimized_model = torchtrt.dynamo.compile(
+            exp_program,
             inputs=input,
-            ir="dynamo",
             min_block_size=1,
             cache_built_engines=False,
             reuse_cached_engines=False,
@@ -156,12 +152,10 @@ class TestWeightStreamingPython(TestCase):
     def test_weight_streaming_invalid_usage(self, _, use_python_runtime, multi_rt):
         model = SampleModel().eval().cuda()
         input = [torch.randn(*INPUT_SIZE, dtype=torch.float32).cuda()]
-        fx_graph = torch.fx.symbolic_trace(model)
-
-        optimized_model = torchtrt.compile(
-            fx_graph,
+        exp_program = torch.export.export(model, tuple(input))
+        optimized_model = torchtrt.dynamo.compile(
+            exp_program,
             inputs=input,
-            ir="dynamo",
             min_block_size=1,
             cache_built_engines=False,
             reuse_cached_engines=False,
@@ -205,12 +199,11 @@ class TestWeightStreamingPython(TestCase):
     def test_weight_streaming_multi_rt(self, _, use_python_runtime):
         model = SampleModel().eval().cuda()
         input = [torch.randn(*INPUT_SIZE, dtype=torch.float32).cuda()]
-        fx_graph = torch.fx.symbolic_trace(model)
+        exp_program = torch.export.export(model, tuple(input))
 
-        optimized_model = torchtrt.compile(
-            fx_graph,
+        optimized_model = torchtrt.dynamo.compile(
+            exp_program,
             inputs=input,
-            ir="dynamo",
             min_block_size=1,
             cache_built_engines=False,
             reuse_cached_engines=False,
@@ -251,12 +244,11 @@ class TestWeightStreamingPython(TestCase):
     def test_weight_streaming_cudagraphs(self, _, use_python_runtime):
         model = SampleModel().eval().cuda()
         input = [torch.randn(*INPUT_SIZE, dtype=torch.float32).cuda()]
-        fx_graph = torch.fx.symbolic_trace(model)
+        exp_program = torch.export.export(model, tuple(input))
 
-        optimized_model = torchtrt.compile(
-            fx_graph,
+        optimized_model = torchtrt.dynamo.compile(
+            exp_program,
             inputs=input,
-            ir="dynamo",
             min_block_size=1,
             cache_built_engines=False,
             reuse_cached_engines=False,
@@ -325,8 +317,6 @@ class TestWeightStreamingPython(TestCase):
             name="x",
         )
         model = SampleModel().eval().cuda()
-        fx_graph = torch.fx.symbolic_trace(model)
-
         input_list = []
         input_list.append(torch.randn((8, 100)).cuda())
         input_list.append(torch.randn((12, 100)).cuda())
@@ -334,9 +324,17 @@ class TestWeightStreamingPython(TestCase):
         input_list.append(torch.randn((8, 100)).cuda())
         input_list.append(torch.randn((8, 100)).cuda())
 
-        optimized_model = torchtrt.compile(
-            fx_graph,
-            "dynamo",
+        dynamic_shapes = (
+            {
+                0: torch.export.Dim("batch_size", min=1, max=128),
+            },
+        )
+        exp_program = torch.export.export(
+            model, (input_list[0],), dynamic_shapes=dynamic_shapes
+        )
+
+        optimized_model = torchtrt.dynamo.compile(
+            exp_program,
             inputs,
             min_block_size=1,
             pass_through_build_failures=True,
@@ -369,7 +367,7 @@ class TestWeightStreamingPython(TestCase):
 
         ref_out_list = []
         for i in range(len(input_list)):
-            ref_out_list.append(fx_graph(input_list[i]))
+            ref_out_list.append(model(input_list[i]))
 
         pre_allocated_output_ctx = torchtrt.runtime.enable_pre_allocated_outputs(
             optimized_model
