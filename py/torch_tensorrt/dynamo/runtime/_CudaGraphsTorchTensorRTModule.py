@@ -27,12 +27,12 @@ class CudaGraphsTorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         super(CudaGraphsTorchTensorRTModule, self).__init__()
         self.compiled_module = compiled_module
         self.inputs = partitioning.construct_submodule_inputs(compiled_module)
+        self.is_weight_streaming_set = False
 
         self._input_buffers: List[torch.Tensor] = []
         self._output_buffers: List[torch.Tensor] = []
         self.cudagraph: Optional[torch.cuda.CUDAGraph] = None
         self.shape_key: Optional[str] = None
-        self.prev_cudagraphs_enabled = False
         self._caller_stream: Optional[torch.cuda.Stream] = None
         self._engine_stream: Optional[torch.cuda.Stream] = None
         self.warm_up()
@@ -77,15 +77,13 @@ class CudaGraphsTorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         cudagraphs_enabled = torch_tensorrt.runtime.get_whole_cudagraphs_mode()
         if cudagraphs_enabled:
             shape_changed = self.validate_input_shapes(inputs)
-            # Cudagraphs record is required if cudagraphs_enabled is toggled to True regardless of shape change
-            need_cudagraphs_record = not self.prev_cudagraphs_enabled or shape_changed
-            self.prev_cudagraphs_enabled = cudagraphs_enabled
-
+            need_cudagraphs_record = shape_changed or self.is_weight_streaming_set
             if need_cudagraphs_record:
                 if self.cudagraph:
                     self.cudagraph.reset()
                 self._input_buffers = [None] * len(self.inputs)
 
+            self.is_weight_streaming_set = False
             # Ensure inputs are available in all scopes and cast symbolic integers to Tensors
             contiguous_inputs: List[torch.Tensor] = [
                 (
