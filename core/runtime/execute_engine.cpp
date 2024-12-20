@@ -211,8 +211,9 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
 
   bool need_cudagraphs_record = std::get<0>(result);
   bool can_use_pre_allocated_outputs = std::get<1>(result);
+  bool need_cudagraphs_reset = std::get<2>(result);
 
-  if (!cudagraphs_enabled || shape_changed) {
+  if (need_cudagraphs_reset) {
     compiled_engine->cudagraph.reset();
   }
 
