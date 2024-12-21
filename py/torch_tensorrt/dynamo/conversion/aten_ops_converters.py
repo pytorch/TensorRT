@@ -1,10 +1,13 @@
 # mypy: disallow-untyped-decorators=False
 
+import ctypes
 import logging
 import operator
+import os
 from typing import Any, Callable, Dict, Optional, Sequence, Tuple, Union
 
 import numpy as np
+import tensorrt as trt
 import torch
 from torch.fx.node import Argument, Node, Target
 from torch_tensorrt.dynamo._settings import CompilationSettings
@@ -16,19 +19,18 @@ from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
     has_static_shapes_in_args,
 )
 from torch_tensorrt.dynamo.conversion.converter_utils import (
+    args_bounds_check,
     enforce_tensor_types,
     get_positive_dim,
     is_only_operator_on_placeholder,
 )
+from torch_tensorrt.dynamo.lowering.passes.fuse_distributed_ops import (
+    tensorrt_fused_nccl_all_gather_op,
+    tensorrt_fused_nccl_reduce_scatter_op,
+)
 from torch_tensorrt.dynamo.types import TRTTensor
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
-
-
-def args_bounds_check(
-    args: Tuple[Argument, ...], i: int, replacement: Optional[Any] = None
-) -> Any:
-    return args[i] if len(args) > i and args[i] is not None else replacement
 
 
 def get_ir(target: Target) -> SourceIR:
@@ -3590,3 +3592,76 @@ def aten_ops_full(
         fill_value=args[1],
         dtype=kwargs.get("dtype", None),
     )
+
+
+try:
+    import tensorrt_llm as trt_llm
+except (ImportError, AssertionError) as e_import_error:
+    _LOGGER.warning(
+        "TensorRT_LLM is not installed. Please install TensorRT_LLM or set trtllm_env",
+        e_import_error,
+    )
+    # note this is for Linux only
+    plugin_lib_path = os.environ.get("trtllm_env")
+    if plugin_lib_path is None:
+        _LOGGER.warning(
+            "Please specify a valid path for trtllm_env libnvinfer_plugin_tensorrt_llm.so when using distributed examples in examples/distributed_inference"
+        )
+    else:
+        _LOGGER.info(f"Plugin lib path found: {plugin_lib_path}")
+        try:
+            handle = ctypes.CDLL(plugin_lib_path)
+            _LOGGER.info(f"Successfully loaded plugin library: {plugin_lib_path}")
+        except OSError as e_os_error:
+            _LOGGER.error(
+                f"Failed to load the shared library at {plugin_lib_path}. "
+                f"Ensure the path is correct and the library is compatible.",
+                e_os_error,
+            )
+        try:
+            handle.initTrtLlmPlugins.argtypes = [ctypes.c_void_p, ctypes.c_char_p]
+            handle.initTrtLlmPlugins.restype = ctypes.c_bool
+        except AttributeError as e_plugin_unavailable:
+            _LOGGER.warning("TensorRT-LLM Plugin is unavailable")
+        try:
+            TRT_LLM_PLUGIN_NAMESPACE = "tensorrt_llm"
+            assert handle.initTrtLlmPlugins(
+                None, TRT_LLM_PLUGIN_NAMESPACE.encode("utf-8")
+            )
+        except Exception as e_initialization_error:
+            _LOGGER.warning(
+                "Exception happened in initializing TensorRT-LLM plugins", e
+            )
+        else:
+
+            @dynamo_tensorrt_converter(tensorrt_fused_nccl_all_gather_op)
+            def insert_nccl_gather_op(
+                ctx: ConversionContext,
+                target: Target,
+                args: Tuple[Argument, ...],
+                kwargs: Dict[str, Argument],
+                name: str,
+            ) -> Union[TRTTensor, Sequence[TRTTensor]]:
+                return impl.nccl_ops.gather_op(
+                    ctx,
+                    target,
+                    SourceIR.ATEN,
+                    name,
+                    [args[0]],
+                )
+
+            @dynamo_tensorrt_converter(tensorrt_fused_nccl_reduce_scatter_op)
+            def insert_nccl_reduce_scatter_plugin(
+                ctx: ConversionContext,
+                target: Target,
+                args: Tuple[Argument, ...],
+                kwargs: Dict[str, Argument],
+                name: str,
+            ) -> Union[TRTTensor, Sequence[TRTTensor]]:
+                return impl.nccl_ops.reduce_scatter_op(
+                    ctx,
+                    target,
+                    SourceIR.ATEN,
+                    name,
+                    [args[0]],
+                )

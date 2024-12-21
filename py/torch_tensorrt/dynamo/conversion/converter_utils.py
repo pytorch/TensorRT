@@ -913,3 +913,9 @@ def set_layer_name(
         else f"{source_ir}_ops.{target.__name__}"
     )
     layer.name = f"[{layer.type.name}]-[{target_name}]-[{name}]"
+
+
+def args_bounds_check(
+    args: Tuple[Argument, ...], i: int, replacement: Optional[Any] = None
+) -> Any:
+    return args[i] if len(args) > i and args[i] is not None else replacement

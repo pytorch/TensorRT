@@ -1,21 +1,25 @@
 from __future__ import annotations
 
+import functools
 import logging
 import unittest
 from typing import Any, Callable, Sequence
 
 import torch
 import torch._dynamo as td
+from torch._dynamo.backends.common import aot_autograd
 from torch._dynamo.utils import detect_fake_mode
 from torch._functorch.aot_autograd import aot_export_joint_simple
 from torch_tensorrt.dynamo import CompilationSettings
 from torch_tensorrt.dynamo._compiler import compile_module
 from torch_tensorrt.dynamo.lowering import (
     get_decompositions,
+    modify_complex_nodes,
     post_lowering,
     remove_detach,
     remove_sym_nodes,
     repair_input_aliasing,
+    replace_complex_placeholder_to_tuple,
 )
 from torch_tensorrt.dynamo.utils import (
     parse_dynamo_kwargs,
@@ -49,7 +53,20 @@ def aot_torch_tensorrt_aten_backend(
     gm: torch.fx.GraphModule, sample_inputs: Sequence[Any], **kwargs: Any
 ) -> torch.nn.Module:
     settings, engine_cache = parse_dynamo_kwargs(kwargs)
-    return _pretraced_backend(gm, sample_inputs, settings, engine_cache)
+    if settings.use_aot_joint_export:
+        return _pretraced_backend(gm, sample_inputs, settings, engine_cache)
+    logger.debug("Wrapping the backend with aot_autograd\n")
+    _pretraced_backend_autograd = functools.partial(
+        _pretraced_backend, settings=settings, engine_cache=engine_cache
+    )
+    settings_aot_autograd = {}
+    settings_aot_autograd["decompostions"] = get_decompositions(
+        settings.enable_experimental_decompositions
+    )
+    return aot_autograd(
+        fw_compiler=_pretraced_backend_autograd,
+        decompositions=get_decompositions(+settings.enable_experimental_decompositions),
+    )(gm, sample_inputs)
 
 
 def _pretraced_backend(
@@ -89,21 +106,36 @@ def _pretraced_backend(
             # Remove detach nodes
             remove_detach(gm, settings)
 
+            complexInputIndices = []
+            for i, torch_input in enumerate(torch_inputs):
+                if torch_inputs[i].dtype == torch.complex64:
+                    complexInputIndices.append(i)
+                    torch_input_real = torch_inputs[i].real
+                    torch_input_imaginary = torch_inputs[i].imag
+                    torch_inputs[i] = torch.stack(
+                        (torch_input_real, torch_input_imaginary), dim=-1
+                    )
+
             # Invoke AOTAutograd to translate operators to aten
-            gm = aot_export_joint_simple(
-                gm,
-                sample_inputs,
-                trace_joint=False,
-                decompositions=get_decompositions(
-                    settings.enable_experimental_decompositions
-                ),
-            )
+            if settings.use_aot_joint_export:
+                gm = aot_export_joint_simple(
+                    gm,
+                    sample_inputs,
+                    trace_joint=False,
+                    decompositions=get_decompositions(
+                        settings.enable_experimental_decompositions
+                    ),
+                )
 
             logger.debug("Post-AOT Autograd graph:\n" + str(gm.graph))
 
             gm = post_lowering(gm, settings)
 
             logger.debug("Lowered Input graph:\n " + str(gm.graph))
+
+            complex_nodes = find_complex_nodes(gm)
+            replace_complex_placeholder_to_tuple(gm, complexInputIndices)
+            modify_complex_nodes(gm, complex_nodes)
 
             torchtrt_inputs = prepare_inputs(
                 torch_inputs, disable_memory_format_check=True
