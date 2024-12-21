@@ -223,12 +223,11 @@ def run_dynamo_converter_tests(session):
     tests = [
         "conversion",
     ]
-    skip_tests = "-k test_upsample_aten and not 3"
     for test in tests:
         if USE_HOST_DEPS:
-            session.run_always("pytest", test, skip_tests, env={"PYTHONPATH": PYT_PATH})
+            session.run_always("pytest", test, env={"PYTHONPATH": PYT_PATH})
         else:
-            session.run_always("pytest", test, skip_tests)
+            session.run_always("pytest", test)
 
 
 def run_dynamo_lower_tests(session):
@@ -245,12 +244,13 @@ def run_dynamo_lower_tests(session):
 def run_dynamo_partitioning_tests(session):
     print("Running Dynamo Partitioning tests")
     session.chdir(os.path.join(TOP_DIR, "tests/py/dynamo/"))
+    num_workers = "auto"
     tests = ["partitioning"]
     for test in tests:
         if USE_HOST_DEPS:
-            session.run_always("pytest", test, env={"PYTHONPATH": PYT_PATH})
+            session.run_always("pytest", test, "-n", num_workers, env={"PYTHONPATH": PYT_PATH})
         else:
-            session.run_always("pytest", test)
+            session.run_always("pytest", test, "-n", num_workers)
 
 
 def run_dynamo_runtime_tests(session):
