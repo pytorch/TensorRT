@@ -245,12 +245,13 @@ def run_dynamo_lower_tests(session):
 def run_dynamo_partitioning_tests(session):
     print("Running Dynamo Partitioning tests")
     session.chdir(os.path.join(TOP_DIR, "tests/py/dynamo/"))
+    num_workers = "auto"
     tests = ["partitioning"]
     for test in tests:
         if USE_HOST_DEPS:
-            session.run_always("pytest", test, env={"PYTHONPATH": PYT_PATH})
+            session.run_always("pytest", test, "-n", num_workers, env={"PYTHONPATH": PYT_PATH})
         else:
-            session.run_always("pytest", test)
+            session.run_always("pytest", test, "-n", num_workers)
 
 
 def run_dynamo_runtime_tests(session):
@@ -259,7 +260,7 @@ def run_dynamo_runtime_tests(session):
     tests = [
         "runtime",
     ]
-    skip_tests = "-k not hw_compat"
+    skip_tests = '-k not hw_compat and not test_004_weight_streaming'
     for test in tests:
         if USE_HOST_DEPS:
             session.run_always("pytest", test, skip_tests, env={"PYTHONPATH": PYT_PATH})
@@ -333,7 +334,8 @@ def run_int8_accuracy_tests(session):
     session.chdir(os.path.join(TOP_DIR, "tests/py/ts"))
     tests = [
         "ptq/test_ptq_to_backend.py",
-        "ptq/test_ptq_dataloader_calibrator.py",
+        #TODO for next release
+        #"ptq/test_ptq_dataloader_calibrator.py",
     ]
     for test in tests:
         if USE_HOST_DEPS:

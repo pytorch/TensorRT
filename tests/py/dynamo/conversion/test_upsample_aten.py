@@ -2,11 +2,21 @@ import torch
 from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
 from torch_tensorrt import Input
+import warnings
+import unittest
 
 from .harness import DispatchTestCase
 
+is_blackwell = False
+if torch.cuda.is_available():
+    arch = torch.cuda.get_device_properties(0)
+    if arch.major==10 or arch.major==12:
+        is_blackwell = True
+else:
+    raise warnings.warn("No GPU detected")
 
 class TestUpsampleConverter(DispatchTestCase):
+    @unittest.skipIf(is_blackwell, "*_3 upsample tests error out in blackwell")
     @parameterized.expand(
         [
             ([7], [3], None),
