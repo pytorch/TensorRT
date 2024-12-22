@@ -7,14 +7,12 @@ from torch_tensorrt.dynamo._settings import CompilationSettings
 from .accumulate_fp32_matmul import accumulate_fp32_matmul
 from .constant_folding import constant_fold
 from .fuse_prims_broadcast import fuse_prims_broadcast
-from .lower_scaled_dot_product_attention import lower_scaled_dot_product_attention
 from .pass_manager import DynamoPassManager
 from .remove_assert_scalar import remove_assert_scalar
 from .remove_detach import remove_detach
 from .remove_input_alias_fixing_clones import remove_input_alias_fixing_clones
 from .repair_input_as_output import repair_input_as_output
 from .replace_max_pool_with_indices import replace_max_pool_with_indices
-from .view_to_reshape import view_to_reshape
 
 ATEN_POST_LOWERING_PASSES = DynamoPassManager.build_from_passlist(
     [
@@ -23,8 +21,6 @@ ATEN_POST_LOWERING_PASSES = DynamoPassManager.build_from_passlist(
         repair_input_as_output,
         fuse_prims_broadcast,
         replace_max_pool_with_indices,
-        lower_scaled_dot_product_attention,
-        view_to_reshape,
         remove_assert_scalar,
         accumulate_fp32_matmul,
     ]
