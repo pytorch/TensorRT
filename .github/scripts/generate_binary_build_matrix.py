@@ -25,8 +25,8 @@ PYTHON_ARCHES_DICT = {
 }
 CUDA_ARCHES_DICT = {
     "nightly": ["11.8", "12.4", "12.6"],
-    "test": ["11.8", "12.1", "12.4"],
-    "release": ["11.8", "12.1", "12.4"],
+    "test": ["11.8", "12.4", "12.6"],
+    "release": ["11.8", "12.4", "12.6"],
 }
 ROCM_ARCHES_DICT = {
     "nightly": ["6.1", "6.2"],
@@ -64,8 +64,8 @@ ROCM = "rocm"
 XPU = "xpu"
 
 
-CURRENT_NIGHTLY_VERSION = "2.6.0"
-CURRENT_CANDIDATE_VERSION = "2.5.1"
+CURRENT_NIGHTLY_VERSION = "2.7.0"
+CURRENT_CANDIDATE_VERSION = "2.6.0"
 CURRENT_STABLE_VERSION = "2.5.1"
 CURRENT_VERSION = CURRENT_STABLE_VERSION
 
