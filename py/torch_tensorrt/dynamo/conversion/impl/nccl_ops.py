@@ -1,13 +1,13 @@
 import os
 from enum import IntEnum, IntFlag, auto
-from typing import Optional, Sequence, Union
+from typing import Optional, Tuple, Union
 
 import numpy as np
-import tensorrt as trt
-import torch
-from torch.fx.node import Target
+from torch.fx.node import Argument, Target
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
 from torch_tensorrt.fx.converters.converter_utils import SourceIR, set_layer_name
+
+import tensorrt as trt
 
 
 # class for AllReduce
@@ -33,25 +33,25 @@ class AllReduceConfig(IntFlag):
     PUSH_MODE = auto()
 
 
-def gather_op(
+def nccl_gather(
     ctx: ConversionContext,
     target: Union[Target, str],
     source_ir: Optional[SourceIR],
     name: str,
-    plug_inputs,
-):
+    plug_inputs: Tuple[Argument, ...],
+) -> trt.ITensor:
     allgather_plg_creator = trt.get_plugin_registry().get_plugin_creator(
         "AllGather", "1", "tensorrt_llm"
     )
     assert allgather_plg_creator is not None
     _world_size = os.environ.get("WORLD_SIZE")
     if _world_size is not None:
-        _world_size = int(_world_size)
+        world_size = int(_world_size)
     else:
         raise RuntimeError(
-            f"The WORLD_SIZE env variable is not set in distributed environment"
+            "The WORLD_SIZE env variable is not set in distributed environment"
         )
-    group = list(range(_world_size))
+    group = list(range(world_size))
     group = trt.PluginField(
         "group", np.array(group, dtype=np.int32), trt.PluginFieldType.INT32
     )
@@ -66,13 +66,13 @@ def gather_op(
     return layer.get_output(0)
 
 
-def reduce_scatter_op(
+def nccl_reduce_scatter(
     ctx: ConversionContext,
     target: Union[Target, str],
     source_ir: Optional[SourceIR],
     name: str,
-    plug_inputs,
-):
+    plug_inputs: Tuple[Argument, ...],
+) -> trt.ITensor:
     allreduce_plg_creator = trt.get_plugin_registry().get_plugin_creator(
         "ReduceScatter", "1", "tensorrt_llm"
     )
@@ -84,12 +84,12 @@ def reduce_scatter_op(
     config = AllReduceConfig(0)
     _world_size = os.environ.get("WORLD_SIZE")
     if _world_size is not None:
-        _world_size = int(_world_size)
+        world_size = int(_world_size)
     else:
         raise RuntimeError(
-            f"The WORLD_SIZE env variable is not set in distributed environment"
+            "The WORLD_SIZE env variable is not set in distributed environment"
         )
-    group = list(range(_world_size))
+    group = list(range(world_size))
     group = trt.PluginField(
         "group", np.array(group, dtype=np.int32), trt.PluginFieldType.INT32
     )
