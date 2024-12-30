@@ -1,5 +1,5 @@
 import logging
-from typing import Sequence
+from typing import Any
 
 import torch
 from torch_tensorrt.dynamo._settings import CompilationSettings
@@ -12,16 +12,23 @@ from torch_tensorrt.dynamo.lowering.passes.pass_utils import (
 logger = logging.getLogger(__name__)
 
 
-def tensorrt_fused_nccl_all_gather_op(args0, args1, args2):
+# TODO: @apbose make these actual torch custom ops, should allow aot_export
+def tensorrt_fused_nccl_all_gather_op(
+    inp: Any, group_size: int, group_name: str
+) -> torch.Tensor:
     return torch.ops._c10d_functional.wait_tensor.default(
-        torch.ops._c10d_functional.all_gather_into_tensor.default(args0, args1, args2)
+        torch.ops._c10d_functional.all_gather_into_tensor.default(
+            inp, group_size, group_name
+        )
     )
 
 
-def tensorrt_fused_nccl_reduce_scatter_op(args0, args1, args2, args3):
+def tensorrt_fused_nccl_reduce_scatter_op(
+    inp: Any, reduce_op: str, group_size: int, group_name: str
+) -> torch.Tensor:
     return torch.ops._c10d_functional.wait_tensor.default(
         torch.ops._c10d_functional.reduce_scatter_tensor.default(
-            args0, args1, args2, args3
+            inp, reduce_op, group_size, group_name
         )
     )
 
@@ -44,16 +51,17 @@ def fuse_distributed_ops(
             wait_tensor_node = list(node.users)[0]
             fused_op = None
             if node.target == torch.ops._c10d_functional.all_gather_into_tensor.default:
-                fused_op = tensorrt_fused_nccl_all_gather_op
-                fused_op_args = (node.args[0], node.args[1], node.args[2])
+                with gm.graph.inserting_after(wait_tensor_node):
+                    fused_node = gm.graph.create_node(
+                        op="call_function",
+                        target=tensorrt_fused_nccl_all_gather_op,  # Define your custom fused function
+                        args=(node.args[0], node.args[1], node.args[2]),
+                    )
             else:
-                fused_op = tensorrt_fused_nccl_reduce_scatter_op
-                fused_op_args = (node.args[0], node.args[1], node.args[2], node.args[3])
-            with gm.graph.inserting_after(wait_tensor_node):
                 fused_node = gm.graph.create_node(
                     op="call_function",
-                    target=fused_op,  # Define your custom fused function
-                    args=fused_op_args,
+                    target=tensorrt_fused_nccl_reduce_scatter_op,  # Define your custom fused function
+                    args=(node.args[0], node.args[1], node.args[2], node.args[3]),
                 )
 
             wait_tensor_node.replace_all_uses_with(fused_node)

@@ -1,8 +1,9 @@
 import logging
+from typing import List, Tuple
 
 import torch
+from torch._subclasses.fake_tensor import FakeTensorMode
 from torch.fx.node import _get_qualified_name
-from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.conversion.converter_utils import args_bounds_check
 
 # dead-code elimination, linting, and recompilation for graph, in-place
@@ -12,17 +13,16 @@ from torch_tensorrt.dynamo.lowering.passes.pass_utils import (
 
 logger = logging.getLogger(__name__)
 
-# for now creating this node, but mostly will want to modify this in input
-
 
 def replace_complex_placeholder_to_tuple(
-    gm: torch.fx.GraphModule, inputListindices
+    gm: torch.fx.GraphModule,
+    inputListindices: List[int],
 ) -> torch.fx.GraphModule:
     modified_graph = False
     input_arg_list = [f"arg{inputListIndex}_1" for inputListIndex in inputListindices]
     for node in gm.graph.nodes:
         if node.op == "placeholder" and node.target in input_arg_list:
-            from torch._subclasses.fake_tensor import FakeTensor, FakeTensorMode
+            from torch._subclasses.fake_tensor import FakeTensorMode
 
             node_shape = node.meta["val"].size()
             new_node_shape = node_shape + (2,)
@@ -52,7 +52,7 @@ def replace_complex_placeholder_to_tuple(
     return gm
 
 
-def infer_slice_shape(node):
+def infer_slice_shape(node: torch.fx.Node) -> Tuple[int, ...]:
     input_shape = node.args[0].meta["val"].shape
     slice_args = node.args
     dim = slice_args[1]
@@ -64,7 +64,7 @@ def infer_slice_shape(node):
     return tuple(new_shape)
 
 
-def infer_reshape_shape(node):
+def infer_reshape_shape(node: torch.fx.Node) -> torch.fx.node.Argument:
     return node.args[1]
 
 
@@ -97,7 +97,7 @@ def propogate_complex_num_shape_change_till_complex_mul(
             stack.append(user)
 
 
-def update_node_meta(node, fake_mode):
+def update_node_meta(node: torch.fx.Node, fake_mode: FakeTensorMode) -> None:
     op_name = node.name
     op_target = node.target
 
