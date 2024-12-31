@@ -7,10 +7,10 @@ from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContex
 from torch_tensorrt.fx.converters.converter_utils import set_layer_name
 from torch_tensorrt.fx.types import TRTTensor
 
-# nearest, linear, cubic
+# bilinear, nearest, bicubic
 GridSamplerInterpolationMode = {
-    0: trt.InterpolationMode.NEAREST,
-    1: trt.InterpolationMode.LINEAR,
+    0: trt.InterpolationMode.LINEAR,
+    1: trt.InterpolationMode.NEAREST,
     2: trt.InterpolationMode.CUBIC,
 }
 
