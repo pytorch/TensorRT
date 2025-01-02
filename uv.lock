@@ -1372,11 +1372,11 @@ requires-dist = [
     { name = "packaging", specifier = ">=23" },
     { name = "rich", marker = "extra == 'monitoring-tools'", specifier = ">=13.7.1" },
     { name = "rich", extras = ["jupyter"], marker = "extra == 'jupyter'", specifier = ">=13.7.1" },
-    { name = "tensorrt-cu12", specifier = ">=10.6.0,<10.8.0" },
-    { name = "tensorrt-cu12-bindings", specifier = ">=10.6.0,<10.8.0" },
-    { name = "tensorrt-cu12-libs", specifier = ">=10.6.0,<10.8.0" },
-    { name = "torch", specifier = ">=2.6.0.dev0,<2.7.0", index = "https://download.pytorch.org/whl/nightly/cu126" },
-    { name = "torchvision", marker = "extra == 'torchvision'", index = "https://download.pytorch.org/whl/nightly/cu126" },
+    { name = "tensorrt-cu12", specifier = "==10.7.0" },
+    { name = "tensorrt-cu12-bindings", specifier = "==10.7.0" },
+    { name = "tensorrt-cu12-libs", specifier = "==10.7.0" },
+    { name = "torch", specifier = ">=2.6.0.dev0,<2.7.0" },
+    { name = "torchvision", marker = "extra == 'torchvision'" },
     { name = "typing-extensions", specifier = ">=4.7.0" },
 ]
 
