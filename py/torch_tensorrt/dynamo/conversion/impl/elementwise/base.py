@@ -3,7 +3,6 @@ import warnings
 from typing import Any, Callable, Optional, Union
 
 import numpy as np
-import tensorrt as trt
 import torch
 from torch.fx.node import Target
 from torch_tensorrt import _enums
@@ -14,11 +13,12 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     broadcast_to_same_shape,
     cast_trt_tensor,
     get_trt_tensor,
-    broadcast,
     has_dynamic_shape,
     set_layer_name,
 )
 from torch_tensorrt.dynamo.types import TRTElementWiseOp, TRTTensor
+
+import tensorrt as trt
 
 
 def get_python_op_from_trt_elementwise_op(

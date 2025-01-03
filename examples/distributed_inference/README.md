@@ -14,3 +14,37 @@ See the examples started with `data_parallel` for more details.
 Here we use torch.distributed as an example, but compilation with tensor parallelism is agnostic to the implementation framework as long as the module is properly sharded.
 
 torchrun --nproc_per_node=2 tensor_parallel_llama2.py
+
+3. Tensor parallel distributed inference using nccl ops plugin
+
+ apt install libmpich-dev
+
+ apt install libopenmpi-dev
+
+ #For python3.10
+
+ pip install tensorrt-llm
+
+ For other python versions, you need to load the libnvinfer_plugin_tensorrt_llm.so. Please set that in the environment variable export TRTLLM_PLUGINS_PATH={lib_path}. For example, we have already set the variable in initialize_distributed_env(). You can replace this with your TRTLLM_PLUGINS_PATH and unset it there
+
+ #then pip install the tensorrt and torch version compatible with installed torchTRT
+
+ mpirun -n 2 --allow-run-as-root python tensor_parallel_simple_example.py
+
+ #For other python
+
+4. Tensor parallel distributed llama3 inference using nccl ops plugin
+
+ apt install libmpich-dev
+
+ apt install libopenmpi-dev
+
+#For python3.10
+
+ pip install tensorrt-llm
+
+ For other python versions, you need to load the libnvinfer_plugin_tensorrt_llm.so
+
+ #then pip install the tensorrt and torch version compatible with installed torchTRT
+
+ mpirun -n 2 --allow-run-as-root python tensor_parallel_llama3.py

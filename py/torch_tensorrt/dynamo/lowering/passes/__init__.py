@@ -1,3 +1,4 @@
 from ._aten_lowering_pass import *
+from ._modify_reshape_complex_nodes import modify_reshape_complex_nodes
 from .remove_sym_nodes import remove_sym_nodes
 from .repair_input_aliasing import repair_input_aliasing
