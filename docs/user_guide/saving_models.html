@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Saving models compiled with Torch-TensorRT &mdash; Torch-TensorRT v2.6.0.dev0+70e2a38 documentation</title>
+  <title>Saving models compiled with Torch-TensorRT &mdash; Torch-TensorRT v2.6.0.dev0+50f29cb documentation</title>
   
 
   
@@ -275,7 +275,7 @@
               
               
                 <div class="version">
-                  v2.6.0.dev0+70e2a38
+                  v2.6.0.dev0+50f29cb
                 </div>
               
             
@@ -492,7 +492,7 @@ specifying the <cite>output_format</cite> flag. Here are the options <cite>outpu
 <span class="n">model</span> <span class="o">=</span> <span class="n">MyModel</span><span class="p">()</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
 <span class="n">inputs</span> <span class="o">=</span> <span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">((</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">))</span><span class="o">.</span><span class="n">cuda</span><span class="p">()]</span>
 <span class="c1"># trt_ep is a torch.fx.GraphModule object</span>
-<span class="n">trt_gm</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">ir</span><span class="o">=</span><span class="s2">&quot;dynamo&quot;</span><span class="p">,</span> <span class="n">inputs</span><span class="p">)</span>
+<span class="n">trt_gm</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">ir</span><span class="o">=</span><span class="s2">&quot;dynamo&quot;</span><span class="p">,</span> <span class="n">inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">)</span>
 <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">trt_gm</span><span class="p">,</span> <span class="s2">&quot;trt.ep&quot;</span><span class="p">,</span> <span class="n">inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">)</span>
 
 <span class="c1"># Later, you can load it and run inference</span>
@@ -509,7 +509,7 @@ specifying the <cite>output_format</cite> flag. Here are the options <cite>outpu
 <span class="n">model</span> <span class="o">=</span> <span class="n">MyModel</span><span class="p">()</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
 <span class="n">inputs</span> <span class="o">=</span> <span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">((</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">))</span><span class="o">.</span><span class="n">cuda</span><span class="p">()]</span>
 <span class="c1"># trt_gm is a torch.fx.GraphModule object</span>
-<span class="n">trt_gm</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">ir</span><span class="o">=</span><span class="s2">&quot;dynamo&quot;</span><span class="p">,</span> <span class="n">inputs</span><span class="p">)</span>
+<span class="n">trt_gm</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">ir</span><span class="o">=</span><span class="s2">&quot;dynamo&quot;</span><span class="p">,</span> <span class="n">inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">)</span>
 <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">trt_gm</span><span class="p">,</span> <span class="s2">&quot;trt.ts&quot;</span><span class="p">,</span> <span class="n">output_format</span><span class="o">=</span><span class="s2">&quot;torchscript&quot;</span><span class="p">,</span> <span class="n">inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">)</span>
 
 <span class="c1"># Later, you can load it and run inference</span>
@@ -528,7 +528,7 @@ For <cite>ir=ts</cite>, this behavior stays the same in 2.X versions as well.</p
 
 <span class="n">model</span> <span class="o">=</span> <span class="n">MyModel</span><span class="p">()</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
 <span class="n">inputs</span> <span class="o">=</span> <span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">((</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">))</span><span class="o">.</span><span class="n">cuda</span><span class="p">()]</span>
-<span class="n">trt_ts</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">ir</span><span class="o">=</span><span class="s2">&quot;ts&quot;</span><span class="p">,</span> <span class="n">inputs</span><span class="p">)</span> <span class="c1"># Output is a ScriptModule object</span>
+<span class="n">trt_ts</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">ir</span><span class="o">=</span><span class="s2">&quot;ts&quot;</span><span class="p">,</span> <span class="n">inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">)</span> <span class="c1"># Output is a ScriptModule object</span>
 <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">trt_ts</span><span class="p">,</span> <span class="s2">&quot;trt_model.ts&quot;</span><span class="p">)</span>
 
 <span class="c1"># Later, you can load it and run inference</span>
