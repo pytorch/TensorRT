@@ -2,7 +2,6 @@ from torch_tensorrt.dynamo.conversion.impl import (
     activation,
     addmm,
     arange,
-    attention,
     cast,
     cat,
     condition,
