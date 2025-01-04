@@ -5,13 +5,15 @@ import copy
 import json
 import sys
 
+import requests  # type: ignore[import-untyped]
+
 # please update the cuda version you want to test with the future tensorRT version here
 # channel: nightly if the future tensorRT version test workflow is triggered from the main branch or your personal branch
 # channel: test if the future tensorRT version test workflow is triggered from the release branch(release/2.5 etc....)
 CUDA_VERSIONS_DICT = {
-    "nightly": ["cu124"],
-    "test": ["cu121", "cu124"],
-    "release": ["cu121", "cu124"],
+    "nightly": ["cu126"],
+    "test": ["cu124", "cu126"],
+    "release": ["cu124", "cu126"],
 }
 
 # please update the python version you want to test with the future tensorRT version here
@@ -29,47 +31,67 @@ TENSORRT_VERSIONS_DICT = {
         "10.4.0": {
             "urls": "https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.4.0/zip/TensorRT-10.4.0.26.Windows.win10.cuda-12.6.zip",
             "strip_prefix": "TensorRT-10.4.0.26",
-            "sha256": "3a7de83778b9e9f812fd8901e07e0d7d6fc54ce633fcff2e340f994df2c6356c",
         },
         "10.5.0": {
             "urls": "https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.5.0/zip/TensorRT-10.5.0.18.Windows.win10.cuda-12.6.zip",
             "strip_prefix": "TensorRT-10.5.0.18",
-            "sha256": "e6436f4164db4e44d727354dccf7d93755efb70d6fbfd6fa95bdfeb2e7331b24",
         },
         "10.6.0": {
             "urls": "https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.6.0/zip/TensorRT-10.6.0.26.Windows.win10.cuda-12.6.zip",
             "strip_prefix": "TensorRT-10.6.0.26",
-            "sha256": "6c6d92c108a1b3368423e8f69f08d31269830f1e4c9da43b37ba34a176797254",
-        },
-        "10.7.0": {
-            "urls": "https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.7.0/zip/TensorRT-10.7.0.23.Windows.win10.cuda-12.6.zip",
-            "strip_prefix": "TensorRT-10.7.0.23",
-            "sha256": "fbdef004578e7ccd5ee51fe7f846b57422364a743372fd8f9f1d7dbd33f62879",
         },
     },
     "linux": {
         "10.4.0": {
             "urls": "https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.4.0/tars/TensorRT-10.4.0.26.Linux.x86_64-gnu.cuda-12.6.tar.gz",
             "strip_prefix": "TensorRT-10.4.0.26",
-            "sha256": "cb0273ecb3ba4db8993a408eedd354712301a6c7f20704c52cdf9f78aa97bbdb",
         },
         "10.5.0": {
             "urls": "https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.5.0/tars/TensorRT-10.5.0.18.Linux.x86_64-gnu.cuda-12.6.tar.gz",
             "strip_prefix": "TensorRT-10.5.0.18",
-            "sha256": "f404d379d639552a3e026cd5267213bd6df18a4eb899d6e47815bbdb34854958",
         },
         "10.6.0": {
             "urls": "https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.6.0/tars/TensorRT-10.6.0.26.Linux.x86_64-gnu.cuda-12.6.tar.gz",
             "strip_prefix": "TensorRT-10.6.0.26",
-            "sha256": "33d3c2f3f4c84dc7991a4337a6fde9ed33f5c8e5c4f03ac2eb6b994a382b03a0",
-        },
-        "10.7.0": {
-            "urls": "https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.7.0/tars/TensorRT-10.7.0.23.Linux.x86_64-gnu.cuda-12.6.tar.gz",
-            "strip_prefix": "TensorRT-10.7.0.23",
-            "sha256": "d7f16520457caaf97ad8a7e94d802f89d77aedf9f361a255f2c216e2a3a40a11",
         },
     },
 }
+
+
+def check_new_tensorrt_version(
+    major: int, minor_from: int, patch_from: int
+) -> tuple[bool, str, str, str, str]:
+    def check_file_availability(url: str) -> bool:
+        try:
+            response = requests.head(url, allow_redirects=True)
+            if response.status_code == 200:
+                content_type = response.headers.get("Content-Type", "")
+                content_disposition = response.headers.get("Content-Disposition", "")
+                if "application" in content_type or "attachment" in content_disposition:
+                    return True
+            return False
+        except requests.RequestException:
+            return False
+
+    trt_linux_release_url = ""
+    trt_win_release_url = ""
+
+    for minor in range(minor_from, minor_from + 3):
+        trt_version = f"{major}.{minor}.0"
+        for patch in range(patch_from, 50):
+            for cuda_minor in range(4, 11):
+                trt_linux_release_url_candidate = f"https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/{trt_version}/tars/TensorRT-{trt_version}.{patch}.Linux.x86_64-gnu.cuda-12.{cuda_minor}.tar.gz"
+                if check_file_availability(trt_linux_release_url_candidate):
+                    trt_linux_release_url = trt_linux_release_url_candidate
+                    trt_win_release_url = f"https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/{trt_version}/zip/TensorRT-{trt_version}.{patch}.Windows.win10.cuda-12.{cuda_minor}.zip"
+                    return (
+                        True,
+                        trt_version,
+                        str(patch),
+                        trt_linux_release_url,
+                        trt_win_release_url,
+                    )
+    return False, "", "", "", ""
 
 
 def main(args: list[str]) -> None:
@@ -108,6 +130,23 @@ def main(args: list[str]) -> None:
         raise Exception(
             f"{includes[0].validation_runner} is not the supported arch, currently only support windows and linux"
         )
+
+    (
+        new_trt_available,
+        trt_version,
+        trt_patch,
+        trt_linux_release_url,
+        trt_win_release_url,
+    ) = check_new_tensorrt_version(major=10, minor_from=7, patch_from=0)
+    if new_trt_available:
+        TENSORRT_VERSIONS_DICT["linux"][trt_version]["urls"] = trt_linux_release_url
+        TENSORRT_VERSIONS_DICT["linux"][trt_version][
+            "strip_prefix"
+        ] = f"TensorRT-{trt_version}.{trt_patch}"
+        TENSORRT_VERSIONS_DICT["windows"][trt_version]["urls"] = trt_win_release_url
+        TENSORRT_VERSIONS_DICT["windows"][trt_version][
+            "strip_prefix"
+        ] = f"TensorRT-{trt_version}.{trt_patch}"
 
     cuda_versions = CUDA_VERSIONS_DICT[channel]
     python_versions = PYTHON_VERSIONS_DICT[channel]

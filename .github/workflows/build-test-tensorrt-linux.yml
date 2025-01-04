@@ -2,6 +2,8 @@ name: Build and Test Torch-TensorRT on Linux with Future TensorRT Versions
 
 on:
   workflow_dispatch:
+  schedule:
+    - cron: '0 0 * * 0'  # Runs at 00:00 UTC every Sunday (minute hour day-of-month month-of-year day-of-week)
 
 permissions:
   id-token: write
