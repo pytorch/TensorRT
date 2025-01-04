@@ -3,8 +3,7 @@ name: Build and Test Torch-TensorRT on Windows with Future TensorRT Versions
 on:
   workflow_dispatch:
   schedule:
-    # - cron: '0 0 * * 0'  # Runs at 00:00 UTC every Sunday (minute hour day-of-month month-of-year day-of-week)
-    - cron: '*/5 * * * *'  # Runs every 5 minutes
+    - cron: '0 0 * * 0'  # Runs at 00:00 UTC every Sunday (minute hour day-of-month month-of-year day-of-week)
 
 permissions:
   id-token: write
@@ -38,6 +37,8 @@ jobs:
         id: generate
         run: |
           set -eou pipefail
+          python -m pip install --upgrade pip
+          pip install requests
           MATRIX_BLOB=${{ toJSON(needs.generate-matrix.outputs.matrix) }}
           MATRIX_BLOB="$(python3 .github/scripts/generate-tensorrt-test-matrix.py --matrix "${MATRIX_BLOB}")"
           echo "${MATRIX_BLOB}"
