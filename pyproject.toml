@@ -85,9 +85,10 @@ dev = [
 torchvision = [
     "torchvision",
 ] #Leaving torchvisions dependency unconstrained so uv can just install something that should work for the torch we have. TV's on PyT makes it hard to put version constrains in
-quantization = ["nvidia-modelopt[deploy,hf,torch]~=0.17.0"]
+quantization = ["nvidia-modelopt[deploy,hf,torch]>=0.17.0"]
 monitoring-tools = ["rich>=13.7.1"]
 jupyter = ["rich[jupyter]>=13.7.1"]
+distributed = ["tensorrt-llm>=0.16.0"]
 
 [project.urls]
 Homepage = "https://pytorch.org/tensorrt"
@@ -101,17 +102,12 @@ include-package-data = false
 
 [tool.uv]
 environments = ["sys_platform == 'linux'", "sys_platform == 'windows'"]
-
 prerelease = "if-necessary-or-explicit"
-
+index-strategy = "unsafe-best-match"                                    # Needed for TRT-LLM
 
 [tool.uv.sources]
-torch = [
-    { index = "pytorch-nightly-cu126"},
-]
-torchvision = [
-     { index = "pytorch-nightly-cu126"},
-]
+torch = [{ index = "pytorch-nightly-cu126" }]
+torchvision = [{ index = "pytorch-nightly-cu126" }]
 
 [[tool.uv.index]]
 name = "pytorch-nightly-cu126"
