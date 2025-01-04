@@ -67,7 +67,6 @@ http_archive(
 http_archive(
     name = "tensorrt",
     build_file = "@//third_party/tensorrt/archive:BUILD",
-    sha256 = "${TENSORRT_SHA256}",
     strip_prefix = "${TENSORRT_STRIP_PREFIX}",
     urls = [
         "${TENSORRT_URLS}",
@@ -77,7 +76,6 @@ http_archive(
 http_archive(
     name = "tensorrt_win",
     build_file = "@//third_party/tensorrt/archive:BUILD",
-    sha256 = "${TENSORRT_SHA256}",
     strip_prefix = "${TENSORRT_STRIP_PREFIX}",
     urls = [
         "${TENSORRT_URLS}",
