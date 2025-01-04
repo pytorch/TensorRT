@@ -37,6 +37,8 @@ jobs:
         id: generate
         run: |
           set -eou pipefail
+          python -m pip install --upgrade pip
+          pip install requests
           MATRIX_BLOB=${{ toJSON(needs.generate-matrix.outputs.matrix) }}
           MATRIX_BLOB="$(python3 .github/scripts/generate-tensorrt-test-matrix.py --matrix "${MATRIX_BLOB}")"
           echo "${MATRIX_BLOB}"
