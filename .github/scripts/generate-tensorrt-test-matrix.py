@@ -139,10 +139,12 @@ def main(args: list[str]) -> None:
         trt_win_release_url,
     ) = check_new_tensorrt_version(major=10, minor_from=7, patch_from=0)
     if new_trt_available:
+        TENSORRT_VERSIONS_DICT["linux"][trt_version] = {}
         TENSORRT_VERSIONS_DICT["linux"][trt_version]["urls"] = trt_linux_release_url
         TENSORRT_VERSIONS_DICT["linux"][trt_version][
             "strip_prefix"
         ] = f"TensorRT-{trt_version}.{trt_patch}"
+        TENSORRT_VERSIONS_DICT["windows"][trt_version] = {}
         TENSORRT_VERSIONS_DICT["windows"][trt_version]["urls"] = trt_win_release_url
         TENSORRT_VERSIONS_DICT["windows"][trt_version][
             "strip_prefix"
