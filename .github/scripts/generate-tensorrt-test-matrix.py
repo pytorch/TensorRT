@@ -40,6 +40,10 @@ TENSORRT_VERSIONS_DICT = {
             "urls": "https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.6.0/zip/TensorRT-10.6.0.26.Windows.win10.cuda-12.6.zip",
             "strip_prefix": "TensorRT-10.6.0.26",
         },
+        "10.7.0": {
+            "urls": "https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.7.0/zip/TensorRT-10.7.0.23.Windows.win10.cuda-12.6.zip",
+            "strip_prefix": "TensorRT-10.7.0.23",
+        },
     },
     "linux": {
         "10.4.0": {
@@ -54,12 +58,16 @@ TENSORRT_VERSIONS_DICT = {
             "urls": "https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.6.0/tars/TensorRT-10.6.0.26.Linux.x86_64-gnu.cuda-12.6.tar.gz",
             "strip_prefix": "TensorRT-10.6.0.26",
         },
+        "10.7.0": {
+            "urls": "https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.7.0/tars/TensorRT-10.7.0.23.Linux.x86_64-gnu.cuda-12.6.tar.gz",
+            "strip_prefix": "TensorRT-10.7.0.23",
+        },
     },
 }
 
 
 def check_new_tensorrt_version(
-    major: int, minor_from: int, patch_from: int
+    major: int = 10, patch_from: int = 0
 ) -> tuple[bool, str, str, str, str]:
     def check_file_availability(url: str) -> bool:
         try:
@@ -76,21 +84,22 @@ def check_new_tensorrt_version(
     trt_linux_release_url = ""
     trt_win_release_url = ""
 
-    for minor in range(minor_from, minor_from + 3):
-        trt_version = f"{major}.{minor}.0"
-        for patch in range(patch_from, 50):
-            for cuda_minor in range(4, 11):
-                trt_linux_release_url_candidate = f"https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/{trt_version}/tars/TensorRT-{trt_version}.{patch}.Linux.x86_64-gnu.cuda-12.{cuda_minor}.tar.gz"
-                if check_file_availability(trt_linux_release_url_candidate):
-                    trt_linux_release_url = trt_linux_release_url_candidate
-                    trt_win_release_url = f"https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/{trt_version}/zip/TensorRT-{trt_version}.{patch}.Windows.win10.cuda-12.{cuda_minor}.zip"
-                    return (
-                        True,
-                        trt_version,
-                        str(patch),
-                        trt_linux_release_url,
-                        trt_win_release_url,
-                    )
+    # calculate the next minor version
+    minor = int(list(TENSORRT_VERSIONS_DICT["linux"].keys())[-1].split(".")[1]) + 1
+    trt_version = f"{major}.{minor}.0"
+    for patch in range(patch_from, 50):
+        for cuda_minor in range(4, 11):
+            trt_linux_release_url_candidate = f"https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/{trt_version}/tars/TensorRT-{trt_version}.{patch}.Linux.x86_64-gnu.cuda-12.{cuda_minor}.tar.gz"
+            if check_file_availability(trt_linux_release_url_candidate):
+                trt_linux_release_url = trt_linux_release_url_candidate
+                trt_win_release_url = f"https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/{trt_version}/zip/TensorRT-{trt_version}.{patch}.Windows.win10.cuda-12.{cuda_minor}.zip"
+                return (
+                    True,
+                    trt_version,
+                    str(patch),
+                    trt_linux_release_url,
+                    trt_win_release_url,
+                )
     return False, "", "", "", ""
 
 
@@ -137,7 +146,7 @@ def main(args: list[str]) -> None:
         trt_patch,
         trt_linux_release_url,
         trt_win_release_url,
-    ) = check_new_tensorrt_version(major=10, minor_from=7, patch_from=0)
+    ) = check_new_tensorrt_version(major=10, patch_from=0)
     if new_trt_available:
         TENSORRT_VERSIONS_DICT["linux"][trt_version] = {}
         TENSORRT_VERSIONS_DICT["linux"][trt_version]["urls"] = trt_linux_release_url
