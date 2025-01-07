@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Dynamic shapes with Torch-TensorRT &mdash; Torch-TensorRT v2.6.0.dev0+50f29cb documentation</title>
+  <title>Dynamic shapes with Torch-TensorRT &mdash; Torch-TensorRT v2.6.0.dev0+69c83d4 documentation</title>
   
 
   
@@ -275,7 +275,7 @@
               
               
                 <div class="version">
-                  v2.6.0.dev0+50f29cb
+                  v2.6.0.dev0+69c83d4
                 </div>
               
             
@@ -480,8 +480,8 @@ However, Torch-TensorRT is an AOT compiler which requires some prior information
 <p>In the case of dynamic input shapes, we must provide the (min_shape, opt_shape, max_shape) arguments so that the model can be optimized for
 this range of input shapes. An example usage of static and dynamic shapes is as follows.</p>
 <p>NOTE: The following code uses Dynamo Frontend. In case of Torchscript Frontend, please swap out <code class="docutils literal notranslate"><span class="pre">ir=dynamo</span></code> with <code class="docutils literal notranslate"><span class="pre">ir=ts</span></code> and the behavior is exactly the same.</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
-<span class="kn">import</span> <span class="nn">torch_tensorrt</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch_tensorrt</span>
 
 <span class="n">model</span> <span class="o">=</span> <span class="n">MyModel</span><span class="p">()</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
 <span class="c1"># Compile with static shapes</span>
@@ -518,14 +518,14 @@ Torch-TensorRT attempts to automatically set the constraints during <code class=
 If you have to set any custom constraints to your model (by using <cite>torch.export.Dim</cite>), we recommend exporting your program first before compiling with Torch-TensorRT.
 Please refer to this <a class="reference external" href="https://pytorch.org/tutorials/intermediate/torch_export_tutorial.html#constraints-dynamic-shapes">documentation</a> to export the Pytorch module with dynamic shapes.
 Here’s a simple example that exports a matmul layer with some restrictions on dynamic dimensions.</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
-<span class="kn">import</span> <span class="nn">torch_tensorrt</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch_tensorrt</span>
 
-<span class="k">class</span> <span class="nc">MatMul</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">MatMul</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
 
-    <span class="k">def</span> <span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">query</span><span class="p">,</span> <span class="n">key</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">query</span><span class="p">,</span> <span class="n">key</span><span class="p">):</span>
         <span class="n">attn_weight</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">matmul</span><span class="p">(</span><span class="n">query</span><span class="p">,</span> <span class="n">key</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">2</span><span class="p">))</span>
         <span class="k">return</span> <span class="n">attn_weight</span>
 
@@ -546,8 +546,8 @@ Here’s a simple example that exports a matmul layer with some restrictions on 
 <p><code class="docutils literal notranslate"><span class="pre">torch_tensorrt.compile(model,</span> <span class="pre">inputs,</span> <span class="pre">ir=&quot;torch_compile&quot;)</span></code> returns a torch.compile boxed function with the backend
 configured to TensorRT. In the case of <code class="docutils literal notranslate"><span class="pre">ir=torch_compile</span></code>, users can provide dynamic shape information for the inputs using <code class="docutils literal notranslate"><span class="pre">torch._dynamo.mark_dynamic</span></code> API (<a class="reference external" href="https://pytorch.org/docs/stable/torch.compiler_dynamic_shapes.html">https://pytorch.org/docs/stable/torch.compiler_dynamic_shapes.html</a>)
 to avoid recompilation of TensorRT engines.</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
-<span class="kn">import</span> <span class="nn">torch_tensorrt</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch_tensorrt</span>
 
 <span class="n">model</span> <span class="o">=</span> <span class="n">MyModel</span><span class="p">()</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
 <span class="n">inputs</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">((</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">float32</span><span class="p">)</span>

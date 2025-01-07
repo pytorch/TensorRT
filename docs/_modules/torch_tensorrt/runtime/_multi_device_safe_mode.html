@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt.runtime._multi_device_safe_mode &mdash; Torch-TensorRT v2.6.0.dev0+50f29cb documentation</title>
+  <title>torch_tensorrt.runtime._multi_device_safe_mode &mdash; Torch-TensorRT v2.6.0.dev0+69c83d4 documentation</title>
   
 
   
@@ -272,7 +272,7 @@
               
               
                 <div class="version">
-                  v2.6.0.dev0+50f29cb
+                  v2.6.0.dev0+69c83d4
                 </div>
               
             
@@ -467,11 +467,11 @@
              <article itemprop="articleBody" id="pytorch-article" class="pytorch-article">
               
   <h1>Source code for torch_tensorrt.runtime._multi_device_safe_mode</h1><div class="highlight"><pre>
-<span></span><span class="kn">import</span> <span class="nn">logging</span>
-<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Any</span>
+<span></span><span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span>
 
-<span class="kn">import</span> <span class="nn">torch</span>
-<span class="kn">import</span> <span class="nn">torch_tensorrt</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch_tensorrt</span>
 
 <span class="k">if</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">ENABLED_FEATURES</span><span class="o">.</span><span class="n">torch_tensorrt_runtime</span><span class="p">:</span>
     <span class="n">_PY_RT_MULTI_DEVICE_SAFE_MODE</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">get_multi_device_safe_mode</span><span class="p">()</span>
@@ -482,19 +482,19 @@
 <span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
 
 
-<span class="k">class</span> <span class="nc">_MultiDeviceSafeModeContextManager</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">_MultiDeviceSafeModeContextManager</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Helper class used in conjunction with `set_multi_device_safe_mode`</span>
 
 <span class="sd">    Used to enable `set_multi_device_safe_mode` as a dual-purpose context manager</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">old_mode</span><span class="p">:</span> <span class="nb">bool</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">old_mode</span><span class="p">:</span> <span class="nb">bool</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">old_mode</span> <span class="o">=</span> <span class="n">old_mode</span>
 
-    <span class="k">def</span> <span class="fm">__enter__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;_MultiDeviceSafeModeContextManager&quot;</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__enter__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;_MultiDeviceSafeModeContextManager&quot;</span><span class="p">:</span>
         <span class="k">return</span> <span class="bp">self</span>
 
-    <span class="k">def</span> <span class="fm">__exit__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__exit__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="c1"># Set multi-device safe mode back to old mode in Python</span>
         <span class="k">global</span> <span class="n">_PY_RT_MULTI_DEVICE_SAFE_MODE</span>
         <span class="n">_PY_RT_MULTI_DEVICE_SAFE_MODE</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">old_mode</span>
@@ -504,7 +504,7 @@
             <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">set_multi_device_safe_mode</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">old_mode</span><span class="p">)</span>
 
 
-<div class="viewcode-block" id="set_multi_device_safe_mode"><a class="viewcode-back" href="../../../py_api/runtime.html#torch_tensorrt.runtime.set_multi_device_safe_mode">[docs]</a><span class="k">def</span> <span class="nf">set_multi_device_safe_mode</span><span class="p">(</span><span class="n">mode</span><span class="p">:</span> <span class="nb">bool</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">_MultiDeviceSafeModeContextManager</span><span class="p">:</span>
+<div class="viewcode-block" id="set_multi_device_safe_mode"><a class="viewcode-back" href="../../../py_api/runtime.html#torch_tensorrt.runtime.set_multi_device_safe_mode">[docs]</a><span class="k">def</span><span class="w"> </span><span class="nf">set_multi_device_safe_mode</span><span class="p">(</span><span class="n">mode</span><span class="p">:</span> <span class="nb">bool</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">_MultiDeviceSafeModeContextManager</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Sets the runtime (Python-only and default) into multi-device safe mode</span>
 
 <span class="sd">    In the case that multiple devices are available on the system, in order for the</span>

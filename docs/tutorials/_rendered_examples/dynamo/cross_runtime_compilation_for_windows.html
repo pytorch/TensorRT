@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Cross runtime compilation for windows example &mdash; Torch-TensorRT v2.6.0.dev0+50f29cb documentation</title>
+  <title>Cross runtime compilation for windows example &mdash; Torch-TensorRT v2.6.0.dev0+69c83d4 documentation</title>
   
 
   
@@ -273,7 +273,7 @@
               
               
                 <div class="version">
-                  v2.6.0.dev0+50f29cb
+                  v2.6.0.dev0+69c83d4
                 </div>
               
             
@@ -487,12 +487,12 @@ It cannot be loaded in Windows with GeForceRTX 3080 which has Compute Capability
 <p>python examples/dynamo/cross_runtime_compilation_for_windows.py –path trt_resnet.ep –load True</p>
 <section id="imports-and-model-definition">
 <h2>Imports and Model Definition<a class="headerlink" href="#imports-and-model-definition" title="Permalink to this heading">¶</a></h2>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">argparse</span>
-<span class="kn">import</span> <span class="nn">platform</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">argparse</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">platform</span>
 
-<span class="kn">import</span> <span class="nn">torch</span>
-<span class="kn">import</span> <span class="nn">torch_tensorrt</span> <span class="k">as</span> <span class="nn">torchtrt</span>
-<span class="kn">import</span> <span class="nn">torchvision.models</span> <span class="k">as</span> <span class="nn">models</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch_tensorrt</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">torchtrt</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torchvision.models</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">models</span>
 
 <span class="n">PARSER</span> <span class="o">=</span> <span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentParser</span><span class="p">(</span>
     <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Cross runtime comilation for windows example: Resnet Model&quot;</span>

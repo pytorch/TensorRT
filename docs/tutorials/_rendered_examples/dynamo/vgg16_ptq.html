@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Deploy Quantized Models using Torch-TensorRT &mdash; Torch-TensorRT v2.6.0.dev0+50f29cb documentation</title>
+  <title>Deploy Quantized Models using Torch-TensorRT &mdash; Torch-TensorRT v2.6.0.dev0+69c83d4 documentation</title>
   
 
   
@@ -275,7 +275,7 @@
               
               
                 <div class="version">
-                  v2.6.0.dev0+50f29cb
+                  v2.6.0.dev0+69c83d4
                 </div>
               
             
@@ -481,20 +481,20 @@ to download the full example code</p>
 <p>Here we demonstrate how to deploy a model quantized to INT8 or FP8 using the Dynamo frontend of Torch-TensorRT</p>
 <section id="imports-and-model-definition">
 <h2>Imports and Model Definition<a class="headerlink" href="#imports-and-model-definition" title="Permalink to this heading">¶</a></h2>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">argparse</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">argparse</span>
 
-<span class="kn">import</span> <span class="nn">modelopt.torch.quantization</span> <span class="k">as</span> <span class="nn">mtq</span>
-<span class="kn">import</span> <span class="nn">torch</span>
-<span class="kn">import</span> <span class="nn">torch.nn</span> <span class="k">as</span> <span class="nn">nn</span>
-<span class="kn">import</span> <span class="nn">torch.nn.functional</span> <span class="k">as</span> <span class="nn">F</span>
-<span class="kn">import</span> <span class="nn">torch_tensorrt</span> <span class="k">as</span> <span class="nn">torchtrt</span>
-<span class="kn">import</span> <span class="nn">torchvision.datasets</span> <span class="k">as</span> <span class="nn">datasets</span>
-<span class="kn">import</span> <span class="nn">torchvision.transforms</span> <span class="k">as</span> <span class="nn">transforms</span>
-<span class="kn">from</span> <span class="nn">modelopt.torch.quantization.utils</span> <span class="kn">import</span> <span class="n">export_torch_mode</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">modelopt.torch.quantization</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">mtq</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch.nn</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">nn</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch.nn.functional</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">F</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch_tensorrt</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">torchtrt</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torchvision.datasets</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">datasets</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torchvision.transforms</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">transforms</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">modelopt.torch.quantization.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">export_torch_mode</span>
 
 
-<span class="k">class</span> <span class="nc">VGG</span><span class="p">(</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">layer_spec</span><span class="p">,</span> <span class="n">num_classes</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span> <span class="n">init_weights</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">VGG</span><span class="p">(</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">layer_spec</span><span class="p">,</span> <span class="n">num_classes</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span> <span class="n">init_weights</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
         <span class="nb">super</span><span class="p">(</span><span class="n">VGG</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
 
         <span class="n">layers</span> <span class="o">=</span> <span class="p">[]</span>
@@ -524,7 +524,7 @@ to download the full example code</p>
         <span class="k">if</span> <span class="n">init_weights</span><span class="p">:</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">_initialize_weights</span><span class="p">()</span>
 
-    <span class="k">def</span> <span class="nf">_initialize_weights</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_initialize_weights</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">modules</span><span class="p">():</span>
             <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">m</span><span class="p">,</span> <span class="n">nn</span><span class="o">.</span><span class="n">Conv2d</span><span class="p">):</span>
                 <span class="n">nn</span><span class="o">.</span><span class="n">init</span><span class="o">.</span><span class="n">kaiming_normal_</span><span class="p">(</span><span class="n">m</span><span class="o">.</span><span class="n">weight</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;fan_out&quot;</span><span class="p">,</span> <span class="n">nonlinearity</span><span class="o">=</span><span class="s2">&quot;relu&quot;</span><span class="p">)</span>
@@ -537,7 +537,7 @@ to download the full example code</p>
                 <span class="n">nn</span><span class="o">.</span><span class="n">init</span><span class="o">.</span><span class="n">normal_</span><span class="p">(</span><span class="n">m</span><span class="o">.</span><span class="n">weight</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mf">0.01</span><span class="p">)</span>
                 <span class="n">nn</span><span class="o">.</span><span class="n">init</span><span class="o">.</span><span class="n">constant_</span><span class="p">(</span><span class="n">m</span><span class="o">.</span><span class="n">bias</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
 
-    <span class="k">def</span> <span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
         <span class="n">x</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">features</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
         <span class="n">x</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">avgpool</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
         <span class="n">x</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">flatten</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
@@ -545,7 +545,7 @@ to download the full example code</p>
         <span class="k">return</span> <span class="n">x</span>
 
 
-<span class="k">def</span> <span class="nf">vgg16</span><span class="p">(</span><span class="n">num_classes</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span> <span class="n">init_weights</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">vgg16</span><span class="p">(</span><span class="n">num_classes</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span> <span class="n">init_weights</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
     <span class="n">vgg16_cfg</span> <span class="o">=</span> <span class="p">[</span>
         <span class="mi">64</span><span class="p">,</span>
         <span class="mi">64</span><span class="p">,</span>
@@ -600,7 +600,7 @@ to download the full example code</p>
 <span class="n">weights</span> <span class="o">=</span> <span class="n">ckpt</span><span class="p">[</span><span class="s2">&quot;model_state_dict&quot;</span><span class="p">]</span>
 
 <span class="k">if</span> <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">device_count</span><span class="p">()</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
-    <span class="kn">from</span> <span class="nn">collections</span> <span class="kn">import</span> <span class="n">OrderedDict</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">collections</span><span class="w"> </span><span class="kn">import</span> <span class="n">OrderedDict</span>
 
     <span class="n">new_state_dict</span> <span class="o">=</span> <span class="n">OrderedDict</span><span class="p">()</span>
     <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">weights</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
@@ -646,7 +646,7 @@ to download the full example code</p>
 </section>
 <section id="define-calibration-loop-for-quantization">
 <h2>Define Calibration Loop for quantization<a class="headerlink" href="#define-calibration-loop-for-quantization" title="Permalink to this heading">¶</a></h2>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span> <span class="nf">calibrate_loop</span><span class="p">(</span><span class="n">model</span><span class="p">):</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">calibrate_loop</span><span class="p">(</span><span class="n">model</span><span class="p">):</span>
     <span class="c1"># calibrate over the training dataset</span>
     <span class="n">total</span> <span class="o">=</span> <span class="mi">0</span>
     <span class="n">correct</span> <span class="o">=</span> <span class="mi">0</span>
@@ -703,7 +703,7 @@ to download the full example code</p>
         <span class="c1"># Compile the model with Torch-TensorRT Dynamo backend</span>
         <span class="n">input_tensor</span> <span class="o">=</span> <span class="n">images</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
         <span class="c1"># torch.export.export() failed due to RuntimeError: Attempting to use FunctionalTensor on its own. Instead, please use it with a corresponding FunctionalTensorMode()</span>
-        <span class="kn">from</span> <span class="nn">torch.export._trace</span> <span class="kn">import</span> <span class="n">_export</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">torch.export._trace</span><span class="w"> </span><span class="kn">import</span> <span class="n">_export</span>
 
         <span class="n">exp_program</span> <span class="o">=</span> <span class="n">_export</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="p">(</span><span class="n">input_tensor</span><span class="p">,))</span>
         <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">quantize_type</span> <span class="o">==</span> <span class="s2">&quot;int8&quot;</span><span class="p">:</span>

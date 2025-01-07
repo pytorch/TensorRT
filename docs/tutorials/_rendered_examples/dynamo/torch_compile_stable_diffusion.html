@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Compiling Stable Diffusion model using the torch.compile backend &mdash; Torch-TensorRT v2.6.0.dev0+50f29cb documentation</title>
+  <title>Compiling Stable Diffusion model using the torch.compile backend &mdash; Torch-TensorRT v2.6.0.dev0+69c83d4 documentation</title>
   
 
   
@@ -275,7 +275,7 @@
               
               
                 <div class="version">
-                  v2.6.0.dev0+50f29cb
+                  v2.6.0.dev0+69c83d4
                 </div>
               
             
@@ -482,9 +482,9 @@ to download the full example code</p>
 <a class="reference internal image-reference" href="../../../_images/majestic_castle.png"><img alt="../../../_images/majestic_castle.png" class="align-right" src="../../../_images/majestic_castle.png" style="width: 256.0px; height: 256.0px;" /></a>
 <section id="imports-and-model-definition">
 <h2>Imports and Model Definition<a class="headerlink" href="#imports-and-model-definition" title="Permalink to this heading">¶</a></h2>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
-<span class="kn">import</span> <span class="nn">torch_tensorrt</span>
-<span class="kn">from</span> <span class="nn">diffusers</span> <span class="kn">import</span> <span class="n">DiffusionPipeline</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch_tensorrt</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">diffusers</span><span class="w"> </span><span class="kn">import</span> <span class="n">DiffusionPipeline</span>
 
 <span class="n">model_id</span> <span class="o">=</span> <span class="s2">&quot;CompVis/stable-diffusion-v1-4&quot;</span>
 <span class="n">device</span> <span class="o">=</span> <span class="s2">&quot;cuda:0&quot;</span>

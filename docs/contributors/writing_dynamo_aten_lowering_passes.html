@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Writing Dynamo ATen Lowering Passes &mdash; Torch-TensorRT v2.6.0.dev0+50f29cb documentation</title>
+  <title>Writing Dynamo ATen Lowering Passes &mdash; Torch-TensorRT v2.6.0.dev0+69c83d4 documentation</title>
   
 
   
@@ -275,7 +275,7 @@
               
               
                 <div class="version">
-                  v2.6.0.dev0+50f29cb
+                  v2.6.0.dev0+69c83d4
                 </div>
               
             
@@ -486,7 +486,7 @@
 </section>
 <section id="example-lowering-pass">
 <h2>Example Lowering Pass<a class="headerlink" href="#example-lowering-pass" title="Permalink to this heading">¶</a></h2>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span> <span class="nf">repair_input_as_output</span><span class="p">(</span><span class="n">gm</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">,</span> <span class="n">sample_inputs</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">:</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">repair_input_as_output</span><span class="p">(</span><span class="n">gm</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">,</span> <span class="n">sample_inputs</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Repair scenarios where inputs are also outputs of the graph</span>
 
 <span class="sd">    TRT does not allow such cases, so we insert a clone (identity) layer</span>
@@ -542,13 +542,13 @@
 <p>Lowering passes are currently registered in <cite>py/torch_tensorrt/dynamo/lowering/passes/__init__.py</cite>, using the <cite>torch.fx.passes.pass_manager.PassManager</cite> utility to assemble the list of passes in a desired order. New passes added directly to that list will be applied to graphs in the Torch-TensorRT <cite>torch.compile</cite> backend. Currently, we offer an ATen lowering pass registration decorator for convenience, which can be invoked either directly, or with the optional <cite>index</cite> keyword argument which controls where in the pass list the lowering pass will be inserted.</p>
 <p>For instance, to insert the pass at the default location (end of the list), the following code can be used:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="nd">@_aten_lowering_pass</span>
-<span class="k">def</span> <span class="nf">my_custom_pass</span><span class="p">(</span><span class="n">gm</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">,</span> <span class="n">sample_inputs</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">:</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">my_custom_pass</span><span class="p">(</span><span class="n">gm</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">,</span> <span class="n">sample_inputs</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">:</span>
     <span class="o">...</span>
 </pre></div>
 </div>
 <p>Alternatively, to insert the pass at a custom index (such as the front of the list) in the passlist, the following code can be used:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="nd">@_aten_lowering_pass</span><span class="p">(</span><span class="n">index</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
-<span class="k">def</span> <span class="nf">my_custom_pass</span><span class="p">(</span><span class="n">gm</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">,</span> <span class="n">sample_inputs</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">:</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">my_custom_pass</span><span class="p">(</span><span class="n">gm</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">,</span> <span class="n">sample_inputs</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">:</span>
     <span class="o">...</span>
 </pre></div>
 </div>

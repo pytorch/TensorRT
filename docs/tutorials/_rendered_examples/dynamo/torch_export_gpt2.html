@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Compiling GPT2 using the dynamo backend &mdash; Torch-TensorRT v2.6.0.dev0+50f29cb documentation</title>
+  <title>Compiling GPT2 using the dynamo backend &mdash; Torch-TensorRT v2.6.0.dev0+69c83d4 documentation</title>
   
 
   
@@ -275,7 +275,7 @@
               
               
                 <div class="version">
-                  v2.6.0.dev0+50f29cb
+                  v2.6.0.dev0+69c83d4
                 </div>
               
             
@@ -481,10 +481,10 @@ to download the full example code</p>
 <p>This script illustrates Torch-TensorRT workflow with dynamo backend on popular GPT2 model.</p>
 <section id="imports-and-model-definition">
 <h2>Imports and Model Definition<a class="headerlink" href="#imports-and-model-definition" title="Permalink to this heading">¶</a></h2>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
-<span class="kn">import</span> <span class="nn">torch_tensorrt</span>
-<span class="kn">from</span> <span class="nn">transformers</span> <span class="kn">import</span> <span class="n">AutoModelForCausalLM</span><span class="p">,</span> <span class="n">AutoTokenizer</span>
-<span class="kn">from</span> <span class="nn">utils</span> <span class="kn">import</span> <span class="n">export_llm</span><span class="p">,</span> <span class="n">generate</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch_tensorrt</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">transformers</span><span class="w"> </span><span class="kn">import</span> <span class="n">AutoModelForCausalLM</span><span class="p">,</span> <span class="n">AutoTokenizer</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">export_llm</span><span class="p">,</span> <span class="n">generate</span>
 </pre></div>
 </div>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Define the parameters and initialize the model</span>
