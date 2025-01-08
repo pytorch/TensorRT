@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Using Torch-TensorRT TorchScript Frontend Directly From PyTorch &mdash; Torch-TensorRT v2.6.0.dev0+50f29cb documentation</title>
+  <title>Using Torch-TensorRT TorchScript Frontend Directly From PyTorch &mdash; Torch-TensorRT v2.6.0.dev0+69c83d4 documentation</title>
   
 
   
@@ -273,7 +273,7 @@
               
               
                 <div class="version">
-                  v2.6.0.dev0+50f29cb
+                  v2.6.0.dev0+69c83d4
                 </div>
               
             
@@ -474,12 +474,12 @@
 <p>You will now be able to directly access TensorRT from PyTorch APIs. The process to use this feature
 is very similar to the compilation workflow described in <a class="reference internal" href="getting_started_with_python_api.html#getting-started-with-python-api"><span class="std std-ref">Using Torch-TensorRT in Python</span></a></p>
 <p>Start by loading <code class="docutils literal notranslate"><span class="pre">torch_tensorrt</span></code> into your application.</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
-<span class="kn">import</span> <span class="nn">torch_tensorrt</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch_tensorrt</span>
 </pre></div>
 </div>
 <p>Then given a TorchScript module, you can compile it with TensorRT using the <code class="docutils literal notranslate"><span class="pre">torch._C._jit_to_backend(&quot;tensorrt&quot;,</span> <span class="pre">...)</span></code> API.</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torchvision.models</span> <span class="k">as</span> <span class="nn">models</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">torchvision.models</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">models</span>
 
 <span class="n">model</span> <span class="o">=</span> <span class="n">models</span><span class="o">.</span><span class="n">mobilenet_v2</span><span class="p">(</span><span class="n">pretrained</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="n">script_model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">script</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>

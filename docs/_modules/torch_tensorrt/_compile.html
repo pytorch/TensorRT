@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt._compile &mdash; Torch-TensorRT v2.6.0.dev0+50f29cb documentation</title>
+  <title>torch_tensorrt._compile &mdash; Torch-TensorRT v2.6.0.dev0+69c83d4 documentation</title>
   
 
   
@@ -272,7 +272,7 @@
               
               
                 <div class="version">
-                  v2.6.0.dev0+50f29cb
+                  v2.6.0.dev0+69c83d4
                 </div>
               
             
@@ -467,51 +467,51 @@
              <article itemprop="articleBody" id="pytorch-article" class="pytorch-article">
               
   <h1>Source code for torch_tensorrt._compile</h1><div class="highlight"><pre>
-<span></span><span class="kn">from</span> <span class="nn">__future__</span> <span class="kn">import</span> <span class="n">annotations</span>
+<span></span><span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
 
-<span class="kn">import</span> <span class="nn">collections.abc</span>
-<span class="kn">import</span> <span class="nn">logging</span>
-<span class="kn">import</span> <span class="nn">platform</span>
-<span class="kn">from</span> <span class="nn">enum</span> <span class="kn">import</span> <span class="n">Enum</span>
-<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Callable</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Sequence</span><span class="p">,</span> <span class="n">Set</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">collections.abc</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">platform</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">enum</span><span class="w"> </span><span class="kn">import</span> <span class="n">Enum</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Callable</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Sequence</span><span class="p">,</span> <span class="n">Set</span>
 
-<span class="kn">import</span> <span class="nn">torch</span>
-<span class="kn">import</span> <span class="nn">torch.fx</span>
-<span class="kn">from</span> <span class="nn">torch_tensorrt._enums</span> <span class="kn">import</span> <span class="n">dtype</span>
-<span class="kn">from</span> <span class="nn">torch_tensorrt._features</span> <span class="kn">import</span> <span class="n">ENABLED_FEATURES</span>
-<span class="kn">from</span> <span class="nn">torch_tensorrt._Input</span> <span class="kn">import</span> <span class="n">Input</span>
-<span class="kn">from</span> <span class="nn">torch_tensorrt.dynamo</span> <span class="kn">import</span> <span class="n">_defaults</span>
-<span class="kn">from</span> <span class="nn">torch_tensorrt.dynamo.runtime._CudaGraphsTorchTensorRTModule</span> <span class="kn">import</span> <span class="p">(</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch.fx</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt._enums</span><span class="w"> </span><span class="kn">import</span> <span class="n">dtype</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt._features</span><span class="w"> </span><span class="kn">import</span> <span class="n">ENABLED_FEATURES</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt._Input</span><span class="w"> </span><span class="kn">import</span> <span class="n">Input</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo</span><span class="w"> </span><span class="kn">import</span> <span class="n">_defaults</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.runtime._CudaGraphsTorchTensorRTModule</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
     <span class="n">CudaGraphsTorchTensorRTModule</span><span class="p">,</span>
 <span class="p">)</span>
-<span class="kn">from</span> <span class="nn">torch_tensorrt.fx</span> <span class="kn">import</span> <span class="n">InputTensorSpec</span>
-<span class="kn">from</span> <span class="nn">torch_tensorrt.fx.lower</span> <span class="kn">import</span> <span class="nb">compile</span> <span class="k">as</span> <span class="n">fx_compile</span>
-<span class="kn">from</span> <span class="nn">torch_tensorrt.fx.utils</span> <span class="kn">import</span> <span class="n">LowerPrecision</span>
-<span class="kn">from</span> <span class="nn">typing_extensions</span> <span class="kn">import</span> <span class="n">TypeGuard</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.fx</span><span class="w"> </span><span class="kn">import</span> <span class="n">InputTensorSpec</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.fx.lower</span><span class="w"> </span><span class="kn">import</span> <span class="nb">compile</span> <span class="k">as</span> <span class="n">fx_compile</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.fx.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">LowerPrecision</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing_extensions</span><span class="w"> </span><span class="kn">import</span> <span class="n">TypeGuard</span>
 
 <span class="k">if</span> <span class="n">ENABLED_FEATURES</span><span class="o">.</span><span class="n">torchscript_frontend</span><span class="p">:</span>
-    <span class="kn">import</span> <span class="nn">torch_tensorrt.ts</span>
-    <span class="kn">from</span> <span class="nn">torch_tensorrt.ts._compiler</span> <span class="kn">import</span> <span class="nb">compile</span> <span class="k">as</span> <span class="n">torchscript_compile</span>
-    <span class="kn">from</span> <span class="nn">torch_tensorrt.ts._compiler</span> <span class="kn">import</span> <span class="p">(</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">torch_tensorrt.ts</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.ts._compiler</span><span class="w"> </span><span class="kn">import</span> <span class="nb">compile</span> <span class="k">as</span> <span class="n">torchscript_compile</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.ts._compiler</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
         <span class="n">convert_method_to_trt_engine</span> <span class="k">as</span> <span class="n">ts_convert_method_to_trt_engine</span><span class="p">,</span>
     <span class="p">)</span>
 
 <span class="k">if</span> <span class="n">ENABLED_FEATURES</span><span class="o">.</span><span class="n">dynamo_frontend</span><span class="p">:</span>
-    <span class="kn">from</span> <span class="nn">torch.export</span> <span class="kn">import</span> <span class="n">ExportedProgram</span>
-    <span class="kn">from</span> <span class="nn">torch_tensorrt.dynamo._compiler</span> <span class="kn">import</span> <span class="nb">compile</span> <span class="k">as</span> <span class="n">dynamo_compile</span>
-    <span class="kn">from</span> <span class="nn">torch_tensorrt.dynamo._compiler</span> <span class="kn">import</span> <span class="p">(</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">torch.export</span><span class="w"> </span><span class="kn">import</span> <span class="n">ExportedProgram</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo._compiler</span><span class="w"> </span><span class="kn">import</span> <span class="nb">compile</span> <span class="k">as</span> <span class="n">dynamo_compile</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo._compiler</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
         <span class="n">convert_exported_program_to_serialized_trt_engine</span> <span class="k">as</span> <span class="n">dynamo_convert_exported_program_to_serialized_trt_engine</span><span class="p">,</span>
     <span class="p">)</span>
-    <span class="kn">from</span> <span class="nn">torch_tensorrt.dynamo._compiler</span> <span class="kn">import</span> <span class="p">(</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo._compiler</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
         <span class="n">cross_compile_for_windows</span> <span class="k">as</span> <span class="n">dynamo_cross_compile_for_windows</span><span class="p">,</span>
     <span class="p">)</span>
-    <span class="kn">from</span> <span class="nn">torch_tensorrt.dynamo._compiler</span> <span class="kn">import</span> <span class="p">(</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo._compiler</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
         <span class="n">load_cross_compiled_exported_program</span> <span class="k">as</span> <span class="n">dynamo_load_cross_compiled_exported_program</span><span class="p">,</span>
     <span class="p">)</span>
-    <span class="kn">from</span> <span class="nn">torch_tensorrt.dynamo._compiler</span> <span class="kn">import</span> <span class="p">(</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo._compiler</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
         <span class="n">save_cross_compiled_exported_program</span> <span class="k">as</span> <span class="n">dynamo_save_cross_compiled_exported_program</span><span class="p">,</span>
     <span class="p">)</span>
-    <span class="kn">from</span> <span class="nn">torch_tensorrt.dynamo._tracer</span> <span class="kn">import</span> <span class="n">trace</span> <span class="k">as</span> <span class="n">dynamo_trace</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo._tracer</span><span class="w"> </span><span class="kn">import</span> <span class="n">trace</span> <span class="k">as</span> <span class="n">dynamo_trace</span>
 
 <span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
 
@@ -525,19 +525,19 @@
 <span class="p">]</span>
 
 
-<span class="k">def</span> <span class="nf">_non_fx_input_interface</span><span class="p">(</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">_non_fx_input_interface</span><span class="p">(</span>
     <span class="n">inputs</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="n">Input</span> <span class="o">|</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span> <span class="o">|</span> <span class="n">InputTensorSpec</span><span class="p">],</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TypeGuard</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="n">Input</span> <span class="o">|</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]]:</span>
     <span class="k">return</span> <span class="nb">all</span><span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">Input</span><span class="p">))</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">inputs</span><span class="p">)</span>
 
 
-<span class="k">def</span> <span class="nf">_fx_input_interface</span><span class="p">(</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">_fx_input_interface</span><span class="p">(</span>
     <span class="n">inputs</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="n">Input</span> <span class="o">|</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span> <span class="o">|</span> <span class="n">InputTensorSpec</span><span class="p">],</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TypeGuard</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="n">InputTensorSpec</span> <span class="o">|</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]]:</span>
     <span class="k">return</span> <span class="nb">all</span><span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">InputTensorSpec</span><span class="p">))</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">inputs</span><span class="p">)</span>
 
 
-<span class="k">class</span> <span class="nc">_IRType</span><span class="p">(</span><span class="n">Enum</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">_IRType</span><span class="p">(</span><span class="n">Enum</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Enum to determine the type of IR selected for model compilation&quot;&quot;&quot;</span>
 
     <span class="n">ts</span> <span class="o">=</span> <span class="mi">0</span>
@@ -547,7 +547,7 @@
     <span class="n">exported_program</span> <span class="o">=</span> <span class="mi">4</span>
 
 
-<span class="k">class</span> <span class="nc">_ModuleType</span><span class="p">(</span><span class="n">Enum</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">_ModuleType</span><span class="p">(</span><span class="n">Enum</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Enum to determine the type of model provided as input&quot;&quot;&quot;</span>
 
     <span class="n">nn</span> <span class="o">=</span> <span class="mi">0</span>
@@ -556,7 +556,7 @@
     <span class="n">ep</span> <span class="o">=</span> <span class="mi">3</span>
 
 
-<span class="k">def</span> <span class="nf">_parse_module_type</span><span class="p">(</span><span class="n">module</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">_ModuleType</span><span class="p">:</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">_parse_module_type</span><span class="p">(</span><span class="n">module</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">_ModuleType</span><span class="p">:</span>
     <span class="k">if</span> <span class="nb">any</span><span class="p">(</span>
         <span class="nb">isinstance</span><span class="p">(</span><span class="n">module</span><span class="p">,</span> <span class="n">t</span><span class="p">)</span>
         <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">ScriptModule</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">ScriptFunction</span><span class="p">]</span>
@@ -572,7 +572,7 @@
         <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;Module is an unknown format&quot;</span><span class="p">)</span>
 
 
-<span class="k">def</span> <span class="nf">_get_target_fe</span><span class="p">(</span><span class="n">module_type</span><span class="p">:</span> <span class="n">_ModuleType</span><span class="p">,</span> <span class="n">ir</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">_IRType</span><span class="p">:</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">_get_target_fe</span><span class="p">(</span><span class="n">module_type</span><span class="p">:</span> <span class="n">_ModuleType</span><span class="p">,</span> <span class="n">ir</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">_IRType</span><span class="p">:</span>
     <span class="n">module_is_tsable</span> <span class="o">=</span> <span class="nb">any</span><span class="p">(</span><span class="n">module_type</span> <span class="o">==</span> <span class="n">t</span> <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="p">[</span><span class="n">_ModuleType</span><span class="o">.</span><span class="n">nn</span><span class="p">,</span> <span class="n">_ModuleType</span><span class="o">.</span><span class="n">ts</span><span class="p">])</span>
     <span class="n">module_is_fxable</span> <span class="o">=</span> <span class="nb">any</span><span class="p">(</span><span class="n">module_type</span> <span class="o">==</span> <span class="n">t</span> <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="p">[</span><span class="n">_ModuleType</span><span class="o">.</span><span class="n">nn</span><span class="p">,</span> <span class="n">_ModuleType</span><span class="o">.</span><span class="n">fx</span><span class="p">])</span>
     <span class="n">module_is_exportable</span> <span class="o">=</span> <span class="n">module_type</span> <span class="o">==</span> <span class="n">_ModuleType</span><span class="o">.</span><span class="n">ep</span>
@@ -633,7 +633,7 @@
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Unknown ir was requested&quot;</span><span class="p">)</span>
 
 
-<div class="viewcode-block" id="compile"><a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.compile">[docs]</a><span class="k">def</span> <span class="nf">compile</span><span class="p">(</span>
+<div class="viewcode-block" id="compile"><a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.compile">[docs]</a><span class="k">def</span><span class="w"> </span><span class="nf">compile</span><span class="p">(</span>
     <span class="n">module</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
     <span class="n">ir</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;default&quot;</span><span class="p">,</span>
     <span class="n">inputs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Sequence</span><span class="p">[</span><span class="n">Input</span> <span class="o">|</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span> <span class="o">|</span> <span class="n">InputTensorSpec</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -743,7 +743,7 @@
         <span class="k">if</span> <span class="n">kwarg_inputs</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="n">kwarg_inputs</span> <span class="o">=</span> <span class="p">{}</span>
 
-        <span class="kn">from</span> <span class="nn">torch_tensorrt.dynamo.utils</span> <span class="kn">import</span> <span class="n">prepare_inputs</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">prepare_inputs</span>
 
         <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">arg_inputs</span><span class="p">,</span> <span class="n">collections</span><span class="o">.</span><span class="n">abc</span><span class="o">.</span><span class="n">Sequence</span><span class="p">):</span>
             <span class="n">arg_inputs</span> <span class="o">=</span> <span class="p">[</span><span class="n">arg_inputs</span><span class="p">]</span>  <span class="c1"># type: ignore</span>
@@ -770,7 +770,7 @@
         <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;Module is an unknown format or the ir requested is unknown&quot;</span><span class="p">)</span></div>
 
 
-<span class="k">def</span> <span class="nf">cross_compile_for_windows</span><span class="p">(</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">cross_compile_for_windows</span><span class="p">(</span>
     <span class="n">module</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">,</span>
     <span class="n">file_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">inputs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Sequence</span><span class="p">[</span><span class="n">Input</span> <span class="o">|</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -843,7 +843,7 @@
     <span class="k">if</span> <span class="n">kwarg_inputs</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">kwarg_inputs</span> <span class="o">=</span> <span class="p">{}</span>
 
-    <span class="kn">from</span> <span class="nn">torch_tensorrt.dynamo.utils</span> <span class="kn">import</span> <span class="n">prepare_inputs</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">prepare_inputs</span>
 
     <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">arg_inputs</span><span class="p">,</span> <span class="n">collections</span><span class="o">.</span><span class="n">abc</span><span class="o">.</span><span class="n">Sequence</span><span class="p">):</span>
         <span class="n">arg_inputs</span> <span class="o">=</span> <span class="p">[</span><span class="n">arg_inputs</span><span class="p">]</span>  <span class="c1"># type: ignore</span>
@@ -869,13 +869,13 @@
     <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;successfully compiled and saved the module for windows&quot;</span><span class="p">)</span>
 
 
-<span class="k">def</span> <span class="nf">torch_compile</span><span class="p">(</span><span class="n">module</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">torch_compile</span><span class="p">(</span><span class="n">module</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Returns a boxed model which is the output of torch.compile.</span>
 <span class="sd">    This does not compile the model to TRT. Execute this model on</span>
 <span class="sd">    sample inputs to compile the model to TRT.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="kn">from</span> <span class="nn">torch_tensorrt.dynamo.backend</span> <span class="kn">import</span> <span class="n">torch_tensorrt_backend</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.backend</span><span class="w"> </span><span class="kn">import</span> <span class="n">torch_tensorrt_backend</span>
 
     <span class="c1"># TODO: Remove dynamic=False when SymInt Dynamic shape support is ready</span>
     <span class="n">boxed_fn</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span>
@@ -885,7 +885,7 @@
     <span class="k">return</span> <span class="n">boxed_fn</span>
 
 
-<div class="viewcode-block" id="convert_method_to_trt_engine"><a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.convert_method_to_trt_engine">[docs]</a><span class="k">def</span> <span class="nf">convert_method_to_trt_engine</span><span class="p">(</span>
+<div class="viewcode-block" id="convert_method_to_trt_engine"><a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.convert_method_to_trt_engine">[docs]</a><span class="k">def</span><span class="w"> </span><span class="nf">convert_method_to_trt_engine</span><span class="p">(</span>
     <span class="n">module</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
     <span class="n">method_name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;forward&quot;</span><span class="p">,</span>
     <span class="n">inputs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Sequence</span><span class="p">[</span><span class="n">Input</span> <span class="o">|</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span> <span class="o">|</span> <span class="n">InputTensorSpec</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -966,7 +966,7 @@
         <span class="k">if</span> <span class="n">kwarg_inputs</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="n">kwarg_inputs</span> <span class="o">=</span> <span class="p">{}</span>
 
-        <span class="kn">from</span> <span class="nn">torch_tensorrt.dynamo.utils</span> <span class="kn">import</span> <span class="n">prepare_inputs</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">prepare_inputs</span>
 
         <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">arg_inputs</span><span class="p">,</span> <span class="n">collections</span><span class="o">.</span><span class="n">abc</span><span class="o">.</span><span class="n">Sequence</span><span class="p">):</span>
             <span class="n">arg_inputs</span> <span class="o">=</span> <span class="p">[</span><span class="n">arg_inputs</span><span class="p">]</span>  <span class="c1"># type: ignore</span>
@@ -994,7 +994,7 @@
         <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;Module is an unknown format or the ir requested is unknown&quot;</span><span class="p">)</span></div>
 
 
-<span class="k">def</span> <span class="nf">load_cross_compiled_exported_program</span><span class="p">(</span><span class="n">file_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">load_cross_compiled_exported_program</span><span class="p">(</span><span class="n">file_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Load an ExportedProgram file in Windows which was previously cross compiled in Linux</span>
 
@@ -1007,7 +1007,7 @@
     <span class="k">return</span> <span class="n">dynamo_load_cross_compiled_exported_program</span><span class="p">(</span><span class="n">file_path</span><span class="p">)</span>
 
 
-<div class="viewcode-block" id="load"><a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.load">[docs]</a><span class="k">def</span> <span class="nf">load</span><span class="p">(</span><span class="n">file_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+<div class="viewcode-block" id="load"><a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.load">[docs]</a><span class="k">def</span><span class="w"> </span><span class="nf">load</span><span class="p">(</span><span class="n">file_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Load either a Torchscript model or ExportedProgram.</span>
 
@@ -1044,7 +1044,7 @@
         <span class="p">)</span></div>
 
 
-<div class="viewcode-block" id="save"><a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.save">[docs]</a><span class="k">def</span> <span class="nf">save</span><span class="p">(</span>
+<div class="viewcode-block" id="save"><a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.save">[docs]</a><span class="k">def</span><span class="w"> </span><span class="nf">save</span><span class="p">(</span>
     <span class="n">module</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
     <span class="n">file_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span><span class="p">,</span>
     <span class="o">*</span><span class="p">,</span>
@@ -1131,7 +1131,7 @@
             <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">module_ts</span><span class="p">,</span> <span class="n">file_path</span><span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="k">if</span> <span class="ow">not</span> <span class="n">retrace</span><span class="p">:</span>
-                <span class="kn">from</span> <span class="nn">torch_tensorrt.dynamo._exporter</span> <span class="kn">import</span> <span class="n">export</span>
+                <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo._exporter</span><span class="w"> </span><span class="kn">import</span> <span class="n">export</span>
 
                 <span class="k">if</span> <span class="n">arg_inputs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
                     <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>

@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Writing Dynamo Converters &mdash; Torch-TensorRT v2.6.0.dev0+50f29cb documentation</title>
+  <title>Writing Dynamo Converters &mdash; Torch-TensorRT v2.6.0.dev0+69c83d4 documentation</title>
   
 
   
@@ -275,7 +275,7 @@
               
               
                 <div class="version">
-                  v2.6.0.dev0+50f29cb
+                  v2.6.0.dev0+69c83d4
                 </div>
               
             
@@ -480,7 +480,7 @@
 <h3>Registration<a class="headerlink" href="#registration" title="Permalink to this heading">¶</a></h3>
 <p>A converter is a function decrorated with  <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.dynamo.dynamo_tensorrt_converter</span></code> that follows the function signature:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="nd">@torch_tensorrt</span><span class="o">.</span><span class="n">dynamo</span><span class="o">.</span><span class="n">conversion</span><span class="o">.</span><span class="n">dynamo_tensorrt_converter</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">aten</span><span class="o">.</span><span class="n">leaky_relu</span><span class="o">.</span><span class="n">default</span><span class="p">)</span>
-<span class="k">def</span> <span class="nf">leaky_relu_converter</span><span class="p">(</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">leaky_relu_converter</span><span class="p">(</span>
     <span class="n">ctx</span><span class="p">:</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">dynamo</span><span class="o">.</span><span class="n">conversion</span><span class="o">.</span><span class="n">ConversionCtx</span><span class="p">,</span>
     <span class="n">target</span><span class="p">:</span> <span class="n">Target</span><span class="p">,</span>
     <span class="n">args</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Argument</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span>
@@ -541,7 +541,7 @@ The type enforcer will autocast before the converter is called, inputs to the su
         <span class="mi">2</span><span class="p">:</span> <span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">TRTTensor</span><span class="p">),</span>
     <span class="p">}</span>
 <span class="p">)</span>  <span class="c1"># type: ignore[misc]</span>
-<span class="k">def</span> <span class="nf">aten_ops_convolution</span><span class="p">(</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">aten_ops_convolution</span><span class="p">(</span>
     <span class="n">ctx</span><span class="p">:</span> <span class="n">ConversionContext</span><span class="p">,</span>
     <span class="n">target</span><span class="p">:</span> <span class="n">Target</span><span class="p">,</span>
     <span class="n">args</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Argument</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span>
@@ -570,7 +570,7 @@ Such converters can be implemented via a decomposition</p>
 <p>The decompositions are registered via <code class="docutils literal notranslate"><span class="pre">register_torch_trt_decomposition</span></code> decorator
 We define <code class="docutils literal notranslate"><span class="pre">addmm_replacement</span></code> and replace it with the torch ops, which will have their corresponding converters called.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="nd">@torch_tensorrt</span><span class="o">.</span><span class="n">dynamo</span><span class="o">.</span><span class="n">lowering</span><span class="o">.</span><span class="n">register_torch_trt_decomposition</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">aten</span><span class="o">.</span><span class="n">addmm</span><span class="p">)</span>
-<span class="k">def</span> <span class="nf">addmm_replacement</span><span class="p">(</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">addmm_replacement</span><span class="p">(</span>
     <span class="n">input_</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">mat1</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">mat2</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">beta</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mi">1</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">:</span>
     <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">add</span><span class="p">(</span>

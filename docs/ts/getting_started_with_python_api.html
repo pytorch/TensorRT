@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Using Torch-TensorRT in Python &mdash; Torch-TensorRT v2.6.0.dev0+50f29cb documentation</title>
+  <title>Using Torch-TensorRT in Python &mdash; Torch-TensorRT v2.6.0.dev0+69c83d4 documentation</title>
   
 
   
@@ -275,7 +275,7 @@
               
               
                 <div class="version">
-                  v2.6.0.dev0+50f29cb
+                  v2.6.0.dev0+69c83d4
                 </div>
               
             
@@ -483,7 +483,7 @@ If given a <code class="docutils literal notranslate"><span class="pre">torch.nn
 to Torch-TensorRT and you will be returned an optimized TorchScript module to run or add into another PyTorch module. Inputs
 is a list of <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.Input</span></code> classes which define input Tensors’ shape, datatype and memory format. Alternatively, if your input is a more complex data type, such as a tuple or list of Tensors, you can use the <code class="docutils literal notranslate"><span class="pre">input_signature</span></code> argument to specify a collection-based input, such as <code class="docutils literal notranslate"><span class="pre">(List[Tensor],</span> <span class="pre">Tuple[Tensor,</span> <span class="pre">Tensor])</span></code>. See the second sample below for an example. You can also specify settings such as operating precision for the engine or target device. After compilation you can save the module just like any other module
 to load in a deployment application. In order to load a TensorRT/TorchScript module, make sure you first import <code class="docutils literal notranslate"><span class="pre">torch_tensorrt</span></code>.</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch_tensorrt</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">torch_tensorrt</span>
 
 <span class="o">...</span>
 
@@ -509,7 +509,7 @@ to load in a deployment application. In order to load a TensorRT/TorchScript mod
 </pre></div>
 </div>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Sample using collection-based inputs via the input_signature argument</span>
-<span class="kn">import</span> <span class="nn">torch_tensorrt</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch_tensorrt</span>
 
 <span class="o">...</span>
 
@@ -534,8 +534,8 @@ to load in a deployment application. In order to load a TensorRT/TorchScript mod
 </pre></div>
 </div>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Deployment application</span>
-<span class="kn">import</span> <span class="nn">torch</span>
-<span class="kn">import</span> <span class="nn">torch_tensorrt</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch_tensorrt</span>
 
 <span class="n">trt_ts_module</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s2">&quot;trt_ts_module.ts&quot;</span><span class="p">)</span>
 <span class="n">input_data</span> <span class="o">=</span> <span class="n">input_data</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">&quot;cuda&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">half</span><span class="p">()</span>

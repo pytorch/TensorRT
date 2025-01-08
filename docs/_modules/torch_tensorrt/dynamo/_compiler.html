@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt.dynamo._compiler &mdash; Torch-TensorRT v2.6.0.dev0+50f29cb documentation</title>
+  <title>torch_tensorrt.dynamo._compiler &mdash; Torch-TensorRT v2.6.0.dev0+69c83d4 documentation</title>
   
 
   
@@ -272,7 +272,7 @@
               
               
                 <div class="version">
-                  v2.6.0.dev0+50f29cb
+                  v2.6.0.dev0+69c83d4
                 </div>
               
             
@@ -467,45 +467,45 @@
              <article itemprop="articleBody" id="pytorch-article" class="pytorch-article">
               
   <h1>Source code for torch_tensorrt.dynamo._compiler</h1><div class="highlight"><pre>
-<span></span><span class="kn">from</span> <span class="nn">__future__</span> <span class="kn">import</span> <span class="n">annotations</span>
+<span></span><span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
 
-<span class="kn">import</span> <span class="nn">collections.abc</span>
-<span class="kn">import</span> <span class="nn">logging</span>
-<span class="kn">import</span> <span class="nn">platform</span>
-<span class="kn">import</span> <span class="nn">warnings</span>
-<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Collection</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Sequence</span><span class="p">,</span> <span class="n">Set</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">,</span> <span class="n">Union</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">collections.abc</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">platform</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">warnings</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Collection</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Sequence</span><span class="p">,</span> <span class="n">Set</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">,</span> <span class="n">Union</span>
 
-<span class="kn">import</span> <span class="nn">torch</span>
-<span class="kn">from</span> <span class="nn">torch.export</span> <span class="kn">import</span> <span class="n">ExportedProgram</span>
-<span class="kn">from</span> <span class="nn">torch.fx.node</span> <span class="kn">import</span> <span class="n">Target</span>
-<span class="kn">from</span> <span class="nn">torch_tensorrt._Device</span> <span class="kn">import</span> <span class="n">Device</span>
-<span class="kn">from</span> <span class="nn">torch_tensorrt._enums</span> <span class="kn">import</span> <span class="n">EngineCapability</span><span class="p">,</span> <span class="n">dtype</span>
-<span class="kn">from</span> <span class="nn">torch_tensorrt._Input</span> <span class="kn">import</span> <span class="n">Input</span>
-<span class="kn">from</span> <span class="nn">torch_tensorrt.dynamo</span> <span class="kn">import</span> <span class="n">_defaults</span><span class="p">,</span> <span class="n">partitioning</span>
-<span class="kn">from</span> <span class="nn">torch_tensorrt.dynamo._DryRunTracker</span> <span class="kn">import</span> <span class="p">(</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch.export</span><span class="w"> </span><span class="kn">import</span> <span class="n">ExportedProgram</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch.fx.node</span><span class="w"> </span><span class="kn">import</span> <span class="n">Target</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt._Device</span><span class="w"> </span><span class="kn">import</span> <span class="n">Device</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt._enums</span><span class="w"> </span><span class="kn">import</span> <span class="n">EngineCapability</span><span class="p">,</span> <span class="n">dtype</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt._Input</span><span class="w"> </span><span class="kn">import</span> <span class="n">Input</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo</span><span class="w"> </span><span class="kn">import</span> <span class="n">_defaults</span><span class="p">,</span> <span class="n">partitioning</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo._DryRunTracker</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
     <span class="n">DryRunTracker</span><span class="p">,</span>
     <span class="n">PerSubgraphData</span><span class="p">,</span>
     <span class="n">dryrun_stats_display</span><span class="p">,</span>
     <span class="n">parse_non_trt_nodes</span><span class="p">,</span>
 <span class="p">)</span>
-<span class="kn">from</span> <span class="nn">torch_tensorrt.dynamo._engine_cache</span> <span class="kn">import</span> <span class="n">BaseEngineCache</span><span class="p">,</span> <span class="n">DiskEngineCache</span>
-<span class="kn">from</span> <span class="nn">torch_tensorrt.dynamo._exporter</span> <span class="kn">import</span> <span class="n">replace_execute_engine_no_op_node</span>
-<span class="kn">from</span> <span class="nn">torch_tensorrt.dynamo.conversion</span> <span class="kn">import</span> <span class="p">(</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo._engine_cache</span><span class="w"> </span><span class="kn">import</span> <span class="n">BaseEngineCache</span><span class="p">,</span> <span class="n">DiskEngineCache</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo._exporter</span><span class="w"> </span><span class="kn">import</span> <span class="n">replace_execute_engine_no_op_node</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.conversion</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
     <span class="n">CompilationSettings</span><span class="p">,</span>
     <span class="n">UnsupportedOperatorException</span><span class="p">,</span>
     <span class="n">convert_module</span><span class="p">,</span>
     <span class="n">interpret_module_to_result</span><span class="p">,</span>
     <span class="n">repair_double_inputs</span><span class="p">,</span>
 <span class="p">)</span>
-<span class="kn">from</span> <span class="nn">torch_tensorrt.dynamo.conversion._ConverterRegistry</span> <span class="kn">import</span> <span class="p">(</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.conversion._ConverterRegistry</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
     <span class="n">DYNAMO_CONVERTERS</span> <span class="k">as</span> <span class="n">CONVERTERS</span><span class="p">,</span>
 <span class="p">)</span>
-<span class="kn">from</span> <span class="nn">torch_tensorrt.dynamo.lowering</span> <span class="kn">import</span> <span class="p">(</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.lowering</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
     <span class="n">get_decompositions</span><span class="p">,</span>
     <span class="n">post_lowering</span><span class="p">,</span>
     <span class="n">pre_export_lowering</span><span class="p">,</span>
 <span class="p">)</span>
-<span class="kn">from</span> <span class="nn">torch_tensorrt.dynamo.utils</span> <span class="kn">import</span> <span class="p">(</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.utils</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
     <span class="n">get_flat_args_with_check</span><span class="p">,</span>
     <span class="n">get_output_metadata</span><span class="p">,</span>
     <span class="n">parse_graph_io</span><span class="p">,</span>
@@ -518,7 +518,7 @@
 <span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
 
 
-<span class="k">def</span> <span class="nf">cross_compile_for_windows</span><span class="p">(</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">cross_compile_for_windows</span><span class="p">(</span>
     <span class="n">exported_program</span><span class="p">:</span> <span class="n">ExportedProgram</span><span class="p">,</span>
     <span class="n">inputs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Sequence</span><span class="p">[</span><span class="n">Sequence</span><span class="p">[</span><span class="n">Any</span><span class="p">]]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="o">*</span><span class="p">,</span>
@@ -835,7 +835,7 @@
     <span class="k">return</span> <span class="n">trt_gm</span>
 
 
-<div class="viewcode-block" id="compile"><a class="viewcode-back" href="../../../py_api/dynamo.html#torch_tensorrt.dynamo.compile">[docs]</a><span class="k">def</span> <span class="nf">compile</span><span class="p">(</span>
+<div class="viewcode-block" id="compile"><a class="viewcode-back" href="../../../py_api/dynamo.html#torch_tensorrt.dynamo.compile">[docs]</a><span class="k">def</span><span class="w"> </span><span class="nf">compile</span><span class="p">(</span>
     <span class="n">exported_program</span><span class="p">:</span> <span class="n">ExportedProgram</span><span class="p">,</span>
     <span class="n">inputs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Sequence</span><span class="p">[</span><span class="n">Sequence</span><span class="p">[</span><span class="n">Any</span><span class="p">]]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="o">*</span><span class="p">,</span>
@@ -1153,7 +1153,7 @@
     <span class="k">return</span> <span class="n">trt_gm</span></div>
 
 
-<span class="k">def</span> <span class="nf">compile_module</span><span class="p">(</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">compile_module</span><span class="p">(</span>
     <span class="n">gm</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">,</span>
     <span class="n">sample_arg_inputs</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="n">Input</span><span class="p">],</span>
     <span class="n">sample_kwarg_inputs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -1210,7 +1210,7 @@
             <span class="sa">f</span><span class="s2">&quot;Detected support for </span><span class="si">{</span><span class="n">num_supported_ops</span><span class="si">}</span><span class="s2"> operators out of </span><span class="si">{</span><span class="n">total_ops</span><span class="si">}</span><span class="s2"> in subgraph.&quot;</span>
         <span class="p">)</span>
 
-    <span class="k">def</span> <span class="nf">contains_metadata</span><span class="p">(</span><span class="n">gm</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">contains_metadata</span><span class="p">(</span><span class="n">gm</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
         <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">nodes</span><span class="p">:</span>
             <span class="k">if</span> <span class="n">node</span><span class="o">.</span><span class="n">op</span> <span class="o">!=</span> <span class="s2">&quot;output&quot;</span> <span class="ow">and</span> <span class="p">(</span><span class="ow">not</span> <span class="n">node</span><span class="o">.</span><span class="n">meta</span><span class="p">)</span> <span class="ow">and</span> <span class="s2">&quot;val&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">node</span><span class="o">.</span><span class="n">meta</span><span class="p">:</span>
                 <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
@@ -1379,7 +1379,7 @@
     <span class="k">return</span> <span class="n">partitioned_module</span>
 
 
-<span class="k">def</span> <span class="nf">convert_exported_program_to_serialized_trt_engine</span><span class="p">(</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">convert_exported_program_to_serialized_trt_engine</span><span class="p">(</span>
     <span class="n">exported_program</span><span class="p">:</span> <span class="n">ExportedProgram</span><span class="p">,</span>
     <span class="n">inputs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Sequence</span><span class="p">[</span><span class="n">Sequence</span><span class="p">[</span><span class="n">Any</span><span class="p">]]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="o">*</span><span class="p">,</span>
@@ -1641,7 +1641,7 @@
     <span class="k">return</span> <span class="n">serialized_engine</span>
 
 
-<span class="k">def</span> <span class="nf">save_cross_compiled_exported_program</span><span class="p">(</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">save_cross_compiled_exported_program</span><span class="p">(</span>
     <span class="n">gm</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">,</span>
     <span class="n">file_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
@@ -1655,14 +1655,14 @@
     <span class="k">if</span> <span class="ow">not</span> <span class="n">file_path</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;File path cannot be empty. Please provide a valid file path&quot;</span><span class="p">)</span>
 
-    <span class="kn">from</span> <span class="nn">torch_tensorrt.dynamo._exporter</span> <span class="kn">import</span> <span class="n">export</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo._exporter</span><span class="w"> </span><span class="kn">import</span> <span class="n">export</span>
 
     <span class="n">exp_program</span> <span class="o">=</span> <span class="n">export</span><span class="p">(</span><span class="n">gm</span><span class="p">,</span> <span class="n">cross_compile_flag</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
     <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">exp_program</span><span class="p">,</span> <span class="n">file_path</span><span class="p">)</span>
     <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;successfully saved the module for windows at </span><span class="si">{</span><span class="n">file_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 
 
-<span class="k">def</span> <span class="nf">load_cross_compiled_exported_program</span><span class="p">(</span><span class="n">file_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">load_cross_compiled_exported_program</span><span class="p">(</span><span class="n">file_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Load an ExportedProgram file in Windows which was previously cross compiled in Linux</span>
 

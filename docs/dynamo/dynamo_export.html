@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Compiling Exported Programs with Torch-TensorRT &mdash; Torch-TensorRT v2.6.0.dev0+50f29cb documentation</title>
+  <title>Compiling Exported Programs with Torch-TensorRT &mdash; Torch-TensorRT v2.6.0.dev0+69c83d4 documentation</title>
   
 
   
@@ -275,7 +275,7 @@
               
               
                 <div class="version">
-                  v2.6.0.dev0+50f29cb
+                  v2.6.0.dev0+69c83d4
                 </div>
               
             
@@ -477,8 +477,8 @@
 can export graphs from Pytorch programs into <code class="docutils literal notranslate"><span class="pre">ExportedProgram</span></code> objects. Torch-TensorRT dynamo
 frontend compiles these <code class="docutils literal notranslate"><span class="pre">ExportedProgram</span></code> objects and optimizes them using TensorRT. Here’s a simple
 usage of the dynamo frontend</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
-<span class="kn">import</span> <span class="nn">torch_tensorrt</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch_tensorrt</span>
 
 <span class="n">model</span> <span class="o">=</span> <span class="n">MyModel</span><span class="p">()</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
 <span class="n">inputs</span> <span class="o">=</span> <span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">((</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span><span class="o">.</span><span class="n">cuda</span><span class="p">()]</span>
@@ -525,8 +525,8 @@ This internally performs some decompositions of operators for downstream optimiz
 The <code class="docutils literal notranslate"><span class="pre">ExportedProgram</span></code> can then be used with <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.dynamo.compile</span></code> API.
 If you have dynamic input shapes in your model, you can use this <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.dynamo.trace</span></code> to export
 the model with dynamic shapes. Alternatively, you can use <code class="docutils literal notranslate"><span class="pre">torch.export</span></code> <a class="reference external" href="https://pytorch.org/docs/stable/export.html#expressing-dynamism">with constraints</a> directly as well.</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
-<span class="kn">import</span> <span class="nn">torch_tensorrt</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch_tensorrt</span>
 
 <span class="n">inputs</span> <span class="o">=</span> <span class="p">[</span><span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">Input</span><span class="p">(</span><span class="n">min_shape</span><span class="o">=</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">),</span>
                               <span class="n">opt_shape</span><span class="o">=</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">),</span>

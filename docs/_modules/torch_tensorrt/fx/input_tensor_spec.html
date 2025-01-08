@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt.fx.input_tensor_spec &mdash; Torch-TensorRT v2.6.0.dev0+50f29cb documentation</title>
+  <title>torch_tensorrt.fx.input_tensor_spec &mdash; Torch-TensorRT v2.6.0.dev0+69c83d4 documentation</title>
   
 
   
@@ -272,7 +272,7 @@
               
               
                 <div class="version">
-                  v2.6.0.dev0+50f29cb
+                  v2.6.0.dev0+69c83d4
                 </div>
               
             
@@ -467,15 +467,15 @@
              <article itemprop="articleBody" id="pytorch-article" class="pytorch-article">
               
   <h1>Source code for torch_tensorrt.fx.input_tensor_spec</h1><div class="highlight"><pre>
-<span></span><span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Iterable</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">NamedTuple</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Sequence</span><span class="p">,</span> <span class="n">Tuple</span>
+<span></span><span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Iterable</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">NamedTuple</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Sequence</span><span class="p">,</span> <span class="n">Tuple</span>
 
-<span class="kn">import</span> <span class="nn">torch</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
 
-<span class="kn">from</span> <span class="nn">.types</span> <span class="kn">import</span> <span class="n">Shape</span><span class="p">,</span> <span class="n">ShapeRange</span>
-<span class="kn">from</span> <span class="nn">.utils</span> <span class="kn">import</span> <span class="n">get_dynamic_dims</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.types</span><span class="w"> </span><span class="kn">import</span> <span class="n">Shape</span><span class="p">,</span> <span class="n">ShapeRange</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_dynamic_dims</span>
 
 
-<span class="k">def</span> <span class="nf">generate_input_specs</span><span class="p">(</span><span class="n">inputs</span><span class="p">,</span> <span class="n">lower_setting</span><span class="p">,</span> <span class="n">additional_inputs</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">generate_input_specs</span><span class="p">(</span><span class="n">inputs</span><span class="p">,</span> <span class="n">lower_setting</span><span class="p">,</span> <span class="n">additional_inputs</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
     <span class="c1"># dynamic_batch is TRT only flag.</span>
     <span class="k">if</span> <span class="p">(</span>
         <span class="ow">not</span> <span class="n">lower_setting</span><span class="o">.</span><span class="n">explicit_batch_dimension</span>
@@ -534,7 +534,7 @@
         <span class="p">)</span>
 
 
-<div class="viewcode-block" id="InputTensorSpec"><a class="viewcode-back" href="../../../py_api/fx.html#torch_tensorrt.fx.InputTensorSpec">[docs]</a><span class="k">class</span> <span class="nc">InputTensorSpec</span><span class="p">(</span><span class="n">NamedTuple</span><span class="p">):</span>
+<div class="viewcode-block" id="InputTensorSpec"><a class="viewcode-back" href="../../../py_api/fx.html#torch_tensorrt.fx.InputTensorSpec">[docs]</a><span class="k">class</span><span class="w"> </span><span class="nc">InputTensorSpec</span><span class="p">(</span><span class="n">NamedTuple</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    This class contains the information of a input tensor.</span>
 
@@ -564,7 +564,7 @@
     <span class="n">has_batch_dim</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span>
 
     <span class="nd">@classmethod</span>
-    <span class="k">def</span> <span class="nf">from_tensor</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">tensor</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;InputTensorSpec&quot;</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">from_tensor</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">tensor</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;InputTensorSpec&quot;</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Produce an InputTenosrSpec named tuple which contains the</span>
 <span class="sd">        information of the given PyTorch tensor.</span>
@@ -578,7 +578,7 @@
         <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span><span class="n">tensor</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span> <span class="n">tensor</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">tensor</span><span class="o">.</span><span class="n">device</span><span class="p">)</span>
 
     <span class="nd">@classmethod</span>
-    <span class="k">def</span> <span class="nf">from_tensors</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">tensors</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="s2">&quot;InputTensorSpec&quot;</span><span class="p">]:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">from_tensors</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">tensors</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="s2">&quot;InputTensorSpec&quot;</span><span class="p">]:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Produce a list of InputTenosrSpec named tuples which contain</span>
 <span class="sd">        the information of all the given PyTorch tensors.</span>
@@ -593,7 +593,7 @@
         <span class="k">return</span> <span class="p">[</span><span class="bp">cls</span><span class="o">.</span><span class="n">from_tensor</span><span class="p">(</span><span class="n">t</span><span class="p">)</span> <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">tensors</span><span class="p">]</span>
 
     <span class="nd">@classmethod</span>
-    <span class="k">def</span> <span class="nf">from_tensors_with_dynamic_batch_size</span><span class="p">(</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">from_tensors_with_dynamic_batch_size</span><span class="p">(</span>
         <span class="bp">cls</span><span class="p">,</span>
         <span class="n">tensors</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">],</span>
         <span class="n">batch_size_range</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">],</span>
@@ -647,7 +647,7 @@
 
     <span class="nd">@classmethod</span>
     <span class="c1"># pyre-ignore [2]: Parameter `sample_input` must have a type other than `Any`</span>
-    <span class="k">def</span> <span class="nf">find_batch_size_dim</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">inputs</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="p">[]:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">find_batch_size_dim</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">inputs</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="p">[]:</span>
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">inputs</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">)</span> <span class="ow">or</span> <span class="nb">len</span><span class="p">(</span><span class="n">inputs</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="mi">1</span><span class="p">:</span>
             <span class="k">return</span> <span class="p">[</span><span class="mi">0</span><span class="p">]</span>
         <span class="n">shapes</span> <span class="o">=</span> <span class="p">[</span><span class="n">i</span><span class="o">.</span><span class="n">shape</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">inputs</span><span class="p">]</span>
@@ -686,7 +686,7 @@
 
         <span class="k">return</span> <span class="n">bs_dim</span>
 
-    <span class="k">def</span> <span class="nf">to_random_tensor</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="nb">id</span><span class="o">=</span><span class="mi">1</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">to_random_tensor</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="nb">id</span><span class="o">=</span><span class="mi">1</span><span class="p">):</span>
         <span class="n">shape</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>
         <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">get_dynamic_dims</span><span class="p">(</span><span class="n">shape</span><span class="p">)):</span>
             <span class="c1"># id=0 -&gt; min shape</span>
@@ -699,7 +699,7 @@
         <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="n">shape</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">device</span><span class="p">)</span>
 
     <span class="nd">@staticmethod</span>
-    <span class="k">def</span> <span class="nf">create_inputs_from_specs</span><span class="p">(</span><span class="n">input_specs</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="s2">&quot;InputTensorSpec&quot;</span><span class="p">]):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">create_inputs_from_specs</span><span class="p">(</span><span class="n">input_specs</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="s2">&quot;InputTensorSpec&quot;</span><span class="p">]):</span>
         <span class="n">inputs</span> <span class="o">=</span> <span class="p">[]</span>
         <span class="k">for</span> <span class="n">spec</span> <span class="ow">in</span> <span class="n">input_specs</span><span class="p">:</span>
             <span class="n">inputs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">spec</span><span class="o">.</span><span class="n">to_random_tensor</span><span class="p">())</span>
@@ -707,7 +707,7 @@
         <span class="k">return</span> <span class="n">inputs</span>
 
     <span class="nd">@staticmethod</span>
-    <span class="k">def</span> <span class="nf">create_inputs_from_max_specs</span><span class="p">(</span><span class="n">input_specs</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="s2">&quot;InputTensorSpec&quot;</span><span class="p">]):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">create_inputs_from_max_specs</span><span class="p">(</span><span class="n">input_specs</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="s2">&quot;InputTensorSpec&quot;</span><span class="p">]):</span>
         <span class="n">inputs</span> <span class="o">=</span> <span class="p">[]</span>
         <span class="k">for</span> <span class="n">spec</span> <span class="ow">in</span> <span class="n">input_specs</span><span class="p">:</span>
             <span class="n">inputs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">spec</span><span class="o">.</span><span class="n">to_random_tensor</span><span class="p">(</span><span class="mi">2</span><span class="p">))</span>

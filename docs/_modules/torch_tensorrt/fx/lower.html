@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt.fx.lower &mdash; Torch-TensorRT v2.6.0.dev0+50f29cb documentation</title>
+  <title>torch_tensorrt.fx.lower &mdash; Torch-TensorRT v2.6.0.dev0+69c83d4 documentation</title>
   
 
   
@@ -272,7 +272,7 @@
               
               
                 <div class="version">
-                  v2.6.0.dev0+50f29cb
+                  v2.6.0.dev0+69c83d4
                 </div>
               
             
@@ -467,34 +467,34 @@
              <article itemprop="articleBody" id="pytorch-article" class="pytorch-article">
               
   <h1>Source code for torch_tensorrt.fx.lower</h1><div class="highlight"><pre>
-<span></span><span class="kn">import</span> <span class="nn">dataclasses</span> <span class="k">as</span> <span class="nn">dc</span>
-<span class="kn">import</span> <span class="nn">logging</span>
-<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Callable</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Sequence</span>
+<span></span><span class="kn">import</span><span class="w"> </span><span class="nn">dataclasses</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">dc</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Callable</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Sequence</span>
 
 <span class="c1"># @manual=//deeplearning/trt/python:py_tensorrt</span>
-<span class="kn">import</span> <span class="nn">tensorrt</span> <span class="k">as</span> <span class="nn">trt</span>
-<span class="kn">import</span> <span class="nn">torch</span>
-<span class="kn">import</span> <span class="nn">torch.fx</span> <span class="k">as</span> <span class="nn">fx</span>
-<span class="kn">import</span> <span class="nn">torch.nn</span> <span class="k">as</span> <span class="nn">nn</span>
-<span class="kn">import</span> <span class="nn">torch_tensorrt.fx.tracer.dispatch_tracer.aten_tracer</span> <span class="k">as</span> <span class="nn">aten_tracer</span>
-<span class="kn">from</span> <span class="nn">torch.fx.passes.splitter_base</span> <span class="kn">import</span> <span class="n">SplitResult</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">tensorrt</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">trt</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch.fx</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">fx</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch.nn</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">nn</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch_tensorrt.fx.tracer.dispatch_tracer.aten_tracer</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">aten_tracer</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch.fx.passes.splitter_base</span><span class="w"> </span><span class="kn">import</span> <span class="n">SplitResult</span>
 
-<span class="kn">from</span> <span class="nn">.fx2trt</span> <span class="kn">import</span> <span class="n">TRTInterpreter</span><span class="p">,</span> <span class="n">TRTInterpreterResult</span>
-<span class="kn">from</span> <span class="nn">.lower_setting</span> <span class="kn">import</span> <span class="n">LowerSetting</span>
-<span class="kn">from</span> <span class="nn">.passes.lower_pass_manager_builder</span> <span class="kn">import</span> <span class="n">LowerPassManagerBuilder</span>
-<span class="kn">from</span> <span class="nn">.passes.pass_utils</span> <span class="kn">import</span> <span class="n">PassFunc</span><span class="p">,</span> <span class="n">validate_inference</span>
-<span class="kn">from</span> <span class="nn">.tools.timing_cache_utils</span> <span class="kn">import</span> <span class="n">TimingCacheManager</span>
-<span class="kn">from</span> <span class="nn">.tools.trt_splitter</span> <span class="kn">import</span> <span class="n">TRTSplitter</span><span class="p">,</span> <span class="n">TRTSplitterSetting</span>
-<span class="kn">from</span> <span class="nn">.tracer.acc_tracer</span> <span class="kn">import</span> <span class="n">acc_tracer</span>
-<span class="kn">from</span> <span class="nn">.trt_module</span> <span class="kn">import</span> <span class="n">TRTModule</span>
-<span class="kn">from</span> <span class="nn">.utils</span> <span class="kn">import</span> <span class="n">LowerPrecision</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.fx2trt</span><span class="w"> </span><span class="kn">import</span> <span class="n">TRTInterpreter</span><span class="p">,</span> <span class="n">TRTInterpreterResult</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.lower_setting</span><span class="w"> </span><span class="kn">import</span> <span class="n">LowerSetting</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.passes.lower_pass_manager_builder</span><span class="w"> </span><span class="kn">import</span> <span class="n">LowerPassManagerBuilder</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.passes.pass_utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">PassFunc</span><span class="p">,</span> <span class="n">validate_inference</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.tools.timing_cache_utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">TimingCacheManager</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.tools.trt_splitter</span><span class="w"> </span><span class="kn">import</span> <span class="n">TRTSplitter</span><span class="p">,</span> <span class="n">TRTSplitterSetting</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.tracer.acc_tracer</span><span class="w"> </span><span class="kn">import</span> <span class="n">acc_tracer</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.trt_module</span><span class="w"> </span><span class="kn">import</span> <span class="n">TRTModule</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">LowerPrecision</span>
 
 <span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
 
 <span class="n">Input</span> <span class="o">=</span> <span class="n">Sequence</span><span class="p">[</span><span class="n">Any</span><span class="p">]</span>
 
 
-<div class="viewcode-block" id="compile"><a class="viewcode-back" href="../../../py_api/fx.html#torch_tensorrt.fx.compile">[docs]</a><span class="k">def</span> <span class="nf">compile</span><span class="p">(</span>
+<div class="viewcode-block" id="compile"><a class="viewcode-back" href="../../../py_api/fx.html#torch_tensorrt.fx.compile">[docs]</a><span class="k">def</span><span class="w"> </span><span class="nf">compile</span><span class="p">(</span>
     <span class="n">module</span><span class="p">:</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">,</span>
     <span class="nb">input</span><span class="p">,</span>
     <span class="n">min_acc_module_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">10</span><span class="p">,</span>
@@ -559,18 +559,18 @@
 
 
 <span class="nd">@dc</span><span class="o">.</span><span class="n">dataclass</span>
-<span class="k">class</span> <span class="nc">LowerTrtInterpreter</span><span class="p">:</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">LowerTrtInterpreter</span><span class="p">:</span>
     <span class="n">lower_setting</span><span class="p">:</span> <span class="n">LowerSetting</span>
     <span class="n">timing_cache_manager</span><span class="p">:</span> <span class="n">TimingCacheManager</span>
 
     <span class="nd">@classmethod</span>
-    <span class="k">def</span> <span class="nf">create</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">lower_setting</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">create</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">lower_setting</span><span class="p">):</span>
         <span class="n">timing_cache_manager</span> <span class="o">=</span> <span class="n">TimingCacheManager</span><span class="p">(</span>
             <span class="n">lower_setting</span><span class="o">.</span><span class="n">timing_cache_prefix</span><span class="p">,</span> <span class="n">lower_setting</span><span class="o">.</span><span class="n">save_timing_cache</span>
         <span class="p">)</span>
         <span class="k">return</span> <span class="n">LowerTrtInterpreter</span><span class="p">(</span><span class="n">lower_setting</span><span class="p">,</span> <span class="n">timing_cache_manager</span><span class="p">)</span>
 
-    <span class="k">def</span> <span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">mod</span><span class="p">,</span> <span class="nb">input</span><span class="p">,</span> <span class="n">split_name</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TRTInterpreterResult</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">mod</span><span class="p">,</span> <span class="nb">input</span><span class="p">,</span> <span class="n">split_name</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TRTInterpreterResult</span><span class="p">:</span>
         <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">lower_setting</span><span class="o">.</span><span class="n">input_specs</span><span class="p">,</span> <span class="s2">&quot;Can&#39;t find input specs for lowering!&quot;</span>
         <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
             <span class="sa">f</span><span class="s2">&quot;split_name=</span><span class="si">{</span><span class="n">split_name</span><span class="si">}</span><span class="s2">, input_specs=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">lower_setting</span><span class="o">.</span><span class="n">input_specs</span><span class="si">}</span><span class="s2">&quot;</span>
@@ -624,7 +624,7 @@
         <span class="k">return</span> <span class="n">interp_result</span>
 
 
-<span class="k">def</span> <span class="nf">default_split_function</span><span class="p">(</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">default_split_function</span><span class="p">(</span>
     <span class="n">model</span><span class="p">:</span> <span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">,</span> <span class="n">inputs</span><span class="p">:</span> <span class="n">Input</span><span class="p">,</span> <span class="n">lower_setting</span><span class="p">:</span> <span class="n">LowerSetting</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">SplitResult</span><span class="p">:</span>
     <span class="n">splitter_setting</span> <span class="o">=</span> <span class="n">TRTSplitterSetting</span><span class="p">()</span>
@@ -636,14 +636,14 @@
     <span class="k">return</span> <span class="n">splitter</span><span class="o">.</span><span class="n">generate_split_results</span><span class="p">()</span>
 
 
-<span class="k">def</span> <span class="nf">create_lower_trt_interpreter</span><span class="p">(</span><span class="n">lower_setting</span><span class="p">:</span> <span class="n">LowerSetting</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">LowerTrtInterpreter</span><span class="p">:</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">create_lower_trt_interpreter</span><span class="p">(</span><span class="n">lower_setting</span><span class="p">:</span> <span class="n">LowerSetting</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">LowerTrtInterpreter</span><span class="p">:</span>
     <span class="k">return</span> <span class="n">LowerTrtInterpreter</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="n">lower_setting</span><span class="p">)</span>
 
 
-<span class="k">def</span> <span class="nf">default_lower_pass</span><span class="p">(</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">default_lower_pass</span><span class="p">(</span>
     <span class="n">create_trt_interpreter</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="n">LowerSetting</span><span class="p">],</span> <span class="n">LowerTrtInterpreter</span><span class="p">],</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">PassFunc</span><span class="p">:</span>
-    <span class="k">def</span> <span class="nf">lower_pass</span><span class="p">(</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">lower_pass</span><span class="p">(</span>
         <span class="n">mod</span><span class="p">:</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">,</span> <span class="nb">input</span><span class="p">:</span> <span class="n">Input</span><span class="p">,</span> <span class="n">lower_setting</span><span class="p">:</span> <span class="n">LowerSetting</span><span class="p">,</span> <span class="n">module_name</span><span class="p">:</span> <span class="nb">str</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
@@ -653,10 +653,10 @@
         <span class="n">interpreter</span> <span class="o">=</span> <span class="n">create_trt_interpreter</span><span class="p">(</span><span class="n">lower_setting</span><span class="p">)</span>
         <span class="n">interp_res</span><span class="p">:</span> <span class="n">TRTInterpreterResult</span> <span class="o">=</span> <span class="n">interpreter</span><span class="p">(</span><span class="n">mod</span><span class="p">,</span> <span class="nb">input</span><span class="p">,</span> <span class="n">module_name</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">lower_setting</span><span class="o">.</span><span class="n">use_experimental_rt</span><span class="p">:</span>
-            <span class="kn">import</span> <span class="nn">io</span>
+            <span class="kn">import</span><span class="w"> </span><span class="nn">io</span>
 
-            <span class="kn">from</span> <span class="nn">torch_tensorrt._Device</span> <span class="kn">import</span> <span class="n">Device</span>
-            <span class="kn">from</span> <span class="nn">torch_tensorrt.dynamo._TorchTensorRTModule</span> <span class="kn">import</span> <span class="n">TorchTensorRTModule</span>
+            <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt._Device</span><span class="w"> </span><span class="kn">import</span> <span class="n">Device</span>
+            <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo._TorchTensorRTModule</span><span class="w"> </span><span class="kn">import</span> <span class="n">TorchTensorRTModule</span>
 
             <span class="k">with</span> <span class="n">io</span><span class="o">.</span><span class="n">BytesIO</span><span class="p">()</span> <span class="k">as</span> <span class="n">engine_bytes</span><span class="p">:</span>
                 <span class="n">engine_bytes</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">interp_res</span><span class="o">.</span><span class="n">engine</span><span class="o">.</span><span class="n">serialize</span><span class="p">())</span>
@@ -685,7 +685,7 @@
 
 
 <span class="nd">@dc</span><span class="o">.</span><span class="n">dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-<span class="k">class</span> <span class="nc">Lowerer</span><span class="p">:</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">Lowerer</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Lowers a module using fx2trt.</span>
 
 <span class="sd">    This is a composable class to facilitate fx2trt. A normal fx2trt process</span>
@@ -709,7 +709,7 @@
     <span class="n">lower_pass_manager_builder</span><span class="p">:</span> <span class="n">LowerPassManagerBuilder</span>
 
     <span class="nd">@classmethod</span>
-    <span class="k">def</span> <span class="nf">create</span><span class="p">(</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">create</span><span class="p">(</span>
         <span class="bp">cls</span><span class="p">,</span>
         <span class="n">lower_setting</span><span class="p">:</span> <span class="n">LowerSetting</span><span class="p">,</span>
         <span class="n">interpreter_builder</span><span class="p">:</span> <span class="n">Callable</span> <span class="o">=</span> <span class="n">create_lower_trt_interpreter</span><span class="p">,</span>
@@ -743,7 +743,7 @@
                 <span class="p">)</span>
             <span class="p">)</span>
 
-    <span class="k">def</span> <span class="fm">__call__</span><span class="p">(</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">module</span><span class="p">:</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">,</span>
         <span class="n">inputs</span><span class="p">:</span> <span class="n">Input</span><span class="p">,</span>
@@ -758,7 +758,7 @@
             <span class="n">atol</span><span class="o">=</span><span class="n">atol</span><span class="p">,</span>
             <span class="n">rtol</span><span class="o">=</span><span class="n">rtol</span><span class="p">,</span>
         <span class="p">)</span>
-        <span class="k">def</span> <span class="nf">do_lower</span><span class="p">(</span><span class="n">module</span><span class="p">:</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">,</span> <span class="n">inputs</span><span class="p">:</span> <span class="n">Input</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">:</span>
+        <span class="k">def</span><span class="w"> </span><span class="nf">do_lower</span><span class="p">(</span><span class="n">module</span><span class="p">:</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">,</span> <span class="n">inputs</span><span class="p">:</span> <span class="n">Input</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">:</span>
             <span class="n">module</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span>
             <span class="k">if</span> <span class="p">(</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">lower_pass_manager_builder</span><span class="o">.</span><span class="n">lower_setting</span><span class="o">.</span><span class="n">lower_precision</span>

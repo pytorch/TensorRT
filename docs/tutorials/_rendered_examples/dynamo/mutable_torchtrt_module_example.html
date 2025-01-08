@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Mutable Torch TensorRT Module &mdash; Torch-TensorRT v2.6.0.dev0+50f29cb documentation</title>
+  <title>Mutable Torch TensorRT Module &mdash; Torch-TensorRT v2.6.0.dev0+69c83d4 documentation</title>
   
 
   
@@ -275,7 +275,7 @@
               
               
                 <div class="version">
-                  v2.6.0.dev0+50f29cb
+                  v2.6.0.dev0+69c83d4
                 </div>
               
             
@@ -486,10 +486,10 @@ The Mutable Torch TensorRT Module is designed to address these challenges, makin
 1. Sample workflow of Mutable Torch TensorRT Module with ResNet 18
 2. Save a Mutable Torch TensorRT Module
 3. Integration with Huggingface pipeline in LoRA use case</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
-<span class="kn">import</span> <span class="nn">torch</span>
-<span class="kn">import</span> <span class="nn">torch_tensorrt</span> <span class="k">as</span> <span class="nn">torch_trt</span>
-<span class="kn">import</span> <span class="nn">torchvision.models</span> <span class="k">as</span> <span class="nn">models</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch_tensorrt</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">torch_trt</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torchvision.models</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">models</span>
 
 <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">seed</span><span class="p">(</span><span class="mi">5</span><span class="p">)</span>
 <span class="n">torch</span><span class="o">.</span><span class="n">manual_seed</span><span class="p">(</span><span class="mi">5</span><span class="p">)</span>
@@ -542,7 +542,7 @@ The Mutable Torch TensorRT Module is designed to address these challenges, makin
 <h2>Stable Diffusion with Huggingface<a class="headerlink" href="#stable-diffusion-with-huggingface" title="Permalink to this heading">¶</a></h2>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># The LoRA checkpoint is from https://civitai.com/models/12597/moxin</span>
 
-<span class="kn">from</span> <span class="nn">diffusers</span> <span class="kn">import</span> <span class="n">DiffusionPipeline</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">diffusers</span><span class="w"> </span><span class="kn">import</span> <span class="n">DiffusionPipeline</span>
 
 <span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
     <span class="n">settings</span> <span class="o">=</span> <span class="p">{</span>

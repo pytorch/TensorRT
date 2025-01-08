@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Compiling SAM2 using the dynamo backend &mdash; Torch-TensorRT v2.6.0.dev0+50f29cb documentation</title>
+  <title>Compiling SAM2 using the dynamo backend &mdash; Torch-TensorRT v2.6.0.dev0+69c83d4 documentation</title>
   
 
   
@@ -275,7 +275,7 @@
               
               
                 <div class="version">
-                  v2.6.0.dev0+50f29cb
+                  v2.6.0.dev0+69c83d4
                 </div>
               
             
@@ -495,15 +495,15 @@ Install the following dependencies before compilation</p>
 </ul>
 <section id="import-the-following-libraries">
 <h2>Import the following libraries<a class="headerlink" href="#import-the-following-libraries" title="Permalink to this heading">¶</a></h2>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">matplotlib</span>
-<span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="k">as</span> <span class="nn">plt</span>
-<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
-<span class="kn">import</span> <span class="nn">pandas</span> <span class="k">as</span> <span class="nn">pd</span>
-<span class="kn">import</span> <span class="nn">torch</span>
-<span class="kn">import</span> <span class="nn">torch_tensorrt</span>
-<span class="kn">from</span> <span class="nn">PIL</span> <span class="kn">import</span> <span class="n">Image</span>
-<span class="kn">from</span> <span class="nn">sam2.sam2_image_predictor</span> <span class="kn">import</span> <span class="n">SAM2ImagePredictor</span>
-<span class="kn">from</span> <span class="nn">sam_components</span> <span class="kn">import</span> <span class="n">SAM2FullModel</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib.pyplot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">plt</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch_tensorrt</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">PIL</span><span class="w"> </span><span class="kn">import</span> <span class="n">Image</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sam2.sam2_image_predictor</span><span class="w"> </span><span class="kn">import</span> <span class="n">SAM2ImagePredictor</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sam_components</span><span class="w"> </span><span class="kn">import</span> <span class="n">SAM2FullModel</span>
 
 <span class="n">matplotlib</span><span class="o">.</span><span class="n">use</span><span class="p">(</span><span class="s2">&quot;Agg&quot;</span><span class="p">)</span>
 </pre></div>
@@ -521,8 +521,8 @@ and predict the masks (via <code class="docutils literal notranslate"><span clas
 standalone module <code class="docutils literal notranslate"><span class="pre">SAM2FullModel</span></code> which uses these utilities from <code class="docutils literal notranslate"><span class="pre">SAM2ImagePredictor</span></code> class.
 <code class="docutils literal notranslate"><span class="pre">SAM2FullModel</span></code> performs feature extraction and mask prediction in a single step instead of two step process of
 <code class="docutils literal notranslate"><span class="pre">SAM2ImagePredictor</span></code> (set_image and predict functions)</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">class</span> <span class="nc">SAM2FullModel</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">model</span><span class="p">):</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">SAM2FullModel</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">model</span><span class="p">):</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">image_encoder</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">forward_image</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_prepare_backbone_features</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">_prepare_backbone_features</span>
@@ -535,7 +535,7 @@ standalone module <code class="docutils literal notranslate"><span class="pre">S
 
         <span class="bp">self</span><span class="o">.</span><span class="n">_bb_feat_sizes</span> <span class="o">=</span> <span class="p">[(</span><span class="mi">256</span><span class="p">,</span> <span class="mi">256</span><span class="p">),</span> <span class="p">(</span><span class="mi">128</span><span class="p">,</span> <span class="mi">128</span><span class="p">),</span> <span class="p">(</span><span class="mi">64</span><span class="p">,</span> <span class="mi">64</span><span class="p">)]</span>
 
-    <span class="k">def</span> <span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">image</span><span class="p">,</span> <span class="n">point_coords</span><span class="p">,</span> <span class="n">point_labels</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">image</span><span class="p">,</span> <span class="n">point_coords</span><span class="p">,</span> <span class="n">point_labels</span><span class="p">):</span>
         <span class="n">backbone_out</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">image_encoder</span><span class="p">(</span><span class="n">image</span><span class="p">)</span>
         <span class="n">_</span><span class="p">,</span> <span class="n">vision_feats</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_prepare_backbone_features</span><span class="p">(</span><span class="n">backbone_out</span><span class="p">)</span>
 
@@ -602,7 +602,7 @@ the <a class="reference external" href="https://github.com/facebookresearch/sam2
 <p>The following functions implement preprocessing components which apply transformations on the input image
 and transform given point coordinates. We use the SAM2Transforms available via the SAM2ImagePredictor class.
 To read more about the transforms, refer to <a class="reference external" href="https://github.com/facebookresearch/sam2/blob/main/sam2/utils/transforms.py">https://github.com/facebookresearch/sam2/blob/main/sam2/utils/transforms.py</a></p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span> <span class="nf">preprocess_inputs</span><span class="p">(</span><span class="n">image</span><span class="p">,</span> <span class="n">predictor</span><span class="p">):</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">preprocess_inputs</span><span class="p">(</span><span class="n">image</span><span class="p">,</span> <span class="n">predictor</span><span class="p">):</span>
     <span class="n">w</span><span class="p">,</span> <span class="n">h</span> <span class="o">=</span> <span class="n">image</span><span class="o">.</span><span class="n">size</span>
     <span class="n">orig_hw</span> <span class="o">=</span> <span class="p">[(</span><span class="n">h</span><span class="p">,</span> <span class="n">w</span><span class="p">)]</span>
     <span class="n">input_image</span> <span class="o">=</span> <span class="n">predictor</span><span class="o">.</span><span class="n">_transforms</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">image</span><span class="p">))[</span><span class="kc">None</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">&quot;cuda:0&quot;</span><span class="p">)</span>
@@ -631,7 +631,7 @@ To read more about the transforms, refer to <a class="reference external" href="
 <h2>Post Processing components<a class="headerlink" href="#post-processing-components" title="Permalink to this heading">¶</a></h2>
 <p>The following functions implement postprocessing components which include plotting and visualizing masks and points.
 We use the SAM2Transforms to post process these masks and sort them via confidence score.</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span> <span class="nf">postprocess_masks</span><span class="p">(</span><span class="n">out</span><span class="p">,</span> <span class="n">predictor</span><span class="p">,</span> <span class="n">image</span><span class="p">):</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">postprocess_masks</span><span class="p">(</span><span class="n">out</span><span class="p">,</span> <span class="n">predictor</span><span class="p">,</span> <span class="n">image</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Postprocess low-resolution masks and convert them for visualization.&quot;&quot;&quot;</span>
     <span class="n">orig_hw</span> <span class="o">=</span> <span class="p">(</span><span class="n">image</span><span class="o">.</span><span class="n">size</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">image</span><span class="o">.</span><span class="n">size</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>  <span class="c1"># (height, width)</span>
     <span class="n">masks</span> <span class="o">=</span> <span class="n">predictor</span><span class="o">.</span><span class="n">_transforms</span><span class="o">.</span><span class="n">postprocess_masks</span><span class="p">(</span><span class="n">out</span><span class="p">[</span><span class="s2">&quot;low_res_masks&quot;</span><span class="p">],</span> <span class="n">orig_hw</span><span class="p">)</span>
@@ -641,7 +641,7 @@ We use the SAM2Transforms to post process these masks and sort them via confiden
     <span class="k">return</span> <span class="n">masks</span><span class="p">[</span><span class="n">sorted_indices</span><span class="p">],</span> <span class="n">scores</span><span class="p">[</span><span class="n">sorted_indices</span><span class="p">]</span>
 
 
-<span class="k">def</span> <span class="nf">show_mask</span><span class="p">(</span><span class="n">mask</span><span class="p">,</span> <span class="n">ax</span><span class="p">,</span> <span class="n">random_color</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">borders</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">show_mask</span><span class="p">(</span><span class="n">mask</span><span class="p">,</span> <span class="n">ax</span><span class="p">,</span> <span class="n">random_color</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">borders</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
     <span class="k">if</span> <span class="n">random_color</span><span class="p">:</span>
         <span class="n">color</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">concatenate</span><span class="p">([</span><span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">random</span><span class="p">(</span><span class="mi">3</span><span class="p">),</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">0.6</span><span class="p">])],</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
     <span class="k">else</span><span class="p">:</span>
@@ -650,7 +650,7 @@ We use the SAM2Transforms to post process these masks and sort them via confiden
     <span class="n">mask</span> <span class="o">=</span> <span class="n">mask</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">uint8</span><span class="p">)</span>
     <span class="n">mask_image</span> <span class="o">=</span> <span class="n">mask</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">h</span><span class="p">,</span> <span class="n">w</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span> <span class="o">*</span> <span class="n">color</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">)</span>
     <span class="k">if</span> <span class="n">borders</span><span class="p">:</span>
-        <span class="kn">import</span> <span class="nn">cv2</span>
+        <span class="kn">import</span><span class="w"> </span><span class="nn">cv2</span>
 
         <span class="n">contours</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">cv2</span><span class="o">.</span><span class="n">findContours</span><span class="p">(</span><span class="n">mask</span><span class="p">,</span> <span class="n">cv2</span><span class="o">.</span><span class="n">RETR_EXTERNAL</span><span class="p">,</span> <span class="n">cv2</span><span class="o">.</span><span class="n">CHAIN_APPROX_NONE</span><span class="p">)</span>
         <span class="c1"># Try to smooth contours</span>
@@ -663,7 +663,7 @@ We use the SAM2Transforms to post process these masks and sort them via confiden
     <span class="n">ax</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="n">mask_image</span><span class="p">)</span>
 
 
-<span class="k">def</span> <span class="nf">show_points</span><span class="p">(</span><span class="n">coords</span><span class="p">,</span> <span class="n">labels</span><span class="p">,</span> <span class="n">ax</span><span class="p">,</span> <span class="n">marker_size</span><span class="o">=</span><span class="mi">375</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">show_points</span><span class="p">(</span><span class="n">coords</span><span class="p">,</span> <span class="n">labels</span><span class="p">,</span> <span class="n">ax</span><span class="p">,</span> <span class="n">marker_size</span><span class="o">=</span><span class="mi">375</span><span class="p">):</span>
     <span class="n">pos_points</span> <span class="o">=</span> <span class="n">coords</span><span class="p">[</span><span class="n">labels</span> <span class="o">==</span> <span class="mi">1</span><span class="p">]</span>
     <span class="n">neg_points</span> <span class="o">=</span> <span class="n">coords</span><span class="p">[</span><span class="n">labels</span> <span class="o">==</span> <span class="mi">0</span><span class="p">]</span>
     <span class="n">ax</span><span class="o">.</span><span class="n">scatter</span><span class="p">(</span>
@@ -686,7 +686,7 @@ We use the SAM2Transforms to post process these masks and sort them via confiden
     <span class="p">)</span>
 
 
-<span class="k">def</span> <span class="nf">visualize_masks</span><span class="p">(</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">visualize_masks</span><span class="p">(</span>
     <span class="n">image</span><span class="p">,</span> <span class="n">masks</span><span class="p">,</span> <span class="n">scores</span><span class="p">,</span> <span class="n">point_coords</span><span class="p">,</span> <span class="n">point_labels</span><span class="p">,</span> <span class="n">title_prefix</span><span class="o">=</span><span class="s2">&quot;&quot;</span><span class="p">,</span> <span class="n">save</span><span class="o">=</span><span class="kc">True</span>
 <span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Visualize and save masks overlaid on the original image.&quot;&quot;&quot;</span>
