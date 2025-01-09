@@ -75,9 +75,8 @@ jobs:
             smoke-test-script: ${{ matrix.smoke-test-script }}
             trigger-event: ${{ github.event_name }}
             architecture: "x86_64"
-            setup-miniconda: false
-            build-platform: "python-build-package"
-            build-command: "python -m pip wheel --no-deps -w dist . --extra-index-url https://download.pytorch.org/whl/test/$WHEEL_DIR"
+            setup-miniconda: true
+            build-platform: "setup-py"
 
     tests-py-torchscript-fe:
         name: Test torchscript frontend [Python]
