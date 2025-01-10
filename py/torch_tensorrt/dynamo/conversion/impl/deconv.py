@@ -6,6 +6,7 @@ import numpy as np
 import tensorrt as trt
 import torch
 from torch.fx.node import Target
+
 from torch_tensorrt.dynamo.conversion import impl
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
 from torch_tensorrt.dynamo.conversion.converter_utils import (
@@ -105,6 +106,9 @@ def deconvNd(
     padding = (padding,) if isinstance(padding, int) else padding
     stride = (stride,) if isinstance(stride, int) else stride
     dilation = (dilation,) if isinstance(dilation, int) else dilation
+    output_padding = (
+        (output_padding,) if isinstance(output_padding, int) else output_padding
+    )
 
     # Expand parameters manually for Conv1D computations
     if is_deconv1d:
@@ -112,6 +116,11 @@ def deconvNd(
         stride = extend_attr_to_tuple(stride, 2) if stride is not None else stride
         dilation = (
             extend_attr_to_tuple(dilation, 2) if dilation is not None else dilation
+        )
+        output_padding = (
+            (tuple(output_padding) + (0,))
+            if output_padding is not None
+            else output_padding
         )
 
     set_layer_name(deconv_layer, target, name, source_ir)
@@ -125,6 +134,20 @@ def deconvNd(
         deconv_layer.dilation_nd = dilation
     if groups is not None:
         deconv_layer.num_groups = groups
+
+    ndims = len(padding)
+    pre_padding_values = []
+    post_padding_values = []
+
+    for dim in range(ndims):
+        pre_padding = padding[dim]
+        post_padding = padding[dim] - output_padding[dim]
+
+        pre_padding_values.append(pre_padding)
+        post_padding_values.append(post_padding)
+
+    deconv_layer.pre_padding = tuple(pre_padding_values)
+    deconv_layer.post_padding = tuple(post_padding_values)
 
     # Handle quantization cases
     if scale is not None and zero_point is not None:

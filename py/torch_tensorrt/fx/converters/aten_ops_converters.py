@@ -10,9 +10,10 @@ import numpy as np
 # @manual=//deeplearning/trt/python:py_tensorrt
 import tensorrt as trt
 import torch
-import torch_tensorrt.fx.tracer.acc_tracer.acc_utils as acc_utils
 from torch.fx.immutable_collections import immutable_list
 from torch.fx.node import Argument, Target
+
+import torch_tensorrt.fx.tracer.acc_tracer.acc_utils as acc_utils
 from torch_tensorrt.fx.converters import acc_ops_converters
 from torch_tensorrt.fx.converters.impl import activation, convolution
 
