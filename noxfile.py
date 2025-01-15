@@ -6,7 +6,7 @@ import nox
 
 # Use system installed Python packages
 PYT_PATH = (
-    "/usr/local/lib/python3.10/dist-packages"
+    "/usr/local/lib/python3.12/dist-packages"
     if not "PYT_PATH" in os.environ
     else os.environ["PYT_PATH"]
 )
@@ -34,7 +34,7 @@ if USE_HOST_DEPS:
 # Set epochs to train VGG model for accuracy tests
 EPOCHS = 25
 
-SUPPORTED_PYTHON_VERSIONS = ["3.9", "3.10", "3.11", "3.12"]
+SUPPORTED_PYTHON_VERSIONS = ["3.7", "3.8", "3.9", "3.10", "3.12"]
 
 nox.options.sessions = [
     "l0_api_tests-" + "{}.{}".format(sys.version_info.major, sys.version_info.minor)
@@ -233,12 +233,15 @@ def run_dynamo_converter_tests(session):
 def run_dynamo_lower_tests(session):
     print("Running Dynamo lowering passes")
     session.chdir(os.path.join(TOP_DIR, "tests/py/dynamo/"))
+    num_workers = "auto"
     tests = ["lowering"]
     for test in tests:
         if USE_HOST_DEPS:
-            session.run_always("pytest", test, env={"PYTHONPATH": PYT_PATH})
+            session.run_always(
+                "pytest", test, "-n", num_workers, env={"PYTHONPATH": PYT_PATH}
+            )
         else:
-            session.run_always("pytest", test)
+            session.run_always("pytest", test, "-n", num_workers)
 
 
 def run_dynamo_partitioning_tests(session):
