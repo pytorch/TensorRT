@@ -28,7 +28,7 @@ jobs:
       - uses: actions/setup-python@v4
         with:
           python-version: '3.10'
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           repository: pytorch/tensorrt
       - name: Generate tensorrt matrix
@@ -131,7 +131,9 @@ jobs:
         export USE_HOST_DEPS=1
         export CI_BUILD=1
         pushd .
-        cd tests/py/dynamo
+        cd tests/py
+        python -m pip install -r requirements.txt
+        cd dynamo
         python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/dynamo_converters_test_results.xml -n 4 conversion/
         popd
 
@@ -157,7 +159,9 @@ jobs:
         export USE_HOST_DEPS=1
         export CI_BUILD=1
         pushd .
-        cd tests/py/dynamo
+        cd tests/py
+        python -m pip install -r requirements.txt
+        cd dynamo
         python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/dyn_models_export.xml --ir dynamo models/
         popd
 
@@ -183,7 +187,9 @@ jobs:
         export USE_HOST_DEPS=1
         export CI_BUILD=1
         pushd .
-        cd tests/py/dynamo
+        cd tests/py
+        python -m pip install -r requirements.txt
+        cd dynamo
         python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/export_serde_test_results.xml --ir dynamo models/test_export_serde.py
         popd
 
@@ -209,7 +215,9 @@ jobs:
         export USE_HOST_DEPS=1
         export CI_BUILD=1
         pushd .
-        cd tests/py/dynamo
+        cd tests/py
+        python -m pip install -r requirements.txt
+        cd dynamo
         python -m pytest -ra -n 10 --junitxml=${RUNNER_TEST_RESULTS_DIR}/torch_compile_be_test_results.xml backend/
         python -m pytest -ra -n 4 --junitxml=${RUNNER_TEST_RESULTS_DIR}/torch_complete_be_e2e_test_results.xml --ir torch_compile models/test_models.py
         python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/torch_compile_dyn_models_export.xml --ir torch_compile models/test_dyn_models.py
@@ -237,7 +245,9 @@ jobs:
         export USE_HOST_DEPS=1
         export CI_BUILD=1
         pushd .
-        cd tests/py/dynamo
+        cd tests/py
+        python -m pip install -r requirements.txt
+        cd dynamo
         python -m pytest -ra -n 4 --junitxml=${RUNNER_TEST_RESULTS_DIR}/tests_py_dynamo_core_runtime_test_results.xml --ignore runtime/test_002_cudagraphs_py.py --ignore runtime/test_002_cudagraphs_cpp.py runtime/
         python -m pytest -ra -n 4 --junitxml=${RUNNER_TEST_RESULTS_DIR}/tests_py_dynamo_core_partitioning_test_results.xml partitioning/
         python -m pytest -ra -n 4 --junitxml=${RUNNER_TEST_RESULTS_DIR}/tests_py_dynamo_core_lowering_test_results.xml lowering/
@@ -265,7 +275,9 @@ jobs:
         export USE_HOST_DEPS=1
         export CI_BUILD=1
         pushd .
-        cd tests/py/dynamo
+        cd tests/py
+        python -m pip install -r requirements.txt
+        cd dynamo
         python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/tests_py_dynamo_core_runtime_cudagraphs_cpp_test_results.xml runtime/test_002_cudagraphs_cpp.py
         python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/tests_py_dynamo_core_runtime_cudagraphs_py_test_results.xml runtime/test_002_cudagraphs_py.py
         popd
