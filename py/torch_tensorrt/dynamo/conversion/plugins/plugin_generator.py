@@ -99,6 +99,69 @@ def custom_op(
 
     return inner(fn)
 
+def _generate_plugin(
+    namespace: str,
+    op_name: str,
+):
+    @trtp.register(f"{namespace}::{op_name}")
+    def add_plugin_desc(x: trtp.TensorDesc, y: trtp.TensorDesc, b: float, a: int) -> Tuple[trtp.TensorDesc]:
+        from torch._subclasses.fake_tensor import FakeTensorMode
+        from torch.fx.experimental.symbolic_shapes import ShapeEnv
+        from sympy import lambdify
+        shape_env = ShapeEnv()
+        fake_mode = FakeTensorMode(shape_env=shape_env)
+        sample_x = {f"x{i}": 5 for i in range(x.ndim)}
+        sample_y = {f"y{i}": 5 for i in range(y.ndim)}
+        syms_x = [mksym(shape_env, v, LocalSource(k), DimDynamic.DYNAMIC) for k,v in sample_x.items()]
+        syms_y = [mksym(shape_env, v, LocalSource(k), DimDynamic.DYNAMIC) for k,v in sample_y.items()]
+        with FakeTensorMode() as fake_mode:
+            fake_x = torch.randn(syms_x)
+            fake_y = torch.randn(syms_y)
+            z = torch.ops.torchtrt_ex.elementwise_mul(fake_x, fake_y, b, a)
+
+        shape_calc_fns = [None] * x.ndim
+        for i in range(x.ndim):
+            shape_calc_fns[i] = lambdify((syms_x[i].node.expr, syms_y[i].node.expr), z.shape[i].node.expr, "math")
+
+        out_desc = x.like()
+        for i in range(out_desc.ndim):
+            out_desc.shape_expr[i] = shape_calc_fns[i](x.shape_expr[i], y.shape_expr[i])
+
+
+    # Type annotations can be omitted for autotune and impl definitions, but will be checked for consistency if added
+    @trtp.autotune(f"{namespace}::{op_name}")
+    def add_plugin_autotune(
+        inp0: trtp.TensorDesc, block_size: int, outputs: Tuple[trtp.TensorDesc]
+    ) -> List[trtp.AutoTuneCombination]:
+        return [trtp.AutoTuneCombination("FP32|FP16, FP32|FP16", "LINEAR", [1, 2])]
+
+
+    @trtp.impl(f"{namespace}::{op_name}")
+    def add_plugin_impl(x: trtp.Tensor, y: trtp.Tensor, b: float, a: int, outputs: Tuple[trtp.Tensor], stream: int):
+        # This should be based on Torch schema
+        in_tensors = [
+            torch.as_tensor(i, device="cuda") for i in (x, y)
+        ]  # What is the right device??
+        dest_tensors = [torch.as_tensor(o, device="cuda") for o in outputs]
+
+        stream = torch.cuda.ExternalStream(stream)
+        with torch.cuda.stream(stream):
+            out_tensors = torch.ops.torchtrt_ex.elementwise_mul(*in_tensors, b, a)
+            [d.copy_(o) for (d, o) in zip(dest_tensors, out_tensors)]
+
+
+            
+def generate_plugin(
+    plugin_id: str,
+    # capability_validator: Optional[Callable[[Node, CompilationSettings], bool]] = None,
+
+):
+    plugin_ns, plugin_name = plugin_id.split("::")
+    _generate_plugin(
+        plugin_ns,
+        plugin_name,
+    )
+
 def _generate_plugin_converter(
     namespace: str,
     op_name: str,

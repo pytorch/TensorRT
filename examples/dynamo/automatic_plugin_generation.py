@@ -83,30 +83,256 @@ from torch._dynamo.source import LocalSource
 from torch.fx.experimental.symbolic_shapes import DimDynamic, ShapeEnv
 from sympy import lambdify
 
-@trtp.register("torchtrt_ex::elementwise_mul")
-def _(x: trtp.TensorDesc, y: trtp.TensorDesc, b: float, a: int) -> Tuple[trtp.TensorDesc]:
-    from torch._subclasses.fake_tensor import FakeTensorMode
-    from torch.fx.experimental.symbolic_shapes import ShapeEnv
-    from sympy import lambdify
-    shape_env = ShapeEnv()
-    fake_mode = FakeTensorMode(shape_env=shape_env)
-    sample_x = {f"x{i}": 5 for i in range(x.ndim)}
-    sample_y = {f"y{i}": 5 for i in range(y.ndim)}
-    syms_x = [mksym(shape_env, v, LocalSource(k), DimDynamic.DYNAMIC) for k,v in sample_x.items()]
-    syms_y = [mksym(shape_env, v, LocalSource(k), DimDynamic.DYNAMIC) for k,v in sample_y.items()]
-    with FakeTensorMode() as fake_mode:
-        fake_x = torch.randn(syms_x)
-        fake_y = torch.randn(syms_y)
-        z = torch.ops.torchtrt_ex.elementwise_mul(fake_x, fake_y, b, a)
 
-    shape_calc_fns = [None] * x.ndim
-    for i in range(x.ndim):
-        shape_calc_fns[i] = lambdify((syms_x[i].node.expr, syms_y[i].node.expr), z.shape[i].node.expr, "math")
+def generate_plugin(plugin_name : str):
+    namespace, name = plugin_name.split("::")
+    
+    torch_op = getattr(getattr(torch.ops, namespace), name) # torch.ops.torchtrt_ex.elementwise_mul
+    print(torch_op)
+    # retrieve torch.ops.torchtrt_ex.elementwise_mul
+    
+    print(torch_op._schemas)
+    
+    # import pdb; pdb.set_trace();
+    
+    # def parse_torch_op_schema(torch_op):
+    #     schema = torch_op._schemas['']
+    #     args = []
+    #     kwargs = {}
+    #     for arg in schema.arguments:
+    #         print(f"Name: {arg.name}, Type: {arg.type}, Default: {arg.default_value}")
+            
+    #     for ret in schema.returns:
+    #         print(f"Return Type: {ret.type}")
+    #         # if arg.default_value is None:
+    #         #     args.append(arg.name)
+    #         # else:
+    #         #     kwargs[arg.name] = arg.default_value
+    #     return args, kwargs
+        
+    # parse_torch_op_schema(torch_op)
+    
+    def _generic_plugin_desc_creator(torch_op):
+        schema = torch_op._schemas['']
+        
+        tensor_args = []
+        
+        arg_list = []
+        
+        func_body = []
+        
+        func_body.append("  shape_env = ShapeEnv()")
+        func_body.append("fake_mode = FakeTensorMode(shape_env=shape_env)")
+        
+        for arg in schema.arguments:
+            print(arg.type)
+            # import pdb; pdb.set_trace();
+            arg_type = "trtp.TensorDesc" if arg.type.isSubtypeOf(torch._C.TensorType.get()) else arg.type
+            arg_list.append(f"{arg.name} : {arg_type}")
+            
+            if arg.type.isSubtypeOf(torch._C.TensorType.get()):
+                tensor_args.append(arg)
+            
+        for arg in tensor_args:
+            func_body.append(f"sample_{arg.name} = {{f'{arg.name}{{i}}': 5 for i in range({arg.name}.ndim)}}")
+            
+        
+        for arg in tensor_args:
+            func_body.append(f"sysm_{arg.name} = [mksym(shape_env, v, LocalSource(k), DimDynamic.DYNAMIC) for k, v in sample_{arg.name}.items()]")
+            
+        func_body.append("with FakeTensorMode() as fake_mode:")
+        
+        for arg in tensor_args: 
+            func_body.append(f"  fake_{arg.name} = torch.randn(sysm_{arg.name})")
+            
+        #     sample_x = {f"x{i}": 5 for i in range(x.ndim)}
+        # sample_y = {f"y{i}": 5 for i in range(y.ndim)}
+        # syms_x = [mksym(shape_env, v, LocalSource(k), DimDynamic.DYNAMIC) for k,v in sample_x.items()]
+        # syms_y = [mksym(shape_env, v, LocalSource(k), DimDynamic.DYNAMIC) for k,v in sample_y.items()]
+        # running_line = f"output = {torch_op}("
+        running_args = []
+        for arg in schema.arguments: 
+            if arg in tensor_args:
+                running_args.append(f"fake_{arg.name}")
+            else:
+                running_args.append(f"{arg.name}")
+        running_line_args = ", ".join(running_args)
+        running_line = f"  output = torch.ops.{torch_op}({running_line_args})"
+        func_body.append(running_line)
+            
 
-    out_desc = x.like()
-    for i in range(out_desc.ndim):
-        out_desc.shape_expr[i] = shape_calc_fns[i](x.shape_expr[i], y.shape_expr[i])
-    return out_desc
+        # Join the argument list to create the signature
+        input_signature = ", ".join(arg_list)
+        print(input_signature)
+        
+        ret_list = []
+        for ret in schema.returns:
+            print(ret.type)
+            if ret.type.isSubtypeOf(torch._C.TensorType.get()):
+                ret_list.append(f"trtp.TensorDesc")
+            else: 
+                raise Exception("Return type has be to Tensor for TRT plugin")
+         
+        
+        ret_signature = "trtp.TensorDesc" if len(ret_list)  == 1 else f"Tuple[{', '.join(ret_list)}" 
+
+        plugin_signature = f"def add_plugin_desc({input_signature}) -> {ret_signature}:"
+        print(plugin_signature)
+        
+        
+        body_str = "\n  ".join(func_body)
+        print("-----------------\n")
+        print(plugin_signature)
+        print(body_str)
+        print("\n-----------------\n")
+
+    def generate_signature(torch_op):
+        schema = torch_op._schemas['']
+        tensor_args = []
+        arg_list = []
+        func_body = []
+        
+        func_body.append("  shape_env = ShapeEnv()")
+        func_body.append("fake_mode = FakeTensorMode(shape_env=shape_env)")
+        
+        args = []
+        kwargs = []
+        
+        for arg in schema.arguments:
+            # import pdb; pdb.set_trace();
+            arg_type = "trtp.TensorDesc" if arg.type.isSubtypeOf(torch._C.TensorType.get()) else arg.type
+            # arg_list.append(f"{arg.name} : {arg_type}")
+            arg_list.append(arg.name)
+            
+            if arg.type.isSubtypeOf(torch._C.TensorType.get()):
+                tensor_args.append(arg)
+                
+            if arg.default_value is None:
+                args.append(arg.name)
+            else:
+                kwargs.append(f"{arg.name} = {arg.default_value}")
+                
+        input_signature = ", ".join(arg_list)
+
+        ret_list = []
+        for ret in schema.returns:
+            print(ret.type)
+            if ret.type.isSubtypeOf(torch._C.TensorType.get()):
+                ret_list.append(f"trtp.TensorDesc")
+            else: 
+                raise Exception("Return type has be to Tensor for TRT plugin")
+         
+        
+        ret_signature = "trtp.TensorDesc" if len(ret_list)  == 1 else f"Tuple[{', '.join(ret_list)}" 
+
+        plugin_signature = f"def add_plugin_desc({input_signature}):"
+        args_input = ", ".join(args)
+        kwargs_input = ", ".join(kwargs)
+        # print(args_input)
+        # print(kwargs_input)
+        # print(plugin_signature)
+        return args_input, kwargs_input, plugin_signature
+        
+    
+    # _generic_plugin_desc_creator(torch_op)
+    
+    args_input, kwargs_input, plugin_signature = generate_signature(torch_op)
+    
+    def _generic_plugin_desc(*args, **kwargs) -> trtp.TensorDesc:
+        shape_env = ShapeEnv()
+        fake_mode = FakeTensorMode(shape_env=shape_env)
+        syms_args = []
+        for arg in args:
+            sample = {f"{i}": 5 for i in range(arg.ndim)}
+            syms_arg = [mksym(shape_env, v, LocalSource(k), DimDynamic.DYNAMIC) for k,v in sample.items()]
+            syms_args.append(syms_arg)
+            
+        with FakeTensorMode() as fake_mode:
+            fake_args = []
+            for syms_arg in syms_args:
+                fake_arg = torch.randn(syms_arg)
+                fake_args.append(fake_arg)
+                
+            output = torch_op(fake_args, kwargs)
+                
+        # We assume that number of dimensions are the same in torch op
+                
+        shape_calc_fns = [None] * args[0].ndim
+        for i in range(args[0].ndim):
+            input_node_expr = [syms_arg[i].node.expr for syms_arg in syms_args]
+            shape_calc_fns[i] = lambdify(input_node_expr, output.shape[i].node.expr, "math")
+
+
+        out_desc = args[0].like()
+        for i in range(out_desc.ndim):
+            input_shape_expr = [arg.shape_expr[i] for arg in args]
+            out_desc.shape_expr[i] = shape_calc_fns[i](input_shape_expr)
+        return out_desc
+        
+            
+        
+    # [SOME PYTHON CODE HERE]
+    codegen_plugin = f"""
+{plugin_signature}
+    return _generic_plugin_desc({args_input}, {kwargs_input})
+    """
+
+#     codegen_plugin = f"""
+# def add_plugin_desc(a):
+#     return a
+#     """
+    
+    print(codegen_plugin)
+
+    plugin_code = compile(codegen_plugin, "<string>", "exec")
+    
+    print(type(plugin_code))
+    print(plugin_code.co_consts[0])
+    
+    from types import FunctionType
+    
+    plugin= FunctionType(plugin_code.co_consts[0], globals(), "plugin")
+    
+    print(plugin)
+    
+    print(f"Function name: {plugin.__name__}")
+    print(f"Argument count: {plugin.__code__.co_argcount}")
+    print(f"Argument names: {plugin.__code__.co_varnames[:plugin.__code__.co_argcount]}")
+    print(f"Function bytecode: {plugin.__code__.co_code}")
+    
+    plugin.__annotations__ = {'X' : trtp.TensorDesc, 'Y' : trtp.TensorDesc, 'b' : float, 'a': int, 'return': trtp.TensorDesc}
+    
+    trtp.register(plugin_name)(plugin)
+    
+    
+    return plugin
+    
+generate_plugin("torchtrt_ex::elementwise_mul")
+
+# @trtp.register("torchtrt_ex::elementwise_mul")
+# def _(x: trtp.TensorDesc, y: trtp.TensorDesc, b: float, a: int) -> Tuple[trtp.TensorDesc]:
+#     from torch._subclasses.fake_tensor import FakeTensorMode
+#     from torch.fx.experimental.symbolic_shapes import ShapeEnv
+#     from sympy import lambdify
+#     shape_env = ShapeEnv()
+#     fake_mode = FakeTensorMode(shape_env=shape_env)
+#     sample_x = {f"x{i}": 5 for i in range(x.ndim)}
+#     sample_y = {f"y{i}": 5 for i in range(y.ndim)}
+#     syms_x = [mksym(shape_env, v, LocalSource(k), DimDynamic.DYNAMIC) for k,v in sample_x.items()]
+#     syms_y = [mksym(shape_env, v, LocalSource(k), DimDynamic.DYNAMIC) for k,v in sample_y.items()]
+#     with FakeTensorMode() as fake_mode:
+#         fake_x = torch.randn(syms_x)
+#         fake_y = torch.randn(syms_y)
+#         z = torch.ops.torchtrt_ex.elementwise_mul(fake_x, fake_y, b, a)
+
+#     shape_calc_fns = [None] * x.ndim
+#     for i in range(x.ndim):
+#         shape_calc_fns[i] = lambdify((syms_x[i].node.expr, syms_y[i].node.expr), z.shape[i].node.expr, "math")
+
+#     out_desc = x.like()
+#     for i in range(out_desc.ndim):
+#         out_desc.shape_expr[i] = shape_calc_fns[i](x.shape_expr[i], y.shape_expr[i])
+#     return out_desc
 
 
 @trtp.impl("torchtrt_ex::elementwise_mul")
