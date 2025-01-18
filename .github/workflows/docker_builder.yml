@@ -54,7 +54,7 @@ jobs:
         TRT_VERSION=$(python3 -c "import versions; versions.tensorrt_version()")
         echo "TRT VERSION = ${TRT_VERSION}"
 
-        DOCKER_BUILDKIT=1 docker build --build-arg TENSORRT_VERSION=$TRT_VERSION -f docker/Dockerfile --tag $DOCKER_TAG .
+        DOCKER_BUILDKIT=1 docker build --build-arg TENSORRT_VERSION=$TRT_VERSION --build-arg USE_CXX11_ABI=1 -f docker/Dockerfile --tag $DOCKER_TAG .
 
     - name: Push Docker image
       env:
