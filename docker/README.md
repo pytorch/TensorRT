@@ -1,13 +1,13 @@
 # Building a Torch-TensorRT container
 
-* Use `Dockerfile` to build a container which provides the exact development environment that our master branch is usually tested against.
+* Use `Dockerfile` to build a container which provides the exact development environment that our main branch is usually tested against.
 
 * The `Dockerfile` currently uses <a href="https://github.com/bazelbuild/bazelisk">Bazelisk</a> to select the Bazel version, and uses the exact library versions of Torch and CUDA listed in <a href="https://github.com/pytorch/TensorRT#dependencies">dependencies</a>.
   * The desired versions of TensorRT must be specified as build-args, with major and minor versions as in: `--build-arg TENSORRT_VERSION=a.b`
-  * [**Optional**] The desired base image be changed by explicitly setting a base image, as in `--build-arg BASE_IMG=nvidia/cuda:11.8.0-devel-ubuntu22.04`, though this is optional
+  * [**Optional**] The desired base image be changed by explicitly setting a base image, as in `--build-arg BASE_IMG=nvidia/cuda:11.8.0-devel-ubuntu22.04`, though this is optional.
   * [**Optional**] Additionally, the desired Python version can be changed by explicitly setting a version, as in `--build-arg PYTHON_VERSION=3.10`, though this is optional as well.
 
-* This `Dockerfile` installs `pre-cxx11-abi` versions of Pytorch and builds Torch-TRT using `pre-cxx11-abi` libtorch as well.
+* This `Dockerfile` installs `pre-cxx11-abi` versions of Pytorch and builds Torch-TRT using `pre-cxx11-abi` libtorch as well. Update on 1/17/2025: In torch 2.6, `PRE_CXX11_ABI` is required for CUDA 11.8 and 12.4, while `USE_CXX11_ABI` is required for CUDA 12.6. As of torch 2.7, torch requires `USE_CXX11_ABI` for all CUDA 11.8, 12.4, and 12.6.
 
 Note: By default the container uses the `pre-cxx11-abi` version of Torch + Torch-TRT. If you are using a workflow that requires a build of PyTorch on the CXX11 ABI (e.g. using the PyTorch NGC containers as a base image), add the Docker build argument: `--build-arg USE_CXX11_ABI=1`
 
@@ -24,7 +24,7 @@ Note: By default the container uses the `pre-cxx11-abi` version of Torch + Torch
 
 Build:
 ```
-DOCKER_BUILDKIT=1 docker build --build-arg TENSORRT_VERSION=10.6.0 -f docker/Dockerfile -t torch_tensorrt:latest .
+DOCKER_BUILDKIT=1 docker build --build-arg TENSORRT_VERSION=10.6.0 --build-arg USE_CXX11_ABI=1 -f docker/Dockerfile -t torch_tensorrt:latest .
 ```
 
 Run:
