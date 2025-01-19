@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>TensorRT Backend for torch.compile &mdash; Torch-TensorRT v2.6.0.dev0+70e2a38 documentation</title>
+  <title>TensorRT Backend for torch.compile &mdash; Torch-TensorRT v2.7.0.dev0+d6be4ba documentation</title>
   
 
   
@@ -135,8 +135,8 @@
                   <span class=dropdown-title>Developer Resources</span>
                   <p>Find resources and get questions answered</p>
                 </a>
-                <a class="nav-dropdown-item" href="https://pytorch.org/ecosystem/contributor-awards-2023">
-                  <span class="dropdown-title">Contributor Awards - 2023</span>
+                <a class="nav-dropdown-item" href="https://pytorch.org/ecosystem/contributor-awards-2024">
+                  <span class="dropdown-title">Contributor Awards - 2024</span>
                   <p>Award winners announced at this year's PyTorch Conference</p>
                 </a>
               </div>
@@ -156,6 +156,9 @@
                 <a class="nav-dropdown-item" href="https://pytorch.org/executorch-overview">
                   <span class="dropdown-title">ExecuTorch</span>
                   <p>End-to-end solution for enabling on-device inference capabilities across mobile and edge devices</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/executorch/stable/index.html">
+                  <span class="dropdown-title">ExecuTorch Docs</span>
                 </a>
               </div>
             </div>  
@@ -204,6 +207,10 @@
                   <span class="dropdown-title">Events</span>
                   <p>Find events, webinars, and podcasts</p>
                 </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/newsletter">
+                  <span class="dropdown-title">Newsletter</span>
+                  <p>Stay up-to-date with the latest updates</p>
+                </a>
             </div>
           </li>
 
@@ -219,7 +226,18 @@
                 </a>
                 <a class="nav-dropdown-item" href="https://pytorch.org/governing-board">
                   <span class="dropdown-title">Governing Board</span>
-                  <p></p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/credits">
+                  <span class="dropdown-title">Cloud Credit Program</span>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/tac">
+                  <span class="dropdown-title">Technical Advisory Council</span>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/staff">
+                  <span class="dropdown-title">Staff</span>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/contact-us">
+                  <span class="dropdown-title">Contact Us</span>
                 </a>
               </div>
             </div>
@@ -275,7 +293,7 @@
               
               
                 <div class="version">
-                  v2.6.0.dev0+70e2a38
+                  v2.7.0.dev0+d6be4ba
                 </div>
               
             
@@ -477,7 +495,7 @@
 <section id="key-features">
 <h2>Key Features<a class="headerlink" href="#key-features" title="Permalink to this heading">¶</a></h2>
 <p>The primary goal of the Torch-TensorRT <cite>torch.compile</cite> backend is to enable Just-In-Time compilation workflows by combining the simplicity of <cite>torch.compile</cite> API with the performance of TensorRT. Invoking the <cite>torch.compile</cite> backend is as simple as importing the <cite>torch_tensorrt</cite> package and specifying the backend:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch_tensorrt</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">torch_tensorrt</span>
 <span class="o">...</span>
 <span class="n">optimized_model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">backend</span><span class="o">=</span><span class="s2">&quot;torch_tensorrt&quot;</span><span class="p">,</span> <span class="n">dynamic</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
 </pre></div>
@@ -492,7 +510,7 @@
 <h2>Customizable Settings<a class="headerlink" href="#customizable-settings" title="Permalink to this heading">¶</a></h2>
 <dl class="py class">
 <dt class="sig sig-object py" id="torch_tensorrt.dynamo.CompilationSettings">
-<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">torch_tensorrt.dynamo.</span></span><span class="sig-name descname"><span class="pre">CompilationSettings</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="pre">enabled_precisions:</span> <span class="pre">~typing.Set[~torch_tensorrt._enums.dtype]</span> <span class="pre">=</span> <span class="pre">&lt;factory&gt;,</span> <span class="pre">debug:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">False,</span> <span class="pre">workspace_size:</span> <span class="pre">int</span> <span class="pre">=</span> <span class="pre">0,</span> <span class="pre">min_block_size:</span> <span class="pre">int</span> <span class="pre">=</span> <span class="pre">5,</span> <span class="pre">torch_executed_ops:</span> <span class="pre">~typing.Collection[~typing.Union[~typing.Callable[[...],</span> <span class="pre">~typing.Any],</span> <span class="pre">str]]</span> <span class="pre">=</span> <span class="pre">&lt;factory&gt;,</span> <span class="pre">pass_through_build_failures:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">False,</span> <span class="pre">max_aux_streams:</span> <span class="pre">~typing.Optional[int]</span> <span class="pre">=</span> <span class="pre">None,</span> <span class="pre">version_compatible:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">False,</span> <span class="pre">optimization_level:</span> <span class="pre">~typing.Optional[int]</span> <span class="pre">=</span> <span class="pre">None,</span> <span class="pre">use_python_runtime:</span> <span class="pre">~typing.Optional[bool]</span> <span class="pre">=</span> <span class="pre">False,</span> <span class="pre">truncate_double:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">False,</span> <span class="pre">use_fast_partitioner:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">True,</span> <span class="pre">enable_experimental_decompositions:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">False,</span> <span class="pre">device:</span> <span class="pre">~torch_tensorrt._Device.Device</span> <span class="pre">=</span> <span class="pre">&lt;factory&gt;,</span> <span class="pre">require_full_compilation:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">False,</span> <span class="pre">disable_tf32:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">False,</span> <span class="pre">assume_dynamic_shape_support:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">False,</span> <span class="pre">sparse_weights:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">False,</span> <span class="pre">engine_capability:</span> <span class="pre">~torch_tensorrt._enums.EngineCapability</span> <span class="pre">=</span> <span class="pre">&lt;factory&gt;,</span> <span class="pre">num_avg_timing_iters:</span> <span class="pre">int</span> <span class="pre">=</span> <span class="pre">1,</span> <span class="pre">dla_sram_size:</span> <span class="pre">int</span> <span class="pre">=</span> <span class="pre">1048576,</span> <span class="pre">dla_local_dram_size:</span> <span class="pre">int</span> <span class="pre">=</span> <span class="pre">1073741824,</span> <span class="pre">dla_global_dram_size:</span> <span class="pre">int</span> <span class="pre">=</span> <span class="pre">536870912,</span> <span class="pre">dryrun:</span> <span class="pre">~typing.Union[bool,</span> <span class="pre">str]</span> <span class="pre">=</span> <span class="pre">False,</span> <span class="pre">hardware_compatible:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">False,</span> <span class="pre">timing_cache_path:</span> <span class="pre">str</span> <span class="pre">=</span> <span class="pre">'/tmp/torch_tensorrt_engine_cache/timing_cache.bin',</span> <span class="pre">lazy_engine_init:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">False,</span> <span class="pre">cache_built_engines:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">False,</span> <span class="pre">reuse_cached_engines:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">False,</span> <span class="pre">use_explicit_typing:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">False,</span> <span class="pre">use_fp32_acc:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">False,</span> <span class="pre">refit_identical_engine_weights:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">False,</span> <span class="pre">strip_engine_weights:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">False,</span> <span class="pre">immutable_weights:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">True,</span> <span class="pre">enable_weight_streaming:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">False,</span> <span class="pre">enable_cross_compile_for_windows:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">False</span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/torch_tensorrt/dynamo/_settings.html#CompilationSettings"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.dynamo.CompilationSettings" title="Permalink to this definition">¶</a></dt>
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">torch_tensorrt.dynamo.</span></span><span class="sig-name descname"><span class="pre">CompilationSettings</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="pre">enabled_precisions:</span> <span class="pre">~typing.Set[~torch_tensorrt._enums.dtype]</span> <span class="pre">=</span> <span class="pre">&lt;factory&gt;,</span> <span class="pre">debug:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">False,</span> <span class="pre">workspace_size:</span> <span class="pre">int</span> <span class="pre">=</span> <span class="pre">0,</span> <span class="pre">min_block_size:</span> <span class="pre">int</span> <span class="pre">=</span> <span class="pre">5,</span> <span class="pre">torch_executed_ops:</span> <span class="pre">~typing.Collection[~typing.Union[~typing.Callable[[...],</span> <span class="pre">~typing.Any],</span> <span class="pre">str]]</span> <span class="pre">=</span> <span class="pre">&lt;factory&gt;,</span> <span class="pre">pass_through_build_failures:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">False,</span> <span class="pre">max_aux_streams:</span> <span class="pre">~typing.Optional[int]</span> <span class="pre">=</span> <span class="pre">None,</span> <span class="pre">version_compatible:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">False,</span> <span class="pre">optimization_level:</span> <span class="pre">~typing.Optional[int]</span> <span class="pre">=</span> <span class="pre">None,</span> <span class="pre">use_python_runtime:</span> <span class="pre">~typing.Optional[bool]</span> <span class="pre">=</span> <span class="pre">False,</span> <span class="pre">truncate_double:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">False,</span> <span class="pre">use_fast_partitioner:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">True,</span> <span class="pre">enable_experimental_decompositions:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">False,</span> <span class="pre">device:</span> <span class="pre">~torch_tensorrt._Device.Device</span> <span class="pre">=</span> <span class="pre">&lt;factory&gt;,</span> <span class="pre">require_full_compilation:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">False,</span> <span class="pre">disable_tf32:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">False,</span> <span class="pre">assume_dynamic_shape_support:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">False,</span> <span class="pre">sparse_weights:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">False,</span> <span class="pre">engine_capability:</span> <span class="pre">~torch_tensorrt._enums.EngineCapability</span> <span class="pre">=</span> <span class="pre">&lt;factory&gt;,</span> <span class="pre">num_avg_timing_iters:</span> <span class="pre">int</span> <span class="pre">=</span> <span class="pre">1,</span> <span class="pre">dla_sram_size:</span> <span class="pre">int</span> <span class="pre">=</span> <span class="pre">1048576,</span> <span class="pre">dla_local_dram_size:</span> <span class="pre">int</span> <span class="pre">=</span> <span class="pre">1073741824,</span> <span class="pre">dla_global_dram_size:</span> <span class="pre">int</span> <span class="pre">=</span> <span class="pre">536870912,</span> <span class="pre">dryrun:</span> <span class="pre">~typing.Union[bool,</span> <span class="pre">str]</span> <span class="pre">=</span> <span class="pre">False,</span> <span class="pre">hardware_compatible:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">False,</span> <span class="pre">timing_cache_path:</span> <span class="pre">str</span> <span class="pre">=</span> <span class="pre">'/tmp/torch_tensorrt_engine_cache/timing_cache.bin',</span> <span class="pre">lazy_engine_init:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">False,</span> <span class="pre">cache_built_engines:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">False,</span> <span class="pre">reuse_cached_engines:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">False,</span> <span class="pre">use_explicit_typing:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">False,</span> <span class="pre">use_fp32_acc:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">False,</span> <span class="pre">refit_identical_engine_weights:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">False,</span> <span class="pre">strip_engine_weights:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">False,</span> <span class="pre">immutable_weights:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">True,</span> <span class="pre">enable_weight_streaming:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">False,</span> <span class="pre">enable_cross_compile_for_windows:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">False,</span> <span class="pre">use_aot_joint_export:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">True</span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/torch_tensorrt/dynamo/_settings.html#CompilationSettings"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.dynamo.CompilationSettings" title="Permalink to this definition">¶</a></dt>
 <dd><p>Compilation settings for Torch-TensorRT Dynamo Paths</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters</dt>
@@ -540,6 +558,7 @@ output to a file if a string path is specified</p></li>
 <li><p><strong>enable_weight_streaming</strong> (<em>bool</em>) – Enable weight streaming.</p></li>
 <li><p><strong>enable_cross_compile_for_windows</strong> (<em>bool</em>) – By default this is False means TensorRT engines can only be executed on the same platform where they were built.
 True will enable cross-platform compatibility which allows the engine to be built on Linux and run on Windows</p></li>
+<li><p><strong>use_aot_joint_export</strong> (<em>bool</em>) – Use aot_export_joint_simple, else wrap backend with AOT_autograd, required for distributed tensors</p></li>
 </ul>
 </dd>
 </dl>
@@ -547,7 +566,7 @@ True will enable cross-platform compatibility which allows the engine to be buil
 
 <section id="custom-setting-usage">
 <h3>Custom Setting Usage<a class="headerlink" href="#custom-setting-usage" title="Permalink to this heading">¶</a></h3>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch_tensorrt</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">torch_tensorrt</span>
 <span class="o">...</span>
 <span class="n">optimized_model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">backend</span><span class="o">=</span><span class="s2">&quot;torch_tensorrt&quot;</span><span class="p">,</span> <span class="n">dynamic</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
                                 <span class="n">options</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;truncate_long_and_double&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
@@ -568,7 +587,7 @@ True will enable cross-platform compatibility which allows the engine to be buil
 <section id="compilation">
 <h2>Compilation<a class="headerlink" href="#compilation" title="Permalink to this heading">¶</a></h2>
 <p>Compilation is triggered by passing inputs to the model, as so:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch_tensorrt</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">torch_tensorrt</span>
 <span class="o">...</span>
 <span class="c1"># Causes model compilation to occur</span>
 <span class="n">first_outputs</span> <span class="o">=</span> <span class="n">optimized_model</span><span class="p">(</span><span class="o">*</span><span class="n">inputs</span><span class="p">)</span>
@@ -589,7 +608,7 @@ True will enable cross-platform compatibility which allows the engine to be buil
 <section id="operator-coverage">
 <h3>Operator Coverage<a class="headerlink" href="#operator-coverage" title="Permalink to this heading">¶</a></h3>
 <p>Compilation is also a useful tool in determining operator coverage for a particular model. For instance, the following compilation command will display the operator coverage for each graph, but will not compile the model - effectively providing a “dryrun” mechanism:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch_tensorrt</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">torch_tensorrt</span>
 <span class="o">...</span>
 <span class="n">optimized_model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">backend</span><span class="o">=</span><span class="s2">&quot;torch_tensorrt&quot;</span><span class="p">,</span> <span class="n">dynamic</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
                                 <span class="n">options</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;debug&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
@@ -601,8 +620,8 @@ True will enable cross-platform compatibility which allows the engine to be buil
 <section id="feasibility-of-serialization">
 <h3>Feasibility of Serialization<a class="headerlink" href="#feasibility-of-serialization" title="Permalink to this heading">¶</a></h3>
 <p>Compilation can also be helpful in demonstrating graph breaks and the feasibility of serialization of a particular model. For instance, if a model has no graph breaks and compiles successfully with the Torch-TensorRT backend, then that model should be compilable and serializeable via the <cite>torch_tensorrt</cite> Dynamo IR, as discussed in <a class="reference internal" href="../user_guide/dynamic_shapes.html#dynamic-shapes"><span class="std std-ref">Dynamic shapes with Torch-TensorRT</span></a>. To determine the number of graph breaks in a model, the <cite>torch._dynamo.explain</cite> function is very useful:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
-<span class="kn">import</span> <span class="nn">torch_tensorrt</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch_tensorrt</span>
 <span class="o">...</span>
 <span class="n">explanation</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">_dynamo</span><span class="o">.</span><span class="n">explain</span><span class="p">(</span><span class="n">model</span><span class="p">)(</span><span class="o">*</span><span class="n">inputs</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Graph breaks: </span><span class="si">{</span><span class="n">explanation</span><span class="o">.</span><span class="n">graph_break_count</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
@@ -875,7 +894,7 @@ True will enable cross-platform compatibility which allows the engine to be buil
                <a href="https://pytorch.org/resources">Developer Resources</a>
              </li>
              <li>
-               <a href="https://pytorch.org/ecosystem/contributor-awards-2023">Contributor Awards - 2023</a>
+               <a href="https://pytorch.org/ecosystem/contributor-awards-2023">Contributor Awards - 2024</a>
              </li>
            </ul>
 
@@ -890,6 +909,9 @@ True will enable cross-platform compatibility which allows the engine to be buil
              
              <li>
                <a href="https://pytorch.org/executorch-overview">ExecuTorch</a>
+             </li>
+             <li>
+               <a href="https://pytorch.org/executorch/stable/index.html">ExecuTorch Documentation</a>
              </li>
            </ul>
 
@@ -929,6 +951,9 @@ True will enable cross-platform compatibility which allows the engine to be buil
             <li>
               <a href="https://pytorch.org/events">Events</a>
             </li>
+            <li>
+               <a href="https://pytorch.org/newsletter">Newsletter</a>
+             </li>
           </ul>
           
           <li class="resources-mobile-menu-title">
@@ -941,6 +966,18 @@ True will enable cross-platform compatibility which allows the engine to be buil
             </li>
             <li>
               <a href="https://pytorch.org/governing-board">Governing Board</a>
+            </li>
+            <li>
+               <a href="https://pytorch.org/credits">Cloud Credit Program</a>
+            </li>
+            <li>
+               <a href="https://pytorch.org/tac">Technical Advisory Council</a>
+            </li>
+            <li>
+               <a href="https://pytorch.org/staff">Staff</a>
+            </li>
+            <li>
+               <a href="https://pytorch.org/contact-us">Contact Us</a>
             </li>
           </ul>
         </ul>

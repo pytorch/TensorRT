@@ -29,3 +29,42 @@ def get_tensor_placeholders(
     ]
 
     return placeholders
+
+
+def find_complex_nodes(gm: torch.fx.GraphModule):
+    complex_nodes = []
+    complexNodes = {}
+    for node in gm.graph.nodes:
+        if is_node_complex(node, complexNodes):
+            complex_nodes.append(node)
+    return complex_nodes
+
+
+def is_node_complex(node: torch.fx.Node, complexNodes):
+    if not isinstance(node, torch.fx.Node):
+        return False
+    if node.name in complexNodes:
+        return True
+    if node.op == "call_function" and node.args is not None:
+        for arg in node.args:
+            if isinstance(arg, int):
+                continue
+            elif isinstance(arg, (list, tuple)):
+                for eachNode in arg:
+                    if is_node_complex(eachNode, complexNodes):
+                        complexNodes[node.name] = True
+                        return True
+
+            elif hasattr(arg, "meta") and "val" in arg.meta:
+                if isinstance(arg.meta["val"], (list, tuple)):
+                    for eachFakeTensorMeta in arg.meta["val"]:
+                        if eachFakeTensorMeta.dtype in (
+                            torch.complex64,
+                            torch.complex128,
+                        ):
+                            complexNodes[node.name] = True
+                            return True
+                elif arg.meta["val"].dtype in (torch.complex64, torch.complex128):
+                    complexNodes[node.name] = True
+                    return True
+    return False

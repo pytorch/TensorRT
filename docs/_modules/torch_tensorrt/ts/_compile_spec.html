@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt.ts._compile_spec &mdash; Torch-TensorRT v2.6.0.dev0+70e2a38 documentation</title>
+  <title>torch_tensorrt.ts._compile_spec &mdash; Torch-TensorRT v2.7.0.dev0+d6be4ba documentation</title>
   
 
   
@@ -132,8 +132,8 @@
                   <span class=dropdown-title>Developer Resources</span>
                   <p>Find resources and get questions answered</p>
                 </a>
-                <a class="nav-dropdown-item" href="https://pytorch.org/ecosystem/contributor-awards-2023">
-                  <span class="dropdown-title">Contributor Awards - 2023</span>
+                <a class="nav-dropdown-item" href="https://pytorch.org/ecosystem/contributor-awards-2024">
+                  <span class="dropdown-title">Contributor Awards - 2024</span>
                   <p>Award winners announced at this year's PyTorch Conference</p>
                 </a>
               </div>
@@ -153,6 +153,9 @@
                 <a class="nav-dropdown-item" href="https://pytorch.org/executorch-overview">
                   <span class="dropdown-title">ExecuTorch</span>
                   <p>End-to-end solution for enabling on-device inference capabilities across mobile and edge devices</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/executorch/stable/index.html">
+                  <span class="dropdown-title">ExecuTorch Docs</span>
                 </a>
               </div>
             </div>  
@@ -201,6 +204,10 @@
                   <span class="dropdown-title">Events</span>
                   <p>Find events, webinars, and podcasts</p>
                 </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/newsletter">
+                  <span class="dropdown-title">Newsletter</span>
+                  <p>Stay up-to-date with the latest updates</p>
+                </a>
             </div>
           </li>
 
@@ -216,7 +223,18 @@
                 </a>
                 <a class="nav-dropdown-item" href="https://pytorch.org/governing-board">
                   <span class="dropdown-title">Governing Board</span>
-                  <p></p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/credits">
+                  <span class="dropdown-title">Cloud Credit Program</span>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/tac">
+                  <span class="dropdown-title">Technical Advisory Council</span>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/staff">
+                  <span class="dropdown-title">Staff</span>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/contact-us">
+                  <span class="dropdown-title">Contact Us</span>
                 </a>
               </div>
             </div>
@@ -272,7 +290,7 @@
               
               
                 <div class="version">
-                  v2.6.0.dev0+70e2a38
+                  v2.7.0.dev0+d6be4ba
                 </div>
               
             
@@ -467,25 +485,25 @@
              <article itemprop="articleBody" id="pytorch-article" class="pytorch-article">
               
   <h1>Source code for torch_tensorrt.ts._compile_spec</h1><div class="highlight"><pre>
-<span></span><span class="kn">from</span> <span class="nn">__future__</span> <span class="kn">import</span> <span class="n">annotations</span>
+<span></span><span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
 
-<span class="kn">from</span> <span class="nn">copy</span> <span class="kn">import</span> <span class="n">deepcopy</span>
-<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Set</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">copy</span><span class="w"> </span><span class="kn">import</span> <span class="n">deepcopy</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Set</span>
 
-<span class="kn">import</span> <span class="nn">torch</span>
-<span class="kn">import</span> <span class="nn">torch_tensorrt._C.ts</span> <span class="k">as</span> <span class="nn">_ts_C</span>
-<span class="kn">from</span> <span class="nn">torch_tensorrt</span> <span class="kn">import</span> <span class="n">_C</span>
-<span class="kn">from</span> <span class="nn">torch_tensorrt._Device</span> <span class="kn">import</span> <span class="n">Device</span>
-<span class="kn">from</span> <span class="nn">torch_tensorrt._enums</span> <span class="kn">import</span> <span class="n">DeviceType</span><span class="p">,</span> <span class="n">EngineCapability</span><span class="p">,</span> <span class="n">dtype</span>
-<span class="kn">from</span> <span class="nn">torch_tensorrt._Input</span> <span class="kn">import</span> <span class="n">Input</span>
-<span class="kn">from</span> <span class="nn">torch_tensorrt.ts._Device</span> <span class="kn">import</span> <span class="n">TorchScriptDevice</span>
-<span class="kn">from</span> <span class="nn">torch_tensorrt.ts._Input</span> <span class="kn">import</span> <span class="n">TorchScriptInput</span>
-<span class="kn">from</span> <span class="nn">torch_tensorrt.ts.logging</span> <span class="kn">import</span> <span class="n">Level</span><span class="p">,</span> <span class="n">log</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch_tensorrt._C.ts</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">_ts_C</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt</span><span class="w"> </span><span class="kn">import</span> <span class="n">_C</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt._Device</span><span class="w"> </span><span class="kn">import</span> <span class="n">Device</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt._enums</span><span class="w"> </span><span class="kn">import</span> <span class="n">DeviceType</span><span class="p">,</span> <span class="n">EngineCapability</span><span class="p">,</span> <span class="n">dtype</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt._Input</span><span class="w"> </span><span class="kn">import</span> <span class="n">Input</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.ts._Device</span><span class="w"> </span><span class="kn">import</span> <span class="n">TorchScriptDevice</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.ts._Input</span><span class="w"> </span><span class="kn">import</span> <span class="n">TorchScriptInput</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.ts.logging</span><span class="w"> </span><span class="kn">import</span> <span class="n">Level</span><span class="p">,</span> <span class="n">log</span>
 
-<span class="kn">import</span> <span class="nn">tensorrt</span> <span class="k">as</span> <span class="nn">trt</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">tensorrt</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">trt</span>
 
 
-<span class="k">def</span> <span class="nf">_internal_input_to_torch_class_input</span><span class="p">(</span><span class="n">i</span><span class="p">:</span> <span class="n">_C</span><span class="o">.</span><span class="n">Input</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">classes</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">_Input</span><span class="p">:</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">_internal_input_to_torch_class_input</span><span class="p">(</span><span class="n">i</span><span class="p">:</span> <span class="n">_C</span><span class="o">.</span><span class="n">Input</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">classes</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">_Input</span><span class="p">:</span>
     <span class="n">clone</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">classes</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">_Input</span><span class="p">()</span>
     <span class="n">clone</span><span class="o">.</span><span class="n">_set_min</span><span class="p">(</span><span class="n">i</span><span class="o">.</span><span class="n">min</span><span class="p">)</span>
     <span class="n">clone</span><span class="o">.</span><span class="n">_set_opt</span><span class="p">(</span><span class="n">i</span><span class="o">.</span><span class="n">opt</span><span class="p">)</span>
@@ -498,7 +516,7 @@
     <span class="k">return</span> <span class="n">clone</span>
 
 
-<span class="k">def</span> <span class="nf">_supported_input_size_type</span><span class="p">(</span><span class="n">input_size</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">_supported_input_size_type</span><span class="p">(</span><span class="n">input_size</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
     <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">input_size</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Size</span><span class="p">):</span>
         <span class="k">return</span> <span class="kc">True</span>
     <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">input_size</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">):</span>
@@ -512,11 +530,11 @@
         <span class="p">)</span>
 
 
-<span class="k">def</span> <span class="nf">_parse_op_precision</span><span class="p">(</span><span class="n">precision</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">_C</span><span class="o">.</span><span class="n">dtype</span><span class="p">:</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">_parse_op_precision</span><span class="p">(</span><span class="n">precision</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">_C</span><span class="o">.</span><span class="n">dtype</span><span class="p">:</span>
     <span class="k">return</span> <span class="n">dtype</span><span class="o">.</span><span class="n">_from</span><span class="p">(</span><span class="n">precision</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">_C</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span>
 
 
-<span class="k">def</span> <span class="nf">_parse_enabled_precisions</span><span class="p">(</span><span class="n">precisions</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Set</span><span class="p">[</span><span class="n">_C</span><span class="o">.</span><span class="n">dtype</span><span class="p">]:</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">_parse_enabled_precisions</span><span class="p">(</span><span class="n">precisions</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Set</span><span class="p">[</span><span class="n">_C</span><span class="o">.</span><span class="n">dtype</span><span class="p">]:</span>
     <span class="n">parsed_precisions</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
     <span class="k">if</span> <span class="nb">any</span><span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">precisions</span><span class="p">,</span> <span class="nb">type</span><span class="p">)</span> <span class="k">for</span> <span class="nb">type</span> <span class="ow">in</span> <span class="p">[</span><span class="nb">list</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">,</span> <span class="nb">set</span><span class="p">]):</span>
         <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">precisions</span><span class="p">:</span>
@@ -526,11 +544,11 @@
     <span class="k">return</span> <span class="n">parsed_precisions</span>
 
 
-<span class="k">def</span> <span class="nf">_parse_device_type</span><span class="p">(</span><span class="n">device</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">_C</span><span class="o">.</span><span class="n">DeviceType</span><span class="p">:</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">_parse_device_type</span><span class="p">(</span><span class="n">device</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">_C</span><span class="o">.</span><span class="n">DeviceType</span><span class="p">:</span>
     <span class="k">return</span> <span class="n">DeviceType</span><span class="o">.</span><span class="n">_from</span><span class="p">(</span><span class="n">device</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">_C</span><span class="o">.</span><span class="n">DeviceType</span><span class="p">)</span>
 
 
-<span class="k">def</span> <span class="nf">_parse_device</span><span class="p">(</span><span class="n">device_info</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">_C</span><span class="o">.</span><span class="n">Device</span><span class="p">:</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">_parse_device</span><span class="p">(</span><span class="n">device_info</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">_C</span><span class="o">.</span><span class="n">Device</span><span class="p">:</span>
     <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">device_info</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
         <span class="n">info</span> <span class="o">=</span> <span class="n">_C</span><span class="o">.</span><span class="n">Device</span><span class="p">()</span>
         <span class="k">if</span> <span class="s2">&quot;device_type&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">device_info</span><span class="p">:</span>
@@ -563,7 +581,7 @@
         <span class="p">)</span>
 
 
-<span class="k">def</span> <span class="nf">_parse_torch_fallback</span><span class="p">(</span><span class="n">fallback_info</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">_ts_C</span><span class="o">.</span><span class="n">TorchFallback</span><span class="p">:</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">_parse_torch_fallback</span><span class="p">(</span><span class="n">fallback_info</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">_ts_C</span><span class="o">.</span><span class="n">TorchFallback</span><span class="p">:</span>
     <span class="n">info</span> <span class="o">=</span> <span class="n">_ts_C</span><span class="o">.</span><span class="n">TorchFallback</span><span class="p">()</span>
     <span class="k">if</span> <span class="s2">&quot;enabled&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">fallback_info</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">KeyError</span><span class="p">(</span><span class="s2">&quot;Enabled is required parameter&quot;</span><span class="p">)</span>
@@ -585,7 +603,7 @@
     <span class="k">return</span> <span class="n">info</span>
 
 
-<span class="k">def</span> <span class="nf">_parse_input_signature</span><span class="p">(</span><span class="n">input_signature</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">depth</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">_parse_input_signature</span><span class="p">(</span><span class="n">input_signature</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">depth</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
     <span class="k">if</span> <span class="n">depth</span> <span class="o">&gt;</span> <span class="mi">2</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">AssertionError</span><span class="p">(</span>
             <span class="s2">&quot;Input nesting depth exceeds max supported depth, use 1 level: [A, B], or 2 level: [A, (B, C)]&quot;</span>
@@ -650,7 +668,7 @@
         <span class="p">)</span>
 
 
-<span class="k">def</span> <span class="nf">_parse_compile_spec</span><span class="p">(</span><span class="n">compile_spec_</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">_ts_C</span><span class="o">.</span><span class="n">CompileSpec</span><span class="p">:</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">_parse_compile_spec</span><span class="p">(</span><span class="n">compile_spec_</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">_ts_C</span><span class="o">.</span><span class="n">CompileSpec</span><span class="p">:</span>
     <span class="c1"># TODO: Use deepcopy to support partial compilation of collections</span>
     <span class="n">compile_spec</span> <span class="o">=</span> <span class="n">deepcopy</span><span class="p">(</span><span class="n">compile_spec_</span><span class="p">)</span>
     <span class="n">info</span> <span class="o">=</span> <span class="n">_ts_C</span><span class="o">.</span><span class="n">CompileSpec</span><span class="p">()</span>
@@ -773,7 +791,7 @@
     <span class="k">return</span> <span class="n">info</span>
 
 
-<div class="viewcode-block" id="TensorRTCompileSpec"><a class="viewcode-back" href="../../../py_api/ts.html#torch_tensorrt.ts.TensorRTCompileSpec">[docs]</a><span class="k">def</span> <span class="nf">TensorRTCompileSpec</span><span class="p">(</span>
+<div class="viewcode-block" id="TensorRTCompileSpec"><a class="viewcode-back" href="../../../py_api/ts.html#torch_tensorrt.ts.TensorRTCompileSpec">[docs]</a><span class="k">def</span><span class="w"> </span><span class="nf">TensorRTCompileSpec</span><span class="p">(</span>
     <span class="n">inputs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span> <span class="o">|</span> <span class="n">Input</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">input_signature</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">device</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">device</span> <span class="o">|</span> <span class="n">Device</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -1132,7 +1150,7 @@
                <a href="https://pytorch.org/resources">Developer Resources</a>
              </li>
              <li>
-               <a href="https://pytorch.org/ecosystem/contributor-awards-2023">Contributor Awards - 2023</a>
+               <a href="https://pytorch.org/ecosystem/contributor-awards-2023">Contributor Awards - 2024</a>
              </li>
            </ul>
 
@@ -1147,6 +1165,9 @@
              
              <li>
                <a href="https://pytorch.org/executorch-overview">ExecuTorch</a>
+             </li>
+             <li>
+               <a href="https://pytorch.org/executorch/stable/index.html">ExecuTorch Documentation</a>
              </li>
            </ul>
 
@@ -1186,6 +1207,9 @@
             <li>
               <a href="https://pytorch.org/events">Events</a>
             </li>
+            <li>
+               <a href="https://pytorch.org/newsletter">Newsletter</a>
+             </li>
           </ul>
           
           <li class="resources-mobile-menu-title">
@@ -1198,6 +1222,18 @@
             </li>
             <li>
               <a href="https://pytorch.org/governing-board">Governing Board</a>
+            </li>
+            <li>
+               <a href="https://pytorch.org/credits">Cloud Credit Program</a>
+            </li>
+            <li>
+               <a href="https://pytorch.org/tac">Technical Advisory Council</a>
+            </li>
+            <li>
+               <a href="https://pytorch.org/staff">Staff</a>
+            </li>
+            <li>
+               <a href="https://pytorch.org/contact-us">Contact Us</a>
             </li>
           </ul>
         </ul>

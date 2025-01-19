@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt._enums &mdash; Torch-TensorRT v2.6.0.dev0+70e2a38 documentation</title>
+  <title>torch_tensorrt._enums &mdash; Torch-TensorRT v2.7.0.dev0+d6be4ba documentation</title>
   
 
   
@@ -132,8 +132,8 @@
                   <span class=dropdown-title>Developer Resources</span>
                   <p>Find resources and get questions answered</p>
                 </a>
-                <a class="nav-dropdown-item" href="https://pytorch.org/ecosystem/contributor-awards-2023">
-                  <span class="dropdown-title">Contributor Awards - 2023</span>
+                <a class="nav-dropdown-item" href="https://pytorch.org/ecosystem/contributor-awards-2024">
+                  <span class="dropdown-title">Contributor Awards - 2024</span>
                   <p>Award winners announced at this year's PyTorch Conference</p>
                 </a>
               </div>
@@ -153,6 +153,9 @@
                 <a class="nav-dropdown-item" href="https://pytorch.org/executorch-overview">
                   <span class="dropdown-title">ExecuTorch</span>
                   <p>End-to-end solution for enabling on-device inference capabilities across mobile and edge devices</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/executorch/stable/index.html">
+                  <span class="dropdown-title">ExecuTorch Docs</span>
                 </a>
               </div>
             </div>  
@@ -201,6 +204,10 @@
                   <span class="dropdown-title">Events</span>
                   <p>Find events, webinars, and podcasts</p>
                 </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/newsletter">
+                  <span class="dropdown-title">Newsletter</span>
+                  <p>Stay up-to-date with the latest updates</p>
+                </a>
             </div>
           </li>
 
@@ -216,7 +223,18 @@
                 </a>
                 <a class="nav-dropdown-item" href="https://pytorch.org/governing-board">
                   <span class="dropdown-title">Governing Board</span>
-                  <p></p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/credits">
+                  <span class="dropdown-title">Cloud Credit Program</span>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/tac">
+                  <span class="dropdown-title">Technical Advisory Council</span>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/staff">
+                  <span class="dropdown-title">Staff</span>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/contact-us">
+                  <span class="dropdown-title">Contact Us</span>
                 </a>
               </div>
             </div>
@@ -272,7 +290,7 @@
               
               
                 <div class="version">
-                  v2.6.0.dev0+70e2a38
+                  v2.7.0.dev0+d6be4ba
                 </div>
               
             
@@ -467,19 +485,19 @@
              <article itemprop="articleBody" id="pytorch-article" class="pytorch-article">
               
   <h1>Source code for torch_tensorrt._enums</h1><div class="highlight"><pre>
-<span></span><span class="kn">from</span> <span class="nn">__future__</span> <span class="kn">import</span> <span class="n">annotations</span>
+<span></span><span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
 
-<span class="kn">import</span> <span class="nn">logging</span>
-<span class="kn">from</span> <span class="nn">enum</span> <span class="kn">import</span> <span class="n">Enum</span><span class="p">,</span> <span class="n">auto</span>
-<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Type</span><span class="p">,</span> <span class="n">Union</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">enum</span><span class="w"> </span><span class="kn">import</span> <span class="n">Enum</span><span class="p">,</span> <span class="n">auto</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Type</span><span class="p">,</span> <span class="n">Union</span>
 
-<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
-<span class="kn">import</span> <span class="nn">tensorrt</span> <span class="k">as</span> <span class="nn">trt</span>
-<span class="kn">import</span> <span class="nn">torch</span>
-<span class="kn">from</span> <span class="nn">torch_tensorrt._features</span> <span class="kn">import</span> <span class="n">ENABLED_FEATURES</span><span class="p">,</span> <span class="n">needs_torch_tensorrt_runtime</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">tensorrt</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">trt</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt._features</span><span class="w"> </span><span class="kn">import</span> <span class="n">ENABLED_FEATURES</span><span class="p">,</span> <span class="n">needs_torch_tensorrt_runtime</span>
 
 
-<div class="viewcode-block" id="dtype"><a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.dtype">[docs]</a><span class="k">class</span> <span class="nc">dtype</span><span class="p">(</span><span class="n">Enum</span><span class="p">):</span>
+<div class="viewcode-block" id="dtype"><a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.dtype">[docs]</a><span class="k">class</span><span class="w"> </span><span class="nc">dtype</span><span class="p">(</span><span class="n">Enum</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Enum to describe data types to Torch-TensorRT, has compatibility with torch, tensorrt and numpy dtypes&quot;&quot;&quot;</span>
 
     <span class="c1"># Supported types in Torch-TensorRT</span>
@@ -575,7 +593,7 @@
     <span class="n">bfloat16</span> <span class="o">=</span> <span class="n">bf16</span>
 
     <span class="nd">@staticmethod</span>
-    <span class="k">def</span> <span class="nf">_is_np_obj</span><span class="p">(</span><span class="n">t</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_is_np_obj</span><span class="p">(</span><span class="n">t</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">t</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">dtype</span><span class="p">):</span>
             <span class="k">return</span> <span class="kc">True</span>
         <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">t</span><span class="p">,</span> <span class="nb">type</span><span class="p">):</span>
@@ -584,7 +602,7 @@
         <span class="k">return</span> <span class="kc">False</span>
 
     <span class="nd">@classmethod</span>
-    <span class="k">def</span> <span class="nf">_from</span><span class="p">(</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_from</span><span class="p">(</span>
         <span class="bp">cls</span><span class="p">,</span>
         <span class="n">t</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">trt</span><span class="o">.</span><span class="n">DataType</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">dtype</span><span class="p">,</span> <span class="nb">type</span><span class="p">],</span>
         <span class="n">use_default</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
@@ -710,7 +728,7 @@
             <span class="k">return</span> <span class="n">t</span>
 
         <span class="k">elif</span> <span class="n">ENABLED_FEATURES</span><span class="o">.</span><span class="n">torchscript_frontend</span><span class="p">:</span>
-            <span class="kn">from</span> <span class="nn">torch_tensorrt</span> <span class="kn">import</span> <span class="n">_C</span>
+            <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt</span><span class="w"> </span><span class="kn">import</span> <span class="n">_C</span>
 
             <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">t</span><span class="p">,</span> <span class="n">_C</span><span class="o">.</span><span class="n">dtype</span><span class="p">):</span>
                 <span class="k">if</span> <span class="n">t</span> <span class="o">==</span> <span class="n">_C</span><span class="o">.</span><span class="n">dtype</span><span class="o">.</span><span class="n">long</span><span class="p">:</span>
@@ -739,7 +757,7 @@
         <span class="p">)</span>
 
 <div class="viewcode-block" id="dtype.try_from"><a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.dtype.try_from">[docs]</a>    <span class="nd">@classmethod</span>
-    <span class="k">def</span> <span class="nf">try_from</span><span class="p">(</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">try_from</span><span class="p">(</span>
         <span class="bp">cls</span><span class="p">,</span>
         <span class="n">t</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">trt</span><span class="o">.</span><span class="n">DataType</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">dtype</span><span class="p">],</span>
         <span class="n">use_default</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
@@ -779,7 +797,7 @@
             <span class="p">)</span>
             <span class="k">return</span> <span class="kc">None</span></div>
 
-<div class="viewcode-block" id="dtype.to"><a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.dtype.to">[docs]</a>    <span class="k">def</span> <span class="nf">to</span><span class="p">(</span>
+<div class="viewcode-block" id="dtype.to"><a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.dtype.to">[docs]</a>    <span class="k">def</span><span class="w"> </span><span class="nf">to</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">t</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">Type</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">dtype</span><span class="p">],</span> <span class="n">Type</span><span class="p">[</span><span class="n">trt</span><span class="o">.</span><span class="n">DataType</span><span class="p">],</span> <span class="n">Type</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">dtype</span><span class="p">],</span> <span class="n">Type</span><span class="p">[</span><span class="n">dtype</span><span class="p">]],</span>
         <span class="n">use_default</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
@@ -898,7 +916,7 @@
             <span class="k">return</span> <span class="bp">self</span>
 
         <span class="k">elif</span> <span class="n">ENABLED_FEATURES</span><span class="o">.</span><span class="n">torchscript_frontend</span><span class="p">:</span>
-            <span class="kn">from</span> <span class="nn">torch_tensorrt</span> <span class="kn">import</span> <span class="n">_C</span>
+            <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt</span><span class="w"> </span><span class="kn">import</span> <span class="n">_C</span>
 
             <span class="k">if</span> <span class="n">t</span> <span class="o">==</span> <span class="n">_C</span><span class="o">.</span><span class="n">dtype</span><span class="p">:</span>
                 <span class="k">if</span> <span class="bp">self</span> <span class="o">==</span> <span class="n">dtype</span><span class="o">.</span><span class="n">i64</span><span class="p">:</span>
@@ -926,7 +944,7 @@
             <span class="sa">f</span><span class="s2">&quot;Provided unsupported destination type for dtype conversion </span><span class="si">{</span><span class="n">t</span><span class="si">}</span><span class="s2">&quot;</span>
         <span class="p">)</span></div>
 
-<div class="viewcode-block" id="dtype.try_to"><a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.dtype.try_to">[docs]</a>    <span class="k">def</span> <span class="nf">try_to</span><span class="p">(</span>
+<div class="viewcode-block" id="dtype.try_to"><a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.dtype.try_to">[docs]</a>    <span class="k">def</span><span class="w"> </span><span class="nf">try_to</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">t</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">Type</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">dtype</span><span class="p">],</span> <span class="n">Type</span><span class="p">[</span><span class="n">trt</span><span class="o">.</span><span class="n">DataType</span><span class="p">],</span> <span class="n">Type</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">dtype</span><span class="p">],</span> <span class="n">Type</span><span class="p">[</span><span class="n">dtype</span><span class="p">]],</span>
         <span class="n">use_default</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span>
@@ -965,11 +983,11 @@
             <span class="p">)</span>
             <span class="k">return</span> <span class="kc">None</span></div>
 
-    <span class="k">def</span> <span class="fm">__eq__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">trt</span><span class="o">.</span><span class="n">DataType</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">dtype</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__eq__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">trt</span><span class="o">.</span><span class="n">DataType</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">dtype</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
         <span class="n">other_</span> <span class="o">=</span> <span class="n">dtype</span><span class="o">.</span><span class="n">_from</span><span class="p">(</span><span class="n">other</span><span class="p">)</span>
         <span class="k">return</span> <span class="nb">bool</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">value</span> <span class="o">==</span> <span class="n">other_</span><span class="o">.</span><span class="n">value</span><span class="p">)</span>
 
-    <span class="k">def</span> <span class="fm">__hash__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__hash__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
         <span class="k">return</span> <span class="nb">hash</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">value</span><span class="p">)</span>
 
     <span class="c1"># Putting aliases here that mess with mypy</span>
@@ -977,7 +995,7 @@
     <span class="nb">int</span> <span class="o">=</span> <span class="n">i32</span></div>
 
 
-<div class="viewcode-block" id="memory_format"><a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.memory_format">[docs]</a><span class="k">class</span> <span class="nc">memory_format</span><span class="p">(</span><span class="n">Enum</span><span class="p">):</span>
+<div class="viewcode-block" id="memory_format"><a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.memory_format">[docs]</a><span class="k">class</span><span class="w"> </span><span class="nc">memory_format</span><span class="p">(</span><span class="n">Enum</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;&quot;&quot;&quot;</span>
 
     <span class="c1"># TensorRT supported memory layouts</span>
@@ -1109,7 +1127,7 @@
     <span class="n">channels_last_3d</span> <span class="o">=</span> <span class="n">dhwc</span>
 
     <span class="nd">@classmethod</span>
-    <span class="k">def</span> <span class="nf">_from</span><span class="p">(</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_from</span><span class="p">(</span>
         <span class="bp">cls</span><span class="p">,</span> <span class="n">f</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">memory_format</span><span class="p">,</span> <span class="n">trt</span><span class="o">.</span><span class="n">TensorFormat</span><span class="p">,</span> <span class="n">memory_format</span><span class="p">]</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">memory_format</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Create a Torch-TensorRT memory format enum from another library memory format enum.</span>
@@ -1185,7 +1203,7 @@
             <span class="k">return</span> <span class="n">f</span>
 
         <span class="k">elif</span> <span class="n">ENABLED_FEATURES</span><span class="o">.</span><span class="n">torchscript_frontend</span><span class="p">:</span>
-            <span class="kn">from</span> <span class="nn">torch_tensorrt</span> <span class="kn">import</span> <span class="n">_C</span>
+            <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt</span><span class="w"> </span><span class="kn">import</span> <span class="n">_C</span>
 
             <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">f</span><span class="p">,</span> <span class="n">_C</span><span class="o">.</span><span class="n">TensorFormat</span><span class="p">):</span>
                 <span class="k">if</span> <span class="n">f</span> <span class="o">==</span> <span class="n">_C</span><span class="o">.</span><span class="n">TensorFormat</span><span class="o">.</span><span class="n">contiguous</span><span class="p">:</span>
@@ -1200,7 +1218,7 @@
         <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;Provided unsupported source type for memory_format conversion&quot;</span><span class="p">)</span>
 
 <div class="viewcode-block" id="memory_format.try_from"><a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.memory_format.try_from">[docs]</a>    <span class="nd">@classmethod</span>
-    <span class="k">def</span> <span class="nf">try_from</span><span class="p">(</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">try_from</span><span class="p">(</span>
         <span class="bp">cls</span><span class="p">,</span> <span class="n">f</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">memory_format</span><span class="p">,</span> <span class="n">trt</span><span class="o">.</span><span class="n">TensorFormat</span><span class="p">,</span> <span class="n">memory_format</span><span class="p">]</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">memory_format</span><span class="p">]:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Create a Torch-TensorRT memory format enum from another library memory format enum.</span>
@@ -1233,7 +1251,7 @@
             <span class="p">)</span>
             <span class="k">return</span> <span class="kc">None</span></div>
 
-<div class="viewcode-block" id="memory_format.to"><a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.memory_format.to">[docs]</a>    <span class="k">def</span> <span class="nf">to</span><span class="p">(</span>
+<div class="viewcode-block" id="memory_format.to"><a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.memory_format.to">[docs]</a>    <span class="k">def</span><span class="w"> </span><span class="nf">to</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">t</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span>
             <span class="n">Type</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">memory_format</span><span class="p">],</span> <span class="n">Type</span><span class="p">[</span><span class="n">trt</span><span class="o">.</span><span class="n">TensorFormat</span><span class="p">],</span> <span class="n">Type</span><span class="p">[</span><span class="n">memory_format</span><span class="p">]</span>
@@ -1308,7 +1326,7 @@
             <span class="k">return</span> <span class="bp">self</span>
 
         <span class="k">elif</span> <span class="n">ENABLED_FEATURES</span><span class="o">.</span><span class="n">torchscript_frontend</span><span class="p">:</span>
-            <span class="kn">from</span> <span class="nn">torch_tensorrt</span> <span class="kn">import</span> <span class="n">_C</span>
+            <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt</span><span class="w"> </span><span class="kn">import</span> <span class="n">_C</span>
 
             <span class="k">if</span> <span class="n">t</span> <span class="o">==</span> <span class="n">_C</span><span class="o">.</span><span class="n">TensorFormat</span><span class="p">:</span>
                 <span class="k">if</span> <span class="bp">self</span> <span class="o">==</span> <span class="n">memory_format</span><span class="o">.</span><span class="n">contiguous</span><span class="p">:</span>
@@ -1324,7 +1342,7 @@
             <span class="s2">&quot;Provided unsupported destination type for memory format conversion&quot;</span>
         <span class="p">)</span></div>
 
-<div class="viewcode-block" id="memory_format.try_to"><a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.memory_format.try_to">[docs]</a>    <span class="k">def</span> <span class="nf">try_to</span><span class="p">(</span>
+<div class="viewcode-block" id="memory_format.try_to"><a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.memory_format.try_to">[docs]</a>    <span class="k">def</span><span class="w"> </span><span class="nf">try_to</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">t</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span>
             <span class="n">Type</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">memory_format</span><span class="p">],</span> <span class="n">Type</span><span class="p">[</span><span class="n">trt</span><span class="o">.</span><span class="n">TensorFormat</span><span class="p">],</span> <span class="n">Type</span><span class="p">[</span><span class="n">memory_format</span><span class="p">]</span>
@@ -1359,17 +1377,17 @@
             <span class="p">)</span>
             <span class="k">return</span> <span class="kc">None</span></div>
 
-    <span class="k">def</span> <span class="fm">__eq__</span><span class="p">(</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__eq__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">memory_format</span><span class="p">,</span> <span class="n">trt</span><span class="o">.</span><span class="n">TensorFormat</span><span class="p">,</span> <span class="n">memory_format</span><span class="p">]</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
         <span class="n">other_</span> <span class="o">=</span> <span class="n">memory_format</span><span class="o">.</span><span class="n">_from</span><span class="p">(</span><span class="n">other</span><span class="p">)</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">value</span> <span class="o">==</span> <span class="n">other_</span><span class="o">.</span><span class="n">value</span>
 
-    <span class="k">def</span> <span class="fm">__hash__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__hash__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
         <span class="k">return</span> <span class="nb">hash</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">value</span><span class="p">)</span></div>
 
 
-<div class="viewcode-block" id="DeviceType"><a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.DeviceType">[docs]</a><span class="k">class</span> <span class="nc">DeviceType</span><span class="p">(</span><span class="n">Enum</span><span class="p">):</span>
+<div class="viewcode-block" id="DeviceType"><a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.DeviceType">[docs]</a><span class="k">class</span><span class="w"> </span><span class="nc">DeviceType</span><span class="p">(</span><span class="n">Enum</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Type of device TensorRT will target&quot;&quot;&quot;</span>
 
     <span class="n">UNKNOWN</span> <span class="o">=</span> <span class="n">auto</span><span class="p">()</span>
@@ -1394,7 +1412,7 @@
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="nd">@classmethod</span>
-    <span class="k">def</span> <span class="nf">_from</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">d</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">trt</span><span class="o">.</span><span class="n">DeviceType</span><span class="p">,</span> <span class="n">DeviceType</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">DeviceType</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_from</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">d</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">trt</span><span class="o">.</span><span class="n">DeviceType</span><span class="p">,</span> <span class="n">DeviceType</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">DeviceType</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Create a Torch-TensorRT device type enum from a TensorRT device type enum.</span>
 
 <span class="sd">        Takes a device type enum from tensorrt and create a ``torch_tensorrt.DeviceType``.</span>
@@ -1433,7 +1451,7 @@
             <span class="k">return</span> <span class="n">d</span>
 
         <span class="k">elif</span> <span class="n">ENABLED_FEATURES</span><span class="o">.</span><span class="n">torchscript_frontend</span><span class="p">:</span>
-            <span class="kn">from</span> <span class="nn">torch_tensorrt</span> <span class="kn">import</span> <span class="n">_C</span>
+            <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt</span><span class="w"> </span><span class="kn">import</span> <span class="n">_C</span>
 
             <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">d</span><span class="p">,</span> <span class="n">_C</span><span class="o">.</span><span class="n">DeviceType</span><span class="p">):</span>
                 <span class="k">if</span> <span class="n">d</span> <span class="o">==</span> <span class="n">_C</span><span class="o">.</span><span class="n">DeviceType</span><span class="o">.</span><span class="n">GPU</span><span class="p">:</span>
@@ -1448,7 +1466,7 @@
         <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;Provided unsupported source type for DeviceType conversion&quot;</span><span class="p">)</span>
 
 <div class="viewcode-block" id="DeviceType.try_from"><a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.DeviceType.try_from">[docs]</a>    <span class="nd">@classmethod</span>
-    <span class="k">def</span> <span class="nf">try_from</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">d</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">trt</span><span class="o">.</span><span class="n">DeviceType</span><span class="p">,</span> <span class="n">DeviceType</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">DeviceType</span><span class="p">]:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">try_from</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">d</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">trt</span><span class="o">.</span><span class="n">DeviceType</span><span class="p">,</span> <span class="n">DeviceType</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">DeviceType</span><span class="p">]:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Create a Torch-TensorRT device type enum from a TensorRT device type enum.</span>
 
 <span class="sd">        Takes a device type enum from tensorrt and create a ``torch_tensorrt.DeviceType``.</span>
@@ -1480,7 +1498,7 @@
             <span class="p">)</span>
             <span class="k">return</span> <span class="kc">None</span></div>
 
-<div class="viewcode-block" id="DeviceType.to"><a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.DeviceType.to">[docs]</a>    <span class="k">def</span> <span class="nf">to</span><span class="p">(</span>
+<div class="viewcode-block" id="DeviceType.to"><a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.DeviceType.to">[docs]</a>    <span class="k">def</span><span class="w"> </span><span class="nf">to</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">t</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">Type</span><span class="p">[</span><span class="n">trt</span><span class="o">.</span><span class="n">DeviceType</span><span class="p">],</span> <span class="n">Type</span><span class="p">[</span><span class="n">DeviceType</span><span class="p">]],</span>
         <span class="n">use_default</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
@@ -1526,7 +1544,7 @@
             <span class="k">return</span> <span class="bp">self</span>
 
         <span class="k">elif</span> <span class="n">ENABLED_FEATURES</span><span class="o">.</span><span class="n">torchscript_frontend</span><span class="p">:</span>
-            <span class="kn">from</span> <span class="nn">torch_tensorrt</span> <span class="kn">import</span> <span class="n">_C</span>
+            <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt</span><span class="w"> </span><span class="kn">import</span> <span class="n">_C</span>
 
             <span class="k">if</span> <span class="n">t</span> <span class="o">==</span> <span class="n">_C</span><span class="o">.</span><span class="n">DeviceType</span><span class="p">:</span>
                 <span class="k">if</span> <span class="bp">self</span> <span class="o">==</span> <span class="n">DeviceType</span><span class="o">.</span><span class="n">GPU</span><span class="p">:</span>
@@ -1542,7 +1560,7 @@
             <span class="s2">&quot;Provided unsupported destination type for device type conversion&quot;</span>
         <span class="p">)</span></div>
 
-<div class="viewcode-block" id="DeviceType.try_to"><a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.DeviceType.try_to">[docs]</a>    <span class="k">def</span> <span class="nf">try_to</span><span class="p">(</span>
+<div class="viewcode-block" id="DeviceType.try_to"><a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.DeviceType.try_to">[docs]</a>    <span class="k">def</span><span class="w"> </span><span class="nf">try_to</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">t</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">Type</span><span class="p">[</span><span class="n">trt</span><span class="o">.</span><span class="n">DeviceType</span><span class="p">],</span> <span class="n">Type</span><span class="p">[</span><span class="n">DeviceType</span><span class="p">]],</span>
         <span class="n">use_default</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
@@ -1575,15 +1593,15 @@
             <span class="p">)</span>
             <span class="k">return</span> <span class="kc">None</span></div>
 
-    <span class="k">def</span> <span class="fm">__eq__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">trt</span><span class="o">.</span><span class="n">DeviceType</span><span class="p">,</span> <span class="n">DeviceType</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__eq__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">trt</span><span class="o">.</span><span class="n">DeviceType</span><span class="p">,</span> <span class="n">DeviceType</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
         <span class="n">other_</span> <span class="o">=</span> <span class="n">DeviceType</span><span class="o">.</span><span class="n">_from</span><span class="p">(</span><span class="n">other</span><span class="p">)</span>
         <span class="k">return</span> <span class="nb">bool</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">value</span> <span class="o">==</span> <span class="n">other_</span><span class="o">.</span><span class="n">value</span><span class="p">)</span>
 
-    <span class="k">def</span> <span class="fm">__hash__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__hash__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
         <span class="k">return</span> <span class="nb">hash</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">value</span><span class="p">)</span></div>
 
 
-<div class="viewcode-block" id="EngineCapability"><a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.EngineCapability">[docs]</a><span class="k">class</span> <span class="nc">EngineCapability</span><span class="p">(</span><span class="n">Enum</span><span class="p">):</span>
+<div class="viewcode-block" id="EngineCapability"><a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.EngineCapability">[docs]</a><span class="k">class</span><span class="w"> </span><span class="nc">EngineCapability</span><span class="p">(</span><span class="n">Enum</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    EngineCapability determines the restrictions of a network during build time and what runtime it targets.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
@@ -1610,7 +1628,7 @@
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="nd">@classmethod</span>
-    <span class="k">def</span> <span class="nf">_from</span><span class="p">(</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_from</span><span class="p">(</span>
         <span class="bp">cls</span><span class="p">,</span> <span class="n">c</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">trt</span><span class="o">.</span><span class="n">EngineCapability</span><span class="p">,</span> <span class="n">EngineCapability</span><span class="p">]</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">EngineCapability</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Create a Torch-TensorRT Engine capability enum from a TensorRT Engine capability enum.</span>
@@ -1651,7 +1669,7 @@
             <span class="k">return</span> <span class="n">c</span>
 
         <span class="k">elif</span> <span class="n">ENABLED_FEATURES</span><span class="o">.</span><span class="n">torchscript_frontend</span><span class="p">:</span>
-            <span class="kn">from</span> <span class="nn">torch_tensorrt</span> <span class="kn">import</span> <span class="n">_C</span>
+            <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt</span><span class="w"> </span><span class="kn">import</span> <span class="n">_C</span>
 
             <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">c</span><span class="p">,</span> <span class="n">_C</span><span class="o">.</span><span class="n">EngineCapability</span><span class="p">):</span>
                 <span class="k">if</span> <span class="n">c</span> <span class="o">==</span> <span class="n">_C</span><span class="o">.</span><span class="n">EngineCapability</span><span class="o">.</span><span class="n">STANDARD</span><span class="p">:</span>
@@ -1668,7 +1686,7 @@
         <span class="p">)</span>
 
 <div class="viewcode-block" id="EngineCapability.try_from"><a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.EngineCapability.try_from">[docs]</a>    <span class="nd">@classmethod</span>
-    <span class="k">def</span> <span class="nf">try_from</span><span class="p">(</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">try_from</span><span class="p">(</span>
         <span class="n">c</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">trt</span><span class="o">.</span><span class="n">EngineCapability</span><span class="p">,</span> <span class="n">EngineCapability</span><span class="p">]</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">EngineCapability</span><span class="p">]:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Create a Torch-TensorRT engine capability enum from a TensorRT engine capability enum.</span>
@@ -1702,7 +1720,7 @@
             <span class="p">)</span>
             <span class="k">return</span> <span class="kc">None</span></div>
 
-<div class="viewcode-block" id="EngineCapability.to"><a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.EngineCapability.to">[docs]</a>    <span class="k">def</span> <span class="nf">to</span><span class="p">(</span>
+<div class="viewcode-block" id="EngineCapability.to"><a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.EngineCapability.to">[docs]</a>    <span class="k">def</span><span class="w"> </span><span class="nf">to</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span> <span class="n">t</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">Type</span><span class="p">[</span><span class="n">trt</span><span class="o">.</span><span class="n">EngineCapability</span><span class="p">],</span> <span class="n">Type</span><span class="p">[</span><span class="n">EngineCapability</span><span class="p">]]</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Union</span><span class="p">[</span><span class="n">trt</span><span class="o">.</span><span class="n">EngineCapability</span><span class="p">,</span> <span class="n">EngineCapability</span><span class="p">]:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Convert ``EngineCapability`` into the equivalent type in tensorrt</span>
@@ -1743,7 +1761,7 @@
             <span class="k">return</span> <span class="bp">self</span>
 
         <span class="k">elif</span> <span class="n">ENABLED_FEATURES</span><span class="o">.</span><span class="n">torchscript_frontend</span><span class="p">:</span>
-            <span class="kn">from</span> <span class="nn">torch_tensorrt</span> <span class="kn">import</span> <span class="n">_C</span>
+            <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt</span><span class="w"> </span><span class="kn">import</span> <span class="n">_C</span>
 
             <span class="k">if</span> <span class="n">t</span> <span class="o">==</span> <span class="n">_C</span><span class="o">.</span><span class="n">EngineCapability</span><span class="p">:</span>
                 <span class="k">if</span> <span class="bp">self</span> <span class="o">==</span> <span class="n">EngineCapability</span><span class="o">.</span><span class="n">STANDARD</span><span class="p">:</span>
@@ -1759,7 +1777,7 @@
             <span class="s2">&quot;Provided unsupported destination type for engine capability type conversion&quot;</span>
         <span class="p">)</span></div>
 
-<div class="viewcode-block" id="EngineCapability.try_to"><a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.EngineCapability.try_to">[docs]</a>    <span class="k">def</span> <span class="nf">try_to</span><span class="p">(</span>
+<div class="viewcode-block" id="EngineCapability.try_to"><a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.EngineCapability.try_to">[docs]</a>    <span class="k">def</span><span class="w"> </span><span class="nf">try_to</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span> <span class="n">t</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">Type</span><span class="p">[</span><span class="n">trt</span><span class="o">.</span><span class="n">EngineCapability</span><span class="p">],</span> <span class="n">Type</span><span class="p">[</span><span class="n">EngineCapability</span><span class="p">]]</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="n">trt</span><span class="o">.</span><span class="n">EngineCapability</span><span class="p">,</span> <span class="n">EngineCapability</span><span class="p">]]:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Convert ``EngineCapability`` into the equivalent type in tensorrt</span>
@@ -1790,15 +1808,15 @@
             <span class="p">)</span>
             <span class="k">return</span> <span class="kc">None</span></div>
 
-    <span class="k">def</span> <span class="fm">__eq__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">trt</span><span class="o">.</span><span class="n">EngineCapability</span><span class="p">,</span> <span class="n">EngineCapability</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__eq__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">trt</span><span class="o">.</span><span class="n">EngineCapability</span><span class="p">,</span> <span class="n">EngineCapability</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
         <span class="n">other_</span> <span class="o">=</span> <span class="n">EngineCapability</span><span class="o">.</span><span class="n">_from</span><span class="p">(</span><span class="n">other</span><span class="p">)</span>
         <span class="k">return</span> <span class="nb">bool</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">value</span> <span class="o">==</span> <span class="n">other_</span><span class="o">.</span><span class="n">value</span><span class="p">)</span>
 
-    <span class="k">def</span> <span class="fm">__hash__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__hash__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
         <span class="k">return</span> <span class="nb">hash</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">value</span><span class="p">)</span></div>
 
 
-<span class="k">class</span> <span class="nc">Platform</span><span class="p">(</span><span class="n">Enum</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">Platform</span><span class="p">(</span><span class="n">Enum</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Specifies a target OS and CPU architecture that a Torch-TensorRT program targets</span>
 <span class="sd">    &quot;&quot;&quot;</span>
@@ -1827,14 +1845,14 @@
     <span class="n">UNKNOWN</span> <span class="o">=</span> <span class="n">auto</span><span class="p">()</span>
 
     <span class="nd">@classmethod</span>
-    <span class="k">def</span> <span class="nf">current_platform</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Platform</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">current_platform</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Platform</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Returns an enum for the current platform Torch-TensorRT is running on</span>
 
 <span class="sd">        Returns:</span>
 <span class="sd">            Platform: Current platform</span>
 <span class="sd">        &quot;&quot;&quot;</span>
-        <span class="kn">import</span> <span class="nn">platform</span>
+        <span class="kn">import</span><span class="w"> </span><span class="nn">platform</span>
 
         <span class="k">if</span> <span class="n">platform</span><span class="o">.</span><span class="n">system</span><span class="p">()</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;linux&quot;</span><span class="p">):</span>
             <span class="c1"># linux</span>
@@ -1850,11 +1868,11 @@
 
         <span class="k">return</span> <span class="n">Platform</span><span class="o">.</span><span class="n">UNKNOWN</span>
 
-    <span class="k">def</span> <span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
         <span class="k">return</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
 
     <span class="nd">@needs_torch_tensorrt_runtime</span>  <span class="c1"># type: ignore</span>
-    <span class="k">def</span> <span class="nf">_to_serialized_rt_platform</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_to_serialized_rt_platform</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
         <span class="n">val</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">_platform_unknown</span><span class="p">()</span>
 
         <span class="k">if</span> <span class="bp">self</span> <span class="o">==</span> <span class="n">Platform</span><span class="o">.</span><span class="n">LINUX_X86_64</span><span class="p">:</span>
@@ -2091,7 +2109,7 @@
                <a href="https://pytorch.org/resources">Developer Resources</a>
              </li>
              <li>
-               <a href="https://pytorch.org/ecosystem/contributor-awards-2023">Contributor Awards - 2023</a>
+               <a href="https://pytorch.org/ecosystem/contributor-awards-2023">Contributor Awards - 2024</a>
              </li>
            </ul>
 
@@ -2106,6 +2124,9 @@
              
              <li>
                <a href="https://pytorch.org/executorch-overview">ExecuTorch</a>
+             </li>
+             <li>
+               <a href="https://pytorch.org/executorch/stable/index.html">ExecuTorch Documentation</a>
              </li>
            </ul>
 
@@ -2145,6 +2166,9 @@
             <li>
               <a href="https://pytorch.org/events">Events</a>
             </li>
+            <li>
+               <a href="https://pytorch.org/newsletter">Newsletter</a>
+             </li>
           </ul>
           
           <li class="resources-mobile-menu-title">
@@ -2157,6 +2181,18 @@
             </li>
             <li>
               <a href="https://pytorch.org/governing-board">Governing Board</a>
+            </li>
+            <li>
+               <a href="https://pytorch.org/credits">Cloud Credit Program</a>
+            </li>
+            <li>
+               <a href="https://pytorch.org/tac">Technical Advisory Council</a>
+            </li>
+            <li>
+               <a href="https://pytorch.org/staff">Staff</a>
+            </li>
+            <li>
+               <a href="https://pytorch.org/contact-us">Contact Us</a>
             </li>
           </ul>
         </ul>
