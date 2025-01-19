@@ -34,7 +34,7 @@ if USE_HOST_DEPS:
 # Set epochs to train VGG model for accuracy tests
 EPOCHS = 25
 
-SUPPORTED_PYTHON_VERSIONS = ["3.7", "3.8", "3.9", "3.10"]
+SUPPORTED_PYTHON_VERSIONS = ["3.9", "3.10", "3.11", "3.12"]
 
 nox.options.sessions = [
     "l0_api_tests-" + "{}.{}".format(sys.version_info.major, sys.version_info.minor)

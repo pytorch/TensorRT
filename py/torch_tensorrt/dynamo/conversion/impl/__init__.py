@@ -12,6 +12,7 @@ from torch_tensorrt.dynamo.conversion.impl import (
     full,
     grid,
     matmul,
+    nccl_ops,
     normalization,
     pad,
     permutation,

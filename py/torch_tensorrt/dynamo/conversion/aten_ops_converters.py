@@ -2,7 +2,7 @@
 
 import logging
 import operator
-from typing import Any, Callable, Dict, Optional, Sequence, Tuple, Union
+from typing import Callable, Dict, Optional, Sequence, Tuple, Union
 
 import numpy as np
 import torch
@@ -16,6 +16,7 @@ from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
     has_static_shapes_in_args,
 )
 from torch_tensorrt.dynamo.conversion.converter_utils import (
+    args_bounds_check,
     enforce_tensor_types,
     get_positive_dim,
     is_only_operator_on_placeholder,
@@ -23,12 +24,6 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
 from torch_tensorrt.dynamo.types import TRTTensor
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
-
-
-def args_bounds_check(
-    args: Tuple[Argument, ...], i: int, replacement: Optional[Any] = None
-) -> Any:
-    return args[i] if len(args) > i and args[i] is not None else replacement
 
 
 def get_ir(target: Target) -> SourceIR:
