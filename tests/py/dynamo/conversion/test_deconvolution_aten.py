@@ -260,8 +260,8 @@ class TestDeconvolutionConverter(DispatchTestCase):
             enable_passes=True,
         )
 
-    # # Testing with (-1, -1, -1, -1, -1) results into Error:
-    # # AssertionError: Channel dim can't be dynamic for deconvolution.
+    # Testing with (-1, -1, -1, -1, -1) results into Error:
+    # AssertionError: Channel dim can't be dynamic for deconvolution.
 
     def test_deconv3d_with_dynamic_shape(self):
         class TestModule(torch.nn.Module):
