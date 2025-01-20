@@ -7,6 +7,7 @@ from typing import Callable, Dict, Optional, Sequence, Tuple, Union
 import numpy as np
 import torch
 from torch.fx.node import Argument, Node, Target
+
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion import impl
@@ -2449,8 +2450,7 @@ def aten_ops_le(
 def conv_param_validator(
     conv_node: Node, settings: Optional[CompilationSettings] = None
 ) -> bool:
-    
-    # return True
+
     return conv_node.args[7] in ([0], [0, 0], [0, 0, 0])
 
 

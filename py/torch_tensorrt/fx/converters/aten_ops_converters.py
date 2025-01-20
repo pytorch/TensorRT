@@ -10,9 +10,10 @@ import numpy as np
 # @manual=//deeplearning/trt/python:py_tensorrt
 import tensorrt as trt
 import torch
-import torch_tensorrt.fx.tracer.acc_tracer.acc_utils as acc_utils
 from torch.fx.immutable_collections import immutable_list
 from torch.fx.node import Argument, Target
+
+import torch_tensorrt.fx.tracer.acc_tracer.acc_utils as acc_utils
 from torch_tensorrt.fx.converters import acc_ops_converters
 from torch_tensorrt.fx.converters.impl import activation, convolution
 
@@ -101,62 +102,6 @@ def aten_ops_batch_norm(
     return acc_ops_converters.acc_ops_batch_norm(
         network, target, None, kwargs_new, name
     )
-
-
-# @tensorrt_converter(torch.ops.aten.convolution.default)
-# def aten_ops_convolution(
-#     network: TRTNetwork,
-#     target: Target,
-#     args: Tuple[Argument, ...],
-#     kwargs: Dict[str, Argument],
-#     name: str,
-# ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-#     kwargs_new = {
-#         "input": args[0],
-#         "weight": args[1],
-#         "bias": args[2],
-#         "stride": args[3],
-#         "padding": args[4],
-#         "dilation": args[5],
-#         "groups": args[8],
-#     }
-#     # we do not handle transposed.
-#     if args[6] is True:
-#         raise RuntimeError(f"Target {target} does not support `transposed=True` ")
-#     # we do not handle output_padding.
-#     if args[7] not in ([0], [0, 0], [0, 0, 0]):
-#         raise RuntimeError(f"Target {target} has non-0 output_padding")
-
-#     if len(kwargs_new["stride"]) == 1:
-#         return convolution.convNd(
-#             network,
-#             target,
-#             source_ir=SourceIR.ATEN,
-#             name=name,
-#             is_conv1d=True,
-#             input_val=kwargs_new["input"],
-#             weight=kwargs_new["weight"],
-#             bias=kwargs_new["bias"],
-#             stride=kwargs_new["stride"],
-#             padding=kwargs_new["padding"],
-#             dilation=kwargs_new["dilation"],
-#             groups=kwargs_new["groups"],
-#         )
-#     else:
-#         return convolution.convNd(
-#             network,
-#             target,
-#             source_ir=SourceIR.ATEN,
-#             name=name,
-#             is_conv1d=False,
-#             input_val=kwargs_new["input"],
-#             weight=kwargs_new["weight"],
-#             bias=kwargs_new["bias"],
-#             stride=kwargs_new["stride"],
-#             padding=kwargs_new["padding"],
-#             dilation=kwargs_new["dilation"],
-#             groups=kwargs_new["groups"],
-#         )
 
 
 @tensorrt_converter(torch.ops.aten.div.default)
