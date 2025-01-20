@@ -2449,6 +2449,8 @@ def aten_ops_le(
 def conv_param_validator(
     conv_node: Node, settings: Optional[CompilationSettings] = None
 ) -> bool:
+    
+    # return True
     return conv_node.args[7] in ([0], [0, 0], [0, 0, 0])
 
 
@@ -2500,6 +2502,7 @@ def aten_ops_convolution(
             stride=args[3],
             padding=args[4],
             dilation=args[5],
+            # output_padding=args[7],
             groups=args[8],
         )
 
