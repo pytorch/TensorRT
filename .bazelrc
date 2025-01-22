@@ -30,10 +30,11 @@ build:windows --cxxopt="/GS-" --cxxopt="/std:c++17" --cxxopt="/permissive-"
 build:windows --cxxopt="/wd4244" --cxxopt="/wd4267" --cxxopt="/wd4819"
 build:windows --features=windows_export_all_symbols
 
-build:python --cxxopt="-D_GLIBCXX_USE_CXX11_ABI=0"
-build:python --linkopt="-D_GLIBCXX_USE_CXX11_ABI=0"
-build:python --define=abi=pre_cxx11_abi
 build:python --define=target_lang=python
+
+build:cxx11_abi --cxxopt="-D_GLIBCXX_USE_CXX11_ABI=1"
+build:cxx11_abi --linkopt="-D_GLIBCXX_USE_CXX11_ABI=1"
+build:cxx11_abi --define=abi=cxx11_abi
 
 build:pre_cxx11_abi --cxxopt="-D_GLIBCXX_USE_CXX11_ABI=0"
 build:pre_cxx11_abi --linkopt="-D_GLIBCXX_USE_CXX11_ABI=0"

@@ -181,8 +181,12 @@ if not PY_ONLY:
             sys.exit("Could not find bazel in PATH")
 
 
-def build_libtorchtrt_pre_cxx11_abi(
-    develop=True, use_dist_dir=True, pre_cxx11_abi=True, rt_only=False
+def build_libtorchtrt_cxx11_abi(
+    develop=True,
+    use_dist_dir=True,
+    pre_cxx11_abi=False,
+    rt_only=False,
+    target_python=True,
 ):
     cmd = [BAZEL_EXE, "build"]
     if rt_only:
@@ -196,9 +200,15 @@ def build_libtorchtrt_pre_cxx11_abi(
         cmd.append("--compilation_mode=opt")
     if use_dist_dir:
         cmd.append("--distdir=third_party/dist_dir/x86_64-linux-gnu")
-    if pre_cxx11_abi:
+
+    if target_python:
         cmd.append("--config=python")
+
+    if pre_cxx11_abi:
+        cmd.append("--config=pre_cxx11_abi")
+        print("using PRE CXX11 ABI build")
     else:
+        cmd.append("--config=cxx11_abi")
         print("using CXX11 ABI build")
 
     if IS_WINDOWS:
@@ -293,7 +303,7 @@ class DevelopCommand(develop):
 
         if not PY_ONLY:
             global PRE_CXX11_ABI
-            build_libtorchtrt_pre_cxx11_abi(
+            build_libtorchtrt_cxx11_abi(
                 develop=True, pre_cxx11_abi=PRE_CXX11_ABI, rt_only=NO_TS
             )
             copy_libtorchtrt(rt_only=NO_TS)
@@ -317,7 +327,7 @@ class InstallCommand(install):
 
         if not PY_ONLY:
             global PRE_CXX11_ABI
-            build_libtorchtrt_pre_cxx11_abi(
+            build_libtorchtrt_cxx11_abi(
                 develop=False, pre_cxx11_abi=PRE_CXX11_ABI, rt_only=NO_TS
             )
             copy_libtorchtrt(rt_only=NO_TS)
@@ -340,7 +350,7 @@ class BdistCommand(bdist_wheel):
     def run(self):
         if not PY_ONLY:
             global PRE_CXX11_ABI
-            build_libtorchtrt_pre_cxx11_abi(
+            build_libtorchtrt_cxx11_abi(
                 develop=False, pre_cxx11_abi=PRE_CXX11_ABI, rt_only=NO_TS
             )
             copy_libtorchtrt(rt_only=NO_TS)
@@ -366,7 +376,7 @@ class EditableWheelCommand(editable_wheel):
             editable_wheel.run(self)
         else:
             global PRE_CXX11_ABI
-            build_libtorchtrt_pre_cxx11_abi(
+            build_libtorchtrt_cxx11_abi(
                 develop=True, pre_cxx11_abi=PRE_CXX11_ABI, rt_only=NO_TS
             )
             gen_version_file()
