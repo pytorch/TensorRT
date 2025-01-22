@@ -8,8 +8,7 @@ requires = [
     "cffi>=1.15.1",
     "typing-extensions>=4.7.0",
     "future>=0.18.3",
-    #"tensorrt-cu12>=10.6.0,<10.8.0",
-    "torch>=2.6.0.dev,<2.7.0",
+    "torch @ file:////usr/local/lib/python3.12/dist-packages/torch"
     "pybind11==2.6.2",
     "numpy",
 ]
@@ -40,7 +39,6 @@ requires-python = ">=3.9"
 keywords = [
     "pytorch",
     "torch",
-    #"tensorrt",
     "trt",
     "ai",
     "artificial intelligence",
@@ -54,7 +52,7 @@ keywords = [
     "inference",
 ]
 dependencies = [
-    "torch>=2.6.0.dev,<2.7.0",
+    "torch @ file:////usr/local/lib/python3.12/dist-packages/torch"
     #"tensorrt-cu12>=10.6.0,<10.8.0",
     #"tensorrt-cu12-bindings>=10.6.0,<10.8.0",
     #"tensorrt-cu12-libs>=10.6.0,<10.8.0",
