@@ -1,4 +1,7 @@
 import torch_tensorrt
+from torch_tensorrt.dynamo.runtime._MLIRTensorRTModule import (  # noqa: F401
+    MLIRTensorRTModule,
+)
 from torch_tensorrt.dynamo.runtime._PythonTorchTensorRTModule import (  # noqa: F401
     PythonTorchTensorRTModule,
 )

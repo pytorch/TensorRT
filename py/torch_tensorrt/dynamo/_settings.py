@@ -26,6 +26,7 @@ from torch_tensorrt.dynamo._defaults import (
     NUM_AVG_TIMING_ITERS,
     OPTIMIZATION_LEVEL,
     PASS_THROUGH_BUILD_FAILURES,
+    PREFER_MLIR_TRT,
     REFIT_IDENTICAL_ENGINE_WEIGHTS,
     REQUIRE_FULL_COMPILATION,
     REUSE_CACHED_ENGINES,
@@ -93,6 +94,7 @@ class CompilationSettings:
         enable_cross_compile_for_windows (bool): By default this is False means TensorRT engines can only be executed on the same platform where they were built.
             True will enable cross-platform compatibility which allows the engine to be built on Linux and run on Windows
         use_aot_joint_export (bool): Use aot_export_joint_simple, else wrap backend with AOT_autograd, required for distributed tensors
+        prefer_mlir_trt (bool): Use MLIR-TRT for compiling the graph/subgraphs, if it is supported.
     """
 
     enabled_precisions: Set[dtype] = field(default_factory=lambda: ENABLED_PRECISIONS)
@@ -134,6 +136,7 @@ class CompilationSettings:
     enable_weight_streaming: bool = ENABLE_WEIGHT_STREAMING
     enable_cross_compile_for_windows: bool = ENABLE_CROSS_COMPILE_FOR_WINDOWS
     use_aot_joint_export: bool = USE_AOT_JOINT_EXPORT
+    prefer_mlir_trt: bool = PREFER_MLIR_TRT
 
 
 _SETTINGS_TO_BE_ENGINE_INVARIANT = (

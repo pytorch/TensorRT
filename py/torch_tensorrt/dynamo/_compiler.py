@@ -24,6 +24,7 @@ from torch_tensorrt.dynamo._exporter import replace_execute_engine_no_op_node
 from torch_tensorrt.dynamo.conversion import (
     CompilationSettings,
     UnsupportedOperatorException,
+    compile_with_mlir_trt,
     convert_module,
     interpret_module_to_result,
     repair_double_inputs,
@@ -413,6 +414,7 @@ def compile(
     strip_engine_weights: bool = _defaults.STRIP_ENGINE_WEIGHTS,
     immutable_weights: bool = _defaults.IMMUTABLE_WEIGHTS,
     enable_weight_streaming: bool = _defaults.ENABLE_WEIGHT_STREAMING,
+    prefer_mlir_trt: bool = _defaults.PREFER_MLIR_TRT,
     **kwargs: Any,
 ) -> torch.fx.GraphModule:
     """Compile an ExportedProgram module for NVIDIA GPUs using TensorRT
@@ -488,6 +490,7 @@ def compile(
         strip_engine_weights (bool): Strip engine weights from the serialized engine. This is useful when the engine is to be deployed in an environment where the weights are not required.
         immutable_weights (bool): Build non-refittable engines. This is useful for some layers that are not refittable. If this argument is set to true, `strip_engine_weights` and `refit_identical_engine_weights` will be ignored.
         enable_weight_streaming (bool): Enable weight streaming.
+        prefer_mlir_trt (bool): Use MLIR-TRT for compiling the graph/subgraphs, if it is supported.
         **kwargs: Any,
     Returns:
         torch.fx.GraphModule: Compiled FX Module, when run it will execute via TensorRT
@@ -662,6 +665,7 @@ def compile(
         "immutable_weights": immutable_weights,
         "enable_cross_compile_for_windows": False,
         "enable_weight_streaming": enable_weight_streaming,
+        "prefer_mlir_trt": prefer_mlir_trt,
     }
 
     settings = CompilationSettings(**compilation_options)
@@ -704,6 +708,10 @@ def compile_module(
     Returns:
         Compiled FX GraphModule
     """
+
+    if settings.prefer_mlir_trt:
+        return compile_with_mlir_trt(gm, sample_arg_inputs, sample_kwarg_inputs)
+
     dryrun_tracker = DryRunTracker()
     if sample_kwarg_inputs is None:
         sample_kwarg_inputs = {}

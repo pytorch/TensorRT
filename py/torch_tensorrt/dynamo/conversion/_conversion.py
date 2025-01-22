@@ -14,7 +14,11 @@ from torch_tensorrt.dynamo.conversion._TRTInterpreter import (
     TRTInterpreter,
     TRTInterpreterResult,
 )
-from torch_tensorrt.dynamo.runtime import PythonTorchTensorRTModule, TorchTensorRTModule
+from torch_tensorrt.dynamo.runtime import (
+    MLIRTensorRTModule,
+    PythonTorchTensorRTModule,
+    TorchTensorRTModule,
+)
 from torch_tensorrt.dynamo.utils import get_output_dtypes
 
 logger = logging.getLogger(__name__)
@@ -115,3 +119,36 @@ def convert_module(
         settings=settings,
         weight_name_map=interpreter_result.weight_name_map,
     )
+
+
+def compile_with_mlir_trt(
+    gm: torch.fx.GraphModule,
+    sample_arg_inputs: Sequence[Input],
+    sample_kwarg_inputs: Optional[dict[Any, Any]] = None,
+):
+
+    import mlir_tensorrt.compiler.api as compiler
+    import mlir_tensorrt.compiler.ir as ir
+    import mlir_tensorrt.compiler.torch_bridge as torch_bridge
+
+    torch_tensors = [input.torch_tensor for input in sample_arg_inputs]
+    torch_input = torch_bridge.TorchInput(gm, tuple(torch_tensors))
+
+    with ir.Context() as ctx:
+        shlo_module = torch_bridge.get_mlir_module_from_torch_module(
+            ctx, torch_input, torch_bridge.OutputType.STABLEHLO
+        )
+        client = compiler.CompilerClient(ctx)
+        task = client.get_compilation_task(
+            "stablehlo-to-executable",
+            [
+                "--tensorrt-builder-opt-level=3",
+                "--tensorrt-strongly-typed=false",
+                "--tensorrt-workspace-memory-pool-limit=1gb",
+            ],
+        )
+        task.run(shlo_module.operation)
+        mlir_exec = compiler.translate_mlir_to_executable(shlo_module.operation)
+        return MLIRTensorRTModule(
+            mlir_exec=mlir_exec,
+        )
