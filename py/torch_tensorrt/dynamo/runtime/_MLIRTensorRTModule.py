@@ -280,7 +280,7 @@ class MLIRTensorRTModule(Module):  # type: ignore[misc]
         session_options = runtime.RuntimeSessionOptions(num_devices=1, device_id=0)
         session = runtime.RuntimeSession(session_options, self.engine)
         runtime_inputs = []
-        for input in inputs:
+        for input in contiguous_inputs:
             arg0 = client.create_memref_view_from_dlpack(input.__dlpack__())
             runtime_inputs.append(arg0)
 
@@ -291,8 +291,8 @@ class MLIRTensorRTModule(Module):  # type: ignore[misc]
         session.execute_function(
             "main", in_args=runtime_inputs, out_args=[arg1], stream=stream
         )
-        breakpoint()
-        outputs = torch.from_blob(client.copy_to_host(arg1, stream=stream))
+
+        outputs = torch.utils.dlpack.from_dlpack(arg1)
         stream.sync()
         return outputs
 
