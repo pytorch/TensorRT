@@ -18,7 +18,7 @@ device_mesh, _world_size, _rank, logger = initialize_distributed_env(
     "./tensor_parallel_llama3"
 )
 # Import should be after initialization of the TRT-LLM plugin .so path
-import tensorrt_llm
+import torch_tensorrt
 
 logger.info(f"Starting PyTorch TP example on rank {_rank}.")
 assert (
