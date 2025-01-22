@@ -364,15 +364,6 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
             (i.contiguous() if isinstance(i, torch.Tensor) else torch.tensor(i).cuda())
             for i in inputs
         ]
-
-        for i, contiguous_input in enumerate(contiguous_inputs):
-            if contiguous_input.dtype == torch.complex64:
-                contiguous_input_real = contiguous_input.real
-                contiguous_input_imag = contiguous_input.imag
-                contiguous_inputs[i] = torch.stack(
-                    (contiguous_input_real, contiguous_input_imag), dim=-1
-                )
-
         with (
             torch.autograd.profiler.record_function("PythonTorchTensorRTModule:Forward")
             if self.profiling_enabled
