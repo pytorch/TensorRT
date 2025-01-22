@@ -119,10 +119,8 @@ if (gpu_arch_version := os.environ.get("CU_VERSION")) is None:
     gpu_arch_version = f"cu{__cuda_version__.replace('.','')}"
 
 
-if RELEASE:
-    __version__ = os.environ.get("BUILD_VERSION")
-else:
-    __version__ = f"{get_base_version()}.dev0+{get_git_revision_short_hash()}"
+
+__version__ = os.environ.get("BUILD_VERSION")
 
 if "--ci" in sys.argv:
     sys.argv.remove("--ci")
