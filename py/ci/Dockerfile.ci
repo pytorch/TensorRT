@@ -10,7 +10,6 @@ RUN wget -q https://developer.nvidia.com/downloads/compute/machine-learning/tens
 
 ENV TENSORRT_DIR=/TensorRT-10.7.0.23
 ENV TENSORRT_VERSION=10.7.0
-ENV USE_CXX11_ABI=1
 
 RUN wget https://github.com/bazelbuild/bazelisk/releases/download/v1.17.0/bazelisk-linux-amd64 \
     && mv bazelisk-linux-amd64 /usr/bin/bazel \

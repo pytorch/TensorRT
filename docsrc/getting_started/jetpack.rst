@@ -115,5 +115,5 @@ Please make sure to build torch_tensorrt wheel file from source release/2.5 bran
     # replace the MODULE.bazel with the jetpack one
     cat toolchains/jp_workspaces/MODULE.bazel.tmpl | envsubst > MODULE.bazel
     # build and install torch_tensorrt wheel file
-    python setup.py --use-cxx11-abi install --user
+    python setup.py install --user
 

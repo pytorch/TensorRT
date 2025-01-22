@@ -42,7 +42,7 @@ jobs:
               run: echo "sha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
             - name: Build Python Package
               env:
-                  USE_CXX11_ABI: 1
+                  USE_PRE_CXX11_ABI: 0
               run: |
                   python3 -m pip install --pre . --extra-index-url https://download.pytorch.org/whl/nightly/cu126
             - name: Generate New Docs

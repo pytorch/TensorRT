@@ -12,8 +12,8 @@ RUN test -n "$TENSORRT_VERSION" || (echo "No tensorrt version specified, please 
 ARG PYTHON_VERSION=3.10
 ENV PYTHON_VERSION=${PYTHON_VERSION}
 
-ARG USE_CXX11_ABI
-ENV USE_CXX11=${USE_CXX11_ABI}
+ARG USE_PRE_CXX11_ABI
+ENV USE_PRE_CXX11=${USE_PRE_CXX11_ABI}
 ENV DEBIAN_FRONTEND=noninteractive
 
 # Install basic dependencies
