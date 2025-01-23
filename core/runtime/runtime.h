@@ -18,7 +18,14 @@ namespace runtime {
 using EngineID = int64_t;
 const std::string ABI_VERSION = "6";
 extern bool MULTI_DEVICE_SAFE_MODE;
-extern bool CUDAGRAPHS_MODE;
+
+typedef enum {
+  STANDARD = 0,
+  SUBGRAPH_CUDAGRAPHS,
+  WHOLE_GRAPH_CUDAGRAPHS,
+} CudaGraphsMode;
+
+extern CudaGraphsMode CUDAGRAPHS_MODE;
 
 typedef enum {
   ABI_TARGET_IDX = 0,
@@ -32,6 +39,10 @@ typedef enum {
   TARGET_PLATFORM_IDX,
   SERIALIZATION_LEN, // NEVER USED FOR DATA, USED TO DETERMINE LENGTH OF SERIALIZED INFO
 } SerializedInfoIndex;
+
+std::string base64_encode(const std::string& in);
+std::string base64_decode(const std::string& in);
+std::string serialize_bindings(const std::vector<std::string>& bindings);
 
 c10::optional<RTDevice> get_most_compatible_device(
     const RTDevice& target_device,
@@ -47,9 +58,9 @@ bool get_multi_device_safe_mode();
 
 void set_multi_device_safe_mode(bool multi_device_safe_mode);
 
-bool get_cudagraphs_mode();
+CudaGraphsMode get_cudagraphs_mode();
 
-void set_cudagraphs_mode(bool cudagraphs_mode);
+void set_cudagraphs_mode(CudaGraphsMode cudagraphs_mode);
 
 class DeviceList {
   using DeviceMap = std::unordered_map<int, RTDevice>;

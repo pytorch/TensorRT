@@ -3,9 +3,16 @@ import unittest
 
 import torch
 import torch_tensorrt
+from torch.testing._internal.common_cuda import PLATFORM_SUPPORTS_FLASH_ATTENTION
 from torch.testing._internal.common_utils import TestCase, run_tests
 
 from ..testing_utilities import DECIMALS_OF_AGREEMENT, lower_graph_testing
+
+isSM8XDevice = torch.cuda.is_available() and torch.cuda.get_device_capability() in [
+    (8, 6),
+    (8, 7),
+    (8, 9),
+]
 
 
 class TestInputAsOutput(TestCase):
@@ -159,6 +166,110 @@ class TestPrimBroadcastFusion(TestCase):
         torch._dynamo.reset()
 
 
+class TestLowerViewToReshape(TestCase):
+    def test_view_to_reshape(self):
+        class ViewToReshape(torch.nn.Module):
+            def forward(self, input):
+                out = torch.ops.aten.view.default(input, (1, 1, -1))
+                return out
+
+        inputs = [
+            torch.rand((3, 4, 5, 32)).cuda(),
+        ]
+
+        fx_graph = torch.fx.symbolic_trace(ViewToReshape())
+        expected_ops = {torch.ops.aten.reshape.default}
+        unexpected_ops = {
+            torch.ops.aten.view.default,
+        }
+
+        unexpected_ops_seen, expected_ops_unseen = lower_graph_testing(
+            fx_graph,
+            inputs,
+            expected_ops=expected_ops,
+            unexpected_ops=unexpected_ops,
+            min_block_size=1,
+        )
+
+        self.assertEqual(
+            len(unexpected_ops_seen),
+            0,
+            f"The following unexpected ops were encountered: {unexpected_ops_seen}",
+        )
+
+        self.assertEqual(
+            len(expected_ops_unseen),
+            0,
+            f"The following expected ops were not encountered: {expected_ops_unseen}",
+        )
+        torch._dynamo.reset()
+
+        # Validate that the results between Torch and Torch-TRT are similar
+        optimized_model = torch_tensorrt.compile(
+            fx_graph,
+            "torch_compile",
+            inputs,
+            min_block_size=1,
+            pass_through_build_failures=True,
+        )
+        optimized_model_results = torch.cat(
+            [tensor.detach().cpu() for tensor in optimized_model(*inputs)]
+        )
+        torch_model_results = torch.cat(
+            [tensor.detach().cpu() for tensor in fx_graph(*inputs)]
+        )
+
+        max_diff = float(
+            torch.max(torch.abs(optimized_model_results - torch_model_results))
+        )
+        self.assertAlmostEqual(
+            max_diff,
+            0,
+            DECIMALS_OF_AGREEMENT,
+            msg=f"ViewToReshape TRT outputs don't match with the original model.",
+        )
+        torch._dynamo.reset()
+
+
+class TestFP32Accumulation(TestCase):
+    def test_fp32_acc(self):
+        class FP32Acc(torch.nn.Module):
+            def forward(self, input, weight):
+                out = torch.ops.aten.mm.default(input, weight)
+                return out
+
+        inputs = [
+            torch.rand((3, 4)).cuda(),
+            torch.rand((4, 5)).cuda(),
+        ]
+
+        fx_graph = torch.fx.symbolic_trace(FP32Acc())
+        expected_ops = {torch.ops.aten._to_copy.default, torch.ops.aten.mm.default}
+        unexpected_ops = {}
+
+        unexpected_ops_seen, expected_ops_unseen = lower_graph_testing(
+            fx_graph,
+            inputs,
+            expected_ops=expected_ops,
+            unexpected_ops=unexpected_ops,
+            min_block_size=1,
+            use_fp32_acc=True,
+        )
+
+        self.assertEqual(
+            len(unexpected_ops_seen),
+            0,
+            f"The following unexpected ops were encountered: {unexpected_ops_seen}",
+        )
+
+        self.assertEqual(
+            len(expected_ops_unseen),
+            0,
+            f"The following expected ops were not encountered: {expected_ops_unseen}",
+        )
+        torch._dynamo.reset()
+
+
 class TestLowerEfficientAttention(TestCase):
     def test_lower_efficient_attention(self):
         class EfficientAttention(torch.nn.Module):
@@ -279,6 +390,10 @@ class TestLowerEfficientAttention(TestCase):
     "Test not supported on Windows",
 )
 class TestLowerFlashAttention(TestCase):
+    @unittest.skipIf(
+        not PLATFORM_SUPPORTS_FLASH_ATTENTION or not isSM8XDevice,
+        "Does not support fused SDPA or not SM86+ hardware",
+    )
     def test_lower_flash_attention(self):
         class FlashAttention(torch.nn.Module):
             def forward(self, q, k, v):
@@ -348,6 +463,10 @@ class TestLowerFlashAttention(TestCase):
         )
         torch._dynamo.reset()
 
+    @unittest.skipIf(
+        not PLATFORM_SUPPORTS_FLASH_ATTENTION or not isSM8XDevice,
+        "Does not support fused SDPA or not SM86+ hardware",
+    )
     def test_flash_attention_converter(self):
         class FlashAttention(torch.nn.Module):
             def forward(self, q, k, v):
@@ -391,222 +510,6 @@ class TestLowerFlashAttention(TestCase):
             0,
             DECIMALS_OF_AGREEMENT - 1,
             msg=f"FlashAttention TRT outputs don't match with the original model.",
-        )
-        torch._dynamo.reset()
-
-
-class TestLowerLinear(TestCase):
-    @unittest.skip(
-        "This test has threshold failures. This is tracked at https://github.com/pytorch/TensorRT/issues/2715",
-    )
-    def test_lower_linear(self):
-        class Linear(torch.nn.Module):
-            def forward(self, input, weight, bias):
-                out = torch.ops.aten.linear.default(input, weight, bias)
-                return out
-
-        inputs = [
-            torch.rand((3, 32)).cuda(),
-            torch.rand((64, 32)).cuda(),
-            torch.rand((64,)).cuda(),
-        ]
-
-        fx_graph = torch.fx.symbolic_trace(Linear())
-        expected_ops = {torch.ops.aten.linear.default}
-        unexpected_ops = {
-            torch.ops.aten.permute.default,
-            torch.ops.aten.addmm.default,
-        }
-
-        unexpected_ops_seen, expected_ops_unseen = lower_graph_testing(
-            fx_graph,
-            inputs,
-            expected_ops=expected_ops,
-            unexpected_ops=unexpected_ops,
-            min_block_size=1,
-        )
-
-        self.assertEqual(
-            len(unexpected_ops_seen),
-            0,
-            f"The following unexpected ops were encountered: {unexpected_ops_seen}",
-        )
-
-        self.assertEqual(
-            len(expected_ops_unseen),
-            0,
-            f"The following expected ops were not encountered: {expected_ops_unseen}",
-        )
-        torch._dynamo.reset()
-
-        # Validate that the results between Torch and Torch-TRT are similar
-        optimized_model = torch_tensorrt.compile(
-            fx_graph,
-            "torch_compile",
-            inputs,
-            min_block_size=1,
-            pass_through_build_failures=True,
-        )
-        optimized_model_results = torch.cat(
-            [tensor.detach().cpu() for tensor in optimized_model(*inputs)]
-        )
-        torch_model_results = torch.cat(
-            [tensor.detach().cpu() for tensor in fx_graph(*inputs)]
-        )
-
-        max_diff = float(
-            torch.max(torch.abs(optimized_model_results - torch_model_results))
-        )
-
-        self.assertAlmostEqual(
-            max_diff,
-            0,
-            DECIMALS_OF_AGREEMENT,
-            msg=f"Linear TRT outputs don't match with the original model.",
-        )
-        torch._dynamo.reset()
-
-    def test_lower_linear_batch(self):
-        class Linear(torch.nn.Module):
-            def forward(self, input, weight, bias):
-                out = torch.ops.aten.linear.default(input, weight, bias)
-                return out
-
-        inputs = [
-            torch.rand((2, 2, 32)).cuda(),
-            torch.rand((64, 32)).cuda(),
-            torch.rand((64,)).cuda(),
-        ]
-
-        fx_graph = torch.fx.symbolic_trace(Linear())
-
-        # Validate that the results between Torch and Torch-TRT are similar
-        optimized_model = torch_tensorrt.compile(
-            fx_graph,
-            "torch_compile",
-            inputs,
-            min_block_size=1,
-            pass_through_build_failures=True,
-        )
-        optimized_model_results = torch.cat(
-            [tensor.detach().cpu() for tensor in optimized_model(*inputs)]
-        )
-        torch_model_results = torch.cat(
-            [tensor.detach().cpu() for tensor in fx_graph(*inputs)]
-        )
-
-        max_diff = float(
-            torch.max(torch.abs(optimized_model_results - torch_model_results))
-        )
-        self.assertAlmostEqual(
-            max_diff,
-            0,
-            DECIMALS_OF_AGREEMENT,
-            msg=f"Linear TRT outputs don't match with the original model.",
-        )
-        torch._dynamo.reset()
-
-
-class TestLowerViewToReshape(TestCase):
-    def test_view_to_reshape(self):
-        class ViewToReshape(torch.nn.Module):
-            def forward(self, input):
-                out = torch.ops.aten.view.default(input, (1, 1, -1))
-                return out
-
-        inputs = [
-            torch.rand((3, 4, 5, 32)).cuda(),
-        ]
-
-        fx_graph = torch.fx.symbolic_trace(ViewToReshape())
-        expected_ops = {torch.ops.aten.reshape.default}
-        unexpected_ops = {
-            torch.ops.aten.view.default,
-        }
-
-        unexpected_ops_seen, expected_ops_unseen = lower_graph_testing(
-            fx_graph,
-            inputs,
-            expected_ops=expected_ops,
-            unexpected_ops=unexpected_ops,
-            min_block_size=1,
-        )
-
-        self.assertEqual(
-            len(unexpected_ops_seen),
-            0,
-            f"The following unexpected ops were encountered: {unexpected_ops_seen}",
-        )
-
-        self.assertEqual(
-            len(expected_ops_unseen),
-            0,
-            f"The following expected ops were not encountered: {expected_ops_unseen}",
-        )
-        torch._dynamo.reset()
-
-        # Validate that the results between Torch and Torch-TRT are similar
-        optimized_model = torch_tensorrt.compile(
-            fx_graph,
-            "torch_compile",
-            inputs,
-            min_block_size=1,
-            pass_through_build_failures=True,
-        )
-        optimized_model_results = torch.cat(
-            [tensor.detach().cpu() for tensor in optimized_model(*inputs)]
-        )
-        torch_model_results = torch.cat(
-            [tensor.detach().cpu() for tensor in fx_graph(*inputs)]
-        )
-
-        max_diff = float(
-            torch.max(torch.abs(optimized_model_results - torch_model_results))
-        )
-        self.assertAlmostEqual(
-            max_diff,
-            0,
-            DECIMALS_OF_AGREEMENT,
-            msg=f"ViewToReshape TRT outputs don't match with the original model.",
-        )
-        torch._dynamo.reset()
-
-
-class TestFP32Accumulation(TestCase):
-    def test_fp32_acc(self):
-        class FP32Acc(torch.nn.Module):
-            def forward(self, input, weight):
-                out = torch.ops.aten.mm.default(input, weight)
-                return out
-
-        inputs = [
-            torch.rand((3, 4)).cuda(),
-            torch.rand((4, 5)).cuda(),
-        ]
-
-        fx_graph = torch.fx.symbolic_trace(FP32Acc())
-        expected_ops = {torch.ops.aten._to_copy.default, torch.ops.aten.mm.default}
-        unexpected_ops = {}
-
-        unexpected_ops_seen, expected_ops_unseen = lower_graph_testing(
-            fx_graph,
-            inputs,
-            expected_ops=expected_ops,
-            unexpected_ops=unexpected_ops,
-            min_block_size=1,
-            use_fp32_acc=True,
-        )
-
-        self.assertEqual(
-            len(unexpected_ops_seen),
-            0,
-            f"The following unexpected ops were encountered: {unexpected_ops_seen}",
-        )
-
-        self.assertEqual(
-            len(expected_ops_unseen),
-            0,
-            f"The following expected ops were not encountered: {expected_ops_unseen}",
         )
         torch._dynamo.reset()
 

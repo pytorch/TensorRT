@@ -21,10 +21,10 @@ TOP_DIR = (
 )
 print(f"Test root directory {TOP_DIR}")
 
-# Set the USE_CXX11=1 to use cxx11_abi
-USE_CXX11 = 0 if not "USE_CXX11" in os.environ else os.environ["USE_CXX11"]
-if USE_CXX11:
-    print("Using cxx11 abi")
+# Set the USE_PRE_CXX11=1 to use pre_cxx11_abi
+USE_PRE_CXX11 = 0 if not "USE_PRE_CXX11" in os.environ else os.environ["USE_PRE_CXX11"]
+if USE_PRE_CXX11:
+    print("Using pre cxx11 abi")
 
 # Set the USE_HOST_DEPS=1 to use host dependencies for tests
 USE_HOST_DEPS = 0 if not "USE_HOST_DEPS" in os.environ else os.environ["USE_HOST_DEPS"]
@@ -34,7 +34,7 @@ if USE_HOST_DEPS:
 # Set epochs to train VGG model for accuracy tests
 EPOCHS = 25
 
-SUPPORTED_PYTHON_VERSIONS = ["3.7", "3.8", "3.9", "3.10"]
+SUPPORTED_PYTHON_VERSIONS = ["3.9", "3.10", "3.11", "3.12"]
 
 nox.options.sessions = [
     "l0_api_tests-" + "{}.{}".format(sys.version_info.major, sys.version_info.minor)
@@ -61,8 +61,8 @@ def download_models(session):
 def install_torch_trt(session):
     print("Installing latest torch-tensorrt build")
     session.chdir(os.path.join(TOP_DIR, "py"))
-    if USE_CXX11:
-        session.run("python", "setup.py", "develop", "--use-cxx11-abi")
+    if USE_PRE_CXX11:
+        session.run("python", "setup.py", "develop", "--use-pre-cxx11-abi")
     else:
         session.run("python", "setup.py", "develop")
 
@@ -258,11 +258,12 @@ def run_dynamo_runtime_tests(session):
     tests = [
         "runtime",
     ]
+    skip_tests = "-k not hw_compat"
     for test in tests:
         if USE_HOST_DEPS:
-            session.run_always("pytest", test, env={"PYTHONPATH": PYT_PATH})
+            session.run_always("pytest", test, skip_tests, env={"PYTHONPATH": PYT_PATH})
         else:
-            session.run_always("pytest", test)
+            session.run_always("pytest", test, skip_tests)
 
 
 def run_dynamo_model_compile_tests(session):
@@ -332,7 +333,6 @@ def run_int8_accuracy_tests(session):
     tests = [
         "ptq/test_ptq_to_backend.py",
         "ptq/test_ptq_dataloader_calibrator.py",
-        "qat/",
     ]
     for test in tests:
         if USE_HOST_DEPS:
@@ -473,7 +473,6 @@ def run_l1_int8_accuracy_tests(session):
         install_deps(session)
         install_torch_trt(session)
     train_model(session)
-    finetune_model(session)
     run_int8_accuracy_tests(session)
     cleanup(session)
 

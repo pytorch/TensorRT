@@ -13,23 +13,27 @@ from torch_tensorrt.dynamo._defaults import (
     DLA_LOCAL_DRAM_SIZE,
     DLA_SRAM_SIZE,
     DRYRUN,
+    ENABLE_CROSS_COMPILE_FOR_WINDOWS,
     ENABLE_EXPERIMENTAL_DECOMPOSITIONS,
     ENABLE_WEIGHT_STREAMING,
     ENABLED_PRECISIONS,
     ENGINE_CAPABILITY,
     HARDWARE_COMPATIBLE,
+    IMMUTABLE_WEIGHTS,
     LAZY_ENGINE_INIT,
-    MAKE_REFITTABLE,
     MAX_AUX_STREAMS,
     MIN_BLOCK_SIZE,
     NUM_AVG_TIMING_ITERS,
     OPTIMIZATION_LEVEL,
     PASS_THROUGH_BUILD_FAILURES,
+    REFIT_IDENTICAL_ENGINE_WEIGHTS,
     REQUIRE_FULL_COMPILATION,
     REUSE_CACHED_ENGINES,
     SPARSE_WEIGHTS,
+    STRIP_ENGINE_WEIGHTS,
     TIMING_CACHE_PATH,
     TRUNCATE_DOUBLE,
+    USE_AOT_JOINT_EXPORT,
     USE_EXPLICIT_TYPING,
     USE_FAST_PARTITIONER,
     USE_FP32_ACC,
@@ -68,7 +72,6 @@ class CompilationSettings:
         assume_dynamic_shape_support (bool): Setting this to true enables the converters work for both dynamic and static shapes. Default: False
         disable_tf32 (bool): Whether to disable TF32 computation for TRT layers
         sparse_weights (bool): Whether to allow the builder to use sparse weights
-        refit (bool): Whether to build a refittable engine
         engine_capability (trt.EngineCapability): Restrict kernel selection to safe gpu kernels or safe dla kernels
         num_avg_timing_iters (int): Number of averaging timing iterations used to select kernels
         dla_sram_size (int): Fast software managed RAM used by DLA to communicate within a layer.
@@ -83,7 +86,13 @@ class CompilationSettings:
         reuse_cached_engines (bool): Whether to load the compiled TRT engines from storage
         use_strong_typing (bool): This flag enables strong typing in TensorRT compilation which respects the precisions set in the Pytorch model. This is useful when users have mixed precision graphs.
         use_fp32_acc (bool): This option inserts cast to FP32 nodes around matmul layers and TensorRT ensures the accumulation of matmul happens in FP32. Use this only when FP16 precision is configured in enabled_precisions.
+        refit_identical_engine_weights (bool): Whether to refit the engine with identical weights
+        strip_engine_weights (bool): Whether to strip the engine weights
+        immutable_weights (bool): Build non-refittable engines. This is useful for some layers that are not refittable. If this argument is set to true, `strip_engine_weights` and `refit_identical_engine_weights` will be ignored
         enable_weight_streaming (bool): Enable weight streaming.
+        enable_cross_compile_for_windows (bool): By default this is False means TensorRT engines can only be executed on the same platform where they were built.
+            True will enable cross-platform compatibility which allows the engine to be built on Linux and run on Windows
+        use_aot_joint_export (bool): Use aot_export_joint_simple, else wrap backend with AOT_autograd, required for distributed tensors
     """
 
     enabled_precisions: Set[dtype] = field(default_factory=lambda: ENABLED_PRECISIONS)
@@ -104,7 +113,6 @@ class CompilationSettings:
     disable_tf32: bool = DISABLE_TF32
     assume_dynamic_shape_support: bool = ASSUME_DYNAMIC_SHAPE_SUPPORT
     sparse_weights: bool = SPARSE_WEIGHTS
-    make_refittable: bool = MAKE_REFITTABLE
     engine_capability: EngineCapability = field(
         default_factory=lambda: ENGINE_CAPABILITY
     )
@@ -120,7 +128,12 @@ class CompilationSettings:
     reuse_cached_engines: bool = REUSE_CACHED_ENGINES
     use_explicit_typing: bool = USE_EXPLICIT_TYPING
     use_fp32_acc: bool = USE_FP32_ACC
+    refit_identical_engine_weights: bool = REFIT_IDENTICAL_ENGINE_WEIGHTS
+    strip_engine_weights: bool = STRIP_ENGINE_WEIGHTS
+    immutable_weights: bool = IMMUTABLE_WEIGHTS
     enable_weight_streaming: bool = ENABLE_WEIGHT_STREAMING
+    enable_cross_compile_for_windows: bool = ENABLE_CROSS_COMPILE_FOR_WINDOWS
+    use_aot_joint_export: bool = USE_AOT_JOINT_EXPORT
 
 
 _SETTINGS_TO_BE_ENGINE_INVARIANT = (
@@ -130,9 +143,11 @@ _SETTINGS_TO_BE_ENGINE_INVARIANT = (
     "optimization_level",
     "disable_tf32",
     "sparse_weights",
-    "make_refittable",
     "engine_capability",
     "hardware_compatible",
+    "refit_identical_engine_weights",
+    "strip_engine_weights",  # TODO: @Evan to remove this after implementing caching weight-stripped engines as default?
+    "immutable_weights",
     "enable_weight_streaming",
 )
 

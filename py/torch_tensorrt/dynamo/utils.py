@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import logging
+import warnings
 from dataclasses import fields, replace
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 import numpy as np
+import sympy
 import tensorrt as trt
 import torch
 from torch._subclasses.fake_tensor import FakeTensor
@@ -124,13 +126,23 @@ def cosine_similarity(gt_tensor: torch.Tensor, pred_tensor: torch.Tensor) -> flo
     return res
 
 
-def input_is_dynamic(inputs: Sequence[Union[Input, torch.Tensor]]) -> bool:
+def input_is_dynamic(inputs: Sequence[Union[Input, torch.Tensor, FakeTensor]]) -> bool:
     """
-    Return true if the provided inputs are `torch_tensorrt.Input` objects and have dynamic shapes.
+    Return true if any of inputs have dynamic shapes. Supported types are torch_tensorrt.Input | torch.Tensor
     """
-    return not any(isinstance(input, torch.Tensor) for input in inputs) and any(
-        input.shape_mode == Input._ShapeMode.DYNAMIC for input in inputs
-    )
+    for input in inputs:
+        if isinstance(input, torch.Tensor):
+            if contains_sym_int(input.shape):
+                return True
+        elif isinstance(input, Input):
+            if input.shape_mode == Input._ShapeMode.DYNAMIC:
+                return True
+        else:
+            raise AssertionError(
+                f"Invalid input type ({type(input)}) found. Supported types are torch_tensorrt.Input | torch.Tensor"
+            )
+
+    return False
 
 
 def get_torch_tensor(
@@ -342,19 +354,19 @@ def extract_var_range_info(symbolic_integer: torch.SymInt) -> Dict[str, int]:
         shape_env.var_to_val
     )
     assert var_range, var_val
-    min_val, max_val, opt_val = int(var_range.lower), int(var_range.upper), int(var_val)
+    min_val, max_val = int(var_range.lower), int(var_range.upper)
     # Torchdynamo 0/1 specialization outlier
     min_val = 1 if min_val == 2 else min_val
     min_max_opt = {}
     min_max_opt["min"] = min_val
     min_max_opt["max"] = max_val
-    min_max_opt["opt"] = opt_val
-
+    if isinstance(var_val, sympy.core.numbers.Integer):
+        min_max_opt["opt"] = int(var_val)
     return min_max_opt
 
 
 def unwrap_tensor_shape(
-    tensor: Union[torch.Tensor, FakeTensor, torch.SymInt]
+    tensor: Union[torch.Tensor, FakeTensor, torch.SymInt], mode: Optional[str] = ""
 ) -> Sequence[Union[int, Tuple[int, int]]]:
     """
     This is a helper function used to print/return the shape of the tensor.
@@ -368,10 +380,13 @@ def unwrap_tensor_shape(
         tensor_shape.append(tensor)
     elif isinstance(tensor, torch.SymInt):
         min_max_opt = extract_var_range_info(tensor)
-        tensor_shape.append((min_max_opt["min"], min_max_opt["max"]))
+        if mode:
+            tensor_shape.append(min_max_opt[mode])
+        else:
+            tensor_shape.append((min_max_opt["min"], min_max_opt["max"]))
     elif isinstance(tensor, (torch.Tensor, FakeTensor)):
         for dimension in tensor.shape:
-            tensor_shape.extend(unwrap_tensor_shape(dimension))
+            tensor_shape.extend(unwrap_tensor_shape(dimension, mode=mode))
 
     return tuple(tensor_shape)
 
@@ -402,9 +417,9 @@ def get_graph_io_attrs(
             metadata = node.meta["val"]
             if isinstance(metadata, (tuple, list)):
                 for tensor in metadata:
-                    graph_io_attrs.append(attr_fn(tensor))
+                    graph_io_attrs.append(attr_fn(tensor))  # type: ignore
             else:
-                graph_io_attrs.append(attr_fn(metadata))
+                graph_io_attrs.append(attr_fn(metadata))  # type: ignore
 
     return graph_io_attrs
 
@@ -480,6 +495,27 @@ def parse_dynamo_kwargs(
         if "options" in kwargs and len(kwargs) == 1:
             kwargs = kwargs["options"]
 
+        if "truncate_long_and_double" in kwargs:
+            if (
+                "truncate_double" in kwargs
+                and kwargs["truncate_double"] is not _defaults.TRUNCATE_DOUBLE
+            ):
+                raise ValueError(
+                    'Provided configuration for "truncate_double" and deprecated API "truncate_long_and_double". '
+                    'Please only use "truncate_double".'
+                )
+            else:
+                kwargs["truncate_double"] = kwargs["truncate_long_and_double"]
+                warnings.warn(
+                    'Compiler option "truncate_long_and_double" is deprecated in favor of "truncate_double" as int64 is now natively supported. '
+                    "This option will be removed in the next version.",
+                    DeprecationWarning,
+                    stacklevel=2,
+                )
+                del kwargs[
+                    "truncate_long_and_double"
+                ]  # Remove deprecated key after handling
+
         valid_attrs = {attr.name for attr in fields(settings)}
         valid_kwargs = {k: v for k, v in kwargs.items() if k in valid_attrs}
         settings = replace(settings, **valid_kwargs)
@@ -522,10 +558,6 @@ def parse_dynamo_kwargs(
 
     engine_cache = None
     if kwargs.get("cache_built_engines") or kwargs.get("reuse_cached_engines"):
-        assert kwargs.get(
-            "make_refittable"
-        ), "Engine caching requires make_refittable to be set to True"
-
         if kwargs.get("custom_engine_cache") is not None:
             engine_cache = kwargs.get("custom_engine_cache")
         else:
@@ -682,6 +714,20 @@ def set_metadata(
     assert len(target_nodes) == len(metadata)
     for idx, node in enumerate(target_nodes):
         node.meta = metadata[idx]
+
+
+def copy_metadata(match_and_replacements: List[Any]) -> None:
+    """
+    Copy the metadata from anchor node to the replacement node. This should be used
+    if the anchor node is replaced with only a single replacement node i.e one-one replacement.
+    """
+    for match_and_replacement in match_and_replacements:
+        anchor_node = match_and_replacement.nodes_map[match_and_replacement.anchor]
+        assert (
+            len(match_and_replacement.replacements) == 1
+        ), "Found more than 1 replacements for the anchor node."
+        replacement_node = match_and_replacement.replacements[0]
+        replacement_node.meta = anchor_node.meta
 
 
 def flatten_nodes(nodes: Any) -> List[torch.fx.node.Node]:

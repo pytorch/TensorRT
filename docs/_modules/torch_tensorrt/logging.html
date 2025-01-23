@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt.logging &mdash; Torch-TensorRT v2.6.0.dev0+1d5be25 documentation</title>
+  <title>torch_tensorrt.logging &mdash; Torch-TensorRT v2.7.0.dev0+cfdb585 documentation</title>
   
 
   
@@ -132,8 +132,8 @@
                   <span class=dropdown-title>Developer Resources</span>
                   <p>Find resources and get questions answered</p>
                 </a>
-                <a class="nav-dropdown-item" href="https://pytorch.org/ecosystem/contributor-awards-2023">
-                  <span class="dropdown-title">Contributor Awards - 2023</span>
+                <a class="nav-dropdown-item" href="https://pytorch.org/ecosystem/contributor-awards-2024">
+                  <span class="dropdown-title">Contributor Awards - 2024</span>
                   <p>Award winners announced at this year's PyTorch Conference</p>
                 </a>
               </div>
@@ -153,6 +153,9 @@
                 <a class="nav-dropdown-item" href="https://pytorch.org/executorch-overview">
                   <span class="dropdown-title">ExecuTorch</span>
                   <p>End-to-end solution for enabling on-device inference capabilities across mobile and edge devices</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/executorch/stable/index.html">
+                  <span class="dropdown-title">ExecuTorch Docs</span>
                 </a>
               </div>
             </div>  
@@ -201,6 +204,10 @@
                   <span class="dropdown-title">Events</span>
                   <p>Find events, webinars, and podcasts</p>
                 </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/newsletter">
+                  <span class="dropdown-title">Newsletter</span>
+                  <p>Stay up-to-date with the latest updates</p>
+                </a>
             </div>
           </li>
 
@@ -216,7 +223,18 @@
                 </a>
                 <a class="nav-dropdown-item" href="https://pytorch.org/governing-board">
                   <span class="dropdown-title">Governing Board</span>
-                  <p></p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/credits">
+                  <span class="dropdown-title">Cloud Credit Program</span>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/tac">
+                  <span class="dropdown-title">Technical Advisory Council</span>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/staff">
+                  <span class="dropdown-title">Staff</span>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/contact-us">
+                  <span class="dropdown-title">Contact Us</span>
                 </a>
               </div>
             </div>
@@ -272,7 +290,7 @@
               
               
                 <div class="version">
-                  v2.6.0.dev0+1d5be25
+                  v2.7.0.dev0+cfdb585
                 </div>
               
             
@@ -326,8 +344,10 @@
 <li class="toctree-l1"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/torch_export_cudagraphs.html">Torch Export with Cudagraphs</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/converter_overloading.html">Overloading Torch-TensorRT Converters with Custom Converters</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/custom_kernel_plugins.html">Using Custom Kernels within TensorRT Engines with Torch-TensorRT</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/auto_generate_converters.html">Automatically Generate a Converter for a Custom Kernel</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/mutable_torchtrt_module_example.html">Mutable Torch TensorRT Module</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/weight_streaming_example.html">Weight Streaming</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/pre_allocated_output_example.html">Pre-allocated output buffer</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Dynamo Frontend</span></p>
 <ul>
@@ -352,8 +372,10 @@
 <li class="toctree-l1"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/torch_compile_resnet_example.html">Compiling ResNet with dynamic shapes using the <cite>torch.compile</cite> backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/torch_compile_transformers_example.html">Compiling BERT using the <cite>torch.compile</cite> backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/torch_compile_stable_diffusion.html">Compiling Stable Diffusion model using the <cite>torch.compile</cite> backend</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/torch_compile_gpt2.html">Compiling GPT2 using the Torch-TensorRT <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code> frontend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/torch_export_gpt2.html">Compiling GPT2 using the dynamo backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/torch_export_llama2.html">Compiling Llama2 using the dynamo backend</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/torch_export_sam2.html">Compiling SAM2 using the dynamo backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../tutorials/notebooks.html">Legacy notebooks</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Python API Documentation</span></p>
@@ -463,24 +485,24 @@
              <article itemprop="articleBody" id="pytorch-article" class="pytorch-article">
               
   <h1>Source code for torch_tensorrt.logging</h1><div class="highlight"><pre>
-<span></span><span class="kn">import</span> <span class="nn">logging</span>
-<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Any</span>
+<span></span><span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span>
 
-<span class="kn">import</span> <span class="nn">torch</span>
-<span class="kn">from</span> <span class="nn">torch_tensorrt._features</span> <span class="kn">import</span> <span class="n">ENABLED_FEATURES</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt._features</span><span class="w"> </span><span class="kn">import</span> <span class="n">ENABLED_FEATURES</span>
 
-<span class="kn">import</span> <span class="nn">tensorrt</span> <span class="k">as</span> <span class="nn">trt</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">tensorrt</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">trt</span>
 
 <span class="n">logging</span><span class="o">.</span><span class="n">captureWarnings</span><span class="p">(</span><span class="kc">True</span><span class="p">)</span>
 <span class="n">_LOGGER</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="s2">&quot;torch_tensorrt [TensorRT Conversion Context]&quot;</span><span class="p">)</span>
 
 
-<span class="k">class</span> <span class="nc">_TRTLogger</span><span class="p">(</span><span class="n">trt</span><span class="o">.</span><span class="n">ILogger</span><span class="p">):</span>  <span class="c1"># type: ignore[misc]</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">_TRTLogger</span><span class="p">(</span><span class="n">trt</span><span class="o">.</span><span class="n">ILogger</span><span class="p">):</span>  <span class="c1"># type: ignore[misc]</span>
 
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">trt</span><span class="o">.</span><span class="n">ILogger</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
 
-    <span class="k">def</span> <span class="nf">log</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">severity</span><span class="p">:</span> <span class="n">trt</span><span class="o">.</span><span class="n">ILogger</span><span class="o">.</span><span class="n">Severity</span><span class="p">,</span> <span class="n">msg</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">log</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">severity</span><span class="p">:</span> <span class="n">trt</span><span class="o">.</span><span class="n">ILogger</span><span class="o">.</span><span class="n">Severity</span><span class="p">,</span> <span class="n">msg</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="c1"># TODO: Move to match once py39 reaches EoL</span>
         <span class="k">if</span> <span class="n">severity</span> <span class="o">==</span> <span class="n">trt</span><span class="o">.</span><span class="n">ILogger</span><span class="o">.</span><span class="n">Severity</span><span class="o">.</span><span class="n">INTERNAL_ERROR</span><span class="p">:</span>
             <span class="n">_LOGGER</span><span class="o">.</span><span class="n">critical</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
@@ -498,7 +520,7 @@
 <span class="n">TRT_LOGGER</span> <span class="o">=</span> <span class="n">_TRTLogger</span><span class="p">()</span>
 
 
-<div class="viewcode-block" id="internal_errors"><a class="viewcode-back" href="../../py_api/logging.html#torch_tensorrt.logging.internal_errors">[docs]</a><span class="k">class</span> <span class="nc">internal_errors</span><span class="p">:</span>
+<div class="viewcode-block" id="internal_errors"><a class="viewcode-back" href="../../py_api/logging.html#torch_tensorrt.logging.internal_errors">[docs]</a><span class="k">class</span><span class="w"> </span><span class="nc">internal_errors</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Context-manager to limit displayed log messages to just internal errors</span>
 
 <span class="sd">    Example:</span>
@@ -509,12 +531,12 @@
 <span class="sd">                outputs = model_torchtrt(inputs)</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
-    <span class="k">def</span> <span class="fm">__enter__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__enter__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">external_lvl</span> <span class="o">=</span> <span class="n">_LOGGER</span><span class="o">.</span><span class="n">getEffectiveLevel</span><span class="p">()</span>
         <span class="n">_LOGGER</span><span class="o">.</span><span class="n">setLevel</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">CRITICAL</span><span class="p">)</span>
 
         <span class="k">if</span> <span class="n">ENABLED_FEATURES</span><span class="o">.</span><span class="n">torchscript_frontend</span><span class="p">:</span>
-            <span class="kn">from</span> <span class="nn">torch_tensorrt.ts</span> <span class="kn">import</span> <span class="n">logging</span> <span class="k">as</span> <span class="n">ts_logging</span>
+            <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.ts</span><span class="w"> </span><span class="kn">import</span> <span class="n">logging</span> <span class="k">as</span> <span class="n">ts_logging</span>
 
             <span class="bp">self</span><span class="o">.</span><span class="n">ts_level</span> <span class="o">=</span> <span class="n">ts_logging</span><span class="o">.</span><span class="n">get_reportable_log_level</span><span class="p">()</span>
             <span class="n">ts_logging</span><span class="o">.</span><span class="n">set_reportable_log_level</span><span class="p">(</span><span class="n">ts_logging</span><span class="o">.</span><span class="n">Level</span><span class="o">.</span><span class="n">InternalError</span><span class="p">)</span>
@@ -525,11 +547,11 @@
                 <span class="nb">int</span><span class="p">(</span><span class="n">trt</span><span class="o">.</span><span class="n">ILogger</span><span class="o">.</span><span class="n">Severity</span><span class="o">.</span><span class="n">INTERNAL_ERROR</span><span class="p">)</span>
             <span class="p">)</span>
 
-    <span class="k">def</span> <span class="fm">__exit__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">exc_type</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">exc_value</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">exc_tb</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__exit__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">exc_type</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">exc_value</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">exc_tb</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">_LOGGER</span><span class="o">.</span><span class="n">setLevel</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">external_lvl</span><span class="p">)</span>
 
         <span class="k">if</span> <span class="n">ENABLED_FEATURES</span><span class="o">.</span><span class="n">torchscript_frontend</span><span class="p">:</span>
-            <span class="kn">from</span> <span class="nn">torch_tensorrt.ts</span> <span class="kn">import</span> <span class="n">logging</span> <span class="k">as</span> <span class="n">ts_logging</span>
+            <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.ts</span><span class="w"> </span><span class="kn">import</span> <span class="n">logging</span> <span class="k">as</span> <span class="n">ts_logging</span>
 
             <span class="n">ts_logging</span><span class="o">.</span><span class="n">set_reportable_log_level</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ts_level</span><span class="p">)</span>
 
@@ -537,7 +559,7 @@
             <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">set_logging_level</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">rt_level</span><span class="p">)</span></div>
 
 
-<div class="viewcode-block" id="errors"><a class="viewcode-back" href="../../py_api/logging.html#torch_tensorrt.logging.errors">[docs]</a><span class="k">class</span> <span class="nc">errors</span><span class="p">:</span>
+<div class="viewcode-block" id="errors"><a class="viewcode-back" href="../../py_api/logging.html#torch_tensorrt.logging.errors">[docs]</a><span class="k">class</span><span class="w"> </span><span class="nc">errors</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Context-manager to limit displayed log messages to just errors and above</span>
 
 <span class="sd">    Example:</span>
@@ -548,12 +570,12 @@
 <span class="sd">                outputs = model_torchtrt(inputs)</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
-    <span class="k">def</span> <span class="fm">__enter__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__enter__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">external_lvl</span> <span class="o">=</span> <span class="n">_LOGGER</span><span class="o">.</span><span class="n">getEffectiveLevel</span><span class="p">()</span>
         <span class="n">_LOGGER</span><span class="o">.</span><span class="n">setLevel</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">ERROR</span><span class="p">)</span>
 
         <span class="k">if</span> <span class="n">ENABLED_FEATURES</span><span class="o">.</span><span class="n">torchscript_frontend</span><span class="p">:</span>
-            <span class="kn">from</span> <span class="nn">torch_tensorrt.ts</span> <span class="kn">import</span> <span class="n">logging</span> <span class="k">as</span> <span class="n">ts_logging</span>
+            <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.ts</span><span class="w"> </span><span class="kn">import</span> <span class="n">logging</span> <span class="k">as</span> <span class="n">ts_logging</span>
 
             <span class="bp">self</span><span class="o">.</span><span class="n">ts_level</span> <span class="o">=</span> <span class="n">ts_logging</span><span class="o">.</span><span class="n">get_reportable_log_level</span><span class="p">()</span>
             <span class="n">ts_logging</span><span class="o">.</span><span class="n">set_reportable_log_level</span><span class="p">(</span><span class="n">ts_logging</span><span class="o">.</span><span class="n">Level</span><span class="o">.</span><span class="n">Error</span><span class="p">)</span>
@@ -562,11 +584,11 @@
             <span class="bp">self</span><span class="o">.</span><span class="n">rt_level</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">get_logging_level</span><span class="p">()</span>
             <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">set_logging_level</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">trt</span><span class="o">.</span><span class="n">ILogger</span><span class="o">.</span><span class="n">Severity</span><span class="o">.</span><span class="n">ERROR</span><span class="p">))</span>
 
-    <span class="k">def</span> <span class="fm">__exit__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">exc_type</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">exc_value</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">exc_tb</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__exit__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">exc_type</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">exc_value</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">exc_tb</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">_LOGGER</span><span class="o">.</span><span class="n">setLevel</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">external_lvl</span><span class="p">)</span>
 
         <span class="k">if</span> <span class="n">ENABLED_FEATURES</span><span class="o">.</span><span class="n">torchscript_frontend</span><span class="p">:</span>
-            <span class="kn">from</span> <span class="nn">torch_tensorrt.ts</span> <span class="kn">import</span> <span class="n">logging</span> <span class="k">as</span> <span class="n">ts_logging</span>
+            <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.ts</span><span class="w"> </span><span class="kn">import</span> <span class="n">logging</span> <span class="k">as</span> <span class="n">ts_logging</span>
 
             <span class="n">ts_logging</span><span class="o">.</span><span class="n">set_reportable_log_level</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ts_level</span><span class="p">)</span>
 
@@ -574,7 +596,7 @@
             <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">set_logging_level</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">rt_level</span><span class="p">)</span></div>
 
 
-<div class="viewcode-block" id="warnings"><a class="viewcode-back" href="../../py_api/logging.html#torch_tensorrt.logging.warnings">[docs]</a><span class="k">class</span> <span class="nc">warnings</span><span class="p">:</span>
+<div class="viewcode-block" id="warnings"><a class="viewcode-back" href="../../py_api/logging.html#torch_tensorrt.logging.warnings">[docs]</a><span class="k">class</span><span class="w"> </span><span class="nc">warnings</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Context-manager to limit displayed log messages to just warnings and above</span>
 
 <span class="sd">    Example:</span>
@@ -585,12 +607,12 @@
 <span class="sd">                model_trt = torch_tensorrt.compile(model, **spec)</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
-    <span class="k">def</span> <span class="fm">__enter__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__enter__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">external_lvl</span> <span class="o">=</span> <span class="n">_LOGGER</span><span class="o">.</span><span class="n">getEffectiveLevel</span><span class="p">()</span>
         <span class="n">_LOGGER</span><span class="o">.</span><span class="n">setLevel</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">WARNING</span><span class="p">)</span>
 
         <span class="k">if</span> <span class="n">ENABLED_FEATURES</span><span class="o">.</span><span class="n">torchscript_frontend</span><span class="p">:</span>
-            <span class="kn">from</span> <span class="nn">torch_tensorrt.ts</span> <span class="kn">import</span> <span class="n">logging</span> <span class="k">as</span> <span class="n">ts_logging</span>
+            <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.ts</span><span class="w"> </span><span class="kn">import</span> <span class="n">logging</span> <span class="k">as</span> <span class="n">ts_logging</span>
 
             <span class="bp">self</span><span class="o">.</span><span class="n">ts_level</span> <span class="o">=</span> <span class="n">ts_logging</span><span class="o">.</span><span class="n">get_reportable_log_level</span><span class="p">()</span>
             <span class="n">ts_logging</span><span class="o">.</span><span class="n">set_reportable_log_level</span><span class="p">(</span><span class="n">ts_logging</span><span class="o">.</span><span class="n">Level</span><span class="o">.</span><span class="n">Warning</span><span class="p">)</span>
@@ -599,11 +621,11 @@
             <span class="bp">self</span><span class="o">.</span><span class="n">rt_level</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">get_logging_level</span><span class="p">()</span>
             <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">set_logging_level</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">trt</span><span class="o">.</span><span class="n">ILogger</span><span class="o">.</span><span class="n">Severity</span><span class="o">.</span><span class="n">WARNING</span><span class="p">))</span>
 
-    <span class="k">def</span> <span class="fm">__exit__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">exc_type</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">exc_value</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">exc_tb</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__exit__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">exc_type</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">exc_value</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">exc_tb</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">_LOGGER</span><span class="o">.</span><span class="n">setLevel</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">external_lvl</span><span class="p">)</span>
 
         <span class="k">if</span> <span class="n">ENABLED_FEATURES</span><span class="o">.</span><span class="n">torchscript_frontend</span><span class="p">:</span>
-            <span class="kn">from</span> <span class="nn">torch_tensorrt.ts</span> <span class="kn">import</span> <span class="n">logging</span> <span class="k">as</span> <span class="n">ts_logging</span>
+            <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.ts</span><span class="w"> </span><span class="kn">import</span> <span class="n">logging</span> <span class="k">as</span> <span class="n">ts_logging</span>
 
             <span class="n">ts_logging</span><span class="o">.</span><span class="n">set_reportable_log_level</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ts_level</span><span class="p">)</span>
 
@@ -611,7 +633,7 @@
             <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">set_logging_level</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">rt_level</span><span class="p">)</span></div>
 
 
-<div class="viewcode-block" id="info"><a class="viewcode-back" href="../../py_api/logging.html#torch_tensorrt.logging.info">[docs]</a><span class="k">class</span> <span class="nc">info</span><span class="p">:</span>
+<div class="viewcode-block" id="info"><a class="viewcode-back" href="../../py_api/logging.html#torch_tensorrt.logging.info">[docs]</a><span class="k">class</span><span class="w"> </span><span class="nc">info</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Context-manager to display all info and greater severity messages</span>
 
 <span class="sd">    Example:</span>
@@ -622,12 +644,12 @@
 <span class="sd">                model_trt = torch_tensorrt.compile(model, **spec)</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
-    <span class="k">def</span> <span class="fm">__enter__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__enter__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">external_lvl</span> <span class="o">=</span> <span class="n">_LOGGER</span><span class="o">.</span><span class="n">getEffectiveLevel</span><span class="p">()</span>
         <span class="n">_LOGGER</span><span class="o">.</span><span class="n">setLevel</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">INFO</span><span class="p">)</span>
 
         <span class="k">if</span> <span class="n">ENABLED_FEATURES</span><span class="o">.</span><span class="n">torchscript_frontend</span><span class="p">:</span>
-            <span class="kn">from</span> <span class="nn">torch_tensorrt.ts</span> <span class="kn">import</span> <span class="n">logging</span> <span class="k">as</span> <span class="n">ts_logging</span>
+            <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.ts</span><span class="w"> </span><span class="kn">import</span> <span class="n">logging</span> <span class="k">as</span> <span class="n">ts_logging</span>
 
             <span class="bp">self</span><span class="o">.</span><span class="n">ts_level</span> <span class="o">=</span> <span class="n">ts_logging</span><span class="o">.</span><span class="n">get_reportable_log_level</span><span class="p">()</span>
             <span class="n">ts_logging</span><span class="o">.</span><span class="n">set_reportable_log_level</span><span class="p">(</span><span class="n">ts_logging</span><span class="o">.</span><span class="n">Level</span><span class="o">.</span><span class="n">Info</span><span class="p">)</span>
@@ -636,11 +658,11 @@
             <span class="bp">self</span><span class="o">.</span><span class="n">rt_level</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">get_logging_level</span><span class="p">()</span>
             <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">set_logging_level</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">trt</span><span class="o">.</span><span class="n">ILogger</span><span class="o">.</span><span class="n">Severity</span><span class="o">.</span><span class="n">INFO</span><span class="p">))</span>
 
-    <span class="k">def</span> <span class="fm">__exit__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">exc_type</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">exc_value</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">exc_tb</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__exit__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">exc_type</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">exc_value</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">exc_tb</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">_LOGGER</span><span class="o">.</span><span class="n">setLevel</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">external_lvl</span><span class="p">)</span>
 
         <span class="k">if</span> <span class="n">ENABLED_FEATURES</span><span class="o">.</span><span class="n">torchscript_frontend</span><span class="p">:</span>
-            <span class="kn">from</span> <span class="nn">torch_tensorrt.ts</span> <span class="kn">import</span> <span class="n">logging</span> <span class="k">as</span> <span class="n">ts_logging</span>
+            <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.ts</span><span class="w"> </span><span class="kn">import</span> <span class="n">logging</span> <span class="k">as</span> <span class="n">ts_logging</span>
 
             <span class="n">ts_logging</span><span class="o">.</span><span class="n">set_reportable_log_level</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ts_level</span><span class="p">)</span>
 
@@ -648,7 +670,7 @@
             <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">set_logging_level</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">rt_level</span><span class="p">)</span></div>
 
 
-<div class="viewcode-block" id="debug"><a class="viewcode-back" href="../../py_api/logging.html#torch_tensorrt.logging.debug">[docs]</a><span class="k">class</span> <span class="nc">debug</span><span class="p">:</span>
+<div class="viewcode-block" id="debug"><a class="viewcode-back" href="../../py_api/logging.html#torch_tensorrt.logging.debug">[docs]</a><span class="k">class</span><span class="w"> </span><span class="nc">debug</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Context-manager to display full debug information through the logger</span>
 
 <span class="sd">    Example:</span>
@@ -659,12 +681,12 @@
 <span class="sd">                model_trt = torch_tensorrt.compile(model, **spec)</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
-    <span class="k">def</span> <span class="fm">__enter__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__enter__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">external_lvl</span> <span class="o">=</span> <span class="n">_LOGGER</span><span class="o">.</span><span class="n">getEffectiveLevel</span><span class="p">()</span>
         <span class="n">_LOGGER</span><span class="o">.</span><span class="n">setLevel</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">)</span>
 
         <span class="k">if</span> <span class="n">ENABLED_FEATURES</span><span class="o">.</span><span class="n">torchscript_frontend</span><span class="p">:</span>
-            <span class="kn">from</span> <span class="nn">torch_tensorrt.ts</span> <span class="kn">import</span> <span class="n">logging</span> <span class="k">as</span> <span class="n">ts_logging</span>
+            <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.ts</span><span class="w"> </span><span class="kn">import</span> <span class="n">logging</span> <span class="k">as</span> <span class="n">ts_logging</span>
 
             <span class="bp">self</span><span class="o">.</span><span class="n">ts_level</span> <span class="o">=</span> <span class="n">ts_logging</span><span class="o">.</span><span class="n">get_reportable_log_level</span><span class="p">()</span>
             <span class="n">ts_logging</span><span class="o">.</span><span class="n">set_reportable_log_level</span><span class="p">(</span><span class="n">ts_logging</span><span class="o">.</span><span class="n">Level</span><span class="o">.</span><span class="n">Debug</span><span class="p">)</span>
@@ -673,11 +695,11 @@
             <span class="bp">self</span><span class="o">.</span><span class="n">rt_level</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">get_logging_level</span><span class="p">()</span>
             <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">set_logging_level</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">trt</span><span class="o">.</span><span class="n">ILogger</span><span class="o">.</span><span class="n">Severity</span><span class="o">.</span><span class="n">VERBOSE</span><span class="p">))</span>
 
-    <span class="k">def</span> <span class="fm">__exit__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">exc_type</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">exc_value</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">exc_tb</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__exit__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">exc_type</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">exc_value</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">exc_tb</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">_LOGGER</span><span class="o">.</span><span class="n">setLevel</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">external_lvl</span><span class="p">)</span>
 
         <span class="k">if</span> <span class="n">ENABLED_FEATURES</span><span class="o">.</span><span class="n">torchscript_frontend</span><span class="p">:</span>
-            <span class="kn">from</span> <span class="nn">torch_tensorrt.ts</span> <span class="kn">import</span> <span class="n">logging</span> <span class="k">as</span> <span class="n">ts_logging</span>
+            <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.ts</span><span class="w"> </span><span class="kn">import</span> <span class="n">logging</span> <span class="k">as</span> <span class="n">ts_logging</span>
 
             <span class="n">ts_logging</span><span class="o">.</span><span class="n">set_reportable_log_level</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ts_level</span><span class="p">)</span>
 
@@ -685,7 +707,7 @@
             <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">set_logging_level</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">rt_level</span><span class="p">)</span></div>
 
 
-<div class="viewcode-block" id="graphs"><a class="viewcode-back" href="../../py_api/logging.html#torch_tensorrt.logging.graphs">[docs]</a><span class="k">class</span> <span class="nc">graphs</span><span class="p">:</span>
+<div class="viewcode-block" id="graphs"><a class="viewcode-back" href="../../py_api/logging.html#torch_tensorrt.logging.graphs">[docs]</a><span class="k">class</span><span class="w"> </span><span class="nc">graphs</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Context-manager to display the results of intermediate lowering passes</span>
 <span class="sd">    as well as full debug information through the logger</span>
 
@@ -697,12 +719,12 @@
 <span class="sd">                model_trt = torch_tensorrt.compile(model, **spec)</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
-    <span class="k">def</span> <span class="fm">__enter__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__enter__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">external_lvl</span> <span class="o">=</span> <span class="n">_LOGGER</span><span class="o">.</span><span class="n">getEffectiveLevel</span><span class="p">()</span>
         <span class="n">_LOGGER</span><span class="o">.</span><span class="n">setLevel</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">NOTSET</span><span class="p">)</span>
 
         <span class="k">if</span> <span class="n">ENABLED_FEATURES</span><span class="o">.</span><span class="n">torchscript_frontend</span><span class="p">:</span>
-            <span class="kn">from</span> <span class="nn">torch_tensorrt.ts</span> <span class="kn">import</span> <span class="n">logging</span> <span class="k">as</span> <span class="n">ts_logging</span>
+            <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.ts</span><span class="w"> </span><span class="kn">import</span> <span class="n">logging</span> <span class="k">as</span> <span class="n">ts_logging</span>
 
             <span class="bp">self</span><span class="o">.</span><span class="n">ts_level</span> <span class="o">=</span> <span class="n">ts_logging</span><span class="o">.</span><span class="n">get_reportable_log_level</span><span class="p">()</span>
             <span class="n">ts_logging</span><span class="o">.</span><span class="n">set_reportable_log_level</span><span class="p">(</span><span class="n">ts_logging</span><span class="o">.</span><span class="n">Level</span><span class="o">.</span><span class="n">Graph</span><span class="p">)</span>
@@ -711,11 +733,11 @@
             <span class="bp">self</span><span class="o">.</span><span class="n">rt_level</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">get_logging_level</span><span class="p">()</span>
             <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">set_logging_level</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">trt</span><span class="o">.</span><span class="n">ILogger</span><span class="o">.</span><span class="n">Severity</span><span class="o">.</span><span class="n">VERBOSE</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
 
-    <span class="k">def</span> <span class="fm">__exit__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">exc_type</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">exc_value</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">exc_tb</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__exit__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">exc_type</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">exc_value</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">exc_tb</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">_LOGGER</span><span class="o">.</span><span class="n">setLevel</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">external_lvl</span><span class="p">)</span>
 
         <span class="k">if</span> <span class="n">ENABLED_FEATURES</span><span class="o">.</span><span class="n">torchscript_frontend</span><span class="p">:</span>
-            <span class="kn">from</span> <span class="nn">torch_tensorrt.ts</span> <span class="kn">import</span> <span class="n">logging</span> <span class="k">as</span> <span class="n">ts_logging</span>
+            <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.ts</span><span class="w"> </span><span class="kn">import</span> <span class="n">logging</span> <span class="k">as</span> <span class="n">ts_logging</span>
 
             <span class="n">ts_logging</span><span class="o">.</span><span class="n">set_reportable_log_level</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ts_level</span><span class="p">)</span>
 
@@ -947,7 +969,7 @@
                <a href="https://pytorch.org/resources">Developer Resources</a>
              </li>
              <li>
-               <a href="https://pytorch.org/ecosystem/contributor-awards-2023">Contributor Awards - 2023</a>
+               <a href="https://pytorch.org/ecosystem/contributor-awards-2023">Contributor Awards - 2024</a>
              </li>
            </ul>
 
@@ -962,6 +984,9 @@
              
              <li>
                <a href="https://pytorch.org/executorch-overview">ExecuTorch</a>
+             </li>
+             <li>
+               <a href="https://pytorch.org/executorch/stable/index.html">ExecuTorch Documentation</a>
              </li>
            </ul>
 
@@ -1001,6 +1026,9 @@
             <li>
               <a href="https://pytorch.org/events">Events</a>
             </li>
+            <li>
+               <a href="https://pytorch.org/newsletter">Newsletter</a>
+             </li>
           </ul>
           
           <li class="resources-mobile-menu-title">
@@ -1013,6 +1041,18 @@
             </li>
             <li>
               <a href="https://pytorch.org/governing-board">Governing Board</a>
+            </li>
+            <li>
+               <a href="https://pytorch.org/credits">Cloud Credit Program</a>
+            </li>
+            <li>
+               <a href="https://pytorch.org/tac">Technical Advisory Council</a>
+            </li>
+            <li>
+               <a href="https://pytorch.org/staff">Staff</a>
+            </li>
+            <li>
+               <a href="https://pytorch.org/contact-us">Contact Us</a>
             </li>
           </ul>
         </ul>

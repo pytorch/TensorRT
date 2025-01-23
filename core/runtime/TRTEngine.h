@@ -19,6 +19,56 @@ namespace torch_tensorrt {
 namespace core {
 namespace runtime {
 
+using FlattenedState = std::tuple<
+    std::tuple<std::string, std::string>, // ABI_VERSION
+    std::tuple<std::string, std::string>, // name
+    std::tuple<std::string, std::string>, // device
+    std::tuple<std::string, std::string>, // engine
+    std::tuple<std::string, std::string>, // input binding names
+    std::tuple<std::string, std::string>, // output binding names
+    std::tuple<std::string, std::string>, // HW compatibility
+    std::tuple<std::string, std::string>, // serialized metadata
+    std::tuple<std::string, std::string>>; // Platform
+
+struct TorchTRTRuntimeStates {
+  // Indicates whether CUDAGraphs were enabled in the previous execute_engine
+  bool old_cudagraphs;
+  // Indicates whether pre-allocated output was enabled in the previous execute_engine
+  bool old_pre_allocated_outputs;
+  // Indicates whether context has changed
+  bool context_changed;
+
+  // Evaluates whether certain conditions are met to enable CUDA Graph recording/reset or to reuse pre-allocated outputs
+  // based on the current and previous states, as well as input shape has changed
+  std::tuple<bool, bool, bool> set_runtime_states(
+      bool new_cudagraphs,
+      bool new_pre_allocated_output,
+      bool shape_changed) {
+    bool need_cudagraphs_record = false;
+    bool can_use_pre_allocated_outputs = false;
+    bool need_cudagraphs_reset = false;
+
+    // Cudagraphs record is required if cudagraphs_enabled is switched to True regardless of shape change
+    if (new_cudagraphs && (!old_cudagraphs || shape_changed || context_changed)) {
+      need_cudagraphs_record = true;
+    }
+    // Pre-allocated output can be used when previous and current state are true without shape change
+    if (old_pre_allocated_outputs && new_pre_allocated_output && !shape_changed) {
+      can_use_pre_allocated_outputs = true;
+    }
+    if (!new_cudagraphs || shape_changed || context_changed) {
+      need_cudagraphs_reset = true;
+    }
+
+    old_cudagraphs = new_cudagraphs;
+    old_pre_allocated_outputs = new_pre_allocated_output;
+    // Reset flag
+    context_changed = false;
+
+    return {need_cudagraphs_record, can_use_pre_allocated_outputs, need_cudagraphs_reset};
+  }
+};
+
 struct TRTEngine : torch::CustomClassHolder {
   // Each engine needs it's own runtime object
   std::shared_ptr<nvinfer1::IRuntime> rt;
@@ -69,14 +119,22 @@ struct TRTEngine : torch::CustomClassHolder {
   void enable_profiling();
   void disable_profiling();
   std::string get_engine_layer_info();
+
   void dump_engine_layer_info_to_file(const std::string& path);
   void dump_engine_layer_info();
   int64_t get_device_memory_budget();
   bool set_device_memory_budget(int64_t budget);
   int64_t get_streamable_device_memory_budget();
   int64_t get_automatic_device_memory_budget();
+  std::vector<at::Tensor> infer_outputs(std::vector<std::vector<int64_t>> input_shapes);
+  void set_pre_allocated_outputs(bool enable);
+  TorchTRTRuntimeStates runtime_states;
   friend std::ostream& operator<<(std::ostream& os, const TRTEngine& engine);
   static const char BINDING_DELIM = '%';
+
+  // Serde re-export functionality
+  FlattenedState __obj_flatten__();
+  std::vector<std::string> serialize();
 
   // CUDAGraph-Related Functionality
   at::cuda::CUDAGraph cudagraph = {};
@@ -84,7 +142,9 @@ struct TRTEngine : torch::CustomClassHolder {
   at::cuda::CUDAStream caller_stream = c10::cuda::getDefaultCUDAStream();
   std::vector<at::Tensor> input_buffers = {};
   std::vector<at::Tensor> output_buffers = {};
-  std::string shape_key;
+  std::string shape_key = "None";
+  bool use_pre_allocated_outputs = false;
+  std::vector<at::Tensor> pre_allocated_outputs;
 
   // TODO: Implement a call method
   // c10::List<at::Tensor> Run(c10::List<at::Tensor> inputs);

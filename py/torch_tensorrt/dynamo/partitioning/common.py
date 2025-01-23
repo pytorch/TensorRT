@@ -31,7 +31,8 @@ def construct_dynamic_input(
         if isinstance(dim, torch.SymInt):
             min_max_opt = extract_var_range_info(dim)
             min_shape.append(min_max_opt["min"])
-            opt_shape.append(min_max_opt["opt"])
+            # opt might not exist
+            opt_shape.append(min_max_opt.get("opt"))
             max_shape.append(min_max_opt["max"])
         else:
             min_shape.append(dim)

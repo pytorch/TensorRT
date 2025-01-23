@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Program Listing for File torch_tensorrt.h &mdash; Torch-TensorRT v2.6.0.dev0+1d5be25 documentation</title>
+  <title>Program Listing for File torch_tensorrt.h &mdash; Torch-TensorRT v2.7.0.dev0+cfdb585 documentation</title>
   
 
   
@@ -133,8 +133,8 @@
                   <span class=dropdown-title>Developer Resources</span>
                   <p>Find resources and get questions answered</p>
                 </a>
-                <a class="nav-dropdown-item" href="https://pytorch.org/ecosystem/contributor-awards-2023">
-                  <span class="dropdown-title">Contributor Awards - 2023</span>
+                <a class="nav-dropdown-item" href="https://pytorch.org/ecosystem/contributor-awards-2024">
+                  <span class="dropdown-title">Contributor Awards - 2024</span>
                   <p>Award winners announced at this year's PyTorch Conference</p>
                 </a>
               </div>
@@ -154,6 +154,9 @@
                 <a class="nav-dropdown-item" href="https://pytorch.org/executorch-overview">
                   <span class="dropdown-title">ExecuTorch</span>
                   <p>End-to-end solution for enabling on-device inference capabilities across mobile and edge devices</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/executorch/stable/index.html">
+                  <span class="dropdown-title">ExecuTorch Docs</span>
                 </a>
               </div>
             </div>  
@@ -202,6 +205,10 @@
                   <span class="dropdown-title">Events</span>
                   <p>Find events, webinars, and podcasts</p>
                 </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/newsletter">
+                  <span class="dropdown-title">Newsletter</span>
+                  <p>Stay up-to-date with the latest updates</p>
+                </a>
             </div>
           </li>
 
@@ -217,7 +224,18 @@
                 </a>
                 <a class="nav-dropdown-item" href="https://pytorch.org/governing-board">
                   <span class="dropdown-title">Governing Board</span>
-                  <p></p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/credits">
+                  <span class="dropdown-title">Cloud Credit Program</span>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/tac">
+                  <span class="dropdown-title">Technical Advisory Council</span>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/staff">
+                  <span class="dropdown-title">Staff</span>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/contact-us">
+                  <span class="dropdown-title">Contact Us</span>
                 </a>
               </div>
             </div>
@@ -273,7 +291,7 @@
               
               
                 <div class="version">
-                  v2.6.0.dev0+1d5be25
+                  v2.7.0.dev0+cfdb585
                 </div>
               
             
@@ -327,8 +345,10 @@
 <li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/torch_export_cudagraphs.html">Torch Export with Cudagraphs</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/converter_overloading.html">Overloading Torch-TensorRT Converters with Custom Converters</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/custom_kernel_plugins.html">Using Custom Kernels within TensorRT Engines with Torch-TensorRT</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/auto_generate_converters.html">Automatically Generate a Converter for a Custom Kernel</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/mutable_torchtrt_module_example.html">Mutable Torch TensorRT Module</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/weight_streaming_example.html">Weight Streaming</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/pre_allocated_output_example.html">Pre-allocated output buffer</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Dynamo Frontend</span></p>
 <ul>
@@ -353,8 +373,10 @@
 <li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/torch_compile_resnet_example.html">Compiling ResNet with dynamic shapes using the <cite>torch.compile</cite> backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/torch_compile_transformers_example.html">Compiling BERT using the <cite>torch.compile</cite> backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/torch_compile_stable_diffusion.html">Compiling Stable Diffusion model using the <cite>torch.compile</cite> backend</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/torch_compile_gpt2.html">Compiling GPT2 using the Torch-TensorRT <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code> frontend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/torch_export_gpt2.html">Compiling GPT2 using the dynamo backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/torch_export_llama2.html">Compiling Llama2 using the dynamo backend</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/torch_export_sam2.html">Compiling SAM2 using the dynamo backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../tutorials/notebooks.html">Legacy notebooks</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Python API Documentation</span></p>
@@ -468,348 +490,348 @@
   <section id="program-listing-for-file-torch-tensorrt-h">
 <span id="program-listing-file-cpp-include-torch-tensorrt-torch-tensorrt-h"></span><h1>Program Listing for File torch_tensorrt.h<a class="headerlink" href="#program-listing-for-file-torch-tensorrt-h" title="Permalink to this heading">¶</a></h1>
 <p>↰ <a class="reference internal" href="file_cpp_include_torch_tensorrt_torch_tensorrt.h.html#file-cpp-include-torch-tensorrt-torch-tensorrt-h"><span class="std std-ref">Return to documentation for file</span></a> (<code class="docutils literal notranslate"><span class="pre">cpp/include/torch_tensorrt/torch_tensorrt.h</span></code>)</p>
-<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>/*
- * Copyright (c) NVIDIA Corporation.
- * All rights reserved.
- *
- * This library is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree.
- */
-
-#pragma once
-
-#include &lt;cuda_runtime.h&gt;
-#include &lt;iostream&gt;
-#include &lt;memory&gt;
-#include &lt;set&gt;
-#include &lt;string&gt;
-#include &lt;vector&gt;
-#include &quot;torch/custom_class.h&quot;
-
-#include &quot;torch_tensorrt/macros.h&quot;
-
-// Just include the .h?
-#ifndef DOXYGEN_SHOULD_SKIP_THIS
-namespace torch {
-namespace jit {
-struct Graph;
-struct Module;
-} // namespace jit
-} // namespace torch
-
-namespace c10 {
-enum class DeviceType : int8_t;
-enum class ScalarType : int8_t;
-template &lt;class&gt;
-class ArrayRef;
-} // namespace c10
-
-namespace nvinfer1 {
-class IInt8Calibrator;
-}
-#endif // DOXYGEN_SHOULD_SKIP_THIS
-
-namespace torch_tensorrt {
-class DataType {
- public:
-  enum Value : int8_t {
-    kLong,
-    kDouble,
-    kFloat,
-    kHalf,
-    kChar,
-    kInt,
-    kBool,
-    kUnknown
-  };
-
-  DataType() = default;
-  constexpr DataType(Value t) : value(t) {}
-  TORCHTRT_API DataType(c10::ScalarType t);
-  operator Value() const {
-    return value;
-  }
-  explicit operator bool() = delete;
-  constexpr bool operator==(DataType other) const {
-    return value == other.value;
-  }
-  constexpr bool operator==(DataType::Value other) const {
-    return value == other;
-  }
-  constexpr bool operator!=(DataType other) const {
-    return value != other.value;
-  }
-  constexpr bool operator!=(DataType::Value other) const {
-    return value != other;
-  }
-
- private:
-  friend TORCHTRT_API std::ostream&amp; operator&lt;&lt;(std::ostream&amp; os, const DataType&amp; dtype);
-  Value value;
-};
-
-struct Device {
-  class DeviceType {
-   public:
-    enum Value : int8_t {
-      kGPU,
-      kDLA,
-    };
-
-    DeviceType() = default;
-    constexpr DeviceType(Value t) : value(t) {}
-    DeviceType(c10::DeviceType t);
-    operator Value() const {
-      return value;
-    }
-    explicit operator bool() = delete;
-    constexpr bool operator==(DeviceType other) const {
-      return value == other.value;
-    }
-    constexpr bool operator!=(DeviceType other) const {
-      return value != other.value;
-    }
-
-   private:
-    Value value;
-  };
-
-  DeviceType device_type;
-
-  /*
-   * Target gpu id
-   */
-  int64_t gpu_id;
-
-  /*
-   * When using DLA core on NVIDIA AGX platforms gpu_id should be set as Xavier device
-   */
-  int64_t dla_core;
-
-  bool allow_gpu_fallback;
-
-  Device() : device_type(DeviceType::kGPU), gpu_id(0), dla_core(0), allow_gpu_fallback(false) {}
-};
-
-enum class EngineCapability : int8_t {
-  kSTANDARD,
-  kSAFETY,
-  kDLA_STANDALONE,
-};
-
-class TensorFormat {
- public:
-  enum Value : int8_t {
-    kContiguous,
-    kChannelsLast,
-    kUnknown,
-  };
-
-  TensorFormat() = default;
-  constexpr TensorFormat(Value t) : value(t) {}
-  TORCHTRT_API TensorFormat(at::MemoryFormat t);
-  operator Value() const {
-    return value;
-  }
-  explicit operator bool() = delete;
-  constexpr bool operator==(TensorFormat other) const {
-    return value == other.value;
-  }
-  constexpr bool operator==(TensorFormat::Value other) const {
-    return value == other;
-  }
-  constexpr bool operator!=(TensorFormat other) const {
-    return value != other.value;
-  }
-  constexpr bool operator!=(TensorFormat::Value other) const {
-    return value != other;
-  }
-
- private:
-  friend TORCHTRT_API std::ostream&amp; operator&lt;&lt;(std::ostream&amp; os, const TensorFormat&amp; format);
-  Value value;
-};
-
-struct Input : torch::CustomClassHolder {
-  std::vector&lt;int64_t&gt; min_shape;
-  std::vector&lt;int64_t&gt; opt_shape;
-  std::vector&lt;int64_t&gt; max_shape;
-  std::vector&lt;int64_t&gt; shape;
-  DataType dtype;
-  TensorFormat format;
-  std::vector&lt;double&gt; tensor_domain;
-
-  Input() {}
-  TORCHTRT_API Input(std::vector&lt;int64_t&gt; shape, TensorFormat format = TensorFormat::kContiguous);
-
-  TORCHTRT_API Input(
-      std::vector&lt;int64_t&gt; shape,
-      std::vector&lt;double&gt; tensor_domain,
-      TensorFormat format = TensorFormat::kContiguous);
-
-  TORCHTRT_API Input(std::vector&lt;int64_t&gt; shape, DataType dtype, TensorFormat format = TensorFormat::kContiguous);
-
-  TORCHTRT_API Input(
-      std::vector&lt;int64_t&gt; shape,
-      DataType dtype,
-      std::vector&lt;double&gt; tensor_domain,
-      TensorFormat format = TensorFormat::kContiguous);
-
-  TORCHTRT_API Input(c10::ArrayRef&lt;int64_t&gt; shape, TensorFormat format = TensorFormat::kContiguous);
-
-  TORCHTRT_API Input(
-      c10::ArrayRef&lt;int64_t&gt; shape,
-      std::vector&lt;double&gt; tensor_domain,
-      TensorFormat format = TensorFormat::kContiguous);
-
-  TORCHTRT_API Input(c10::ArrayRef&lt;int64_t&gt; shape, DataType dtype, TensorFormat format = TensorFormat::kContiguous);
-
-  TORCHTRT_API Input(
-      c10::ArrayRef&lt;int64_t&gt; shape,
-      DataType dtype,
-      std::vector&lt;double&gt; tensor_domain,
-      TensorFormat format = TensorFormat::kContiguous);
-
-  TORCHTRT_API Input(
-      std::vector&lt;int64_t&gt; min_shape,
-      std::vector&lt;int64_t&gt; opt_shape,
-      std::vector&lt;int64_t&gt; max_shape,
-      TensorFormat format = TensorFormat::kContiguous);
-  TORCHTRT_API Input(
-      std::vector&lt;int64_t&gt; min_shape,
-      std::vector&lt;int64_t&gt; opt_shape,
-      std::vector&lt;int64_t&gt; max_shape,
-      std::vector&lt;double&gt; tensor_domain,
-      TensorFormat format = TensorFormat::kContiguous);
-
-  TORCHTRT_API Input(
-      std::vector&lt;int64_t&gt; min_shape,
-      std::vector&lt;int64_t&gt; opt_shape,
-      std::vector&lt;int64_t&gt; max_shape,
-      DataType dtype,
-      TensorFormat format = TensorFormat::kContiguous);
-
-  TORCHTRT_API Input(
-      std::vector&lt;int64_t&gt; min_shape,
-      std::vector&lt;int64_t&gt; opt_shape,
-      std::vector&lt;int64_t&gt; max_shape,
-      DataType dtype,
-      std::vector&lt;double&gt; tensor_domain,
-      TensorFormat format = TensorFormat::kContiguous);
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="cm">/*</span>
+<span class="cm"> * Copyright (c) NVIDIA Corporation.</span>
+<span class="cm"> * All rights reserved.</span>
+<span class="cm"> *</span>
+<span class="cm"> * This library is licensed under the BSD-style license found in the</span>
+<span class="cm"> * LICENSE file in the root directory of this source tree.</span>
+<span class="cm"> */</span>
+
+<span class="cp">#pragma once</span>
+
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;cuda_runtime.h&gt;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;iostream&gt;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;memory&gt;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;set&gt;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;string&gt;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;vector&gt;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;torch/custom_class.h&quot;</span>
+
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;torch_tensorrt/macros.h&quot;</span>
+
+<span class="c1">// Just include the .h?</span>
+<span class="cp">#ifndef DOXYGEN_SHOULD_SKIP_THIS</span>
+<span class="k">namespace</span><span class="w"> </span><span class="nn">torch</span><span class="w"> </span><span class="p">{</span>
+<span class="k">namespace</span><span class="w"> </span><span class="nn">jit</span><span class="w"> </span><span class="p">{</span>
+<span class="k">struct</span><span class="w"> </span><span class="nc">Graph</span><span class="p">;</span>
+<span class="k">struct</span><span class="w"> </span><span class="nc">Module</span><span class="p">;</span>
+<span class="p">}</span><span class="w"> </span><span class="c1">// namespace jit</span>
+<span class="p">}</span><span class="w"> </span><span class="c1">// namespace torch</span>
+
+<span class="k">namespace</span><span class="w"> </span><span class="nn">c10</span><span class="w"> </span><span class="p">{</span>
+<span class="k">enum</span><span class="w"> </span><span class="k">class</span><span class="w"> </span><span class="nc">DeviceType</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="kt">int8_t</span><span class="p">;</span>
+<span class="k">enum</span><span class="w"> </span><span class="k">class</span><span class="w"> </span><span class="nc">ScalarType</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="kt">int8_t</span><span class="p">;</span>
+<span class="k">template</span><span class="w"> </span><span class="o">&lt;</span><span class="k">class</span><span class="o">&gt;</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">ArrayRef</span><span class="p">;</span>
+<span class="p">}</span><span class="w"> </span><span class="c1">// namespace c10</span>
+
+<span class="k">namespace</span><span class="w"> </span><span class="nn">nvinfer1</span><span class="w"> </span><span class="p">{</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">IInt8Calibrator</span><span class="p">;</span>
+<span class="p">}</span>
+<span class="cp">#endif </span><span class="c1">// DOXYGEN_SHOULD_SKIP_THIS</span>
+
+<span class="k">namespace</span><span class="w"> </span><span class="nn">torch_tensorrt</span><span class="w"> </span><span class="p">{</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">DataType</span><span class="w"> </span><span class="p">{</span>
+<span class="w"> </span><span class="k">public</span><span class="o">:</span>
+<span class="w">  </span><span class="k">enum</span><span class="w"> </span><span class="nc">Value</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="kt">int8_t</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">kLong</span><span class="p">,</span>
+<span class="w">    </span><span class="n">kDouble</span><span class="p">,</span>
+<span class="w">    </span><span class="n">kFloat</span><span class="p">,</span>
+<span class="w">    </span><span class="n">kHalf</span><span class="p">,</span>
+<span class="w">    </span><span class="n">kChar</span><span class="p">,</span>
+<span class="w">    </span><span class="n">kInt</span><span class="p">,</span>
+<span class="w">    </span><span class="n">kBool</span><span class="p">,</span>
+<span class="w">    </span><span class="n">kUnknown</span>
+<span class="w">  </span><span class="p">};</span>
+
+<span class="w">  </span><span class="n">DataType</span><span class="p">()</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">default</span><span class="p">;</span>
+<span class="w">  </span><span class="k">constexpr</span><span class="w"> </span><span class="n">DataType</span><span class="p">(</span><span class="n">Value</span><span class="w"> </span><span class="n">t</span><span class="p">)</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">value</span><span class="p">(</span><span class="n">t</span><span class="p">)</span><span class="w"> </span><span class="p">{}</span>
+<span class="w">  </span><span class="n">TORCHTRT_API</span><span class="w"> </span><span class="n">DataType</span><span class="p">(</span><span class="n">c10</span><span class="o">::</span><span class="n">ScalarType</span><span class="w"> </span><span class="n">t</span><span class="p">);</span>
+<span class="w">  </span><span class="k">operator</span><span class="w"> </span><span class="n">Value</span><span class="p">()</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">value</span><span class="p">;</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="w">  </span><span class="k">explicit</span><span class="w"> </span><span class="k">operator</span><span class="w"> </span><span class="kt">bool</span><span class="p">()</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">delete</span><span class="p">;</span>
+<span class="w">  </span><span class="k">constexpr</span><span class="w"> </span><span class="kt">bool</span><span class="w"> </span><span class="k">operator</span><span class="o">==</span><span class="p">(</span><span class="n">DataType</span><span class="w"> </span><span class="n">other</span><span class="p">)</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">value</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">other</span><span class="p">.</span><span class="n">value</span><span class="p">;</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="w">  </span><span class="k">constexpr</span><span class="w"> </span><span class="kt">bool</span><span class="w"> </span><span class="k">operator</span><span class="o">==</span><span class="p">(</span><span class="n">DataType</span><span class="o">::</span><span class="n">Value</span><span class="w"> </span><span class="n">other</span><span class="p">)</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">value</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">other</span><span class="p">;</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="w">  </span><span class="k">constexpr</span><span class="w"> </span><span class="kt">bool</span><span class="w"> </span><span class="k">operator</span><span class="o">!=</span><span class="p">(</span><span class="n">DataType</span><span class="w"> </span><span class="n">other</span><span class="p">)</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">value</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="n">other</span><span class="p">.</span><span class="n">value</span><span class="p">;</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="w">  </span><span class="k">constexpr</span><span class="w"> </span><span class="kt">bool</span><span class="w"> </span><span class="k">operator</span><span class="o">!=</span><span class="p">(</span><span class="n">DataType</span><span class="o">::</span><span class="n">Value</span><span class="w"> </span><span class="n">other</span><span class="p">)</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">value</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="n">other</span><span class="p">;</span>
+<span class="w">  </span><span class="p">}</span>
+
+<span class="w"> </span><span class="k">private</span><span class="o">:</span>
+<span class="w">  </span><span class="k">friend</span><span class="w"> </span><span class="n">TORCHTRT_API</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">ostream</span><span class="o">&amp;</span><span class="w"> </span><span class="k">operator</span><span class="o">&lt;&lt;</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">ostream</span><span class="o">&amp;</span><span class="w"> </span><span class="n">os</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="n">DataType</span><span class="o">&amp;</span><span class="w"> </span><span class="n">dtype</span><span class="p">);</span>
+<span class="w">  </span><span class="n">Value</span><span class="w"> </span><span class="n">value</span><span class="p">;</span>
+<span class="p">};</span>
+
+<span class="k">struct</span><span class="w"> </span><span class="nc">Device</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="k">class</span><span class="w"> </span><span class="nc">DeviceType</span><span class="w"> </span><span class="p">{</span>
+<span class="w">   </span><span class="k">public</span><span class="o">:</span>
+<span class="w">    </span><span class="k">enum</span><span class="w"> </span><span class="nc">Value</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="kt">int8_t</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="n">kGPU</span><span class="p">,</span>
+<span class="w">      </span><span class="n">kDLA</span><span class="p">,</span>
+<span class="w">    </span><span class="p">};</span>
+
+<span class="w">    </span><span class="n">DeviceType</span><span class="p">()</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">default</span><span class="p">;</span>
+<span class="w">    </span><span class="k">constexpr</span><span class="w"> </span><span class="n">DeviceType</span><span class="p">(</span><span class="n">Value</span><span class="w"> </span><span class="n">t</span><span class="p">)</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">value</span><span class="p">(</span><span class="n">t</span><span class="p">)</span><span class="w"> </span><span class="p">{}</span>
+<span class="w">    </span><span class="n">DeviceType</span><span class="p">(</span><span class="n">c10</span><span class="o">::</span><span class="n">DeviceType</span><span class="w"> </span><span class="n">t</span><span class="p">);</span>
+<span class="w">    </span><span class="k">operator</span><span class="w"> </span><span class="n">Value</span><span class="p">()</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="k">return</span><span class="w"> </span><span class="n">value</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">    </span><span class="k">explicit</span><span class="w"> </span><span class="k">operator</span><span class="w"> </span><span class="kt">bool</span><span class="p">()</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">delete</span><span class="p">;</span>
+<span class="w">    </span><span class="k">constexpr</span><span class="w"> </span><span class="kt">bool</span><span class="w"> </span><span class="k">operator</span><span class="o">==</span><span class="p">(</span><span class="n">DeviceType</span><span class="w"> </span><span class="n">other</span><span class="p">)</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="k">return</span><span class="w"> </span><span class="n">value</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">other</span><span class="p">.</span><span class="n">value</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">    </span><span class="k">constexpr</span><span class="w"> </span><span class="kt">bool</span><span class="w"> </span><span class="k">operator</span><span class="o">!=</span><span class="p">(</span><span class="n">DeviceType</span><span class="w"> </span><span class="n">other</span><span class="p">)</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="k">return</span><span class="w"> </span><span class="n">value</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="n">other</span><span class="p">.</span><span class="n">value</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">   </span><span class="k">private</span><span class="o">:</span>
+<span class="w">    </span><span class="n">Value</span><span class="w"> </span><span class="n">value</span><span class="p">;</span>
+<span class="w">  </span><span class="p">};</span>
+
+<span class="w">  </span><span class="n">DeviceType</span><span class="w"> </span><span class="n">device_type</span><span class="p">;</span>
+
+<span class="w">  </span><span class="cm">/*</span>
+<span class="cm">   * Target gpu id</span>
+<span class="cm">   */</span>
+<span class="w">  </span><span class="kt">int64_t</span><span class="w"> </span><span class="n">gpu_id</span><span class="p">;</span>
+
+<span class="w">  </span><span class="cm">/*</span>
+<span class="cm">   * When using DLA core on NVIDIA AGX platforms gpu_id should be set as Xavier device</span>
+<span class="cm">   */</span>
+<span class="w">  </span><span class="kt">int64_t</span><span class="w"> </span><span class="n">dla_core</span><span class="p">;</span>
+
+<span class="w">  </span><span class="kt">bool</span><span class="w"> </span><span class="n">allow_gpu_fallback</span><span class="p">;</span>
+
+<span class="w">  </span><span class="n">Device</span><span class="p">()</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">device_type</span><span class="p">(</span><span class="n">DeviceType</span><span class="o">::</span><span class="n">kGPU</span><span class="p">),</span><span class="w"> </span><span class="n">gpu_id</span><span class="p">(</span><span class="mi">0</span><span class="p">),</span><span class="w"> </span><span class="n">dla_core</span><span class="p">(</span><span class="mi">0</span><span class="p">),</span><span class="w"> </span><span class="n">allow_gpu_fallback</span><span class="p">(</span><span class="nb">false</span><span class="p">)</span><span class="w"> </span><span class="p">{}</span>
+<span class="p">};</span>
+
+<span class="k">enum</span><span class="w"> </span><span class="k">class</span><span class="w"> </span><span class="nc">EngineCapability</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="kt">int8_t</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="n">kSTANDARD</span><span class="p">,</span>
+<span class="w">  </span><span class="n">kSAFETY</span><span class="p">,</span>
+<span class="w">  </span><span class="n">kDLA_STANDALONE</span><span class="p">,</span>
+<span class="p">};</span>
+
+<span class="k">class</span><span class="w"> </span><span class="nc">TensorFormat</span><span class="w"> </span><span class="p">{</span>
+<span class="w"> </span><span class="k">public</span><span class="o">:</span>
+<span class="w">  </span><span class="k">enum</span><span class="w"> </span><span class="nc">Value</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="kt">int8_t</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">kContiguous</span><span class="p">,</span>
+<span class="w">    </span><span class="n">kChannelsLast</span><span class="p">,</span>
+<span class="w">    </span><span class="n">kUnknown</span><span class="p">,</span>
+<span class="w">  </span><span class="p">};</span>
+
+<span class="w">  </span><span class="n">TensorFormat</span><span class="p">()</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">default</span><span class="p">;</span>
+<span class="w">  </span><span class="k">constexpr</span><span class="w"> </span><span class="n">TensorFormat</span><span class="p">(</span><span class="n">Value</span><span class="w"> </span><span class="n">t</span><span class="p">)</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">value</span><span class="p">(</span><span class="n">t</span><span class="p">)</span><span class="w"> </span><span class="p">{}</span>
+<span class="w">  </span><span class="n">TORCHTRT_API</span><span class="w"> </span><span class="n">TensorFormat</span><span class="p">(</span><span class="n">at</span><span class="o">::</span><span class="n">MemoryFormat</span><span class="w"> </span><span class="n">t</span><span class="p">);</span>
+<span class="w">  </span><span class="k">operator</span><span class="w"> </span><span class="n">Value</span><span class="p">()</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">value</span><span class="p">;</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="w">  </span><span class="k">explicit</span><span class="w"> </span><span class="k">operator</span><span class="w"> </span><span class="kt">bool</span><span class="p">()</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">delete</span><span class="p">;</span>
+<span class="w">  </span><span class="k">constexpr</span><span class="w"> </span><span class="kt">bool</span><span class="w"> </span><span class="k">operator</span><span class="o">==</span><span class="p">(</span><span class="n">TensorFormat</span><span class="w"> </span><span class="n">other</span><span class="p">)</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">value</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">other</span><span class="p">.</span><span class="n">value</span><span class="p">;</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="w">  </span><span class="k">constexpr</span><span class="w"> </span><span class="kt">bool</span><span class="w"> </span><span class="k">operator</span><span class="o">==</span><span class="p">(</span><span class="n">TensorFormat</span><span class="o">::</span><span class="n">Value</span><span class="w"> </span><span class="n">other</span><span class="p">)</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">value</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">other</span><span class="p">;</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="w">  </span><span class="k">constexpr</span><span class="w"> </span><span class="kt">bool</span><span class="w"> </span><span class="k">operator</span><span class="o">!=</span><span class="p">(</span><span class="n">TensorFormat</span><span class="w"> </span><span class="n">other</span><span class="p">)</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">value</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="n">other</span><span class="p">.</span><span class="n">value</span><span class="p">;</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="w">  </span><span class="k">constexpr</span><span class="w"> </span><span class="kt">bool</span><span class="w"> </span><span class="k">operator</span><span class="o">!=</span><span class="p">(</span><span class="n">TensorFormat</span><span class="o">::</span><span class="n">Value</span><span class="w"> </span><span class="n">other</span><span class="p">)</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">value</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="n">other</span><span class="p">;</span>
+<span class="w">  </span><span class="p">}</span>
+
+<span class="w"> </span><span class="k">private</span><span class="o">:</span>
+<span class="w">  </span><span class="k">friend</span><span class="w"> </span><span class="n">TORCHTRT_API</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">ostream</span><span class="o">&amp;</span><span class="w"> </span><span class="k">operator</span><span class="o">&lt;&lt;</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">ostream</span><span class="o">&amp;</span><span class="w"> </span><span class="n">os</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="n">TensorFormat</span><span class="o">&amp;</span><span class="w"> </span><span class="n">format</span><span class="p">);</span>
+<span class="w">  </span><span class="n">Value</span><span class="w"> </span><span class="n">value</span><span class="p">;</span>
+<span class="p">};</span>
+
+<span class="k">struct</span><span class="w"> </span><span class="nc">Input</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">torch</span><span class="o">::</span><span class="n">CustomClassHolder</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span><span class="w"> </span><span class="n">min_shape</span><span class="p">;</span>
+<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span><span class="w"> </span><span class="n">opt_shape</span><span class="p">;</span>
+<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span><span class="w"> </span><span class="n">max_shape</span><span class="p">;</span>
+<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span><span class="w"> </span><span class="n">shape</span><span class="p">;</span>
+<span class="w">  </span><span class="n">DataType</span><span class="w"> </span><span class="n">dtype</span><span class="p">;</span>
+<span class="w">  </span><span class="n">TensorFormat</span><span class="w"> </span><span class="n">format</span><span class="p">;</span>
+<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="w"> </span><span class="n">tensor_domain</span><span class="p">;</span>
+
+<span class="w">  </span><span class="n">Input</span><span class="p">()</span><span class="w"> </span><span class="p">{}</span>
+<span class="w">  </span><span class="n">TORCHTRT_API</span><span class="w"> </span><span class="n">Input</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span><span class="w"> </span><span class="n">shape</span><span class="p">,</span><span class="w"> </span><span class="n">TensorFormat</span><span class="w"> </span><span class="n">format</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">TensorFormat</span><span class="o">::</span><span class="n">kContiguous</span><span class="p">);</span>
+
+<span class="w">  </span><span class="n">TORCHTRT_API</span><span class="w"> </span><span class="nf">Input</span><span class="p">(</span>
+<span class="w">      </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span><span class="w"> </span><span class="n">shape</span><span class="p">,</span>
+<span class="w">      </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="w"> </span><span class="n">tensor_domain</span><span class="p">,</span>
+<span class="w">      </span><span class="n">TensorFormat</span><span class="w"> </span><span class="n">format</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">TensorFormat</span><span class="o">::</span><span class="n">kContiguous</span><span class="p">);</span>
+
+<span class="w">  </span><span class="n">TORCHTRT_API</span><span class="w"> </span><span class="nf">Input</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span><span class="w"> </span><span class="n">shape</span><span class="p">,</span><span class="w"> </span><span class="n">DataType</span><span class="w"> </span><span class="n">dtype</span><span class="p">,</span><span class="w"> </span><span class="n">TensorFormat</span><span class="w"> </span><span class="n">format</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">TensorFormat</span><span class="o">::</span><span class="n">kContiguous</span><span class="p">);</span>
+
+<span class="w">  </span><span class="n">TORCHTRT_API</span><span class="w"> </span><span class="nf">Input</span><span class="p">(</span>
+<span class="w">      </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span><span class="w"> </span><span class="n">shape</span><span class="p">,</span>
+<span class="w">      </span><span class="n">DataType</span><span class="w"> </span><span class="n">dtype</span><span class="p">,</span>
+<span class="w">      </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="w"> </span><span class="n">tensor_domain</span><span class="p">,</span>
+<span class="w">      </span><span class="n">TensorFormat</span><span class="w"> </span><span class="n">format</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">TensorFormat</span><span class="o">::</span><span class="n">kContiguous</span><span class="p">);</span>
+
+<span class="w">  </span><span class="n">TORCHTRT_API</span><span class="w"> </span><span class="nf">Input</span><span class="p">(</span><span class="n">c10</span><span class="o">::</span><span class="n">ArrayRef</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span><span class="w"> </span><span class="n">shape</span><span class="p">,</span><span class="w"> </span><span class="n">TensorFormat</span><span class="w"> </span><span class="n">format</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">TensorFormat</span><span class="o">::</span><span class="n">kContiguous</span><span class="p">);</span>
+
+<span class="w">  </span><span class="n">TORCHTRT_API</span><span class="w"> </span><span class="nf">Input</span><span class="p">(</span>
+<span class="w">      </span><span class="n">c10</span><span class="o">::</span><span class="n">ArrayRef</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span><span class="w"> </span><span class="n">shape</span><span class="p">,</span>
+<span class="w">      </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="w"> </span><span class="n">tensor_domain</span><span class="p">,</span>
+<span class="w">      </span><span class="n">TensorFormat</span><span class="w"> </span><span class="n">format</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">TensorFormat</span><span class="o">::</span><span class="n">kContiguous</span><span class="p">);</span>
+
+<span class="w">  </span><span class="n">TORCHTRT_API</span><span class="w"> </span><span class="nf">Input</span><span class="p">(</span><span class="n">c10</span><span class="o">::</span><span class="n">ArrayRef</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span><span class="w"> </span><span class="n">shape</span><span class="p">,</span><span class="w"> </span><span class="n">DataType</span><span class="w"> </span><span class="n">dtype</span><span class="p">,</span><span class="w"> </span><span class="n">TensorFormat</span><span class="w"> </span><span class="n">format</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">TensorFormat</span><span class="o">::</span><span class="n">kContiguous</span><span class="p">);</span>
+
+<span class="w">  </span><span class="n">TORCHTRT_API</span><span class="w"> </span><span class="nf">Input</span><span class="p">(</span>
+<span class="w">      </span><span class="n">c10</span><span class="o">::</span><span class="n">ArrayRef</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span><span class="w"> </span><span class="n">shape</span><span class="p">,</span>
+<span class="w">      </span><span class="n">DataType</span><span class="w"> </span><span class="n">dtype</span><span class="p">,</span>
+<span class="w">      </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="w"> </span><span class="n">tensor_domain</span><span class="p">,</span>
+<span class="w">      </span><span class="n">TensorFormat</span><span class="w"> </span><span class="n">format</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">TensorFormat</span><span class="o">::</span><span class="n">kContiguous</span><span class="p">);</span>
+
+<span class="w">  </span><span class="n">TORCHTRT_API</span><span class="w"> </span><span class="nf">Input</span><span class="p">(</span>
+<span class="w">      </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span><span class="w"> </span><span class="n">min_shape</span><span class="p">,</span>
+<span class="w">      </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span><span class="w"> </span><span class="n">opt_shape</span><span class="p">,</span>
+<span class="w">      </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span><span class="w"> </span><span class="n">max_shape</span><span class="p">,</span>
+<span class="w">      </span><span class="n">TensorFormat</span><span class="w"> </span><span class="n">format</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">TensorFormat</span><span class="o">::</span><span class="n">kContiguous</span><span class="p">);</span>
+<span class="w">  </span><span class="n">TORCHTRT_API</span><span class="w"> </span><span class="nf">Input</span><span class="p">(</span>
+<span class="w">      </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span><span class="w"> </span><span class="n">min_shape</span><span class="p">,</span>
+<span class="w">      </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span><span class="w"> </span><span class="n">opt_shape</span><span class="p">,</span>
+<span class="w">      </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span><span class="w"> </span><span class="n">max_shape</span><span class="p">,</span>
+<span class="w">      </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="w"> </span><span class="n">tensor_domain</span><span class="p">,</span>
+<span class="w">      </span><span class="n">TensorFormat</span><span class="w"> </span><span class="n">format</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">TensorFormat</span><span class="o">::</span><span class="n">kContiguous</span><span class="p">);</span>
+
+<span class="w">  </span><span class="n">TORCHTRT_API</span><span class="w"> </span><span class="nf">Input</span><span class="p">(</span>
+<span class="w">      </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span><span class="w"> </span><span class="n">min_shape</span><span class="p">,</span>
+<span class="w">      </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span><span class="w"> </span><span class="n">opt_shape</span><span class="p">,</span>
+<span class="w">      </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span><span class="w"> </span><span class="n">max_shape</span><span class="p">,</span>
+<span class="w">      </span><span class="n">DataType</span><span class="w"> </span><span class="n">dtype</span><span class="p">,</span>
+<span class="w">      </span><span class="n">TensorFormat</span><span class="w"> </span><span class="n">format</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">TensorFormat</span><span class="o">::</span><span class="n">kContiguous</span><span class="p">);</span>
+
+<span class="w">  </span><span class="n">TORCHTRT_API</span><span class="w"> </span><span class="nf">Input</span><span class="p">(</span>
+<span class="w">      </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span><span class="w"> </span><span class="n">min_shape</span><span class="p">,</span>
+<span class="w">      </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span><span class="w"> </span><span class="n">opt_shape</span><span class="p">,</span>
+<span class="w">      </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span><span class="w"> </span><span class="n">max_shape</span><span class="p">,</span>
+<span class="w">      </span><span class="n">DataType</span><span class="w"> </span><span class="n">dtype</span><span class="p">,</span>
+<span class="w">      </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="w"> </span><span class="n">tensor_domain</span><span class="p">,</span>
+<span class="w">      </span><span class="n">TensorFormat</span><span class="w"> </span><span class="n">format</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">TensorFormat</span><span class="o">::</span><span class="n">kContiguous</span><span class="p">);</span>
 
-  TORCHTRT_API Input(
-      c10::ArrayRef&lt;int64_t&gt; min_shape,
-      c10::ArrayRef&lt;int64_t&gt; opt_shape,
-      c10::ArrayRef&lt;int64_t&gt; max_shape,
-      TensorFormat format = TensorFormat::kContiguous);
-
-  TORCHTRT_API Input(
-      c10::ArrayRef&lt;int64_t&gt; min_shape,
-      c10::ArrayRef&lt;int64_t&gt; opt_shape,
-      c10::ArrayRef&lt;int64_t&gt; max_shape,
-      std::vector&lt;double&gt; tensor_domain,
-      TensorFormat format = TensorFormat::kContiguous);
-
-  TORCHTRT_API Input(
-      c10::ArrayRef&lt;int64_t&gt; min_shape,
-      c10::ArrayRef&lt;int64_t&gt; opt_shape,
-      c10::ArrayRef&lt;int64_t&gt; max_shape,
-      DataType dtype,
-      TensorFormat format = TensorFormat::kContiguous);
-
-  TORCHTRT_API Input(
-      c10::ArrayRef&lt;int64_t&gt; min_shape,
-      c10::ArrayRef&lt;int64_t&gt; opt_shape,
-      c10::ArrayRef&lt;int64_t&gt; max_shape,
-      DataType dtype,
-      std::vector&lt;double&gt; tensor_domain,
-      TensorFormat format = TensorFormat::kContiguous);
-
-  TORCHTRT_API Input(at::Tensor tensor);
-
- private:
-  friend TORCHTRT_API std::ostream&amp; operator&lt;&lt;(std::ostream&amp; os, const Input&amp; input);
-  bool input_is_dynamic;
-};
-
-struct GraphInputs {
-  torch::jit::IValue input_signature; // nested Input, full input spec
-  std::vector&lt;Input&gt; inputs; // flatten input spec
-};
-
-TORCHTRT_API std::string get_build_info();
-
-TORCHTRT_API void dump_build_info();
-
-TORCHTRT_API void set_device(const int gpu_id);
-
-namespace torchscript {
-struct CompileSpec {
-  TORCHTRT_API CompileSpec(std::vector&lt;std::vector&lt;int64_t&gt;&gt; fixed_sizes);
-
-  TORCHTRT_API CompileSpec(std::vector&lt;c10::ArrayRef&lt;int64_t&gt;&gt; fixed_sizes);
-
-  TORCHTRT_API CompileSpec(std::vector&lt;Input&gt; inputs);
-
-  TORCHTRT_API CompileSpec(torch::jit::IValue input_signature);
-  // Defaults should reflect TensorRT defaults for BuilderConfig
-
-  GraphInputs graph_inputs;
-  std::set&lt;DataType&gt; enabled_precisions = {DataType::kFloat};
-
-  bool disable_tf32 = false;
-
-  bool sparse_weights = false;
-
-  bool refit = false;
-
-  bool debug = false;
-
-  bool truncate_long_and_double = false;
-
-  bool allow_shape_tensors = false;
-
-  Device device;
-
-  EngineCapability capability = EngineCapability::kSTANDARD;
-
-  uint64_t num_avg_timing_iters = 1;
-
-  uint64_t workspace_size = 0;
-
-  uint64_t dla_sram_size = 1048576;
-
-  uint64_t dla_local_dram_size = 1073741824;
-
-  uint64_t dla_global_dram_size = 536870912;
-
-  nvinfer1::IInt8Calibrator* ptq_calibrator = nullptr;
-
-  bool require_full_compilation = false;
-
-  uint64_t min_block_size = 3;
-
-  std::vector&lt;std::string&gt; torch_executed_ops;
-
-  std::vector&lt;std::string&gt; torch_executed_modules;
-};
-
-TORCHTRT_API bool check_method_operator_support(const torch::jit::Module&amp; module, std::string method_name);
-
-TORCHTRT_API torch::jit::Module compile(const torch::jit::Module&amp; module, CompileSpec info);
-
-TORCHTRT_API std::string convert_method_to_trt_engine(
-    const torch::jit::Module&amp; module,
-    std::string method_name,
-    CompileSpec info);
-
-TORCHTRT_API torch::jit::Module embed_engine_in_new_module(
-    const std::string&amp; engine,
-    Device device,
-    const std::vector&lt;std::string&gt;&amp; input_binding_names = std::vector&lt;std::string&gt;(),
-    const std::vector&lt;std::string&gt;&amp; output_binding_names = std::vector&lt;std::string&gt;());
-} // namespace torchscript
-} // namespace torch_tensorrt
+<span class="w">  </span><span class="n">TORCHTRT_API</span><span class="w"> </span><span class="nf">Input</span><span class="p">(</span>
+<span class="w">      </span><span class="n">c10</span><span class="o">::</span><span class="n">ArrayRef</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span><span class="w"> </span><span class="n">min_shape</span><span class="p">,</span>
+<span class="w">      </span><span class="n">c10</span><span class="o">::</span><span class="n">ArrayRef</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span><span class="w"> </span><span class="n">opt_shape</span><span class="p">,</span>
+<span class="w">      </span><span class="n">c10</span><span class="o">::</span><span class="n">ArrayRef</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span><span class="w"> </span><span class="n">max_shape</span><span class="p">,</span>
+<span class="w">      </span><span class="n">TensorFormat</span><span class="w"> </span><span class="n">format</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">TensorFormat</span><span class="o">::</span><span class="n">kContiguous</span><span class="p">);</span>
+
+<span class="w">  </span><span class="n">TORCHTRT_API</span><span class="w"> </span><span class="nf">Input</span><span class="p">(</span>
+<span class="w">      </span><span class="n">c10</span><span class="o">::</span><span class="n">ArrayRef</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span><span class="w"> </span><span class="n">min_shape</span><span class="p">,</span>
+<span class="w">      </span><span class="n">c10</span><span class="o">::</span><span class="n">ArrayRef</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span><span class="w"> </span><span class="n">opt_shape</span><span class="p">,</span>
+<span class="w">      </span><span class="n">c10</span><span class="o">::</span><span class="n">ArrayRef</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span><span class="w"> </span><span class="n">max_shape</span><span class="p">,</span>
+<span class="w">      </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="w"> </span><span class="n">tensor_domain</span><span class="p">,</span>
+<span class="w">      </span><span class="n">TensorFormat</span><span class="w"> </span><span class="n">format</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">TensorFormat</span><span class="o">::</span><span class="n">kContiguous</span><span class="p">);</span>
+
+<span class="w">  </span><span class="n">TORCHTRT_API</span><span class="w"> </span><span class="nf">Input</span><span class="p">(</span>
+<span class="w">      </span><span class="n">c10</span><span class="o">::</span><span class="n">ArrayRef</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span><span class="w"> </span><span class="n">min_shape</span><span class="p">,</span>
+<span class="w">      </span><span class="n">c10</span><span class="o">::</span><span class="n">ArrayRef</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span><span class="w"> </span><span class="n">opt_shape</span><span class="p">,</span>
+<span class="w">      </span><span class="n">c10</span><span class="o">::</span><span class="n">ArrayRef</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span><span class="w"> </span><span class="n">max_shape</span><span class="p">,</span>
+<span class="w">      </span><span class="n">DataType</span><span class="w"> </span><span class="n">dtype</span><span class="p">,</span>
+<span class="w">      </span><span class="n">TensorFormat</span><span class="w"> </span><span class="n">format</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">TensorFormat</span><span class="o">::</span><span class="n">kContiguous</span><span class="p">);</span>
+
+<span class="w">  </span><span class="n">TORCHTRT_API</span><span class="w"> </span><span class="nf">Input</span><span class="p">(</span>
+<span class="w">      </span><span class="n">c10</span><span class="o">::</span><span class="n">ArrayRef</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span><span class="w"> </span><span class="n">min_shape</span><span class="p">,</span>
+<span class="w">      </span><span class="n">c10</span><span class="o">::</span><span class="n">ArrayRef</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span><span class="w"> </span><span class="n">opt_shape</span><span class="p">,</span>
+<span class="w">      </span><span class="n">c10</span><span class="o">::</span><span class="n">ArrayRef</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span><span class="w"> </span><span class="n">max_shape</span><span class="p">,</span>
+<span class="w">      </span><span class="n">DataType</span><span class="w"> </span><span class="n">dtype</span><span class="p">,</span>
+<span class="w">      </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="w"> </span><span class="n">tensor_domain</span><span class="p">,</span>
+<span class="w">      </span><span class="n">TensorFormat</span><span class="w"> </span><span class="n">format</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">TensorFormat</span><span class="o">::</span><span class="n">kContiguous</span><span class="p">);</span>
+
+<span class="w">  </span><span class="n">TORCHTRT_API</span><span class="w"> </span><span class="nf">Input</span><span class="p">(</span><span class="n">at</span><span class="o">::</span><span class="n">Tensor</span><span class="w"> </span><span class="n">tensor</span><span class="p">);</span>
+
+<span class="w"> </span><span class="k">private</span><span class="o">:</span>
+<span class="w">  </span><span class="k">friend</span><span class="w"> </span><span class="n">TORCHTRT_API</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">ostream</span><span class="o">&amp;</span><span class="w"> </span><span class="k">operator</span><span class="o">&lt;&lt;</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">ostream</span><span class="o">&amp;</span><span class="w"> </span><span class="n">os</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="n">Input</span><span class="o">&amp;</span><span class="w"> </span><span class="n">input</span><span class="p">);</span>
+<span class="w">  </span><span class="kt">bool</span><span class="w"> </span><span class="n">input_is_dynamic</span><span class="p">;</span>
+<span class="p">};</span>
+
+<span class="k">struct</span><span class="w"> </span><span class="nc">GraphInputs</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="n">torch</span><span class="o">::</span><span class="n">jit</span><span class="o">::</span><span class="n">IValue</span><span class="w"> </span><span class="n">input_signature</span><span class="p">;</span><span class="w"> </span><span class="c1">// nested Input, full input spec</span>
+<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">Input</span><span class="o">&gt;</span><span class="w"> </span><span class="n">inputs</span><span class="p">;</span><span class="w"> </span><span class="c1">// flatten input spec</span>
+<span class="p">};</span>
+
+<span class="n">TORCHTRT_API</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="w"> </span><span class="n">get_build_info</span><span class="p">();</span>
+
+<span class="n">TORCHTRT_API</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="n">dump_build_info</span><span class="p">();</span>
+
+<span class="n">TORCHTRT_API</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="n">set_device</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">gpu_id</span><span class="p">);</span>
+
+<span class="k">namespace</span><span class="w"> </span><span class="nn">torchscript</span><span class="w"> </span><span class="p">{</span>
+<span class="k">struct</span><span class="w"> </span><span class="nc">CompileSpec</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="n">TORCHTRT_API</span><span class="w"> </span><span class="nf">CompileSpec</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;&gt;</span><span class="w"> </span><span class="n">fixed_sizes</span><span class="p">);</span>
+
+<span class="w">  </span><span class="n">TORCHTRT_API</span><span class="w"> </span><span class="nf">CompileSpec</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">c10</span><span class="o">::</span><span class="n">ArrayRef</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;&gt;</span><span class="w"> </span><span class="n">fixed_sizes</span><span class="p">);</span>
+
+<span class="w">  </span><span class="n">TORCHTRT_API</span><span class="w"> </span><span class="nf">CompileSpec</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">Input</span><span class="o">&gt;</span><span class="w"> </span><span class="n">inputs</span><span class="p">);</span>
+
+<span class="w">  </span><span class="n">TORCHTRT_API</span><span class="w"> </span><span class="nf">CompileSpec</span><span class="p">(</span><span class="n">torch</span><span class="o">::</span><span class="n">jit</span><span class="o">::</span><span class="n">IValue</span><span class="w"> </span><span class="n">input_signature</span><span class="p">);</span>
+<span class="w">  </span><span class="c1">// Defaults should reflect TensorRT defaults for BuilderConfig</span>
+
+<span class="w">  </span><span class="n">GraphInputs</span><span class="w"> </span><span class="n">graph_inputs</span><span class="p">;</span>
+<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">set</span><span class="o">&lt;</span><span class="n">DataType</span><span class="o">&gt;</span><span class="w"> </span><span class="n">enabled_precisions</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="n">DataType</span><span class="o">::</span><span class="n">kFloat</span><span class="p">};</span>
+
+<span class="w">  </span><span class="kt">bool</span><span class="w"> </span><span class="n">disable_tf32</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">false</span><span class="p">;</span>
+
+<span class="w">  </span><span class="kt">bool</span><span class="w"> </span><span class="n">sparse_weights</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">false</span><span class="p">;</span>
+
+<span class="w">  </span><span class="kt">bool</span><span class="w"> </span><span class="n">refit</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">false</span><span class="p">;</span>
+
+<span class="w">  </span><span class="kt">bool</span><span class="w"> </span><span class="n">debug</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">false</span><span class="p">;</span>
+
+<span class="w">  </span><span class="kt">bool</span><span class="w"> </span><span class="n">truncate_long_and_double</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">false</span><span class="p">;</span>
+
+<span class="w">  </span><span class="kt">bool</span><span class="w"> </span><span class="n">allow_shape_tensors</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">false</span><span class="p">;</span>
+
+<span class="w">  </span><span class="n">Device</span><span class="w"> </span><span class="n">device</span><span class="p">;</span>
+
+<span class="w">  </span><span class="n">EngineCapability</span><span class="w"> </span><span class="n">capability</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">EngineCapability</span><span class="o">::</span><span class="n">kSTANDARD</span><span class="p">;</span>
+
+<span class="w">  </span><span class="kt">uint64_t</span><span class="w"> </span><span class="n">num_avg_timing_iters</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span>
+
+<span class="w">  </span><span class="kt">uint64_t</span><span class="w"> </span><span class="n">workspace_size</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+
+<span class="w">  </span><span class="kt">uint64_t</span><span class="w"> </span><span class="n">dla_sram_size</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1048576</span><span class="p">;</span>
+
+<span class="w">  </span><span class="kt">uint64_t</span><span class="w"> </span><span class="n">dla_local_dram_size</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1073741824</span><span class="p">;</span>
+
+<span class="w">  </span><span class="kt">uint64_t</span><span class="w"> </span><span class="n">dla_global_dram_size</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">536870912</span><span class="p">;</span>
+
+<span class="w">  </span><span class="n">nvinfer1</span><span class="o">::</span><span class="n">IInt8Calibrator</span><span class="o">*</span><span class="w"> </span><span class="n">ptq_calibrator</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">nullptr</span><span class="p">;</span>
+
+<span class="w">  </span><span class="kt">bool</span><span class="w"> </span><span class="n">require_full_compilation</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">false</span><span class="p">;</span>
+
+<span class="w">  </span><span class="kt">uint64_t</span><span class="w"> </span><span class="n">min_block_size</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">3</span><span class="p">;</span>
+
+<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="o">&gt;</span><span class="w"> </span><span class="n">torch_executed_ops</span><span class="p">;</span>
+
+<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="o">&gt;</span><span class="w"> </span><span class="n">torch_executed_modules</span><span class="p">;</span>
+<span class="p">};</span>
+
+<span class="n">TORCHTRT_API</span><span class="w"> </span><span class="kt">bool</span><span class="w"> </span><span class="n">check_method_operator_support</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">torch</span><span class="o">::</span><span class="n">jit</span><span class="o">::</span><span class="n">Module</span><span class="o">&amp;</span><span class="w"> </span><span class="k">module</span><span class="p">,</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="w"> </span><span class="n">method_name</span><span class="p">);</span>
+
+<span class="n">TORCHTRT_API</span><span class="w"> </span><span class="n">torch</span><span class="o">::</span><span class="n">jit</span><span class="o">::</span><span class="n">Module</span><span class="w"> </span><span class="n">compile</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">torch</span><span class="o">::</span><span class="n">jit</span><span class="o">::</span><span class="n">Module</span><span class="o">&amp;</span><span class="w"> </span><span class="k">module</span><span class="p">,</span><span class="w"> </span><span class="n">CompileSpec</span><span class="w"> </span><span class="n">info</span><span class="p">);</span>
+
+<span class="n">TORCHTRT_API</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="w"> </span><span class="n">convert_method_to_trt_engine</span><span class="p">(</span>
+<span class="w">    </span><span class="k">const</span><span class="w"> </span><span class="n">torch</span><span class="o">::</span><span class="n">jit</span><span class="o">::</span><span class="n">Module</span><span class="o">&amp;</span><span class="w"> </span><span class="k">module</span><span class="p">,</span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="w"> </span><span class="n">method_name</span><span class="p">,</span>
+<span class="w">    </span><span class="n">CompileSpec</span><span class="w"> </span><span class="n">info</span><span class="p">);</span>
+
+<span class="n">TORCHTRT_API</span><span class="w"> </span><span class="n">torch</span><span class="o">::</span><span class="n">jit</span><span class="o">::</span><span class="n">Module</span><span class="w"> </span><span class="n">embed_engine_in_new_module</span><span class="p">(</span>
+<span class="w">    </span><span class="k">const</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="o">&amp;</span><span class="w"> </span><span class="n">engine</span><span class="p">,</span>
+<span class="w">    </span><span class="n">Device</span><span class="w"> </span><span class="n">device</span><span class="p">,</span>
+<span class="w">    </span><span class="k">const</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="o">&gt;&amp;</span><span class="w"> </span><span class="n">input_binding_names</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="o">&gt;</span><span class="p">(),</span>
+<span class="w">    </span><span class="k">const</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="o">&gt;&amp;</span><span class="w"> </span><span class="n">output_binding_names</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="o">&gt;</span><span class="p">());</span>
+<span class="p">}</span><span class="w"> </span><span class="c1">// namespace torchscript</span>
+<span class="p">}</span><span class="w"> </span><span class="c1">// namespace torch_tensorrt</span>
 </pre></div>
 </div>
 </section>
@@ -1042,7 +1064,7 @@ TORCHTRT_API torch::jit::Module embed_engine_in_new_module(
                <a href="https://pytorch.org/resources">Developer Resources</a>
              </li>
              <li>
-               <a href="https://pytorch.org/ecosystem/contributor-awards-2023">Contributor Awards - 2023</a>
+               <a href="https://pytorch.org/ecosystem/contributor-awards-2023">Contributor Awards - 2024</a>
              </li>
            </ul>
 
@@ -1057,6 +1079,9 @@ TORCHTRT_API torch::jit::Module embed_engine_in_new_module(
              
              <li>
                <a href="https://pytorch.org/executorch-overview">ExecuTorch</a>
+             </li>
+             <li>
+               <a href="https://pytorch.org/executorch/stable/index.html">ExecuTorch Documentation</a>
              </li>
            </ul>
 
@@ -1096,6 +1121,9 @@ TORCHTRT_API torch::jit::Module embed_engine_in_new_module(
             <li>
               <a href="https://pytorch.org/events">Events</a>
             </li>
+            <li>
+               <a href="https://pytorch.org/newsletter">Newsletter</a>
+             </li>
           </ul>
           
           <li class="resources-mobile-menu-title">
@@ -1108,6 +1136,18 @@ TORCHTRT_API torch::jit::Module embed_engine_in_new_module(
             </li>
             <li>
               <a href="https://pytorch.org/governing-board">Governing Board</a>
+            </li>
+            <li>
+               <a href="https://pytorch.org/credits">Cloud Credit Program</a>
+            </li>
+            <li>
+               <a href="https://pytorch.org/tac">Technical Advisory Council</a>
+            </li>
+            <li>
+               <a href="https://pytorch.org/staff">Staff</a>
+            </li>
+            <li>
+               <a href="https://pytorch.org/contact-us">Contact Us</a>
             </li>
           </ul>
         </ul>

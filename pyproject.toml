@@ -8,8 +8,8 @@ requires = [
     "cffi>=1.15.1",
     "typing-extensions>=4.7.0",
     "future>=0.18.3",
-    "tensorrt-cu12==10.3.0",
-    "torch>=2.6.0.dev,<2.7.0",
+    "tensorrt-cu12>=10.7.0,<10.8.0",
+    "torch>=2.7.0.dev,<2.8.0",
     "pybind11==2.6.2",
     "numpy",
 ]
@@ -54,36 +54,19 @@ keywords = [
     "inference",
 ]
 dependencies = [
-    "torch>=2.6.0.dev,<2.7.0",
-    "tensorrt-cu12==10.3.0",
-    "tensorrt-cu12-bindings==10.3.0",
-    "tensorrt-cu12-libs==10.3.0",
+    "torch>=2.7.0.dev,<2.8.0",
+    "tensorrt-cu12>=10.7.0,<10.8.0",
+    "tensorrt-cu12-bindings>=10.7.0,<10.8.0",
+    "tensorrt-cu12-libs>=10.7.0,<10.8.0",
     "packaging>=23",
     "numpy",
     "typing-extensions>=4.7.0",
 ]
+
 dynamic = ["version"]
 
-[project.optional-dependencies]
-torchvision = [
-    "torchvision",
-] #Leaving torchvisions dependency unconstrained so uv can just install something that should work for the torch we have. TV's on PyT makes it hard to put version constrains in
-quantization = ["nvidia-modelopt[deploy,hf,torch]~=0.17.0"]
-monitoring-tools = ["rich>=13.7.1"]
-jupyter = ["rich[jupyter]>=13.7.1"]
-
-[project.urls]
-Homepage = "https://pytorch.org/tensorrt"
-Documentation = "https://pytorch.org/tensorrt"
-Repository = "https://github.com/pytorch/tensorrt.git"
-Changelog = "https://github.com/pytorch/tensorrt/releases"
-
-[tool.setuptools]
-package-dir = { "" = "py" }
-include-package-data = false
-
-[tool.uv]
-dev-dependencies = [
+[dependency-groups]
+dev = [
     "pre-commit>=2.20.0",
     "black>=22.6.0",
     "clang-format==14.0.6",
@@ -98,14 +81,69 @@ dev-dependencies = [
     "pyyaml",
 ]
 
+[project.optional-dependencies]
+torchvision = [
+    "torchvision",
+] #Leaving torchvisions dependency unconstrained so uv can just install something that should work for the torch we have. TV's on PyT makes it hard to put version constrains in
+quantization = ["nvidia-modelopt[deploy,hf,torch]>=0.17.0"]
+monitoring-tools = ["rich>=13.7.1"]
+jupyter = ["rich[jupyter]>=13.7.1"]
+distributed = ["tensorrt-llm>=0.16.0"]
+
+[project.urls]
+Homepage = "https://pytorch.org/tensorrt"
+Documentation = "https://pytorch.org/tensorrt"
+Repository = "https://github.com/pytorch/tensorrt.git"
+Changelog = "https://github.com/pytorch/tensorrt/releases"
+
+[tool.setuptools]
+package-dir = { "" = "py" }
+include-package-data = false
+
+[tool.uv]
 environments = ["sys_platform == 'linux'", "sys_platform == 'windows'"]
-
-extra-index-url = [
-    "https://download.pytorch.org/whl/nightly/cu124", # We are going to define the dev enviorment as latest supported CUDA, and allow CI to handle the others, change as needed
-]
-
 prerelease = "if-necessary-or-explicit"
-index-strategy = "unsafe-best-match"
+index-strategy = "unsafe-best-match"                                    # Needed for TRT-LLM
+
+[tool.uv.sources]
+torch = [{ index = "pytorch-nightly-cu126" }]
+torchvision = [{ index = "pytorch-nightly-cu126" }]
+
+[[tool.uv.index]]
+name = "pytorch-nightly-cu126"
+url = "https://download.pytorch.org/whl/nightly/cu126"
+explicit = false
+
+# [[tool.uv.index]]
+# name = "pytorch-nightly-cu124"
+# url = "https://download.pytorch.org/whl/nightly/cu124"
+# explicit = true
+
+# [[tool.uv.index]]
+# name = "pytorch-nightly-cu118"
+# url = "https://download.pytorch.org/whl/nightly/cu118"
+# explicit = true
+
+# [[tool.uv.index]]
+# name = "pytorch-test-cu124"
+# url = "https://download.pytorch.org/whl/test/cu124"
+# explicit = false
+
+# [[tool.uv.index]]
+# name = "pytorch-test-cu118"
+# url = "https://download.pytorch.org/whl/test/cu118"
+# explicit = false
+
+# [[tool.uv.index]]
+# name = "pytorch-release-cu124"
+# url = "https://download.pytorch.org/whl/cu124"
+# explicit = false
+
+# [[tool.uv.index]]
+# name = "pytorch-release-cu118"
+# url = "https://download.pytorch.org/whl/cu118"
+# explicit = false
+
 
 [tool.ruff]
 # NOTE: Synchoronize the ignores with .flake8

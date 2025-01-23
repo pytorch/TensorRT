@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt.dynamo._refit &mdash; Torch-TensorRT v2.6.0.dev0+1d5be25 documentation</title>
+  <title>torch_tensorrt.dynamo._refit &mdash; Torch-TensorRT v2.7.0.dev0+cfdb585 documentation</title>
   
 
   
@@ -132,8 +132,8 @@
                   <span class=dropdown-title>Developer Resources</span>
                   <p>Find resources and get questions answered</p>
                 </a>
-                <a class="nav-dropdown-item" href="https://pytorch.org/ecosystem/contributor-awards-2023">
-                  <span class="dropdown-title">Contributor Awards - 2023</span>
+                <a class="nav-dropdown-item" href="https://pytorch.org/ecosystem/contributor-awards-2024">
+                  <span class="dropdown-title">Contributor Awards - 2024</span>
                   <p>Award winners announced at this year's PyTorch Conference</p>
                 </a>
               </div>
@@ -153,6 +153,9 @@
                 <a class="nav-dropdown-item" href="https://pytorch.org/executorch-overview">
                   <span class="dropdown-title">ExecuTorch</span>
                   <p>End-to-end solution for enabling on-device inference capabilities across mobile and edge devices</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/executorch/stable/index.html">
+                  <span class="dropdown-title">ExecuTorch Docs</span>
                 </a>
               </div>
             </div>  
@@ -201,6 +204,10 @@
                   <span class="dropdown-title">Events</span>
                   <p>Find events, webinars, and podcasts</p>
                 </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/newsletter">
+                  <span class="dropdown-title">Newsletter</span>
+                  <p>Stay up-to-date with the latest updates</p>
+                </a>
             </div>
           </li>
 
@@ -216,7 +223,18 @@
                 </a>
                 <a class="nav-dropdown-item" href="https://pytorch.org/governing-board">
                   <span class="dropdown-title">Governing Board</span>
-                  <p></p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/credits">
+                  <span class="dropdown-title">Cloud Credit Program</span>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/tac">
+                  <span class="dropdown-title">Technical Advisory Council</span>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/staff">
+                  <span class="dropdown-title">Staff</span>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/contact-us">
+                  <span class="dropdown-title">Contact Us</span>
                 </a>
               </div>
             </div>
@@ -272,7 +290,7 @@
               
               
                 <div class="version">
-                  v2.6.0.dev0+1d5be25
+                  v2.7.0.dev0+cfdb585
                 </div>
               
             
@@ -326,8 +344,10 @@
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/torch_export_cudagraphs.html">Torch Export with Cudagraphs</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/converter_overloading.html">Overloading Torch-TensorRT Converters with Custom Converters</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/custom_kernel_plugins.html">Using Custom Kernels within TensorRT Engines with Torch-TensorRT</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/auto_generate_converters.html">Automatically Generate a Converter for a Custom Kernel</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/mutable_torchtrt_module_example.html">Mutable Torch TensorRT Module</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/weight_streaming_example.html">Weight Streaming</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/pre_allocated_output_example.html">Pre-allocated output buffer</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Dynamo Frontend</span></p>
 <ul>
@@ -352,8 +372,10 @@
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/torch_compile_resnet_example.html">Compiling ResNet with dynamic shapes using the <cite>torch.compile</cite> backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/torch_compile_transformers_example.html">Compiling BERT using the <cite>torch.compile</cite> backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/torch_compile_stable_diffusion.html">Compiling Stable Diffusion model using the <cite>torch.compile</cite> backend</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/torch_compile_gpt2.html">Compiling GPT2 using the Torch-TensorRT <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code> frontend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/torch_export_gpt2.html">Compiling GPT2 using the dynamo backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/torch_export_llama2.html">Compiling Llama2 using the dynamo backend</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/torch_export_sam2.html">Compiling SAM2 using the dynamo backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/notebooks.html">Legacy notebooks</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Python API Documentation</span></p>
@@ -463,42 +485,42 @@
              <article itemprop="articleBody" id="pytorch-article" class="pytorch-article">
               
   <h1>Source code for torch_tensorrt.dynamo._refit</h1><div class="highlight"><pre>
-<span></span><span class="kn">from</span> <span class="nn">__future__</span> <span class="kn">import</span> <span class="n">annotations</span>
+<span></span><span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
 
-<span class="kn">import</span> <span class="nn">collections.abc</span>
-<span class="kn">import</span> <span class="nn">copy</span>
-<span class="kn">import</span> <span class="nn">logging</span>
-<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Sequence</span><span class="p">,</span> <span class="n">Tuple</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">collections.abc</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">copy</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Sequence</span><span class="p">,</span> <span class="n">Tuple</span>
 
-<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
-<span class="kn">import</span> <span class="nn">tensorrt</span> <span class="k">as</span> <span class="nn">trt</span>
-<span class="kn">import</span> <span class="nn">torch</span>
-<span class="kn">from</span> <span class="nn">torch.export</span> <span class="kn">import</span> <span class="n">ExportedProgram</span>
-<span class="kn">from</span> <span class="nn">torch_tensorrt._enums</span> <span class="kn">import</span> <span class="n">dtype</span>
-<span class="kn">from</span> <span class="nn">torch_tensorrt._Input</span> <span class="kn">import</span> <span class="n">Input</span>
-<span class="kn">from</span> <span class="nn">torch_tensorrt.dynamo</span> <span class="kn">import</span> <span class="n">partitioning</span>
-<span class="kn">from</span> <span class="nn">torch_tensorrt.dynamo._exporter</span> <span class="kn">import</span> <span class="n">inline_torch_modules</span>
-<span class="kn">from</span> <span class="nn">torch_tensorrt.dynamo._settings</span> <span class="kn">import</span> <span class="n">CompilationSettings</span>
-<span class="kn">from</span> <span class="nn">torch_tensorrt.dynamo.conversion._conversion</span> <span class="kn">import</span> <span class="n">infer_module_output_dtypes</span>
-<span class="kn">from</span> <span class="nn">torch_tensorrt.dynamo.conversion._ConverterRegistry</span> <span class="kn">import</span> <span class="p">(</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">tensorrt</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">trt</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch.export</span><span class="w"> </span><span class="kn">import</span> <span class="n">ExportedProgram</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt._enums</span><span class="w"> </span><span class="kn">import</span> <span class="n">dtype</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt._Input</span><span class="w"> </span><span class="kn">import</span> <span class="n">Input</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo</span><span class="w"> </span><span class="kn">import</span> <span class="n">partitioning</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo._exporter</span><span class="w"> </span><span class="kn">import</span> <span class="n">inline_torch_modules</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo._settings</span><span class="w"> </span><span class="kn">import</span> <span class="n">CompilationSettings</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.conversion._conversion</span><span class="w"> </span><span class="kn">import</span> <span class="n">infer_module_output_dtypes</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.conversion._ConverterRegistry</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
     <span class="n">DYNAMO_CONVERTERS</span> <span class="k">as</span> <span class="n">CONVERTERS</span><span class="p">,</span>
 <span class="p">)</span>
-<span class="kn">from</span> <span class="nn">torch_tensorrt.dynamo.conversion._TRTInterpreter</span> <span class="kn">import</span> <span class="n">TRTInterpreter</span>
-<span class="kn">from</span> <span class="nn">torch_tensorrt.dynamo.conversion.truncate_double</span> <span class="kn">import</span> <span class="n">repair_double_inputs</span>
-<span class="kn">from</span> <span class="nn">torch_tensorrt.dynamo.lowering</span> <span class="kn">import</span> <span class="p">(</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.conversion._TRTInterpreter</span><span class="w"> </span><span class="kn">import</span> <span class="n">TRTInterpreter</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.conversion.truncate_double</span><span class="w"> </span><span class="kn">import</span> <span class="n">repair_double_inputs</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.lowering</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
     <span class="n">get_decompositions</span><span class="p">,</span>
     <span class="n">post_lowering</span><span class="p">,</span>
     <span class="n">pre_export_lowering</span><span class="p">,</span>
 <span class="p">)</span>
-<span class="kn">from</span> <span class="nn">torch_tensorrt.dynamo.runtime._PythonTorchTensorRTModule</span> <span class="kn">import</span> <span class="p">(</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.runtime._PythonTorchTensorRTModule</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
     <span class="n">PythonTorchTensorRTModule</span><span class="p">,</span>
 <span class="p">)</span>
-<span class="kn">from</span> <span class="nn">torch_tensorrt.dynamo.runtime._TorchTensorRTModule</span> <span class="kn">import</span> <span class="p">(</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.runtime._TorchTensorRTModule</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
     <span class="n">ENGINE_IDX</span><span class="p">,</span>
     <span class="n">SERIALIZED_METADATA_IDX</span><span class="p">,</span>
     <span class="n">TorchTensorRTModule</span><span class="p">,</span>
 <span class="p">)</span>
-<span class="kn">from</span> <span class="nn">torch_tensorrt.dynamo.utils</span> <span class="kn">import</span> <span class="p">(</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.utils</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
     <span class="n">check_module_output</span><span class="p">,</span>
     <span class="n">get_model_device</span><span class="p">,</span>
     <span class="n">get_torch_inputs</span><span class="p">,</span>
@@ -506,12 +528,12 @@
     <span class="n">to_torch_device</span><span class="p">,</span>
     <span class="n">to_torch_tensorrt_device</span><span class="p">,</span>
 <span class="p">)</span>
-<span class="kn">from</span> <span class="nn">torch_tensorrt.logging</span> <span class="kn">import</span> <span class="n">TRT_LOGGER</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.logging</span><span class="w"> </span><span class="kn">import</span> <span class="n">TRT_LOGGER</span>
 
 <span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
 
 
-<span class="k">def</span> <span class="nf">construct_refit_mapping</span><span class="p">(</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">construct_refit_mapping</span><span class="p">(</span>
     <span class="n">module</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">,</span>
     <span class="n">inputs</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="n">Input</span><span class="p">],</span>
     <span class="n">settings</span><span class="p">:</span> <span class="n">CompilationSettings</span> <span class="o">=</span> <span class="n">CompilationSettings</span><span class="p">(),</span>
@@ -572,7 +594,7 @@
     <span class="k">return</span> <span class="n">weight_map</span>
 
 
-<span class="k">def</span> <span class="nf">construct_refit_mapping_from_weight_name_map</span><span class="p">(</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">construct_refit_mapping_from_weight_name_map</span><span class="p">(</span>
     <span class="n">weight_name_map</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span> <span class="n">state_dict</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
     <span class="n">engine_weight_map</span> <span class="o">=</span> <span class="p">{}</span>
@@ -598,7 +620,7 @@
     <span class="k">return</span> <span class="n">engine_weight_map</span>
 
 
-<span class="k">def</span> <span class="nf">_refit_single_trt_engine_with_gm</span><span class="p">(</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">_refit_single_trt_engine_with_gm</span><span class="p">(</span>
     <span class="n">new_gm</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">,</span>
     <span class="n">old_engine</span><span class="p">:</span> <span class="n">trt</span><span class="o">.</span><span class="n">ICudaEngine</span><span class="p">,</span>
     <span class="n">input_list</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="n">Any</span><span class="p">],</span>
@@ -621,13 +643,26 @@
             <span class="k">if</span> <span class="n">torch_device</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="s2">&quot;cuda&quot;</span>
             <span class="k">else</span> <span class="n">trt</span><span class="o">.</span><span class="n">TensorLocation</span><span class="o">.</span><span class="n">HOST</span>
         <span class="p">)</span>
+
+        <span class="n">constant_mapping</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="n">weight_name_map</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span>
+            <span class="s2">&quot;constant_mapping&quot;</span><span class="p">,</span> <span class="p">{}</span>
+        <span class="p">)</span>  <span class="c1"># type: ignore</span>
         <span class="n">mapping</span> <span class="o">=</span> <span class="n">construct_refit_mapping_from_weight_name_map</span><span class="p">(</span>
             <span class="n">weight_name_map</span><span class="p">,</span> <span class="n">new_gm</span><span class="o">.</span><span class="n">state_dict</span><span class="p">()</span>
         <span class="p">)</span>
+        <span class="n">constant_mapping_with_type</span> <span class="o">=</span> <span class="p">{}</span>
 
-        <span class="c1"># Debug Use</span>
-        <span class="c1"># correct = construct_refit_mapping(new_gm, input_list, settings)</span>
-        <span class="c1"># comparison = {k: (np.allclose(correct[k][0], mapping[k][0].cpu().numpy(), 1e-2, 1e-2), correct[k][0], mapping[k][0]) for k in mapping if k in correct}</span>
+        <span class="k">for</span> <span class="n">constant_name</span><span class="p">,</span> <span class="n">val</span> <span class="ow">in</span> <span class="n">constant_mapping</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="n">np_weight_type</span> <span class="o">=</span> <span class="n">val</span><span class="o">.</span><span class="n">dtype</span>
+            <span class="n">val_tensor</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">from_numpy</span><span class="p">(</span><span class="n">val</span><span class="p">)</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
+            <span class="n">trt_dtype</span> <span class="o">=</span> <span class="n">dtype</span><span class="o">.</span><span class="n">try_from</span><span class="p">(</span><span class="n">np_weight_type</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">trt</span><span class="o">.</span><span class="n">DataType</span><span class="p">)</span>
+            <span class="n">torch_dtype</span> <span class="o">=</span> <span class="n">dtype</span><span class="o">.</span><span class="n">try_from</span><span class="p">(</span><span class="n">np_weight_type</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span>
+            <span class="n">constant_mapping_with_type</span><span class="p">[</span><span class="n">constant_name</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">val_tensor</span><span class="o">.</span><span class="n">clone</span><span class="p">()</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">contiguous</span><span class="p">()</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">torch_dtype</span><span class="p">),</span>
+                <span class="n">trt_dtype</span><span class="p">,</span>
+            <span class="p">)</span>
+
+        <span class="n">mapping</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">constant_mapping_with_type</span><span class="p">)</span>
 
         <span class="k">for</span> <span class="n">layer_name</span> <span class="ow">in</span> <span class="n">weight_list</span><span class="p">:</span>
             <span class="k">if</span> <span class="n">layer_name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">mapping</span><span class="p">:</span>
@@ -663,7 +698,7 @@
         <span class="k">raise</span> <span class="ne">AssertionError</span><span class="p">(</span><span class="s2">&quot;Refitting failed.&quot;</span><span class="p">)</span>
 
 
-<div class="viewcode-block" id="refit_module_weights"><a class="viewcode-back" href="../../../py_api/dynamo.html#torch_tensorrt.dynamo.refit_module_weights">[docs]</a><span class="k">def</span> <span class="nf">refit_module_weights</span><span class="p">(</span>
+<div class="viewcode-block" id="refit_module_weights"><a class="viewcode-back" href="../../../py_api/dynamo.html#torch_tensorrt.dynamo.refit_module_weights">[docs]</a><span class="k">def</span><span class="w"> </span><span class="nf">refit_module_weights</span><span class="p">(</span>
     <span class="n">compiled_module</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span> <span class="o">|</span> <span class="n">ExportedProgram</span><span class="p">,</span>
     <span class="n">new_weight_module</span><span class="p">:</span> <span class="n">ExportedProgram</span><span class="p">,</span>
     <span class="n">arg_inputs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="o">...</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -716,7 +751,7 @@
         <span class="p">]</span>
         <span class="k">assert</span> <span class="p">(</span>
             <span class="n">encoded_metadata</span> <span class="o">!=</span> <span class="s2">&quot;&quot;</span>
-        <span class="p">),</span> <span class="s2">&quot;The engine provided is either not refittable or was built with a version of Torch-TensorRT that is too old, please recompile using the latest version with make_refittable=True&quot;</span>
+        <span class="p">),</span> <span class="s2">&quot;The engine provided is either not refittable or was built with a version of Torch-TensorRT that is too old, please recompile using the latest version&quot;</span>
         <span class="n">settings</span> <span class="o">=</span> <span class="n">TorchTensorRTModule</span><span class="o">.</span><span class="n">decode_metadata</span><span class="p">(</span><span class="n">encoded_metadata</span><span class="p">)[</span><span class="s2">&quot;settings&quot;</span><span class="p">]</span>
         <span class="c1"># Handle torch modules</span>
         <span class="n">compiled_submodules_map</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">compiled_submodules</span><span class="p">)</span>
@@ -734,8 +769,8 @@
     <span class="k">assert</span> <span class="n">settings</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
 
     <span class="k">assert</span> <span class="p">(</span>
-        <span class="n">settings</span><span class="o">.</span><span class="n">make_refittable</span>
-    <span class="p">),</span> <span class="s2">&quot;Refitting is not enabled. Please recompile the engine with refit=True.&quot;</span>
+        <span class="ow">not</span> <span class="n">settings</span><span class="o">.</span><span class="n">immutable_weights</span>
+    <span class="p">),</span> <span class="s2">&quot;Refitting is not enabled. Please recompile the engine with immutable_weights=False.&quot;</span>
 
     <span class="k">if</span> <span class="n">settings</span><span class="o">.</span><span class="n">debug</span><span class="p">:</span>
         <span class="n">set_log_level</span><span class="p">(</span><span class="n">logger</span><span class="o">.</span><span class="n">parent</span><span class="p">,</span> <span class="n">logging</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">)</span>
@@ -914,17 +949,21 @@
                     <span class="n">weight_name_map</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
                 <span class="p">)</span>
 
-        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">compiled_submodule</span><span class="p">,</span> <span class="n">TorchTensorRTModule</span><span class="p">):</span>
-            <span class="n">serialized_engine</span> <span class="o">=</span> <span class="nb">bytes</span><span class="p">(</span><span class="n">engine</span><span class="o">.</span><span class="n">serialize</span><span class="p">())</span>
-            <span class="n">new_engine_info</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">engine_info</span><span class="p">)</span>
-            <span class="n">new_engine_info</span><span class="p">[</span><span class="n">ENGINE_IDX</span><span class="p">]</span> <span class="o">=</span> <span class="n">serialized_engine</span>
-            <span class="n">refitted_engine</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">classes</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">Engine</span><span class="p">(</span><span class="nb">tuple</span><span class="p">(</span><span class="n">new_engine_info</span><span class="p">))</span>
-            <span class="n">compiled_submodule</span><span class="o">.</span><span class="n">engine</span> <span class="o">=</span> <span class="n">refitted_engine</span>
+        <span class="c1"># clear EXCLUDE_WEIGHTS flag</span>
+        <span class="n">serialization_config</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">create_serialization_config</span><span class="p">()</span>
+        <span class="n">serialization_config</span><span class="o">.</span><span class="n">clear_flag</span><span class="p">(</span><span class="n">trt</span><span class="o">.</span><span class="n">SerializationFlag</span><span class="o">.</span><span class="n">EXCLUDE_WEIGHTS</span><span class="p">)</span>
+        <span class="n">serialized_engine</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">serialize_with_config</span><span class="p">(</span><span class="n">serialization_config</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span>
+            <span class="n">compiled_submodule</span><span class="p">,</span> <span class="p">(</span><span class="n">PythonTorchTensorRTModule</span><span class="p">,</span> <span class="n">TorchTensorRTModule</span><span class="p">)</span>
+        <span class="p">):</span>
+            <span class="n">compiled_submodule</span><span class="o">.</span><span class="n">engine</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># Clear the engine for TorchTensorRTModule, otherwise it won&#39;t be updated</span>
+            <span class="n">compiled_submodule</span><span class="o">.</span><span class="n">serialized_engine</span> <span class="o">=</span> <span class="nb">bytes</span><span class="p">(</span><span class="n">serialized_engine</span><span class="p">)</span>
+            <span class="n">compiled_submodule</span><span class="o">.</span><span class="n">setup_engine</span><span class="p">()</span>
 
         <span class="k">elif</span> <span class="n">inline_module</span><span class="p">:</span>
-            <span class="n">serialized_engine</span> <span class="o">=</span> <span class="nb">bytes</span><span class="p">(</span><span class="n">engine</span><span class="o">.</span><span class="n">serialize</span><span class="p">())</span>
             <span class="n">new_engine_info</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">engine_info</span><span class="p">)</span>
-            <span class="n">new_engine_info</span><span class="p">[</span><span class="n">ENGINE_IDX</span><span class="p">]</span> <span class="o">=</span> <span class="n">serialized_engine</span>
+            <span class="n">new_engine_info</span><span class="p">[</span><span class="n">ENGINE_IDX</span><span class="p">]</span> <span class="o">=</span> <span class="nb">bytes</span><span class="p">(</span><span class="n">serialized_engine</span><span class="p">)</span>
             <span class="n">refitted_engine</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">classes</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">Engine</span><span class="p">(</span><span class="nb">tuple</span><span class="p">(</span><span class="n">new_engine_info</span><span class="p">))</span>
             <span class="nb">setattr</span><span class="p">(</span><span class="n">compiled_module</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">_engine&quot;</span><span class="p">,</span> <span class="n">refitted_engine</span><span class="p">)</span>
 
@@ -958,10 +997,10 @@
 
 
 <span class="c1"># Util functions -----------</span>
-<span class="kn">import</span> <span class="nn">base64</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">base64</span>
 
 
-<span class="k">def</span> <span class="nf">get_engine_from_encoded_engine</span><span class="p">(</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">get_engine_from_encoded_engine</span><span class="p">(</span>
     <span class="n">encoded_engine</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">runtime</span><span class="p">:</span> <span class="n">trt</span><span class="o">.</span><span class="n">Runtime</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">trt</span><span class="o">.</span><span class="n">ICudaEngine</span><span class="p">:</span>
     <span class="n">serialized_engine</span> <span class="o">=</span> <span class="n">base64</span><span class="o">.</span><span class="n">b64decode</span><span class="p">(</span><span class="n">encoded_engine</span><span class="p">)</span>
@@ -1193,7 +1232,7 @@
                <a href="https://pytorch.org/resources">Developer Resources</a>
              </li>
              <li>
-               <a href="https://pytorch.org/ecosystem/contributor-awards-2023">Contributor Awards - 2023</a>
+               <a href="https://pytorch.org/ecosystem/contributor-awards-2023">Contributor Awards - 2024</a>
              </li>
            </ul>
 
@@ -1208,6 +1247,9 @@
              
              <li>
                <a href="https://pytorch.org/executorch-overview">ExecuTorch</a>
+             </li>
+             <li>
+               <a href="https://pytorch.org/executorch/stable/index.html">ExecuTorch Documentation</a>
              </li>
            </ul>
 
@@ -1247,6 +1289,9 @@
             <li>
               <a href="https://pytorch.org/events">Events</a>
             </li>
+            <li>
+               <a href="https://pytorch.org/newsletter">Newsletter</a>
+             </li>
           </ul>
           
           <li class="resources-mobile-menu-title">
@@ -1259,6 +1304,18 @@
             </li>
             <li>
               <a href="https://pytorch.org/governing-board">Governing Board</a>
+            </li>
+            <li>
+               <a href="https://pytorch.org/credits">Cloud Credit Program</a>
+            </li>
+            <li>
+               <a href="https://pytorch.org/tac">Technical Advisory Council</a>
+            </li>
+            <li>
+               <a href="https://pytorch.org/staff">Staff</a>
+            </li>
+            <li>
+               <a href="https://pytorch.org/contact-us">Contact Us</a>
             </li>
           </ul>
         </ul>

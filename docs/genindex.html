@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Index &mdash; Torch-TensorRT v2.6.0.dev0+1d5be25 documentation</title>
+  <title>Index &mdash; Torch-TensorRT v2.7.0.dev0+cfdb585 documentation</title>
   
 
   
@@ -132,8 +132,8 @@
                   <span class=dropdown-title>Developer Resources</span>
                   <p>Find resources and get questions answered</p>
                 </a>
-                <a class="nav-dropdown-item" href="https://pytorch.org/ecosystem/contributor-awards-2023">
-                  <span class="dropdown-title">Contributor Awards - 2023</span>
+                <a class="nav-dropdown-item" href="https://pytorch.org/ecosystem/contributor-awards-2024">
+                  <span class="dropdown-title">Contributor Awards - 2024</span>
                   <p>Award winners announced at this year's PyTorch Conference</p>
                 </a>
               </div>
@@ -153,6 +153,9 @@
                 <a class="nav-dropdown-item" href="https://pytorch.org/executorch-overview">
                   <span class="dropdown-title">ExecuTorch</span>
                   <p>End-to-end solution for enabling on-device inference capabilities across mobile and edge devices</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/executorch/stable/index.html">
+                  <span class="dropdown-title">ExecuTorch Docs</span>
                 </a>
               </div>
             </div>  
@@ -201,6 +204,10 @@
                   <span class="dropdown-title">Events</span>
                   <p>Find events, webinars, and podcasts</p>
                 </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/newsletter">
+                  <span class="dropdown-title">Newsletter</span>
+                  <p>Stay up-to-date with the latest updates</p>
+                </a>
             </div>
           </li>
 
@@ -216,7 +223,18 @@
                 </a>
                 <a class="nav-dropdown-item" href="https://pytorch.org/governing-board">
                   <span class="dropdown-title">Governing Board</span>
-                  <p></p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/credits">
+                  <span class="dropdown-title">Cloud Credit Program</span>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/tac">
+                  <span class="dropdown-title">Technical Advisory Council</span>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/staff">
+                  <span class="dropdown-title">Staff</span>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/contact-us">
+                  <span class="dropdown-title">Contact Us</span>
                 </a>
               </div>
             </div>
@@ -272,7 +290,7 @@
               
               
                 <div class="version">
-                  v2.6.0.dev0+1d5be25
+                  v2.7.0.dev0+cfdb585
                 </div>
               
             
@@ -326,8 +344,10 @@
 <li class="toctree-l1"><a class="reference internal" href="tutorials/_rendered_examples/dynamo/torch_export_cudagraphs.html">Torch Export with Cudagraphs</a></li>
 <li class="toctree-l1"><a class="reference internal" href="tutorials/_rendered_examples/dynamo/converter_overloading.html">Overloading Torch-TensorRT Converters with Custom Converters</a></li>
 <li class="toctree-l1"><a class="reference internal" href="tutorials/_rendered_examples/dynamo/custom_kernel_plugins.html">Using Custom Kernels within TensorRT Engines with Torch-TensorRT</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tutorials/_rendered_examples/dynamo/auto_generate_converters.html">Automatically Generate a Converter for a Custom Kernel</a></li>
 <li class="toctree-l1"><a class="reference internal" href="tutorials/_rendered_examples/dynamo/mutable_torchtrt_module_example.html">Mutable Torch TensorRT Module</a></li>
 <li class="toctree-l1"><a class="reference internal" href="tutorials/_rendered_examples/dynamo/weight_streaming_example.html">Weight Streaming</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tutorials/_rendered_examples/dynamo/pre_allocated_output_example.html">Pre-allocated output buffer</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Dynamo Frontend</span></p>
 <ul>
@@ -352,8 +372,10 @@
 <li class="toctree-l1"><a class="reference internal" href="tutorials/_rendered_examples/dynamo/torch_compile_resnet_example.html">Compiling ResNet with dynamic shapes using the <cite>torch.compile</cite> backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="tutorials/_rendered_examples/dynamo/torch_compile_transformers_example.html">Compiling BERT using the <cite>torch.compile</cite> backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="tutorials/_rendered_examples/dynamo/torch_compile_stable_diffusion.html">Compiling Stable Diffusion model using the <cite>torch.compile</cite> backend</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tutorials/_rendered_examples/dynamo/torch_compile_gpt2.html">Compiling GPT2 using the Torch-TensorRT <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code> frontend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="tutorials/_rendered_examples/dynamo/torch_export_gpt2.html">Compiling GPT2 using the dynamo backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="tutorials/_rendered_examples/dynamo/torch_export_llama2.html">Compiling Llama2 using the dynamo backend</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tutorials/_rendered_examples/dynamo/torch_export_sam2.html">Compiling SAM2 using the dynamo backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="tutorials/notebooks.html">Legacy notebooks</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Python API Documentation</span></p>
@@ -482,6 +504,7 @@
  | <a href="#S"><strong>S</strong></a>
  | <a href="#T"><strong>T</strong></a>
  | <a href="#U"><strong>U</strong></a>
+ | <a href="#V"><strong>V</strong></a>
  | <a href="#W"><strong>W</strong></a>
  | <a href="#X"><strong>X</strong></a>
  
@@ -557,8 +580,6 @@
         <li><a href="py_api/ts.html#torch_tensorrt.ts.convert_method_to_trt_engine">(in module torch_tensorrt.ts)</a>
 </li>
       </ul></li>
-      <li><a href="py_api/runtime.html#torch_tensorrt.runtime.PythonTorchTensorRTModule.cudagraphs_validate_shapes">cudagraphs_validate_shapes() (torch_tensorrt.runtime.PythonTorchTensorRTModule method)</a>
-</li>
   </ul></td>
 </tr></table>
 
@@ -939,17 +960,17 @@
 </li>
       <li><a href="_cpp_api/structtorch__tensorrt_1_1Device.html#_CPPv4N14torch_tensorrt6Device6gpu_idE">torch_tensorrt::Device::gpu_id (C++ member)</a>
 </li>
-      <li><a href="_cpp_api/function_namespacetorch__tensorrt_1ad6a4ee8ca6c8f6e5519eb1128ec7f4a1.html#_CPPv4N14torch_tensorrt15dump_build_infoEv">torch_tensorrt::dump_build_info (C++ function)</a>
+      <li><a href="_cpp_api/function_torch__tensorrt_8h_1ad6a4ee8ca6c8f6e5519eb1128ec7f4a1.html#_CPPv4N14torch_tensorrt15dump_build_infoEv">torch_tensorrt::dump_build_info (C++ function)</a>
 </li>
-      <li><a href="_cpp_api/enum_namespacetorch__tensorrt_1a3fbe5d72e4fc624dbd038853079620eb.html#_CPPv4N14torch_tensorrt16EngineCapabilityE">torch_tensorrt::EngineCapability (C++ enum)</a>
+      <li><a href="_cpp_api/enum_torch__tensorrt_8h_1a3fbe5d72e4fc624dbd038853079620eb.html#_CPPv4N14torch_tensorrt16EngineCapabilityE">torch_tensorrt::EngineCapability (C++ enum)</a>
 </li>
-      <li><a href="_cpp_api/enum_namespacetorch__tensorrt_1a3fbe5d72e4fc624dbd038853079620eb.html#_CPPv4N14torch_tensorrt16EngineCapability15kDLA_STANDALONEE">torch_tensorrt::EngineCapability::kDLA_STANDALONE (C++ enumerator)</a>
+      <li><a href="_cpp_api/enum_torch__tensorrt_8h_1a3fbe5d72e4fc624dbd038853079620eb.html#_CPPv4N14torch_tensorrt16EngineCapability15kDLA_STANDALONEE">torch_tensorrt::EngineCapability::kDLA_STANDALONE (C++ enumerator)</a>
 </li>
-      <li><a href="_cpp_api/enum_namespacetorch__tensorrt_1a3fbe5d72e4fc624dbd038853079620eb.html#_CPPv4N14torch_tensorrt16EngineCapability7kSAFETYE">torch_tensorrt::EngineCapability::kSAFETY (C++ enumerator)</a>
+      <li><a href="_cpp_api/enum_torch__tensorrt_8h_1a3fbe5d72e4fc624dbd038853079620eb.html#_CPPv4N14torch_tensorrt16EngineCapability7kSAFETYE">torch_tensorrt::EngineCapability::kSAFETY (C++ enumerator)</a>
 </li>
-      <li><a href="_cpp_api/enum_namespacetorch__tensorrt_1a3fbe5d72e4fc624dbd038853079620eb.html#_CPPv4N14torch_tensorrt16EngineCapability9kSTANDARDE">torch_tensorrt::EngineCapability::kSTANDARD (C++ enumerator)</a>
+      <li><a href="_cpp_api/enum_torch__tensorrt_8h_1a3fbe5d72e4fc624dbd038853079620eb.html#_CPPv4N14torch_tensorrt16EngineCapability9kSTANDARDE">torch_tensorrt::EngineCapability::kSTANDARD (C++ enumerator)</a>
 </li>
-      <li><a href="_cpp_api/function_namespacetorch__tensorrt_1ac4ab8313ae72c2c899ea31548b528528.html#_CPPv4N14torch_tensorrt14get_build_infoEv">torch_tensorrt::get_build_info (C++ function)</a>
+      <li><a href="_cpp_api/function_torch__tensorrt_8h_1ac4ab8313ae72c2c899ea31548b528528.html#_CPPv4N14torch_tensorrt14get_build_infoEv">torch_tensorrt::get_build_info (C++ function)</a>
 </li>
       <li><a href="_cpp_api/structtorch__tensorrt_1_1GraphInputs.html#_CPPv4N14torch_tensorrt11GraphInputsE">torch_tensorrt::GraphInputs (C++ struct)</a>
 </li>
@@ -975,53 +996,69 @@
 </li>
       <li><a href="_cpp_api/structtorch__tensorrt_1_1Input.html#_CPPv4N14torch_tensorrt5Input13tensor_domainE">torch_tensorrt::Input::tensor_domain (C++ member)</a>
 </li>
-      <li><a href="_cpp_api/function_namespacetorch__tensorrt_1_1logging_1a56e110feaaba2c3fd44bd201fd21a76a.html#_CPPv4N14torch_tensorrt7logging24get_is_colored_output_onEv">torch_tensorrt::logging::get_is_colored_output_on (C++ function)</a>
+      <li><a href="_cpp_api/function_logging_8h_1a56e110feaaba2c3fd44bd201fd21a76a.html#_CPPv4N14torch_tensorrt7logging24get_is_colored_output_onEv">torch_tensorrt::logging::get_is_colored_output_on (C++ function)</a>
 </li>
-      <li><a href="_cpp_api/function_namespacetorch__tensorrt_1_1logging_1a0593f776f469c20469e2f729fc7861a3.html#_CPPv4N14torch_tensorrt7logging18get_logging_prefixEv">torch_tensorrt::logging::get_logging_prefix (C++ function)</a>
+      <li><a href="_cpp_api/function_logging_8h_1a0593f776f469c20469e2f729fc7861a3.html#_CPPv4N14torch_tensorrt7logging18get_logging_prefixEv">torch_tensorrt::logging::get_logging_prefix (C++ function)</a>
 </li>
-      <li><a href="_cpp_api/function_namespacetorch__tensorrt_1_1logging_1a0c012cb374addd90eb1f42eaec570650.html#_CPPv4N14torch_tensorrt7logging24get_reportable_log_levelEv">torch_tensorrt::logging::get_reportable_log_level (C++ function)</a>
+      <li><a href="_cpp_api/function_logging_8h_1a0c012cb374addd90eb1f42eaec570650.html#_CPPv4N14torch_tensorrt7logging24get_reportable_log_levelEv">torch_tensorrt::logging::get_reportable_log_level (C++ function)</a>
 </li>
-      <li><a href="_cpp_api/enum_namespacetorch__tensorrt_1_1logging_1a130f65408ad8cbaee060f05e8db69558.html#_CPPv4N14torch_tensorrt7logging5LevelE">torch_tensorrt::logging::Level (C++ enum)</a>
+      <li><a href="_cpp_api/enum_logging_8h_1a130f65408ad8cbaee060f05e8db69558.html#_CPPv4N14torch_tensorrt7logging5LevelE">torch_tensorrt::logging::Level (C++ enum)</a>
 </li>
-      <li><a href="_cpp_api/enum_namespacetorch__tensorrt_1_1logging_1a130f65408ad8cbaee060f05e8db69558.html#_CPPv4N14torch_tensorrt7logging5Level6kDEBUGE">torch_tensorrt::logging::Level::kDEBUG (C++ enumerator)</a>
+      <li><a href="_cpp_api/enum_logging_8h_1a130f65408ad8cbaee060f05e8db69558.html#_CPPv4N14torch_tensorrt7logging5Level6kDEBUGE">torch_tensorrt::logging::Level::kDEBUG (C++ enumerator)</a>
+</li>
+      <li><a href="_cpp_api/enum_logging_8h_1a130f65408ad8cbaee060f05e8db69558.html#_CPPv4N14torch_tensorrt7logging5Level6kERRORE">torch_tensorrt::logging::Level::kERROR (C++ enumerator)</a>
+</li>
+      <li><a href="_cpp_api/enum_logging_8h_1a130f65408ad8cbaee060f05e8db69558.html#_CPPv4N14torch_tensorrt7logging5Level6kGRAPHE">torch_tensorrt::logging::Level::kGRAPH (C++ enumerator)</a>
+</li>
+      <li><a href="_cpp_api/enum_logging_8h_1a130f65408ad8cbaee060f05e8db69558.html#_CPPv4N14torch_tensorrt7logging5Level5kINFOE">torch_tensorrt::logging::Level::kINFO (C++ enumerator)</a>
+</li>
+      <li><a href="_cpp_api/enum_logging_8h_1a130f65408ad8cbaee060f05e8db69558.html#_CPPv4N14torch_tensorrt7logging5Level15kINTERNAL_ERRORE">torch_tensorrt::logging::Level::kINTERNAL_ERROR (C++ enumerator)</a>
 </li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="_cpp_api/enum_namespacetorch__tensorrt_1_1logging_1a130f65408ad8cbaee060f05e8db69558.html#_CPPv4N14torch_tensorrt7logging5Level6kERRORE">torch_tensorrt::logging::Level::kERROR (C++ enumerator)</a>
+      <li><a href="_cpp_api/enum_logging_8h_1a130f65408ad8cbaee060f05e8db69558.html#_CPPv4N14torch_tensorrt7logging5Level8kWARNINGE">torch_tensorrt::logging::Level::kWARNING (C++ enumerator)</a>
 </li>
-      <li><a href="_cpp_api/enum_namespacetorch__tensorrt_1_1logging_1a130f65408ad8cbaee060f05e8db69558.html#_CPPv4N14torch_tensorrt7logging5Level6kGRAPHE">torch_tensorrt::logging::Level::kGRAPH (C++ enumerator)</a>
+      <li><a href="_cpp_api/function_logging_8h_1ac46ac0901cb97e3ae6e93b45f24e90b8.html#_CPPv4N14torch_tensorrt7logging3logE5LevelNSt6stringE">torch_tensorrt::logging::log (C++ function)</a>
 </li>
-      <li><a href="_cpp_api/enum_namespacetorch__tensorrt_1_1logging_1a130f65408ad8cbaee060f05e8db69558.html#_CPPv4N14torch_tensorrt7logging5Level5kINFOE">torch_tensorrt::logging::Level::kINFO (C++ enumerator)</a>
+      <li><a href="_cpp_api/function_logging_8h_1ad2efd47b6c3689e58ccc595680579ae5.html#_CPPv4N14torch_tensorrt7logging24set_is_colored_output_onEb">torch_tensorrt::logging::set_is_colored_output_on (C++ function)</a>
 </li>
-      <li><a href="_cpp_api/enum_namespacetorch__tensorrt_1_1logging_1a130f65408ad8cbaee060f05e8db69558.html#_CPPv4N14torch_tensorrt7logging5Level15kINTERNAL_ERRORE">torch_tensorrt::logging::Level::kINTERNAL_ERROR (C++ enumerator)</a>
+      <li><a href="_cpp_api/function_logging_8h_1af8f3443813315af7901903d25dd495cc.html#_CPPv4N14torch_tensorrt7logging18set_logging_prefixENSt6stringE">torch_tensorrt::logging::set_logging_prefix (C++ function)</a>
 </li>
-      <li><a href="_cpp_api/enum_namespacetorch__tensorrt_1_1logging_1a130f65408ad8cbaee060f05e8db69558.html#_CPPv4N14torch_tensorrt7logging5Level8kWARNINGE">torch_tensorrt::logging::Level::kWARNING (C++ enumerator)</a>
-</li>
-      <li><a href="_cpp_api/function_namespacetorch__tensorrt_1_1logging_1ac46ac0901cb97e3ae6e93b45f24e90b8.html#_CPPv4N14torch_tensorrt7logging3logE5LevelNSt6stringE">torch_tensorrt::logging::log (C++ function)</a>
-</li>
-      <li><a href="_cpp_api/function_namespacetorch__tensorrt_1_1logging_1ad2efd47b6c3689e58ccc595680579ae5.html#_CPPv4N14torch_tensorrt7logging24set_is_colored_output_onEb">torch_tensorrt::logging::set_is_colored_output_on (C++ function)</a>
-</li>
-      <li><a href="_cpp_api/function_namespacetorch__tensorrt_1_1logging_1af8f3443813315af7901903d25dd495cc.html#_CPPv4N14torch_tensorrt7logging18set_logging_prefixENSt6stringE">torch_tensorrt::logging::set_logging_prefix (C++ function)</a>
-</li>
-      <li><a href="_cpp_api/function_namespacetorch__tensorrt_1_1logging_1a7cb50492421ea9de4e3db895819df6f2.html#_CPPv4N14torch_tensorrt7logging24set_reportable_log_levelE5Level">torch_tensorrt::logging::set_reportable_log_level (C++ function)</a>
+      <li><a href="_cpp_api/function_logging_8h_1a7cb50492421ea9de4e3db895819df6f2.html#_CPPv4N14torch_tensorrt7logging24set_reportable_log_levelE5Level">torch_tensorrt::logging::set_reportable_log_level (C++ function)</a>
 </li>
       <li><a href="_cpp_api/classtorch__tensorrt_1_1ptq_1_1Int8CacheCalibrator.html#_CPPv4I0EN14torch_tensorrt3ptq19Int8CacheCalibratorE">torch_tensorrt::ptq::Int8CacheCalibrator (C++ class)</a>
+</li>
+      <li><a href="_cpp_api/classtorch__tensorrt_1_1ptq_1_1Int8CacheCalibrator.html#_CPPv4N14torch_tensorrt3ptq19Int8CacheCalibrator8getBatchEA_PvA_PKci">torch_tensorrt::ptq::Int8CacheCalibrator::getBatch (C++ function)</a>
+</li>
+      <li><a href="_cpp_api/classtorch__tensorrt_1_1ptq_1_1Int8CacheCalibrator.html#_CPPv4NK14torch_tensorrt3ptq19Int8CacheCalibrator12getBatchSizeEv">torch_tensorrt::ptq::Int8CacheCalibrator::getBatchSize (C++ function)</a>
 </li>
       <li><a href="_cpp_api/classtorch__tensorrt_1_1ptq_1_1Int8CacheCalibrator.html#_CPPv4N14torch_tensorrt3ptq19Int8CacheCalibrator19Int8CacheCalibratorERKNSt6stringE">torch_tensorrt::ptq::Int8CacheCalibrator::Int8CacheCalibrator (C++ function)</a>
 </li>
       <li><a href="_cpp_api/classtorch__tensorrt_1_1ptq_1_1Int8CacheCalibrator.html#_CPPv4N14torch_tensorrt3ptq19Int8CacheCalibratorcvPN8nvinfer115IInt8CalibratorEEv">torch_tensorrt::ptq::Int8CacheCalibrator::operator nvinfer1::IInt8Calibrator* (C++ function)</a>
 </li>
+      <li><a href="_cpp_api/classtorch__tensorrt_1_1ptq_1_1Int8CacheCalibrator.html#_CPPv4N14torch_tensorrt3ptq19Int8CacheCalibrator20readCalibrationCacheER6size_t">torch_tensorrt::ptq::Int8CacheCalibrator::readCalibrationCache (C++ function)</a>
+</li>
+      <li><a href="_cpp_api/classtorch__tensorrt_1_1ptq_1_1Int8CacheCalibrator.html#_CPPv4N14torch_tensorrt3ptq19Int8CacheCalibrator21writeCalibrationCacheEPKv6size_t">torch_tensorrt::ptq::Int8CacheCalibrator::writeCalibrationCache (C++ function)</a>
+</li>
       <li><a href="_cpp_api/classtorch__tensorrt_1_1ptq_1_1Int8Calibrator.html#_CPPv4I00EN14torch_tensorrt3ptq14Int8CalibratorE">torch_tensorrt::ptq::Int8Calibrator (C++ class)</a>
+</li>
+      <li><a href="_cpp_api/classtorch__tensorrt_1_1ptq_1_1Int8Calibrator.html#_CPPv4N14torch_tensorrt3ptq14Int8Calibrator8getBatchEA_PvA_PKci">torch_tensorrt::ptq::Int8Calibrator::getBatch (C++ function)</a>
+</li>
+      <li><a href="_cpp_api/classtorch__tensorrt_1_1ptq_1_1Int8Calibrator.html#_CPPv4NK14torch_tensorrt3ptq14Int8Calibrator12getBatchSizeEv">torch_tensorrt::ptq::Int8Calibrator::getBatchSize (C++ function)</a>
 </li>
       <li><a href="_cpp_api/classtorch__tensorrt_1_1ptq_1_1Int8Calibrator.html#_CPPv4N14torch_tensorrt3ptq14Int8Calibrator14Int8CalibratorE19DataLoaderUniquePtrRKNSt6stringEb">torch_tensorrt::ptq::Int8Calibrator::Int8Calibrator (C++ function)</a>
 </li>
       <li><a href="_cpp_api/classtorch__tensorrt_1_1ptq_1_1Int8Calibrator.html#_CPPv4N14torch_tensorrt3ptq14Int8CalibratorcvPN8nvinfer115IInt8CalibratorEEv">torch_tensorrt::ptq::Int8Calibrator::operator nvinfer1::IInt8Calibrator* (C++ function)</a>
 </li>
-      <li><a href="_cpp_api/function_namespacetorch__tensorrt_1_1ptq_1a226e3c83379d1012cde8578c1c86b16c.html#_CPPv4I0EN14torch_tensorrt3ptq26make_int8_cache_calibratorE19Int8CacheCalibratorI9AlgorithmERKNSt6stringE">torch_tensorrt::ptq::make_int8_cache_calibrator (C++ function)</a>
+      <li><a href="_cpp_api/classtorch__tensorrt_1_1ptq_1_1Int8Calibrator.html#_CPPv4N14torch_tensorrt3ptq14Int8Calibrator20readCalibrationCacheER6size_t">torch_tensorrt::ptq::Int8Calibrator::readCalibrationCache (C++ function)</a>
 </li>
-      <li><a href="_cpp_api/function_namespacetorch__tensorrt_1_1ptq_1a6186e305f47c1d94b6130ef6c7f7e178.html#_CPPv4I00EN14torch_tensorrt3ptq20make_int8_calibratorE14Int8CalibratorI9Algorithm10DataLoaderE10DataLoaderRKNSt6stringEb">torch_tensorrt::ptq::make_int8_calibrator (C++ function)</a>
+      <li><a href="_cpp_api/classtorch__tensorrt_1_1ptq_1_1Int8Calibrator.html#_CPPv4N14torch_tensorrt3ptq14Int8Calibrator21writeCalibrationCacheEPKv6size_t">torch_tensorrt::ptq::Int8Calibrator::writeCalibrationCache (C++ function)</a>
 </li>
-      <li><a href="_cpp_api/function_namespacetorch__tensorrt_1ad1acd06eaeaffbbcf6e7ebf426891384.html#_CPPv4N14torch_tensorrt10set_deviceEKi">torch_tensorrt::set_device (C++ function)</a>
+      <li><a href="_cpp_api/function_ptq_8h_1a226e3c83379d1012cde8578c1c86b16c.html#_CPPv4I0EN14torch_tensorrt3ptq26make_int8_cache_calibratorE19Int8CacheCalibratorI9AlgorithmERKNSt6stringE">torch_tensorrt::ptq::make_int8_cache_calibrator (C++ function)</a>
+</li>
+      <li><a href="_cpp_api/function_ptq_8h_1a6186e305f47c1d94b6130ef6c7f7e178.html#_CPPv4I00EN14torch_tensorrt3ptq20make_int8_calibratorE14Int8CalibratorI9Algorithm10DataLoaderE10DataLoaderRKNSt6stringEb">torch_tensorrt::ptq::make_int8_calibrator (C++ function)</a>
+</li>
+      <li><a href="_cpp_api/function_torch__tensorrt_8h_1ad1acd06eaeaffbbcf6e7ebf426891384.html#_CPPv4N14torch_tensorrt10set_deviceEKi">torch_tensorrt::set_device (C++ function)</a>
 </li>
       <li><a href="_cpp_api/classtorch__tensorrt_1_1TensorFormat.html#_CPPv4N14torch_tensorrt12TensorFormatE">torch_tensorrt::TensorFormat (C++ class)</a>
 </li>
@@ -1043,9 +1080,9 @@
 </li>
       <li><a href="_cpp_api/classtorch__tensorrt_1_1TensorFormat.html#_CPPv4N14torch_tensorrt12TensorFormat5Value8kUnknownE">torch_tensorrt::TensorFormat::Value::kUnknown (C++ enumerator)</a>
 </li>
-      <li><a href="_cpp_api/function_namespacetorch__tensorrt_1_1torchscript_1a5b405fd3bf3c8fc2e2a54cbbab979797.html#_CPPv4N14torch_tensorrt11torchscript29check_method_operator_supportERKN5torch3jit6ModuleENSt6stringE">torch_tensorrt::torchscript::check_method_operator_support (C++ function)</a>
+      <li><a href="_cpp_api/function_torch__tensorrt_8h_1a5b405fd3bf3c8fc2e2a54cbbab979797.html#_CPPv4N14torch_tensorrt11torchscript29check_method_operator_supportERKN5torch3jit6ModuleENSt6stringE">torch_tensorrt::torchscript::check_method_operator_support (C++ function)</a>
 </li>
-      <li><a href="_cpp_api/function_namespacetorch__tensorrt_1_1torchscript_1a6e19490a08fb1553c9dd347a5ae79db9.html#_CPPv4N14torch_tensorrt11torchscript7compileERKN5torch3jit6ModuleE11CompileSpec">torch_tensorrt::torchscript::compile (C++ function)</a>
+      <li><a href="_cpp_api/function_torch__tensorrt_8h_1a6e19490a08fb1553c9dd347a5ae79db9.html#_CPPv4N14torch_tensorrt11torchscript7compileERKN5torch3jit6ModuleE11CompileSpec">torch_tensorrt::torchscript::compile (C++ function)</a>
 </li>
       <li><a href="_cpp_api/structtorch__tensorrt_1_1torchscript_1_1CompileSpec.html#_CPPv4N14torch_tensorrt11torchscript11CompileSpecE">torch_tensorrt::torchscript::CompileSpec (C++ struct)</a>
 </li>
@@ -1091,9 +1128,9 @@
 </li>
       <li><a href="_cpp_api/structtorch__tensorrt_1_1torchscript_1_1CompileSpec.html#_CPPv4N14torch_tensorrt11torchscript11CompileSpec14workspace_sizeE">torch_tensorrt::torchscript::CompileSpec::workspace_size (C++ member)</a>
 </li>
-      <li><a href="_cpp_api/function_namespacetorch__tensorrt_1_1torchscript_1ae8d56472106eeef37fbe51ff7f40c9b2.html#_CPPv4N14torch_tensorrt11torchscript28convert_method_to_trt_engineERKN5torch3jit6ModuleENSt6stringE11CompileSpec">torch_tensorrt::torchscript::convert_method_to_trt_engine (C++ function)</a>
+      <li><a href="_cpp_api/function_torch__tensorrt_8h_1ae8d56472106eeef37fbe51ff7f40c9b2.html#_CPPv4N14torch_tensorrt11torchscript28convert_method_to_trt_engineERKN5torch3jit6ModuleENSt6stringE11CompileSpec">torch_tensorrt::torchscript::convert_method_to_trt_engine (C++ function)</a>
 </li>
-      <li><a href="_cpp_api/function_namespacetorch__tensorrt_1_1torchscript_1a81f9783517335dda877d8cfcf38987c9.html#_CPPv4N14torch_tensorrt11torchscript26embed_engine_in_new_moduleERKNSt6stringE6DeviceRKNSt6vectorINSt6stringEEERKNSt6vectorINSt6stringEEE">torch_tensorrt::torchscript::embed_engine_in_new_module (C++ function)</a>
+      <li><a href="_cpp_api/function_torch__tensorrt_8h_1a81f9783517335dda877d8cfcf38987c9.html#_CPPv4N14torch_tensorrt11torchscript26embed_engine_in_new_moduleERKNSt6stringE6DeviceRKNSt6vectorINSt6stringEEERKNSt6vectorINSt6stringEEE">torch_tensorrt::torchscript::embed_engine_in_new_module (C++ function)</a>
 </li>
       <li><a href="_cpp_api/define_macros_8h_1a31398a6d4d27e28817afb0f0139e909e.html#c.TORCH_TENSORRT_MAJOR_VERSION">TORCH_TENSORRT_MAJOR_VERSION (C macro)</a>
 </li>
@@ -1150,6 +1187,14 @@
       <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.DeviceType.UNKNOWN">UNKNOWN (torch_tensorrt.DeviceType attribute)</a>
 </li>
       <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.dtype.unknown">unknown (torch_tensorrt.dtype attribute)</a>
+</li>
+  </ul></td>
+</tr></table>
+
+<h2 id="V">V</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="py_api/runtime.html#torch_tensorrt.runtime.PythonTorchTensorRTModule.validate_input_shapes">validate_input_shapes() (torch_tensorrt.runtime.PythonTorchTensorRTModule method)</a>
 </li>
   </ul></td>
 </tr></table>
@@ -1400,7 +1445,7 @@
                <a href="https://pytorch.org/resources">Developer Resources</a>
              </li>
              <li>
-               <a href="https://pytorch.org/ecosystem/contributor-awards-2023">Contributor Awards - 2023</a>
+               <a href="https://pytorch.org/ecosystem/contributor-awards-2023">Contributor Awards - 2024</a>
              </li>
            </ul>
 
@@ -1415,6 +1460,9 @@
              
              <li>
                <a href="https://pytorch.org/executorch-overview">ExecuTorch</a>
+             </li>
+             <li>
+               <a href="https://pytorch.org/executorch/stable/index.html">ExecuTorch Documentation</a>
              </li>
            </ul>
 
@@ -1454,6 +1502,9 @@
             <li>
               <a href="https://pytorch.org/events">Events</a>
             </li>
+            <li>
+               <a href="https://pytorch.org/newsletter">Newsletter</a>
+             </li>
           </ul>
           
           <li class="resources-mobile-menu-title">
@@ -1466,6 +1517,18 @@
             </li>
             <li>
               <a href="https://pytorch.org/governing-board">Governing Board</a>
+            </li>
+            <li>
+               <a href="https://pytorch.org/credits">Cloud Credit Program</a>
+            </li>
+            <li>
+               <a href="https://pytorch.org/tac">Technical Advisory Council</a>
+            </li>
+            <li>
+               <a href="https://pytorch.org/staff">Staff</a>
+            </li>
+            <li>
+               <a href="https://pytorch.org/contact-us">Contact Us</a>
             </li>
           </ul>
         </ul>

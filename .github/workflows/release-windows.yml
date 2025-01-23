@@ -15,7 +15,7 @@ permissions:
 
 jobs:
   generate-matrix:
-    uses: pytorch/test-infra/.github/workflows/generate_binary_build_matrix.yml@main
+    uses: ./.github/workflows/generate_binary_build_matrix.yml
     if: ${{ contains(github.event.pull_request.labels.*.name, 'build-release-artifacts') || startsWith(github.event.ref, 'refs/tags/v') }}
     with:
       package-type: wheel
@@ -31,10 +31,10 @@ jobs:
       matrix: ${{ steps.generate.outputs.matrix }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/setup-python@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: '3.10'
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           repository: pytorch/tensorrt
       - name: Generate release matrix

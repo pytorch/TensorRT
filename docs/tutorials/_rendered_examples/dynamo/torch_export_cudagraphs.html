@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Torch Export with Cudagraphs &mdash; Torch-TensorRT v2.6.0.dev0+1d5be25 documentation</title>
+  <title>Torch Export with Cudagraphs &mdash; Torch-TensorRT v2.7.0.dev0+cfdb585 documentation</title>
   
 
   
@@ -135,8 +135,8 @@
                   <span class=dropdown-title>Developer Resources</span>
                   <p>Find resources and get questions answered</p>
                 </a>
-                <a class="nav-dropdown-item" href="https://pytorch.org/ecosystem/contributor-awards-2023">
-                  <span class="dropdown-title">Contributor Awards - 2023</span>
+                <a class="nav-dropdown-item" href="https://pytorch.org/ecosystem/contributor-awards-2024">
+                  <span class="dropdown-title">Contributor Awards - 2024</span>
                   <p>Award winners announced at this year's PyTorch Conference</p>
                 </a>
               </div>
@@ -156,6 +156,9 @@
                 <a class="nav-dropdown-item" href="https://pytorch.org/executorch-overview">
                   <span class="dropdown-title">ExecuTorch</span>
                   <p>End-to-end solution for enabling on-device inference capabilities across mobile and edge devices</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/executorch/stable/index.html">
+                  <span class="dropdown-title">ExecuTorch Docs</span>
                 </a>
               </div>
             </div>  
@@ -204,6 +207,10 @@
                   <span class="dropdown-title">Events</span>
                   <p>Find events, webinars, and podcasts</p>
                 </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/newsletter">
+                  <span class="dropdown-title">Newsletter</span>
+                  <p>Stay up-to-date with the latest updates</p>
+                </a>
             </div>
           </li>
 
@@ -219,7 +226,18 @@
                 </a>
                 <a class="nav-dropdown-item" href="https://pytorch.org/governing-board">
                   <span class="dropdown-title">Governing Board</span>
-                  <p></p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/credits">
+                  <span class="dropdown-title">Cloud Credit Program</span>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/tac">
+                  <span class="dropdown-title">Technical Advisory Council</span>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/staff">
+                  <span class="dropdown-title">Staff</span>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/contact-us">
+                  <span class="dropdown-title">Contact Us</span>
                 </a>
               </div>
             </div>
@@ -275,7 +293,7 @@
               
               
                 <div class="version">
-                  v2.6.0.dev0+1d5be25
+                  v2.7.0.dev0+cfdb585
                 </div>
               
             
@@ -329,8 +347,10 @@
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Torch Export with Cudagraphs</a></li>
 <li class="toctree-l1"><a class="reference internal" href="converter_overloading.html">Overloading Torch-TensorRT Converters with Custom Converters</a></li>
 <li class="toctree-l1"><a class="reference internal" href="custom_kernel_plugins.html">Using Custom Kernels within TensorRT Engines with Torch-TensorRT</a></li>
+<li class="toctree-l1"><a class="reference internal" href="auto_generate_converters.html">Automatically Generate a Converter for a Custom Kernel</a></li>
 <li class="toctree-l1"><a class="reference internal" href="mutable_torchtrt_module_example.html">Mutable Torch TensorRT Module</a></li>
 <li class="toctree-l1"><a class="reference internal" href="weight_streaming_example.html">Weight Streaming</a></li>
+<li class="toctree-l1"><a class="reference internal" href="pre_allocated_output_example.html">Pre-allocated output buffer</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Dynamo Frontend</span></p>
 <ul>
@@ -355,8 +375,10 @@
 <li class="toctree-l1"><a class="reference internal" href="torch_compile_resnet_example.html">Compiling ResNet with dynamic shapes using the <cite>torch.compile</cite> backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="torch_compile_transformers_example.html">Compiling BERT using the <cite>torch.compile</cite> backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="torch_compile_stable_diffusion.html">Compiling Stable Diffusion model using the <cite>torch.compile</cite> backend</a></li>
+<li class="toctree-l1"><a class="reference internal" href="torch_compile_gpt2.html">Compiling GPT2 using the Torch-TensorRT <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code> frontend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="torch_export_gpt2.html">Compiling GPT2 using the dynamo backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="torch_export_llama2.html">Compiling Llama2 using the dynamo backend</a></li>
+<li class="toctree-l1"><a class="reference internal" href="torch_export_sam2.html">Compiling SAM2 using the dynamo backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../notebooks.html">Legacy notebooks</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Python API Documentation</span></p>
@@ -477,10 +499,9 @@ to download the full example code</p>
 <p>This interactive script is intended as an overview of the process by which the Torch-TensorRT Cudagraphs integration can be used in the <cite>ir=”dynamo”</cite> path. The functionality works similarly in the <cite>torch.compile</cite> path as well.</p>
 <section id="imports-and-model-definition">
 <h2>Imports and Model Definition<a class="headerlink" href="#imports-and-model-definition" title="Permalink to this heading">¶</a></h2>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
-<span class="kn">import</span> <span class="nn">torchvision.models</span> <span class="k">as</span> <span class="nn">models</span>
-
-<span class="kn">import</span> <span class="nn">torch_tensorrt</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch_tensorrt</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torchvision.models</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">models</span>
 </pre></div>
 </div>
 </section>
@@ -513,8 +534,8 @@ to download the full example code</p>
 <section id="inference-using-the-cudagraphs-integration">
 <h2>Inference using the Cudagraphs Integration<a class="headerlink" href="#inference-using-the-cudagraphs-integration" title="Permalink to this heading">¶</a></h2>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># We can enable the cudagraphs API with a context manager</span>
-<span class="k">with</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">runtime</span><span class="o">.</span><span class="n">enable_cudagraphs</span><span class="p">():</span>
-    <span class="n">out_trt</span> <span class="o">=</span> <span class="n">opt</span><span class="p">(</span><span class="n">inputs</span><span class="p">)</span>
+<span class="k">with</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">runtime</span><span class="o">.</span><span class="n">enable_cudagraphs</span><span class="p">(</span><span class="n">opt</span><span class="p">)</span> <span class="k">as</span> <span class="n">cudagraphs_module</span><span class="p">:</span>
+    <span class="n">out_trt</span> <span class="o">=</span> <span class="n">cudagraphs_module</span><span class="p">(</span><span class="n">inputs</span><span class="p">)</span>
 
 <span class="c1"># Alternatively, we can set the cudagraphs mode for the session</span>
 <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">runtime</span><span class="o">.</span><span class="n">set_cudagraphs_mode</span><span class="p">(</span><span class="kc">True</span><span class="p">)</span>
@@ -529,9 +550,49 @@ to download the full example code</p>
 <span class="n">inputs_2</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">((</span><span class="mi">8</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">))</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
 <span class="n">inputs_3</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">((</span><span class="mi">4</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">))</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
 
-<span class="k">with</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">runtime</span><span class="o">.</span><span class="n">enable_cudagraphs</span><span class="p">():</span>
-    <span class="n">out_trt_2</span> <span class="o">=</span> <span class="n">opt</span><span class="p">(</span><span class="n">inputs_2</span><span class="p">)</span>
-    <span class="n">out_trt_3</span> <span class="o">=</span> <span class="n">opt</span><span class="p">(</span><span class="n">inputs_3</span><span class="p">)</span>
+<span class="k">with</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">runtime</span><span class="o">.</span><span class="n">enable_cudagraphs</span><span class="p">(</span><span class="n">opt</span><span class="p">)</span> <span class="k">as</span> <span class="n">cudagraphs_module</span><span class="p">:</span>
+    <span class="n">out_trt_2</span> <span class="o">=</span> <span class="n">cudagraphs_module</span><span class="p">(</span><span class="n">inputs_2</span><span class="p">)</span>
+    <span class="n">out_trt_3</span> <span class="o">=</span> <span class="n">cudagraphs_module</span><span class="p">(</span><span class="n">inputs_3</span><span class="p">)</span>
+</pre></div>
+</div>
+<section id="cuda-graphs-with-module-that-contains-graph-breaks">
+<h3>Cuda graphs with module that contains graph breaks<a class="headerlink" href="#cuda-graphs-with-module-that-contains-graph-breaks" title="Permalink to this heading">¶</a></h3>
+<p>When CUDA Graphs are applied to a TensorRT model that contains graph breaks, each break introduces additional
+overhead. This occurs because graph breaks prevent the entire model from being executed as a single, continuous
+optimized unit. As a result, some of the performance benefits typically provided by CUDA Graphs, such as reduced
+kernel launch overhead and improved execution efficiency, may be diminished.
+Using a wrapped runtime module with CUDA Graphs allows you to encapsulate sequences of operations into graphs
+that can be executed efficiently, even in the presence of graph breaks.
+If TensorRT module has graph breaks, CUDA Graph context manager returns a wrapped_module. This module captures entire
+execution graph, enabling efficient replay during subsequent inferences by reducing kernel launch overheads
+and improving performance. Note that initializing with the wrapper module involves a warm-up phase where the
+module is executed several times. This warm-up ensures that memory allocations and initializations are not
+recorded in CUDA Graphs, which helps maintain consistent execution paths and optimize performance.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">SampleModel</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">relu</span><span class="p">((</span><span class="n">x</span> <span class="o">+</span> <span class="mi">2</span><span class="p">)</span> <span class="o">*</span> <span class="mf">0.5</span><span class="p">)</span>
+
+
+<span class="n">model</span> <span class="o">=</span> <span class="n">SampleModel</span><span class="p">()</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
+<span class="nb">input</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">((</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">))</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">&quot;cuda&quot;</span><span class="p">)</span>
+
+<span class="c1"># The &#39;torch_executed_ops&#39; compiler option is used in this example to intentionally introduce graph breaks within the module.</span>
+<span class="c1"># Note: The Dynamo backend is required for the CUDA Graph context manager to handle modules in an Ahead-Of-Time (AOT) manner.</span>
+<span class="n">opt_with_graph_break</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span>
+    <span class="n">model</span><span class="p">,</span>
+    <span class="n">ir</span><span class="o">=</span><span class="s2">&quot;dynamo&quot;</span><span class="p">,</span>
+    <span class="n">inputs</span><span class="o">=</span><span class="p">[</span><span class="nb">input</span><span class="p">],</span>
+    <span class="n">min_block_size</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+    <span class="n">pass_through_build_failures</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">torch_executed_ops</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;torch.ops.aten.mul.Tensor&quot;</span><span class="p">},</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p>If module has graph breaks, whole submodules are recorded and replayed by cuda graphs</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">with</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">runtime</span><span class="o">.</span><span class="n">enable_cudagraphs</span><span class="p">(</span>
+    <span class="n">opt_with_graph_break</span>
+<span class="p">)</span> <span class="k">as</span> <span class="n">cudagraphs_module</span><span class="p">:</span>
+    <span class="n">cudagraphs_module</span><span class="p">(</span><span class="nb">input</span><span class="p">)</span>
 </pre></div>
 </div>
 <p class="sphx-glr-timing"><strong>Total running time of the script:</strong> ( 0 minutes  0.000 seconds)</p>
@@ -544,6 +605,7 @@ to download the full example code</p>
 </div>
 </div>
 <p class="sphx-glr-signature"><a class="reference external" href="https://sphinx-gallery.github.io">Gallery generated by Sphinx-Gallery</a></p>
+</section>
 </section>
 </section>
 
@@ -593,7 +655,10 @@ to download the full example code</p>
 <li><a class="reference internal" href="#">Torch Export with Cudagraphs</a><ul>
 <li><a class="reference internal" href="#imports-and-model-definition">Imports and Model Definition</a></li>
 <li><a class="reference internal" href="#compilation-with-torch-tensorrt-compile-using-default-settings">Compilation with <cite>torch_tensorrt.compile</cite> Using Default Settings</a></li>
-<li><a class="reference internal" href="#inference-using-the-cudagraphs-integration">Inference using the Cudagraphs Integration</a></li>
+<li><a class="reference internal" href="#inference-using-the-cudagraphs-integration">Inference using the Cudagraphs Integration</a><ul>
+<li><a class="reference internal" href="#cuda-graphs-with-module-that-contains-graph-breaks">Cuda graphs with module that contains graph breaks</a></li>
+</ul>
+</li>
 </ul>
 </li>
 </ul>
@@ -789,7 +854,7 @@ to download the full example code</p>
                <a href="https://pytorch.org/resources">Developer Resources</a>
              </li>
              <li>
-               <a href="https://pytorch.org/ecosystem/contributor-awards-2023">Contributor Awards - 2023</a>
+               <a href="https://pytorch.org/ecosystem/contributor-awards-2023">Contributor Awards - 2024</a>
              </li>
            </ul>
 
@@ -804,6 +869,9 @@ to download the full example code</p>
              
              <li>
                <a href="https://pytorch.org/executorch-overview">ExecuTorch</a>
+             </li>
+             <li>
+               <a href="https://pytorch.org/executorch/stable/index.html">ExecuTorch Documentation</a>
              </li>
            </ul>
 
@@ -843,6 +911,9 @@ to download the full example code</p>
             <li>
               <a href="https://pytorch.org/events">Events</a>
             </li>
+            <li>
+               <a href="https://pytorch.org/newsletter">Newsletter</a>
+             </li>
           </ul>
           
           <li class="resources-mobile-menu-title">
@@ -855,6 +926,18 @@ to download the full example code</p>
             </li>
             <li>
               <a href="https://pytorch.org/governing-board">Governing Board</a>
+            </li>
+            <li>
+               <a href="https://pytorch.org/credits">Cloud Credit Program</a>
+            </li>
+            <li>
+               <a href="https://pytorch.org/tac">Technical Advisory Council</a>
+            </li>
+            <li>
+               <a href="https://pytorch.org/staff">Staff</a>
+            </li>
+            <li>
+               <a href="https://pytorch.org/contact-us">Contact Us</a>
             </li>
           </ul>
         </ul>

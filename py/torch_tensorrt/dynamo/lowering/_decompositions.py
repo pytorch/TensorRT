@@ -4,7 +4,10 @@ from typing import Any, Callable, Dict, List, Optional
 
 import torch
 from torch._decomp import register_decomposition
-from torch._export.utils import _decomp_table_to_post_autograd_aten
+from torch._export.utils import (
+    _collect_all_valid_cia_ops_for_aten_namespace,
+    _get_decomp_for_cia,
+)
 from torch._ops import OpOverload
 from torch_tensorrt.dynamo._defaults import default_device
 from torch_tensorrt.dynamo.conversion.converter_utils import get_positive_dim
@@ -400,6 +403,38 @@ def log_softmax_decomposition(
     )
 
 
+@register_torch_trt_decomposition(aten.instance_norm, registry=TORCH_TRT_DECOMPOSITIONS)
+def instance_norm_decomposition(
+    input: torch.Tensor,
+    weight: Optional[torch.Tensor],
+    bias: Optional[torch.Tensor],
+    running_mean: Optional[torch.Tensor],
+    running_var: Optional[torch.Tensor],
+    use_input_stats: bool,
+    momentum: float,
+    eps: float,
+    cudnn_enabled: bool,
+) -> torch.Tensor:
+    if use_input_stats:
+        return torch.nn.functional.group_norm(input, input.shape[1], weight, bias, eps)
+    else:
+        return torch.nn.functional.batch_norm(
+            input, running_mean, running_var, weight, bias, False, momentum, eps
+        )
+
+
+@register_torch_trt_decomposition(
+    torch.ops.aten.full_like, registry=TORCH_TRT_DECOMPOSITIONS
+)  # type: ignore
+def full_like_decomposition(*args, **kwargs) -> torch.Tensor:
+    input = args[0]
+    shape = args[0].shape
+    fill_value = args[1]
+    kwargs["dtype"] = input.dtype
+    kwargs["device"] = to_torch_device(default_device())
+    return torch.full(shape, fill_value, dtype=kwargs["dtype"], device=kwargs["device"])
+
+
 def get_decompositions(
     enable_experimental_decompositions: bool = False,
 ) -> Dict[OpOverload, Callable[[Any], Any]]:
@@ -412,7 +447,10 @@ def get_decompositions(
         return {**CORE_ATEN_DECOMPOSITIONS_FILTERED, **TORCH_TRT_DECOMPOSITIONS}
     else:
         # changes made here due to torch2.6 changes https://github.com/pytorch/pytorch/pull/135080
-        decomp_table = _decomp_table_to_post_autograd_aten()
+        decomp_table = {}
+        for op in _collect_all_valid_cia_ops_for_aten_namespace():
+            decomp_table[op] = _get_decomp_for_cia(op)
+
         DECOMP_TABLE_FILTERED: Dict[OpOverload, Callable[[Any], Any]] = {
             decomp: decomp_table[decomp]
             for decomp in decomp_table

@@ -1,6 +1,7 @@
 import torch
 from parameterized import param, parameterized
 from torch.testing._internal.common_utils import run_tests
+
 from torch_tensorrt import Input
 
 from .harness import DispatchTestCase
@@ -15,6 +16,21 @@ class TestDeconvolutionConverter(DispatchTestCase):
             param("non_zero_padding", 1, padding=1),
             param("dilation", 1, dilation=2),
             param("groups", 1, groups=3),
+            param("output_padding_1", 3, stride=2, padding=1, output_padding=1),
+            param("output_padding_2", 3, stride=2, padding=2, output_padding=1),
+            param("output_padding_3", 3, stride=2, padding=3, output_padding=1),
+            param("output_padding_4", 3, stride=3, padding=2, output_padding=1),
+            param("output_padding_5", 3, stride=3, padding=3, output_padding=1),
+            param("output_padding_6", 3, stride=3, padding=3, output_padding=2),
+            param(
+                "combined_params",
+                3,
+                stride=3,
+                padding=3,
+                dilation=2,
+                groups=3,
+                output_padding=2,
+            ),
         ]
     )
     def test_deconv1d(
@@ -26,6 +42,7 @@ class TestDeconvolutionConverter(DispatchTestCase):
         dilation=1,
         groups=1,
         bias=True,
+        output_padding=0,
     ):
         class TestModule(torch.nn.Module):
             def __init__(self):
@@ -36,9 +53,10 @@ class TestDeconvolutionConverter(DispatchTestCase):
                     kernel_size=kernel_size,
                     stride=stride,
                     padding=padding,
-                    dilation=dilation,
+                    output_padding=output_padding,
                     groups=groups,
                     bias=bias,
+                    dilation=dilation,
                 )
 
             def forward(self, x):
@@ -49,6 +67,7 @@ class TestDeconvolutionConverter(DispatchTestCase):
             TestModule(),
             inputs,
             use_dynamo_tracer=True,
+            enable_passes=True,
         )
 
     def test_deconv1d_with_dynamic_shape(
@@ -89,6 +108,7 @@ class TestDeconvolutionConverter(DispatchTestCase):
             TestModule(),
             input_specs,
             use_dynamo_tracer=True,
+            enable_passes=True,
         )
 
     @parameterized.expand(
@@ -99,6 +119,22 @@ class TestDeconvolutionConverter(DispatchTestCase):
             param("non_zero_padding", 1, padding=1),
             param("dilation", 1, dilation=2),
             param("groups", 1, groups=3),
+            param("output_padding_1", 3, stride=2, padding=1, output_padding=1),
+            param("output_padding_2", 3, stride=2, padding=1, output_padding=1),
+            param("output_padding_3", 3, stride=2, padding=2, output_padding=1),
+            param("output_padding_4", 3, stride=2, padding=3, output_padding=1),
+            param("output_padding_5", 3, stride=3, padding=2, output_padding=1),
+            param("output_padding_6", 3, stride=3, padding=3, output_padding=1),
+            param("output_padding_7", 3, stride=3, padding=3, output_padding=2),
+            param(
+                "combined_params",
+                3,
+                stride=3,
+                padding=3,
+                dilation=2,
+                groups=3,
+                output_padding=2,
+            ),
         ]
     )
     def test_deconv2d(
@@ -110,6 +146,7 @@ class TestDeconvolutionConverter(DispatchTestCase):
         dilation=1,
         groups=1,
         bias=True,
+        output_padding=0,
     ):
         class TestModule(torch.nn.Module):
             def __init__(self):
@@ -120,9 +157,10 @@ class TestDeconvolutionConverter(DispatchTestCase):
                     kernel_size=kernel_size,
                     stride=stride,
                     padding=padding,
-                    dilation=dilation,
+                    output_padding=output_padding,
                     groups=groups,
                     bias=bias,
+                    dilation=dilation,
                 )
 
             def forward(self, x):
@@ -133,6 +171,7 @@ class TestDeconvolutionConverter(DispatchTestCase):
             TestModule(),
             inputs,
             use_dynamo_tracer=True,
+            enable_passes=True,
         )
 
     # Testing with (-1, -1, -1, -1) results into Error:
@@ -158,6 +197,7 @@ class TestDeconvolutionConverter(DispatchTestCase):
             TestModule(),
             input_specs,
             use_dynamo_tracer=True,
+            enable_passes=True,
         )
 
     @parameterized.expand(
@@ -168,6 +208,19 @@ class TestDeconvolutionConverter(DispatchTestCase):
             param("non_zero_padding", 1, padding=1),
             param("dilation", 1, dilation=2),
             param("groups", 1, groups=3),
+            param("output_padding_1", 3, stride=2, padding=1, output_padding=1),
+            param("output_padding_2", 3, stride=2, padding=2, output_padding=1),
+            param("output_padding_3", 3, stride=3, padding=3, output_padding=1),
+            param("output_padding_4", 3, stride=3, padding=3, output_padding=2),
+            param(
+                "combined_params",
+                3,
+                stride=3,
+                padding=3,
+                dilation=2,
+                groups=3,
+                output_padding=2,
+            ),
         ]
     )
     def test_deconv3d(
@@ -179,6 +232,7 @@ class TestDeconvolutionConverter(DispatchTestCase):
         dilation=1,
         groups=1,
         bias=True,
+        output_padding=0,
     ):
         class TestModule(torch.nn.Module):
             def __init__(self):
@@ -189,9 +243,10 @@ class TestDeconvolutionConverter(DispatchTestCase):
                     kernel_size=kernel_size,
                     stride=stride,
                     padding=padding,
-                    dilation=dilation,
+                    output_padding=output_padding,
                     groups=groups,
                     bias=bias,
+                    dilation=dilation,
                 )
 
             def forward(self, x):
@@ -202,6 +257,7 @@ class TestDeconvolutionConverter(DispatchTestCase):
             TestModule(),
             inputs,
             use_dynamo_tracer=True,
+            enable_passes=True,
         )
 
     # Testing with (-1, -1, -1, -1, -1) results into Error:
@@ -227,6 +283,7 @@ class TestDeconvolutionConverter(DispatchTestCase):
             TestModule(),
             input_specs,
             use_dynamo_tracer=True,
+            enable_passes=True,
         )
 
 

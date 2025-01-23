@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt.dynamo._exporter &mdash; Torch-TensorRT v2.6.0.dev0+1d5be25 documentation</title>
+  <title>torch_tensorrt.dynamo._exporter &mdash; Torch-TensorRT v2.7.0.dev0+cfdb585 documentation</title>
   
 
   
@@ -132,8 +132,8 @@
                   <span class=dropdown-title>Developer Resources</span>
                   <p>Find resources and get questions answered</p>
                 </a>
-                <a class="nav-dropdown-item" href="https://pytorch.org/ecosystem/contributor-awards-2023">
-                  <span class="dropdown-title">Contributor Awards - 2023</span>
+                <a class="nav-dropdown-item" href="https://pytorch.org/ecosystem/contributor-awards-2024">
+                  <span class="dropdown-title">Contributor Awards - 2024</span>
                   <p>Award winners announced at this year's PyTorch Conference</p>
                 </a>
               </div>
@@ -153,6 +153,9 @@
                 <a class="nav-dropdown-item" href="https://pytorch.org/executorch-overview">
                   <span class="dropdown-title">ExecuTorch</span>
                   <p>End-to-end solution for enabling on-device inference capabilities across mobile and edge devices</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/executorch/stable/index.html">
+                  <span class="dropdown-title">ExecuTorch Docs</span>
                 </a>
               </div>
             </div>  
@@ -201,6 +204,10 @@
                   <span class="dropdown-title">Events</span>
                   <p>Find events, webinars, and podcasts</p>
                 </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/newsletter">
+                  <span class="dropdown-title">Newsletter</span>
+                  <p>Stay up-to-date with the latest updates</p>
+                </a>
             </div>
           </li>
 
@@ -216,7 +223,18 @@
                 </a>
                 <a class="nav-dropdown-item" href="https://pytorch.org/governing-board">
                   <span class="dropdown-title">Governing Board</span>
-                  <p></p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/credits">
+                  <span class="dropdown-title">Cloud Credit Program</span>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/tac">
+                  <span class="dropdown-title">Technical Advisory Council</span>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/staff">
+                  <span class="dropdown-title">Staff</span>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/contact-us">
+                  <span class="dropdown-title">Contact Us</span>
                 </a>
               </div>
             </div>
@@ -272,7 +290,7 @@
               
               
                 <div class="version">
-                  v2.6.0.dev0+1d5be25
+                  v2.7.0.dev0+cfdb585
                 </div>
               
             
@@ -326,8 +344,10 @@
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/torch_export_cudagraphs.html">Torch Export with Cudagraphs</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/converter_overloading.html">Overloading Torch-TensorRT Converters with Custom Converters</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/custom_kernel_plugins.html">Using Custom Kernels within TensorRT Engines with Torch-TensorRT</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/auto_generate_converters.html">Automatically Generate a Converter for a Custom Kernel</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/mutable_torchtrt_module_example.html">Mutable Torch TensorRT Module</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/weight_streaming_example.html">Weight Streaming</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/pre_allocated_output_example.html">Pre-allocated output buffer</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Dynamo Frontend</span></p>
 <ul>
@@ -352,8 +372,10 @@
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/torch_compile_resnet_example.html">Compiling ResNet with dynamic shapes using the <cite>torch.compile</cite> backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/torch_compile_transformers_example.html">Compiling BERT using the <cite>torch.compile</cite> backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/torch_compile_stable_diffusion.html">Compiling Stable Diffusion model using the <cite>torch.compile</cite> backend</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/torch_compile_gpt2.html">Compiling GPT2 using the Torch-TensorRT <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code> frontend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/torch_export_gpt2.html">Compiling GPT2 using the dynamo backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/torch_export_llama2.html">Compiling Llama2 using the dynamo backend</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/torch_export_sam2.html">Compiling SAM2 using the dynamo backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/notebooks.html">Legacy notebooks</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Python API Documentation</span></p>
@@ -463,15 +485,16 @@
              <article itemprop="articleBody" id="pytorch-article" class="pytorch-article">
               
   <h1>Source code for torch_tensorrt.dynamo._exporter</h1><div class="highlight"><pre>
-<span></span><span class="kn">import</span> <span class="nn">copy</span>
-<span class="kn">import</span> <span class="nn">operator</span>
-<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">Sequence</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">,</span> <span class="n">cast</span>
+<span></span><span class="kn">import</span><span class="w"> </span><span class="nn">base64</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">copy</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">operator</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Sequence</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">,</span> <span class="n">cast</span>
 
-<span class="kn">import</span> <span class="nn">torch</span>
-<span class="kn">from</span> <span class="nn">torch._guards</span> <span class="kn">import</span> <span class="n">detect_fake_mode</span>
-<span class="kn">from</span> <span class="nn">torch._subclasses.fake_tensor</span> <span class="kn">import</span> <span class="n">FakeTensor</span>
-<span class="kn">from</span> <span class="nn">torch.export</span> <span class="kn">import</span> <span class="n">ExportedProgram</span><span class="p">,</span> <span class="n">ExportGraphSignature</span>
-<span class="kn">from</span> <span class="nn">torch.export.exported_program</span> <span class="kn">import</span> <span class="p">(</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch._guards</span><span class="w"> </span><span class="kn">import</span> <span class="n">detect_fake_mode</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch._subclasses.fake_tensor</span><span class="w"> </span><span class="kn">import</span> <span class="n">FakeTensor</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch.export</span><span class="w"> </span><span class="kn">import</span> <span class="n">ExportedProgram</span><span class="p">,</span> <span class="n">ExportGraphSignature</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch.export.exported_program</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
     <span class="n">CustomObjArgument</span><span class="p">,</span>
     <span class="n">InputKind</span><span class="p">,</span>
     <span class="n">InputSpec</span><span class="p">,</span>
@@ -481,24 +504,28 @@
     <span class="n">OutputSpec</span><span class="p">,</span>
     <span class="n">TensorArgument</span><span class="p">,</span>
 <span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.runtime._TorchTensorRTModule</span><span class="w"> </span><span class="kn">import</span> <span class="n">ENGINE_IDX</span><span class="p">,</span> <span class="n">NAME_IDX</span>
 
 
-<div class="viewcode-block" id="export"><a class="viewcode-back" href="../../../py_api/dynamo.html#torch_tensorrt.dynamo.export">[docs]</a><span class="k">def</span> <span class="nf">export</span><span class="p">(</span>
+<div class="viewcode-block" id="export"><a class="viewcode-back" href="../../../py_api/dynamo.html#torch_tensorrt.dynamo.export">[docs]</a><span class="k">def</span><span class="w"> </span><span class="nf">export</span><span class="p">(</span>
     <span class="n">gm</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">,</span>
+    <span class="n">cross_compile_flag</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">bool</span><span class="p">]</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ExportedProgram</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Export the result of TensorRT compilation into the desired output format.</span>
 
 <span class="sd">    Arguments:</span>
 <span class="sd">        gm (torch.fx.GraphModule): Compiled Torch-TensorRT module, generated by ``torch_tensorrt.dynamo.compile``</span>
 <span class="sd">        inputs (torch.Tensor): Torch input tensors</span>
+<span class="sd">        cross_compile_flag (bool): Flag to indicated whether it is cross_compilation enabled or not</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="n">patched_module</span> <span class="o">=</span> <span class="n">transform</span><span class="p">(</span><span class="n">gm</span><span class="p">)</span>
+    <span class="n">patched_module</span> <span class="o">=</span> <span class="n">transform</span><span class="p">(</span><span class="n">gm</span><span class="p">,</span> <span class="n">cross_compile_flag</span><span class="p">)</span>
     <span class="n">exp_program</span> <span class="o">=</span> <span class="n">create_trt_exp_program</span><span class="p">(</span><span class="n">patched_module</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">exp_program</span></div>
 
 
-<span class="k">def</span> <span class="nf">transform</span><span class="p">(</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">transform</span><span class="p">(</span>
     <span class="n">gm</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">,</span>
+    <span class="n">cross_compile_flag</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">bool</span><span class="p">]</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Transforms the graphmodule by inlining Pytorch and TensorRT submodules.</span>
@@ -508,6 +535,7 @@
 <span class="sd">    Arguments:</span>
 <span class="sd">        gm (torch.fx.GraphModule): Compiled Torch-TensorRT module, generated by ``torch_tensorrt.dynamo.compile``</span>
 <span class="sd">        inputs (torch.Tensor): Torch input tensors</span>
+<span class="sd">        cross_compile_flag (bool): Flag to indicated whether it is cross_compilation enabled or not</span>
 
 <span class="sd">    Returns an inlined torch.fx.GraphModule</span>
 <span class="sd">    &quot;&quot;&quot;</span>
@@ -516,7 +544,7 @@
     <span class="n">gm</span> <span class="o">=</span> <span class="n">copy</span><span class="o">.</span><span class="n">deepcopy</span><span class="p">(</span><span class="n">gm</span><span class="p">)</span>
 
     <span class="c1"># Inline TensorRT submodules</span>
-    <span class="n">inline_trt_modules</span><span class="p">(</span><span class="n">gm</span><span class="p">)</span>
+    <span class="n">inline_trt_modules</span><span class="p">(</span><span class="n">gm</span><span class="p">,</span> <span class="n">cross_compile_flag</span><span class="p">)</span>
 
     <span class="c1"># Inline pytorch submodules</span>
     <span class="n">inline_torch_modules</span><span class="p">(</span><span class="n">gm</span><span class="p">)</span>
@@ -529,7 +557,7 @@
     <span class="k">return</span> <span class="n">gm</span>
 
 
-<span class="k">def</span> <span class="nf">lift</span><span class="p">(</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">lift</span><span class="p">(</span>
     <span class="n">gm</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">,</span> <span class="n">graph_signature</span><span class="p">:</span> <span class="n">Any</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">,</span> <span class="n">ExportGraphSignature</span><span class="p">,</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
@@ -651,7 +679,7 @@
     <span class="k">return</span> <span class="n">gm</span><span class="p">,</span> <span class="n">graph_signature</span><span class="p">,</span> <span class="n">state_dict</span><span class="p">,</span> <span class="n">constants</span>
 
 
-<span class="k">def</span> <span class="nf">get_duplicate_nodes</span><span class="p">(</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">get_duplicate_nodes</span><span class="p">(</span>
     <span class="n">gm</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">,</span> <span class="n">submodule</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Sequence</span><span class="p">[</span><span class="n">Any</span><span class="p">],</span> <span class="n">Sequence</span><span class="p">[</span><span class="n">Any</span><span class="p">]]:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
@@ -674,7 +702,7 @@
     <span class="k">return</span> <span class="n">submodule_duplicate_inputs</span><span class="p">,</span> <span class="n">gm_duplicate_inputs</span>
 
 
-<span class="k">def</span> <span class="nf">inline_torch_modules</span><span class="p">(</span><span class="n">gm</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">:</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">inline_torch_modules</span><span class="p">(</span><span class="n">gm</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Inline a submodule within the parent graph (gm). All `call_module` nodes</span>
 <span class="sd">    should be replaced by their nodes in the submodule.</span>
@@ -741,7 +769,7 @@
     <span class="k">return</span> <span class="n">gm</span>
 
 
-<span class="k">def</span> <span class="nf">copy_submodule_attributes</span><span class="p">(</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">copy_submodule_attributes</span><span class="p">(</span>
     <span class="n">gm</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">,</span> <span class="n">submodule</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">,</span> <span class="n">submodule_name</span><span class="p">:</span> <span class="nb">str</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
@@ -752,7 +780,7 @@
 <span class="sd">    _assign_attr does exactly that. It creates a module for eg: conv, adds an attribute weight</span>
 <span class="sd">    to it and adds this conv module as an attribute to parent gm.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="kn">from</span> <span class="nn">torch.export.unflatten</span> <span class="kn">import</span> <span class="n">_assign_attr</span><span class="p">,</span> <span class="n">_AttrKind</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">torch.export.unflatten</span><span class="w"> </span><span class="kn">import</span> <span class="n">_assign_attr</span><span class="p">,</span> <span class="n">_AttrKind</span>
 
     <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">submodule</span><span class="o">.</span><span class="n">named_parameters</span><span class="p">():</span>
         <span class="n">_assign_attr</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">gm</span><span class="p">,</span> <span class="n">key</span><span class="p">,</span> <span class="n">_AttrKind</span><span class="o">.</span><span class="n">PARAMETER</span><span class="p">)</span>
@@ -761,7 +789,7 @@
         <span class="n">_assign_attr</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">gm</span><span class="p">,</span> <span class="n">key</span><span class="p">,</span> <span class="n">_AttrKind</span><span class="o">.</span><span class="n">BUFFER</span><span class="p">)</span>
 
 
-<span class="k">def</span> <span class="nf">create_trt_exp_program</span><span class="p">(</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">create_trt_exp_program</span><span class="p">(</span>
     <span class="n">gm</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ExportedProgram</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Creates a new Exported Program. This function takes an torch.fx.GraphModule which has TRT engines</span>
@@ -815,7 +843,9 @@
     <span class="k">return</span> <span class="n">trt_exp_program</span>
 
 
-<span class="k">def</span> <span class="nf">inline_trt_modules</span><span class="p">(</span><span class="n">gm</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">:</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">inline_trt_modules</span><span class="p">(</span>
+    <span class="n">gm</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">,</span> <span class="n">cross_compile_flag</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">bool</span><span class="p">]</span> <span class="o">=</span> <span class="kc">False</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Replace TRT submodules with trt engine nodes.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
@@ -838,24 +868,35 @@
         <span class="n">num_outputs</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">trt_module_node</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">&quot;val&quot;</span><span class="p">])</span>
         <span class="c1"># Insert a call_function node to perform inference on TRT engine</span>
         <span class="k">with</span> <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">inserting_before</span><span class="p">(</span><span class="n">trt_module_node</span><span class="p">):</span>
-            <span class="n">engine_name</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">_engine&quot;</span>
-            <span class="nb">setattr</span><span class="p">(</span><span class="n">gm</span><span class="p">,</span> <span class="n">engine_name</span><span class="p">,</span> <span class="n">trt_module</span><span class="o">.</span><span class="n">engine</span><span class="p">)</span>
-            <span class="n">engine_node</span> <span class="o">=</span> <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">get_attr</span><span class="p">(</span><span class="n">engine_name</span><span class="p">)</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">cross_compile_flag</span><span class="p">:</span>
+                <span class="c1"># for the normal workflow: use the execute_engine node</span>
+                <span class="n">engine_name</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">_engine&quot;</span>
+                <span class="nb">setattr</span><span class="p">(</span><span class="n">gm</span><span class="p">,</span> <span class="n">engine_name</span><span class="p">,</span> <span class="n">trt_module</span><span class="o">.</span><span class="n">engine</span><span class="p">)</span>
+                <span class="n">engine_node</span> <span class="o">=</span> <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">get_attr</span><span class="p">(</span><span class="n">engine_name</span><span class="p">)</span>
 
-            <span class="n">trt_node</span> <span class="o">=</span> <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">call_function</span><span class="p">(</span>
-                <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">execute_engine</span><span class="o">.</span><span class="n">default</span><span class="p">,</span>
-                <span class="p">(</span><span class="n">trt_module_node</span><span class="o">.</span><span class="n">args</span><span class="p">,</span> <span class="n">engine_node</span><span class="p">),</span>
-            <span class="p">)</span>
+                <span class="n">trt_node</span> <span class="o">=</span> <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">call_function</span><span class="p">(</span>
+                    <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">execute_engine</span><span class="o">.</span><span class="n">default</span><span class="p">,</span>
+                    <span class="p">(</span><span class="n">trt_module_node</span><span class="o">.</span><span class="n">args</span><span class="p">,</span> <span class="n">engine_node</span><span class="p">),</span>
+                <span class="p">)</span>
+                <span class="c1"># meta[&quot;val&quot;] should be a lighter version of a tensor. For eg: it should be a FakeTensor (with output shape and dtype properties)</span>
+                <span class="c1"># Lighter version of a custom_obj is not defined clearly. meta[&quot;val&quot;] does not have any type expectations but</span>
+                <span class="c1"># for custom object nodes, it should be CustomObjArgument</span>
+                <span class="n">engine_node</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">&quot;val&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">CustomObjArgument</span><span class="p">(</span>
+                    <span class="n">name</span><span class="o">=</span><span class="n">engine_node</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">class_fqn</span><span class="o">=</span><span class="s2">&quot;&quot;</span>
+                <span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="c1"># for the cross compile for windows workflow: use the no_op_placeholder node</span>
+                <span class="n">engine_info</span> <span class="o">=</span> <span class="n">trt_module</span><span class="o">.</span><span class="n">_pack_engine_info</span><span class="p">()</span>
+                <span class="n">engine_bytes</span> <span class="o">=</span> <span class="n">engine_info</span><span class="p">[</span><span class="n">ENGINE_IDX</span><span class="p">]</span>
+                <span class="n">engine_info</span><span class="p">[</span><span class="n">ENGINE_IDX</span><span class="p">]</span> <span class="o">=</span> <span class="n">base64</span><span class="o">.</span><span class="n">b64encode</span><span class="p">(</span><span class="n">engine_bytes</span><span class="p">)</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s2">&quot;utf-8&quot;</span><span class="p">)</span>
+                <span class="c1"># insert the no_placeholder node in the graph which should be replaced to the actual execute_engine node while load in the windows</span>
+                <span class="n">trt_node</span> <span class="o">=</span> <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">call_function</span><span class="p">(</span>
+                    <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">no_op_placeholder_for_execute_engine</span><span class="o">.</span><span class="n">default</span><span class="p">,</span>
+                    <span class="p">(</span><span class="n">trt_module_node</span><span class="o">.</span><span class="n">args</span><span class="p">,</span> <span class="o">*</span><span class="n">engine_info</span><span class="p">),</span>
+                <span class="p">)</span>
             <span class="c1"># set trt_node.meta with trt_module_node.meta</span>
             <span class="k">assert</span> <span class="n">num_outputs</span> <span class="o">&gt;</span> <span class="mi">0</span>
             <span class="n">trt_node</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">&quot;val&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">trt_module_node</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">&quot;val&quot;</span><span class="p">]</span>
-
-            <span class="c1"># meta[&quot;val&quot;] should be a lighter version of a tensor. For eg: it should be a FakeTensor (with output shape and dtype properties)</span>
-            <span class="c1"># Lighter version of a custom_obj is not defined clearly. meta[&quot;val&quot;] does not have any type expectations but</span>
-            <span class="c1"># for custom object nodes, it should be CustomObjArgument</span>
-            <span class="n">engine_node</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">&quot;val&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">CustomObjArgument</span><span class="p">(</span>
-                <span class="n">name</span><span class="o">=</span><span class="n">engine_node</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">class_fqn</span><span class="o">=</span><span class="s2">&quot;&quot;</span>
-            <span class="p">)</span>
 
         <span class="k">if</span> <span class="n">num_outputs</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
             <span class="c1"># Insert getitem nodes as outputs (for export serialization to work)</span>
@@ -876,6 +917,60 @@
         <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">erase_node</span><span class="p">(</span><span class="n">trt_module_node</span><span class="p">)</span>
 
     <span class="k">return</span> <span class="n">gm</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">replace_execute_engine_no_op_node</span><span class="p">(</span>
+    <span class="n">exp_program</span><span class="p">:</span> <span class="n">ExportedProgram</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ExportedProgram</span><span class="p">:</span>
+    <span class="n">gm</span> <span class="o">=</span> <span class="n">exp_program</span><span class="o">.</span><span class="n">graph_module</span>
+    <span class="n">no_op_placeholder_nodes</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">nodes</span><span class="p">:</span>
+        <span class="k">if</span> <span class="s2">&quot;no_op_placeholder_for_execute_engine&quot;</span> <span class="ow">in</span> <span class="n">node</span><span class="o">.</span><span class="n">name</span><span class="p">:</span>
+            <span class="n">no_op_placeholder_nodes</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">node</span><span class="p">)</span>
+    <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">no_op_placeholder_nodes</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span>
+    <span class="k">for</span> <span class="n">no_op_placeholder_node</span> <span class="ow">in</span> <span class="n">no_op_placeholder_nodes</span><span class="p">:</span>
+        <span class="k">if</span> <span class="s2">&quot;val&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">no_op_placeholder_node</span><span class="o">.</span><span class="n">meta</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;metadata info is missing for the node: </span><span class="si">{</span><span class="n">node</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">with</span> <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">inserting_before</span><span class="p">(</span><span class="n">no_op_placeholder_node</span><span class="p">):</span>
+            <span class="n">packed_engine_info</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">no_op_placeholder_node</span><span class="o">.</span><span class="n">args</span><span class="p">[</span><span class="mi">1</span><span class="p">:])</span>
+            <span class="n">engine_bytes</span> <span class="o">=</span> <span class="n">packed_engine_info</span><span class="p">[</span><span class="n">ENGINE_IDX</span><span class="p">]</span>
+            <span class="n">engine_name</span> <span class="o">=</span> <span class="n">packed_engine_info</span><span class="p">[</span><span class="n">NAME_IDX</span><span class="p">]</span>
+
+            <span class="n">packed_engine_info</span><span class="p">[</span><span class="n">ENGINE_IDX</span><span class="p">]</span> <span class="o">=</span> <span class="n">base64</span><span class="o">.</span><span class="n">b64decode</span><span class="p">(</span>
+                <span class="n">engine_bytes</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="s2">&quot;utf-8&quot;</span><span class="p">)</span>
+            <span class="p">)</span>
+            <span class="n">trt_engine</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">classes</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">Engine</span><span class="p">(</span><span class="nb">tuple</span><span class="p">(</span><span class="n">packed_engine_info</span><span class="p">))</span>
+            <span class="nb">setattr</span><span class="p">(</span><span class="n">gm</span><span class="p">,</span> <span class="n">engine_name</span><span class="p">,</span> <span class="n">trt_engine</span><span class="p">)</span>
+            <span class="n">engine_node</span> <span class="o">=</span> <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">get_attr</span><span class="p">(</span><span class="n">engine_name</span><span class="p">)</span>
+
+            <span class="n">trt_node</span> <span class="o">=</span> <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">call_function</span><span class="p">(</span>
+                <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">execute_engine</span><span class="o">.</span><span class="n">default</span><span class="p">,</span>
+                <span class="p">(</span><span class="n">no_op_placeholder_node</span><span class="o">.</span><span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">engine_node</span><span class="p">),</span>
+            <span class="p">)</span>
+            <span class="n">trt_node</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">&quot;val&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">no_op_placeholder_node</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">&quot;val&quot;</span><span class="p">]</span>
+            <span class="n">engine_node</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">&quot;val&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">CustomObjArgument</span><span class="p">(</span>
+                <span class="n">name</span><span class="o">=</span><span class="n">engine_node</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">class_fqn</span><span class="o">=</span><span class="s2">&quot;&quot;</span>
+            <span class="p">)</span>
+
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">no_op_placeholder_node</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">&quot;val&quot;</span><span class="p">])</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="k">with</span> <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">inserting_after</span><span class="p">(</span><span class="n">trt_node</span><span class="p">):</span>
+                <span class="n">getitem_output</span> <span class="o">=</span> <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">call_function</span><span class="p">(</span><span class="n">operator</span><span class="o">.</span><span class="n">getitem</span><span class="p">,</span> <span class="p">(</span><span class="n">trt_node</span><span class="p">,</span> <span class="mi">0</span><span class="p">))</span>
+                <span class="n">getitem_output</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">&quot;val&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">trt_node</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">&quot;val&quot;</span><span class="p">]</span>
+            <span class="n">no_op_placeholder_node</span><span class="o">.</span><span class="n">replace_all_uses_with</span><span class="p">(</span><span class="n">getitem_output</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">no_op_placeholder_node</span><span class="o">.</span><span class="n">replace_all_uses_with</span><span class="p">(</span><span class="n">trt_node</span><span class="p">)</span>
+            <span class="n">getitem_nodes</span> <span class="o">=</span> <span class="n">trt_node</span><span class="o">.</span><span class="n">users</span>
+            <span class="k">for</span> <span class="n">idx</span><span class="p">,</span> <span class="n">getitem_node</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">getitem_nodes</span><span class="p">):</span>
+                <span class="n">getitem_node</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">&quot;val&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">trt_node</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">&quot;val&quot;</span><span class="p">][</span><span class="n">idx</span><span class="p">]</span>
+
+        <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">erase_node</span><span class="p">(</span><span class="n">no_op_placeholder_node</span><span class="p">)</span>
+
+    <span class="n">gm</span><span class="o">.</span><span class="n">delete_all_unused_submodules</span><span class="p">()</span>
+    <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">eliminate_dead_code</span><span class="p">()</span>
+    <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">lint</span><span class="p">()</span>
+    <span class="n">gm</span><span class="o">.</span><span class="n">recompile</span><span class="p">()</span>
+
+    <span class="k">return</span> <span class="n">exp_program</span>
 </pre></div>
 
              </article>
@@ -1102,7 +1197,7 @@
                <a href="https://pytorch.org/resources">Developer Resources</a>
              </li>
              <li>
-               <a href="https://pytorch.org/ecosystem/contributor-awards-2023">Contributor Awards - 2023</a>
+               <a href="https://pytorch.org/ecosystem/contributor-awards-2023">Contributor Awards - 2024</a>
              </li>
            </ul>
 
@@ -1117,6 +1212,9 @@
              
              <li>
                <a href="https://pytorch.org/executorch-overview">ExecuTorch</a>
+             </li>
+             <li>
+               <a href="https://pytorch.org/executorch/stable/index.html">ExecuTorch Documentation</a>
              </li>
            </ul>
 
@@ -1156,6 +1254,9 @@
             <li>
               <a href="https://pytorch.org/events">Events</a>
             </li>
+            <li>
+               <a href="https://pytorch.org/newsletter">Newsletter</a>
+             </li>
           </ul>
           
           <li class="resources-mobile-menu-title">
@@ -1168,6 +1269,18 @@
             </li>
             <li>
               <a href="https://pytorch.org/governing-board">Governing Board</a>
+            </li>
+            <li>
+               <a href="https://pytorch.org/credits">Cloud Credit Program</a>
+            </li>
+            <li>
+               <a href="https://pytorch.org/tac">Technical Advisory Council</a>
+            </li>
+            <li>
+               <a href="https://pytorch.org/staff">Staff</a>
+            </li>
+            <li>
+               <a href="https://pytorch.org/contact-us">Contact Us</a>
             </li>
           </ul>
         </ul>

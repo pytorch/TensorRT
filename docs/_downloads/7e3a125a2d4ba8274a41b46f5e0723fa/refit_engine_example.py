@@ -47,7 +47,7 @@ inputs = [torch.rand((1, 3, 224, 224)).to("cuda")]
 # ---------------------------------------
 #
 # The inital step is to compile a module and save it as with a normal. Note that there is an
-# additional parameter `make_refittable` that is set to `True`. This parameter is used to
+# additional parameter `immutable_weights` that is set to `False`. This parameter is used to
 # indicate that the engine being built should support weight refitting later. Engines built without
 # these setttings will not be able to be refit.
 #
@@ -69,7 +69,7 @@ trt_gm = torch_trt.dynamo.compile(
     debug=debug,
     min_block_size=min_block_size,
     torch_executed_ops=torch_executed_ops,
-    make_refittable=True,
+    immutable_weights=False,
     reuse_cached_engines=False,
 )  # Output is a torch.fx.GraphModule
 
