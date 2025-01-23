@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Installation &mdash; Torch-TensorRT v2.7.0.dev0+aca5d5c documentation</title>
+  <title>Installation &mdash; Torch-TensorRT v2.7.0.dev0+cfdb585 documentation</title>
   
 
   
@@ -293,7 +293,7 @@
               
               
                 <div class="version">
-                  v2.7.0.dev0+aca5d5c
+                  v2.7.0.dev0+cfdb585
                 </div>
               
             
@@ -696,19 +696,19 @@ recommended commands:</p>
 <td><p>bazel build //:libtorchtrt -c opt --config pre_cxx11_abi</p></td>
 </tr>
 <tr class="row-even"><td><p>libtorch-cxx11-abi-shared-with-deps-<a href="#id5"><span class="problematic" id="id6">*</span></a>.zip from PyTorch.org</p></td>
-<td><p>python setup.py bdist_wheel –use-cxx11-abi</p></td>
+<td><p>python setup.py bdist_wheel</p></td>
 <td><p>bazel build //:libtorchtrt -c opt</p></td>
 </tr>
 <tr class="row-odd"><td><p>PyTorch preinstalled in an NGC container</p></td>
-<td><p>python setup.py bdist_wheel –use-cxx11-abi</p></td>
+<td><p>python setup.py bdist_wheel</p></td>
 <td><p>bazel build //:libtorchtrt -c opt</p></td>
 </tr>
 <tr class="row-even"><td><p>PyTorch from the NVIDIA Forums for Jetson</p></td>
-<td><p>python setup.py bdist_wheel –use-cxx11-abi</p></td>
+<td><p>python setup.py bdist_wheel</p></td>
 <td><p>bazel build //:libtorchtrt -c opt</p></td>
 </tr>
 <tr class="row-odd"><td><p>PyTorch built from Source</p></td>
-<td><p>python setup.py bdist_wheel –use-cxx11-abi</p></td>
+<td><p>python setup.py bdist_wheel</p></td>
 <td><p>bazel build //:libtorchtrt -c opt</p></td>
 </tr>
 </tbody>
@@ -839,10 +839,10 @@ new_local_repository<span class="o">(</span>
 <div><p>NOTE: Due to shifting dependencies locations between Jetpack 4.5 and newer Jetpack versions there is now a flag for <code class="docutils literal notranslate"><span class="pre">setup.py</span></code> which sets the jetpack version (default: 5.0)</p>
 </div></blockquote>
 <p>Compile the Python API using the following command from the <code class="docutils literal notranslate"><span class="pre">//py</span></code> directory:</p>
-<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>python3<span class="w"> </span>setup.py<span class="w"> </span>install<span class="w"> </span>--use-cxx11-abi
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>python3<span class="w"> </span>setup.py<span class="w"> </span>install
 </pre></div>
 </div>
-<p>If you have a build of PyTorch that uses Pre-CXX11 ABI drop the <code class="docutils literal notranslate"><span class="pre">--use-cxx11-abi</span></code> flag</p>
+<p>If you have a build of PyTorch that uses Pre-CXX11 ABI drop the <code class="docutils literal notranslate"><span class="pre">--use-pre-cxx11-abi</span></code> flag</p>
 <p>If you are building for Jetpack 4.5 add the <code class="docutils literal notranslate"><span class="pre">--jetpack-version</span> <span class="pre">5.0</span></code> flag</p>
 </section>
 </section>
