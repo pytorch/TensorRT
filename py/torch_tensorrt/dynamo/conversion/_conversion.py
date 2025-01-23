@@ -135,20 +135,14 @@ def compile_with_mlir_trt(
     torch_input = torch_bridge.TorchInput(gm, tuple(torch_tensors))
 
     with ir.Context() as ctx:
-        shlo_module = torch_bridge.get_mlir_module_from_torch_module(
-            ctx, torch_input, torch_bridge.OutputType.STABLEHLO
+        linalg_module = torch_bridge.get_mlir_module_from_torch_module(
+            ctx, torch_input, torch_bridge.OutputType.LINALG_ON_TENSORS
         )
         client = compiler.CompilerClient(ctx)
-        task = client.get_compilation_task(
-            "stablehlo-to-executable",
-            [
-                "--tensorrt-builder-opt-level=3",
-                "--tensorrt-strongly-typed=false",
-                "--tensorrt-workspace-memory-pool-limit=1gb",
-            ],
-        )
-        task.run(shlo_module.operation)
-        mlir_exec = compiler.translate_mlir_to_executable(shlo_module.operation)
+        task = client.get_compilation_task("linalg-to-executable", [])
+        task.run(linalg_module.operation)
+        mlir_exec = compiler.translate_mlir_to_executable(linalg_module.operation)
+
         return MLIRTensorRTModule(
             mlir_exec=mlir_exec,
         )
