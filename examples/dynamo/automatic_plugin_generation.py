@@ -3,6 +3,8 @@ import triton.language as tl
 
 from typing import Tuple
 import torch_tensorrt
+from torch._subclasses.fake_tensor import FakeTensorMode
+
 
 @triton.jit
 def elementwise_mul_kernel(X, Y, Z, BLOCK_SIZE: tl.constexpr):
@@ -231,14 +233,25 @@ def generate_plugin(plugin_name : str):
         # print(args_input)
         # print(kwargs_input)
         # print(plugin_signature)
-        return args_input, kwargs_input, plugin_signature
+        plugin_impl_arg_list = arg_list
+        plugin_impl_arg_list.append('outputs')
+        plugin_impl_arg_list.append('stream')
+        plugin_impl_input = ", ".join(plugin_impl_arg_list)
+        plugin_impl_signagture = f"def add_plugin_impl({plugin_impl_input}):"
+        
+        print(plugin_impl_signagture)
+        
+        return args_input, kwargs_input, plugin_signature, plugin_impl_signagture
         
     
     # _generic_plugin_desc_creator(torch_op)
     
-    args_input, kwargs_input, plugin_signature = generate_signature(torch_op)
+    args_input, kwargs_input, plugin_signature, plugin_impl_signagture = generate_signature(torch_op)
     
     def _generic_plugin_desc(*args, **kwargs) -> trtp.TensorDesc:
+        from torch._subclasses.fake_tensor import FakeTensorMode
+        from torch.fx.experimental.symbolic_shapes import ShapeEnv
+        from sympy import lambdify
         shape_env = ShapeEnv()
         fake_mode = FakeTensorMode(shape_env=shape_env)
         syms_args = []
@@ -253,23 +266,31 @@ def generate_plugin(plugin_name : str):
                 fake_arg = torch.randn(syms_arg)
                 fake_args.append(fake_arg)
                 
-            output = torch_op(fake_args, kwargs)
+            output = torch_op(*fake_args, **kwargs)
                 
         # We assume that number of dimensions are the same in torch op
-                
+        print(output)
+        print("Here1")
         shape_calc_fns = [None] * args[0].ndim
         for i in range(args[0].ndim):
             input_node_expr = [syms_arg[i].node.expr for syms_arg in syms_args]
-            shape_calc_fns[i] = lambdify(input_node_expr, output.shape[i].node.expr, "math")
+            print(f"Expected arguments: {len(tuple(input_node_expr))}")  # Should be 2
+
+            shape_calc_fns[i] = lambdify(tuple(input_node_expr), output.shape[i].node.expr, "math")
+
+        print("Here2")
 
 
         out_desc = args[0].like()
         for i in range(out_desc.ndim):
             input_shape_expr = [arg.shape_expr[i] for arg in args]
-            out_desc.shape_expr[i] = shape_calc_fns[i](input_shape_expr)
-        return out_desc
-        
+            print(f"actual count: {len(tuple(input_shape_expr))}")
+            print(shape_calc_fns[i])
+            out_desc.shape_expr[i] = shape_calc_fns[i](*input_shape_expr)
             
+        print("Here3")
+
+        return out_desc
         
     # [SOME PYTHON CODE HERE]
     codegen_plugin = f"""
@@ -288,8 +309,14 @@ def generate_plugin(plugin_name : str):
     
     print(type(plugin_code))
     print(plugin_code.co_consts[0])
+        
+
+    globals()["_generic_plugin_desc"] = _generic_plugin_desc
+    # globals()["FakeTensorMode"] = FakeTensorMode
+
     
     from types import FunctionType
+    
     
     plugin= FunctionType(plugin_code.co_consts[0], globals(), "plugin")
     
@@ -303,6 +330,64 @@ def generate_plugin(plugin_name : str):
     plugin.__annotations__ = {'X' : trtp.TensorDesc, 'Y' : trtp.TensorDesc, 'b' : float, 'a': int, 'return': trtp.TensorDesc}
     
     trtp.register(plugin_name)(plugin)
+    
+    
+    # plugin implementation
+    # def generate_impl_signature(registered_signature):
+        
+    
+    def _generic_plugin_impl(outputs, stream, *args, **kwargs):
+        in_tensors = [
+            torch.as_tensor(i, device="cuda") for i in args
+        ]
+        
+        dest_tensors = [torch.as_tensor(o, device="cuda") for o in outputs]
+        
+        stream = torch.cuda.ExternalStream(stream)
+        with torch.cuda.stream(stream):
+            out_tensors = torch_op(*in_tensors, **kwargs)
+            [d.copy_(o) for (d, o) in zip(dest_tensors, out_tensors)]
+
+    
+    plugin_impl_func = f"""
+{plugin_impl_signagture}
+    _generic_plugin_impl(outputs, stream, {args_input}, {kwargs_input})
+    """
+    
+    print(plugin_impl_func)
+    
+    plugin_impl_code = compile(plugin_impl_func, "<string>", "exec")
+    
+    print(type(plugin_impl_code))
+    print(plugin_impl_code.co_consts[0])
+        
+
+    globals()["_generic_plugin_impl"] = _generic_plugin_impl
+    
+    
+    plugin_impl= FunctionType(plugin_impl_code.co_consts[0], globals(), "plugin_impl")
+    
+    print(plugin_impl)
+    
+    print(f"Function name: {plugin_impl.__name__}")
+    print(f"Argument count: {plugin_impl.__code__.co_argcount}")
+    print(f"Argument names: {plugin_impl.__code__.co_varnames[:plugin_impl.__code__.co_argcount]}")
+    print(f"Function bytecode: {plugin_impl.__code__.co_code}")
+    
+    plugin_impl.__annotations__ = {'X' : trtp.Tensor, 'Y' : trtp.Tensor, 'b' : float, 'a': int, 'outputs' : Tuple[trtp.Tensor], 'stream' : int}
+    
+    import inspect
+    sig = inspect.signature(plugin_impl)
+    # registered_attr_names = plugin_def.input_attrs.keys()
+
+    # input arg annotations are optional, but we will validate if provided
+    for name, param in sig.parameters.items():
+        print(name)
+        print(param.annotation)
+        
+
+    trtp.impl(plugin_name)(plugin_impl)
+
     
     
     return plugin
@@ -335,18 +420,18 @@ generate_plugin("torchtrt_ex::elementwise_mul")
 #     return out_desc
 
 
-@trtp.impl("torchtrt_ex::elementwise_mul")
-def _(x: trtp.Tensor, y: trtp.Tensor, b: float, a: int, outputs: Tuple[trtp.Tensor], stream: int):
-    # This should be based on Torch schema
-    in_tensors = [
-        torch.as_tensor(i, device="cuda") for i in (x, y)
-    ]  # What is the right device??
-    dest_tensors = [torch.as_tensor(o, device="cuda") for o in outputs]
+# @trtp.impl("torchtrt_ex::elementwise_mul")
+# def _(X: trtp.Tensor, Y: trtp.Tensor, b: float, a: int, outputs: Tuple[trtp.Tensor], stream: int):
+#     # This should be based on Torch schema
+#     in_tensors = [
+#         torch.as_tensor(i, device="cuda") for i in (X, Y)
+#     ]  # What is the right device??
+#     dest_tensors = [torch.as_tensor(o, device="cuda") for o in outputs]
 
-    stream = torch.cuda.ExternalStream(stream)
-    with torch.cuda.stream(stream):
-        out_tensors = torch.ops.torchtrt_ex.elementwise_mul(*in_tensors, b, a)
-        [d.copy_(o) for (d, o) in zip(dest_tensors, out_tensors)]
+#     stream = torch.cuda.ExternalStream(stream)
+#     with torch.cuda.stream(stream):
+#         out_tensors = torch.ops.torchtrt_ex.elementwise_mul(*in_tensors, b, a)
+#         [d.copy_(o) for (d, o) in zip(dest_tensors, out_tensors)]
 
 # @trtp.impl("torchtrt_ex::elementwise_mul")
 # def _(x: trtp.Tensor, y: trtp.Tensor, b: float, a: int, outputs: Tuple[trtp.Tensor], stream: int):
