@@ -12,7 +12,6 @@ from torch.nn import Module
 from torch_tensorrt._Device import Device
 from torch_tensorrt._enums import Platform, dtype
 from torch_tensorrt.dynamo._settings import CompilationSettings
-from torch_tensorrt.dynamo.utils import DYNAMIC_DIM
 from torch_tensorrt.logging import TRT_LOGGER
 from torch_tensorrt.runtime._utils import (
     _is_switch_required,
@@ -21,6 +20,41 @@ from torch_tensorrt.runtime._utils import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+class DynamicOutputAllocator(trt.IOutputAllocator):  # type: ignore[misc]
+    def __init__(self, output_dtypes: Dict[str, torch.dtype]) -> None:
+        trt.IOutputAllocator.__init__(self)
+        self.buffers: Dict[str, torch.Tensor] = {}
+        self.shapes: Dict[str, Tuple[int, ...]] = {}
+        self.dtypes: Dict[str, torch.dtype] = output_dtypes
+
+    def reallocate_output_async(
+        self,
+        tensor_name: str,
+        memory: int,
+        size: int,
+        alignment: int,
+        stream: torch.cuda.Stream,
+    ) -> Any:
+        shape = (size,)
+        if tensor_name not in self.buffers:
+            self.buffers[tensor_name] = torch.empty(
+                shape,
+                dtype=self.dtypes[tensor_name],
+                device=torch.cuda.current_device(),
+            )
+        else:
+            if self.buffers[tensor_name].shape != shape:
+                self.buffers[tensor_name] = torch.empty(
+                    shape,
+                    dtype=self.dtypes[tensor_name],
+                    device=torch.cuda.current_device(),
+                )
+        return self.buffers[tensor_name].data_ptr()
+
+    def notify_shape(self, tensor_name: str, shape: Tuple[int, ...]) -> None:
+        self.shapes[tensor_name] = tuple(shape)
 
 
 class TorchTRTRuntimeStates:
@@ -128,7 +162,6 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
 
         self.name = name
         self._input_buffers: List[torch.Tensor] = []
-        self._output_buffers: List[torch.Tensor] = []
         self.cudagraph: Optional[torch.cuda.CUDAGraph] = None
         self._caller_stream: Optional[torch.cuda.Stream] = None
         self._engine_stream: Optional[torch.cuda.Stream] = None
@@ -147,6 +180,8 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         self.output_names = (
             output_binding_names if output_binding_names is not None else []
         )
+        self.output_allocator: Optional[DynamicOutputAllocator] = None
+
         self.initialized = False
         self.target_device_id = (
             settings.device.gpu_id
@@ -320,7 +355,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                 # Clone is required to avoid re-using user-provided GPU memory
                 self._input_buffers[i] = contiguous_inputs[i].clone()
 
-            # For shape tensors, we use CPU pointers and for data tensors, we use GPU pointers
+            # For shape tensors, we use CPU pointers; for data tensors, we use GPU pointers
             # as per TensorRT requirements
             if self.engine.is_shape_inference_io(input_name):
                 # Shape tensor inputs are casted to int64 explicitly
@@ -342,18 +377,18 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                         input_name, contiguous_inputs[i].data_ptr()
                     )
 
-    def create_output_tensors(self) -> List[torch.Tensor]:
-        # create output tensors
-        outputs: List[torch.Tensor] = []
+    def setup_output_allocator(self) -> None:
+        if self.output_allocator is None:
+            output_dtypes_dict = {}
+            for o, output_name in enumerate(self.output_names):
+                output_dtypes_dict[output_name] = self.output_dtypes[o]
+            self.output_allocator = DynamicOutputAllocator(output_dtypes_dict)
 
-        for o, _ in enumerate(self.output_names):
-            output = torch.empty(
-                size=self.output_shapes[o],
-                dtype=self.output_dtypes[o],
-                device=torch.cuda.current_device(),
-            )
-            outputs.append(output)
-        return outputs
+        for output_name in self.output_names:
+            if not self.context.set_output_allocator(
+                output_name, self.output_allocator
+            ):
+                raise RuntimeError(f"Failed to set output allocator for {output_name}")
 
     def set_pre_allocated_outputs(self, enable: bool) -> None:
         self.use_pre_allocated_outputs = enable
@@ -387,7 +422,6 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
 
             if need_cudagraphs_record:
                 self._input_buffers = [None] * len(self.input_names)
-                self._output_buffers = [None] * len(self.output_names)
 
             # If in safe mode, check at each iteration for whether a switch is required
             if (
@@ -447,36 +481,12 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
 
             with (
                 torch.autograd.profiler.record_function(
-                    "PythonTorchTensorRTModule:ProcessOutputs"
+                    "PythonTorchTensorRTModule:ProcessOutputAllocators"
                 )
                 if self.profiling_enabled
                 else nullcontext()
             ):
-                if can_use_pre_allocated_outputs:
-                    outputs = self.pre_allocated_outputs
-                else:
-                    self.output_shapes = [
-                        tuple(self.context.get_tensor_shape(output_name))
-                        for output_name in self.output_names
-                    ]
-                    if DYNAMIC_DIM in self.output_shapes:
-                        raise ValueError(
-                            "Encountered dynamic output shapes during runtime. This could mean the network has data-dependent output shapes which is not currently supported."
-                        )
-                    outputs = self.create_output_tensors()
-
-                for o, output_name in enumerate(self.output_names):
-                    if need_cudagraphs_record:
-                        self._output_buffers[o] = outputs[o].clone()
-
-                    if cudagraphs_enabled:
-                        self.context.set_tensor_address(
-                            output_name, self._output_buffers[o].data_ptr()
-                        )
-                    else:
-                        self.context.set_tensor_address(
-                            output_name, outputs[o].data_ptr()
-                        )
+                self.setup_output_allocator()
 
             with (
                 torch.autograd.profiler.record_function(
@@ -495,6 +505,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                 self._engine_stream.wait_stream(self._caller_stream)
 
                 with torch.cuda.stream(self._engine_stream):
+
                     if cudagraphs_enabled:
                         if need_cudagraphs_record:
                             self.cudagraph = torch.cuda.CUDAGraph()
@@ -507,7 +518,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                             ):
                                 self.context.execute_async_v3(
                                     self._engine_stream.cuda_stream
-                                )
+                                )  # The OutputAllocator is called by execute_async_v3()
 
                             if self.profiling_enabled:
                                 import tempfile
@@ -524,12 +535,23 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
 
                 self._caller_stream.wait_stream(self._engine_stream)
 
-            if self.use_pre_allocated_outputs:
-                self.pre_allocated_outputs = self.create_output_tensors()
-
-            if cudagraphs_enabled:
-                for idx, o in enumerate(outputs):
-                    o.copy_(self._output_buffers[idx])
+            with (
+                torch.autograd.profiler.record_function(
+                    "PythonTorchTensorRTModule:ProcessOutputs"
+                )
+                if self.profiling_enabled
+                else nullcontext()
+            ):
+                outputs = []
+                for o, output_name in enumerate(self.output_names):
+                    assert self.output_allocator is not None
+                    shape = self.output_allocator.shapes.get(output_name, None)
+                    self.output_shapes[o] = shape
+                    dtype = self.output_dtypes[o]
+                    output = self.output_allocator.buffers.get(output_name, None).clone().detach()
+                    prod = int(torch.prod(torch.tensor(shape)))
+                    output = output.reshape(-1).view(dtype)[:prod].reshape(shape)
+                    outputs.append(output)
 
             if len(outputs) == 1:
                 return outputs[0]
