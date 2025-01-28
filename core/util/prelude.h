@@ -2,6 +2,7 @@
 
 // A collection of headers from util that will typically get included in most
 // files
+#include <stdint.h>
 #include "core/util/Exception.h"
 #include "core/util/build_info.h"
 #include "core/util/jit_util.h"
