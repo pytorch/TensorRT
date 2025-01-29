@@ -134,9 +134,15 @@ auto batch_norm_registrations TORCHTRT_UNUSED =
 
               auto eps = static_cast<float>(args[7].unwrapToDouble(1e-5f));
 
-              auto scales = args[1].unwrapToTensor(at::ones(shape[1], options)).cpu().contiguous();
-              auto bias = args[2].unwrapToTensor(at::zeros(shape[1], options)).cpu().contiguous();
 
+              auto scales = at::ones(shape[1], options);
+              if (!args[1].IValue()->isNone()) {
+                scales = args[1].unwrapToTensor(at::ones(shape[1], options)).cpu().contiguous();
+              }
+              auto bias = at::zeros(shape[1], options);
+              if (!args[2].IValue()->isNone()){
+                bias = args[2].unwrapToTensor(at::zeros(shape[1], options)).cpu().contiguous();
+              }
               // track_running_stats=True
               if (!args[3].IValue()->isNone() || !args[4].IValue()->isNone()) {
                 auto running_mean = args[3].unwrapToTensor();
@@ -154,6 +160,8 @@ auto batch_norm_registrations TORCHTRT_UNUSED =
                 return true;
               }
 
+              // Not sure this actually does something since the cudnn_enabled is from the PyTorch context.
+              // We need cuDNN either way to run this converter
               auto cudnn_enabled = static_cast<bool>(args[8].unwrapToBool(false));
               if (!cudnn_enabled) {
                 LOG_DEBUG(
@@ -162,7 +170,7 @@ auto batch_norm_registrations TORCHTRT_UNUSED =
                     so for some functionalities, users need to install correct \
                     cuDNN version by themselves. Please see our support matrix \
                     here: https://docs.nvidia.com/deeplearning/tensorrt/support-matrix/index.html.");
-                return false;
+                //return false;
               }
 
               const int relu = 0;
