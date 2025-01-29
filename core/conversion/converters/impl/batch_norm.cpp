@@ -134,7 +134,6 @@ auto batch_norm_registrations TORCHTRT_UNUSED =
 
               auto eps = static_cast<float>(args[7].unwrapToDouble(1e-5f));
 
-
               auto scales = at::ones(shape[1], options);
               if (!args[1].IValue()->isNone()) {
                 scales = args[1].unwrapToTensor(at::ones(shape[1], options)).cpu().contiguous();
