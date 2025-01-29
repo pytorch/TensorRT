@@ -89,121 +89,19 @@ from sympy import lambdify
 def generate_plugin(plugin_name : str):
     namespace, name = plugin_name.split("::")
     
-    torch_op = getattr(getattr(torch.ops, namespace), name) # torch.ops.torchtrt_ex.elementwise_mul
-    print(torch_op)
     # retrieve torch.ops.torchtrt_ex.elementwise_mul
+    torch_op = getattr(getattr(torch.ops, namespace), name) # torch.ops.torchtrt_ex.elementwise_mul
     
-    print(torch_op._schemas)
-    
-    # import pdb; pdb.set_trace();
-    
-    # def parse_torch_op_schema(torch_op):
-    #     schema = torch_op._schemas['']
-    #     args = []
-    #     kwargs = {}
-    #     for arg in schema.arguments:
-    #         print(f"Name: {arg.name}, Type: {arg.type}, Default: {arg.default_value}")
-            
-    #     for ret in schema.returns:
-    #         print(f"Return Type: {ret.type}")
-    #         # if arg.default_value is None:
-    #         #     args.append(arg.name)
-    #         # else:
-    #         #     kwargs[arg.name] = arg.default_value
-    #     return args, kwargs
-        
-    # parse_torch_op_schema(torch_op)
-    
-    def _generic_plugin_desc_creator(torch_op):
-        schema = torch_op._schemas['']
-        
-        tensor_args = []
-        
-        arg_list = []
-        
-        func_body = []
-        
-        func_body.append("  shape_env = ShapeEnv()")
-        func_body.append("fake_mode = FakeTensorMode(shape_env=shape_env)")
-        
-        for arg in schema.arguments:
-            print(arg.type)
-            # import pdb; pdb.set_trace();
-            arg_type = "trtp.TensorDesc" if arg.type.isSubtypeOf(torch._C.TensorType.get()) else arg.type
-            arg_list.append(f"{arg.name} : {arg_type}")
-            
-            if arg.type.isSubtypeOf(torch._C.TensorType.get()):
-                tensor_args.append(arg)
-            
-        for arg in tensor_args:
-            func_body.append(f"sample_{arg.name} = {{f'{arg.name}{{i}}': 5 for i in range({arg.name}.ndim)}}")
-            
-        
-        for arg in tensor_args:
-            func_body.append(f"sysm_{arg.name} = [mksym(shape_env, v, LocalSource(k), DimDynamic.DYNAMIC) for k, v in sample_{arg.name}.items()]")
-            
-        func_body.append("with FakeTensorMode() as fake_mode:")
-        
-        for arg in tensor_args: 
-            func_body.append(f"  fake_{arg.name} = torch.randn(sysm_{arg.name})")
-            
-        #     sample_x = {f"x{i}": 5 for i in range(x.ndim)}
-        # sample_y = {f"y{i}": 5 for i in range(y.ndim)}
-        # syms_x = [mksym(shape_env, v, LocalSource(k), DimDynamic.DYNAMIC) for k,v in sample_x.items()]
-        # syms_y = [mksym(shape_env, v, LocalSource(k), DimDynamic.DYNAMIC) for k,v in sample_y.items()]
-        # running_line = f"output = {torch_op}("
-        running_args = []
-        for arg in schema.arguments: 
-            if arg in tensor_args:
-                running_args.append(f"fake_{arg.name}")
-            else:
-                running_args.append(f"{arg.name}")
-        running_line_args = ", ".join(running_args)
-        running_line = f"  output = torch.ops.{torch_op}({running_line_args})"
-        func_body.append(running_line)
-            
-
-        # Join the argument list to create the signature
-        input_signature = ", ".join(arg_list)
-        print(input_signature)
-        
-        ret_list = []
-        for ret in schema.returns:
-            print(ret.type)
-            if ret.type.isSubtypeOf(torch._C.TensorType.get()):
-                ret_list.append(f"trtp.TensorDesc")
-            else: 
-                raise Exception("Return type has be to Tensor for TRT plugin")
-         
-        
-        ret_signature = "trtp.TensorDesc" if len(ret_list)  == 1 else f"Tuple[{', '.join(ret_list)}" 
-
-        plugin_signature = f"def add_plugin_desc({input_signature}) -> {ret_signature}:"
-        print(plugin_signature)
-        
-        
-        body_str = "\n  ".join(func_body)
-        print("-----------------\n")
-        print(plugin_signature)
-        print(body_str)
-        print("\n-----------------\n")
-
+    # generate the related required signature based on the torch operation
     def generate_signature(torch_op):
         schema = torch_op._schemas['']
         tensor_args = []
         arg_list = []
-        func_body = []
-        
-        func_body.append("  shape_env = ShapeEnv()")
-        func_body.append("fake_mode = FakeTensorMode(shape_env=shape_env)")
         
         args = []
         kwargs = []
         
         for arg in schema.arguments:
-            # import pdb; pdb.set_trace();
-            arg_type = "trtp.TensorDesc" if arg.type.isSubtypeOf(torch._C.TensorType.get()) else arg.type
-            # arg_list.append(f"{arg.name} : {arg_type}")
             arg_list.append(arg.name)
             
             if arg.type.isSubtypeOf(torch._C.TensorType.get()):
@@ -214,7 +112,6 @@ def generate_plugin(plugin_name : str):
             else:
                 kwargs.append(f"{arg.name} = {arg.default_value}")
                 
-        input_signature = ", ".join(arg_list)
 
         ret_list = []
         for ret in schema.returns:
@@ -224,15 +121,12 @@ def generate_plugin(plugin_name : str):
             else: 
                 raise Exception("Return type has be to Tensor for TRT plugin")
          
-        
-        ret_signature = "trtp.TensorDesc" if len(ret_list)  == 1 else f"Tuple[{', '.join(ret_list)}" 
-
+        input_signature = ", ".join(arg_list)
         plugin_signature = f"def add_plugin_desc({input_signature}):"
         args_input = ", ".join(args)
         kwargs_input = ", ".join(kwargs)
-        # print(args_input)
-        # print(kwargs_input)
-        # print(plugin_signature)
+
+
         plugin_impl_arg_list = arg_list
         plugin_impl_arg_list.append('outputs')
         plugin_impl_arg_list.append('stream')
@@ -243,9 +137,7 @@ def generate_plugin(plugin_name : str):
         
         return args_input, kwargs_input, plugin_signature, plugin_impl_signagture
         
-    
-    # _generic_plugin_desc_creator(torch_op)
-    
+        
     args_input, kwargs_input, plugin_signature, plugin_impl_signagture = generate_signature(torch_op)
     
     def _generic_plugin_desc(*args, **kwargs) -> trtp.TensorDesc:
@@ -278,9 +170,6 @@ def generate_plugin(plugin_name : str):
 
             shape_calc_fns[i] = lambdify(tuple(input_node_expr), output.shape[i].node.expr, "math")
 
-        print("Here2")
-
-
         out_desc = args[0].like()
         for i in range(out_desc.ndim):
             input_shape_expr = [arg.shape_expr[i] for arg in args]
@@ -288,31 +177,19 @@ def generate_plugin(plugin_name : str):
             print(shape_calc_fns[i])
             out_desc.shape_expr[i] = shape_calc_fns[i](*input_shape_expr)
             
-        print("Here3")
 
         return out_desc
         
-    # [SOME PYTHON CODE HERE]
     codegen_plugin = f"""
 {plugin_signature}
     return _generic_plugin_desc({args_input}, {kwargs_input})
     """
 
-#     codegen_plugin = f"""
-# def add_plugin_desc(a):
-#     return a
-#     """
-    
-    print(codegen_plugin)
 
     plugin_code = compile(codegen_plugin, "<string>", "exec")
-    
-    print(type(plugin_code))
-    print(plugin_code.co_consts[0])
-        
+            
 
     globals()["_generic_plugin_desc"] = _generic_plugin_desc
-    # globals()["FakeTensorMode"] = FakeTensorMode
 
     
     from types import FunctionType
@@ -320,21 +197,14 @@ def generate_plugin(plugin_name : str):
     
     plugin= FunctionType(plugin_code.co_consts[0], globals(), "plugin")
     
-    print(plugin)
     
-    print(f"Function name: {plugin.__name__}")
-    print(f"Argument count: {plugin.__code__.co_argcount}")
-    print(f"Argument names: {plugin.__code__.co_varnames[:plugin.__code__.co_argcount]}")
-    print(f"Function bytecode: {plugin.__code__.co_code}")
+
     
     plugin.__annotations__ = {'X' : trtp.TensorDesc, 'Y' : trtp.TensorDesc, 'b' : float, 'a': int, 'return': trtp.TensorDesc}
     
     trtp.register(plugin_name)(plugin)
     
-    
-    # plugin implementation
-    # def generate_impl_signature(registered_signature):
-        
+
     
     def _generic_plugin_impl(outputs, stream, *args, **kwargs):
         in_tensors = [
@@ -354,25 +224,17 @@ def generate_plugin(plugin_name : str):
     _generic_plugin_impl(outputs, stream, {args_input}, {kwargs_input})
     """
     
-    print(plugin_impl_func)
     
     plugin_impl_code = compile(plugin_impl_func, "<string>", "exec")
     
-    print(type(plugin_impl_code))
-    print(plugin_impl_code.co_consts[0])
-        
+
+    
 
     globals()["_generic_plugin_impl"] = _generic_plugin_impl
     
     
     plugin_impl= FunctionType(plugin_impl_code.co_consts[0], globals(), "plugin_impl")
     
-    print(plugin_impl)
-    
-    print(f"Function name: {plugin_impl.__name__}")
-    print(f"Argument count: {plugin_impl.__code__.co_argcount}")
-    print(f"Argument names: {plugin_impl.__code__.co_varnames[:plugin_impl.__code__.co_argcount]}")
-    print(f"Function bytecode: {plugin_impl.__code__.co_code}")
     
     plugin_impl.__annotations__ = {'X' : trtp.Tensor, 'Y' : trtp.Tensor, 'b' : float, 'a': int, 'outputs' : Tuple[trtp.Tensor], 'stream' : int}
     
