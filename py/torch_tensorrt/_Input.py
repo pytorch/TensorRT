@@ -261,7 +261,7 @@ class Input(object):
 
     @staticmethod
     def _parse_tensor_domain(
-        domain: Optional[Tuple[float, float]]
+        domain: Optional[Tuple[float, float]],
     ) -> Tuple[float, float]:
         """
         Produce a tuple of integers which specifies a tensor domain in the interval format: [lo, hi)
