@@ -55,6 +55,7 @@ keywords = [
 ]
 dependencies = [
     "torch>=2.7.0.dev,<2.8.0",
+    "tensorrt>=10.7.0.post1,<10.8.0",
     "tensorrt-cu12>=10.7.0.post1,<10.8.0",
     "tensorrt-cu12-bindings>=10.7.0,<10.8.0",
     "tensorrt-cu12-libs>=10.7.0,<10.8.0",
