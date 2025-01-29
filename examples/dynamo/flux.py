@@ -180,7 +180,9 @@ if __name__ == "__main__":
                         use_fp32_acc=use_fp32_acc,
                     )
                     trt_end = time.time()
+                    config = pipe.transformer.config
                     pipe.transformer = trt_model
+                    pipe.transformer.config = config
 
                     free, total = torch.cuda.mem_get_info(cuda_device)
                     print(
