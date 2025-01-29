@@ -94,7 +94,6 @@ def convert_module(
     rt_cls = PythonTorchTensorRTModule
 
     if ENABLED_FEATURES.torch_tensorrt_runtime and not settings.use_python_runtime:
-
         from torch_tensorrt.dynamo.runtime import TorchTensorRTModule
 
         rt_cls = TorchTensorRTModule
@@ -102,7 +101,6 @@ def convert_module(
     elif (
         not ENABLED_FEATURES.torch_tensorrt_runtime and not settings.use_python_runtime
     ):
-
         logger.info(
             "Since Torch-TensorRT runtime is not available, using Python Runtime, some features may not be available"
         )
