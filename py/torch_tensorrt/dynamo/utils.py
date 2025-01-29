@@ -246,9 +246,10 @@ def prepare_inputs(
     if isinstance(inputs, Input):
         return inputs
 
-    elif isinstance(inputs, torch.Tensor):
+    elif isinstance(inputs, (torch.Tensor, int, float, bool)):
         return Input.from_tensor(
-            inputs, disable_memory_format_check=disable_memory_format_check
+            torch.tensor(inputs),
+            disable_memory_format_check=disable_memory_format_check,
         )
 
     elif isinstance(inputs, (list, tuple)):
@@ -395,8 +396,8 @@ def unwrap_tensor_dtype(tensor: Union[torch.Tensor, FakeTensor, torch.SymInt]) -
     """
     Returns the dtype of torch.tensor or FakeTensor. For symbolic integers, we return int64
     """
-    if isinstance(tensor, (torch.Tensor, FakeTensor)):
-        return tensor.dtype
+    if isinstance(tensor, (torch.Tensor, FakeTensor, int, float, bool)):
+        return torch.tensor(tensor).dtype
     elif isinstance(tensor, torch.SymInt):
         return torch.int64
     else:
