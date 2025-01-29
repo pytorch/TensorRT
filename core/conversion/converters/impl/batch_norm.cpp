@@ -140,7 +140,7 @@ auto batch_norm_registrations TORCHTRT_UNUSED =
                 scales = args[1].unwrapToTensor(at::ones(shape[1], options)).cpu().contiguous();
               }
               auto bias = at::zeros(shape[1], options);
-              if (!args[2].IValue()->isNone()){
+              if (!args[2].IValue()->isNone()) {
                 bias = args[2].unwrapToTensor(at::zeros(shape[1], options)).cpu().contiguous();
               }
               // track_running_stats=True
@@ -170,7 +170,7 @@ auto batch_norm_registrations TORCHTRT_UNUSED =
                     so for some functionalities, users need to install correct \
                     cuDNN version by themselves. Please see our support matrix \
                     here: https://docs.nvidia.com/deeplearning/tensorrt/support-matrix/index.html.");
-                //return false;
+                // return false;
               }
 
               const int relu = 0;
