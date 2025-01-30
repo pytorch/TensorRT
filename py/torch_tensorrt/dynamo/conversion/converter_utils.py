@@ -6,6 +6,7 @@ import os
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union, overload
 
 import numpy as np
+import tensorrt as trt
 import torch
 import torch_tensorrt.dynamo.conversion.impl as impl
 from torch.fx.node import Argument, Target
@@ -18,8 +19,6 @@ from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
     ConverterRegistry,
     DynamoConverterImplSignature,
 )
-
-import tensorrt as trt
 
 from ..types import Shape, TRTDataType, TRTLayer, TRTTensor
 

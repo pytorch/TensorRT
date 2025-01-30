@@ -393,7 +393,6 @@ def test_custom_model_with_dynamo_trace_kwarg_dynamic():
 
 @pytest.mark.unit
 def test_custom_model_with_dynamo_trace_kwarg_list_dynamic():
-
     class net(nn.Module):
         def __init__(self):
             super().__init__()

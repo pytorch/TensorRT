@@ -112,7 +112,6 @@ def constant_padNd(
     pad: Sequence[Union[int, TRTTensor]],
     value: Union[int, float] = 0,
 ) -> TRTTensor:
-
     rank = len(input.shape)
 
     start_indices_tensor, padded_shape_tensor = get_padded_shape_tensors(

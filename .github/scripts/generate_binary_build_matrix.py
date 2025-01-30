@@ -469,7 +469,6 @@ def generate_wheels_matrix(
     ret: List[Dict[str, Any]] = []
     for python_version in python_versions:
         for arch_version in arches:
-
             # TODO: Enable Python 3.13 support for ROCM
             if arch_version in ROCM_ARCHES and python_version == "3.13":
                 continue
