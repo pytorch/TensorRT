@@ -517,7 +517,7 @@ def _replace_transpose_last_dims_impl(
     changed = False
 
     def _calculate_dim(
-        transpose_dim: Union[torch.fx.Node, int]
+        transpose_dim: Union[torch.fx.Node, int],
     ) -> Union[torch.fx.Node, int]:
         nonlocal transpose_input_node
         nonlocal changed

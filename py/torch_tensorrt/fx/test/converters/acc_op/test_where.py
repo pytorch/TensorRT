@@ -101,7 +101,7 @@ class TestWhere(AccTestCase):
             def forward(self, condition):
                 return torch.where(condition, self.x, self.y)
 
-        inputs = [(torch.randn(condition_shape) > 0)]
+        inputs = [torch.randn(condition_shape) > 0]
         self.run_test(
             Where(x_shape, y_shape),
             inputs,
