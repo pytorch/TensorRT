@@ -4,7 +4,8 @@
 Torch Compile Advanced Usage
 ======================================================
 
-This interactive script is intended as an overview of the process by which `torch_tensorrt.compile(..., ir="torch_compile", ...)` works, and how it integrates with the `torch.compile` API."""
+This interactive script is intended as an overview of the process by which `torch_tensorrt.compile(..., ir="torch_compile", ...)` works, and how it integrates with the `torch.compile` API.
+"""
 
 # %%
 # Imports and Model Definition
