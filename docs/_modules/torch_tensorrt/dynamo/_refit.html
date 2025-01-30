@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt.dynamo._refit &mdash; Torch-TensorRT v2.7.0.dev0+cfdb585 documentation</title>
+  <title>torch_tensorrt.dynamo._refit &mdash; Torch-TensorRT v2.7.0.dev0+f2a38f5 documentation</title>
   
 
   
@@ -290,7 +290,7 @@
               
               
                 <div class="version">
-                  v2.7.0.dev0+cfdb585
+                  v2.7.0.dev0+f2a38f5
                 </div>
               
             
@@ -738,7 +738,6 @@
     <span class="c1"># Get the settings and check the setting to be uniform</span>
     <span class="n">settings</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">CompilationSettings</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
     <span class="k">if</span> <span class="n">inline_module</span><span class="p">:</span>
-
         <span class="c1"># Obtain the settings</span>
         <span class="n">compiled_submodules</span> <span class="o">=</span> <span class="p">[</span>
             <span class="p">(</span><span class="n">name</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;_engine&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">),</span> <span class="n">engine</span><span class="p">)</span>
@@ -849,7 +848,6 @@
     <span class="c1"># Generate the corresponding TRT Module for those</span>
 
     <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">new_submodule</span> <span class="ow">in</span> <span class="n">new_partitioned_module</span><span class="o">.</span><span class="n">named_children</span><span class="p">():</span>
-
         <span class="c1"># Refit each submodule</span>
         <span class="c1"># Extract engine from the submodule</span>
         <span class="k">try</span><span class="p">:</span>

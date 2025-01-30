@@ -25,12 +25,12 @@ Torch Compile Advanced Usage
 
 This interactive script is intended as an overview of the process by which `torch_tensorrt.compile(..., ir="torch_compile", ...)` works, and how it integrates with the `torch.compile` API.
 
-.. GENERATED FROM PYTHON SOURCE LINES 10-12
+.. GENERATED FROM PYTHON SOURCE LINES 11-13
 
 Imports and Model Definition
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. GENERATED FROM PYTHON SOURCE LINES 12-16
+.. GENERATED FROM PYTHON SOURCE LINES 13-17
 
 .. code-block:: python
 
@@ -39,7 +39,7 @@ Imports and Model Definition
     import torch_tensorrt
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 17-32
+.. GENERATED FROM PYTHON SOURCE LINES 18-33
 
 .. code-block:: python
 
@@ -59,12 +59,12 @@ Imports and Model Definition
 
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 33-35
+.. GENERATED FROM PYTHON SOURCE LINES 34-36
 
 Compilation with `torch.compile` Using Default Settings
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. GENERATED FROM PYTHON SOURCE LINES 35-40
+.. GENERATED FROM PYTHON SOURCE LINES 36-41
 
 .. code-block:: python
 
@@ -74,7 +74,7 @@ Compilation with `torch.compile` Using Default Settings
     model = Model().eval().cuda()
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 41-49
+.. GENERATED FROM PYTHON SOURCE LINES 42-50
 
 .. code-block:: python
 
@@ -87,12 +87,12 @@ Compilation with `torch.compile` Using Default Settings
     optimized_model(*sample_inputs)
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 50-52
+.. GENERATED FROM PYTHON SOURCE LINES 51-53
 
 Compilation with `torch.compile` Using Custom Settings
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. GENERATED FROM PYTHON SOURCE LINES 52-64
+.. GENERATED FROM PYTHON SOURCE LINES 53-65
 
 .. code-block:: python
 
@@ -109,7 +109,7 @@ Compilation with `torch.compile` Using Custom Settings
     model_half = Model().eval().cuda()
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 65-91
+.. GENERATED FROM PYTHON SOURCE LINES 66-92
 
 .. code-block:: python
 
@@ -140,12 +140,12 @@ Compilation with `torch.compile` Using Custom Settings
     optimized_model_custom(*sample_inputs_half)
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 92-94
+.. GENERATED FROM PYTHON SOURCE LINES 93-95
 
 Cleanup
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. GENERATED FROM PYTHON SOURCE LINES 94-98
+.. GENERATED FROM PYTHON SOURCE LINES 95-99
 
 .. code-block:: python
 
@@ -154,7 +154,7 @@ Cleanup
     torch._dynamo.reset()
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 99-108
+.. GENERATED FROM PYTHON SOURCE LINES 100-109
 
 Cuda Driver Error Note
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
