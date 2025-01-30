@@ -57,7 +57,6 @@ class MyEngineCache(BaseEngineCache):
 
 
 class TestHashFunction(TestCase):
-
     def test_reexport_is_equal(self):
         pyt_model = models.resnet18(pretrained=True).eval().to("cuda")
         example_inputs = (torch.randn((100, 3, 224, 224)).to("cuda"),)
@@ -177,7 +176,6 @@ class TestHashFunction(TestCase):
 
 
 class TestEngineCache(TestCase):
-
     @pytest.mark.xfail
     def test_dynamo_compile_with_default_disk_engine_cache(self):
         model = models.resnet18(pretrained=True).eval().to("cuda")

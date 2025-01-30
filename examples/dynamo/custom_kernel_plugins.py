@@ -316,7 +316,6 @@ from typing import Any, List, Optional, Self
 
 import cupy as cp  # Needed to work around API gaps in PyTorch to build torch.Tensors around preallocated CUDA memory
 import numpy as np
-
 import tensorrt as trt
 
 
@@ -348,7 +347,6 @@ class CircularPaddingPlugin(trt.IPluginV2DynamicExt):  # type: ignore[misc]
         inputs: List[trt.DimsExprs],
         exprBuilder: trt.IExprBuilder,
     ) -> trt.DimsExprs:
-
         output_dims = trt.DimsExprs(inputs[0])
 
         for i in range(np.size(self.pads) // 2):
@@ -404,7 +402,6 @@ class CircularPaddingPlugin(trt.IPluginV2DynamicExt):  # type: ignore[misc]
         workspace: int,
         stream: int,
     ) -> None:
-
         # Host code is slightly different as this will be run as part of the TRT execution
         in_dtype = torchtrt.dtype.try_from(input_desc[0].type).to(np.dtype)
 
@@ -528,7 +525,6 @@ def circular_padding_converter(
     kwargs: Dict[str, Argument],
     name: str,
 ):
-
     # How to retrieve a plugin if it is defined elsewhere (e.g. linked library)
     plugin_registry = trt.get_plugin_registry()
     plugin_creator = plugin_registry.get_plugin_creator(

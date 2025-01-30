@@ -285,7 +285,6 @@ class DevelopCommand(develop):
             self.root_is_pure = False
 
     def run(self):
-
         if not PY_ONLY:
             global CXX11_ABI
             build_libtorchtrt_pre_cxx11_abi(
@@ -309,7 +308,6 @@ class InstallCommand(install):
             self.root_is_pure = False
 
     def run(self):
-
         if not PY_ONLY:
             global CXX11_ABI
             build_libtorchtrt_pre_cxx11_abi(

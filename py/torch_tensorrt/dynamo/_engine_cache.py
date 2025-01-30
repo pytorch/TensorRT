@@ -29,7 +29,6 @@ UnpackedCacheHit = Tuple[
 
 
 class BaseEngineCache(ABC):
-
     @abstractmethod
     def __init__(
         self,
@@ -224,7 +223,6 @@ class DiskEngineCache(BaseEngineCache):
         engine_cache_dir: str,
         engine_cache_size: int,
     ) -> None:
-
         def get_dir_size(path: str) -> int:
             total = 0
             with os.scandir(path) as it:

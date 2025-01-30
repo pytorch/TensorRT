@@ -197,7 +197,6 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         algorithm_selector: Optional[trt.IAlgorithmSelector] = None,
         tactic_sources: Optional[int] = None,
     ) -> trt.IBuilderConfig:
-
         builder_config = self.builder.create_builder_config()
 
         if self.compilation_settings.debug:

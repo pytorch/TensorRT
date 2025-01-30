@@ -633,7 +633,6 @@ def check_output_equal(
     rtol: float = RTOL,
     atol: float = ATOL,
 ) -> bool:
-
     if type(output1) != type(output2):
         logger.warning(
             "The output types are different. Check_output_equal will always return false."
