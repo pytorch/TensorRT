@@ -42,7 +42,6 @@ def batch_norm(
     cudnn_enabled: bool,
     return_mean_rstd: bool,
 ) -> Union[TRTTensor, Tuple[TRTTensor, torch.Tensor, torch.Tensor]]:
-
     if has_dynamic_shape(input.shape):
         assert input.shape[1] != -1, "Channel dim can't be dynamic for batch norm."
 

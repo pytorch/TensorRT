@@ -12,7 +12,6 @@ TRIALS = 10
 
 
 class TestStreams(TestCase):
-
     def test_non_default_stream_exec(self):
         class SampleModel(torch.nn.Module):
             def forward(self, x):

@@ -25,12 +25,12 @@ Compiling ResNet with dynamic shapes using the `torch.compile` backend
 
 This interactive script is intended as a sample of the Torch-TensorRT workflow with `torch.compile` on a ResNet model.
 
-.. GENERATED FROM PYTHON SOURCE LINES 10-12
+.. GENERATED FROM PYTHON SOURCE LINES 11-13
 
 Imports and Model Definition
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. GENERATED FROM PYTHON SOURCE LINES 12-17
+.. GENERATED FROM PYTHON SOURCE LINES 13-18
 
 .. code-block:: python
 
@@ -40,7 +40,7 @@ Imports and Model Definition
     import torchvision.models as models
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 18-23
+.. GENERATED FROM PYTHON SOURCE LINES 19-24
 
 .. code-block:: python
 
@@ -50,12 +50,12 @@ Imports and Model Definition
     inputs = [torch.randn((1, 3, 224, 224)).to("cuda").half()]
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 24-26
+.. GENERATED FROM PYTHON SOURCE LINES 25-27
 
 Optional Input Arguments to `torch_tensorrt.compile`
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. GENERATED FROM PYTHON SOURCE LINES 26-43
+.. GENERATED FROM PYTHON SOURCE LINES 27-44
 
 .. code-block:: python
 
@@ -77,12 +77,12 @@ Optional Input Arguments to `torch_tensorrt.compile`
     torch_executed_ops = {}
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 44-46
+.. GENERATED FROM PYTHON SOURCE LINES 45-47
 
 Compilation with `torch_tensorrt.compile`
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. GENERATED FROM PYTHON SOURCE LINES 46-59
+.. GENERATED FROM PYTHON SOURCE LINES 47-60
 
 .. code-block:: python
 
@@ -100,17 +100,17 @@ Compilation with `torch_tensorrt.compile`
     )
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 60-62
+.. GENERATED FROM PYTHON SOURCE LINES 61-63
 
 Equivalently, we could have run the above via the torch.compile frontend, as so:
 `optimized_model = torch.compile(model, backend="torch_tensorrt", options={"enabled_precisions": enabled_precisions, ...}); optimized_model(*inputs)`
 
-.. GENERATED FROM PYTHON SOURCE LINES 64-66
+.. GENERATED FROM PYTHON SOURCE LINES 65-67
 
 Inference
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. GENERATED FROM PYTHON SOURCE LINES 66-71
+.. GENERATED FROM PYTHON SOURCE LINES 67-72
 
 .. code-block:: python
 
@@ -120,7 +120,7 @@ Inference
     new_outputs = optimized_model(*new_inputs)
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 72-77
+.. GENERATED FROM PYTHON SOURCE LINES 73-78
 
 .. code-block:: python
 
@@ -130,12 +130,12 @@ Inference
     new_batch_size_outputs = optimized_model(*new_batch_size_inputs)
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 78-80
+.. GENERATED FROM PYTHON SOURCE LINES 79-81
 
 Avoid recompilation by specifying dynamic shapes before Torch-TRT compilation
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. GENERATED FROM PYTHON SOURCE LINES 80-120
+.. GENERATED FROM PYTHON SOURCE LINES 81-121
 
 .. code-block:: python
 

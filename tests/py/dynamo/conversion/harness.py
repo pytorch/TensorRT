@@ -500,7 +500,6 @@ class DispatchTestCase(TRTTestCase):
         enable_passes=False,
         immutable_weights=True,
     ):
-
         # Previous instance of the interpreter auto-casted 64-bit inputs
         # We replicate this behavior here
         compilation_settings = CompilationSettings(
