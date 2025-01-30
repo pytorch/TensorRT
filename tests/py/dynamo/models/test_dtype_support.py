@@ -13,7 +13,6 @@ from ..testing_utilities import DECIMALS_OF_AGREEMENT, lower_graph_testing
 
 
 class Test64BitSupport(TestCase):
-
     @unittest.skipIf(
         not torch_tensorrt.ENABLED_FEATURES.torch_tensorrt_runtime,
         "Torch-TensorRT Runtime is not available",

@@ -478,7 +478,6 @@ def sign(
     name: str,
     input_val: TRTTensor,
 ) -> TRTTensor:
-
     return convert_unary(
         ctx, target, source_ir, name, trt.UnaryOperation.SIGN, input_val
     )

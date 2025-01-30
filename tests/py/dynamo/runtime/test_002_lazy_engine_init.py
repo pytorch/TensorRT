@@ -45,7 +45,6 @@ def assert_close(outputs, ref_outputs):
 
 
 class TestLazyEngineInit(TestCase):
-
     def test_lazy_engine_init_py(self):
         class Test(torch.nn.Module):
             def forward(self, a, b):
