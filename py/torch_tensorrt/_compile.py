@@ -653,7 +653,6 @@ def save(
                 )
             torch.export.save(module, file_path)
     elif module_type == _ModuleType.fx:
-
         # The module type is torch.fx.GraphModule
         if output_format == "torchscript":
             module_ts = torch.jit.trace(
@@ -671,7 +670,6 @@ def save(
                 exp_program = export(module)
                 torch.export.save(exp_program, file_path)
             else:
-
                 if arg_inputs is None:
                     raise ValueError(
                         "Provided model is a torch.fx.GraphModule and retrace is True, however the inputs or arg_inputs are empty. Please provide valid torch.tensors as inputs or arg_inputs to trace and save the model"
