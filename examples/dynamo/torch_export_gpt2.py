@@ -4,7 +4,8 @@
 Compiling GPT2 using the dynamo backend
 ==========================================================
 
-This script illustrates Torch-TensorRT workflow with dynamo backend on popular GPT2 model."""
+This script illustrates Torch-TensorRT workflow with dynamo backend on popular GPT2 model.
+"""
 
 # %%
 # Imports and Model Definition
