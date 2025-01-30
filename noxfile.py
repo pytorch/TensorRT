@@ -237,7 +237,9 @@ def run_dynamo_lower_tests(session):
     tests = ["lowering"]
     for test in tests:
         if USE_HOST_DEPS:
-            session.run_always("pytest", test, "-n", num_workers, env={"PYTHONPATH": PYT_PATH})
+            session.run_always(
+                "pytest", test, "-n", num_workers, env={"PYTHONPATH": PYT_PATH}
+            )
         else:
             session.run_always("pytest", test, "-n", num_workers)
 
