@@ -25,12 +25,12 @@ Compiling Llama2 using the dynamo backend
 
 This script illustrates Torch-TensorRT workflow with dynamo backend on popular Llama2 model.
 
-.. GENERATED FROM PYTHON SOURCE LINES 10-12
+.. GENERATED FROM PYTHON SOURCE LINES 11-13
 
 Imports and Model Definition
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. GENERATED FROM PYTHON SOURCE LINES 12-17
+.. GENERATED FROM PYTHON SOURCE LINES 13-18
 
 .. code-block:: python
 
@@ -40,11 +40,11 @@ Imports and Model Definition
     from utils import export_llm, generate
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 18-19
+.. GENERATED FROM PYTHON SOURCE LINES 19-20
 
 Define the parameters and initialize the model
 
-.. GENERATED FROM PYTHON SOURCE LINES 19-37
+.. GENERATED FROM PYTHON SOURCE LINES 20-38
 
 .. code-block:: python
 
@@ -67,11 +67,11 @@ Define the parameters and initialize the model
     tokenizer = AutoTokenizer.from_pretrained(llama_path)
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 38-39
+.. GENERATED FROM PYTHON SOURCE LINES 39-40
 
 Tokenize a sample input prompt and get pytorch model outputs
 
-.. GENERATED FROM PYTHON SOURCE LINES 39-47
+.. GENERATED FROM PYTHON SOURCE LINES 40-48
 
 .. code-block:: python
 
@@ -84,12 +84,12 @@ Tokenize a sample input prompt and get pytorch model outputs
     pyt_gen_tokens = generate(model, input_ids, MAX_TOKENS, tokenizer.eos_token_id)
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 48-50
+.. GENERATED FROM PYTHON SOURCE LINES 49-51
 
 Compilation with `Torch-TensorRT` using dynamo backend and generate TensorRT outputs
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. GENERATED FROM PYTHON SOURCE LINES 50-74
+.. GENERATED FROM PYTHON SOURCE LINES 51-75
 
 .. code-block:: python
 
@@ -118,12 +118,12 @@ Compilation with `Torch-TensorRT` using dynamo backend and generate TensorRT out
     trt_gen_tokens = generate(trt_model, input_ids, MAX_TOKENS, tokenizer.eos_token_id)
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 75-77
+.. GENERATED FROM PYTHON SOURCE LINES 76-78
 
 Decode the output sentences of PyTorch and TensorRT
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. GENERATED FROM PYTHON SOURCE LINES 77-102
+.. GENERATED FROM PYTHON SOURCE LINES 78-103
 
 .. code-block:: python
 

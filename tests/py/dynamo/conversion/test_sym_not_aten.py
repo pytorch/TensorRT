@@ -7,7 +7,6 @@ from .harness import DispatchTestCase
 
 
 class TestSymNotConverter(DispatchTestCase):
-
     @parameterized.expand(
         [
             (torch.tensor(True),),

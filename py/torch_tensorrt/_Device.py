@@ -9,11 +9,10 @@ if sys.version_info >= (3, 11):
 else:
     from typing_extensions import Self
 
+import tensorrt as trt
 import torch
 from torch_tensorrt._enums import DeviceType
 from torch_tensorrt._features import needs_torch_tensorrt_runtime
-
-import tensorrt as trt
 
 
 class Device(object):

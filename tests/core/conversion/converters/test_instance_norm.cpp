@@ -18,7 +18,7 @@ constexpr auto graph = R"IR(
             %running_mean.1 : Tensor?,
             %running_var.1 : Tensor?,
             %use_input_stats.1 : bool):
-        %cudnn_enabled.1 : bool = prim::Constant[value=0]()
+        %cudnn_enabled.1 : bool = prim::Constant[value=1]()
         %momentum.1 : float = prim::Constant[value=0.10000000000000001]()
         %eps.1 : float = prim::Constant[value=1.0000000000000001e-05]()
         %4 : Tensor = aten::instance_norm(%input.1,

@@ -32,7 +32,6 @@ assertions = unittest.TestCase()
 )
 @pytest.mark.unit
 def test_mapping():
-
     model = models.resnet18(pretrained=False).eval().to("cuda")
     model2 = models.resnet18(pretrained=True).eval().to("cuda")
     inputs = [torch.randn((1, 3, 224, 224)).to("cuda")]
@@ -88,7 +87,6 @@ def test_mapping():
 )
 @pytest.mark.unit
 def test_refit_one_engine_with_weightmap():
-
     model = models.resnet18(pretrained=False).eval().to("cuda")
     model2 = models.resnet18(pretrained=True).eval().to("cuda")
     inputs = [torch.randn((1, 3, 224, 224)).to("cuda")]
@@ -138,7 +136,6 @@ def test_refit_one_engine_with_weightmap():
 )
 @pytest.mark.unit
 def test_refit_one_engine_no_map_with_weightmap():
-
     model = models.resnet18(pretrained=False).eval().to("cuda")
     model2 = models.resnet18(pretrained=True).eval().to("cuda")
     inputs = [torch.randn((1, 3, 224, 224)).to("cuda")]
@@ -189,7 +186,6 @@ def test_refit_one_engine_no_map_with_weightmap():
 )
 @pytest.mark.unit
 def test_refit_one_engine_with_wrong_weightmap():
-
     model = models.resnet18(pretrained=False).eval().to("cuda")
     model2 = models.resnet18(pretrained=True).eval().to("cuda")
     inputs = [torch.randn((1, 3, 224, 224)).to("cuda")]
@@ -345,7 +341,6 @@ def test_refit_one_engine_inline_runtime__with_weightmap():
 
 @pytest.mark.unit
 def test_refit_one_engine_python_runtime_with_weightmap():
-
     model = models.resnet18(pretrained=False).eval().to("cuda")
     model2 = models.resnet18(pretrained=True).eval().to("cuda")
     inputs = [torch.randn((1, 3, 224, 224)).to("cuda")]
@@ -394,7 +389,6 @@ def test_refit_one_engine_python_runtime_with_weightmap():
 )
 @pytest.mark.unit
 def test_refit_multiple_engine_with_weightmap():
-
     class net(nn.Module):
         def __init__(self):
             super().__init__()
@@ -466,7 +460,6 @@ def test_refit_multiple_engine_with_weightmap():
 )
 @pytest.mark.unit
 def test_refit_one_engine_without_weightmap():
-
     model = models.resnet18(pretrained=True).eval().to("cuda")
     model2 = models.resnet18(pretrained=False).eval().to("cuda")
     inputs = [torch.randn((1, 3, 224, 224)).to("cuda")]
@@ -616,7 +609,6 @@ def test_refit_one_engine_inline_runtime_without_weightmap():
 
 @pytest.mark.unit
 def test_refit_one_engine_python_runtime_without_weightmap():
-
     model = models.resnet18(pretrained=True).eval().to("cuda")
     model2 = models.resnet18(pretrained=False).eval().to("cuda")
     inputs = [torch.randn((1, 3, 224, 224)).to("cuda")]
@@ -665,7 +657,6 @@ def test_refit_one_engine_python_runtime_without_weightmap():
 )
 @pytest.mark.unit
 def test_refit_multiple_engine_without_weightmap():
-
     class net(nn.Module):
         def __init__(self):
             super().__init__()
@@ -733,7 +724,6 @@ def test_refit_multiple_engine_without_weightmap():
 
 @pytest.mark.unit
 def test_refit_cumsum_fallback():
-
     class net(nn.Module):
         def __init__(self):
             super().__init__()
