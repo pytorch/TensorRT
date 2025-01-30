@@ -6,7 +6,6 @@ from .harness import DispatchTestCase
 
 
 class TestResizeConverter(DispatchTestCase):
-
     def compare_resized_tensors(self, tensor1, tensor2, input_shape, target_shape):
         # Check if the sizes match
         if tensor1.size() != tensor2.size():

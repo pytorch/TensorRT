@@ -12,7 +12,6 @@ from ..testing_utilities import DECIMALS_OF_AGREEMENT
 
 
 class TestCrossCompileSaveForWindows(TestCase):
-
     @unittest.skipIf(
         platform.system() != "Linux" or platform.architecture()[0] != "64bit",
         "Cross compile for windows can only be enabled on linux x86-64 platform",
