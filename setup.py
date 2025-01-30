@@ -33,7 +33,7 @@ LEGACY_BASE_VERSION_SUFFIX_PATTERN = re.compile("a0$")
 
 
 def get_root_dir() -> Path:
-    dir_path = os.path.dirname(os.path.realpath(__file__)) 
+    dir_path = os.path.dirname(os.path.realpath(__file__))
     return dir_path
 
 
@@ -117,7 +117,6 @@ if (release_env_var := os.environ.get("RELEASE")) is not None:
 
 if (gpu_arch_version := os.environ.get("CU_VERSION")) is None:
     gpu_arch_version = f"cu{__cuda_version__.replace('.','')}"
-
 
 
 __version__ = os.environ.get("BUILD_VERSION")
