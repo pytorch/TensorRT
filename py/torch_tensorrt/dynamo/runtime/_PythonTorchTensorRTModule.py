@@ -466,7 +466,6 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                     outputs = self.create_output_tensors()
 
                 for o, output_name in enumerate(self.output_names):
-
                     if need_cudagraphs_record:
                         self._output_buffers[o] = outputs[o].clone()
 
@@ -496,7 +495,6 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                 self._engine_stream.wait_stream(self._caller_stream)
 
                 with torch.cuda.stream(self._engine_stream):
-
                     if cudagraphs_enabled:
                         if need_cudagraphs_record:
                             self.cudagraph = torch.cuda.CUDAGraph()

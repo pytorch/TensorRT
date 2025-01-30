@@ -10,7 +10,6 @@ from types import FunctionType
 from typing import (
     Any,
     Callable,
-    cast,
     Dict,
     Iterable,
     Optional,
@@ -19,6 +18,7 @@ from typing import (
     Tuple,
     Type,
     Union,
+    cast,
 )
 
 import torch
@@ -31,7 +31,6 @@ from torch.fx.node import Argument, Node, Target
 from torch.fx.passes import shape_prop
 
 from . import acc_normalizer, acc_ops, acc_shape_prop, acc_utils  # noqa: F401
-
 
 _LOGGER = logging.getLogger(__name__)
 

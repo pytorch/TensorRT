@@ -332,7 +332,6 @@ def cumsum(
     input: TRTTensor,
     dim: int,
 ) -> TRTTensor:
-
     input_shape = input.shape
     dim = get_positive_dim(dim, len(input_shape))
     if input_shape[dim] < 0:
