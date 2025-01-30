@@ -465,7 +465,7 @@ def to_torch_device(device: Optional[Union[Device, torch.device, str]]) -> torch
 
 
 def to_torch_tensorrt_device(
-    device: Optional[Union[Device, torch.device, str]]
+    device: Optional[Union[Device, torch.device, str]],
 ) -> Device:
     """Cast a device-type to torch_tensorrt.Device
 
