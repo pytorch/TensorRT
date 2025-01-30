@@ -25,12 +25,12 @@ Compiling BERT using the `torch.compile` backend
 
 This interactive script is intended as a sample of the Torch-TensorRT workflow with `torch.compile` on a BERT model.
 
-.. GENERATED FROM PYTHON SOURCE LINES 10-12
+.. GENERATED FROM PYTHON SOURCE LINES 11-13
 
 Imports and Model Definition
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. GENERATED FROM PYTHON SOURCE LINES 12-17
+.. GENERATED FROM PYTHON SOURCE LINES 13-18
 
 .. code-block:: python
 
@@ -40,7 +40,7 @@ Imports and Model Definition
     from transformers import BertModel
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 18-27
+.. GENERATED FROM PYTHON SOURCE LINES 19-28
 
 .. code-block:: python
 
@@ -54,12 +54,12 @@ Imports and Model Definition
 
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 28-30
+.. GENERATED FROM PYTHON SOURCE LINES 29-31
 
 Optional Input Arguments to `torch_tensorrt.compile`
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. GENERATED FROM PYTHON SOURCE LINES 30-47
+.. GENERATED FROM PYTHON SOURCE LINES 31-48
 
 .. code-block:: python
 
@@ -81,12 +81,12 @@ Optional Input Arguments to `torch_tensorrt.compile`
     torch_executed_ops = {}
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 48-50
+.. GENERATED FROM PYTHON SOURCE LINES 49-51
 
 Compilation with `torch.compile`
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. GENERATED FROM PYTHON SOURCE LINES 50-69
+.. GENERATED FROM PYTHON SOURCE LINES 51-70
 
 .. code-block:: python
 
@@ -110,17 +110,17 @@ Compilation with `torch.compile`
     optimized_model(*inputs)
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 70-72
+.. GENERATED FROM PYTHON SOURCE LINES 71-73
 
 Equivalently, we could have run the above via the convenience frontend, as so:
 `torch_tensorrt.compile(model, ir="torch_compile", inputs=inputs, **compilation_kwargs)`
 
-.. GENERATED FROM PYTHON SOURCE LINES 74-76
+.. GENERATED FROM PYTHON SOURCE LINES 75-77
 
 Inference
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. GENERATED FROM PYTHON SOURCE LINES 76-84
+.. GENERATED FROM PYTHON SOURCE LINES 77-85
 
 .. code-block:: python
 
@@ -133,7 +133,7 @@ Inference
     new_outputs = optimized_model(*new_inputs)
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 85-93
+.. GENERATED FROM PYTHON SOURCE LINES 86-94
 
 .. code-block:: python
 
@@ -146,12 +146,12 @@ Inference
     new_outputs = optimized_model(*new_inputs)
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 94-96
+.. GENERATED FROM PYTHON SOURCE LINES 95-97
 
 Cleanup
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. GENERATED FROM PYTHON SOURCE LINES 96-100
+.. GENERATED FROM PYTHON SOURCE LINES 97-101
 
 .. code-block:: python
 
@@ -160,7 +160,7 @@ Cleanup
     torch._dynamo.reset()
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 101-110
+.. GENERATED FROM PYTHON SOURCE LINES 102-111
 
 Cuda Driver Error Note
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

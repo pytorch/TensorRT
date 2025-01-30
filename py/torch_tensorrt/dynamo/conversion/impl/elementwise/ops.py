@@ -457,7 +457,6 @@ def add(
     lhs_val: Union[TRTTensor, int, float],
     rhs_val: Union[TRTTensor, int, float],
 ) -> TRTTensor:
-
     return convert_binary_elementwise(
         ctx, target, source_ir, name, trt.ElementWiseOperation.SUM, lhs_val, rhs_val
     )

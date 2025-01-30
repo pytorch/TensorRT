@@ -1535,7 +1535,6 @@ class TestLowering(TestCase):
                 super().__init__()
 
             def forward(self, input):
-
                 return torch.ops.aten.scatter_reduce_.two(
                     input, dim, index, src, reduce=reduce_op_str
                 )

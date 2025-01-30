@@ -25,12 +25,12 @@ Compiling GPT2 using the dynamo backend
 
 This script illustrates Torch-TensorRT workflow with dynamo backend on popular GPT2 model.
 
-.. GENERATED FROM PYTHON SOURCE LINES 10-12
+.. GENERATED FROM PYTHON SOURCE LINES 11-13
 
 Imports and Model Definition
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. GENERATED FROM PYTHON SOURCE LINES 12-17
+.. GENERATED FROM PYTHON SOURCE LINES 13-18
 
 .. code-block:: python
 
@@ -40,7 +40,7 @@ Imports and Model Definition
     from utils import export_llm, generate
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 18-39
+.. GENERATED FROM PYTHON SOURCE LINES 19-40
 
 .. code-block:: python
 
@@ -66,11 +66,11 @@ Imports and Model Definition
         )
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 40-41
+.. GENERATED FROM PYTHON SOURCE LINES 41-42
 
 Tokenize a sample input prompt and get pytorch model outputs
 
-.. GENERATED FROM PYTHON SOURCE LINES 41-50
+.. GENERATED FROM PYTHON SOURCE LINES 42-51
 
 .. code-block:: python
 
@@ -84,12 +84,12 @@ Tokenize a sample input prompt and get pytorch model outputs
 
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 51-53
+.. GENERATED FROM PYTHON SOURCE LINES 52-54
 
 Compilation with `Torch-TensorRT` using dynamo backend and generate TensorRT outputs
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. GENERATED FROM PYTHON SOURCE LINES 53-77
+.. GENERATED FROM PYTHON SOURCE LINES 54-78
 
 .. code-block:: python
 
@@ -118,12 +118,12 @@ Compilation with `Torch-TensorRT` using dynamo backend and generate TensorRT out
     trt_gen_tokens = generate(trt_model, input_ids, MAX_TOKENS, tokenizer.eos_token_id)
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 78-80
+.. GENERATED FROM PYTHON SOURCE LINES 79-81
 
 Decode the output sentences of PyTorch and TensorRT
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. GENERATED FROM PYTHON SOURCE LINES 80-98
+.. GENERATED FROM PYTHON SOURCE LINES 81-99
 
 .. code-block:: python
 

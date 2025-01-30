@@ -1,17 +1,15 @@
 import logging
 from typing import Any
 
+import tensorrt as trt
 import torch
 from torch_tensorrt._features import ENABLED_FEATURES
-
-import tensorrt as trt
 
 logging.captureWarnings(True)
 _LOGGER = logging.getLogger("torch_tensorrt [TensorRT Conversion Context]")
 
 
 class _TRTLogger(trt.ILogger):  # type: ignore[misc]
-
     def __init__(self) -> None:
         trt.ILogger.__init__(self)
 

@@ -235,13 +235,13 @@ recommended commands:
 +-------------------------------------------------------------+----------------------------------------------------------+--------------------------------------------------------------------+
 | libtorch-shared-with-deps-*.zip from PyTorch.org            | python -m pip install .                                  | bazel build //:libtorchtrt -c opt \-\-config pre_cxx11_abi         |
 +-------------------------------------------------------------+----------------------------------------------------------+--------------------------------------------------------------------+
-| libtorch-cxx11-abi-shared-with-deps-*.zip from PyTorch.org  | python setup.py bdist_wheel --use-cxx11-abi              | bazel build //:libtorchtrt -c opt                                  |
+| libtorch-cxx11-abi-shared-with-deps-*.zip from PyTorch.org  | python setup.py bdist_wheel                              | bazel build //:libtorchtrt -c opt                                  |
 +-------------------------------------------------------------+----------------------------------------------------------+--------------------------------------------------------------------+
-| PyTorch preinstalled in an NGC container                    | python setup.py bdist_wheel --use-cxx11-abi              | bazel build //:libtorchtrt -c opt                                  |
+| PyTorch preinstalled in an NGC container                    | python setup.py bdist_wheel                              | bazel build //:libtorchtrt -c opt                                  |
 +-------------------------------------------------------------+----------------------------------------------------------+--------------------------------------------------------------------+
-| PyTorch from the NVIDIA Forums for Jetson                   | python setup.py bdist_wheel --use-cxx11-abi              | bazel build //:libtorchtrt -c opt                                  |
+| PyTorch from the NVIDIA Forums for Jetson                   | python setup.py bdist_wheel                              | bazel build //:libtorchtrt -c opt                                  |
 +-------------------------------------------------------------+----------------------------------------------------------+--------------------------------------------------------------------+
-| PyTorch built from Source                                   | python setup.py bdist_wheel --use-cxx11-abi              | bazel build //:libtorchtrt -c opt                                  |
+| PyTorch built from Source                                   | python setup.py bdist_wheel                              | bazel build //:libtorchtrt -c opt                                  |
 +-------------------------------------------------------------+----------------------------------------------------------+--------------------------------------------------------------------+
 
     NOTE: For all of the above cases you must correctly declare the source of PyTorch you intend to use in your WORKSPACE file for both Python and C++ builds. See below for more information
@@ -383,8 +383,8 @@ Compile the Python API using the following command from the ``//py`` directory:
 
 .. code-block:: shell
 
-    python3 setup.py install --use-cxx11-abi
+    python3 setup.py install
 
-If you have a build of PyTorch that uses Pre-CXX11 ABI drop the ``--use-cxx11-abi`` flag
+If you have a build of PyTorch that uses Pre-CXX11 ABI drop the ``--use-pre-cxx11-abi`` flag
 
 If you are building for Jetpack 4.5 add the ``--jetpack-version 5.0`` flag

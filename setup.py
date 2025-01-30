@@ -78,7 +78,7 @@ load_dep_info()
 
 dir_path = os.path.join(str(get_root_dir()), "py")
 
-CXX11_ABI = IS_WINDOWS
+PRE_CXX11_ABI = False
 JETPACK_VERSION = None
 PY_ONLY = False
 NO_TS = False
@@ -136,13 +136,13 @@ if (ci_env_var := os.environ.get("CI_BUILD")) is not None:
     if ci_env_var == "1":
         CI_BUILD = True
 
-if "--use-cxx11-abi" in sys.argv:
-    sys.argv.remove("--use-cxx11-abi")
-    CXX11_ABI = True
+if "--use-pre-cxx11-abi" in sys.argv:
+    sys.argv.remove("--use-pre-cxx11-abi")
+    PRE_CXX11_ABI = True
 
-if (cxx11_abi_env_var := os.environ.get("USE_CXX11_ABI")) is not None:
-    if cxx11_abi_env_var == "1":
-        CXX11_ABI = True
+if (pre_cxx11_abi_env_var := os.environ.get("USE_PRE_CXX11_ABI")) is not None:
+    if pre_cxx11_abi_env_var == "1":
+        PRE_CXX11_ABI = True
 
 if platform.uname().processor == "aarch64":
     if "--jetpack-version" in sys.argv:
@@ -165,9 +165,9 @@ if platform.uname().processor == "aarch64":
         )
         JETPACK_VERSION = "6.1"
 
-    if not CXX11_ABI:
+    if PRE_CXX11_ABI:
         warnings.warn(
-            "Jetson platform detected but did not see --use-cxx11-abi option, if using a pytorch distribution provided by NVIDIA include this flag"
+            "Jetson platform detected. Please remove --use-pre-cxx11-abi flag if you are using it."
         )
 
 
@@ -181,8 +181,12 @@ if not PY_ONLY:
             sys.exit("Could not find bazel in PATH")
 
 
-def build_libtorchtrt_pre_cxx11_abi(
-    develop=True, use_dist_dir=True, cxx11_abi=False, rt_only=False
+def build_libtorchtrt_cxx11_abi(
+    develop=True,
+    use_dist_dir=True,
+    pre_cxx11_abi=False,
+    rt_only=False,
+    target_python=True,
 ):
     cmd = [BAZEL_EXE, "build"]
     if rt_only:
@@ -196,9 +200,15 @@ def build_libtorchtrt_pre_cxx11_abi(
         cmd.append("--compilation_mode=opt")
     if use_dist_dir:
         cmd.append("--distdir=third_party/dist_dir/x86_64-linux-gnu")
-    if not cxx11_abi:
+
+    if target_python:
         cmd.append("--config=python")
+
+    if pre_cxx11_abi:
+        cmd.append("--config=pre_cxx11_abi")
+        print("using PRE CXX11 ABI build")
     else:
+        cmd.append("--config=cxx11_abi")
         print("using CXX11 ABI build")
 
     if IS_WINDOWS:
@@ -290,11 +300,10 @@ class DevelopCommand(develop):
             self.root_is_pure = False
 
     def run(self):
-
         if not PY_ONLY:
-            global CXX11_ABI
-            build_libtorchtrt_pre_cxx11_abi(
-                develop=True, cxx11_abi=CXX11_ABI, rt_only=NO_TS
+            global PRE_CXX11_ABI
+            build_libtorchtrt_cxx11_abi(
+                develop=True, pre_cxx11_abi=PRE_CXX11_ABI, rt_only=NO_TS
             )
             copy_libtorchtrt(rt_only=NO_TS)
 
@@ -314,11 +323,10 @@ class InstallCommand(install):
             self.root_is_pure = False
 
     def run(self):
-
         if not PY_ONLY:
-            global CXX11_ABI
-            build_libtorchtrt_pre_cxx11_abi(
-                develop=False, cxx11_abi=CXX11_ABI, rt_only=NO_TS
+            global PRE_CXX11_ABI
+            build_libtorchtrt_cxx11_abi(
+                develop=False, pre_cxx11_abi=PRE_CXX11_ABI, rt_only=NO_TS
             )
             copy_libtorchtrt(rt_only=NO_TS)
 
@@ -339,9 +347,9 @@ class BdistCommand(bdist_wheel):
 
     def run(self):
         if not PY_ONLY:
-            global CXX11_ABI
-            build_libtorchtrt_pre_cxx11_abi(
-                develop=False, cxx11_abi=CXX11_ABI, rt_only=NO_TS
+            global PRE_CXX11_ABI
+            build_libtorchtrt_cxx11_abi(
+                develop=False, pre_cxx11_abi=PRE_CXX11_ABI, rt_only=NO_TS
             )
             copy_libtorchtrt(rt_only=NO_TS)
 
@@ -365,9 +373,9 @@ class EditableWheelCommand(editable_wheel):
             gen_version_file()
             editable_wheel.run(self)
         else:
-            global CXX11_ABI
-            build_libtorchtrt_pre_cxx11_abi(
-                develop=True, cxx11_abi=CXX11_ABI, rt_only=NO_TS
+            global PRE_CXX11_ABI
+            build_libtorchtrt_cxx11_abi(
+                develop=True, pre_cxx11_abi=PRE_CXX11_ABI, rt_only=NO_TS
             )
             gen_version_file()
             copy_libtorchtrt(rt_only=NO_TS)
@@ -561,9 +569,9 @@ if not (PY_ONLY or NO_TS):
                     "-Wno-deprecated-declarations",
                 ]
                 + (
-                    ["-D_GLIBCXX_USE_CXX11_ABI=1"]
-                    if CXX11_ABI
-                    else ["-D_GLIBCXX_USE_CXX11_ABI=0"]
+                    ["-D_GLIBCXX_USE_CXX11_ABI=0"]
+                    if PRE_CXX11_ABI
+                    else ["-D_GLIBCXX_USE_CXX11_ABI=1"]
                 )
             ),
             extra_link_args=(
@@ -584,9 +592,9 @@ if not (PY_ONLY or NO_TS):
                     "-export-dynamic",
                 ]
                 + (
-                    ["-D_GLIBCXX_USE_CXX11_ABI=1"]
-                    if CXX11_ABI
-                    else ["-D_GLIBCXX_USE_CXX11_ABI=0"]
+                    ["-D_GLIBCXX_USE_CXX11_ABI=0"]
+                    if PRE_CXX11_ABI
+                    else ["-D_GLIBCXX_USE_CXX11_ABI=1"]
                 )
             ),
             undef_macros=["NDEBUG"],

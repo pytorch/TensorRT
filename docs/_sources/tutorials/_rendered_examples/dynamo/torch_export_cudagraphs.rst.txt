@@ -25,12 +25,12 @@ Torch Export with Cudagraphs
 
 This interactive script is intended as an overview of the process by which the Torch-TensorRT Cudagraphs integration can be used in the `ir="dynamo"` path. The functionality works similarly in the `torch.compile` path as well.
 
-.. GENERATED FROM PYTHON SOURCE LINES 10-12
+.. GENERATED FROM PYTHON SOURCE LINES 11-13
 
 Imports and Model Definition
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. GENERATED FROM PYTHON SOURCE LINES 12-17
+.. GENERATED FROM PYTHON SOURCE LINES 13-18
 
 .. code-block:: python
 
@@ -40,12 +40,12 @@ Imports and Model Definition
     import torchvision.models as models
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 18-20
+.. GENERATED FROM PYTHON SOURCE LINES 19-21
 
 Compilation with `torch_tensorrt.compile` Using Default Settings
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. GENERATED FROM PYTHON SOURCE LINES 20-27
+.. GENERATED FROM PYTHON SOURCE LINES 21-28
 
 .. code-block:: python
 
@@ -57,7 +57,7 @@ Compilation with `torch_tensorrt.compile` Using Default Settings
     inputs = torch.randn((16, 3, 224, 224)).cuda()
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 28-44
+.. GENERATED FROM PYTHON SOURCE LINES 29-45
 
 .. code-block:: python
 
@@ -78,12 +78,12 @@ Compilation with `torch_tensorrt.compile` Using Default Settings
     )
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 45-47
+.. GENERATED FROM PYTHON SOURCE LINES 46-48
 
 Inference using the Cudagraphs Integration
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. GENERATED FROM PYTHON SOURCE LINES 47-60
+.. GENERATED FROM PYTHON SOURCE LINES 48-61
 
 .. code-block:: python
 
@@ -101,7 +101,7 @@ Inference using the Cudagraphs Integration
     out_trt = opt(inputs)
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 61-70
+.. GENERATED FROM PYTHON SOURCE LINES 62-71
 
 .. code-block:: python
 
@@ -115,7 +115,7 @@ Inference using the Cudagraphs Integration
         out_trt_3 = cudagraphs_module(inputs_3)
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 71-85
+.. GENERATED FROM PYTHON SOURCE LINES 72-86
 
 Cuda graphs with module that contains graph breaks
 ----------------------------------
@@ -132,7 +132,7 @@ and improving performance. Note that initializing with the wrapper module involv
 module is executed several times. This warm-up ensures that memory allocations and initializations are not
 recorded in CUDA Graphs, which helps maintain consistent execution paths and optimize performance.
 
-.. GENERATED FROM PYTHON SOURCE LINES 85-106
+.. GENERATED FROM PYTHON SOURCE LINES 86-107
 
 .. code-block:: python
 
@@ -158,11 +158,11 @@ recorded in CUDA Graphs, which helps maintain consistent execution paths and opt
     )
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 107-108
+.. GENERATED FROM PYTHON SOURCE LINES 108-109
 
 If module has graph breaks, whole submodules are recorded and replayed by cuda graphs
 
-.. GENERATED FROM PYTHON SOURCE LINES 108-112
+.. GENERATED FROM PYTHON SOURCE LINES 109-113
 
 .. code-block:: python
 

@@ -204,7 +204,6 @@ class MutableTorchTensorRTModule(object):
         self.init_finished = True
 
     def store_state_dict_metadata(self) -> None:
-
         for k, v in self.original_model.state_dict().items():
             self.state_dict_metadata[k] = v.shape
 
@@ -400,7 +399,6 @@ class MutableTorchTensorRTModule(object):
         return self.forward(*args, **kwargs)
 
     def __getattr__(self, name: str) -> Any:
-
         if name in self.__dict__:
             # this object has it
             return getattr(self, name)
@@ -413,7 +411,6 @@ class MutableTorchTensorRTModule(object):
         return getattr(self.pytorch_model, name)
 
     def __delattr__(self, name: str) -> Any:
-
         if name in self.__dict__:
             # this object has it
             super().__delattr__(name)
