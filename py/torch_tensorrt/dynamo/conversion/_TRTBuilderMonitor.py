@@ -53,13 +53,13 @@ class _ASCIIMonitor(trt.IProgressMonitor):  # type: ignore
         if self._render:
 
             def clear_line() -> None:
-                print("\x1B[2K", end="")
+                print("\x1b[2K", end="")
 
             def move_to_start_of_line() -> None:
-                print("\x1B[0G", end="")
+                print("\x1b[0G", end="")
 
             def move_cursor_up(lines: int) -> None:
-                print("\x1B[{}A".format(lines), end="")
+                print("\x1b[{}A".format(lines), end="")
 
             def progress_bar(steps: int, num_steps: int) -> str:
                 INNER_WIDTH = 10
