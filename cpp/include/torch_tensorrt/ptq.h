@@ -59,7 +59,7 @@ class Int8Calibrator : Algorithm {
    * calibration cache
    * @param use_cache : bool - Whether to use the cache (if it exists)
    */
-  Int8Calibrator(DataLoaderUniquePtr dataloader, const std::string& cache_file_path, bool use_cache)
+   Int8Calibrator(DataLoaderUniquePtr dataloader, const std::string& cache_file_path, bool use_cache)
       : dataloader_(dataloader.get()), cache_file_path_(cache_file_path), use_cache_(use_cache) {
     for (auto batch : *dataloader_) {
       batched_data_.push_back(batch.data);
@@ -308,8 +308,8 @@ class Int8CacheCalibrator : Algorithm {
  * @param use_cache: bool - use calibration cache
  * @return Int8Calibrator<Algorithm, DataLoader>
  */
-
 template <typename Algorithm = nvinfer1::IInt8EntropyCalibrator2, typename DataLoader>
+[[deprecated("Int8 PTQ Calibrator has been deprecated by TensorRT, please plan on porting to a NVIDIA Model Optimizer Toolkit based workflow. See: https://pytorch.org/TensorRT/tutorials/_rendered_examples/dynamo/vgg16_ptq.html for more details")]]
 inline Int8Calibrator<Algorithm, DataLoader> make_int8_calibrator(
     DataLoader dataloader,
     const std::string& cache_file_path,
@@ -344,6 +344,7 @@ inline Int8Calibrator<Algorithm, DataLoader> make_int8_calibrator(
  * @return Int8CacheCalibrator<Algorithm>
  */
 template <typename Algorithm = nvinfer1::IInt8EntropyCalibrator2>
+[[deprecated("Int8 PTQ Calibrator has been deprecated by TensorRT, please plan on porting to a NVIDIA Model Optimizer Toolkit based workflow. See: https://pytorch.org/TensorRT/tutorials/_rendered_examples/dynamo/vgg16_ptq.html for more details")]]
 inline Int8CacheCalibrator<Algorithm> make_int8_cache_calibrator(const std::string& cache_file_path) {
   return Int8CacheCalibrator<Algorithm>(cache_file_path);
 }
