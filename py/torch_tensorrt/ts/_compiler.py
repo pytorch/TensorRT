@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import warnings
 from typing import Any, List, Optional, Sequence, Set, Tuple
 
 import torch
@@ -101,6 +102,12 @@ def compile(
     Returns:
         torch.jit.ScriptModule: Compiled TorchScript Module, when run it will execute via TensorRT
     """
+
+    warnings.warn(
+        'The torchscript frontend for Torch-TensorRT has been deprecated, please plan on porting to the dynamo frontend (torch_tensorrt.compile(..., ir="dynamo"). Torchscript will continue to be a supported deployment format via post compilation torchscript tracing, see: https://pytorch.org/TensorRT/user_guide/saving_models.html for more details',
+        DeprecationWarning,
+        stacklevel=2,
+    )
 
     input_list = list(inputs) if inputs is not None else []
     enabled_precisions_set = (
@@ -240,6 +247,12 @@ def convert_method_to_trt_engine(
     Returns:
         bytes: Serialized TensorRT engine, can either be saved to a file or deserialized via TensorRT APIs
     """
+    warnings.warn(
+        'The torchscript frontend for Torch-TensorRT has been deprecated, please plan on porting to the dynamo frontend (torch_tensorrt.convert_method_to_trt_engine(..., ir="dynamo"). Torchscript will continue to be a supported deployment format via post compilation torchscript tracing, see: https://pytorch.org/TensorRT/user_guide/saving_models.html for more details',
+        DeprecationWarning,
+        stacklevel=2,
+    )
+
     input_list = list(inputs) if inputs is not None else []
     enabled_precisions_set = (
         enabled_precisions if enabled_precisions is not None else {torch.float}
