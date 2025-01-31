@@ -30,6 +30,9 @@
   STR(TORCH_TENSORRT_MAJOR_VERSION) \
   "." STR(TORCH_TENSORRT_MINOR_VERSION) "." STR(TORCH_TENSORRT_PATCH_VERSION)
 
+#define TORCH_TENSORRT_PTQ_DEPRECATION \
+  [[deprecated(                        \
+      "Int8 PTQ Calibrator has been deprecated by TensorRT, please plan on porting to a NVIDIA Model Optimizer Toolkit based workflow. See: https://pytorch.org/TensorRT/tutorials/_rendered_examples/dynamo/vgg16_ptq.html for more details")]]
 // Setup namespace aliases for ease of use
 namespace torch_tensorrt {
 namespace torchscript {}
