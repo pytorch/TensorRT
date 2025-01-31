@@ -308,9 +308,8 @@ class Int8CacheCalibrator : Algorithm {
  * @param use_cache: bool - use calibration cache
  * @return Int8Calibrator<Algorithm, DataLoader>
  */
-
 template <typename Algorithm = nvinfer1::IInt8EntropyCalibrator2, typename DataLoader>
-inline Int8Calibrator<Algorithm, DataLoader> make_int8_calibrator(
+TORCH_TENSORRT_PTQ_DEPRECATION inline Int8Calibrator<Algorithm, DataLoader> make_int8_calibrator(
     DataLoader dataloader,
     const std::string& cache_file_path,
     bool use_cache) {
@@ -344,7 +343,8 @@ inline Int8Calibrator<Algorithm, DataLoader> make_int8_calibrator(
  * @return Int8CacheCalibrator<Algorithm>
  */
 template <typename Algorithm = nvinfer1::IInt8EntropyCalibrator2>
-inline Int8CacheCalibrator<Algorithm> make_int8_cache_calibrator(const std::string& cache_file_path) {
+TORCH_TENSORRT_PTQ_DEPRECATION inline Int8CacheCalibrator<Algorithm> make_int8_cache_calibrator(
+    const std::string& cache_file_path) {
   return Int8CacheCalibrator<Algorithm>(cache_file_path);
 }
 
