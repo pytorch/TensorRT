@@ -548,7 +548,11 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                     shape = self.output_allocator.shapes.get(output_name, None)
                     self.output_shapes[o] = shape
                     dtype = self.output_dtypes[o]
-                    output = self.output_allocator.buffers.get(output_name, None).clone().detach()
+                    output = (
+                        self.output_allocator.buffers.get(output_name, None)
+                        .clone()
+                        .detach()
+                    )
                     prod = int(torch.prod(torch.tensor(shape)))
                     output = output.reshape(-1).view(dtype)[:prod].reshape(shape)
                     outputs.append(output)
