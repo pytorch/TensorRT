@@ -69,11 +69,39 @@ struct TorchTRTRuntimeStates {
   }
 };
 
+class DynamicOutputAllocator : public nvinfer1::IOutputAllocator {
+ public:
+  DynamicOutputAllocator(const std::unordered_map<std::string, at::ScalarType>& output_dtypes);
+
+  void* reallocateOutputAsync(
+      char const* tensorName,
+      void* currentMemory,
+      uint64_t size,
+      uint64_t alignment,
+      cudaStream_t stream) override;
+
+  void notifyShape(char const* tensorName, nvinfer1::Dims const& dims) noexcept override;
+
+  const std::unordered_map<std::string, at::Tensor>& getBuffers() const {
+    return buffers;
+  }
+
+  const std::unordered_map<std::string, nvinfer1::Dims>& getShapes() const {
+    return shapes;
+  }
+
+ private:
+  std::unordered_map<std::string, at::ScalarType> dtypes;
+  std::unordered_map<std::string, at::Tensor> buffers;
+  std::unordered_map<std::string, nvinfer1::Dims> shapes;
+};
+
 struct TRTEngine : torch::CustomClassHolder {
   // Each engine needs it's own runtime object
   std::shared_ptr<nvinfer1::IRuntime> rt;
   std::shared_ptr<nvinfer1::ICudaEngine> cuda_engine;
   std::shared_ptr<nvinfer1::IExecutionContext> exec_ctx;
+  std::shared_ptr<DynamicOutputAllocator> output_allocator;
   std::pair<uint64_t, uint64_t> num_io;
   std::string name;
   RTDevice device_info;
@@ -141,7 +169,6 @@ struct TRTEngine : torch::CustomClassHolder {
   at::cuda::CUDAStream engine_stream = c10::cuda::getDefaultCUDAStream();
   at::cuda::CUDAStream caller_stream = c10::cuda::getDefaultCUDAStream();
   std::vector<at::Tensor> input_buffers = {};
-  std::vector<at::Tensor> output_buffers = {};
   std::string shape_key = "None";
   bool use_pre_allocated_outputs = false;
   std::vector<at::Tensor> pre_allocated_outputs;
