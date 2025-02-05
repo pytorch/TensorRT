@@ -1200,7 +1200,7 @@ class EngineCapability(Enum):
 
     @classmethod
     def try_from(
-        c: Union[trt.EngineCapability, EngineCapability]
+        c: Union[trt.EngineCapability, EngineCapability],
     ) -> Optional[EngineCapability]:
         """Create a Torch-TensorRT engine capability enum from a TensorRT engine capability enum.
 

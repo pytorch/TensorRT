@@ -42,7 +42,6 @@ def test_check_output_equal():
 )
 @pytest.mark.unit
 def test_resnet18():
-
     torch.manual_seed(0)
     inputs = [torch.rand((1, 3, 224, 224)).to("cuda")]
 
@@ -79,7 +78,6 @@ def test_resnet18():
 )
 @pytest.mark.unit
 def test_save():
-
     torch.manual_seed(0)
     inputs = [torch.rand((1, 3, 224, 224)).to("cuda")]
 
@@ -116,7 +114,6 @@ def test_save():
 )
 @pytest.mark.unit
 def test_resnet18_modify_attribute():
-
     torch.manual_seed(0)
     inputs = [torch.rand((1, 3, 224, 224)).to("cuda")]
 
@@ -157,7 +154,6 @@ def test_resnet18_modify_attribute():
 )
 @pytest.mark.unit
 def test_resnet18_modify_attribute_no_refit():
-
     torch.manual_seed(0)
     inputs = [torch.rand((1, 3, 224, 224)).to("cuda")]
 

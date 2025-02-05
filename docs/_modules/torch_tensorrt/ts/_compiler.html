@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt.ts._compiler &mdash; Torch-TensorRT v2.7.0.dev0+cfdb585 documentation</title>
+  <title>torch_tensorrt.ts._compiler &mdash; Torch-TensorRT v2.7.0.dev0+3ee73ad documentation</title>
   
 
   
@@ -290,7 +290,7 @@
               
               
                 <div class="version">
-                  v2.7.0.dev0+cfdb585
+                  v2.7.0.dev0+3ee73ad
                 </div>
               
             
@@ -487,6 +487,7 @@
   <h1>Source code for torch_tensorrt.ts._compiler</h1><div class="highlight"><pre>
 <span></span><span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
 
+<span class="kn">import</span><span class="w"> </span><span class="nn">warnings</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Sequence</span><span class="p">,</span> <span class="n">Set</span><span class="p">,</span> <span class="n">Tuple</span>
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
@@ -588,6 +589,12 @@
 <span class="sd">    Returns:</span>
 <span class="sd">        torch.jit.ScriptModule: Compiled TorchScript Module, when run it will execute via TensorRT</span>
 <span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+        <span class="s1">&#39;The torchscript frontend for Torch-TensorRT has been deprecated, please plan on porting to the dynamo frontend (torch_tensorrt.compile(..., ir=&quot;dynamo&quot;). Torchscript will continue to be a supported deployment format via post compilation torchscript tracing, see: https://pytorch.org/TensorRT/user_guide/saving_models.html for more details&#39;</span><span class="p">,</span>
+        <span class="ne">DeprecationWarning</span><span class="p">,</span>
+        <span class="n">stacklevel</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+    <span class="p">)</span>
 
     <span class="n">input_list</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">inputs</span><span class="p">)</span> <span class="k">if</span> <span class="n">inputs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="p">[]</span>
     <span class="n">enabled_precisions_set</span> <span class="o">=</span> <span class="p">(</span>
@@ -727,6 +734,12 @@
 <span class="sd">    Returns:</span>
 <span class="sd">        bytes: Serialized TensorRT engine, can either be saved to a file or deserialized via TensorRT APIs</span>
 <span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+        <span class="s1">&#39;The torchscript frontend for Torch-TensorRT has been deprecated, please plan on porting to the dynamo frontend (torch_tensorrt.convert_method_to_trt_engine(..., ir=&quot;dynamo&quot;). Torchscript will continue to be a supported deployment format via post compilation torchscript tracing, see: https://pytorch.org/TensorRT/user_guide/saving_models.html for more details&#39;</span><span class="p">,</span>
+        <span class="ne">DeprecationWarning</span><span class="p">,</span>
+        <span class="n">stacklevel</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+    <span class="p">)</span>
+
     <span class="n">input_list</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">inputs</span><span class="p">)</span> <span class="k">if</span> <span class="n">inputs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="p">[]</span>
     <span class="n">enabled_precisions_set</span> <span class="o">=</span> <span class="p">(</span>
         <span class="n">enabled_precisions</span> <span class="k">if</span> <span class="n">enabled_precisions</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="p">{</span><span class="n">torch</span><span class="o">.</span><span class="n">float</span><span class="p">}</span>

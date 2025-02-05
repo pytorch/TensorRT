@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt.dynamo._compiler &mdash; Torch-TensorRT v2.7.0.dev0+cfdb585 documentation</title>
+  <title>torch_tensorrt.dynamo._compiler &mdash; Torch-TensorRT v2.7.0.dev0+3ee73ad documentation</title>
   
 
   
@@ -290,7 +290,7 @@
               
               
                 <div class="version">
-                  v2.7.0.dev0+cfdb585
+                  v2.7.0.dev0+3ee73ad
                 </div>
               
             
@@ -536,7 +536,7 @@
 <span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
 
 
-<span class="k">def</span><span class="w"> </span><span class="nf">cross_compile_for_windows</span><span class="p">(</span>
+<div class="viewcode-block" id="cross_compile_for_windows"><a class="viewcode-back" href="../../../py_api/dynamo.html#torch_tensorrt.dynamo.cross_compile_for_windows">[docs]</a><span class="k">def</span><span class="w"> </span><span class="nf">cross_compile_for_windows</span><span class="p">(</span>
     <span class="n">exported_program</span><span class="p">:</span> <span class="n">ExportedProgram</span><span class="p">,</span>
     <span class="n">inputs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Sequence</span><span class="p">[</span><span class="n">Sequence</span><span class="p">[</span><span class="n">Any</span><span class="p">]]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="o">*</span><span class="p">,</span>
@@ -850,7 +850,7 @@
         <span class="n">trt_kwarg_inputs</span><span class="p">,</span>
         <span class="n">settings</span><span class="p">,</span>
     <span class="p">)</span>
-    <span class="k">return</span> <span class="n">trt_gm</span>
+    <span class="k">return</span> <span class="n">trt_gm</span></div>
 
 
 <div class="viewcode-block" id="compile"><a class="viewcode-back" href="../../../py_api/dynamo.html#torch_tensorrt.dynamo.compile">[docs]</a><span class="k">def</span><span class="w"> </span><span class="nf">compile</span><span class="p">(</span>
@@ -1397,7 +1397,7 @@
     <span class="k">return</span> <span class="n">partitioned_module</span>
 
 
-<span class="k">def</span><span class="w"> </span><span class="nf">convert_exported_program_to_serialized_trt_engine</span><span class="p">(</span>
+<div class="viewcode-block" id="convert_exported_program_to_serialized_trt_engine"><a class="viewcode-back" href="../../../py_api/dynamo.html#torch_tensorrt.dynamo.convert_exported_program_to_serialized_trt_engine">[docs]</a><span class="k">def</span><span class="w"> </span><span class="nf">convert_exported_program_to_serialized_trt_engine</span><span class="p">(</span>
     <span class="n">exported_program</span><span class="p">:</span> <span class="n">ExportedProgram</span><span class="p">,</span>
     <span class="n">inputs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Sequence</span><span class="p">[</span><span class="n">Sequence</span><span class="p">[</span><span class="n">Any</span><span class="p">]]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="o">*</span><span class="p">,</span>
@@ -1656,10 +1656,10 @@
         <span class="p">)</span>
 
     <span class="n">serialized_engine</span><span class="p">:</span> <span class="nb">bytes</span> <span class="o">=</span> <span class="n">interpreter_result</span><span class="o">.</span><span class="n">serialized_engine</span>
-    <span class="k">return</span> <span class="n">serialized_engine</span>
+    <span class="k">return</span> <span class="n">serialized_engine</span></div>
 
 
-<span class="k">def</span><span class="w"> </span><span class="nf">save_cross_compiled_exported_program</span><span class="p">(</span>
+<div class="viewcode-block" id="save_cross_compiled_exported_program"><a class="viewcode-back" href="../../../py_api/dynamo.html#torch_tensorrt.dynamo.save_cross_compiled_exported_program">[docs]</a><span class="k">def</span><span class="w"> </span><span class="nf">save_cross_compiled_exported_program</span><span class="p">(</span>
     <span class="n">gm</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">,</span>
     <span class="n">file_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
@@ -1677,10 +1677,10 @@
 
     <span class="n">exp_program</span> <span class="o">=</span> <span class="n">export</span><span class="p">(</span><span class="n">gm</span><span class="p">,</span> <span class="n">cross_compile_flag</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
     <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">exp_program</span><span class="p">,</span> <span class="n">file_path</span><span class="p">)</span>
-    <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;successfully saved the module for windows at </span><span class="si">{</span><span class="n">file_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;successfully saved the module for windows at </span><span class="si">{</span><span class="n">file_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span></div>
 
 
-<span class="k">def</span><span class="w"> </span><span class="nf">load_cross_compiled_exported_program</span><span class="p">(</span><span class="n">file_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+<div class="viewcode-block" id="load_cross_compiled_exported_program"><a class="viewcode-back" href="../../../py_api/dynamo.html#torch_tensorrt.dynamo.load_cross_compiled_exported_program">[docs]</a><span class="k">def</span><span class="w"> </span><span class="nf">load_cross_compiled_exported_program</span><span class="p">(</span><span class="n">file_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Load an ExportedProgram file in Windows which was previously cross compiled in Linux</span>
 
@@ -1711,7 +1711,7 @@
             <span class="sa">f</span><span class="s2">&quot;cross_load the file </span><span class="si">{</span><span class="n">file_path</span><span class="si">}</span><span class="s2"> doesn&#39;t correspond to a valid ExportedProgram. Please verify the file path.&quot;</span>
         <span class="p">)</span>
 
-    <span class="k">return</span> <span class="n">replace_execute_engine_no_op_node</span><span class="p">(</span><span class="n">exp_program</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">replace_execute_engine_no_op_node</span><span class="p">(</span><span class="n">exp_program</span><span class="p">)</span></div>
 </pre></div>
 
              </article>

@@ -247,7 +247,7 @@ def hard_sigmoid(
     operation_type = trt.ActivationType.HARD_SIGMOID
 
     def hard_sigmoid_dyn_range_fn(
-        dyn_range: Tuple[float, float]
+        dyn_range: Tuple[float, float],
     ) -> Tuple[float, float]:
         def hard_sigmoid_fn(x: float) -> float:
             return max(0, min(1, alpha * x + beta))
@@ -310,7 +310,7 @@ def thresholded_relu(
     operation_type = trt.ActivationType.THRESHOLDED_RELU
 
     def thresholded_relu_dyn_range_fn(
-        dyn_range: Tuple[float, float]
+        dyn_range: Tuple[float, float],
     ) -> Tuple[float, float]:
         def thresholded_relu_fn(x: float) -> float:
             return x if x > alpha else 0

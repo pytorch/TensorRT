@@ -472,7 +472,7 @@ def to_torch_device(device: Optional[Union[Device, torch.device, str]]) -> torch
 
 
 def to_torch_tensorrt_device(
-    device: Optional[Union[Device, torch.device, str]]
+    device: Optional[Union[Device, torch.device, str]],
 ) -> Device:
     """Cast a device-type to torch_tensorrt.Device
 
@@ -640,7 +640,6 @@ def check_output_equal(
     rtol: float = RTOL,
     atol: float = ATOL,
 ) -> bool:
-
     if type(output1) != type(output2):
         logger.warning(
             "The output types are different. Check_output_equal will always return false."

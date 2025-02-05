@@ -251,7 +251,6 @@ def refit_module_weights(
     # Get the settings and check the setting to be uniform
     settings: Optional[CompilationSettings] = None
     if inline_module:
-
         # Obtain the settings
         compiled_submodules = [
             (name.replace("_engine", ""), engine)
@@ -362,7 +361,6 @@ def refit_module_weights(
     # Generate the corresponding TRT Module for those
 
     for name, new_submodule in new_partitioned_module.named_children():
-
         # Refit each submodule
         # Extract engine from the submodule
         try:

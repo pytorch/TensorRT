@@ -31,7 +31,6 @@ class SampleModel(torch.nn.Module):
 
 
 class TestWeightStreamingPython(TestCase):
-
     @parameterized.expand(
         [
             ("python_runtime", True),

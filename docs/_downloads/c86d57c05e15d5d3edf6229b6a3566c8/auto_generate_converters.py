@@ -39,7 +39,7 @@ operation in PyTorch to TensorRT.
 
 from typing import Tuple
 
-import tensorrt_bindings.plugin as trtp
+import tensorrt.plugin as trtp
 import torch
 import torch_tensorrt
 import triton
