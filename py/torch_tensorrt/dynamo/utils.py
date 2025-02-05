@@ -243,7 +243,10 @@ def prepare_inputs(
     inputs: Input | torch.Tensor | Sequence[Any] | Dict[Any, Any],
     disable_memory_format_check: bool = False,
 ) -> Any:
-    if isinstance(inputs, Input):
+    if inputs is None:
+        return None
+
+    elif isinstance(inputs, Input):
         return inputs
 
     elif isinstance(inputs, (torch.Tensor, int, float, bool)):
@@ -400,6 +403,9 @@ def unwrap_tensor_dtype(tensor: Union[torch.Tensor, FakeTensor, torch.SymInt]) -
         return torch.tensor(tensor).dtype
     elif isinstance(tensor, torch.SymInt):
         return torch.int64
+    elif tensor is None:
+        # Case where we explicitly pass one of the inputs to be None (eg: FLUX.1-dev)
+        return None
     else:
         raise ValueError(f"Found invalid tensor type {type(tensor)}")
 
