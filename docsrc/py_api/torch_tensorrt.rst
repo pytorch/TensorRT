@@ -22,9 +22,9 @@ Functions
 
 .. autofunction:: convert_method_to_trt_engine
 
-.. autofunction: cross_compile_for_windows
+.. autofunction:: cross_compile_for_windows
 
-.. autofunction load_cross_compiled_exported_program
+.. autofunction:: load_cross_compiled_exported_program
 
 .. autofunction:: get_build_info
 
