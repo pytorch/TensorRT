@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt.fx &mdash; Torch-TensorRT v2.7.0.dev0+ceb9aa5 documentation</title>
+  <title>Template Function torch_tensorrt::ptq::make_int8_cache_calibrator &mdash; Torch-TensorRT v2.7.0.dev0+ceb9aa5 documentation</title>
   
 
   
@@ -39,8 +39,8 @@
   <link rel="stylesheet" href="../_static/css/custom.css" type="text/css" />
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="torch_tensorrt.dynamo" href="dynamo.html" />
-    <link rel="prev" title="torch_tensorrt.ts" href="ts.html" />
+    <link rel="next" title="Template Function torch_tensorrt::ptq::make_int8_calibrator" href="function_ptq_8h_1ab79e3404965db0eec712f7268f29138a.html" />
+    <link rel="prev" title="Function torch_tensorrt::logging::set_reportable_log_level" href="function_logging_8h_1a7cb50492421ea9de4e3db895819df6f2.html" />
   <!-- Google Tag Manager -->
     <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
     new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
@@ -382,21 +382,21 @@
 <li class="toctree-l1"><a class="reference internal" href="../tutorials/notebooks.html">Legacy notebooks</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Python API Documentation</span></p>
-<ul class="current">
-<li class="toctree-l1 current"><a class="reference internal" href="torch_tensorrt.html">torch_tensorrt</a></li>
-<li class="toctree-l1"><a class="reference internal" href="dynamo.html">torch_tensorrt.dynamo</a></li>
-<li class="toctree-l1"><a class="reference internal" href="logging.html">torch_tensorrt.logging</a></li>
-<li class="toctree-l1 current"><a class="current reference internal" href="#">torch_tensorrt.fx</a></li>
-<li class="toctree-l1"><a class="reference internal" href="ts.html">torch_tensorrt.ts</a></li>
-<li class="toctree-l1"><a class="reference internal" href="ptq.html">torch_tensorrt.ts.ptq</a></li>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../py_api/torch_tensorrt.html">torch_tensorrt</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../py_api/dynamo.html">torch_tensorrt.dynamo</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../py_api/logging.html">torch_tensorrt.logging</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../py_api/fx.html">torch_tensorrt.fx</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../py_api/ts.html">torch_tensorrt.ts</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../py_api/ptq.html">torch_tensorrt.ts.ptq</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">C++ API Documentation</span></p>
-<ul>
-<li class="toctree-l1"><a class="reference internal" href="../_cpp_api/torch_tensort_cpp.html">Torch-TensorRT C++ API</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../_cpp_api/namespace_torch_tensorrt.html">Namespace torch_tensorrt</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../_cpp_api/namespace_torch_tensorrt__logging.html">Namespace torch_tensorrt::logging</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../_cpp_api/namespace_torch_tensorrt__torchscript.html">Namespace torch_tensorrt::torchscript</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../_cpp_api/namespace_torch_tensorrt__ptq.html">Namespace torch_tensorrt::ptq</a></li>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="torch_tensort_cpp.html">Torch-TensorRT C++ API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="namespace_torch_tensorrt.html">Namespace torch_tensorrt</a></li>
+<li class="toctree-l1"><a class="reference internal" href="namespace_torch_tensorrt__logging.html">Namespace torch_tensorrt::logging</a></li>
+<li class="toctree-l1"><a class="reference internal" href="namespace_torch_tensorrt__torchscript.html">Namespace torch_tensorrt::torchscript</a></li>
+<li class="toctree-l1"><a class="reference internal" href="namespace_torch_tensorrt__ptq.html">Namespace torch_tensorrt::ptq</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">CLI Documentation</span></p>
 <ul>
@@ -453,15 +453,15 @@
       </li>
 
         
-          <li><a href="torch_tensorrt.html">torch_tensorrt</a> &gt;</li>
+          <li><a href="torch_tensort_cpp.html">Torch-TensorRT C++ API</a> &gt;</li>
         
-      <li>torch_tensorrt.fx</li>
+      <li>Template Function torch_tensorrt::ptq::make_int8_cache_calibrator</li>
     
     
       <li class="pytorch-breadcrumbs-aside">
         
             
-            <a href="../_sources/py_api/fx.rst.txt" rel="nofollow"><img src="../_static/images/view-page-source-icon.svg"></a>
+            <a href="../_sources/_cpp_api/function_ptq_8h_1af43f19b7b8f732447847cef1e8bd02ac.rst.txt" rel="nofollow"><img src="../_static/images/view-page-source-icon.svg"></a>
           
         
       </li>
@@ -491,78 +491,35 @@
             <div role="main" class="main-content" itemscope="itemscope" itemtype="http://schema.org/Article">
              <article itemprop="articleBody" id="pytorch-article" class="pytorch-article">
               
-  <section id="torch-tensorrt-fx">
-<span id="torch-tensorrt-fx-py"></span><h1>torch_tensorrt.fx<a class="headerlink" href="#torch-tensorrt-fx" title="Permalink to this heading">¶</a></h1>
-<span class="target" id="module-torch_tensorrt.fx"></span><section id="functions">
-<h2>Functions<a class="headerlink" href="#functions" title="Permalink to this heading">¶</a></h2>
-<dl class="py function">
-<dt class="sig sig-object py" id="torch_tensorrt.fx.compile">
-<span class="sig-prename descclassname"><span class="pre">torch_tensorrt.fx.</span></span><span class="sig-name descname"><span class="pre">compile</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">module</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Module</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">input</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">min_acc_module_size</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">10</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_batch_size</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">2048</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_workspace_size</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">33554432</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">explicit_batch_dimension</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lower_precision</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">LowerPrecision.FP16</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose_log</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">timing_cache_prefix</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">''</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">save_timing_cache</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cuda_graph_batch_size</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">-</span> <span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dynamic_batch</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_aten</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_experimental_fx_rt</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">correctness_atol</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">correctness_rtol</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.1</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Module</span></span></span><a class="reference internal" href="../_modules/torch_tensorrt/fx/lower.html#compile"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.fx.compile" title="Permalink to this definition">¶</a></dt>
-<dd><p>Takes in original module, input and lowering setting, run lowering workflow to turn module
-into lowered module, or so called TRTModule.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters</dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>module</strong> – Original module for lowering.</p></li>
-<li><p><strong>input</strong> – Input for module.</p></li>
-<li><p><strong>max_batch_size</strong> – Maximum batch size (must be &gt;= 1 to be set, 0 means not set)</p></li>
-<li><p><strong>min_acc_module_size</strong> – Minimal number of nodes for an accelerated submodule</p></li>
-<li><p><strong>max_workspace_size</strong> – Maximum size of workspace given to TensorRT.</p></li>
-<li><p><strong>explicit_batch_dimension</strong> – Use explicit batch dimension in TensorRT if set True, otherwise use implicit batch dimension.</p></li>
-<li><p><strong>lower_precision</strong> – lower_precision config given to TRTModule.</p></li>
-<li><p><strong>verbose_log</strong> – Enable verbose log for TensorRT if set True.</p></li>
-<li><p><strong>timing_cache_prefix</strong> – Timing cache file name for timing cache used by fx2trt.</p></li>
-<li><p><strong>save_timing_cache</strong> – Update timing cache with current timing cache data if set to True.</p></li>
-<li><p><strong>cuda_graph_batch_size</strong> – Cuda graph batch size, default to be -1.</p></li>
-<li><p><strong>dynamic_batch</strong> – batch dimension (dim=0) is dynamic.</p></li>
-<li><p><strong>use_experimental_fx_rt</strong> – Uses the next generation TRTModule which supports both Python and TorchScript based execution (including in C++).</p></li>
+  <section id="template-function-torch-tensorrt-ptq-make-int8-cache-calibrator">
+<span id="exhale-function-ptq-8h-1af43f19b7b8f732447847cef1e8bd02ac"></span><h1>Template Function torch_tensorrt::ptq::make_int8_cache_calibrator<a class="headerlink" href="#template-function-torch-tensorrt-ptq-make-int8-cache-calibrator" title="Permalink to this heading">¶</a></h1>
+<ul class="simple">
+<li><p>Defined in <a class="reference internal" href="file_cpp_include_torch_tensorrt_ptq.h.html#file-cpp-include-torch-tensorrt-ptq-h"><span class="std std-ref">File ptq.h</span></a></p></li>
 </ul>
-</dd>
-<dt class="field-even">Returns</dt>
-<dd class="field-even"><p>A torch.nn.Module lowered by TensorRT.</p>
-</dd>
-</dl>
-</dd></dl>
-
-</section>
-<section id="classes">
-<h2>Classes<a class="headerlink" href="#classes" title="Permalink to this heading">¶</a></h2>
-<dl class="py class">
-<dt class="sig sig-object py" id="torch_tensorrt.fx.TRTModule">
-<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">torch_tensorrt.fx.</span></span><span class="sig-name descname"><span class="pre">TRTModule</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">engine</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">input_names</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">output_names</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cuda_graph_batch_size</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">-</span> <span class="pre">1</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/torch_tensorrt/fx/trt_module.html#TRTModule"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.fx.TRTModule" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="py class">
-<dt class="sig sig-object py" id="torch_tensorrt.fx.InputTensorSpec">
-<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">torch_tensorrt.fx.</span></span><span class="sig-name descname"><span class="pre">InputTensorSpec</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">shape</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Sequence</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dtype</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dtype</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">device</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">device</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">device(type='cpu')</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">shape_ranges</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">Sequence</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Sequence</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Sequence</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">[]</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">has_batch_dim</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/torch_tensorrt/fx/input_tensor_spec.html#InputTensorSpec"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.fx.InputTensorSpec" title="Permalink to this definition">¶</a></dt>
-<dd><p>This class contains the information of a input tensor.</p>
-<p>shape: shape of the tensor.</p>
-<p>dtype: dtyep of the tensor.</p>
-<dl class="simple">
-<dt>device: device of the tensor. This is only used to generate inputs to the given model</dt><dd><p>in order to run shape prop. For TensorRT engine, inputs have to be on cuda device.</p>
-</dd>
-<dt>shape_ranges: If dynamic shape is needed (shape has dimensions of -1), then this field</dt><dd><p>has to be provided (default is empty list). Every shape_range is a tuple of three
-tuples ((min_input_shape), (optimized_input_shape), (max_input_shape)). Each shape_range
-is used to populate a TensorRT optimization profile.
-e.g. If the input shape varies from (1, 224) to (100, 224) and we want to optimize
-for (25, 224) because it’s the most common input shape, then we set shape_ranges to
-((1, 224), (25, 225), (100, 224)).</p>
-</dd>
-<dt>has_batch_dim: Whether the shape includes batch dimension. Batch dimension has to be provided</dt><dd><p>if the engine want to run with dynamic shape.</p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py class">
-<dt class="sig sig-object py" id="torch_tensorrt.fx.TRTInterpreter">
-<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">torch_tensorrt.fx.</span></span><span class="sig-name descname"><span class="pre">TRTInterpreter</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">module</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">GraphModule</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">input_specs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">List</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#torch_tensorrt.fx.InputTensorSpec" title="torch_tensorrt.fx.input_tensor_spec.InputTensorSpec"><span class="pre">InputTensorSpec</span></a><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">explicit_batch_dimension</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">explicit_precision</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">logger_level</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/torch_tensorrt/fx/fx2trt.html#TRTInterpreter"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.fx.TRTInterpreter" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="py class">
-<dt class="sig sig-object py" id="torch_tensorrt.fx.TRTInterpreterResult">
-<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">torch_tensorrt.fx.</span></span><span class="sig-name descname"><span class="pre">TRTInterpreterResult</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">engine</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">input_names</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">output_names</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">serialized_cache</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/torch_tensorrt/fx/fx2trt.html#TRTInterpreterResult"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.fx.TRTInterpreterResult" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
+<section id="function-documentation">
+<h2>Function Documentation<a class="headerlink" href="#function-documentation" title="Permalink to this heading">¶</a></h2>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>doxygenfunction: Unable to resolve function “torch_tensorrt::ptq::make_int8_cache_calibrator” with arguments “(const std::string&amp;)”.
+Candidate function could not be parsed. Parsing error is
+Error when parsing function declaration.
+If the function has no return type:
+  Error in declarator or parameters-and-qualifiers
+  Invalid C++ declaration: Expecting “(” in parameters-and-qualifiers. [error at 96]
+    template&lt;typename Algorithm = nvinfer1::IInt8EntropyCalibrator2&gt; TORCH_TENSORRT_PTQ_DEPRECATION Int8CacheCalibrator&lt; Algorithm &gt; make_int8_cache_calibrator (const std::string &amp;cache_file_path)
+    ————————————————————————————————^
+If the function has a return type:
+  Error in declarator or parameters-and-qualifiers
+  If pointer to member declarator:
+    Invalid C++ declaration: Expected ‘::’ in pointer to member (function). [error at 129]
+      template&lt;typename Algorithm = nvinfer1::IInt8EntropyCalibrator2&gt; TORCH_TENSORRT_PTQ_DEPRECATION Int8CacheCalibrator&lt; Algorithm &gt; make_int8_cache_calibrator (const std::string &amp;cache_file_path)
+      ———————————————————————————————————————————^
+  If declarator-id:
+    Invalid C++ declaration: Expecting “(” in parameters-and-qualifiers. [error at 129]
+      template&lt;typename Algorithm = nvinfer1::IInt8EntropyCalibrator2&gt; TORCH_TENSORRT_PTQ_DEPRECATION Int8CacheCalibrator&lt; Algorithm &gt; make_int8_cache_calibrator (const std::string &amp;cache_file_path)
+      ———————————————————————————————————————————^
+</p>
+</div>
 </section>
 </section>
 
@@ -574,10 +531,10 @@ for (25, 224) because it’s the most common input shape, then we set shape_rang
   
     <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
       
-        <a href="dynamo.html" class="btn btn-neutral float-right" title="torch_tensorrt.dynamo" accesskey="n" rel="next">Next <img src="../_static/images/chevron-right-orange.svg" class="next-page"></a>
+        <a href="function_ptq_8h_1ab79e3404965db0eec712f7268f29138a.html" class="btn btn-neutral float-right" title="Template Function torch_tensorrt::ptq::make_int8_calibrator" accesskey="n" rel="next">Next <img src="../_static/images/chevron-right-orange.svg" class="next-page"></a>
       
       
-        <a href="ts.html" class="btn btn-neutral" title="torch_tensorrt.ts" accesskey="p" rel="prev"><img src="../_static/images/chevron-right-orange.svg" class="previous-page"> Previous</a>
+        <a href="function_logging_8h_1a7cb50492421ea9de4e3db895819df6f2.html" class="btn btn-neutral" title="Function torch_tensorrt::logging::set_reportable_log_level" accesskey="p" rel="prev"><img src="../_static/images/chevron-right-orange.svg" class="previous-page"> Previous</a>
       
     </div>
   
@@ -609,9 +566,8 @@ for (25, 224) because it’s the most common input shape, then we set shape_rang
           <div class="pytorch-right-menu" id="pytorch-right-menu">
             <div class="pytorch-side-scroll" id="pytorch-side-scroll-right">
               <ul>
-<li><a class="reference internal" href="#">torch_tensorrt.fx</a><ul>
-<li><a class="reference internal" href="#functions">Functions</a></li>
-<li><a class="reference internal" href="#classes">Classes</a></li>
+<li><a class="reference internal" href="#">Template Function torch_tensorrt::ptq::make_int8_cache_calibrator</a><ul>
+<li><a class="reference internal" href="#function-documentation">Function Documentation</a></li>
 </ul>
 </li>
 </ul>
