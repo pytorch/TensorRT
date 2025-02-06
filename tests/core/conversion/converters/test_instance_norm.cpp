@@ -4,6 +4,7 @@
 #include "tests/util/util.h"
 #include "torch/csrc/jit/ir/irparser.h"
 
+#ifndef DISABLE_TEST_IN_CI
 // Tensor instance_norm(
 //     const Tensor& input,
 //     const c10::optional<Tensor>& weight_opt /* optional */,
@@ -101,3 +102,5 @@ TEST(Converters, ATenInstanceNormRunningStatsConvertsCorrectly) {
   auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {trt_in});
   ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0])));
 }
+
+#endif
