@@ -10,7 +10,6 @@ import torch._dynamo as td
 from torch._dynamo.backends.common import aot_autograd
 from torch._dynamo.utils import detect_fake_mode
 from torch._functorch.aot_autograd import aot_export_joint_simple
-from torch._ops import OpOverload
 from torch_tensorrt.dynamo import CompilationSettings
 from torch_tensorrt.dynamo._compiler import compile_module
 from torch_tensorrt.dynamo.lowering import (
@@ -63,11 +62,19 @@ def aot_torch_tensorrt_aten_backend(
     settings_aot_autograd["decompositions"] = get_decompositions(
         settings.enable_experimental_decompositions
     )
+    # This is added since detach lowering leads to alias nodes
+    # Error - View operation returned a tensor that is the same as the input base tensor
+    # torch nop_decompositions in torch/_decomp/decompositions.py
     # transpose key deleted since not desirable to lower it to permute
-    for key in settings_aot_autograd["decompositions"]:
-        if "transpose" in key._name:
-            to_delete = key
-    del settings_aot_autograd["decompositions"][to_delete]
+    to_delete = {
+        key
+        for key in settings_aot_autograd["decompositions"]
+        if "detach" in key._name or "transpose" in key._name
+    }
+
+    for key in to_delete:
+        del settings_aot_autograd["decompositions"][key]
+
     return aot_autograd(
         fw_compiler=_pretraced_backend_autograd,
         decompositions=settings_aot_autograd["decompositions"],
