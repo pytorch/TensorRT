@@ -2,6 +2,7 @@ import logging
 from typing import Callable, Optional, Sequence, Union
 
 import torch
+from torch_tensorrt._enums import Platform
 from torch_tensorrt.dynamo._settings import CompilationSettings
 
 from .accumulate_fp32_matmul import accumulate_fp32_matmul
@@ -17,20 +18,22 @@ from .repair_input_as_output import repair_input_as_output
 from .replace_max_pool_with_indices import replace_max_pool_with_indices
 from .view_to_reshape import view_to_reshape
 
-ATEN_POST_LOWERING_PASSES = DynamoPassManager.build_from_passlist(
-    [
-        remove_input_alias_fixing_clones,
-        constant_fold,
-        repair_input_as_output,
-        fuse_prims_broadcast,
-        fuse_distributed_ops,
-        replace_max_pool_with_indices,
-        lower_scaled_dot_product_attention,
-        view_to_reshape,
-        remove_assert_scalar,
-        accumulate_fp32_matmul,
-    ]
-)
+pass_list = [
+    remove_input_alias_fixing_clones,
+    constant_fold,
+    repair_input_as_output,
+    fuse_prims_broadcast,
+    replace_max_pool_with_indices,
+    lower_scaled_dot_product_attention,
+    view_to_reshape,
+    remove_assert_scalar,
+    accumulate_fp32_matmul,
+]
+
+if torch.cuda.get_device_capability() not in [(8, 7), (7, 2)]:
+    pass_list.append(fuse_distributed_ops)
+
+ATEN_POST_LOWERING_PASSES = DynamoPassManager.build_from_passlist(pass_list)
 
 ATEN_PRE_LOWERING_PASSES = DynamoPassManager.build_from_passlist(
     [
