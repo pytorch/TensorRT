@@ -25,6 +25,7 @@ Model Zoo
 * :ref:`_torch_export_gpt2`: Compiling a GPT2 model using AOT workflow (`ir=dynamo`)
 * :ref:`_torch_export_llama2`: Compiling a Llama2 model using AOT workflow (`ir=dynamo`)
 * :ref:`_torch_export_sam2`: Compiling SAM2 model using AOT workflow (`ir=dynamo`)
+* :ref:`_torch_export_flux_dev`: Compiling FLUX.1-dev model using AOT workflow (`ir=dynamo`)
 
 
 .. raw:: html
@@ -182,6 +183,23 @@ Model Zoo
 .. raw:: html
 
       <div class="sphx-glr-thumbnail-title">Pre-allocated output buffer</div>
+    </div>
+
+
+.. raw:: html
+
+    <div class="sphx-glr-thumbcontainer" tooltip="This example illustrates the state of the art model FLUX.1-dev optimized using Torch-TensorRT.">
+
+.. only:: html
+
+  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_torch_export_flux_dev_thumb.png
+    :alt:
+
+  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_torch_export_flux_dev.py`
+
+.. raw:: html
+
+      <div class="sphx-glr-thumbnail-title">Compiling FLUX.1-dev model using the Torch-TensorRT dynamo backend</div>
     </div>
 
 
@@ -389,6 +407,7 @@ Model Zoo
    /tutorials/_rendered_examples/dynamo/torch_export_cudagraphs
    /tutorials/_rendered_examples/dynamo/engine_caching_bert_example
    /tutorials/_rendered_examples/dynamo/pre_allocated_output_example
+   /tutorials/_rendered_examples/dynamo/torch_export_flux_dev
    /tutorials/_rendered_examples/dynamo/mutable_torchtrt_module_example
    /tutorials/_rendered_examples/dynamo/torch_compile_resnet_example
    /tutorials/_rendered_examples/dynamo/torch_export_gpt2
