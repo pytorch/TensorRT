@@ -269,6 +269,48 @@ class TestFP32Accumulation(TestCase):
         )
         torch._dynamo.reset()
 
+    def test_fp32_acc_for_addmm(self):
+        class FP32Acc(torch.nn.Module):
+            def forward(self, input, mat1, mat2):
+                out = torch.ops.aten.addmm.default(input, mat1, mat2)
+                return out
+
+        inputs = [
+            torch.rand((3, 5)).cuda(),
+            torch.rand((3, 4)).cuda(),
+            torch.rand((4, 5)).cuda(),
+        ]
+
+        fx_graph = torch.fx.symbolic_trace(FP32Acc())
+        expected_ops = {
+            torch.ops.aten._to_copy.default,
+            torch.ops.aten.mm.default,
+            torch.ops.aten.add.Tensor,
+        }
+        unexpected_ops = {}
+
+        unexpected_ops_seen, expected_ops_unseen = lower_graph_testing(
+            fx_graph,
+            inputs,
+            expected_ops=expected_ops,
+            unexpected_ops=unexpected_ops,
+            min_block_size=1,
+            use_fp32_acc=True,
+        )
+
+        self.assertEqual(
+            len(unexpected_ops_seen),
+            0,
+            f"The following unexpected ops were encountered: {unexpected_ops_seen}",
+        )
+
+        self.assertEqual(
+            len(expected_ops_unseen),
+            0,
+            f"The following expected ops were not encountered: {expected_ops_unseen}",
+        )
+        torch._dynamo.reset()
+
 
 class TestLowerEfficientAttention(TestCase):
     def test_lower_efficient_attention(self):
