@@ -63,6 +63,8 @@ dynamic_shapes = {
     "txt_ids": {0: SEQ_LEN},
     "img_ids": {0: IMG_ID},
     "guidance": {0: BATCH},
+    "joint_attention_kwargs": {},
+    "return_dict": None
 }
 # The guidance factor is of type torch.float32
 dummy_inputs = {
@@ -79,6 +81,8 @@ dummy_inputs = {
     "txt_ids": torch.randn((512, 3), dtype=torch.float16).to(DEVICE),
     "img_ids": torch.randn((4096, 3), dtype=torch.float16).to(DEVICE),
     "guidance": torch.tensor([1.0, 1.0], dtype=torch.float32).to(DEVICE),
+    "joint_attention_kwargs": {},
+    "return_dict": False
 }
 # This will create an exported program which is going to be compiled with Torch-TensorRT
 ep = _export(
