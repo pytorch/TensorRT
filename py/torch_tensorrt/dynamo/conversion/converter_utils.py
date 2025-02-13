@@ -3,6 +3,8 @@ import ctypes
 import functools
 import logging
 import os
+import subprocess
+import sys
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union, overload
 
 import numpy as np
@@ -13,6 +15,7 @@ from torch.fx.experimental.proxy_tensor import unset_fake_temporarily
 from torch.fx.node import Argument, Target
 from torch.fx.passes.shape_prop import TensorMetadata
 from torch_tensorrt import _enums
+from torch_tensorrt._enums import Platform
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
@@ -1011,57 +1014,91 @@ def load_tensorrt_llm() -> bool:
     Returns:
         bool: True if the plugin was successfully loaded and initialized, False otherwise.
     """
+
+    plugin_lib_path = os.environ.get("TRTLLM_PLUGINS_PATH")
+    if not plugin_lib_path:
+        _LOGGER.warning(
+            "Please set the TRTLLM_PLUGINS_PATH to the directory containing libnvinfer_plugin_tensorrt_llm.so to use converters for torch.distributed ops or else set the USE_TRTLLM_PLUGINS variable to download the shared library",
+        )
+        use_trtllm_plugin = os.environ.get("USE_TRTLLM_PLUGINS", "0").lower() in (
+            "1",
+            "true",
+            "yes",
+            "on",
+        )
+        if not use_trtllm_plugin:
+            _LOGGER.warning(
+                "Neither TRTLLM_PLUGIN_PATH is set nor is it directed to download the shared library"
+            )
+            return False
+        else:
+            py_version = f"cp{sys.version_info.major}{sys.version_info.minor}"
+            platform = Platform.current_platform()
+            if Platform == Platform.LINUX_X86_64:
+                platform = "linux_x86_64"
+            elif Platform == Platform.LINUX_AARCH64:
+                platform = "linux_aarch64"
+
+            if py_version not in ("cp310", "cp312"):
+                _LOGGER.warning(
+                    "No available wheel for python versions other than py3.10 and py3.12"
+                )
+            if py_version == "cp310" and platform == "linux_aarch64":
+                _LOGGER.warning("No available wheel for python3.10 with Linux aarch64")
+
+            base_url = "https://pypi.nvidia.com/tensorrt-llm/"
+            file_name = (
+                "tensorrt_llm-0.17.0.post1-{py_version}-{py_version}-{platform}.whl"
+            )
+            download_url = base_url + file_name
+            cmd = ["wget", download_url]
+            subprocess.run(cmd)
+            if os.path.exists(file_name):
+                _LOGGER.info("filename download is completed")
+                import zipfile
+
+                with zipfile.ZipFile(file_name, "r") as zip_ref:
+                    zip_ref.extractall(
+                        "./tensorrt_llm"
+                    )  # Extract to a folder named 'tensorrt_llm'
+                    plugin_lib_path = (
+                        "./tensorrt_llm" + "libnvinfer_plugin_tensorrt_llm.so"
+                    )
     try:
-        import tensorrt_llm as trt_llm  # noqa: F401
+        # Load the shared library
+        handle = ctypes.CDLL(plugin_lib_path)
+        _LOGGER.info(f"Successfully loaded plugin library: {plugin_lib_path}")
+    except OSError as e_os_error:
+        _LOGGER.error(
+            f"Failed to load libnvinfer_plugin_tensorrt_llm.so from {plugin_lib_path}"
+            f"Ensure the path is correct and the library is compatible",
+            exc_info=e_os_error,
+        )
+        return False
 
-        _LOGGER.info("TensorRT-LLM successfully imported")
-        return True
-    except (ImportError, AssertionError) as e_import_error:
-        # Check for environment variable for the plugin library path
-        plugin_lib_path = os.environ.get("TRTLLM_PLUGINS_PATH")
-        if not plugin_lib_path:
-            _LOGGER.warning(
-                "TensorRT-LLM is not installed. Please install TensorRT-LLM or set TRTLLM_PLUGINS_PATH to the directory containing libnvinfer_plugin_tensorrt_llm.so to use converters for torch.distributed ops",
-            )
-            return False
+    try:
+        # Configure plugin initialization arguments
+        handle.initTrtLlmPlugins.argtypes = [ctypes.c_void_p, ctypes.c_char_p]
+        handle.initTrtLlmPlugins.restype = ctypes.c_bool
+    except AttributeError as e_plugin_unavailable:
+        _LOGGER.warning(
+            "Unable to initialize the TensorRT-LLM plugin library",
+            exc_info=e_plugin_unavailable,
+        )
+        return False
 
-        _LOGGER.info(f"TensorRT-LLM Plugin lib path found: {plugin_lib_path}")
-        try:
-            # Load the shared library
-            handle = ctypes.CDLL(plugin_lib_path)
-            _LOGGER.info(f"Successfully loaded plugin library: {plugin_lib_path}")
-        except OSError as e_os_error:
-            _LOGGER.error(
-                f"Failed to load libnvinfer_plugin_tensorrt_llm.so from {plugin_lib_path}"
-                f"Ensure the path is correct and the library is compatible",
-                exc_info=e_os_error,
-            )
+    try:
+        # Initialize the plugin
+        TRT_LLM_PLUGIN_NAMESPACE = "tensorrt_llm"
+        if handle.initTrtLlmPlugins(None, TRT_LLM_PLUGIN_NAMESPACE.encode("utf-8")):
+            _LOGGER.info("TensorRT-LLM plugin successfully initialized")
+            return True
+        else:
+            _LOGGER.warning("TensorRT-LLM plugin library failed in initialization")
             return False
-
-        try:
-            # Configure plugin initialization arguments
-            handle.initTrtLlmPlugins.argtypes = [ctypes.c_void_p, ctypes.c_char_p]
-            handle.initTrtLlmPlugins.restype = ctypes.c_bool
-        except AttributeError as e_plugin_unavailable:
-            _LOGGER.warning(
-                "Unable to initialize the TensorRT-LLM plugin library",
-                exc_info=e_plugin_unavailable,
-            )
-            return False
-
-        try:
-            # Initialize the plugin
-            TRT_LLM_PLUGIN_NAMESPACE = "tensorrt_llm"
-            if handle.initTrtLlmPlugins(None, TRT_LLM_PLUGIN_NAMESPACE.encode("utf-8")):
-                _LOGGER.info("TensorRT-LLM plugin successfully initialized")
-                return True
-            else:
-                _LOGGER.warning("TensorRT-LLM plugin library failed in initialization")
-                return False
-        except Exception as e_initialization_error:
-            _LOGGER.warning(
-                "Exception occurred during TensorRT-LLM plugin library initialization",
-                exc_info=e_initialization_error,
-            )
-            return False
-    return False
+    except Exception as e_initialization_error:
+        _LOGGER.warning(
+            "Exception occurred during TensorRT-LLM plugin library initialization",
+            exc_info=e_initialization_error,
+        )
+        return False

@@ -98,6 +98,7 @@ def cross_compile_for_windows(
     enable_weight_streaming: bool = _defaults.ENABLE_WEIGHT_STREAMING,
     tiling_optimization_level: str = _defaults.TILING_OPTIMIZATION_LEVEL,
     l2_limit_for_tiling: int = _defaults.L2_LIMIT_FOR_TILING,
+    use_aot_joint_export: bool = _defaults.USE_AOT_JOINT_EXPORT,
     **kwargs: Any,
 ) -> torch.fx.GraphModule:
     """Compile an ExportedProgram module using TensorRT in Linux for Inference in Windows
@@ -173,6 +174,7 @@ def cross_compile_for_windows(
         enable_weight_streaming (bool): Enable weight streaming.
         tiling_optimization_level (str): The optimization level of tiling strategies. A higher level allows TensorRT to spend more time searching for better tiling strategy. We currently support ["none", "fast", "moderate", "full"].
         l2_limit_for_tiling (int): The target L2 cache usage limit (in bytes) for tiling optimization (default is -1 which means no limit).
+        use_aot_joint_export (bool): Use aot_export_joint_simple, else wrap backend with AOT_autograd, required for distributed tensors
         **kwargs: Any,
     Returns:
         torch.fx.GraphModule: Compiled FX Module, when run it will execute via TensorRT
@@ -332,6 +334,7 @@ def cross_compile_for_windows(
         "enable_weight_streaming": enable_weight_streaming,
         "tiling_optimization_level": tiling_optimization_level,
         "l2_limit_for_tiling": l2_limit_for_tiling,
+        "use_aot_joint_export": use_aot_joint_export,
     }
 
     # disable the following settings is not supported for cross compilation for windows feature
@@ -421,6 +424,7 @@ def compile(
     enable_weight_streaming: bool = _defaults.ENABLE_WEIGHT_STREAMING,
     tiling_optimization_level: str = _defaults.TILING_OPTIMIZATION_LEVEL,
     l2_limit_for_tiling: int = _defaults.L2_LIMIT_FOR_TILING,
+    use_aot_joint_export: bool = _defaults.USE_AOT_JOINT_EXPORT,
     **kwargs: Any,
 ) -> torch.fx.GraphModule:
     """Compile an ExportedProgram module for NVIDIA GPUs using TensorRT
@@ -498,6 +502,7 @@ def compile(
         enable_weight_streaming (bool): Enable weight streaming.
         tiling_optimization_level (str): The optimization level of tiling strategies. A higher level allows TensorRT to spend more time searching for better tiling strategy. We currently support ["none", "fast", "moderate", "full"].
         l2_limit_for_tiling (int): The target L2 cache usage limit (in bytes) for tiling optimization (default is -1 which means no limit).
+
         **kwargs: Any,
     Returns:
         torch.fx.GraphModule: Compiled FX Module, when run it will execute via TensorRT
@@ -674,6 +679,7 @@ def compile(
         "enable_weight_streaming": enable_weight_streaming,
         "tiling_optimization_level": tiling_optimization_level,
         "l2_limit_for_tiling": l2_limit_for_tiling,
+        "use_aot_joint_export": use_aot_joint_export,
     }
 
     settings = CompilationSettings(**compilation_options)
@@ -964,6 +970,7 @@ def convert_exported_program_to_serialized_trt_engine(
     enable_weight_streaming: bool = _defaults.ENABLE_WEIGHT_STREAMING,
     tiling_optimization_level: str = _defaults.TILING_OPTIMIZATION_LEVEL,
     l2_limit_for_tiling: int = _defaults.L2_LIMIT_FOR_TILING,
+    use_aot_joint_export: bool = _defaults.USE_AOT_JOINT_EXPORT,
     **kwargs: Any,
 ) -> bytes:
     """Convert an ExportedProgram to a serialized TensorRT engine
@@ -1029,6 +1036,7 @@ def convert_exported_program_to_serialized_trt_engine(
         enable_weight_streaming (bool): Enable weight streaming.
         tiling_optimization_level (str): The optimization level of tiling strategies. A higher level allows TensorRT to spend more time searching for better tiling strategy. We currently support ["none", "fast", "moderate", "full"].
         l2_limit_for_tiling (int): The target L2 cache usage limit (in bytes) for tiling optimization (default is -1 which means no limit).
+        use_aot_joint_export (bool): Use aot_export_joint_simple, else wrap backend with AOT_autograd, required for distributed tensors
     Returns:
         bytes: Serialized TensorRT engine, can either be saved to a file or deserialized via TensorRT APIs
     """
@@ -1147,6 +1155,7 @@ def convert_exported_program_to_serialized_trt_engine(
         "enable_weight_streaming": enable_weight_streaming,
         "tiling_optimization_level": tiling_optimization_level,
         "l2_limit_for_tiling": l2_limit_for_tiling,
+        "use_aot_joint_export": use_aot_joint_export,
     }
 
     settings = CompilationSettings(**compilation_options)
