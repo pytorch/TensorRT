@@ -79,6 +79,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         name: str = "",
         settings: CompilationSettings = CompilationSettings(),  # Assumes engine was built with default compilation settings if object not passed
         weight_name_map: Optional[dict[Any, Any]] = None,
+        engine_is_dds: bool = False,
     ):
         """Takes a name, target device, serialized TensorRT engine, and binding names / order and constructs
         a PyTorch ``torch.nn.Module`` around it. Uses the Torch-TensorRT runtime extension to run the engines
@@ -97,6 +98,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
             name (str): Name for module
             settings (torch_tensorrt.dynamo.CompilationSettings): Settings used to compile engine, assumes engine was built with default compilation settings if object not passed
             weight_name_map (dict): Mapping of engine weight name to state_dict weight name
+            engine_is_dds (bool): Whether the engine is Data Dependent Shape
 
         Example:
 
@@ -132,6 +134,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         self.weight_name_map = weight_name_map
         self.serialized_engine = serialized_engine
         self.engine = None
+        self.engine_is_dds = engine_is_dds
 
         if (
             serialized_engine
@@ -146,7 +149,11 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
             if self.settings.device is not None
             else Device._current_device()
         )
-        metadata = {"settings": self.settings, "weight_name_map": self.weight_name_map}
+        metadata = {
+            "settings": self.settings,
+            "weight_name_map": self.weight_name_map,
+            "engine_is_dds": self.engine_is_dds,
+        }
         target_platform = (
             Platform.current_platform()
             if not self.settings.enable_cross_compile_for_windows
@@ -263,6 +270,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
             metadata = TorchTensorRTModule.decode_metadata(serialized_metadata)
             self.settings = metadata["settings"]
             self.weight_name_map = metadata["weight_name_map"]
+            self.engine_is_dds = metadata["engine_is_dds"]
 
         else:
             self.engine = None
