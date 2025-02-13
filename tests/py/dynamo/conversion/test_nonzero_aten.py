@@ -19,8 +19,33 @@ class TestNonZeroConverter(DispatchTestCase):
     )
     def test_non_zero(self, input_shape, dtype):
         class NonZero(nn.Module):
+            # This is a DDS network
             def forward(self, input):
-                return torch.ops.aten.nonzero.default(input)
+                out = torch.ops.aten.nonzero.default(input)
+                return out
+
+        inputs = [torch.randint(low=0, high=3, size=input_shape, dtype=dtype)]
+        self.run_test(
+            NonZero(),
+            inputs,
+        )
+
+    @parameterized.expand(
+        [
+            ((10,), torch.int),
+            ((1, 20), torch.int32),
+            ((2, 3), torch.int64),
+            ((2, 3, 4), torch.float),
+            ((2, 3, 4, 5), torch.float),
+        ]
+    )
+    def test_non_zero(self, input_shape, dtype):
+        class NonZero(nn.Module):
+            # This is a static network
+            def forward(self, input):
+                out = torch.ops.aten.nonzero.default(input)
+                out = torch.ops.aten.sum.dim_IntList(out, 0)
+                return out
 
         inputs = [torch.randint(low=0, high=3, size=input_shape, dtype=dtype)]
         self.run_test(

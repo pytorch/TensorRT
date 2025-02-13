@@ -127,6 +127,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         name: str = "",
         settings: CompilationSettings = CompilationSettings(),
         weight_name_map: Optional[dict[Any, Any]] = None,
+        engine_is_dds: bool = False,
     ):
         """Takes a name, target device, serialized TensorRT engine, and binding names / order and constructs
         a PyTorch ``torch.nn.Module`` around it. Uses TensorRT Python APIs to run the engine
@@ -140,6 +141,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
             name (str): Name for module
             settings (torch_tensorrt.dynamo.CompilationSettings): Settings used to compile engine, assumes engine was built with default compilation settings if object not passed
             weight_name_map (dict): Mapping of engine weight name to state_dict weight name
+            engine_is_dds (bool): Whether the engine is Data Dependent Shape
 
         Example:
 
@@ -200,7 +202,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
             torch_tensorrt.runtime.get_cudagraphs_mode()
         )
 
-        self.contains_dds_layer = False
+        self.engine_is_dds = engine_is_dds
         self.pre_allocated_outputs: List[torch.Tensor] = []
         self.use_pre_allocated_outputs = False
         self.output_allocator: Optional[DynamicOutputAllocator] = None
@@ -276,18 +278,11 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
             for output_name in self.output_names
         ]
 
-        self.contains_dds_layer = self._check_dds_layer()
-        if self.contains_dds_layer:
-            self.setup_output_allocator()
+        if self.engine_is_dds:
+            self.create_output_allocator()
 
         if torch_tensorrt.runtime.get_cudagraphs_mode():
             self.cudagraph = torch.cuda.CUDAGraph()
-
-    def _check_dds_layer(self) -> bool:
-        layer_info = self.get_layer_info()
-        if "trainStation" in layer_info:  # contains dds layer
-            return True
-        return False
 
     def _check_initialized(self) -> None:
         if not self.initialized:
@@ -406,18 +401,12 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
     def set_pre_allocated_outputs(self, enable: bool) -> None:
         self.use_pre_allocated_outputs = enable
 
-    def setup_output_allocator(self) -> None:
+    def create_output_allocator(self) -> None:
         if self.output_allocator is None:
             output_dtypes_dict = {}
             for o, output_name in enumerate(self.output_names):
                 output_dtypes_dict[output_name] = self.output_dtypes[o]
             self.output_allocator = DynamicOutputAllocator(output_dtypes_dict)
-
-        for output_name in self.output_names:
-            if not self.context.set_output_allocator(
-                output_name, self.output_allocator
-            ):
-                raise RuntimeError(f"Failed to set output allocator for {output_name}")
 
     def forward(self, *inputs: torch.Tensor) -> torch.Tensor | Tuple[torch.Tensor, ...]:
 
@@ -571,6 +560,23 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
 
             with (
                 torch.autograd.profiler.record_function(
+                    "PythonTorchTensorRTModule:SetupOutputAllocator"
+                )
+                if self.profiling_enabled
+                else nullcontext()
+            ):
+                self.create_output_allocator()
+                # need to set output allocator every run
+                for output_name in self.output_names:
+                    if not self.context.set_output_allocator(
+                        output_name, self.output_allocator
+                    ):
+                        raise RuntimeError(
+                            f"Failed to set output allocator for {output_name}"
+                        )
+
+            with (
+                torch.autograd.profiler.record_function(
                     "PythonTorchTensorRTModule:TensorRTRuntime"
                 )
                 if self.profiling_enabled
@@ -662,7 +668,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                     ]
                     logger.warning(f"Moved all input Tensors to cuda:{device_id}")
 
-            if self.contains_dds_layer:
+            if self.engine_is_dds:
                 return run_output_allocator()
             else:
                 return run_cuda_graph()

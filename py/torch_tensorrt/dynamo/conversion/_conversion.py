@@ -30,7 +30,7 @@ def infer_module_output_dtypes(
     """
     outputs = [node for node in module.graph.nodes if node.op == "output"]
     outputs = outputs[0].args
-    return get_output_dtypes(outputs, truncate_double)
+    return get_output_dtypes(outputs, truncate_double)  # type: ignore[no-any-return]
 
 
 def interpret_module_to_result(
@@ -112,4 +112,5 @@ def convert_module(
         name=name,
         settings=settings,
         weight_name_map=interpreter_result.weight_name_map,
+        engine_is_dds=interpreter_result.engine_is_dds,
     )
