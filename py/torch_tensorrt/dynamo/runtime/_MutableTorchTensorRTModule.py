@@ -1,3 +1,4 @@
+import inspect
 import logging
 from copy import deepcopy
 from enum import Enum, auto
@@ -41,6 +42,10 @@ class RefitState:
         return self._state
 
 
+class DynamicShapeOutOfRangeException(Exception):
+    pass
+
+
 class MutableTorchTensorRTModule(object):
     """
     Initialize a MutableTorchTensorRTModule to seamlessly manipulate it like a regular PyTorch module.
@@ -65,7 +70,7 @@ class MutableTorchTensorRTModule(object):
             Union[torch.dtype, dtype]
         ] = _defaults.ENABLED_PRECISIONS,
         engine_capability: EngineCapability = _defaults.ENGINE_CAPABILITY,
-        immutable_weights: bool = _defaults.IMMUTABLE_WEIGHTS,
+        immutable_weights: bool = False,
         debug: bool = _defaults.DEBUG,
         num_avg_timing_iters: int = _defaults.NUM_AVG_TIMING_ITERS,
         workspace_size: int = _defaults.WORKSPACE_SIZE,
@@ -189,6 +194,9 @@ class MutableTorchTensorRTModule(object):
             "hardware_compatible": hardware_compatible,
             "timing_cache_path": timing_cache_path,
         }
+        self.arg_dynamic_shapes: Optional[tuple[Any]] = None
+        self.kwarg_dynamic_shapes: Optional[dict[Any, Any]] = None
+        self.total_dynamic_shape: Optional[dict[Any, Any]] = None
 
         self.settings = CompilationSettings(**compilation_options)
         self.run_info: Optional[tuple[Any, ...]] = None
@@ -202,6 +210,31 @@ class MutableTorchTensorRTModule(object):
             {},
         )
         self.init_finished = True
+
+    def set_dynamic_shape_hint(
+        self,
+        args_dynamic_shape: tuple[dict[Any, Any]],
+        kwargs_dynamic_shape: dict[str, Any],
+    ) -> None:
+        assert isinstance(
+            args_dynamic_shape, tuple
+        ), "args dynamic shape has to be a tuple"
+        assert isinstance(
+            kwargs_dynamic_shape, dict
+        ), "args dynamic shape has to be a dictionary"
+        self.kwarg_dynamic_shapes = kwargs_dynamic_shape
+        self.arg_dynamic_shapes = args_dynamic_shape
+        self.total_dynamic_shape = self.kwarg_dynamic_shapes.copy()
+        signature = list(
+            inspect.signature(self.original_model.forward).parameters.keys()
+        )
+        for i, arg in enumerate(self.arg_dynamic_shapes):
+            self.total_dynamic_shape[signature[i]] = arg
+        self.refit_state.set_state(RefitFlag.NEEDS_RECOMPILE)
+
+        # Clear cached inputs
+        self.arg_inputs = tuple()
+        self.kwarg_inputs = {}
 
     def store_state_dict_metadata(self) -> None:
         for k, v in self.original_model.state_dict().items():
@@ -295,6 +328,7 @@ class MutableTorchTensorRTModule(object):
             self.original_model,
             self.arg_inputs,
             kwargs=self.kwarg_inputs,
+            dynamic_shapes=self.total_dynamic_shape,
         )
         self.gm = dynamo_compile(
             self.exp_program,
@@ -306,14 +340,26 @@ class MutableTorchTensorRTModule(object):
         torch.cuda.empty_cache()
 
     def _validate_inputs(self, *args: Any, **kwargs: Any) -> None:
-        if (
-            not self.arg_inputs
-            or not MutableTorchTensorRTModule.check_inputs_equal(self.arg_inputs, args)
-            or not MutableTorchTensorRTModule.check_inputs_equal(
-                self.kwarg_inputs, kwargs
-            )
-        ):
+        try:
+            if (
+                not self.arg_inputs
+                or not MutableTorchTensorRTModule.check_inputs_equal(
+                    self.arg_inputs, args, dynamic_shapes=self.arg_dynamic_shapes
+                )
+                or not MutableTorchTensorRTModule.check_inputs_equal(
+                    self.kwarg_inputs, kwargs, dynamic_shapes=self.kwarg_dynamic_shapes
+                )
+            ):
+                logger.info("Input change detected.")
+                self.refit_state.set_state(RefitFlag.NEEDS_RECOMPILE)
+                self.store_inputs(args, kwargs)
+        except DynamicShapeOutOfRangeException as e:
             logger.info("Input change detected.")
+            logger.warning(e)
+            logger.warning("Recompiling the engine with static shape")
+            self.arg_dynamic_shapes = None
+            self.kwarg_dynamic_shapes = None
+            self.total_dynamic_shape = None
             self.refit_state.set_state(RefitFlag.NEEDS_RECOMPILE)
             self.store_inputs(args, kwargs)
 
@@ -436,33 +482,66 @@ class MutableTorchTensorRTModule(object):
     def check_inputs_equal(
         input1: Any,
         input2: Any,
+        dynamic_shapes: Any = None,
     ) -> bool:
-        # TODO: Add support for dynamic shape
+
         if isinstance(input1, (tuple, list)):
             if len(input1) != len(input2):
                 return False
-            for a, b in zip(input1, input2):
+            for (i, a), b in zip(enumerate(input1), input2):
                 if type(a) != type(b):
                     return False
-                if isinstance(a, torch.Tensor) and a.shape != b.shape:
+                if isinstance(a, bool) and a != b:
                     return False
-                elif isinstance(a, bool) and a != b:
-                    return False
+                elif isinstance(a, torch.Tensor) and a.shape != b.shape:
+                    if dynamic_shapes is None:
+                        return False
+                    else:
+                        tensor_dynamic_shape = dynamic_shapes[i]
+                        if not MutableTorchTensorRTModule.check_tensor_shapes_with_dynamic_shapes(
+                            a, b, tensor_dynamic_shape
+                        ):
+                            return False
 
         elif isinstance(input1, dict):
             if input1.keys() != input2.keys():
                 return False
-            for a, b in zip(input1.values(), input2.values()):
-                if type(a) != type(b):
+            for (ka, va), vb in zip(input1.items(), input2.values()):
+                if type(va) != type(vb):
                     return False
-                if isinstance(a, torch.Tensor) and a.shape != b.shape:
+                if isinstance(va, bool) and va != vb:
                     return False
-                elif isinstance(a, bool) and a != b:
-                    return False
+                elif isinstance(va, torch.Tensor) and va.shape != vb.shape:
+                    if dynamic_shapes is None:
+                        return False
+                    else:
+                        tensor_dynamic_shape = dynamic_shapes[ka]
+                        if not MutableTorchTensorRTModule.check_tensor_shapes_with_dynamic_shapes(
+                            va, vb, tensor_dynamic_shape
+                        ):
+                            return False
                 elif isinstance(
-                    a, (list, tuple, dict)
-                ) and not MutableTorchTensorRTModule.check_inputs_equal(a, b):
+                    va, (list, tuple, dict)
+                ) and not MutableTorchTensorRTModule.check_inputs_equal(
+                    va, vb, dynamic_shapes[ka] if dynamic_shapes else None
+                ):
                     return False
+        return True
+
+    @staticmethod
+    def check_tensor_shapes_with_dynamic_shapes(
+        t1: torch.tensor, t2: torch.tensor, dynamic_shape: dict[int, Any]
+    ) -> bool:
+        for (i, axis_0), axis_1 in zip(enumerate(t1.shape), t2.shape):
+            if axis_0 != axis_1:
+                if i not in dynamic_shape:
+                    return False
+                dyn = dynamic_shape[i]
+                if axis_1 > dyn.max or axis_1 < dyn.min:
+                    raise DynamicShapeOutOfRangeException(
+                        f"The input size ({axis_1}) of dimension ({i}) is not in dynamic shape range [{dyn.max}, {dyn.max}]!"
+                    )
+
         return True
 
     @staticmethod
