@@ -1,8 +1,6 @@
 import collections
-import ctypes
 import functools
 import logging
-import os
 from typing import (
     Any,
     Callable,
@@ -24,6 +22,7 @@ from torch.fx.experimental.proxy_tensor import unset_fake_temporarily
 from torch.fx.node import Argument, Target
 from torch.fx.passes.shape_prop import TensorMetadata
 from torch_tensorrt import _enums
+from torch_tensorrt._enums import Platform
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
@@ -1120,69 +1119,6 @@ def args_bounds_check(
     return args[i] if len(args) > i and args[i] is not None else replacement
 
 
-def load_tensorrt_llm() -> bool:
-    """
-    Attempts to load the TensorRT-LLM plugin and initialize it.
-
-    Returns:
-        bool: True if the plugin was successfully loaded and initialized, False otherwise.
-    """
-    try:
-        import tensorrt_llm as trt_llm  # noqa: F401
-
-        _LOGGER.info("TensorRT-LLM successfully imported")
-        return True
-    except (ImportError, AssertionError) as e_import_error:
-        # Check for environment variable for the plugin library path
-        plugin_lib_path = os.environ.get("TRTLLM_PLUGINS_PATH")
-        if not plugin_lib_path:
-            _LOGGER.warning(
-                "TensorRT-LLM is not installed. Please install TensorRT-LLM or set TRTLLM_PLUGINS_PATH to the directory containing libnvinfer_plugin_tensorrt_llm.so to use converters for torch.distributed ops",
-            )
-            return False
-
-        _LOGGER.info(f"TensorRT-LLM Plugin lib path found: {plugin_lib_path}")
-        try:
-            # Load the shared library
-            handle = ctypes.CDLL(plugin_lib_path)
-            _LOGGER.info(f"Successfully loaded plugin library: {plugin_lib_path}")
-        except OSError as e_os_error:
-            _LOGGER.error(
-                f"Failed to load libnvinfer_plugin_tensorrt_llm.so from {plugin_lib_path}"
-                f"Ensure the path is correct and the library is compatible",
-                exc_info=e_os_error,
-            )
-            return False
-
-        try:
-            # Configure plugin initialization arguments
-            handle.initTrtLlmPlugins.argtypes = [ctypes.c_void_p, ctypes.c_char_p]
-            handle.initTrtLlmPlugins.restype = ctypes.c_bool
-        except AttributeError as e_plugin_unavailable:
-            _LOGGER.warning(
-                "Unable to initialize the TensorRT-LLM plugin library",
-                exc_info=e_plugin_unavailable,
-            )
-            return False
-
-        try:
-            # Initialize the plugin
-            TRT_LLM_PLUGIN_NAMESPACE = "tensorrt_llm"
-            if handle.initTrtLlmPlugins(None, TRT_LLM_PLUGIN_NAMESPACE.encode("utf-8")):
-                _LOGGER.info("TensorRT-LLM plugin successfully initialized")
-                return True
-            else:
-                _LOGGER.warning("TensorRT-LLM plugin library failed in initialization")
-                return False
-        except Exception as e_initialization_error:
-            _LOGGER.warning(
-                "Exception occurred during TensorRT-LLM plugin library initialization",
-                exc_info=e_initialization_error,
-            )
-            return False
-    return False
-
-
 def promote_trt_tensors_to_same_dtype(
     ctx: ConversionContext, lhs: TRTTensor, rhs: TRTTensor, name_prefix: str
 ) -> tuple[TRTTensor, TRTTensor]:
@@ -1220,3 +1156,4 @@ def promote_trt_tensors_to_same_dtype(
     rhs_cast = cast_trt_tensor(ctx, rhs, promoted_dtype, f"{name_prefix}rhs_cast")
 
     return lhs_cast, rhs_cast
+    

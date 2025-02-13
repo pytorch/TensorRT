@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import ctypes
 import gc
 import logging
+import os
+import urllib.request
 import warnings
 from dataclasses import fields, replace
 from enum import Enum
@@ -14,9 +17,10 @@ import torch
 from torch._subclasses.fake_tensor import FakeTensor
 from torch.fx.experimental.proxy_tensor import unset_fake_temporarily
 from torch_tensorrt._Device import Device
-from torch_tensorrt._enums import dtype
+from torch_tensorrt._enums import Platform, dtype
 from torch_tensorrt._features import ENABLED_FEATURES
 from torch_tensorrt._Input import Input
+from torch_tensorrt._version import __tensorrt_llm_version__
 from torch_tensorrt.dynamo import _defaults
 from torch_tensorrt.dynamo._defaults import default_device
 from torch_tensorrt.dynamo._engine_cache import BaseEngineCache
@@ -850,4 +854,128 @@ def get_output_dtypes(output: Any, truncate_doulbe: bool = False) -> List[dtype]
 def is_tegra_platform() -> bool:
     if torch.cuda.get_device_capability() in [(8, 7), (7, 2)]:
         return True
+    return False
+
+
+def download_plugin_lib_path(py_version: str, platform: str) -> str:
+    plugin_lib_path = None
+
+    # Downloading TRT-LLM lib
+    base_url = "https://pypi.nvidia.com/tensorrt-llm/"
+    file_name = f"tensorrt_llm-{__tensorrt_llm_version__}-{py_version}-{py_version}-{platform}.whl"
+    download_url = base_url + file_name
+    if not (os.path.exists(file_name)):
+        try:
+            logger.debug(f"Downloading {download_url} ...")
+            urllib.request.urlretrieve(download_url, file_name)
+            logger.debug("Download succeeded and TRT-LLM wheel is now present")
+        except urllib.error.HTTPError as e:
+            logger.error(
+                f"HTTP error {e.code} when trying to download {download_url}: {e.reason}"
+            )
+        except urllib.error.URLError as e:
+            logger.error(
+                f"URL error when trying to download {download_url}: {e.reason}"
+            )
+        except OSError as e:
+            logger.error(f"Local file write error: {e}")
+
+    # Proceeding with the unzip of the wheel file
+    # This will exist if the filename was already downloaded
+    if "linux" in platform:
+        lib_filename = "libnvinfer_plugin_tensorrt_llm.so"
+    else:
+        lib_filename = "libnvinfer_plugin_tensorrt_llm.dll"
+    plugin_lib_path = os.path.join("./tensorrt_llm/libs", lib_filename)
+    if os.path.exists(plugin_lib_path):
+        return plugin_lib_path
+    try:
+        import zipfile
+    except ImportError as e:
+        raise ImportError(
+            "zipfile module is required but not found. Please install zipfile"
+        )
+    with zipfile.ZipFile(file_name, "r") as zip_ref:
+        zip_ref.extractall(".")  # Extract to a folder named 'tensorrt_llm'
+        plugin_lib_path = "./tensorrt_llm/libs/" + lib_filename
+    return plugin_lib_path
+
+
+def load_tensorrt_llm() -> bool:
+    """
+    Attempts to load the TensorRT-LLM plugin and initialize it.
+    Either the env variable TRTLLM_PLUGINS_PATH can specify the path
+    Or the user can specify USE_TRTLLM_PLUGINS as either of (1, true, yes, on) to download the TRT-LLM distribution and load it
+
+    Returns:
+        bool: True if the plugin was successfully loaded and initialized, False otherwise.
+    """
+    plugin_lib_path = os.environ.get("TRTLLM_PLUGINS_PATH")
+    if not plugin_lib_path:
+        # this option can be used by user if TRTLLM_PLUGINS_PATH is not set by user
+        use_trtllm_plugin = os.environ.get("USE_TRTLLM_PLUGINS", "0").lower() in (
+            "1",
+            "true",
+            "yes",
+            "on",
+        )
+        if not use_trtllm_plugin:
+            logger.warning(
+                "Neither TRTLLM_PLUGIN_PATH is set nor is it directed to download the shared library. Please set either of the two to use TRT-LLM libraries in torchTRT"
+            )
+            return False
+        else:
+            # this is used as the default py version
+            py_version = "cp310"
+            platform = Platform.current_platform()
+
+            platform = str(platform).lower()
+            plugin_lib_path = download_plugin_lib_path(py_version, platform)
+
+    try:
+        # Load the shared TRT-LLM file
+        handle = ctypes.CDLL(plugin_lib_path)
+        logger.info(f"Successfully loaded plugin library: {plugin_lib_path}")
+    except OSError as e_os_error:
+        if "libmpi" in str(e_os_error):
+            logger.warning(
+                f"Failed to load libnvinfer_plugin_tensorrt_llm.so from {plugin_lib_path}. "
+                f"The dependency libmpi.so is missing. "
+                f"Please install the packages libmpich-dev and libopenmpi-dev.",
+                exc_info=e_os_error,
+            )
+        else:
+            logger.warning(
+                f"Failed to load libnvinfer_plugin_tensorrt_llm.so from {plugin_lib_path}"
+                f"Ensure the path is correct and the library is compatible",
+                exc_info=e_os_error,
+            )
+        return False
+
+    try:
+        # Configure plugin initialization arguments
+        handle.initTrtLlmPlugins.argtypes = [ctypes.c_void_p, ctypes.c_char_p]
+        handle.initTrtLlmPlugins.restype = ctypes.c_bool
+    except AttributeError as e_plugin_unavailable:
+        logger.warning(
+            "Unable to initialize the TensorRT-LLM plugin library",
+            exc_info=e_plugin_unavailable,
+        )
+        return False
+
+    try:
+        # Initialize the plugin
+        TRT_LLM_PLUGIN_NAMESPACE = "tensorrt_llm"
+        if handle.initTrtLlmPlugins(None, TRT_LLM_PLUGIN_NAMESPACE.encode("utf-8")):
+            logger.info("TensorRT-LLM plugin successfully initialized")
+            return True
+        else:
+            logger.warning("TensorRT-LLM plugin library failed in initialization")
+            return False
+    except Exception as e_initialization_error:
+        logger.warning(
+            "Exception occurred during TensorRT-LLM plugin library initialization",
+            exc_info=e_initialization_error,
+        )
+        return False
     return False
