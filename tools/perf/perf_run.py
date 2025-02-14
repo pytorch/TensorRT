@@ -175,6 +175,7 @@ def run_ts_trt(model, input_tensors, params, precision, batch_size):
         "inputs": input_tensors,
         "enabled_precisions": {precision_to_dtype(precision)},
         "truncate_long_and_double": params.get("truncate", False),
+        "use_python_runtime": params.get("use_python_runtime", False),
     }
 
     if precision == "int8":
@@ -217,6 +218,7 @@ def run_hf_dynamo(model, input_tensors, params, precision, batch_size):
         inputs=input_tensors,
         enabled_precisions={precision_to_dtype(precision)},
         truncate_double=params.get("truncate", False),
+        use_python_runtime=params.get("use_python_runtime", False),
     )
     end_compile = timeit.default_timer()
     compile_time_s = end_compile - start_compile
@@ -262,6 +264,7 @@ def run_dynamo(model, input_tensors, params, precision, batch_size):
         ),
         cache_built_engines=params.get("cache_built_engines", False),
         reuse_cached_engines=params.get("reuse_cached_engines", False),
+        use_python_runtime=params.get("use_python_runtime", False),
     )
     end_compile = timeit.default_timer()
     compile_time_s = end_compile - start_compile
@@ -292,6 +295,7 @@ def run_torch_compile(model, input_tensors, params, precision, batch_size):
         "enabled_precisions": {precision_to_dtype(precision)},
         "truncate": params.get("truncate", False),
         "min_block_size": params.get("min_block_size", 1),
+        "use_python_runtime": params.get("use_python_runtime", False),
     }
     start_compile = timeit.default_timer()
     model = torch.compile(model, backend="tensorrt", dynamic=None, options=compile_spec)
@@ -525,6 +529,7 @@ def run(
 
 
 if __name__ == "__main__":
+    torchtrt.runtime.set_cudagraphs_mode(True)
     arg_parser = argparse.ArgumentParser(
         description="Run inference on a model with random input values"
     )
@@ -586,6 +591,11 @@ if __name__ == "__main__":
         "--is_trt_engine",
         action="store_true",
         help="Boolean flag to determine if the user provided model is a TRT engine or not",
+    )
+    arg_parser.add_argument(
+        "--use_python_runtime",
+        action="store_true",
+        help="Whether to use Python runtime or not. Using C++ runtime by default",
     )
     arg_parser.add_argument(
         "--report",
