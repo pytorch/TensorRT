@@ -529,7 +529,6 @@ def run(
 
 
 if __name__ == "__main__":
-    torchtrt.runtime.set_cudagraphs_mode(True)
     arg_parser = argparse.ArgumentParser(
         description="Run inference on a model with random input values"
     )
@@ -598,6 +597,11 @@ if __name__ == "__main__":
         help="Whether to use Python runtime or not. Using C++ runtime by default",
     )
     arg_parser.add_argument(
+        "--enable_cuda_graph",
+        action="store_true",
+        help="Whether to enable CUDA Graph. It is not used by default",
+    )
+    arg_parser.add_argument(
         "--report",
         type=str,
         help="Path of the output file where performance summary is written.",
@@ -662,6 +666,8 @@ if __name__ == "__main__":
         raise ValueError(
             "No Pytorch model (nn.Module) is provided for torchdynamo compilation. Please provide a pytorch model using --model_torch argument"
         )
+
+    torchtrt.runtime.set_cudagraphs_mode(params.get("enable_cuda_graph", False))
 
     batch_size = params["batch_size"]
     is_trt_engine = params["is_trt_engine"]
