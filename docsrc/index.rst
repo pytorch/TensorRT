@@ -68,7 +68,7 @@ Tutorials
 * :ref:`mutable_torchtrt_module_example`
 * :ref:`weight_streaming_example`
 * :ref:`pre_allocated_output_example`
-* :ref:`tensor_parallel_llama`
+* :ref:`tensor_parallel_llama3`
 
 .. toctree::
    :caption: Tutorials

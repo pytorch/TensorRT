@@ -1,5 +1,5 @@
 """
-.. _tensor_parallel_llama:
+.. _tensor_parallel_llama3:
 
 Torch distributed example for llama3-7B model
 ======================================================
@@ -16,6 +16,7 @@ import os
 import time
 
 import torch
+import torch_tensorrt
 
 # %%
 # Pytorch Tensor Parallel APIs offer set of module level primitives(ParallelStyle) to configure the sharding of tensors in each layer of the model
