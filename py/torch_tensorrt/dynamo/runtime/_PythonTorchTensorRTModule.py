@@ -545,6 +545,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
             return outputs
 
         def run_output_allocator() -> torch.Tensor | Tuple[torch.Tensor, ...]:
+            torch_tensorrt.runtime.set_cudagraphs_mode(False)
             with (
                 torch.autograd.profiler.record_function(
                     "PythonTorchTensorRTModule:ProcessInputs"
