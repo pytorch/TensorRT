@@ -32,12 +32,12 @@ with torch.no_grad():
             pad_token_id=tokenizer.eos_token_id,
             use_cache=True,
             attn_implementation="sdpa",
+            num_hidden_layers=1,
         )
         .eval()
         .half()
         .to(DEVICE)
     )
-
 # %%
 # Tokenize a sample input prompt and get pytorch model outputs
 prompt = "What is parallel programming ?"
@@ -70,6 +70,7 @@ with torch_tensorrt.logging.debug():
         use_explicit_typing=True,
         use_fp32_acc=True,
         debug=True,
+        insert_flashinfer_ops=True,
         torch_executed_ops={"torch.ops.tensorrt.flashinfer_forward"},
     )
 

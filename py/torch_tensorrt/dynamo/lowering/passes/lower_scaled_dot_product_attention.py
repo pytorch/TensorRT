@@ -50,10 +50,10 @@ def lower_scaled_dot_product_attention(
 
             new_attention_node = match.replacements[0]
 
-            # assert (
-            #     new_attention_node.target
-            #     == torch.nn.functional.scaled_dot_product_attention
-            # )
+            assert (
+                new_attention_node.target
+                == torch.nn.functional.scaled_dot_product_attention
+            )
 
             # Copy the metadata of the replaced attention node to the new node
             # TODO: Investigate why there are multiple FakeTensors in the metadata.
@@ -164,7 +164,6 @@ def scaled_dot_product_attention_replacement() -> Tuple[
     def replacement(
         query: torch.Tensor, key: torch.Tensor, value: torch.Tensor
     ) -> torch.Tensor:
-        return torch.ops.tensorrt.flashinfer_forward(query, key, value)
-        # return torch.nn.functional.scaled_dot_product_attention(query, key, value)
+        return torch.nn.functional.scaled_dot_product_attention(query, key, value)
 
     return (efficient, flash, efficient_scale, flash_scale), replacement

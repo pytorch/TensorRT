@@ -17,7 +17,7 @@ def remove_assert_scalar(
     for node in gm.graph.nodes:
         if (
             node.target == torch.ops.aten._assert_scalar.default
-            or node == torch.ops.aten._assert_tensor_metadata.default
+            or node.target == torch.ops.aten._assert_tensor_metadata.default
         ):
             gm.graph.erase_node(node)
             count += 1
