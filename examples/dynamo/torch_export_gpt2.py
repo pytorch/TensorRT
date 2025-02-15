@@ -18,7 +18,7 @@ from utils import export_llm, generate
 # %%
 
 # Define the parameters and initialize the model
-MAX_TOKENS = 32
+MAX_TOKENS = 6
 DEVICE = torch.device("cuda:0")
 
 # Define the GPT2 model from hugging face
@@ -30,18 +30,19 @@ with torch.no_grad():
         AutoModelForCausalLM.from_pretrained(
             "gpt2",
             pad_token_id=tokenizer.eos_token_id,
-            use_cache=False,
-            attn_implementation="eager",
+            use_cache=True,
+            attn_implementation="sdpa",
         )
         .eval()
         .half()
+        .to(DEVICE)
     )
 
 # %%
 # Tokenize a sample input prompt and get pytorch model outputs
-prompt = "I enjoy walking with my cute dog"
+prompt = "What is parallel programming ?"
 model_inputs = tokenizer(prompt, return_tensors="pt")
-input_ids = model_inputs["input_ids"]
+input_ids = model_inputs["input_ids"].to(DEVICE)
 
 # Auto-regressive generation loop for greedy decoding using PyTorch model
 # We use a custom generate function which is very similar to the huggingface one.
@@ -58,16 +59,19 @@ pyt_gen_tokens = generate(model, input_ids, MAX_TOKENS, tokenizer.eos_token_id)
 # 2) Enable use_explicit_typing=True. Certain layers are explicitly casted to FP32 within the pytorch model and this flag respects this behavior during TRT compilation
 # 3) Enable use_fp32_acc=True. This ensures all the matmuls are accumulated in FP32 precision (similar to PyTorch)
 gpt2_ep = export_llm(model, input_ids, max_seq_len=1024)
-trt_model = torch_tensorrt.dynamo.compile(
-    gpt2_ep,
-    inputs=[input_ids],
-    enabled_precisions={torch.float32},
-    truncate_double=True,
-    device=DEVICE,
-    disable_tf32=True,
-    use_explicit_typing=True,
-    use_fp32_acc=True,
-)
+with torch_tensorrt.logging.debug():
+    trt_model = torch_tensorrt.dynamo.compile(
+        gpt2_ep,
+        inputs=[input_ids],
+        enabled_precisions={torch.float32},
+        truncate_double=True,
+        device=DEVICE,
+        disable_tf32=True,
+        use_explicit_typing=True,
+        use_fp32_acc=True,
+        debug=True,
+        torch_executed_ops={"torch.ops.tensorrt.flashinfer_forward"},
+    )
 
 # Auto-regressive generation loop for greedy decoding using TensorRT model
 # We use a custom generate function which is very similar to the huggingface one.
