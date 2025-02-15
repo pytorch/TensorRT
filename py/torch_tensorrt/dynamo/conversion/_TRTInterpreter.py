@@ -33,7 +33,9 @@ from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContex
 from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
     DYNAMO_CONVERTERS as CONVERTERS,
 )
-from torch_tensorrt.dynamo.conversion._ConverterRegistry import CallingConvention
+from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
+    CallingConvention,
+)
 from torch_tensorrt.dynamo.conversion._TRTBuilderMonitor import TRTBulderMonitor
 from torch_tensorrt.dynamo.conversion.converter_utils import (
     get_node_io,
@@ -740,10 +742,6 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
     def run_node(self, n: torch.fx.Node) -> torch.fx.Node:
         self._cur_node_name = get_node_name(n)
         self._cur_node = n
-        # add "_itensor_to_tensor_meta"
-        kwargs = dict(n.kwargs)
-        kwargs["_itensor_to_tensor_meta"] = self._itensor_to_tensor_meta
-        n.kwargs = kwargs
 
         if _LOGGER.isEnabledFor(logging.DEBUG):
             _LOGGER.debug(
@@ -758,11 +756,6 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         _LOGGER.info(
             f"Converted node {self._cur_node_name} [{n.target}] ({get_node_io(n, self.const_mapping)})"
         )
-
-        # remove "_itensor_to_tensor_meta"
-        kwargs = dict(n.kwargs)
-        del kwargs["_itensor_to_tensor_meta"]
-        n.kwargs = kwargs
 
         if isinstance(trt_node, trt.ITensor):
             self._itensor_to_tensor_meta[trt_node] = n.meta.get("tensor_meta")
