@@ -624,3 +624,18 @@ def native_dropout(
         mask = np.ones(input_val.shape, dtype=bool)
         mask = get_trt_tensor(ctx, mask, f"{name}_mask")
         return identity_layer.get_output(0), mask
+
+
+def nonzero(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    input_val: TRTTensor,
+) -> TRTTensor:
+    non_zero_layer = ctx.net.add_non_zero(input_val)
+    set_layer_name(non_zero_layer, target, f"{name}_non_zero", source_ir)
+    shuffle_layer = ctx.net.add_shuffle(non_zero_layer.get_output(0))
+    shuffle_layer.first_transpose = trt.Permutation([1, 0])
+    set_layer_name(shuffle_layer, target, f"{name}_transpose", source_ir)
+    return shuffle_layer.get_output(0)
