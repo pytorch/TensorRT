@@ -69,12 +69,13 @@ def aot_torch_tensorrt_aten_backend(
     to_delete = {
         key
         for key in settings_aot_autograd["decompositions"]
-        if "detach" in key._name or "transpose" in key._name
+        if "transpose" in key._name
     }
 
     for key in to_delete:
         del settings_aot_autograd["decompositions"][key]
 
+    remove_detach(gm, settings)
     return aot_autograd(
         fw_compiler=_pretraced_backend_autograd,
         decompositions=settings_aot_autograd["decompositions"],
