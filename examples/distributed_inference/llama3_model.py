@@ -1,3 +1,7 @@
+"""
+This file contains the Llama3 model example used for tensor parallel distribution
+"""
+
 # Taken and modified pytorch lightening
 # https://lightning.ai/lightning-ai/studios/tensor-parallelism-supercharging-large-model-training-with-pytorch-lightning
 

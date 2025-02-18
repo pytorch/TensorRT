@@ -1,10 +1,12 @@
+.. _tensor_parallel_llama3:
+
 Torch-TensorRT Parallelism for Distributed Inference
 ====================================================
 
 Examples in this folder demonstrate distributed inference on multiple devices with the Torch-TensorRT backend.
 
 Data Parallel Distributed Inference based on `Accelerate <https://huggingface.co/docs/accelerate/usage_guides/distributed_inference>`_
----------------------------------------------------------------------------------------------------------------
+-----------------------------------------------------------------------------------------------------------------------------------------
 
 Using Accelerate, users can achieve data parallel distributed inference with the Torch-TensorRT backend.
 In this case, the entire model will be loaded onto each GPU, and different chunks of batch input are processed on each device.
@@ -36,7 +38,7 @@ The functional implementation of ops is imported from the `tensorrt_llm` package
 We have two options:
 
 Option 1: Install TensorRT-LLM
--------------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Follow the instructions to `install TensorRT-LLM <https://nvidia.github.io/TensorRT-LLM/installation/linux.html>`_.
 
@@ -52,7 +54,7 @@ The import might fail if `tensorrt_llm` overrides `torch_tensorrt` dependencies.
 Option 2 is preferable if you do not wish to install `tensorrt_llm` and its dependencies.
 
 Option 2: Link the TensorRT-LLM Directly
------------------------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Alternatively, you can load `libnvinfer_plugin_tensorrt_llm.so` manually:
 

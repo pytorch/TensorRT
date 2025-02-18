@@ -1,3 +1,9 @@
+"""
+This script contains utility functions for Tensor Parallelism
+using Torch-TensorRT. It sets up the necessary communication protocols,
+environments and partitions the model across multiple GPUs.
+"""
+
 import logging
 import os
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union

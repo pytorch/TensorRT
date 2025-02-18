@@ -1,3 +1,7 @@
+"""
+This file contains the Tensor parallel simple model example used for tensor parallel distribution
+"""
+
 import time
 
 import tensorrt as trt

@@ -18,7 +18,6 @@ import time
 import torch
 import torch_tensorrt
 
-# %%
 # Pytorch Tensor Parallel APIs offer set of module level primitives(ParallelStyle) to configure the sharding of tensors in each layer of the model
 # ParallelTransformer creates the parallelize_plan for the FeedForward layer of the model
 from llama3_model import ModelArgs, ParallelTransformer
@@ -32,15 +31,17 @@ from torch.distributed.algorithms._checkpoint.checkpoint_wrapper import (
 
 # %%
 # Initialize the distributed environment
-# ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-# Depending on the inputs/outputs sharded DTensors layout specified above, proper communication operations are required to transform DTensor layouts
-# eg operations: allreduce, allgather, reduce_gather
-# NCCL operations enable these operations.
-# The below API does the following
-# Initialize the communicators and the distributed environment
-# Sets the path for the TRT-LLM plugin .so path which is required for the NCCL operations in Torch-TRT backend. Please note that if you are in python3.10 environment, `import tensorrt_llm` should be enough
-# Initialize the logger. eg: In case of 2 GPUs, the log files are `./tensor_parallel_llama3_0.log` and `./tensor_parallel_llama3_1.log`
+# ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+# The following steps are performed:
+#
+# - Initialize the communicators and the distributed environment
+# - Set the path for the `TRT-LLM`` plugin `.so` file, which is required for the NCCL operations in Torch-TRT backend.
+# - Initialize the logger:
+#
+#   - Example: In a 2-GPU setup, the log files will be:
+#     - `./tensor_parallel_llama3_0.log`
+#     - `./tensor_parallel_llama3_1.log`
+#
 device_mesh, _world_size, _rank, logger = initialize_distributed_env(
     "./tensor_parallel_llama3"
 )
@@ -91,13 +92,33 @@ with torch.no_grad():
     # %%
     # Model inference with Torch-TensorRT backend
     # -------------------------------------------
-    #  When we compile the distributed model using Torch-TensorRT backend, pytorch distributed libraries create the sharded model
-    #  on multiple GPUs and the communicator operations are used for proper communication. In the above,
-    # `ColwiseParallel` and `RowwiseParallel` shard the attention layers in the column or row fashion.
-    # `SequenceParallel` performs sharded computations of the normalization layer
-    # `PrepareModuleInput` configures the model input with proper communication operations
-    # The NCCL operations used in the distributed backend is handled by the TensorRT-LLM NCCL plugins, which causes no graph breaks now
-
+    # When we compile the distributed model using the **Torch-TensorRT** backend, PyTorch's distributed libraries:
+    #
+    # - Create the **sharded model** across multiple GPUs.
+    # - Use **communicator operations** to ensure proper communication.
+    #
+    # The following components manage different aspects of parallelism:
+    #
+    # - **`ColwiseParallel`** and **`RowwiseParallel`**:
+    #   - Shard the attention layers in **column-wise** or **row-wise** fashion.
+    #
+    # - **`SequenceParallel`**:
+    #   - Performs **sharded computations** of the normalization layer.
+    #
+    # - **`PrepareModuleInput`**:
+    #   - Configures the model input with proper **communication operations**.
+    #
+    # **NCCL Operations in TensorRT-LLM:**
+    #
+    # - The **TensorRT-LLM NCCL plugins** handle distributed backend NCCL operations, preventing **graph breaks**.
+    # - Depending on the **DTensor sharding layout**, proper **communication operations** are required to transform the DTensor layout.
+    #
+    # **Common NCCL Operations Used:**
+    #
+    # - `allreduce`
+    # - `allgather`
+    # - `reduce_scatter`
+    #
     torch.manual_seed(0)
     inp = torch.randint(32000, (8, 256), device="cuda")
     python_result = model(inp)
