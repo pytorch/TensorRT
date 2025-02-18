@@ -41,6 +41,10 @@ Option 1: Install TensorRT-LLM
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Follow the instructions to `install TensorRT-LLM <https://nvidia.github.io/TensorRT-LLM/installation/linux.html>`_.
+Please note that before installing TensorRT-LLM, you need to
+
+1. apt install libmpich-dev
+2. apt install libopenmpi-dev
 
 If the default installation fails due to issues like library version mismatches or Python compatibility, consider using Option 2.
 After a successful installation, test by running:
