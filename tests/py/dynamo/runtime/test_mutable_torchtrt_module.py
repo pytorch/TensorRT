@@ -36,6 +36,126 @@ def test_check_output_equal():
     )
 
 
+@pytest.mark.unit
+def test_check_input_shape_dynamic():
+    torch.manual_seed(0)
+    a = {
+        "a": torch.rand(10, 3),
+        "b": [torch.rand(10, 30), torch.rand(5, 5)],
+        "c": {"a": torch.rand(10, 30), "b": [torch.rand(10, 30), torch.rand(5, 5)]},
+    }
+    torch.manual_seed(0)
+    b = {
+        "a": torch.rand(10, 30),
+        "b": [torch.rand(10, 30), torch.rand(5, 5)],
+        "c": {"a": torch.rand(10, 30), "b": [torch.rand(10, 30), torch.rand(5, 5)]},
+    }
+
+    dim = torch.export.Dim("dim", min=1, max=50)
+    dynamic_shape = {"a": {1: dim}, "b": [{}, {}], "c": {"a": {}, "b": [{}, {}]}}
+    assertions.assertFalse(
+        torch_trt.MutableTorchTensorRTModule.check_inputs_equal(a, b),
+        msg=f"test_check_output_equal is not correct.",
+    )
+    assertions.assertTrue(
+        torch_trt.MutableTorchTensorRTModule.check_inputs_equal(a, b, dynamic_shape),
+        msg=f"test_check_output_equal is not correct.",
+    )
+
+
+@pytest.mark.unit
+def test_model_complex_dynamic_shape():
+    class Model(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+
+        def forward(self, a, b, c=None):
+            x = torch.matmul(a, b)
+            x = torch.matmul(c["a"], c["b"][0].T)
+            x = 2 * c["b"][1]
+            return x
+
+    model = Model().eval().cuda()
+    inputs = [torch.rand(10, 3)]
+    kwargs = {
+        "b": torch.rand(3, 30),
+        "c": {"a": torch.rand(10, 30), "b": [torch.rand(10, 30), torch.rand(5, 3)]},
+    }
+
+    dim = torch.export.Dim("dim", min=1, max=50)
+    dim2 = torch.export.Dim("dim2", min=1, max=50)
+    args_dynamic_shapes = ({1: dim},)
+    kwarg_dynamic_shapes = {
+        "b": {0: dim},
+        "c": {"a": {}, "b": [{}, {1: dim2}]},
+    }
+    # Export the model first with custom dynamic shape constraints
+    # exp_program = torch.export.export(model, tuple(inputs), kwargs=k
+    trt_gm = torch_trt.MutableTorchTensorRTModule(model, debug=True)
+    trt_gm.set_dynamic_shape_hint(args_dynamic_shapes, kwarg_dynamic_shapes)
+    # Run inference
+    trt_gm(*inputs, **kwargs)
+
+    inputs_2 = [torch.rand(10, 9)]
+    kwargs_2 = {
+        "b": torch.rand(9, 30),
+        "c": {"a": torch.rand(10, 30), "b": [torch.rand(10, 30), torch.rand(5, 20)]},
+    }
+
+    kwargs = torch_trt.MutableTorchTensorRTModule.process_kwarg_inputs(kwargs_2)
+    trt_gm._validate_inputs(*inputs_2, **kwargs_2)
+    assertions.assertTrue(
+        trt_gm.refit_state.get_state() == RefitFlag.LIVE,
+        msg=f"Dynamic shape support is not correct.",
+    )
+    trt_gm(*inputs_2, **kwargs_2)
+
+    # Change does not align with Dynamic Shape Hint
+    inputs_3 = [torch.rand(7, 9)]
+    kwargs_3 = {
+        "b": torch.rand(9, 30),
+        "c": {"a": torch.rand(10, 30), "b": [torch.rand(10, 30), torch.rand(5, 20)]},
+    }
+
+    kwargs = torch_trt.MutableTorchTensorRTModule.process_kwarg_inputs(kwargs_3)
+    trt_gm._validate_inputs(*inputs_3, **kwargs_3)
+    assertions.assertTrue(
+        trt_gm.refit_state.get_state() == RefitFlag.NEEDS_RECOMPILE,
+        msg=f"Dynamic shape support is not correct.",
+    )
+    trt_gm(*inputs_3, **kwargs_3)
+
+    # # Stored input is changed (inputs first dimension is 7)
+    inputs_4 = [torch.rand(7, 20)]
+    kwargs_4 = {
+        "b": torch.rand(20, 30),
+        "c": {"a": torch.rand(10, 30), "b": [torch.rand(10, 30), torch.rand(5, 20)]},
+    }
+
+    kwargs = torch_trt.MutableTorchTensorRTModule.process_kwarg_inputs(kwargs_4)
+    trt_gm._validate_inputs(*inputs_4, **kwargs_4)
+    assertions.assertTrue(
+        trt_gm.refit_state.get_state() == RefitFlag.LIVE,
+        msg=f"Dynamic shape support is not correct.",
+    )
+    trt_gm(*inputs_4, **kwargs_4)
+
+    # # Change outside of the dynamic range limit
+    inputs_5 = [torch.rand(7, 900)]
+    kwargs_5 = {
+        "b": torch.rand(900, 30),
+        "c": {"a": torch.rand(10, 30), "b": [torch.rand(10, 30), torch.rand(5, 20)]},
+    }
+
+    kwargs = torch_trt.MutableTorchTensorRTModule.process_kwarg_inputs(kwargs_5)
+    trt_gm._validate_inputs(*inputs_5, **kwargs_5)
+    assertions.assertTrue(
+        trt_gm.refit_state.get_state() == RefitFlag.NEEDS_RECOMPILE,
+        msg=f"Dynamic shape support is not correct.",
+    )
+    trt_gm(*inputs_5, **kwargs_5)
+
+
 @unittest.skipIf(
     not torch_trt.ENABLED_FEATURES.torch_tensorrt_runtime,
     "TorchScript Frontend is not available",

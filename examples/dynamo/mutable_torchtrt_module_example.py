@@ -83,15 +83,13 @@ with torch.no_grad():
         "immutable_weights": False,
     }
 
-    model_id = "runwayml/stable-diffusion-v1-5"
+    model_id = "stabilityai/stable-diffusion-xl-base-1.0"
     device = "cuda:0"
 
-    prompt = "house in forest, shuimobysim, wuchangshuo, best quality"
-    negative = "(worst quality:2), (low quality:2), (normal quality:2), lowres, normal quality, out of focus, cloudy, (watermark:2),"
+    prompt = "cinematic photo elsa, police uniform <lora:princess_xl_v2:0.8>, . 35mm photograph, film, bokeh, professional, 4k, highly detailed"
+    negative = "drawing, painting, crayon, sketch, graphite, impressionist, noisy, blurry, soft, deformed, ugly, nude"
 
-    pipe = DiffusionPipeline.from_pretrained(
-        model_id, revision="fp16", torch_dtype=torch.float16
-    )
+    pipe = DiffusionPipeline.from_pretrained(model_id, torch_dtype=torch.float16)
     pipe.to(device)
 
     # The only extra line you need
@@ -103,7 +101,7 @@ with torch.no_grad():
     # Standard Huggingface LoRA loading procedure
     pipe.load_lora_weights(
         "stablediffusionapi/load_lora_embeddings",
-        weight_name="moxin.safetensors",
+        weight_name="all-disney-princess-xl-lo.safetensors",
         adapter_name="lora1",
     )
     pipe.set_adapters(["lora1"], adapter_weights=[1])
