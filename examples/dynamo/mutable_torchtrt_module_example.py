@@ -14,6 +14,7 @@ In this tutorial, we are going to walk through
 1. Sample workflow of Mutable Torch TensorRT Module with ResNet 18
 2. Save a Mutable Torch TensorRT Module
 3. Integration with Huggingface pipeline in LoRA use case
+4. Usage of dynamic shape with Mutable Torch TensorRT Module
 """
 
 import numpy as np
@@ -63,15 +64,13 @@ print("Refit successfully!")
 # Saving Mutable Torch TensorRT Module
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-# Currently, saving is only enabled for C++ runtime, not python runtime.
+# Currently, saving is only when "use_python" = False in settings
 torch_trt.MutableTorchTensorRTModule.save(mutable_module, "mutable_module.pkl")
 reload = torch_trt.MutableTorchTensorRTModule.load("mutable_module.pkl")
 
 # %%
 # Stable Diffusion with Huggingface
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-# The LoRA checkpoint is from https://civitai.com/models/12597/moxin
 
 from diffusers import DiffusionPipeline
 
@@ -111,3 +110,45 @@ with torch.no_grad():
     # Refit triggered
     image = pipe(prompt, negative_prompt=negative, num_inference_steps=30).images[0]
     image.save("./with_LoRA_mutable.jpg")
+
+
+# %%
+# Use Mutable Torch TensorRT module with dynamic shape
+# ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+class Model(torch.nn.Module):
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, a, b, c={}):
+        x = torch.matmul(a, b)
+        x = torch.matmul(c["a"], c["b"].T)
+        print(c["b"][0])
+        x = 2 * c["b"]
+        return x
+
+
+device = "cuda:0"
+model = Model().eval().to(device)
+inputs = (torch.rand(10, 3).to(device), torch.rand(3, 30).to(device))
+kwargs = {
+    "c": {"a": torch.rand(10, 30).to(device), "b": torch.rand(10, 30).to(device)},
+}
+dim_0 = torch.export.Dim("dim", min=1, max=50)
+dim_1 = torch.export.Dim("dim", min=1, max=50)
+dim_2 = torch.export.Dim("dim2", min=1, max=50)
+args_dynamic_shapes = ({1: dim_1}, {0: dim_0})
+kwarg_dynamic_shapes = {
+    "c": {"a": {}, "b": {0: dim_2}},
+}
+# Export the model first with custom dynamic shape constraints
+model = torch_trt.MutableTorchTensorRTModule(model, debug=True, min_block_size=1)
+model.set_expected_dynamic_shape_range(args_dynamic_shapes, kwarg_dynamic_shapes)
+# Compile
+model(*inputs, **kwargs)
+# Change input shape
+inputs_2 = (torch.rand(10, 5).to(device), torch.rand(10, 30).to(device))
+kwargs_2 = {
+    "c": {"a": torch.rand(10, 30).to(device), "b": torch.rand(5, 30).to(device)},
+}
+# Run without recompiling
+model(*inputs_2, **kwargs_2)
