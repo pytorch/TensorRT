@@ -59,17 +59,26 @@ def aot_torch_tensorrt_aten_backend(
         _pretraced_backend, settings=settings, engine_cache=engine_cache
     )
     settings_aot_autograd = {}
-    settings_aot_autograd["decompostions"] = get_decompositions(
+    settings_aot_autograd["decompositions"] = get_decompositions(
         settings.enable_experimental_decompositions
     )
     # This is added since detach lowering leads to alias nodes
     # Error - View operation returned a tensor that is the same as the input base tensor
     # torch nop_decompositions in torch/_decomp/decompositions.py
-    if aten.detach in settings_aot_autograd["decompositions"]:
-        del settings_aot_autograd["decompositions"][aten.detach]
+    # transpose key deleted since not desirable to lower it to permute
+    to_delete = {
+        key
+        for key in settings_aot_autograd["decompositions"]
+        if "transpose" in key._name
+    }
+
+    for key in to_delete:
+        del settings_aot_autograd["decompositions"][key]
+
+    remove_detach(gm, settings)
     return aot_autograd(
         fw_compiler=_pretraced_backend_autograd,
-        decompositions=get_decompositions(settings.enable_experimental_decompositions),
+        decompositions=settings_aot_autograd["decompositions"],
     )(gm, sample_inputs)
 
 

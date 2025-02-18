@@ -3,6 +3,7 @@
 import logging
 from typing import Dict, Sequence, Tuple, Union
 
+import tensorrt as trt
 from torch.fx.node import Argument, Target
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion import impl
@@ -16,8 +17,6 @@ from torch_tensorrt.dynamo.lowering.passes.fuse_distributed_ops import (
     tensorrt_fused_nccl_reduce_scatter_op,
 )
 
-import tensorrt as trt
-
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
 if load_tensorrt_llm():
@@ -30,7 +29,7 @@ if load_tensorrt_llm():
         kwargs: Dict[str, Argument],
         name: str,
     ) -> Union[trt.ITensor, Sequence[trt.ITensor]]:
-        return impl.distributed.nccl_gather(
+        return impl.nccl_ops.nccl_gather(
             ctx,
             target,
             SourceIR.ATEN,
@@ -46,7 +45,7 @@ if load_tensorrt_llm():
         kwargs: Dict[str, Argument],
         name: str,
     ) -> Union[trt.ITensor, Sequence[trt.ITensor]]:
-        return impl.distributed.nccl_reduce_scatter(
+        return impl.nccl_ops.nccl_reduce_scatter(
             ctx,
             target,
             SourceIR.ATEN,
@@ -54,7 +53,6 @@ if load_tensorrt_llm():
             [args[0]],
         )
 
-    breakpoint()
 else:
     _LOGGER.debug(
         "Did not load torch.distributed converters since TensorRT-LLM is not available"
