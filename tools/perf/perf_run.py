@@ -188,15 +188,27 @@ def run_ts_trt(model, input_tensors, params, precision, batch_size):
 
     iters = params.get("iterations", 20)
 
-    record_perf(
-        model,
-        "Torchscript",
-        input_tensors,
-        precision,
-        iters,
-        batch_size,
-        compile_time_s,
-    )
+    if params.get("enable_cuda_graph", False):
+        with torchtrt.runtime.enable_cudagraphs(model) as cudagraphs_module:
+            record_perf(
+                cudagraphs_module,
+                "Torchscript",
+                input_tensors,
+                precision,
+                iters,
+                batch_size,
+                compile_time_s,
+            )
+    else:
+        record_perf(
+            model,
+            "Torchscript",
+            input_tensors,
+            precision,
+            iters,
+            batch_size,
+            compile_time_s,
+        )
 
 
 @run_with_try_except
@@ -222,16 +234,30 @@ def run_hf_dynamo(model, input_tensors, params, precision, batch_size):
     )
     end_compile = timeit.default_timer()
     compile_time_s = end_compile - start_compile
-    record_llm_perf(
-        trt_model,
-        "Dynamo",
-        input_tensors,
-        precision,
-        osl,
-        batch_size,
-        iters,
-        compile_time_s,
-    )
+
+    if params.get("enable_cuda_graph", False):
+        with torchtrt.runtime.enable_cudagraphs(trt_model) as cudagraphs_module:
+            record_llm_perf(
+                cudagraphs_module,
+                "Dynamo",
+                input_tensors,
+                precision,
+                osl,
+                batch_size,
+                iters,
+                compile_time_s,
+            )
+    else:
+        record_llm_perf(
+            trt_model,
+            "Dynamo",
+            input_tensors,
+            precision,
+            osl,
+            batch_size,
+            iters,
+            compile_time_s,
+        )
 
 
 @run_with_try_except
@@ -270,9 +296,21 @@ def run_dynamo(model, input_tensors, params, precision, batch_size):
     compile_time_s = end_compile - start_compile
     iters = params.get("iterations", 20)
 
-    record_perf(
-        model, "Dynamo", input_tensors, precision, iters, batch_size, compile_time_s
-    )
+    if params.get("enable_cuda_graph", False):
+        with torchtrt.runtime.enable_cudagraphs(model) as cudagraphs_module:
+            record_perf(
+                cudagraphs_module,
+                "Dynamo",
+                input_tensors,
+                precision,
+                iters,
+                batch_size,
+                compile_time_s,
+            )
+    else:
+        record_perf(
+            model, "Dynamo", input_tensors, precision, iters, batch_size, compile_time_s
+        )
 
 
 @run_with_try_except
@@ -304,15 +342,27 @@ def run_torch_compile(model, input_tensors, params, precision, batch_size):
     compile_time_s = end_compile - start_compile
     iters = params.get("iterations", 20)
 
-    record_perf(
-        model,
-        "torch_compile",
-        input_tensors,
-        precision,
-        iters,
-        batch_size,
-        compile_time_s,
-    )
+    if params.get("enable_cuda_graph", False):
+        with torchtrt.runtime.enable_cudagraphs(model) as cudagraphs_module:
+            record_perf(
+                cudagraphs_module,
+                "torch_compile",
+                input_tensors,
+                precision,
+                iters,
+                batch_size,
+                compile_time_s,
+            )
+    else:
+        record_perf(
+            model,
+            "torch_compile",
+            input_tensors,
+            precision,
+            iters,
+            batch_size,
+            compile_time_s,
+        )
 
 
 @run_with_try_except
@@ -332,16 +382,29 @@ def run_hf_inductor(model, input_tensors, params, precision, batch_size):
     compile_time_s = end_compile - start_compile
     iters = params.get("iterations", 20)
 
-    record_llm_perf(
-        model,
-        "Inductor",
-        input_tensors,
-        precision,
-        osl,
-        batch_size,
-        iters,
-        compile_time_s,
-    )
+    if params.get("enable_cuda_graph", False):
+        with torchtrt.runtime.enable_cudagraphs(model) as cudagraphs_module:
+            record_llm_perf(
+                cudagraphs_module,
+                "Inductor",
+                input_tensors,
+                precision,
+                osl,
+                batch_size,
+                iters,
+                compile_time_s,
+            )
+    else:
+        record_llm_perf(
+            model,
+            "Inductor",
+            input_tensors,
+            precision,
+            osl,
+            batch_size,
+            iters,
+            compile_time_s,
+        )
 
 
 @run_with_try_except
@@ -367,9 +430,27 @@ def run_inductor(model, input_tensors, params, precision, batch_size):
     compile_time_s = end_compile - start_compile
     iters = params.get("iterations", 20)
 
-    record_perf(
-        model, "inductor", input_tensors, precision, iters, batch_size, compile_time_s
-    )
+    if params.get("enable_cuda_graph", False):
+        with torchtrt.runtime.enable_cudagraphs(model) as cudagraphs_module:
+            record_perf(
+                cudagraphs_module,
+                "inductor",
+                input_tensors,
+                precision,
+                iters,
+                batch_size,
+                compile_time_s,
+            )
+    else:
+        record_perf(
+            model,
+            "inductor",
+            input_tensors,
+            precision,
+            iters,
+            batch_size,
+            compile_time_s,
+        )
 
 
 @run_with_try_except
@@ -666,8 +747,6 @@ if __name__ == "__main__":
         raise ValueError(
             "No Pytorch model (nn.Module) is provided for torchdynamo compilation. Please provide a pytorch model using --model_torch argument"
         )
-
-    torchtrt.runtime.set_cudagraphs_mode(params.get("enable_cuda_graph", False))
 
     batch_size = params["batch_size"]
     is_trt_engine = params["is_trt_engine"]
