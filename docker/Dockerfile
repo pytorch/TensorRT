@@ -1,15 +1,16 @@
 # syntax=docker/dockerfile:1
 
 # Base image starts with CUDA
-ARG BASE_IMG=nvidia/cuda:12.4.1-devel-ubuntu22.04
+#TODO: cuda version
+ARG BASE_IMG=nvidia/cuda:12.8.0-devel-ubuntu22.04
 FROM ${BASE_IMG} as base
-ENV BASE_IMG=nvidia/cuda:12.4.1-devel-ubuntu22.04
+ENV BASE_IMG=nvidia/cuda:12.8.0-devel-ubuntu22.04
 
 ARG TENSORRT_VERSION
 ENV TENSORRT_VERSION=${TENSORRT_VERSION}
 RUN test -n "$TENSORRT_VERSION" || (echo "No tensorrt version specified, please use --build-arg TENSORRT_VERSION=x.y to specify a version." && exit 1)
 
-ARG PYTHON_VERSION=3.10
+ARG PYTHON_VERSION=3.11
 ENV PYTHON_VERSION=${PYTHON_VERSION}
 
 ARG USE_PRE_CXX11_ABI
