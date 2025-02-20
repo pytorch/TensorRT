@@ -18,8 +18,8 @@ jobs:
             options: --gpus all
         env:
             CUDA_HOME: /usr/local/cuda-12.8
-            VERSION_SUFFIX: cu126
-            CU_VERSION: cu126
+            VERSION_SUFFIX: cu128
+            CU_VERSION: cu128
             CHANNEL: nightly
             CI_BUILD: 1
         steps:
