@@ -12,15 +12,15 @@ import requests  # type: ignore[import-untyped]
 # channel: test if the future tensorRT version test workflow is triggered from the release branch(release/2.5 etc....)
 CUDA_VERSIONS_DICT = {
     "nightly": ["cu128"],
-    "test": ["cu124", "cu126", "cu128"],
-    "release": ["cu124", "cu126", "cu128"],
+    "test": ["cu118", "cu126", "cu128"],
+    "release": ["cu118", "cu126", "cu128"],
 }
 
 # please update the python version you want to test with the future tensorRT version here
 # channel: nightly if the future tensorRT version test workflow is triggered from the main branch or your personal branch
 # channel: test if the future tensorRT version test workflow is triggered from the release branch(release/2.5 etc....)
 PYTHON_VERSIONS_DICT = {
-    "nightly": ["3.9"],
+    "nightly": ["3.11"],
     "test": ["3.9", "3.10", "3.11", "3.12"],
     "release": ["3.9", "3.10", "3.11", "3.12"],
 }
