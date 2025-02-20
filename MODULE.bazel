@@ -36,13 +36,13 @@ new_local_repository = use_repo_rule("@bazel_tools//tools/build_defs/repo:local.
 new_local_repository(
     name = "cuda",
     build_file = "@//third_party/cuda:BUILD",
-    path = "/usr/local/cuda-12.6/",
+    path = "/usr/local/cuda-12.8/",
 )
 
 new_local_repository(
     name = "cuda_win",
     build_file = "@//third_party/cuda:BUILD",
-    path = "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v12.6/",
+    path = "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v12.8/",
 )
 
 http_archive = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
@@ -79,18 +79,18 @@ http_archive(
 http_archive(
     name = "tensorrt",
     build_file = "@//third_party/tensorrt/archive:BUILD",
-    strip_prefix = "TensorRT-10.7.0.23",
+    strip_prefix = "TensorRT-10.8.0.43",
     urls = [
-        "https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.7.0/tars/TensorRT-10.7.0.23.Linux.x86_64-gnu.cuda-12.6.tar.gz",
+        "https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.8.0/tars/TensorRT-10.8.0.43.Linux.x86_64-gnu.cuda-12.8.tar.gz",
     ],
 )
 
 http_archive(
     name = "tensorrt_win",
     build_file = "@//third_party/tensorrt/archive:BUILD",
-    strip_prefix = "TensorRT-10.7.0.23",
+    strip_prefix = "TensorRT-10.8.0.43",
     urls = [
-        "https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.7.0/zip/TensorRT-10.7.0.23.Windows.win10.cuda-12.6.zip",
+        "https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.8.0/zip/TensorRT-10.8.0.43.Windows.win10.cuda-12.8.zip",
     ],
 )
 
