@@ -181,6 +181,11 @@ def run_ts_trt(model, input_tensors, params, precision, batch_size):
     if precision == "int8":
         compile_settings.update({"calib": params.get("calibration_cache")})
 
+    if params.get("enable_cuda_graph", False):
+        logging.warning(
+            f"Torchscript backend doesn't support CUDA Graphs. `--enable_cuda_graph` will be ignored."
+        )
+
     start_compile = timeit.default_timer()
     model = torchtrt.compile(model, ir="ts", **compile_settings)
     end_compile = timeit.default_timer()
@@ -188,27 +193,15 @@ def run_ts_trt(model, input_tensors, params, precision, batch_size):
 
     iters = params.get("iterations", 20)
 
-    if params.get("enable_cuda_graph", False):
-        with torchtrt.runtime.enable_cudagraphs(model) as cudagraphs_module:
-            record_perf(
-                cudagraphs_module,
-                "Torchscript",
-                input_tensors,
-                precision,
-                iters,
-                batch_size,
-                compile_time_s,
-            )
-    else:
-        record_perf(
-            model,
-            "Torchscript",
-            input_tensors,
-            precision,
-            iters,
-            batch_size,
-            compile_time_s,
-        )
+    record_perf(
+        model,
+        "Torchscript",
+        input_tensors,
+        precision,
+        iters,
+        batch_size,
+        compile_time_s,
+    )
 
 
 @run_with_try_except
@@ -374,37 +367,28 @@ def run_hf_inductor(model, input_tensors, params, precision, batch_size):
     # Mark dynamic shapes for input sequence
     input_seq = input_tensors[0]
     torch._dynamo.mark_dynamic(input_seq, 1, min=1, max=osl)
+    mode = "max-autotune"
+    if params.get("enable_cuda_graph", False):
+        mode = "reduce-overhead"
+
     start_compile = timeit.default_timer()
     # Compile the model
-    model = torch.compile(model, backend="inductor", dynamic=None, mode="max-autotune")
+    model = torch.compile(model, backend="inductor", dynamic=None, mode=mode)
     model(input_seq)
     end_compile = timeit.default_timer()
     compile_time_s = end_compile - start_compile
     iters = params.get("iterations", 20)
 
-    if params.get("enable_cuda_graph", False):
-        with torchtrt.runtime.enable_cudagraphs(model) as cudagraphs_module:
-            record_llm_perf(
-                cudagraphs_module,
-                "Inductor",
-                input_tensors,
-                precision,
-                osl,
-                batch_size,
-                iters,
-                compile_time_s,
-            )
-    else:
-        record_llm_perf(
-            model,
-            "Inductor",
-            input_tensors,
-            precision,
-            osl,
-            batch_size,
-            iters,
-            compile_time_s,
-        )
+    record_llm_perf(
+        model,
+        "Inductor",
+        input_tensors,
+        precision,
+        osl,
+        batch_size,
+        iters,
+        compile_time_s,
+    )
 
 
 @run_with_try_except
@@ -423,34 +407,26 @@ def run_inductor(model, input_tensors, params, precision, batch_size):
     if params["is_text_llm"]:
         return run_hf_inductor(model, input_tensors, params, precision, batch_size)
 
+    mode = "max-autotune"
+    if params.get("enable_cuda_graph", False):
+        mode = "reduce-overhead"
+
     start_compile = timeit.default_timer()
-    model = torch.compile(model, backend="inductor", dynamic=None, mode="max-autotune")
+    model = torch.compile(model, backend="inductor", dynamic=None, mode=mode)
     model(*input_tensors)
     end_compile = timeit.default_timer()
     compile_time_s = end_compile - start_compile
     iters = params.get("iterations", 20)
 
-    if params.get("enable_cuda_graph", False):
-        with torchtrt.runtime.enable_cudagraphs(model) as cudagraphs_module:
-            record_perf(
-                cudagraphs_module,
-                "inductor",
-                input_tensors,
-                precision,
-                iters,
-                batch_size,
-                compile_time_s,
-            )
-    else:
-        record_perf(
-            model,
-            "inductor",
-            input_tensors,
-            precision,
-            iters,
-            batch_size,
-            compile_time_s,
-        )
+    record_perf(
+        model,
+        "inductor",
+        input_tensors,
+        precision,
+        iters,
+        batch_size,
+        compile_time_s,
+    )
 
 
 @run_with_try_except
