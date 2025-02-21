@@ -24,7 +24,7 @@ def remove_assert_scalar(
 
     if count > 0:
         gm = clean_up_graph_after_modifications(gm)
-    
+
     logger.debug(f"Removed {count} assert_scalar nodes:\n{gm.graph}")
 
     return gm

@@ -9,11 +9,11 @@ Torch-TensorRT.
 
 **FLUX.1 [dev]** is a 12 billion parameter rectified flow transformer capable of generating images from text descriptions. It is an open-weight, guidance-distilled model for non-commercial applications.
 
-Install the following dependencies before compilation
+To run this demo, you need to have access to Flux model (request for access if you do not have it already on the `FLUX.1-dev <https://huggingface.co/black-forest-labs/FLUX.1-dev>`_ page) and install the following dependencies
 
 .. code-block:: python
 
-    pip install sentencepiece=="0.2.0" transformers=="4.48.2" accelerate=="1.3.0" diffusers=="0.32.2"
+    pip install sentencepiece=="0.2.0" transformers=="4.48.2" accelerate=="1.3.0" diffusers=="0.32.2" protobuf=="5.29.3"
 
 There are different components of the ``FLUX.1-dev`` pipeline such as ``transformer``, ``vae``, ``text_encoder``, ``tokenizer`` and ``scheduler``. In this example,
 we demonstrate optimizing the ``transformer`` component of the model (which typically consumes >95% of the e2e diffusion latency)
@@ -64,7 +64,7 @@ dynamic_shapes = {
     "img_ids": {0: IMG_ID},
     "guidance": {0: BATCH},
     "joint_attention_kwargs": {},
-    "return_dict": None
+    "return_dict": None,
 }
 # The guidance factor is of type torch.float32
 dummy_inputs = {
@@ -82,7 +82,7 @@ dummy_inputs = {
     "img_ids": torch.randn((4096, 3), dtype=torch.float16).to(DEVICE),
     "guidance": torch.tensor([1.0, 1.0], dtype=torch.float32).to(DEVICE),
     "joint_attention_kwargs": {},
-    "return_dict": False
+    "return_dict": False,
 }
 # This will create an exported program which is going to be compiled with Torch-TensorRT
 ep = _export(
