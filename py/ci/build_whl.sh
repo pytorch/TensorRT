@@ -32,18 +32,6 @@ patch_wheel() {
     LD_LIBRARY_PATH=$LD_LIBRARY_PATH:${TENSERRT_DIR}/lib:$1/torch/lib:$1/tensorrt/:${CUDA_HOME}/lib64:${CUDA_HOME}/lib64/stubs $2/bin/python -m auditwheel repair  $(cat ${PROJECT_DIR}/py/ci/soname_excludes.params) --plat manylinux_2_34_x86_64 dist/torch_tensorrt-*-$3-linux_x86_64.whl
 }
 
-py38() {
-    cd ${PROJECT_DIR}
-    PY_BUILD_CODE=cp38-cp38
-    PY_SINGLE_BUILD_CODE=cp38
-    PY_VERSION=3.8
-    PY_NAME=python${PY_VERSION}
-    PY_DIR=/opt/python/${PY_BUILD_CODE}
-    PY_PKG_DIR=${PY_DIR}/lib/${PY_NAME}/site-packages/
-    build_wheel ${PY_DIR} ${PY_SINGLE_BUILD_CODE}
-    patch_wheel ${PY_PKG_DIR} ${PY_DIR} ${PY_BUILD_CODE}
-}
-
 py39() {
     cd ${PROJECT_DIR}
     PY_BUILD_CODE=cp39-cp39
