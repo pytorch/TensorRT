@@ -241,7 +241,7 @@ jobs:
           name: ${{ env.ARTIFACT_NAME }}
           path: ${{ inputs.repository }}/release/wheel/
       - name: Upload pre-cxx11 tarball to GitHub
-        if: ${{ inputs.cxx11-tarball-release != 'true' && env.PYTHON_VERSION == '3.10' }}
+        if: ${{ inputs.cxx11-tarball-release != 'true' && env.PYTHON_VERSION == '3.11' }}
         continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
