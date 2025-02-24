@@ -17,7 +17,6 @@ torch_enabled_decompositions: Set[Union[OpOverload, OpOverloadPacket]] = {
     aten.addcmul,
     aten.addcmul_,
     aten.addr,
-    aten.addmm,
     aten.aminmax,
     aten.arange.default,
     aten.arange.start,

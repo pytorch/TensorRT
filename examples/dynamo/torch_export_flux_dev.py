@@ -38,11 +38,10 @@ pipe = FluxPipeline.from_pretrained(
     "black-forest-labs/FLUX.1-dev",
     torch_dtype=torch.float16,
 )
-pipe.to(DEVICE).to(torch.float16)
+
 # Store the config and transformer backbone
 config = pipe.transformer.config
-backbone = pipe.transformer
-
+backbone = pipe.transformer.to(DEVICE)
 
 # %%
 # Export the backbone using torch.export
@@ -120,8 +119,11 @@ trt_gm = torch_tensorrt.dynamo.compile(
 # ---------------------------
 # Release the GPU memory occupied by the exported program and the pipe.transformer
 # Set the transformer in the Flux pipeline to the Torch-TRT compiled model
-backbone.to("cpu")
+
 del ep
+backbone.to("cpu")
+pipe.to(DEVICE)
+torch.cuda.empty_cache()
 pipe.transformer = trt_gm
 pipe.transformer.config = config
 

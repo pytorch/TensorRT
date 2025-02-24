@@ -91,6 +91,28 @@ replace_inplace_op(aten.scatter_add_, aten.scatter_add)
 replace_inplace_op(aten.scatter_reduce_, aten.scatter_reduce)
 
 
+@register_torch_trt_decomposition(aten.addmm, registry=TORCH_TRT_DECOMPOSITIONS)
+def addmm(self: torch.Tensor, mat1: torch.Tensor, mat2: torch.Tensor, beta: int = 1, alpha: int = 1):  # type: ignore
+    """
+    This is directly taken from Pytorch's addmm decomposition code: https://github.com/pytorch/pytorch/blob/cba14212e6f99186bee55ba33ac51c69a6870410/torch/_decomp/decompositions.py#L1447-L1461
+    The key difference is that we avoid upcasting or downcasting inputs and outputs. By default, PyTorch performs an FP32 upcast for mat1 and mat2, which can be problematic if either is a constant weight. During constant folding, this could lead to storing FP32 weights in the graph, unnecessarily increasing GPU memory consumption.
+    """
+    if not self.is_floating_point() and not self.is_complex():
+        beta = int(beta)
+        alpha = int(alpha)
+
+    out = alpha * torch.mm(mat1, mat2)
+    if beta == 0:
+        return out
+    # The output of aten.addmm is contiguous, we need to match this behavior in the decomposition.
+    # The original implementation 'beta * self + out' would return a strided tensor if `self` is strided.
+    # We thus use `out`, the output of torch.mm, which is always contiguous, as the first argument for addition.
+    # This is relying on TensorIterator's behavior that it takes higher precedence on the stride of first input.
+    # Alternative, we can write `(beta * self + out).contiguous()`, but it introduces another copy in some cases.
+    # This implementation is not ideal, and we should revisit this when we have a better solution.
+    return out + beta * self
+
+
 @register_torch_trt_decomposition(aten.rsqrt, registry=TORCH_TRT_DECOMPOSITIONS)
 def rsqrt_replacement(*args, **kwargs) -> torch.Tensor:  # type: ignore
     return torch.reciprocal(torch.sqrt(*args, **kwargs))
