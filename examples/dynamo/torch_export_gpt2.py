@@ -12,7 +12,11 @@ This script illustrates Torch-TensorRT workflow with dynamo backend on popular G
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 import torch
 import torch_tensorrt
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import AutoModelForCausalLM, AutoTokenizer, StoppingCriteriaList
+from transformers.generation.stopping_criteria import (
+    EosTokenCriteria,
+    MaxLengthCriteria,
+)
 from utils import export_llm, generate
 
 # %%
@@ -30,9 +34,9 @@ with torch.no_grad():
         AutoModelForCausalLM.from_pretrained(
             "gpt2",
             pad_token_id=tokenizer.eos_token_id,
-            use_cache=True,
+            use_cache=False,
             attn_implementation="sdpa",
-            num_hidden_layers=1,
+            num_hidden_layers=4,
         )
         .eval()
         .half()
@@ -47,6 +51,22 @@ input_ids = model_inputs["input_ids"].to(DEVICE)
 # Auto-regressive generation loop for greedy decoding using PyTorch model
 # We use a custom generate function which is very similar to the huggingface one.
 pyt_gen_tokens = generate(model, input_ids, MAX_TOKENS, tokenizer.eos_token_id)
+
+
+# Initialize kvcaching
+# construct a cache info object
+from torch_tensorrt.dynamo.lowering import AttentionRegistry, SequenceInfo
+
+MAX_SEQ_LEN = input_ids.shape[-1] + MAX_TOKENS
+sequence_info = SequenceInfo(
+    max_seq_len=MAX_SEQ_LEN,
+    max_batch_size=1,
+    page_size=MAX_SEQ_LEN,
+)
+
+csi = torch_tensorrt.dynamo.lowering.CachedSequenceInterface(
+    AttentionRegistry.get("FlashInfer"), sequence_info=sequence_info, device=DEVICE
+)
 
 
 # %%
@@ -71,14 +91,48 @@ with torch_tensorrt.logging.debug():
         use_fp32_acc=True,
         debug=True,
         insert_flashinfer_ops=True,
-        torch_executed_ops={"torch.ops.tensorrt.flashinfer_forward"},
+        cached_seq_interface=csi,
+        min_block_size=1e7,
     )
 
+
+def custom_generate(model, input_seq, csi, max_tokens, eos_token_id):
+    """
+    Greedy decoding of the model. This generates up to max_tokens.
+    """
+    # Max length of output seq = current input_seq length + max_tokens allowed to generate
+    max_output_seq_length = input_seq.shape[1] + max_tokens
+    stopping_criteria = StoppingCriteriaList(
+        [
+            MaxLengthCriteria(max_length=max_output_seq_length),
+            EosTokenCriteria(eos_token_id=eos_token_id),
+        ]
+    )
+    csi.info.reset()
+    csi.info.nest_sequences(input_seq)
+
+    while True:
+        outputs = model(*csi.args)
+        logits = outputs.logits
+        next_token_logits = logits[:, -1, :]
+        next_tokens = torch.argmax(next_token_logits, dim=-1)
+        input_seq = torch.cat([input_seq, next_tokens[:, None]], dim=-1)
+        # TODO: Handle batch in this check
+        if stopping_criteria(input_seq, logits).item():
+            break
+
+    return input_seq
+
+
+trt_gen_tokens = custom_generate(
+    trt_model, input_ids, csi, MAX_TOKENS, tokenizer.eos_token_id
+)
+# breakpoint()
 # Auto-regressive generation loop for greedy decoding using TensorRT model
 # We use a custom generate function which is very similar to the huggingface one.
 # Move inputs to GPU
-input_ids = input_ids.to(DEVICE)
-trt_gen_tokens = generate(trt_model, input_ids, MAX_TOKENS, tokenizer.eos_token_id)
+# input_ids = input_ids.to(DEVICE)
+# trt_gen_tokens = generate(trt_model, input_ids, MAX_TOKENS, tokenizer.eos_token_id)
 
 # %%
 # Decode the output sentences of PyTorch and TensorRT

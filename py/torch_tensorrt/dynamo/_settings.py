@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Collection, Optional, Set, Tuple, Union
+from typing import Any, Collection, Optional, Set, Tuple, Union
 
 from torch.fx.node import Target
 from torch_tensorrt._Device import Device
@@ -7,6 +7,7 @@ from torch_tensorrt._enums import EngineCapability, dtype
 from torch_tensorrt.dynamo._defaults import (
     ASSUME_DYNAMIC_SHAPE_SUPPORT,
     CACHE_BUILT_ENGINES,
+    CACHED_SEQ_INTERFACE,
     DEBUG,
     DISABLE_TF32,
     DLA_GLOBAL_DRAM_SIZE,
@@ -137,6 +138,7 @@ class CompilationSettings:
     enable_cross_compile_for_windows: bool = ENABLE_CROSS_COMPILE_FOR_WINDOWS
     use_aot_joint_export: bool = USE_AOT_JOINT_EXPORT
     insert_flashinfer_ops: bool = INSERT_FLASHINFER_OPS
+    cached_seq_interface: Any = CACHED_SEQ_INTERFACE
 
 
 _SETTINGS_TO_BE_ENGINE_INVARIANT = (

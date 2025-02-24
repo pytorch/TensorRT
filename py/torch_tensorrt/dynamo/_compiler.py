@@ -415,6 +415,7 @@ def compile(
     immutable_weights: bool = _defaults.IMMUTABLE_WEIGHTS,
     enable_weight_streaming: bool = _defaults.ENABLE_WEIGHT_STREAMING,
     insert_flashinfer_ops: bool = _defaults.INSERT_FLASHINFER_OPS,
+    cached_seq_interface: Any = _defaults.CACHED_SEQ_INTERFACE,
     **kwargs: Any,
 ) -> torch.fx.GraphModule:
     """Compile an ExportedProgram module for NVIDIA GPUs using TensorRT
@@ -491,6 +492,7 @@ def compile(
         immutable_weights (bool): Build non-refittable engines. This is useful for some layers that are not refittable. If this argument is set to true, `strip_engine_weights` and `refit_identical_engine_weights` will be ignored.
         enable_weight_streaming (bool): Enable weight streaming.
         insert_flashinfer_ops (bool): Insert Flashinfer custom attention op with kv caching
+        cached_seq_interface (Any): cached_seq_interface
         **kwargs: Any,
     Returns:
         torch.fx.GraphModule: Compiled FX Module, when run it will execute via TensorRT
@@ -666,6 +668,7 @@ def compile(
         "enable_cross_compile_for_windows": False,
         "enable_weight_streaming": enable_weight_streaming,
         "insert_flashinfer_ops": insert_flashinfer_ops,
+        "cached_seq_interface": cached_seq_interface,
     }
 
     settings = CompilationSettings(**compilation_options)
@@ -711,10 +714,9 @@ def compile_module(
     dryrun_tracker = DryRunTracker()
     if sample_kwarg_inputs is None:
         sample_kwarg_inputs = {}
-    breakpoint()
 
     if settings.insert_flashinfer_ops:
-        gm = insert_flashinfer_attn_with_cache(gm)
+        gm = insert_flashinfer_attn_with_cache(gm, settings)
 
     # Configure user compilation settings to converters.
     CONVERTERS.set_compilation_settings(settings)
