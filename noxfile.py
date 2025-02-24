@@ -233,15 +233,12 @@ def run_dynamo_converter_tests(session):
 def run_dynamo_lower_tests(session):
     print("Running Dynamo lowering passes")
     session.chdir(os.path.join(TOP_DIR, "tests/py/dynamo/"))
-    num_workers = "auto"
     tests = ["lowering"]
     for test in tests:
         if USE_HOST_DEPS:
-            session.run_always(
-                "pytest", test, "-n", num_workers, env={"PYTHONPATH": PYT_PATH}
-            )
+            session.run_always("pytest", test, env={"PYTHONPATH": PYT_PATH})
         else:
-            session.run_always("pytest", test, "-n", num_workers)
+            session.run_always("pytest", test)
 
 
 def run_dynamo_partitioning_tests(session):
