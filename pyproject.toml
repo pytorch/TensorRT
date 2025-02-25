@@ -12,6 +12,7 @@ requires = [
     "torch>=2.7.0.dev,<2.8.0",
     "pybind11==2.6.2",
     "numpy",
+    "sympy",
 ]
 build-backend = "setuptools.build_meta"
 
