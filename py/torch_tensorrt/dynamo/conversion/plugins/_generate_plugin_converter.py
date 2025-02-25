@@ -4,9 +4,9 @@ from typing import Callable, Dict, Optional, Sequence, Tuple, Union
 import numpy as np
 
 # Seems like a bug in TensorRT
-import tensorrt_bindings.plugin as trtp
+import tensorrt.plugin as trtp
 import torch
-from tensorrt_bindings.plugin._lib import QDP_REGISTRY
+from tensorrt.plugin._lib import QDP_REGISTRY
 from torch.fx.node import Argument, Node, Target
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext

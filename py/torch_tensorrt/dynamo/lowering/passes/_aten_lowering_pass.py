@@ -9,7 +9,7 @@ from .constant_folding import constant_fold
 from .fuse_distributed_ops import fuse_distributed_ops
 from .fuse_prims_broadcast import fuse_prims_broadcast
 from .pass_manager import DynamoPassManager
-from .remove_assert_scalar import remove_assert_scalar
+from .remove_assert_nodes import remove_assert_nodes
 from .remove_detach import remove_detach
 from .remove_input_alias_fixing_clones import remove_input_alias_fixing_clones
 from .repair_input_as_output import repair_input_as_output
@@ -23,7 +23,9 @@ ATEN_POST_LOWERING_PASSES = DynamoPassManager.build_from_passlist(
         fuse_prims_broadcast,
         fuse_distributed_ops,
         replace_max_pool_with_indices,
-        remove_assert_scalar,
+        # lower_scaled_dot_product_attention,
+        # view_to_reshape,
+        remove_assert_nodes,
         accumulate_fp32_matmul,
     ]
 )

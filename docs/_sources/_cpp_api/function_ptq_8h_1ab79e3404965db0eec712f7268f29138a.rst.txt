@@ -1,0 +1,14 @@
+.. _exhale_function_ptq_8h_1ab79e3404965db0eec712f7268f29138a:
+
+Template Function torch_tensorrt::ptq::make_int8_calibrator
+===========================================================
+
+- Defined in :ref:`file_cpp_include_torch_tensorrt_ptq.h`
+
+
+Function Documentation
+----------------------
+
+
+.. doxygenfunction:: torch_tensorrt::ptq::make_int8_calibrator(DataLoader, const std::string&, bool)
+   :project: Torch-TensorRT

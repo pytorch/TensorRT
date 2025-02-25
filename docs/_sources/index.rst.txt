@@ -141,6 +141,7 @@ Model Zoo
 * :ref:`torch_export_gpt2`
 * :ref:`torch_export_llama2`
 * :ref:`torch_export_sam2`
+* :ref:`torch_export_flux_dev`
 * :ref:`notebooks`
 
 .. toctree::
@@ -157,6 +158,7 @@ Model Zoo
    tutorials/_rendered_examples/dynamo/torch_export_gpt2
    tutorials/_rendered_examples/dynamo/torch_export_llama2
    tutorials/_rendered_examples/dynamo/torch_export_sam2
+   tutorials/_rendered_examples/dynamo/torch_export_flux_dev
    tutorials/notebooks
 
 Python API Documentation
