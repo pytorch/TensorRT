@@ -272,7 +272,7 @@ class TestFP32Accumulation(TestCase):
     def test_fp32_acc_for_addmm(self):
         class FP32Acc(torch.nn.Module):
             def forward(self, input, mat1, mat2):
-                out = torch.ops.aten.addmm.default(input, mat1, mat2)
+                out = torch.ops.aten.addmm.default(input, mat1, mat2, beta=20, alpha=2)
                 return out
 
         inputs = [

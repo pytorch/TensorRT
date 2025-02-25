@@ -2891,6 +2891,34 @@ def aten_ops_argmin(
     )
 
 
+@dynamo_tensorrt_converter(torch.ops.aten.addmm.default, supports_dynamic_shapes=True)
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+        1: (np.ndarray, torch.Tensor, TRTTensor),
+        2: (np.ndarray, torch.Tensor, TRTTensor),
+    }
+)
+def aten_ops_addmm(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.addmm.addmm(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        args[1],
+        args[2],
+        beta=kwargs.get("beta", 1),
+        alpha=kwargs.get("alpha", 1),
+    )
+
+
 @dynamo_tensorrt_converter(
     torch.ops.aten.constant_pad_nd.default, supports_dynamic_shapes=True
 )
