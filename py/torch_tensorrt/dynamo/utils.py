@@ -793,3 +793,9 @@ def get_output_dtypes(output: Any, truncate_doulbe: bool = False) -> List[dtype]
             f"got unexpected type {type(output)}, expected type is a torch.fx.node.Node or a tuple/list of torch.fx.node.Node"
         )
     return output_dtypes
+
+
+def is_tegra_platform() -> bool:
+    if torch.cuda.get_device_capability() in [(8, 7), (7, 2)]:
+        return True
+    return False
