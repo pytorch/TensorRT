@@ -272,9 +272,6 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         self.input_binding_names = state[2]
         self.output_binding_names = state[3]
 
-    def set_pre_allocated_outputs(self, enable: bool) -> None:
-        self.engine.use_pre_allocated_outputs = enable
-
     def forward(self, *inputs: Any) -> torch.Tensor | Tuple[torch.Tensor, ...]:
         """Implementation of the forward pass for a TensorRT engine
 

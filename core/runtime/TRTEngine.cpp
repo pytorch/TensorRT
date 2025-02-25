@@ -30,6 +30,27 @@ std::vector<std::string> split(const std::string& str, char delim) {
   return strings;
 }
 
+DynamicOutputAllocator::DynamicOutputAllocator(const std::unordered_map<std::string, at::ScalarType>& output_dtypes)
+    : dtypes(output_dtypes) {}
+
+void* DynamicOutputAllocator::reallocateOutputAsync(
+    char const* tensorName,
+    void* currentMemory,
+    uint64_t size,
+    uint64_t alignment,
+    cudaStream_t stream) {
+  std::vector<int64_t> shape = {static_cast<int64_t>(size)};
+  auto it = buffers.find(tensorName);
+  if (it == buffers.end() || it->second.sizes() != shape) {
+    buffers[tensorName] = at::empty(shape, at::TensorOptions().dtype(dtypes.at(tensorName)).device(c10::kCUDA));
+  }
+  return buffers[tensorName].data_ptr();
+}
+
+void DynamicOutputAllocator::notifyShape(char const* tensorName, nvinfer1::Dims const& dims) noexcept {
+  shapes[tensorName] = dims;
+}
+
 TRTEngine::TRTEngine(
     const std::string& serialized_engine,
     const RTDevice& cuda_device,
@@ -137,7 +158,6 @@ TRTEngine::TRTEngine(
     in_binding_names.resize(inputs);
     input_buffers.resize(inputs);
     out_binding_names.resize(outputs);
-    output_buffers.resize(outputs);
     for (int64_t x = 0; x < cuda_engine->getNbIOTensors(); x++) {
       std::string bind_name = cuda_engine->getIOTensorName(x);
       if (cuda_engine->getTensorIOMode(bind_name.c_str()) == nvinfer1::TensorIOMode::kINPUT) {
@@ -179,7 +199,6 @@ TRTEngine::TRTEngine(
 
     uint64_t outputs = _out_binding_names.size();
     out_binding_names.resize(outputs);
-    output_buffers.resize(outputs);
     for (size_t pyt_idx = 0; pyt_idx < outputs; pyt_idx++) {
       auto binding_name = _out_binding_names[pyt_idx];
       // Check if the binding name provided is in the list of engine's bindings

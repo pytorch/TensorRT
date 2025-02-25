@@ -343,9 +343,9 @@ class TestWeightStreamingPython(TestCase):
             use_python_runtime=use_python_runtime,
         )
 
-        # List of tuples representing different configurations for three features:
-        # Cuda graphs, pre-allocated output buffer, weight streaming change
-        states = list(itertools.product((True, False), repeat=3))
+        # List of tuples representing different configurations for two features:
+        # Cuda graphs and weight streaming change
+        states = list(itertools.product((True, False), repeat=2))
         # Create pairs of configurations representing an initial state and a changed state
         states_permutations = itertools.permutations(states, 2)
 
@@ -368,16 +368,11 @@ class TestWeightStreamingPython(TestCase):
         for i in range(len(input_list)):
             ref_out_list.append(model(input_list[i]))
 
-        pre_allocated_output_ctx = torchtrt.runtime.enable_pre_allocated_outputs(
-            optimized_model
-        )
-
         for init_state, changed_state in states_permutations:
-            for cuda_graphs, pre_allocated_output, weight_streaming in [
+            for cuda_graphs, weight_streaming in [
                 init_state,
                 changed_state,
             ]:
-                pre_allocated_output_ctx.set_pre_allocated_output(pre_allocated_output)
                 if cuda_graphs:
                     with torchtrt.runtime.enable_cudagraphs(
                         optimized_model

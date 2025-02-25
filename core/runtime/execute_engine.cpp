@@ -163,22 +163,23 @@ void setup_input_tensors(
     }
   }
 }
-std::vector<at::Tensor> create_output_tensors(c10::intrusive_ptr<TRTEngine> compiled_engine) {
-  std::vector<at::Tensor> outputs(compiled_engine->num_io.second);
-  for (auto output_indices : compiled_engine->out_binding_map) {
-    // out_binding_map stores TRT_IDX: PYT_IDX
-    auto pyt_idx = output_indices.second;
 
-    std::string name = compiled_engine->out_binding_names[pyt_idx];
-    auto out_shape = compiled_engine->exec_ctx->getTensorShape(name.c_str());
-    LOG_DEBUG("Output Name: " << name << " Shape: " << out_shape);
-
-    auto dims = core::util::toVec(out_shape);
-    auto type = util::TRTDataTypeToScalarType(compiled_engine->exec_ctx->getEngine().getTensorDataType(name.c_str()));
-    outputs[pyt_idx] = std::move(at::empty(dims, {at::kCUDA}).to(type).contiguous());
+void setup_output_allocator(c10::intrusive_ptr<TRTEngine> compiled_engine) {
+  if (compiled_engine->output_allocator == nullptr) {
+    std::unordered_map<std::string, at::ScalarType> output_dtypes_dict;
+    for (size_t o = 0; o < compiled_engine->out_binding_names.size(); ++o) {
+      auto name = compiled_engine->out_binding_names[o];
+      output_dtypes_dict[name] =
+          util::TRTDataTypeToScalarType(compiled_engine->exec_ctx->getEngine().getTensorDataType(name.c_str()));
+    }
+    compiled_engine->output_allocator = std::make_shared<DynamicOutputAllocator>(output_dtypes_dict);
   }
 
-  return outputs;
+  for (const auto& output_name : compiled_engine->out_binding_names) {
+    if (!compiled_engine->exec_ctx->setOutputAllocator(output_name.c_str(), compiled_engine->output_allocator.get())) {
+      throw std::runtime_error("Failed to set output allocator for " + output_name);
+    }
+  }
 }
 
 std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intrusive_ptr<TRTEngine> compiled_engine) {
@@ -218,7 +219,6 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
   }
 
   // Intialize inputs and outputs to be available throughout the succeeding scopes
-  std::vector<at::Tensor> outputs(compiled_engine->num_io.second);
 
   if (MULTI_DEVICE_SAFE_MODE) {
     std::unique_ptr<torch::autograd::profiler::RecordProfile> device_profiler_guard;
@@ -287,44 +287,20 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
             << " cannot be inferred. This could happen if the input tensor addresses/shapes haven't been configured correctly");
   }
 
-  { // Output Setup
-    std::unique_ptr<torch::autograd::profiler::RecordProfile> output_profiler_guard;
+  { // OutputAllocator Setup
+    std::unique_ptr<torch::autograd::profiler::RecordProfile> output_allocator_profiler_guard;
     if (compiled_engine->profile_execution) {
-      output_profiler_guard =
+      output_allocator_profiler_guard =
           std::make_unique<torch::autograd::profiler::RecordProfile>(compiled_engine->output_profile_path);
     }
-    if (can_use_pre_allocated_outputs) {
-      outputs = compiled_engine->pre_allocated_outputs;
-    } else {
-      outputs = create_output_tensors(compiled_engine);
-    }
-
-    for (auto output_indices : compiled_engine->out_binding_map) {
-      auto pyt_idx = output_indices.second;
-      std::string name = compiled_engine->out_binding_names[pyt_idx];
-      if (need_cudagraphs_record) {
-        // If we are recording the cuda graph then we need to update the persistent output buffer
-        compiled_engine->output_buffers[pyt_idx] = std::move(outputs[pyt_idx].clone());
-      }
-
-      if (cudagraphs_enabled) {
-        TORCHTRT_CHECK(
-            compiled_engine->exec_ctx->setTensorAddress(
-                name.c_str(), compiled_engine->output_buffers[pyt_idx].data_ptr()),
-            "Error while setting the output tensor address");
-      } else {
-        TORCHTRT_CHECK(
-            compiled_engine->exec_ctx->setTensorAddress(name.c_str(), outputs[pyt_idx].data_ptr()),
-            "Error while setting the output tensor address");
-      }
-    }
+    setup_output_allocator(compiled_engine);
   }
 
   auto current_device_id = -1;
   if (inputs.size() > 0) {
     current_device_id = inputs[0].device().index(); // Done this way to avoid a call to cudart
-  } else if (outputs.size() > 0) {
-    current_device_id = outputs[0].device().index(); // Done this way to avoid a call to cudart
+  } else {
+    current_device_id = c10::cuda::current_device();
   }
 
   compiled_engine->caller_stream = c10::cuda::getCurrentCUDAStream(current_device_id);
@@ -368,21 +344,32 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
     }
   } // End engine exeuction (resets to caller stream)
 
-  // Create output buffer for next execution of graph or trt context.
-  if (compiled_engine->use_pre_allocated_outputs) {
-    compiled_engine->pre_allocated_outputs = create_output_tensors(compiled_engine);
-  }
-
   // Block caller stream until engine execution is complete
   at::cuda::CUDAEvent trt_exec_complete;
   trt_exec_complete.record(compiled_engine->engine_stream);
   trt_exec_complete.block(compiled_engine->caller_stream);
 
-  if (cudagraphs_enabled) {
-    // If in CUDAGraph mode, results need to be copied to the result buffers (on caller stream)
-    for (size_t o = 0; o < compiled_engine->output_buffers.size(); o++) {
-      outputs[o].copy_(compiled_engine->output_buffers[o], false);
+  std::unique_ptr<torch::autograd::profiler::RecordProfile> output_profiler_guard;
+  if (compiled_engine->profile_execution) {
+    output_profiler_guard =
+        std::make_unique<torch::autograd::profiler::RecordProfile>(compiled_engine->output_profile_path);
+  }
+  std::vector<at::Tensor> outputs;
+  for (size_t i = 0; i < compiled_engine->out_binding_names.size(); i++) {
+    auto name = compiled_engine->out_binding_names[i];
+    auto dims = compiled_engine->output_allocator->getShapes().at(name);
+    auto dtype = util::TRTDataTypeToScalarType(compiled_engine->exec_ctx->getEngine().getTensorDataType(name.c_str()));
+    at::Tensor output = compiled_engine->output_allocator->getBuffers().at(name).clone().detach();
+    int64_t prod = 1;
+    for (int i = 0; i < dims.nbDims; ++i) {
+      prod *= dims.d[i];
     }
+    std::vector<int64_t> dims_vec(dims.nbDims);
+    for (int i = 0; i < dims.nbDims; ++i) {
+      dims_vec[i] = dims.d[i];
+    }
+    output = output.reshape(-1).view(dtype).slice(0, 0, prod).reshape(dims_vec);
+    outputs.push_back(output);
   }
 
   if (compiled_engine->profile_execution) {
