@@ -3,6 +3,7 @@ from typing import Callable, Optional, Sequence, Union
 
 import torch
 from torch_tensorrt.dynamo._settings import CompilationSettings
+from torch_tensorrt.dynamo.utils import is_tegra_platform
 
 from .accumulate_fp32_matmul import accumulate_fp32_matmul
 from .constant_folding import constant_fold
@@ -29,7 +30,7 @@ pass_list = [
     accumulate_fp32_matmul,
 ]
 
-if torch.cuda.get_device_capability() not in [(8, 7), (7, 2)]:
+if not is_tegra_platform():
     pass_list.append(fuse_distributed_ops)
 
 ATEN_POST_LOWERING_PASSES = DynamoPassManager.build_from_passlist(pass_list)
