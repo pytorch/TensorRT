@@ -2,6 +2,7 @@ import logging
 from typing import Callable, Dict, Optional, Sequence, Tuple, Union
 
 import numpy as np
+import tensorrt as trt
 
 # Seems like a bug in TensorRT
 import tensorrt.plugin as trtp
@@ -17,8 +18,6 @@ from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
     dynamo_tensorrt_converter,
 )
 from torch_tensorrt.dynamo.conversion.converter_utils import get_trt_tensor
-
-import tensorrt as trt
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -58,13 +57,24 @@ def _generate_plugin_converter(
         # Assuming TensorRT preserves kwargs order like PyTorch does
         non_tensor_inputs = plugin.input_attrs
 
+        kwargs = {}
+
+        for arg in torch_schema.arguments:
+            if arg.default_value is not None:
+                kwargs[arg.name] = arg.default_value
+
         non_tensor_args = args[len(tensor_inputs) :]
         non_tensor_kwargs = dict(zip(list(non_tensor_inputs.keys()), non_tensor_args))
-        for k, v in non_tensor_kwargs.items():
-            if isinstance(v, torch.fx.immutable_collections.immutable_list):
-                non_tensor_kwargs[k] = np.array(v)
 
-        layer = ctx.net.add_plugin(plugin(*itensor_args, **non_tensor_kwargs))
+        for k, v in kwargs.items():
+            if k in non_tensor_kwargs:
+                kwargs[k] = non_tensor_kwargs[k]
+
+        for k, v in kwargs.items():
+            if isinstance(v, torch.fx.immutable_collections.immutable_list):
+                kwargs[k] = np.array(v)
+
+        layer = ctx.net.add_plugin(plugin(*itensor_args, **kwargs))
         assert layer, f"{namespace}::{name} plugin layer was not able to be created"
         _LOGGER.debug(
             f"Adding generated plugin for {namespace}::{name} to tensorrt network"
