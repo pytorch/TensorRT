@@ -5,9 +5,9 @@
 * The `Dockerfile` currently uses <a href="https://github.com/bazelbuild/bazelisk">Bazelisk</a> to select the Bazel version, and uses the exact library versions of Torch and CUDA listed in <a href="https://github.com/pytorch/TensorRT#dependencies">dependencies</a>.
   * The desired versions of TensorRT must be specified as build-args, with major and minor versions as in: `--build-arg TENSORRT_VERSION=a.b`
   * [**Optional**] The desired base image be changed by explicitly setting a base image, as in `--build-arg BASE_IMG=nvidia/cuda:11.8.0-devel-ubuntu22.04`, though this is optional.
-  * [**Optional**] Additionally, the desired Python version can be changed by explicitly setting a version, as in `--build-arg PYTHON_VERSION=3.10`, though this is optional as well.
+  * [**Optional**] Additionally, the desired Python version can be changed by explicitly setting a version, as in `--build-arg PYTHON_VERSION=3.11`, though this is optional as well.
 
-* This `Dockerfile` installs `cxx11-abi` versions of Pytorch and builds Torch-TRT using `cxx11-abi` libtorch as well. As of torch 2.7, torch requires `cxx11-abi` for all CUDA 11.8, 12.4, and 12.6.
+* This `Dockerfile` installs `cxx11-abi` versions of Pytorch and builds Torch-TRT using `cxx11-abi` libtorch as well. As of torch 2.7, torch requires `cxx11-abi` for all CUDA 11.8, 12.4, 12.6, and later versions.
 
 Note: By default the container uses the `cxx11-abi` version of Torch + Torch-TRT. If you are using a workflow that requires a build of PyTorch on the PRE CXX11 ABI, please add the Docker build argument: `--build-arg USE_PRE_CXX11_ABI=1`
 
@@ -17,14 +17,14 @@ Note: By default the container uses the `cxx11-abi` version of Torch + Torch-TRT
 
 ### Instructions
 
-- The example below uses TensorRT 10.7.0.23
+- The example below uses TensorRT 10.8.0.43
 - See <a href="https://github.com/pytorch/TensorRT#dependencies">dependencies</a> for a list of current default dependencies.
 
 > From root of Torch-TensorRT repo
 
 Build:
 ```
-DOCKER_BUILDKIT=1 docker build --build-arg TENSORRT_VERSION=10.7.0 -f docker/Dockerfile -t torch_tensorrt:latest .
+DOCKER_BUILDKIT=1 docker build --build-arg TENSORRT_VERSION=10.8.0 -f docker/Dockerfile -t torch_tensorrt:latest .
 ```
 
 Run:

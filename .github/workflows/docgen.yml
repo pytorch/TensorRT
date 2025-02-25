@@ -14,12 +14,12 @@ jobs:
         if: ${{ ! contains(github.actor, 'pytorchbot') }}
         environment: pytorchbot-env
         container:
-            image: docker.io/pytorch/manylinux2_28-builder:cuda12.6
+            image: docker.io/pytorch/manylinux2_28-builder:cuda12.8
             options: --gpus all
         env:
-            CUDA_HOME: /usr/local/cuda-12.6
-            VERSION_SUFFIX: cu126
-            CU_VERSION: cu126
+            CUDA_HOME: /usr/local/cuda-12.8
+            VERSION_SUFFIX: cu128
+            CU_VERSION: cu128
             CHANNEL: nightly
             CI_BUILD: 1
         steps:
