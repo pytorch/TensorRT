@@ -1,7 +1,14 @@
+import unittest
+
 import torch
 import torch_tensorrt
 from parameterized import parameterized
+from torch.testing._internal.common_cuda import (
+    PLATFORM_SUPPORTS_CUDNN_ATTENTION,
+    PLATFORM_SUPPORTS_FLASH_ATTENTION,
+)
 from torch.testing._internal.common_utils import TestCase, run_tests
+from torch_tensorrt.dynamo.utils import ATOL, RTOL
 
 from ..testing_utilities import DECIMALS_OF_AGREEMENT, lower_graph_testing
 
@@ -1718,6 +1725,396 @@ class TestLowering(TestCase):
             0,
             DECIMALS_OF_AGREEMENT,
             "Instance_norm TRT outputs don't match with the original model.",
+        )
+
+    def test_lowering_view(self):
+        class TestModule(torch.nn.Module):
+            def forward(self, x):
+                return torch.ops.aten.view.default(x, [1, 3, -1])
+
+        # Operations expected to be removed in the traced graph after decompositions
+        expected_ops = {torch.ops.aten._reshape_copy.default}
+        unexpected_ops = {torch.ops.aten.view.default}
+
+        inputs = [torch.randn(1, 3, 5, 7, device="cuda")]
+
+        exported_program = torch.export.export(TestModule(), tuple(inputs))
+        fx_graph = exported_program.module()
+        unexpected_ops_seen, expected_ops_unseen = lower_graph_testing(
+            fx_graph,
+            inputs,
+            expected_ops=expected_ops,
+            unexpected_ops=unexpected_ops,
+            min_block_size=1,
+        )
+
+        self.assertEqual(
+            len(unexpected_ops_seen),
+            0,
+            f"The following unexpected ops were encountered: {unexpected_ops_seen}",
+        )
+
+        self.assertEqual(
+            len(expected_ops_unseen),
+            0,
+            f"The following expected ops were not encountered: {expected_ops_unseen}",
+        )
+
+        torch._dynamo.reset()
+
+        # Validate that the results between Torch and Torch-TRT are similar
+        trt_model = torch_tensorrt.dynamo.compile(
+            exported_program, inputs, min_block_size=1
+        )
+        torch.testing.assert_close(
+            trt_model(*inputs),
+            fx_graph(*inputs),
+            rtol=RTOL,
+            atol=ATOL,
+            msg="View TRT outputs don't match with the original model.",
+        )
+
+    @parameterized.expand(
+        [
+            (True, False, None, False),
+            (False, True, 0.123, True),
+        ]
+    )
+    def test_lowering_scaled_dot_product_attention(
+        self, attn, is_causal, scale, enable_gqa
+    ):
+        class TestModule(torch.nn.Module):
+            def forward(self, query, key, value, attn_mask=None):
+                return torch.ops.aten.scaled_dot_product_attention.default(
+                    query,
+                    key,
+                    value,
+                    attn_mask,
+                    0.0,
+                    is_causal,
+                    scale=scale,
+                    enable_gqa=enable_gqa,
+                )
+
+        # Operations expected to be removed in the traced graph after decompositions
+        unexpected_ops = {torch.ops.aten.scaled_dot_product_attention.default}
+
+        inputs = [
+            torch.rand(1, 3, 8, 16, dtype=torch.half, device="cuda"),
+            torch.rand(1, 3, 8, 16, dtype=torch.half, device="cuda"),
+            torch.rand(1, 3, 8, 16, dtype=torch.half, device="cuda"),
+        ]
+        if attn:
+            inputs += [torch.rand(1, 3, 8, 8, dtype=torch.half, device="cuda")]
+
+        exported_program = torch.export.export(TestModule(), tuple(inputs))
+        fx_graph = exported_program.module()
+        unexpected_ops_seen, _ = lower_graph_testing(
+            fx_graph, inputs, unexpected_ops=unexpected_ops, min_block_size=1
+        )
+
+        self.assertEqual(
+            len(unexpected_ops_seen),
+            0,
+            f"The following unexpected ops were encountered: {unexpected_ops_seen}",
+        )
+
+        torch._dynamo.reset()
+
+        # Validate that the results between Torch and Torch-TRT are similar
+        trt_model = torch_tensorrt.dynamo.compile(
+            exported_program, inputs, enabled_precisions={torch.half}, min_block_size=1
+        )
+        torch.testing.assert_close(
+            trt_model(*inputs),
+            fx_graph(*inputs),
+            rtol=RTOL,
+            atol=ATOL,
+            msg="Scaled_dot_product_attention TRT outputs don't match with the original model.",
+        )
+
+    @parameterized.expand(
+        [
+            (True, False, None, False),
+            (False, True, 0.123, True),
+        ]
+    )
+    def test_lowering_scaled_dot_product_attention_with_dynamic_shape(
+        self, attn, is_causal, scale, enable_gqa
+    ):
+        class TestModule(torch.nn.Module):
+            def forward(self, query, key, value, attn_mask=None):
+                return torch.ops.aten.scaled_dot_product_attention.default(
+                    query,
+                    key,
+                    value,
+                    attn_mask,
+                    0.0,
+                    is_causal,
+                    scale=scale,
+                    enable_gqa=enable_gqa,
+                )
+
+        example_inputs = [
+            torch.zeros(2, 2, 16, 32, dtype=torch.half, device="cuda"),
+            torch.zeros(2, 2, 16, 32, dtype=torch.half, device="cuda"),
+            torch.zeros(2, 2, 16, 32, dtype=torch.half, device="cuda"),
+        ]
+        if attn:
+            example_inputs += [
+                torch.zeros(2, 2, 16, 16, dtype=torch.half, device="cuda")
+            ]
+
+        dim0 = torch.export.Dim("dim0", min=2, max=4)
+        dim1 = torch.export.Dim("dim1", min=2, max=8)
+        _dim2 = torch.export.Dim("dim2", min=16 // 8, max=64 // 8)
+        _dim3 = torch.export.Dim("dim3", min=32 // 8, max=128 // 8)
+        dim2 = _dim2 * 8
+        dim3 = _dim3 * 8
+
+        dynamic_shapes = {
+            "query": {0: dim0, 1: dim1, 2: dim2, 3: dim3},
+            "key": {0: dim0, 1: dim1, 2: dim2, 3: dim3},
+            "value": {0: dim0, 1: dim1, 2: dim2, 3: dim3},
+        }
+        if attn:
+            dynamic_shapes["attn_mask"] = {0: dim0, 1: dim1, 2: dim2, 3: dim2}
+
+        exported_program = torch.export.export(
+            TestModule(), tuple(example_inputs), dynamic_shapes=dynamic_shapes
+        )
+        fx_graph = exported_program.module()
+
+        inputs = [
+            torch_tensorrt.Input(
+                min_shape=(2, 2, 16, 32),
+                opt_shape=(3, 4, 32, 64),
+                max_shape=(4, 8, 64, 128),
+                dtype=torch.half,
+            ),
+            torch_tensorrt.Input(
+                min_shape=(2, 2, 16, 32),
+                opt_shape=(3, 4, 32, 64),
+                max_shape=(4, 8, 64, 128),
+                dtype=torch.half,
+            ),
+            torch_tensorrt.Input(
+                min_shape=(2, 2, 16, 32),
+                opt_shape=(3, 4, 32, 64),
+                max_shape=(4, 8, 64, 128),
+                dtype=torch.half,
+            ),
+        ]
+        if attn:
+            inputs += [
+                torch_tensorrt.Input(
+                    min_shape=(2, 2, 16, 16),
+                    opt_shape=(3, 4, 32, 32),
+                    max_shape=(4, 8, 64, 64),
+                    dtype=torch.half,
+                )
+            ]
+
+        torch._dynamo.reset()
+
+        # Validate that the results between Torch and Torch-TRT are similar
+        trt_model = torch_tensorrt.dynamo.compile(
+            exported_program, inputs, enabled_precisions={torch.half}, min_block_size=1
+        )
+
+        inputs = [
+            torch.rand(4, 8, 64, 128, dtype=torch.half, device="cuda"),
+            torch.rand(4, 8, 64, 128, dtype=torch.half, device="cuda"),
+            torch.rand(4, 8, 64, 128, dtype=torch.half, device="cuda"),
+        ]
+        if attn:
+            inputs += [torch.rand(4, 8, 64, 64, dtype=torch.half, device="cuda")]
+
+        torch.testing.assert_close(
+            trt_model(*inputs),
+            fx_graph(*inputs),
+            rtol=RTOL,
+            atol=ATOL,
+            msg="Scaled_dot_product_attention_with_dynamic_shape TRT outputs don't match with the original model.",
+        )
+
+    @parameterized.expand(
+        [
+            (False, None),
+            (True, 0.123),
+        ]
+    )
+    @unittest.skipUnless(
+        PLATFORM_SUPPORTS_FLASH_ATTENTION, "Platform doesn't support Flash attention"
+    )
+    def test_lowering_scaled_dot_product_flash_attention(self, is_causal, scale):
+        class TestModule(torch.nn.Module):
+            def forward(self, query, key, value):
+                return torch.ops.aten._scaled_dot_product_flash_attention.default(
+                    query,
+                    key,
+                    value,
+                    0.0,
+                    is_causal,
+                    False,
+                    scale=scale,
+                )[0]
+
+        # Operations expected to be removed in the traced graph after decompositions
+        unexpected_ops = {torch.ops.aten._scaled_dot_product_flash_attention.default}
+
+        inputs = [
+            torch.rand(1, 3, 8, 16, dtype=torch.half, device="cuda"),
+            torch.rand(1, 3, 8, 16, dtype=torch.half, device="cuda"),
+            torch.rand(1, 3, 8, 16, dtype=torch.half, device="cuda"),
+        ]
+
+        exported_program = torch.export.export(TestModule(), tuple(inputs))
+        fx_graph = exported_program.module()
+        unexpected_ops_seen, _ = lower_graph_testing(
+            fx_graph, inputs, unexpected_ops=unexpected_ops, min_block_size=1
+        )
+
+        self.assertEqual(
+            len(unexpected_ops_seen),
+            0,
+            f"The following unexpected ops were encountered: {unexpected_ops_seen}",
+        )
+
+        torch._dynamo.reset()
+
+        # Validate that the results between Torch and Torch-TRT are similar
+        trt_model = torch_tensorrt.dynamo.compile(
+            exported_program, inputs, enabled_precisions={torch.half}, min_block_size=1
+        )
+        torch.testing.assert_close(
+            trt_model(*inputs),
+            fx_graph(*inputs),
+            rtol=RTOL,
+            atol=ATOL,
+            msg="Scaled_dot_product_flash_attention TRT outputs don't match with the original model.",
+        )
+
+    @parameterized.expand(
+        [
+            (True, False, None),
+            (False, True, 0.123),
+        ]
+    )
+    def test_lowering_scaled_dot_product_efficient_attention(
+        self, attn, is_causal, scale
+    ):
+        class TestModule(torch.nn.Module):
+            def forward(self, query, key, value, attn_bias=None):
+                return torch.ops.aten._scaled_dot_product_efficient_attention.default(
+                    query,
+                    key,
+                    value,
+                    attn_bias,
+                    False,
+                    0.0,
+                    is_causal,
+                    scale=scale,
+                )[0]
+
+        # Operations expected to be removed in the traced graph after decompositions
+        unexpected_ops = {
+            torch.ops.aten._scaled_dot_product_efficient_attention.default
+        }
+
+        inputs = [
+            torch.rand(1, 3, 8, 16, dtype=torch.half, device="cuda"),
+            torch.rand(1, 3, 8, 16, dtype=torch.half, device="cuda"),
+            torch.rand(1, 3, 8, 16, dtype=torch.half, device="cuda"),
+        ]
+        if attn:
+            inputs += [torch.rand(1, 3, 8, 8, dtype=torch.half, device="cuda")]
+
+        exported_program = torch.export.export(TestModule(), tuple(inputs))
+        fx_graph = exported_program.module()
+        unexpected_ops_seen, _ = lower_graph_testing(
+            fx_graph, inputs, unexpected_ops=unexpected_ops, min_block_size=1
+        )
+
+        self.assertEqual(
+            len(unexpected_ops_seen),
+            0,
+            f"The following unexpected ops were encountered: {unexpected_ops_seen}",
+        )
+
+        torch._dynamo.reset()
+
+        # Validate that the results between Torch and Torch-TRT are similar
+        trt_model = torch_tensorrt.dynamo.compile(
+            exported_program, inputs, enabled_precisions={torch.half}, min_block_size=1
+        )
+        torch.testing.assert_close(
+            trt_model(*inputs),
+            fx_graph(*inputs),
+            rtol=RTOL,
+            atol=ATOL,
+            msg="Scaled_dot_product_efficient_attention TRT outputs don't match with the original model.",
+        )
+
+    @parameterized.expand(
+        [
+            (True, False, None),
+            (False, True, 0.123),
+        ]
+    )
+    @unittest.skipUnless(
+        PLATFORM_SUPPORTS_CUDNN_ATTENTION, "Platform doesn't support cuDNN attention"
+    )
+    def test_lowering_scaled_dot_product_cudnn_attention(self, attn, is_causal, scale):
+        class TestModule(torch.nn.Module):
+            def forward(self, query, key, value, attn_bias=None):
+                return torch.ops.aten._scaled_dot_product_cudnn_attention.default(
+                    query,
+                    key,
+                    value,
+                    attn_bias,
+                    False,
+                    0.0,
+                    is_causal,
+                    False,
+                    scale=scale,
+                )[0]
+
+        # Operations expected to be removed in the traced graph after decompositions
+        unexpected_ops = {torch.ops.aten._scaled_dot_product_cudnn_attention.default}
+
+        inputs = [
+            torch.rand(1, 3, 8, 16, dtype=torch.half, device="cuda"),
+            torch.rand(1, 3, 8, 16, dtype=torch.half, device="cuda"),
+            torch.rand(1, 3, 8, 16, dtype=torch.half, device="cuda"),
+        ]
+        if attn:
+            inputs += [torch.rand(1, 3, 8, 8, dtype=torch.half, device="cuda")]
+
+        exported_program = torch.export.export(TestModule(), tuple(inputs))
+        fx_graph = exported_program.module()
+        unexpected_ops_seen, _ = lower_graph_testing(
+            fx_graph, inputs, unexpected_ops=unexpected_ops, min_block_size=1
+        )
+
+        self.assertEqual(
+            len(unexpected_ops_seen),
+            0,
+            f"The following unexpected ops were encountered: {unexpected_ops_seen}",
+        )
+
+        torch._dynamo.reset()
+
+        # Validate that the results between Torch and Torch-TRT are similar
+        trt_model = torch_tensorrt.dynamo.compile(
+            exported_program, inputs, enabled_precisions={torch.half}, min_block_size=1
+        )
+        torch.testing.assert_close(
+            trt_model(*inputs),
+            fx_graph(*inputs),
+            rtol=RTOL,
+            atol=ATOL,
+            msg="Scaled_dot_product_cudnn_attention TRT outputs don't match with the original model.",
         )
 
 
