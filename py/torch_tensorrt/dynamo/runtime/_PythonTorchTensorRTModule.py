@@ -202,10 +202,13 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
             torch_tensorrt.runtime.get_cudagraphs_mode()
         )
 
-        self.engine_is_dds = engine_is_dds
+        self.cudagraphs_enabled = False
         self.pre_allocated_outputs: List[torch.Tensor] = []
         self.use_pre_allocated_outputs = False
+
+        self.engine_is_dds = engine_is_dds
         self.output_allocator: Optional[DynamicOutputAllocator] = None
+        self.use_output_allocator_outputs = False
 
         if self.serialized_engine is not None and not self.settings.lazy_engine_init:
             self.setup_engine()
@@ -401,6 +404,9 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
     def set_pre_allocated_outputs(self, enable: bool) -> None:
         self.use_pre_allocated_outputs = enable
 
+    def set_output_allocator_outputs(self, enable: bool) -> None:
+        self.use_output_allocator_outputs = enable
+
     def create_output_allocator(self) -> None:
         if self.output_allocator is None:
             output_dtypes_dict = {}
@@ -410,15 +416,14 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
 
     def forward(self, *inputs: torch.Tensor) -> torch.Tensor | Tuple[torch.Tensor, ...]:
 
-        def run_cuda_graph() -> torch.Tensor | Tuple[torch.Tensor, ...]:
-            cudagraphs_enabled = torch_tensorrt.runtime.get_cudagraphs_mode()
+        def run_standard_execution() -> torch.Tensor | Tuple[torch.Tensor, ...]:
             shape_changed = self.validate_input_shapes(inputs)
             (
                 need_cudagraphs_record,
                 can_use_pre_allocated_outputs,
                 need_cudagraphs_reset,
             ) = self.runtime_states.set_runtime_states(
-                cudagraphs_enabled, self.use_pre_allocated_outputs, shape_changed
+                self.cudagraphs_enabled, self.use_pre_allocated_outputs, shape_changed
             )
 
             if need_cudagraphs_reset and self.cudagraph:
@@ -441,7 +446,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                 ), f"Wrong number of inputs, expect {len(self.input_names)} get {len(contiguous_inputs)}."
 
                 self.setup_input_tensors(
-                    contiguous_inputs, cudagraphs_enabled, need_cudagraphs_record
+                    contiguous_inputs, self.cudagraphs_enabled, need_cudagraphs_record
                 )
 
                 if shape_changed:
@@ -477,7 +482,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                     if need_cudagraphs_record:
                         self._output_buffers[o] = outputs[o].clone()
 
-                    if cudagraphs_enabled:
+                    if self.cudagraphs_enabled:
                         self.context.set_tensor_address(
                             output_name, self._output_buffers[o].data_ptr()
                         )
@@ -503,7 +508,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                 self._engine_stream.wait_stream(self._caller_stream)
 
                 with torch.cuda.stream(self._engine_stream):
-                    if cudagraphs_enabled:
+                    if self.cudagraphs_enabled:
                         if need_cudagraphs_record:
                             self.cudagraph = torch.cuda.CUDAGraph()
 
@@ -535,7 +540,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
             if self.use_pre_allocated_outputs:
                 self.pre_allocated_outputs = self.create_output_tensors()
 
-            if cudagraphs_enabled:
+            if self.cudagraphs_enabled:
                 for idx, o in enumerate(outputs):
                     o.copy_(self._output_buffers[idx])
 
@@ -545,7 +550,9 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
             return outputs
 
         def run_output_allocator() -> torch.Tensor | Tuple[torch.Tensor, ...]:
-            torch_tensorrt.runtime.set_cudagraphs_mode(False)
+            assert (
+                not torch_tensorrt.runtime.get_cudagraphs_mode()
+            ), "CUDA Graphs are not compatible with OutputAllocator."
             with (
                 torch.autograd.profiler.record_function(
                     "PythonTorchTensorRTModule:ProcessInputs"
@@ -625,6 +632,8 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
 
             return outputs
 
+        self.cudagraphs_enabled = torch_tensorrt.runtime.get_cudagraphs_mode()
+
         # Run forward function
         contiguous_inputs: List[torch.Tensor] = [
             (i.contiguous() if isinstance(i, torch.Tensor) else torch.tensor(i).cuda())
@@ -670,9 +679,26 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                     logger.warning(f"Moved all input Tensors to cuda:{device_id}")
 
             if self.engine_is_dds:
+                if self.cudagraphs_enabled:
+                    raise RuntimeError(
+                        "The module is Data-Dependent Shape (DDS). It has to be handled by OutputAllocator which is not compatible with CUDA Graphs. Please disable CUDA Graphs."
+                    )
+                logger.debug(
+                    "The module is Data-Dependent Shape (DDS). Using output allocator."
+                )
                 return run_output_allocator()
             else:
-                return run_cuda_graph()
+                if self.cudagraphs_enabled and self.use_output_allocator_outputs:
+                    raise RuntimeError(
+                        "Both CUDA Graphs and OutputAllocator are enabled. Please disable either one."
+                    )
+                if self.use_output_allocator_outputs:
+                    logger.debug("Using output allocator.")
+                    return run_output_allocator()
+                logger.debug(
+                    f"Using standard execution with cudagraphs={self.cudagraphs_enabled}."
+                )
+                return run_standard_execution()
 
     def enable_profiling(self, profiler: "trt.IProfiler" = None) -> None:
         """
