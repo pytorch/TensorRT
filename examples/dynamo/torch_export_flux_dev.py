@@ -9,11 +9,11 @@ Torch-TensorRT.
 
 **FLUX.1 [dev]** is a 12 billion parameter rectified flow transformer capable of generating images from text descriptions. It is an open-weight, guidance-distilled model for non-commercial applications.
 
-Install the following dependencies before compilation
+To run this demo, you need to have access to Flux model (request for access if you do not have it already on the `FLUX.1-dev <https://huggingface.co/black-forest-labs/FLUX.1-dev>`_ page) and install the following dependencies
 
 .. code-block:: python
 
-    pip install sentencepiece=="0.2.0" transformers=="4.48.2" accelerate=="1.3.0" diffusers=="0.32.2"
+    pip install sentencepiece=="0.2.0" transformers=="4.48.2" accelerate=="1.3.0" diffusers=="0.32.2" protobuf=="5.29.3"
 
 There are different components of the ``FLUX.1-dev`` pipeline such as ``transformer``, ``vae``, ``text_encoder``, ``tokenizer`` and ``scheduler``. In this example,
 we demonstrate optimizing the ``transformer`` component of the model (which typically consumes >95% of the e2e diffusion latency)
@@ -38,11 +38,10 @@ pipe = FluxPipeline.from_pretrained(
     "black-forest-labs/FLUX.1-dev",
     torch_dtype=torch.float16,
 )
-pipe.to(DEVICE).to(torch.float16)
+
 # Store the config and transformer backbone
 config = pipe.transformer.config
-backbone = pipe.transformer
-
+backbone = pipe.transformer.to(DEVICE)
 
 # %%
 # Export the backbone using torch.export
@@ -63,6 +62,8 @@ dynamic_shapes = {
     "txt_ids": {0: SEQ_LEN},
     "img_ids": {0: IMG_ID},
     "guidance": {0: BATCH},
+    "joint_attention_kwargs": {},
+    "return_dict": None,
 }
 # The guidance factor is of type torch.float32
 dummy_inputs = {
@@ -79,6 +80,8 @@ dummy_inputs = {
     "txt_ids": torch.randn((512, 3), dtype=torch.float16).to(DEVICE),
     "img_ids": torch.randn((4096, 3), dtype=torch.float16).to(DEVICE),
     "guidance": torch.tensor([1.0, 1.0], dtype=torch.float32).to(DEVICE),
+    "joint_attention_kwargs": {},
+    "return_dict": False,
 }
 # This will create an exported program which is going to be compiled with Torch-TensorRT
 ep = _export(
@@ -116,8 +119,11 @@ trt_gm = torch_tensorrt.dynamo.compile(
 # ---------------------------
 # Release the GPU memory occupied by the exported program and the pipe.transformer
 # Set the transformer in the Flux pipeline to the Torch-TRT compiled model
-backbone.to("cpu")
+
 del ep
+backbone.to("cpu")
+pipe.to(DEVICE)
+torch.cuda.empty_cache()
 pipe.transformer = trt_gm
 pipe.transformer.config = config
 
