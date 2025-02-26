@@ -217,8 +217,9 @@ class MutableTorchTensorRTModule(object):
     ) -> None:
         """
         Set the dynamic shape range. The shape hint should EXACTLY follow arg_inputs and kwarg_inputs passed to the forward function
-        and should not omit any entries. If the dynamic shape is not required for the input, an empty dictionary should be given
-        as the shape hint for that input.
+        and should not omit any entries (except None in the kwarg_inputs). If there is a nested dict/list in the input, the dynamic shape for that entry should also be an nested dict/list.
+        If the dynamic shape is not required for an input, an empty dictionary should be given as the shape hint for that input.
+        Note that you should exclude keyword arguments with value None as those will be filtered out.
 
         Example:
         def forward(a, b, c=0, d=0):
@@ -423,7 +424,7 @@ class MutableTorchTensorRTModule(object):
         else:
             if self.kwarg_dynamic_shapes.keys() != self.kwarg_inputs.keys():
                 logger.warning(
-                    f"kwarg_inputs has {list(self.kwarg_inputs.keys())} but kwarg_dynamic_shape has {list(self.kwarg_dynamic_shapes.keys())}!"
+                    f"kwarg_inputs has {list(self.kwarg_inputs.keys())} but kwarg_dynamic_shape has {list(self.kwarg_dynamic_shapes.keys())}! You may need to exclude keyword arguments with value None."
                 )
                 return False
 
