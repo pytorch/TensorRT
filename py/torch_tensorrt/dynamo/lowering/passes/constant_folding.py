@@ -51,6 +51,8 @@ def constant_fold(
         gm.graph.erase_node(node)
 
     gm = clean_up_graph_after_modifications(gm)
+    # Delete the constant folder instance which holds GPU memory
+    del cf
 
     logger.debug(f"Graph after constant folding:\n{gm.graph}")
 

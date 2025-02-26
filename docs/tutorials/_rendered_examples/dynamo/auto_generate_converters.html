@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Automatically Generate a Converter for a Custom Kernel &mdash; Torch-TensorRT v2.7.0.dev0+f2a38f5 documentation</title>
+  <title>Automatically Generate a Converter for a Custom Kernel &mdash; Torch-TensorRT v2.7.0.dev0+b43c4c2 documentation</title>
   
 
   
@@ -293,7 +293,7 @@
               
               
                 <div class="version">
-                  v2.7.0.dev0+f2a38f5
+                  v2.7.0.dev0+b43c4c2
                 </div>
               
             
@@ -379,6 +379,7 @@
 <li class="toctree-l1"><a class="reference internal" href="torch_export_gpt2.html">Compiling GPT2 using the dynamo backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="torch_export_llama2.html">Compiling Llama2 using the dynamo backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="torch_export_sam2.html">Compiling SAM2 using the dynamo backend</a></li>
+<li class="toctree-l1"><a class="reference internal" href="torch_export_flux_dev.html">Compiling FLUX.1-dev model using the Torch-TensorRT dynamo backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../notebooks.html">Legacy notebooks</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Python API Documentation</span></p>
@@ -523,7 +524,7 @@ transformations that the operator will perform. This meta-kernel is used by Dyna
 is necessary to define.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Tuple</span>
 
-<span class="kn">import</span><span class="w"> </span><span class="nn">tensorrt_bindings.plugin</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">trtp</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">tensorrt.plugin</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">trtp</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">torch_tensorrt</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">triton</span>

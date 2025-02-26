@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt.runtime &mdash; Torch-TensorRT v2.7.0.dev0+f2a38f5 documentation</title>
+  <title>torch_tensorrt.runtime &mdash; Torch-TensorRT v2.7.0.dev0+b43c4c2 documentation</title>
   
 
   
@@ -293,7 +293,7 @@
               
               
                 <div class="version">
-                  v2.7.0.dev0+f2a38f5
+                  v2.7.0.dev0+b43c4c2
                 </div>
               
             
@@ -379,6 +379,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/torch_export_gpt2.html">Compiling GPT2 using the dynamo backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/torch_export_llama2.html">Compiling Llama2 using the dynamo backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/torch_export_sam2.html">Compiling SAM2 using the dynamo backend</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/torch_export_flux_dev.html">Compiling FLUX.1-dev model using the Torch-TensorRT dynamo backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../tutorials/notebooks.html">Legacy notebooks</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Python API Documentation</span></p>
@@ -514,6 +515,31 @@ the warning about running unsafely in a multi-device context.</p>
 </pre></div>
 </div>
 </dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="torch_tensorrt.runtime.enable_cudagraphs">
+<span class="sig-prename descclassname"><span class="pre">torch_tensorrt.runtime.</span></span><span class="sig-name descname"><span class="pre">enable_cudagraphs</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">compiled_module</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Union</span><span class="p"><span class="pre">[</span></span><span class="pre">GraphModule</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Module</span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">_CudagraphsContextManager</span></span></span><a class="reference internal" href="../_modules/torch_tensorrt/runtime/_cudagraphs.html#enable_cudagraphs"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.runtime.enable_cudagraphs" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="torch_tensorrt.runtime.get_cudagraphs_mode">
+<span class="sig-prename descclassname"><span class="pre">torch_tensorrt.runtime.</span></span><span class="sig-name descname"><span class="pre">get_cudagraphs_mode</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bool</span></span></span><a class="reference internal" href="../_modules/torch_tensorrt/runtime/_cudagraphs.html#get_cudagraphs_mode"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.runtime.get_cudagraphs_mode" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="torch_tensorrt.runtime.get_whole_cudagraphs_mode">
+<span class="sig-prename descclassname"><span class="pre">torch_tensorrt.runtime.</span></span><span class="sig-name descname"><span class="pre">get_whole_cudagraphs_mode</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bool</span></span></span><a class="reference internal" href="../_modules/torch_tensorrt/runtime/_cudagraphs.html#get_whole_cudagraphs_mode"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.runtime.get_whole_cudagraphs_mode" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="torch_tensorrt.runtime.enable_pre_allocated_outputs">
+<span class="sig-prename descclassname"><span class="pre">torch_tensorrt.runtime.</span></span><span class="sig-name descname"><span class="pre">enable_pre_allocated_outputs</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">module</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">GraphModule</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">_PreAllocatedOutputContextManager</span></span></span><a class="reference internal" href="../_modules/torch_tensorrt/runtime/_pre_allocated_outputs.html#enable_pre_allocated_outputs"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.runtime.enable_pre_allocated_outputs" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="torch_tensorrt.runtime.weight_streaming">
+<span class="sig-prename descclassname"><span class="pre">torch_tensorrt.runtime.</span></span><span class="sig-name descname"><span class="pre">weight_streaming</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">module</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">GraphModule</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">_WeightStreamingContextManager</span></span></span><a class="reference internal" href="../_modules/torch_tensorrt/runtime/_weight_streaming.html#weight_streaming"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.runtime.weight_streaming" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
 
 </section>
 <section id="classes">

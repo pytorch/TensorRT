@@ -7,6 +7,7 @@ else:
     from typing_extensions import Self
 
 import os
+import warnings
 from enum import Enum
 
 import torch
@@ -88,6 +89,11 @@ class DataLoaderCalibrator(object):
         pass
 
     def __new__(cls, *args: Any, **kwargs: Any) -> Self:
+        warnings.warn(
+            "Int8 PTQ Calibrator has been deprecated by TensorRT, please plan on porting to a NVIDIA Model Optimizer Toolkit based workflow. See: https://pytorch.org/TensorRT/tutorials/_rendered_examples/dynamo/vgg16_ptq.html for more details",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         dataloader = args[0]
         algo_type = kwargs.get("algo_type", CalibrationAlgo.ENTROPY_CALIBRATION_2)
         cache_file = kwargs.get("cache_file", None)
@@ -175,6 +181,11 @@ class CacheCalibrator(object):
         pass
 
     def __new__(cls, *args: Any, **kwargs: Any) -> Self:
+        warnings.warn(
+            "Int8 PTQ Calibrator has been deprecated by TensorRT, please plan on porting to a NVIDIA Model Optimizer Toolkit based workflow. See: https://pytorch.org/TensorRT/tutorials/_rendered_examples/dynamo/vgg16_ptq.html for more details",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         cache_file = args[0]
         algo_type = kwargs.get("algo_type", CalibrationAlgo.ENTROPY_CALIBRATION_2)
 

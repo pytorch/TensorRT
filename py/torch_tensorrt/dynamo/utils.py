@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import gc
 import logging
 import warnings
 from dataclasses import fields, replace
@@ -30,6 +31,7 @@ COSINE_THRESHOLD = 0.99
 DYNAMIC_DIM = -1
 RTOL = 5e-3
 ATOL = 5e-3
+CPU_DEVICE = "cpu"
 
 
 class Frameworks(Enum):
@@ -79,6 +81,17 @@ if trt.__version__ >= "7.0":
         Frameworks.TORCH: torch.bool,
         Frameworks.TRT: trt.bool,
     }
+
+
+def delete_module(module: torch.fx.GraphModule) -> None:
+    """
+    This is a helper function to delete the instance of module. We first move it to CPU and then
+    delete the object. This function ensures the GPU memory occupied by the module is released effectively after this call
+    """
+    module.to(CPU_DEVICE)
+    del module
+    torch.cuda.empty_cache()
+    gc.collect()
 
 
 def use_python_runtime_parser(use_python_runtime: Optional[bool] = None) -> bool:
@@ -243,12 +256,16 @@ def prepare_inputs(
     inputs: Input | torch.Tensor | Sequence[Any] | Dict[Any, Any],
     disable_memory_format_check: bool = False,
 ) -> Any:
-    if isinstance(inputs, Input):
+    if inputs is None:
+        return None
+
+    elif isinstance(inputs, Input):
         return inputs
 
-    elif isinstance(inputs, torch.Tensor):
+    elif isinstance(inputs, (torch.Tensor, int, float, bool)):
         return Input.from_tensor(
-            inputs, disable_memory_format_check=disable_memory_format_check
+            torch.tensor(inputs),
+            disable_memory_format_check=disable_memory_format_check,
         )
 
     elif isinstance(inputs, (list, tuple)):
@@ -395,10 +412,13 @@ def unwrap_tensor_dtype(tensor: Union[torch.Tensor, FakeTensor, torch.SymInt]) -
     """
     Returns the dtype of torch.tensor or FakeTensor. For symbolic integers, we return int64
     """
-    if isinstance(tensor, (torch.Tensor, FakeTensor)):
-        return tensor.dtype
+    if isinstance(tensor, (torch.Tensor, FakeTensor, int, float, bool)):
+        return torch.tensor(tensor).dtype
     elif isinstance(tensor, torch.SymInt):
         return torch.int64
+    elif tensor is None:
+        # Case where we explicitly pass one of the inputs to be None (eg: FLUX.1-dev)
+        return None
     else:
         raise ValueError(f"Found invalid tensor type {type(tensor)}")
 

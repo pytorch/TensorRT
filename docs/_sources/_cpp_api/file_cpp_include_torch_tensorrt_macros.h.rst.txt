@@ -62,6 +62,8 @@ Defines
 
 - :ref:`exhale_define_macros_8h_1a282fd3c0b1c3a215148ae372070e1268`
 
+- :ref:`exhale_define_macros_8h_1a46612a64c219548c5ef03013eb2144ec`
+
 - :ref:`exhale_define_macros_8h_1adad592a7b1b7eed529cdf6acd584c883`
 
 - :ref:`exhale_define_macros_8h_1abd1465eb38256d3f22cc1426b23d516b`
