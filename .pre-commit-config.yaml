@@ -1,7 +1,7 @@
 exclude: ^.github/actions/assigner/dist
 repos:
     - repo: https://github.com/pre-commit/pre-commit-hooks
-      rev: v4.5.0
+      rev: v5.0.0
       hooks:
           - id: check-yaml
           - id: trailing-whitespace
@@ -32,7 +32,7 @@ repos:
       hooks:
           - id: validate-pyproject
     - repo: https://github.com/pycqa/isort
-      rev: 5.13.2
+      rev: 6.0.0
       hooks:
           - id: isort
             name: isort (python)
@@ -52,7 +52,7 @@ repos:
           - id: black
             exclude: ^examples/custom_converters/elu_converter/setup.py|^docs
     - repo: https://github.com/crate-ci/typos
-      rev: v1.22.9
+      rev: typos-dict-v0.12.4
       hooks:
           - id: typos
     - repo: https://github.com/astral-sh/uv-pre-commit

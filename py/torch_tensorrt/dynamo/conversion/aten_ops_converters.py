@@ -7,7 +7,6 @@ from typing import Callable, Dict, Optional, Sequence, Tuple, Union
 import numpy as np
 import torch
 from torch.fx.node import Argument, Node, Target
-
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion import impl
@@ -650,6 +649,11 @@ def aten_ops_erf(
 @dynamo_tensorrt_converter(
     torch.ops.aten.unsqueeze.default, supports_dynamic_shapes=True
 )
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+    }
+)
 def aten_ops_unsqueeze(
     ctx: ConversionContext,
     target: Target,
@@ -657,9 +661,7 @@ def aten_ops_unsqueeze(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    return impl.unsqueeze.unsqueeze(
-        ctx, target, SourceIR.ATEN, name, input_t=args[0], dim=args[1]
-    )
+    return impl.unsqueeze.unsqueeze(ctx, target, SourceIR.ATEN, name, args[0], args[1])
 
 
 @dynamo_tensorrt_converter(
