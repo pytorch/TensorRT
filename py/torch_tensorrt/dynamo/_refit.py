@@ -395,9 +395,12 @@ def refit_module_weights(
                     try:
                         weight_name_map = compiled_submodule.weight_name_map
                     except AttributeError:
-                        logger.warning(
-                            "The module was compiled with an old version of Torch-TensorRT. Rebuilding the weight map."
-                        )
+                        if not isinstance(
+                            compiled_submodule, torch.fx.graph_module.GraphModule
+                        ):
+                            logger.warning(
+                                "The module was compiled with an old version of Torch-TensorRT. Rebuilding the weight map."
+                            )
                     if not weight_name_map:
                         use_weight_map_cache = False
                         logger.warning(
