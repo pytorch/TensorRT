@@ -32,6 +32,7 @@ class CudaGraphsTorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         self._input_buffers: List[torch.Tensor] = []
         self._output_buffers: List[torch.Tensor] = []
         self.cudagraph: Optional[torch.cuda.CUDAGraph] = None
+        self.use_output_allocator_outputs = False
         self.shape_key: Optional[str] = None
         self._caller_stream: Optional[torch.cuda.Stream] = None
         self._engine_stream: Optional[torch.cuda.Stream] = None
@@ -73,8 +74,16 @@ class CudaGraphsTorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         if self.cudagraph:
             self.cudagraph.reset()
 
+    def set_output_allocator_outputs(self, enable: bool) -> None:
+        self.use_output_allocator_outputs = enable
+
     def forward(self, *inputs: torch.Tensor) -> torch.Tensor | Tuple[torch.Tensor, ...]:
         cudagraphs_enabled = torch_tensorrt.runtime.get_whole_cudagraphs_mode()
+        if cudagraphs_enabled and self.use_output_allocator_outputs:
+            raise RuntimeError(
+                "There are non-TRT submodules in the module. OutputAllocator is not compatible with modules with non-TRT submodules."
+            )
+
         if cudagraphs_enabled:
             shape_changed = self.validate_input_shapes(inputs)
             need_cudagraphs_record = shape_changed or self.is_weight_streaming_set
