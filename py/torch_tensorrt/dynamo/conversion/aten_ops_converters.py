@@ -3554,7 +3554,7 @@ def aten_ops_full(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.nonzero.default)
+@dynamo_tensorrt_converter(torch.ops.aten.nonzero.default, supports_dynamic_shapes=True)
 def aten_ops_nonzero(
     ctx: ConversionContext,
     target: Target,

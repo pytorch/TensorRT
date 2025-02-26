@@ -17,7 +17,7 @@ class TestNonZeroConverter(DispatchTestCase):
             ((2, 3, 4, 5), torch.float),
         ]
     )
-    def test_non_zero(self, input_shape, dtype):
+    def test_nonzero_dds(self, input_shape, dtype):
         class NonZero(nn.Module):
             # This is a DDS network
             def forward(self, input):
@@ -39,7 +39,7 @@ class TestNonZeroConverter(DispatchTestCase):
             ((2, 3, 4, 5), torch.float),
         ]
     )
-    def test_non_zero(self, input_shape, dtype):
+    def test_nonzero_non_dds(self, input_shape, dtype):
         class NonZero(nn.Module):
             # This is a static network
             def forward(self, input):
@@ -78,10 +78,55 @@ class TestNonZeroConverter(DispatchTestCase):
             ),
         ]
     )
-    def test_nonzero_dynamic_shape(self, _, min_shape, opt_shape, max_shape, dtype):
+    def test_nonzero_dynamic_shape_dds(self, _, min_shape, opt_shape, max_shape, dtype):
         class NonZero(nn.Module):
             def forward(self, input):
                 return torch.ops.aten.nonzero.default(input)
+
+        input_specs = [
+            Input(
+                min_shape=min_shape,
+                opt_shape=opt_shape,
+                max_shape=max_shape,
+                dtype=dtype,
+            ),
+        ]
+
+        self.run_test_with_dynamic_shape(NonZero(), input_specs)
+
+    @parameterized.expand(
+        [
+            (
+                "1d",
+                (1,),
+                (10,),
+                (100,),
+                torch.int32,
+            ),
+            (
+                "2d",
+                (1, 2),
+                (5, 10),
+                (20, 40),
+                torch.float16,
+            ),
+            (
+                "3d",
+                (1, 2, 3),
+                (5, 10, 20),
+                (30, 40, 50),
+                torch.float,
+            ),
+        ]
+    )
+    def test_nonzero_dynamic_shape_non_dds(
+        self, _, min_shape, opt_shape, max_shape, dtype
+    ):
+        class NonZero(nn.Module):
+            def forward(self, input):
+                out = torch.ops.aten.nonzero.default(input)
+                out = torch.ops.aten.sum.dim_IntList(out, 0)
+                return out
 
         input_specs = [
             Input(
