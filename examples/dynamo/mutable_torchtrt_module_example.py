@@ -93,8 +93,30 @@ with torch.no_grad():
 
     # The only extra line you need
     pipe.unet = torch_trt.MutableTorchTensorRTModule(pipe.unet, **settings)
-
-    image = pipe(prompt, negative_prompt=negative, num_inference_steps=30).images[0]
+    BATCH = torch.export.Dim("BATCH", min=1 * 2, max=12 * 2)
+    _HEIGHT = torch.export.Dim("_HEIGHT", min=16, max=32)
+    _WIDTH = torch.export.Dim("_WIDTH", min=16, max=32)
+    HEIGHT = 4 * _HEIGHT
+    WIDTH = 4 * _WIDTH
+    args_dynamic_shapes = ({0: BATCH, 2: HEIGHT, 3: WIDTH}, {})
+    kwargs_dynamic_shapes = {
+        "encoder_hidden_states": {0: BATCH},
+        "added_cond_kwargs": {
+            "text_embeds": {0: BATCH},
+            "time_ids": {0: BATCH},
+        },
+    }
+    pipe.unet.set_expected_dynamic_shape_range(
+        args_dynamic_shapes, kwargs_dynamic_shapes
+    )
+    image = pipe(
+        prompt,
+        negative_prompt=negative,
+        num_inference_steps=30,
+        height=1024,
+        width=768,
+        num_images_per_prompt=2,
+    ).images[0]
     image.save("./without_LoRA_mutable.jpg")
 
     # Standard Huggingface LoRA loading procedure
@@ -108,7 +130,14 @@ with torch.no_grad():
     pipe.unload_lora_weights()
 
     # Refit triggered
-    image = pipe(prompt, negative_prompt=negative, num_inference_steps=30).images[0]
+    image = pipe(
+        prompt,
+        negative_prompt=negative,
+        num_inference_steps=30,
+        height=1024,
+        width=1024,
+        num_images_per_prompt=1,
+    ).images[0]
     image.save("./with_LoRA_mutable.jpg")
 
 
