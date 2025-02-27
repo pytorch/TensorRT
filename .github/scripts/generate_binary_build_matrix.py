@@ -34,13 +34,6 @@ ROCM_ARCHES_DICT = {
     "release": ["6.1", "6.2"],
 }
 
-# CUDA_CUDDN_VERSIONS = {
-#     "11.8": {"cuda": "11.8.0", "cudnn": "9"},
-#     "12.1": {"cuda": "12.1.1", "cudnn": "9"},
-#     "12.4": {"cuda": "12.4.1", "cudnn": "9"},
-#     "12.6": {"cuda": "12.6.2", "cudnn": "9"},
-# }
-
 PACKAGE_TYPES = ["wheel", "conda", "libtorch"]
 PRE_CXX11_ABI = "pre-cxx11"
 CXX11_ABI = "cxx11-abi"
