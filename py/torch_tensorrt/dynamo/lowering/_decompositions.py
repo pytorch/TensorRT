@@ -1,6 +1,6 @@
 import logging
 from enum import Enum, auto
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import torch
 from torch._decomp import register_decomposition
@@ -433,6 +433,137 @@ def full_like_decomposition(*args, **kwargs) -> torch.Tensor:
     kwargs["dtype"] = input.dtype
     kwargs["device"] = to_torch_device(default_device())
     return torch.full(shape, fill_value, dtype=kwargs["dtype"], device=kwargs["device"])
+
+
+@register_torch_trt_decomposition(aten.view.default, registry=TORCH_TRT_DECOMPOSITIONS)
+def view_decomposition(x: torch.Tensor, size: List[torch.SymInt]) -> torch.Tensor:
+    return aten._reshape_copy.default(x, size)
+
+
+@register_torch_trt_decomposition(
+    aten.scaled_dot_product_attention, registry=TORCH_TRT_DECOMPOSITIONS
+)
+def scaled_dot_product_attention_decomposition(
+    query: torch.Tensor,
+    key: torch.Tensor,
+    value: torch.Tensor,
+    attn_mask: Optional[torch.Tensor] = None,
+    dropout_p: float = 0.0,
+    is_causal: bool = False,
+    *,
+    scale: Optional[float] = None,
+    enable_gqa: bool = False,
+) -> torch.Tensor:
+    L, S = query.size(-2), key.size(-2)
+    device = query.device
+    attn_bias = torch.zeros(L, S, dtype=query.dtype, device=device)
+
+    if is_causal:
+        assert attn_mask is None, "attn_mask must be None when is_causal=True"
+        temp_mask = torch.ones(L, S, dtype=torch.bool, device=device).tril(diagonal=0)
+        attn_bias = attn_bias.masked_fill(temp_mask.logical_not(), float("-inf"))
+
+    if attn_mask is not None:
+        if attn_mask.dtype == torch.bool:
+            attn_bias = attn_bias.masked_fill(attn_mask.logical_not(), float("-inf"))
+        else:
+            attn_bias = attn_mask + attn_bias
+
+    if enable_gqa:
+        key = key.repeat_interleave(query.size(-3) // key.size(-3), -3)
+        value = value.repeat_interleave(query.size(-3) // value.size(-3), -3)
+
+    attn_weight = query @ key.transpose(-2, -1)
+
+    if scale is None:
+        scale = torch.sqrt(torch.scalar_tensor(query.size(-1), dtype=torch.int))
+        attn_weight = attn_weight / scale
+    else:
+        attn_weight = attn_weight * scale
+
+    attn_weight = attn_weight + attn_bias
+    attn_weight = torch.softmax(attn_weight, dim=-1)
+    return attn_weight @ value
+
+
+@register_torch_trt_decomposition(
+    aten._scaled_dot_product_flash_attention, registry=TORCH_TRT_DECOMPOSITIONS
+)
+def scaled_dot_product_flash_attention_decomposition(
+    query: torch.Tensor,
+    key: torch.Tensor,
+    value: torch.Tensor,
+    dropout_p: float = 0.0,
+    is_causal: bool = False,
+    return_debug_mask: bool = False,
+    *,
+    scale: Optional[float] = None,
+) -> Tuple[
+    torch.Tensor,
+    torch.Tensor,
+    torch.Tensor,
+    torch.Tensor,
+    torch.SymInt,
+    torch.SymInt,
+    torch.Tensor,
+    torch.Tensor,
+    torch.Tensor,
+]:
+    attn = scaled_dot_product_attention_decomposition(
+        query, key, value, None, dropout_p, is_causal, scale=scale
+    )
+    return attn, None, None, None, 0, 0, None, None, None
+
+
+@register_torch_trt_decomposition(
+    aten._scaled_dot_product_efficient_attention, registry=TORCH_TRT_DECOMPOSITIONS
+)
+def scaled_dot_product_efficient_attention_decomposition(
+    query: torch.Tensor,
+    key: torch.Tensor,
+    value: torch.Tensor,
+    attn_bias: Optional[torch.Tensor],
+    compute_log_sumexp: bool,
+    dropout_p: float = 0.0,
+    is_causal: bool = False,
+    *,
+    scale: Optional[float] = None,
+) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+    attn = scaled_dot_product_attention_decomposition(
+        query, key, value, attn_bias, dropout_p, is_causal, scale=scale
+    )
+    return attn, None, None, None
+
+
+@register_torch_trt_decomposition(
+    aten._scaled_dot_product_cudnn_attention, registry=TORCH_TRT_DECOMPOSITIONS
+)
+def scaled_dot_product_cudnn_attention_decomposition(
+    query: torch.Tensor,
+    key: torch.Tensor,
+    value: torch.Tensor,
+    attn_bias: Optional[torch.Tensor],
+    compute_log_sumexp: bool,
+    dropout_p: float = 0.0,
+    is_causal: bool = False,
+    return_debug_mask: bool = False,
+    *,
+    scale: Optional[float] = None,
+) -> Tuple[
+    torch.Tensor,
+    torch.Tensor,
+    torch.Tensor,
+    torch.Tensor,
+    torch.SymInt,
+    torch.SymInt,
+    torch.Tensor,
+    torch.Tensor,
+    torch.Tensor,
+]:
+    attn = scaled_dot_product_attention_decomposition(
+        query, key, value, attn_bias, dropout_p, is_causal, scale=scale
+    )
+    return attn, None, None, None, 0, 0, None, None, None
 
 
 @register_torch_trt_decomposition(
