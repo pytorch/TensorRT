@@ -21,7 +21,7 @@ For these cases, it is possible to use a TensorRT plugin to replace the operator
 the performance and resource overhead from a graph break.
 
 Previously this involved a complex process in not only building a performant kernel but setting it up to run in TensorRT (see: `Using Custom Kernels within TensorRT Engines with Torch-TensorRT <https://pytorch.org/TensorRT/tutorials/_rendered_examples/dynamo/custom_kernel_plugins.html>`_).
-With TensorRT 10.7, there is a new Python native plugin system which greatly streamlines this process. This
+As of TensorRT 10.7, there is a new Python native plugin system which greatly streamlines this process. This
 plugin system also allows Torch-TensorRT to automatically generate the necessary conversion code to convert the
 operation in PyTorch to TensorRT.
 """
