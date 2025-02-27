@@ -684,6 +684,8 @@ def compile(
     )
 
     gm = exported_program.module()
+    # TODO: Memory control prototyping. Under discussion
+    exported_program.module().to("cpu")
     logger.debug("Input graph: " + str(gm.graph))
 
     # Apply lowering on the graph module
@@ -820,6 +822,7 @@ def compile_module(
     trt_modules = {}
     # Iterate over all components that can be accelerated
     # Generate the corresponding TRT Module for those
+
     for name, _ in partitioned_module.named_children():
         submodule = getattr(partitioned_module, name)
         # filter on the GraphModule
