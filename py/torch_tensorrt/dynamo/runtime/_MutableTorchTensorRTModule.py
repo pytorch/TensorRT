@@ -442,9 +442,9 @@ class MutableTorchTensorRTModule(object):
             return {
                 k: MutableTorchTensorRTModule._process_kwarg_inputs(v)
                 for k, v in inputs.items()
-                if (v is not None and not isinstance(v, bool))
+                if (v is not None)
             }
-        elif isinstance(inputs, torch.Tensor):
+        elif isinstance(inputs, (torch.Tensor, bool)):
             return inputs
         elif isinstance(inputs, (int, float, np.ndarray)):
             return torch.tensor(inputs)
