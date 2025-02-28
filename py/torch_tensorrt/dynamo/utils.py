@@ -378,7 +378,17 @@ def extract_var_range_info(symbolic_integer: torch.SymInt) -> Dict[str, int]:
         shape_env.var_to_val
     )
     assert var_range, var_val
-    min_val, max_val = int(var_range.lower), int(var_range.upper)
+    min_val_, max_val_ = var_range.lower, var_range.upper # int(var_range.lower), int(var_range.upper)
+
+    if isinstance(var_range.lower, torch.utils._sympy.numbers.NegativeIntInfinity):
+        min_val_ = 1  
+
+    # if isinstance(var_range.upper, torch.utils._sympy.numbers.IntInfinity):
+    #     max_val_ = 2048 
+
+    min_val = int(min_val_)
+    max_val = int(max_val_)    
+
     # Torchdynamo 0/1 specialization outlier
     min_val = 1 if min_val == 2 else min_val
     min_max_opt = {}
