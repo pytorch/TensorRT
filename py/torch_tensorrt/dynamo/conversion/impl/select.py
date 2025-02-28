@@ -14,6 +14,7 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     get_positive_dim,
     get_trt_tensor,
     to_numpy,
+    create_constant,
 )
 from torch_tensorrt.dynamo.conversion.impl.elementwise import convert_binary_elementwise
 from torch_tensorrt.dynamo.conversion.impl.shape import shape as get_shape
@@ -480,28 +481,46 @@ def index_put_converter(
     values: TRTTensor,
     accumulate: bool = False,
 ) -> TRTTensor:
-    # Reshape indices to add an extra dimension if necessary (indices is a Tuple of ITensors)
     reshaped_indices = []
-    for i, each_input in enumerate(indices):
-        if not isinstance(each_input, TRTTensor):
-            each_input = get_trt_tensor(ctx, each_input, f"{name}_tensor_{i}")
-        each_input = impl.shuffle.reshape(
+    for i, each_idx in enumerate(indices):
+        idx_trt = get_trt_tensor(ctx, each_idx, f"{name}_idx_{i}")
+        idx_trt = impl.shuffle.reshape(
             ctx,
             target,
             source_ir,
-            f"{name}_reshape_{i}",
-            each_input,
-            (-1, 1),  # Reshape to (N, 1)
+            f"{name}_reshape_idx_{i}",
+            idx_trt,
+            shape=(-1, 1),
         )
-        reshaped_indices.append(each_input)
+        reshaped_indices.append(idx_trt)
 
-    # Concatenate along the second dimension (columns)
+    # Concat -> (N, K)
     indices_cat = impl.cat.cat(
-        ctx, target, source_ir, f"{name}_cat", reshaped_indices, dim=1
+        ctx, target, source_ir, f"{name}_cat_indices", reshaped_indices, dim=1
+    )
+
+    source_shape = tuple(input_tensor.shape)  
+    k = len(indices)
+    leftover_dims = source_shape[k:] 
+
+    index_shapes_py = [tuple(idx.shape) for idx in reshaped_indices] 
+    N = index_shapes_py[0][0] 
+    sub_tensor_shape = (N,) + leftover_dims
+
+    broadcasted_values = impl.slice.expand(
+        ctx,
+        target,
+        source_ir,
+        f"{name}_expand_values",
+        values,
+        sub_tensor_shape,
     )
 
     scatter_layer = ctx.net.add_scatter(
-        input_tensor, indices_cat, values, trt.ScatterMode.ND
+        input_tensor,
+        indices_cat,
+        broadcasted_values,
+        trt.ScatterMode.ND,
     )
     scatter_layer.axis = 0
     set_layer_name(scatter_layer, target, f"{name}_scatter_layer", source_ir)
