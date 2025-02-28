@@ -107,7 +107,7 @@ class BaseEngineCache(ABC):
         input_specs: Sequence[Input],
         compilation_settings: CompilationSettings,
         weight_name_map: Optional[Dict[Any, Any]],
-        engine_is_dds: bool,
+        requires_output_allocator: bool,
     ) -> bytes:
         """Pack serialized engine, input names, output names, and weight map into a single blob
 
@@ -118,7 +118,7 @@ class BaseEngineCache(ABC):
             input_specs (Sequence[Input]): input specs of TRT engine
             compilation_settings (CompilationSettings): compilation settings of TRT engine
             weight_name_map (Optional[Dict[Any, Any]]): weight name map for refitting
-            engine_is_dds (bool): whether the engine is data-dependent shape
+            requires_output_allocator (bool): whether the engine requires output allocator
         Returns:
             bytes: packed blob
         """
@@ -132,7 +132,7 @@ class BaseEngineCache(ABC):
                 "input_specs": input_specs,
                 "compilation_settings": settings,
                 "weight_name_map": weight_name_map,
-                "engine_is_dds": engine_is_dds,
+                "requires_output_allocator": requires_output_allocator,
             }
         )
 
@@ -154,7 +154,7 @@ class BaseEngineCache(ABC):
             unpacked["input_specs"],
             unpacked["compilation_settings"],
             unpacked["weight_name_map"],
-            unpacked["engine_is_dds"],
+            unpacked["requires_output_allocator"],
         )
 
     def insert(

@@ -112,5 +112,5 @@ def convert_module(
         name=name,
         settings=settings,
         weight_name_map=interpreter_result.weight_name_map,
-        engine_is_dds=interpreter_result.engine_is_dds,
+        requires_output_allocator=interpreter_result.requires_output_allocator,
     )
