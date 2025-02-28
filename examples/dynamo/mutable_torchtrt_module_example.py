@@ -65,7 +65,7 @@ print("Refit successfully!")
 # Saving Mutable Torch TensorRT Module
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-# Currently, saving is only when "use_python" = False in settings
+# Currently, saving is only enabled when "use_python_runtime" = False in settings
 torch_trt.MutableTorchTensorRTModule.save(mutable_module, "mutable_module.pkl")
 reload = torch_trt.MutableTorchTensorRTModule.load("mutable_module.pkl")
 
@@ -94,7 +94,7 @@ with torch.no_grad():
 
     # The only extra line you need
     pipe.unet = torch_trt.MutableTorchTensorRTModule(pipe.unet, **settings)
-    BATCH = torch.export.Dim("BATCH", min=1 * 2, max=12 * 2)
+    BATCH = torch.export.Dim("BATCH", min=2, max=24)
     _HEIGHT = torch.export.Dim("_HEIGHT", min=16, max=32)
     _WIDTH = torch.export.Dim("_WIDTH", min=16, max=32)
     HEIGHT = 4 * _HEIGHT
@@ -201,24 +201,18 @@ import os
 from torch_tensorrt.dynamo._defaults import TIMING_CACHE_PATH
 
 model = models.resnet18(pretrained=True).eval().to("cuda")
-enabled_precisions = {torch.float}
-debug = False
-min_block_size = 1
-use_python_runtime = True
 
 times = []
 start = torch.cuda.Event(enable_timing=True)
 end = torch.cuda.Event(enable_timing=True)
 
-
 example_inputs = (torch.randn((100, 3, 224, 224)).to("cuda"),)
-# Mark the dim0 of inputs as dynamic
 model = torch_trt.MutableTorchTensorRTModule(
     model,
-    use_python_runtime=use_python_runtime,
-    enabled_precisions=enabled_precisions,
-    debug=debug,
-    min_block_size=min_block_size,
+    use_python_runtime=True,
+    enabled_precisions={torch.float},
+    debug=True,
+    min_block_size=1,
     immutable_weights=False,
     cache_built_engines=True,
     reuse_cached_engines=True,

@@ -66,11 +66,11 @@ def test_check_input_shape_dynamic():
     dynamic_shape = {"a": {1: dim}, "b": [{}, {}], "c": {"a": {}, "b": [{}, {}]}}
     assertions.assertFalse(
         torch_trt.MutableTorchTensorRTModule._check_inputs_shape(a, b),
-        msg=f"test_check_output_equal is not correct.",
+        msg=f"test_check_input_shape_dynamic is not correct.",
     )
     assertions.assertTrue(
         torch_trt.MutableTorchTensorRTModule._check_inputs_shape(a, b, dynamic_shape),
-        msg=f"test_check_output_equal is not correct.",
+        msg=f"test_check_input_shape_dynamic is not correct.",
     )
 
 

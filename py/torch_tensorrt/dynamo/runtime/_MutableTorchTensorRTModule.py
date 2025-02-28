@@ -228,20 +228,21 @@ class MutableTorchTensorRTModule(object):
         seq_len = torch.export.Dim("seq_len", min=1, max=10)
         args_dynamic_shape = ({0: seq_len}, {}) # b does not have a dynamic shape
         kwargs_dynamic_shape = {'c': {0, seq_len}, 'd': {}} # d does not have a dynamic shape
+        set_expected_dynamic_shape_range(args_dynamic_shape, kwargs_dynamic_shape)
         # Later when you call the function
         forward(*(a, b), **{c:..., d:...})
 
-
+        Reference: https://pytorch.org/docs/stable/export.html#expressing-dynamism
         Arguments:
             args_dynamic_shape (tuple[dict[Any, Any]]): Dynamic shape hint for the arg_inputs,
             kwargs_dynamic_shape: (dict[str, Any]): Dynamic shape hint for the kwarg_inputs
         """
         assert isinstance(
             args_dynamic_shape, tuple
-        ), "args dynamic shape has to be a tuple"
+        ), f"args dynamic shape has to be a tuple, but got {type(args_dynamic_shape)}"
         assert isinstance(
             kwargs_dynamic_shape, dict
-        ), "args dynamic shape has to be a dictionary"
+        ), f"args dynamic shape has to be a dictionary, but got {type(kwargs_dynamic_shape)}"
         self.kwarg_dynamic_shapes = kwargs_dynamic_shape
         self.arg_dynamic_shapes = args_dynamic_shape
 
