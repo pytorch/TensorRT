@@ -127,7 +127,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         name: str = "",
         settings: CompilationSettings = CompilationSettings(),
         weight_name_map: Optional[dict[Any, Any]] = None,
-        engine_is_dds: bool = False,
+        requires_output_allocator: bool = False,
     ):
         """Takes a name, target device, serialized TensorRT engine, and binding names / order and constructs
         a PyTorch ``torch.nn.Module`` around it. Uses TensorRT Python APIs to run the engine
@@ -141,7 +141,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
             name (str): Name for module
             settings (torch_tensorrt.dynamo.CompilationSettings): Settings used to compile engine, assumes engine was built with default compilation settings if object not passed
             weight_name_map (dict): Mapping of engine weight name to state_dict weight name
-            engine_is_dds (bool): Whether the engine is Data Dependent Shape
+            requires_output_allocator (bool): Whether the engine requires an output allocator
 
         Example:
 
@@ -206,7 +206,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         self.pre_allocated_outputs: List[torch.Tensor] = []
         self.use_pre_allocated_outputs = False
 
-        self.engine_is_dds = engine_is_dds
+        self.requires_output_allocator = requires_output_allocator
         self.output_allocator: Optional[DynamicOutputAllocator] = None
         self.use_output_allocator_outputs = False
 
@@ -281,7 +281,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
             for output_name in self.output_names
         ]
 
-        if self.engine_is_dds:
+        if self.requires_output_allocator:
             self.create_output_allocator()
 
         if torch_tensorrt.runtime.get_cudagraphs_mode():
@@ -678,14 +678,12 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                     ]
                     logger.warning(f"Moved all input Tensors to cuda:{device_id}")
 
-            if self.engine_is_dds:
+            if self.requires_output_allocator:
                 if self.cudagraphs_enabled:
                     raise RuntimeError(
-                        "The module is Data-Dependent Shape (DDS). It has to be handled by OutputAllocator which is not compatible with CUDA Graphs. Please disable CUDA Graphs."
+                        "This module requires OutputAllocator which is not compatible with CUDA Graphs. Please disable CUDA Graphs."
                     )
-                logger.debug(
-                    "The module is Data-Dependent Shape (DDS). Using output allocator."
-                )
+                logger.debug("Using OutputAllocator in runtime.")
                 return run_output_allocator()
             else:
                 if self.cudagraphs_enabled and self.use_output_allocator_outputs:
@@ -693,7 +691,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                         "Both CUDA Graphs and OutputAllocator are enabled. Please disable either one."
                     )
                 if self.use_output_allocator_outputs:
-                    logger.debug("Using output allocator.")
+                    logger.debug("Using OutputAllocator in runtime.")
                     return run_output_allocator()
                 logger.debug(
                     f"Using standard execution with cudagraphs={self.cudagraphs_enabled}."

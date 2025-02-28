@@ -64,7 +64,7 @@ class TRTInterpreterResult(NamedTuple):
     input_names: Sequence[str]
     output_names: Sequence[str]
     weight_name_map: Optional[dict[Any, Any]]
-    engine_is_dds: bool
+    requires_output_allocator: bool
 
 
 class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
@@ -138,9 +138,6 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
 
         # Engine cache for storing and reusing TRT engines
         self.engine_cache = engine_cache
-
-        # Whether the engine is data-dependent shape (dds)
-        self.engine_is_dds: bool = False
 
     def validate_conversion(self) -> Set[str]:
         missing_converters: Set[str] = set()
@@ -581,7 +578,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                 self.input_specs,
                 self.compilation_settings,
                 self.weight_name_map,
-                self.engine_is_dds,
+                self.ctx.requires_output_allocator,
             ),
         )
 
@@ -596,7 +593,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                 cached_engine_input_specs,
                 engine_compilation_settings,
                 self.weight_name_map,
-                self.engine_is_dds,
+                self.ctx.requires_output_allocator,
             ) = cached_data
 
             setting_compatiblity, incompattible_settings = settings_are_compatible(
@@ -658,19 +655,9 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                 self._input_names,
                 self._output_names,
                 self.weight_name_map,
-                self.engine_is_dds,
+                self.ctx.requires_output_allocator,
             )
         return None
-
-    def check_dds(self, serialized_engine: bytes, output_names: List[str]) -> bool:
-        runtime = trt.Runtime(TRT_LOGGER)
-        engine = runtime.deserialize_cuda_engine(serialized_engine)
-
-        for output_name in output_names:
-            output_shape = engine.get_tensor_shape(output_name)
-            if -1 in output_shape:
-                return True
-        return False
 
     def run(
         self,
@@ -728,8 +715,6 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         )
         assert serialized_engine
 
-        self.engine_is_dds = self.check_dds(serialized_engine, self._output_names)
-
         _LOGGER.info(
             f"Build TRT engine elapsed time: {datetime.now() - build_engine_start_time}"
         )
@@ -756,7 +741,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             self._input_names,
             self._output_names,
             self.weight_name_map,
-            self.engine_is_dds,
+            self.ctx.requires_output_allocator,
         )
 
     def run_node(self, n: torch.fx.Node) -> torch.fx.Node:
@@ -850,7 +835,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                 f"Conversion of module of type {submod_type} not currently supported!"
             )
 
-        converter, calling_convention = converter_packet
+        converter, calling_convention, requires_output_allocator = converter_packet
 
         assert self._cur_node_name is not None
 
@@ -867,7 +852,10 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                 f"Conversion of function {torch.typename(target)} not currently supported!"
             )
 
-        converter, calling_convention = converter_packet
+        converter, calling_convention, requires_output_allocator = converter_packet
+        if requires_output_allocator:
+            self.ctx.requires_output_allocator = True
+            _LOGGER.debug(f"{target} requires output allocator")
 
         if calling_convention is CallingConvention.LEGACY:
             return converter(self.ctx.net, target, args, kwargs, self._cur_node_name)
@@ -897,7 +885,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             raise UnsupportedOperatorException(
                 f"Conversion of method {target} not currently supported!"
             )
-        converter, calling_convention = converter_packet
+        converter, calling_convention, requires_output_allocator = converter_packet
 
         if calling_convention is CallingConvention.LEGACY:
             return converter(self.ctx.net, target, args, kwargs, self._cur_node_name)

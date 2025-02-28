@@ -11,9 +11,11 @@ class ConversionContext:
     Args:
         net: TensorRT Network being built
         compilation_settings: Settings selected by the user for compilation
+        requires_output_allocator: Whether the network requires output allocator
     """
 
     net: TRTNetwork
     compilation_settings: CompilationSettings = field(
         default_factory=CompilationSettings
     )
+    requires_output_allocator: bool = False
