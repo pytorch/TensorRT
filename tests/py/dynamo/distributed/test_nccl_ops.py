@@ -3,19 +3,11 @@ import os
 import torch
 import torch.distributed as dist
 import torch.nn as nn
+from distributed_utils import set_environment_variables_pytest
 from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
 
-
-def set_environment_variables():
-    os.environ["WORLD_SIZE"] = str(1)
-    os.environ["RANK"] = str(0)
-    os.environ["MASTER_ADDR"] = "127.0.0.1"
-    os.environ["MASTER_PORT"] = str(29500)
-    os.environ["USE_TRTLLM_PLUGINS"] = "1"
-
-
-set_environment_variables()
+set_environment_variables_pytest()
 dist.init_process_group(backend="nccl", init_method="env://")
 group = dist.new_group(ranks=[0])
 group_name = group.group_name
@@ -47,7 +39,7 @@ class TestGatherNcclOpsConverter(DispatchTestCase):
             DistributedGatherModel(linear_layer_dim).cuda(),
             inputs,
             use_dynamo_tracer=True,
-            fuse_distributed_ops=True,
+            enable_passes=True,
         )
 
     @parameterized.expand([(8)])
@@ -76,7 +68,7 @@ class TestGatherNcclOpsConverter(DispatchTestCase):
             DistributedReduceScatterModel(linear_layer_dim).cuda(),
             inputs,
             use_dynamo_tracer=True,
-            fuse_distributed_ops=True,
+            enable_passes=True,
         )
 
 
