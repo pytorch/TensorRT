@@ -200,23 +200,6 @@ Model Zoo
 
 .. raw:: html
 
-    <div class="sphx-glr-thumbcontainer" tooltip="This example illustrates the state of the art model FLUX.1-dev optimized using Torch-TensorRT.">
-
-.. only:: html
-
-  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_torch_export_flux_dev_thumb.png
-    :alt:
-
-  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_torch_export_flux_dev.py`
-
-.. raw:: html
-
-      <div class="sphx-glr-thumbnail-title">Compiling FLUX.1-dev model using the Torch-TensorRT dynamo backend</div>
-    </div>
-
-
-.. raw:: html
-
     <div class="sphx-glr-thumbcontainer" tooltip="We are going to demonstrate how we can easily use Mutable Torch TensorRT Module to compile, int...">
 
 .. only:: html
@@ -246,6 +229,23 @@ Model Zoo
 .. raw:: html
 
       <div class="sphx-glr-thumbnail-title">Compiling ResNet with dynamic shapes using the torch.compile backend</div>
+    </div>
+
+
+.. raw:: html
+
+    <div class="sphx-glr-thumbcontainer" tooltip="This example illustrates the state of the art model FLUX.1-dev optimized using Torch-TensorRT.">
+
+.. only:: html
+
+  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_torch_export_flux_dev_thumb.png
+    :alt:
+
+  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_torch_export_flux_dev.py`
+
+.. raw:: html
+
+      <div class="sphx-glr-thumbnail-title">Compiling FLUX.1-dev model using the Torch-TensorRT dynamo backend</div>
     </div>
 
 
@@ -297,6 +297,23 @@ Model Zoo
 .. raw:: html
 
       <div class="sphx-glr-thumbnail-title">Automatically Generate a Converter for a Custom Kernel</div>
+    </div>
+
+
+.. raw:: html
+
+    <div class="sphx-glr-thumbcontainer" tooltip="We are going to demonstrate how to automatically generate a plugin for a custom kernel using To...">
+
+.. only:: html
+
+  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_auto_generate_plugin_thumb.png
+    :alt:
+
+  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_auto_generate_plugin.py`
+
+.. raw:: html
+
+      <div class="sphx-glr-thumbnail-title">Automatically Generate a Plugin for a Custom Kernel</div>
     </div>
 
 
