@@ -2,6 +2,7 @@ import logging
 from typing import Optional, Sequence, Union
 
 import numpy as np
+import tensorrt as trt
 import torch
 from torch.fx.node import Target
 from torch_tensorrt.dynamo._SourceIR import SourceIR
@@ -13,7 +14,6 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     get_positive_dim,
     get_trt_tensor,
     to_numpy,
-    create_constant,
 )
 from torch_tensorrt.dynamo.conversion.impl.elementwise import convert_binary_elementwise
 from torch_tensorrt.dynamo.conversion.impl.shape import shape as get_shape
@@ -23,8 +23,6 @@ from torch_tensorrt.fx.converters.converter_utils import (
     set_layer_name,
 )
 from torch_tensorrt.fx.types import TRTTensor
-
-import tensorrt as trt
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -499,12 +497,12 @@ def index_put_converter(
         ctx, target, source_ir, f"{name}_cat_indices", reshaped_indices, dim=1
     )
 
-    source_shape = tuple(input_tensor.shape)  
+    source_shape = tuple(input_tensor.shape)
     k = len(indices)
-    leftover_dims = source_shape[k:] 
+    leftover_dims = source_shape[k:]
 
-    index_shapes_py = [tuple(idx.shape) for idx in reshaped_indices] 
-    N = index_shapes_py[0][0] 
+    index_shapes_py = [tuple(idx.shape) for idx in reshaped_indices]
+    N = index_shapes_py[0][0]
     sub_tensor_shape = (N,) + leftover_dims
 
     broadcasted_values = impl.slice.expand(

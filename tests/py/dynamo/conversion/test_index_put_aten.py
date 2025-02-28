@@ -136,12 +136,12 @@ class TestIndexPutConverter(DispatchTestCase):
             ),
             param(
                 test_name="3d_indices_float_broadcast_index",
-                source_tensor=torch.zeros([3, 3, 3], dtype = torch.int32),
+                source_tensor=torch.zeros([3, 3, 3], dtype=torch.int32),
                 indices_tensor=(
-                    torch.tensor([0,1], dtype=torch.int32),
-                    torch.tensor([0,1], dtype=torch.int32),
+                    torch.tensor([0, 1], dtype=torch.int32),
+                    torch.tensor([0, 1], dtype=torch.int32),
                 ),
-                value_tensor=torch.tensor([10],  dtype = torch.int32),
+                value_tensor=torch.tensor([10], dtype=torch.int32),
             ),
             param(
                 test_name="3d_indices_broadcast_1dim",
@@ -149,13 +149,12 @@ class TestIndexPutConverter(DispatchTestCase):
                 indices_tensor=(torch.tensor([1], dtype=torch.int32),),
                 value_tensor=torch.tensor([7], dtype=torch.int32),
             ),
-                        param(
+            param(
                 test_name="2d_indices_broadcast_1dim",
                 source_tensor=torch.zeros([4, 4], dtype=torch.int32),
                 indices_tensor=(torch.tensor([1, 3], dtype=torch.int32),),
                 value_tensor=torch.tensor([5], dtype=torch.int32),
             ),
-
             # 예시 4) 4D 소스, 2D 인덱스 → 마지막 2차원 전체 브로드캐스트
             param(
                 test_name="4d_indices_broadcast_2dim",
@@ -169,7 +168,7 @@ class TestIndexPutConverter(DispatchTestCase):
             # param(
             #     test_name="4d_indices_none_none_single_idx",
             #     source_tensor=torch.zeros([1, 2, 5, 3], dtype=torch.int32),
-            #     # None이 들어가면 현재 코드에서 문제가 발생할 수 있음
+            #     # indexing with None is WIP.
             #     indices_tensor=(None, None, torch.tensor([2], dtype=torch.int32)),
             #     value_tensor=torch.tensor(
             #         [[[10, 20, 30],
