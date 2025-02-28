@@ -88,6 +88,7 @@ backbone.to("cpu")
 del ep
 pipe.transformer = trt_gm
 pipe.transformer.config = config
+trt_gm.device = torch.device("cuda")
 torch.cuda.empty_cache()
 
 
