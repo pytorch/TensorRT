@@ -1,2 +1,2 @@
 __cuda_version__: "12.6"
-__tensorrt_version__: "10.7.0.post1"
+__tensorrt_version__: "10.7.0"
