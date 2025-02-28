@@ -28,6 +28,7 @@ Model Zoo
 * :ref:`_torch_export_flux_dev`: Compiling FLUX.1-dev model using AOT workflow (`ir=dynamo`)
 
 
+
 .. raw:: html
 
     <div class="sphx-glr-thumbnails">
@@ -188,23 +189,6 @@ Model Zoo
 
 .. raw:: html
 
-    <div class="sphx-glr-thumbcontainer" tooltip="We are going to demonstrate how we can easily use Mutable Torch TensorRT Module to compile, int...">
-
-.. only:: html
-
-  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_mutable_torchtrt_module_example_thumb.png
-    :alt:
-
-  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_mutable_torchtrt_module_example.py`
-
-.. raw:: html
-
-      <div class="sphx-glr-thumbnail-title">Mutable Torch TensorRT Module</div>
-    </div>
-
-
-.. raw:: html
-
     <div class="sphx-glr-thumbcontainer" tooltip="This interactive script is intended as a sample of the Torch-TensorRT workflow with torch.compi...">
 
 .. only:: html
@@ -341,6 +325,23 @@ Model Zoo
 
 .. raw:: html
 
+    <div class="sphx-glr-thumbcontainer" tooltip="We are going to demonstrate how we can easily use Mutable Torch TensorRT Module to compile, int...">
+
+.. only:: html
+
+  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_mutable_torchtrt_module_example_thumb.png
+    :alt:
+
+  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_mutable_torchtrt_module_example.py`
+
+.. raw:: html
+
+      <div class="sphx-glr-thumbnail-title">Mutable Torch TensorRT Module</div>
+    </div>
+
+
+.. raw:: html
+
     <div class="sphx-glr-thumbcontainer" tooltip="This example illustrates the state of the art model Segment Anything Model 2 (SAM2) optimized u...">
 
 .. only:: html
@@ -424,7 +425,6 @@ Model Zoo
    /tutorials/_rendered_examples/dynamo/torch_export_cudagraphs
    /tutorials/_rendered_examples/dynamo/engine_caching_bert_example
    /tutorials/_rendered_examples/dynamo/pre_allocated_output_example
-   /tutorials/_rendered_examples/dynamo/mutable_torchtrt_module_example
    /tutorials/_rendered_examples/dynamo/torch_compile_resnet_example
    /tutorials/_rendered_examples/dynamo/torch_export_flux_dev
    /tutorials/_rendered_examples/dynamo/torch_export_gpt2
@@ -433,6 +433,7 @@ Model Zoo
    /tutorials/_rendered_examples/dynamo/auto_generate_plugin
    /tutorials/_rendered_examples/dynamo/converter_overloading
    /tutorials/_rendered_examples/dynamo/weight_streaming_example
+   /tutorials/_rendered_examples/dynamo/mutable_torchtrt_module_example
    /tutorials/_rendered_examples/dynamo/torch_export_sam2
    /tutorials/_rendered_examples/dynamo/vgg16_ptq
    /tutorials/_rendered_examples/dynamo/engine_caching_example
