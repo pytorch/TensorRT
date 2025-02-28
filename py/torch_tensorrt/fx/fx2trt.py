@@ -382,7 +382,7 @@ class TRTInterpreter(torch.fx.Interpreter):
             output.name = name
             self.network.mark_output(output)
             if output_bool:
-                output.dtype = trt.bool
-            elif self.output_fp16 and output.dtype == trt.float32:
-                output.dtype = trt.float16
+                output.dtype = trt.DataType.BOOL
+            elif self.output_fp16 and output.dtype == trt.DataType.FLOAT:
+                output.dtype = trt.DataType.HALF
             self._output_names.append(name)

@@ -122,7 +122,7 @@ def scaled_dot_product_attention(
 
             # since we want our attn_bias to be in float32, so cast it to float32
             shape_tensor = cast_trt_tensor(
-                ctx, shape_tensor, trt.float32, name + "_casted", target, source_ir
+                ctx, shape_tensor, trt.DataType.FLOAT, name + "_casted", target, source_ir
             )
 
             # initialize the attn_bias as the zeros tensor

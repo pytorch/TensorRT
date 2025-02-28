@@ -35,9 +35,9 @@ def exp(
         TRTTensor: A TensorRT tensor represent the result of exp operator.
     """
     if (isinstance(input_val, TRTTensor)) and (
-        input_val.dtype == trt.int8 or input_val.dtype == trt.int32
+        input_val.dtype == trt.DataType.INT8 or input_val.dtype == trt.DataType.INT32
     ):
-        input_val = cast_trt_tensor(ctx, input_val, trt.float32, name)
+        input_val = cast_trt_tensor(ctx, input_val, trt.DataType.FLOAT, name)
 
     return convert_unary(
         ctx, target, source_ir, name, trt.UnaryOperation.EXP, input_val
@@ -78,9 +78,9 @@ def log(
     input_val: TRTTensor,
 ) -> TRTTensor:
     if (isinstance(input_val, TRTTensor)) and (
-        input_val.dtype == trt.int8 or input_val.dtype == trt.int32
+        input_val.dtype == trt.DataType.INT8 or input_val.dtype == trt.DataType.INT32
     ):
-        input_val = cast_trt_tensor(ctx, input_val, trt.float32, name)
+        input_val = cast_trt_tensor(ctx, input_val, trt.DataType.FLOAT, name)
 
     return convert_unary(
         ctx, target, source_ir, name, trt.UnaryOperation.LOG, input_val
@@ -144,9 +144,9 @@ def sqrt(
     input_val: TRTTensor,
 ) -> TRTTensor:
     if (isinstance(input_val, TRTTensor)) and (
-        input_val.dtype == trt.int8 or input_val.dtype == trt.int32
+        input_val.dtype == trt.DataType.INT8 or input_val.dtype == trt.DataType.INT32
     ):
-        input_val = cast_trt_tensor(ctx, input_val, trt.float32, name)
+        input_val = cast_trt_tensor(ctx, input_val, trt.DataType.FLOAT, name)
 
     return convert_unary(
         ctx, target, source_ir, name, trt.UnaryOperation.SQRT, input_val
@@ -161,9 +161,9 @@ def recip(
     input_val: TRTTensor,
 ) -> TRTTensor:
     if (isinstance(input_val, TRTTensor)) and (
-        input_val.dtype == trt.int8 or input_val.dtype == trt.int32
+        input_val.dtype == trt.DataType.INT8 or input_val.dtype == trt.DataType.INT32
     ):
-        input_val = cast_trt_tensor(ctx, input_val, trt.float32, name)
+        input_val = cast_trt_tensor(ctx, input_val, trt.DataType.FLOAT, name)
 
     return convert_unary(
         ctx, target, source_ir, name, trt.UnaryOperation.RECIP, input_val
@@ -190,9 +190,9 @@ def sin(
     input_val: TRTTensor,
 ) -> TRTTensor:
     if (isinstance(input_val, TRTTensor)) and (
-        input_val.dtype == trt.int8 or input_val.dtype == trt.int32
+        input_val.dtype == trt.DataType.INT8 or input_val.dtype == trt.DataType.INT32
     ):
-        input_val = cast_trt_tensor(ctx, input_val, trt.float32, name)
+        input_val = cast_trt_tensor(ctx, input_val, trt.DataType.FLOAT, name)
 
     return convert_unary(
         ctx, target, source_ir, name, trt.UnaryOperation.SIN, input_val
@@ -207,9 +207,9 @@ def cos(
     input_val: TRTTensor,
 ) -> TRTTensor:
     if (isinstance(input_val, TRTTensor)) and (
-        input_val.dtype == trt.int8 or input_val.dtype == trt.int32
+        input_val.dtype == trt.DataType.INT8 or input_val.dtype == trt.DataType.INT32
     ):
-        input_val = cast_trt_tensor(ctx, input_val, trt.float32, name)
+        input_val = cast_trt_tensor(ctx, input_val, trt.DataType.FLOAT, name)
 
     return convert_unary(
         ctx, target, source_ir, name, trt.UnaryOperation.COS, input_val
@@ -224,9 +224,9 @@ def tan(
     input_val: TRTTensor,
 ) -> TRTTensor:
     if (isinstance(input_val, TRTTensor)) and (
-        input_val.dtype == trt.int8 or input_val.dtype == trt.int32
+        input_val.dtype == trt.DataType.INT8 or input_val.dtype == trt.DataType.INT32
     ):
-        input_val = cast_trt_tensor(ctx, input_val, trt.float32, name)
+        input_val = cast_trt_tensor(ctx, input_val, trt.DataType.FLOAT, name)
 
     return convert_unary(
         ctx, target, source_ir, name, trt.UnaryOperation.TAN, input_val
@@ -241,9 +241,9 @@ def sinh(
     input_val: TRTTensor,
 ) -> TRTTensor:
     if (isinstance(input_val, TRTTensor)) and (
-        input_val.dtype == trt.int8 or input_val.dtype == trt.int32
+        input_val.dtype == trt.DataType.INT8 or input_val.dtype == trt.DataType.INT32
     ):
-        input_val = cast_trt_tensor(ctx, input_val, trt.float32, name)
+        input_val = cast_trt_tensor(ctx, input_val, trt.DataType.FLOAT, name)
 
     return convert_unary(
         ctx, target, source_ir, name, trt.UnaryOperation.SINH, input_val
@@ -258,9 +258,9 @@ def cosh(
     input_val: TRTTensor,
 ) -> TRTTensor:
     if (isinstance(input_val, TRTTensor)) and (
-        input_val.dtype == trt.int8 or input_val.dtype == trt.int32
+        input_val.dtype == trt.DataType.INT8 or input_val.dtype == trt.DataType.INT32
     ):
-        input_val = cast_trt_tensor(ctx, input_val, trt.float32, name)
+        input_val = cast_trt_tensor(ctx, input_val, trt.DataType.FLOAT, name)
 
     return convert_unary(
         ctx, target, source_ir, name, trt.UnaryOperation.COSH, input_val
@@ -275,9 +275,9 @@ def asin(
     input_val: TRTTensor,
 ) -> TRTTensor:
     if (isinstance(input_val, TRTTensor)) and (
-        input_val.dtype == trt.int8 or input_val.dtype == trt.int32
+        input_val.dtype == trt.DataType.INT8 or input_val.dtype == trt.DataType.INT32
     ):
-        input_val = cast_trt_tensor(ctx, input_val, trt.float32, name)
+        input_val = cast_trt_tensor(ctx, input_val, trt.DataType.FLOAT, name)
 
     return convert_unary(
         ctx, target, source_ir, name, trt.UnaryOperation.ASIN, input_val
@@ -292,9 +292,9 @@ def acos(
     input_val: TRTTensor,
 ) -> TRTTensor:
     if (isinstance(input_val, TRTTensor)) and (
-        input_val.dtype == trt.int8 or input_val.dtype == trt.int32
+        input_val.dtype == trt.DataType.INT8 or input_val.dtype == trt.DataType.INT32
     ):
-        input_val = cast_trt_tensor(ctx, input_val, trt.float32, name)
+        input_val = cast_trt_tensor(ctx, input_val, trt.DataType.FLOAT, name)
 
     return convert_unary(
         ctx, target, source_ir, name, trt.UnaryOperation.ACOS, input_val
@@ -309,9 +309,9 @@ def atan(
     input_val: TRTTensor,
 ) -> TRTTensor:
     if (isinstance(input_val, TRTTensor)) and (
-        input_val.dtype == trt.int8 or input_val.dtype == trt.int32
+        input_val.dtype == trt.DataType.INT8 or input_val.dtype == trt.DataType.INT32
     ):
-        input_val = cast_trt_tensor(ctx, input_val, trt.float32, name)
+        input_val = cast_trt_tensor(ctx, input_val, trt.DataType.FLOAT, name)
 
     return convert_unary(
         ctx, target, source_ir, name, trt.UnaryOperation.ATAN, input_val
@@ -326,9 +326,9 @@ def asinh(
     input_val: TRTTensor,
 ) -> TRTTensor:
     if (isinstance(input_val, TRTTensor)) and (
-        input_val.dtype == trt.int8 or input_val.dtype == trt.int32
+        input_val.dtype == trt.DataType.INT8 or input_val.dtype == trt.DataType.INT32
     ):
-        input_val = cast_trt_tensor(ctx, input_val, trt.float32, name)
+        input_val = cast_trt_tensor(ctx, input_val, trt.DataType.FLOAT, name)
 
     return convert_unary(
         ctx, target, source_ir, name, trt.UnaryOperation.ASINH, input_val
@@ -343,9 +343,9 @@ def acosh(
     input_val: TRTTensor,
 ) -> TRTTensor:
     if (isinstance(input_val, TRTTensor)) and (
-        input_val.dtype == trt.int8 or input_val.dtype == trt.int32
+        input_val.dtype == trt.DataType.INT8 or input_val.dtype == trt.DataType.INT32
     ):
-        input_val = cast_trt_tensor(ctx, input_val, trt.float32, name)
+        input_val = cast_trt_tensor(ctx, input_val, trt.DataType.FLOAT, name)
 
     return convert_unary(
         ctx, target, source_ir, name, trt.UnaryOperation.ACOSH, input_val
@@ -360,9 +360,9 @@ def atanh(
     input_val: TRTTensor,
 ) -> TRTTensor:
     if (isinstance(input_val, TRTTensor)) and (
-        input_val.dtype == trt.int8 or input_val.dtype == trt.int32
+        input_val.dtype == trt.DataType.INT8 or input_val.dtype == trt.DataType.INT32
     ):
-        input_val = cast_trt_tensor(ctx, input_val, trt.float32, name)
+        input_val = cast_trt_tensor(ctx, input_val, trt.DataType.FLOAT, name)
 
     return convert_unary(
         ctx, target, source_ir, name, trt.UnaryOperation.ATANH, input_val
@@ -377,9 +377,9 @@ def ceil(
     input_val: TRTTensor,
 ) -> TRTTensor:
     if (isinstance(input_val, TRTTensor)) and (
-        input_val.dtype == trt.int8 or input_val.dtype == trt.int32
+        input_val.dtype == trt.DataType.INT8 or input_val.dtype == trt.DataType.INT32
     ):
-        input_val = cast_trt_tensor(ctx, input_val, trt.float32, name)
+        input_val = cast_trt_tensor(ctx, input_val, trt.DataType.FLOAT, name)
 
     return convert_unary(
         ctx, target, source_ir, name, trt.UnaryOperation.CEIL, input_val
@@ -394,9 +394,9 @@ def floor(
     input_val: TRTTensor,
 ) -> TRTTensor:
     if (isinstance(input_val, TRTTensor)) and (
-        input_val.dtype == trt.int8 or input_val.dtype == trt.int32
+        input_val.dtype == trt.DataType.INT8 or input_val.dtype == trt.DataType.INT32
     ):
-        input_val = cast_trt_tensor(ctx, input_val, trt.float32, name)
+        input_val = cast_trt_tensor(ctx, input_val, trt.DataType.FLOAT, name)
 
     return convert_unary(
         ctx, target, source_ir, name, trt.UnaryOperation.FLOOR, input_val
@@ -410,8 +410,8 @@ def logical_not(
     name: str,
     input_val: TRTTensor,
 ) -> TRTTensor:
-    if (isinstance(input_val, TRTTensor)) and input_val.dtype != trt.bool:
-        input_val = cast_trt_tensor(ctx, input_val, trt.bool, name)
+    if (isinstance(input_val, TRTTensor)) and input_val.dtype != trt.DataType.BOOL:
+        input_val = cast_trt_tensor(ctx, input_val, trt.DataType.BOOL, name)
 
     return convert_unary(
         ctx, target, source_ir, name, trt.UnaryOperation.NOT, input_val
@@ -434,7 +434,7 @@ def sym_not(
             "Torch-TensorRT support for sym_not operator when type is torch.SymBool is not available, Need to Implement"
         )
     elif isinstance(input_val, (TRTTensor, torch.Tensor)):
-        if input_val.dtype != trt.bool and input_val.dtype != torch.bool:
+        if input_val.dtype != trt.DataType.BOOL and input_val.dtype != torch.bool:
             raise RuntimeError(
                 f"Only Boolean value of ITensor/Tensor is allowed for sym_not, got {input_val.dtype=}"
             )
@@ -452,7 +452,7 @@ def sym_not(
                 ctx, target, source_ir, name + "_reshpaed", input_val, (1,)
             )
     elif isinstance(input_val, bool):
-        input_val = get_trt_tensor(ctx, input_val, name + "_casted", dtype=trt.bool)
+        input_val = get_trt_tensor(ctx, input_val, name + "_casted", dtype=trt.DataType.BOOL)
 
     return convert_unary(
         ctx, target, source_ir, name, trt.UnaryOperation.NOT, input_val
@@ -491,9 +491,9 @@ def round(
     input_val: TRTTensor,
 ) -> TRTTensor:
     if (isinstance(input_val, TRTTensor)) and (
-        input_val.dtype == trt.int8 or input_val.dtype == trt.int32
+        input_val.dtype == trt.DataType.INT8 or input_val.dtype == trt.DataType.INT32
     ):
-        input_val = cast_trt_tensor(ctx, input_val, trt.float32, name)
+        input_val = cast_trt_tensor(ctx, input_val, trt.DataType.FLOAT, name)
 
     return convert_unary(
         ctx, target, source_ir, name, trt.UnaryOperation.ROUND, input_val
@@ -508,9 +508,9 @@ def isinf(
     input_val: TRTTensor,
 ) -> TRTTensor:
     if (isinstance(input_val, TRTTensor)) and (
-        input_val.dtype == trt.int8 or input_val.dtype == trt.int32
+        input_val.dtype == trt.DataType.INT8 or input_val.dtype == trt.DataType.INT32
     ):
-        input_val = cast_trt_tensor(ctx, input_val, trt.float32, name)
+        input_val = cast_trt_tensor(ctx, input_val, trt.DataType.FLOAT, name)
 
     return convert_unary(
         ctx, target, source_ir, name, trt.UnaryOperation.ISINF, input_val
@@ -525,9 +525,9 @@ def neg(
     input_val: TRTTensor,
 ) -> TRTTensor:
     if (isinstance(input_val, TRTTensor)) and (
-        input_val.dtype == trt.int8 or input_val.dtype == trt.int32
+        input_val.dtype == trt.DataType.INT8 or input_val.dtype == trt.DataType.INT32
     ):
-        input_val = cast_trt_tensor(ctx, input_val, trt.float32, name)
+        input_val = cast_trt_tensor(ctx, input_val, trt.DataType.FLOAT, name)
 
     return convert_unary(
         ctx, target, source_ir, name, trt.UnaryOperation.NEG, input_val
@@ -542,9 +542,9 @@ def erf(
     input_val: TRTTensor,
 ) -> TRTTensor:
     if (isinstance(input_val, TRTTensor)) and (
-        input_val.dtype == trt.int8 or input_val.dtype == trt.int32
+        input_val.dtype == trt.DataType.INT8 or input_val.dtype == trt.DataType.INT32
     ):
-        input_val = cast_trt_tensor(ctx, input_val, trt.float32, name)
+        input_val = cast_trt_tensor(ctx, input_val, trt.DataType.FLOAT, name)
 
     return convert_unary(
         ctx, target, source_ir, name, trt.UnaryOperation.ERF, input_val
@@ -558,7 +558,7 @@ def trunc(
     name: str,
     input_val: TRTTensor,
 ) -> TRTTensor:
-    if input_val.dtype not in (trt.float16, trt.float32):
+    if input_val.dtype not in (trt.DataType.HALF, trt.DataType.FLOAT):
         return impl.cast.to_copy(
             ctx,
             target,

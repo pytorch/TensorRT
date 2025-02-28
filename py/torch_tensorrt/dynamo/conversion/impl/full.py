@@ -75,7 +75,7 @@ def full(
 
     if isinstance(fill_value, bool):
         output = cast_trt_tensor(
-            ctx, output, trt.bool, name + "_casted", target, source_ir
+            ctx, output, trt.DataType.BOOL, name + "_casted", target, source_ir
         )
         output = impl.elementwise.logical_or(
             ctx, target, source_ir, name + "_add", output, fill_value

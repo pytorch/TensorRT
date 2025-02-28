@@ -98,7 +98,7 @@ def index(
             tensor_indices.append(ind)
 
     if not tensor_indices:
-        cast_layer = ctx.net.add_cast(input, trt.int32)
+        cast_layer = ctx.net.add_cast(input, trt.DataType.INT32)
         set_layer_name(cast_layer, target, name + "_index_casted", source_ir)
         return cast_layer.get_output(0)
     elif len(tensor_indices) == 1:
@@ -276,7 +276,7 @@ def index(
         cum_adv_index_shape_tensor = cast_trt_tensor(
             ctx,
             cum_adv_index_shape_tensor,
-            trt.int32,
+            trt.DataType.INT32,
             name + "_cum_adv_index_shape_casted",
         )
         cum_adv_index_shape = cum_adv_index.shape
@@ -427,8 +427,8 @@ def scatter(
     input_shape = input.shape
     index_shape = index.shape
     index_shape_list = list(index_shape)
-    if index.dtype == trt.int64:
-        index = cast_trt_tensor(ctx, index, trt.int32, name + "_cast_index_tensor")
+    if index.dtype == trt.DataType.INT64:
+        index = cast_trt_tensor(ctx, index, trt.DataType.INT32, name + "_cast_index_tensor")
     dim = get_positive_dim(dim, len(input_shape))
     src_tensor = src
     # scatter.value

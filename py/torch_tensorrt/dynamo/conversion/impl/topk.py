@@ -30,8 +30,8 @@ def argmax_argmin(
     dim: Optional[int],
     keep_dim: bool = False,
 ) -> TRTTensor:
-    if input.dtype == trt.int32:
-        input = cast_trt_tensor(ctx, input, trt.float32, name, target, source_ir)
+    if input.dtype == trt.DataType.INT32:
+        input = cast_trt_tensor(ctx, input, trt.DataType.FLOAT, name, target, source_ir)
 
     # Three different cases here:
     # 1. dim == None, flatten input tensor first, keep_dim will be ignore and the output rank == input rank

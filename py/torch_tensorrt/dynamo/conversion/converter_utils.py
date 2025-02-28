@@ -184,9 +184,9 @@ def cast_int_int_div_trt_tensor(
     Returns:
         A list of lhs_val and rhs_val casted to the appropriate datatype
     """
-    if lhs_val.dtype == trt.int32 and rhs_val.dtype == trt.int32:
-        lhs_val = cast_trt_tensor(ctx, lhs_val, trt.float32, name)
-        rhs_val = cast_trt_tensor(ctx, rhs_val, trt.float32, name)
+    if lhs_val.dtype == trt.DataType.INT32 and rhs_val.dtype == trt.DataType.INT32:
+        lhs_val = cast_trt_tensor(ctx, lhs_val, trt.DataType.FLOAT, name)
+        rhs_val = cast_trt_tensor(ctx, rhs_val, trt.DataType.FLOAT, name)
     return [lhs_val, rhs_val]
 
 
@@ -313,8 +313,8 @@ def extend_attr_to_tuple(
 def cast_int_or_float_to_bool(
     ctx: ConversionContext, name: str, tensor: TRTTensor
 ) -> TRTTensor:
-    if tensor.dtype != trt.bool:
-        return cast_trt_tensor(ctx, tensor, trt.bool, name)
+    if tensor.dtype != trt.DataType.BOOL:
+        return cast_trt_tensor(ctx, tensor, trt.DataType.BOOL, name)
 
     return tensor
 
@@ -870,7 +870,7 @@ def prepend_ones(
         tensor_shape_layer = ctx.net.add_shape(tensor)
         tensor_shape = tensor_shape_layer.get_output(0)
         tensor_shape = cast_trt_tensor(
-            ctx, tensor_shape, trt.int32, name + "shape_casted", "shape"
+            ctx, tensor_shape, trt.DataType.INT32, name + "shape_casted", "shape"
         )
         tensor_shape_layer.name = f"{name}_broadcast_orig_shape"
         prepend_shape_layer = ctx.net.add_constant(

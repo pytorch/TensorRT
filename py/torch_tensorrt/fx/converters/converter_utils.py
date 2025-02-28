@@ -353,7 +353,7 @@ def prepend_ones(
         tensor_shape_layer = network.add_shape(tensor)
         tensor_shape = tensor_shape_layer.get_output(0)
         tensor_shape = type_cast(
-            network, "shape", name + "shape_casted", tensor_shape, trt.int32
+            network, "shape", name + "shape_casted", tensor_shape, trt.DataType.INT32
         )
         tensor_shape_layer.name = f"{name}_broadcast_orig_shape"
         prepend_shape_layer = network.add_constant(
@@ -715,12 +715,12 @@ def mark_as_int8_layer(layer, dynamic_range):
         trt.LayerType.CONSTANT,
         trt.LayerType.SHAPE,
     }:
-        layer.precision = trt.int8
+        layer.precision = trt.DataType.INT8
 
     for i in range(layer.num_outputs):
         output_val = layer.get_output(i)
         output_val.dynamic_range = dynamic_range
-        layer.set_output_type(i, trt.int8)
+        layer.set_output_type(i, trt.DataType.INT8)
         # output_val.dtype = trt.int8
 
 
@@ -873,7 +873,7 @@ def get_python_op_from_trt_elementwise_op(
 def dtype_uniform(
     network: TRTNetwork, target: Target, name: str, input: TRTTensor, other: TRTTensor
 ):
-    table = {trt.bool: 0, trt.int32: 1, trt.float16: 2, trt.float32: 3}
+    table = {trt.DataType.BOOL: 0, trt.DataType.INT32: 1, trt.DataType.HALF: 2, trt.DataType.FLOAT: 3}
     input_dtype = input.dtype
     other_dtype = other.dtype
     if table[input_dtype] > table[other_dtype]:
@@ -888,12 +888,12 @@ def dtype_uniform(
         input = layer.get_output(0)
     elif table[input_dtype] == 0 and table[other_dtype] == 0:
         layer_i = network.add_identity(input)
-        layer_i.set_output_type(0, trt.int32)
+        layer_i.set_output_type(0, trt.DataType.INT32)
         set_layer_name(layer_i, target, f"{name}_input_dtype_change")
         input = layer_i.get_output(0)
 
         layer_o = network.add_identity(other)
-        layer_o.set_output_type(0, trt.int32)
+        layer_o.set_output_type(0, trt.DataType.INT32)
         set_layer_name(layer_o, target, f"{name}_other_dtype_change")
         other = layer_o.get_output(0)
     return input, other

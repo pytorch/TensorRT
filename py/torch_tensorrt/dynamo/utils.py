@@ -41,43 +41,43 @@ class Frameworks(Enum):
 DataTypeEquivalence: Dict[
     TRTDataType, Dict[Frameworks, Union[TRTDataType, np.dtype, torch.dtype]]
 ] = {
-    trt.int8: {
+    trt.DataType.INT8: {
         Frameworks.NUMPY: np.int8,
         Frameworks.TORCH: torch.int8,
-        Frameworks.TRT: trt.int8,
+        Frameworks.TRT: trt.DataType.INT8,
     },
-    trt.int32: {
+    trt.DataType.INT32: {
         Frameworks.NUMPY: np.int32,
         Frameworks.TORCH: torch.int32,
-        Frameworks.TRT: trt.int32,
+        Frameworks.TRT: trt.DataType.INT32,
     },
-    trt.int64: {
+    trt.DataType.INT64: {
         Frameworks.NUMPY: np.int64,
         Frameworks.TORCH: torch.int64,
-        Frameworks.TRT: trt.int64,
+        Frameworks.TRT: trt.DataType.INT64,
     },
-    trt.float16: {
+    trt.DataType.HALF: {
         Frameworks.NUMPY: np.float16,
         Frameworks.TORCH: torch.float16,
-        Frameworks.TRT: trt.float16,
+        Frameworks.TRT: trt.DataType.HALF,
     },
-    trt.float32: {
+    trt.DataType.FLOAT: {
         Frameworks.NUMPY: np.float32,
         Frameworks.TORCH: torch.float32,
-        Frameworks.TRT: trt.float32,
+        Frameworks.TRT: trt.DataType.FLOAT,
     },
-    trt.bool: {
+    trt.DataType.BOOL: {
         Frameworks.NUMPY: bool,
         Frameworks.TORCH: torch.bool,
-        Frameworks.TRT: trt.bool,
+        Frameworks.TRT: trt.DataType.BOOL,
     },
 }
 
 if trt.__version__ >= "7.0":
-    DataTypeEquivalence[trt.bool] = {
+    DataTypeEquivalence[trt.DataType.BOOL] = {
         Frameworks.NUMPY: np.bool_,
         Frameworks.TORCH: torch.bool,
-        Frameworks.TRT: trt.bool,
+        Frameworks.TRT: trt.DataType.BOOL,
     }
 
 

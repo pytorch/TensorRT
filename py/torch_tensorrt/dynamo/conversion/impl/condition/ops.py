@@ -37,8 +37,8 @@ def where(
     if not isinstance(condition, TRTTensor):
         condition = get_trt_tensor(ctx, condition, f"{name}_condition")
 
-    if condition.dtype != trt.bool:
-        condition = cast_trt_tensor(ctx, condition, trt.float32, f"{name}_cast")
+    if condition.dtype != trt.DataType.BOOL:
+        condition = cast_trt_tensor(ctx, condition, trt.DataType.FLOAT, f"{name}_cast")
         condition = ne(ctx, target, source_ir, f"{name}_cond_zero", condition, 0)
 
     diff = max_shape_len - len(condition_shape)

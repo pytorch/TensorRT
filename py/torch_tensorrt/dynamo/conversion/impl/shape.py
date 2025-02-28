@@ -43,7 +43,7 @@ def shape(
     input_shape = cast_trt_tensor(
         ctx,
         input_shape,
-        trt.int32,
+        trt.DataType.INT32,
         name + "_shape_casted",
     )
     set_layer_name(shape_layer, target, name + "_shape", source_ir)
@@ -93,7 +93,7 @@ def get_shape_with_dynamic_shape(
     input_shape = cast_trt_tensor(
         ctx,
         input_shape,
-        trt.int32,
+        trt.DataType.INT32,
         name + "_int32_casted",
     )
     # input_shape.dtype is int64 in TRT 10.0

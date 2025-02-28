@@ -24,9 +24,9 @@ def amax(
     keepdim: bool = False,
 ) -> TRTTensor:
     if (isinstance(input_val, TRTTensor)) and (
-        input_val.dtype == trt.int8 or input_val.dtype == trt.int32
+        input_val.dtype == trt.DataType.INT8 or input_val.dtype == trt.DataType.INT32
     ):
-        input_val = cast_trt_tensor(ctx, input_val, trt.float32, name)
+        input_val = cast_trt_tensor(ctx, input_val, trt.DataType.FLOAT, name)
 
     if isinstance(dim, (tuple, list)) and len(dim) == 0:
         dim = tuple(range(len(input_val.shape)))
@@ -51,9 +51,9 @@ def amin(
     keepdim: bool = False,
 ) -> TRTTensor:
     if (isinstance(input_val, TRTTensor)) and (
-        input_val.dtype == trt.int8 or input_val.dtype == trt.int32
+        input_val.dtype == trt.DataType.INT8 or input_val.dtype == trt.DataType.INT32
     ):
-        input_val = cast_trt_tensor(ctx, input_val, trt.float32, name)
+        input_val = cast_trt_tensor(ctx, input_val, trt.DataType.FLOAT, name)
 
     if isinstance(dim, (tuple, list)) and len(dim) == 0:
         dim = tuple(range(len(input_val.shape)))
@@ -77,8 +77,8 @@ def sum(
     dim: Optional[Union[int, Sequence[int]]],
     keepdim: bool,
 ) -> TRTTensor:
-    if (isinstance(input_val, TRTTensor)) and (input_val.dtype == trt.bool):
-        input_val = cast_trt_tensor(ctx, input_val, trt.int32, name)
+    if (isinstance(input_val, TRTTensor)) and (input_val.dtype == trt.DataType.BOOL):
+        input_val = cast_trt_tensor(ctx, input_val, trt.DataType.INT32, name)
 
     if dim is None or (isinstance(dim, (tuple, list)) and len(dim) == 0):
         dim = tuple(range(len(input_val.shape)))
@@ -103,9 +103,9 @@ def prod(
     keepdim: bool,
 ) -> TRTTensor:
     if (isinstance(input_val, TRTTensor)) and (
-        input_val.dtype == trt.int8 or input_val.dtype == trt.int32
+        input_val.dtype == trt.DataType.INT8 or input_val.dtype == trt.DataType.INT32
     ):
-        input_val = cast_trt_tensor(ctx, input_val, trt.float32, name)
+        input_val = cast_trt_tensor(ctx, input_val, trt.DataType.FLOAT, name)
 
     if dim is None:
         dim = tuple(range(len(input_val.shape)))
@@ -131,9 +131,9 @@ def max(
     return_indices: bool,
 ) -> Union[TRTTensor, Tuple[TRTTensor, TRTTensor]]:
     if (isinstance(input_val, TRTTensor)) and (
-        input_val.dtype == trt.int8 or input_val.dtype == trt.int32
+        input_val.dtype == trt.DataType.INT8 or input_val.dtype == trt.DataType.INT32
     ):
-        input_val = cast_trt_tensor(ctx, input_val, trt.float32, name)
+        input_val = cast_trt_tensor(ctx, input_val, trt.DataType.FLOAT, name)
 
     if dim is None:
         dim = tuple(range(len(input_val.shape)))
@@ -163,9 +163,9 @@ def min(
     return_indices: bool,
 ) -> Union[TRTTensor, Tuple[TRTTensor, TRTTensor]]:
     if (isinstance(input_val, TRTTensor)) and (
-        input_val.dtype == trt.int8 or input_val.dtype == trt.int32
+        input_val.dtype == trt.DataType.INT8 or input_val.dtype == trt.DataType.INT32
     ):
-        input_val = cast_trt_tensor(ctx, input_val, trt.float32, name)
+        input_val = cast_trt_tensor(ctx, input_val, trt.DataType.FLOAT, name)
 
     if dim is None:
         dim = tuple(range(len(input_val.shape)))
@@ -194,9 +194,9 @@ def mean(
     keepdim: bool,
 ) -> TRTTensor:
     if (isinstance(input_val, TRTTensor)) and (
-        input_val.dtype == trt.int8 or input_val.dtype == trt.int32
+        input_val.dtype == trt.DataType.INT8 or input_val.dtype == trt.DataType.INT32
     ):
-        input_val = cast_trt_tensor(ctx, input_val, trt.float32, name)
+        input_val = cast_trt_tensor(ctx, input_val, trt.DataType.FLOAT, name)
 
     if dim is None or (isinstance(dim, (tuple, list)) and len(dim) == 0):
         dim = tuple(range(len(input_val.shape)))
@@ -220,8 +220,8 @@ def any(
     dim: Union[int, Optional[Sequence[int]]] = None,
     keepdim: bool = False,
 ) -> TRTTensor:
-    if (isinstance(input_val, TRTTensor)) and (input_val.dtype == trt.bool):
-        input_val = cast_trt_tensor(ctx, input_val, trt.int32, f"{name}_cast")
+    if (isinstance(input_val, TRTTensor)) and (input_val.dtype == trt.DataType.BOOL):
+        input_val = cast_trt_tensor(ctx, input_val, trt.DataType.INT32, f"{name}_cast")
 
     abs_out = impl.unary.abs(
         ctx,
@@ -237,4 +237,4 @@ def any(
 
     max_out = amax(ctx, target, source_ir, f"{name}_amax", abs_out, dim, keepdim)
 
-    return cast_trt_tensor(ctx, max_out, trt.bool, f"{name}_cast_to_bool")
+    return cast_trt_tensor(ctx, max_out, trt.DataType.BOOL, f"{name}_cast_to_bool")

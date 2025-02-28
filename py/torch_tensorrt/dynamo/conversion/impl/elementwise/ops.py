@@ -123,9 +123,9 @@ def rsqrt(
     input: TRTTensor,
 ) -> TRTTensor:
     if (isinstance(input, TRTTensor)) and (
-        input.dtype == trt.int8 or input.dtype == trt.int32
+        input.dtype == trt.DataType.INT8 or input.dtype == trt.DataType.INT32
     ):
-        input = cast_trt_tensor(ctx, input, trt.float32, f"{name}_cast")
+        input = cast_trt_tensor(ctx, input, trt.DataType.FLOAT, f"{name}_cast")
     sqrt_trt_output = convert_unary(
         ctx,
         target,
@@ -253,9 +253,9 @@ def atan2(
     pi_tensor = get_trt_tensor(ctx, pi_value, f"{name}_pi")
 
     if isinstance(input, TRTTensor):
-        input = cast_trt_tensor(ctx, input, trt.float32, f"{name}_input")
+        input = cast_trt_tensor(ctx, input, trt.DataType.FLOAT, f"{name}_input")
     if isinstance(other, TRTTensor):
-        other = cast_trt_tensor(ctx, other, trt.float32, f"{name}_other")
+        other = cast_trt_tensor(ctx, other, trt.DataType.FLOAT, f"{name}_other")
 
     input, other = broadcast(ctx, input, other, f"{name}_input", f"{name}_other")
 
@@ -368,20 +368,20 @@ def atan2(
             ctx,
             (pi_value / 2) * np.ones(input.shape, dtype=np.float32),
             f"{name}_pi_over_2_tensor",
-            dtype=trt.float32,
+            dtype=trt.DataType.FLOAT,
         )
 
         minus_pi_over_2_tensor = get_trt_tensor(
             ctx,
             (-pi_value / 2) * np.ones(input.shape, dtype=np.float32),
             f"{name}_minus_pi_over_2_tensor",
-            dtype=trt.float32,
+            dtype=trt.DataType.FLOAT,
         )
         zero_tensor = get_trt_tensor(
             ctx,
             np.zeros(input.shape, dtype=np.float32),
             f"{name}_zero_tensor",
-            dtype=trt.float32,
+            dtype=trt.DataType.FLOAT,
         )
 
     # π/2 if x>0 and y=0,
@@ -545,8 +545,8 @@ def pow(
     rhs_val: Union[TRTTensor, int, float],
 ) -> TRTTensor:
     # POW operation supports only float32 and int8 inputs
-    lhs_val = get_trt_tensor(ctx, lhs_val, name + "_lhs_val", trt.float32)
-    rhs_val = get_trt_tensor(ctx, rhs_val, name + "_rhs_val", trt.float32)
+    lhs_val = get_trt_tensor(ctx, lhs_val, name + "_lhs_val", trt.DataType.FLOAT)
+    rhs_val = get_trt_tensor(ctx, rhs_val, name + "_rhs_val", trt.DataType.FLOAT)
     out = convert_binary_elementwise(
         ctx, target, source_ir, name, trt.ElementWiseOperation.POW, lhs_val, rhs_val
     )

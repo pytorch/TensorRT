@@ -125,7 +125,7 @@ def slice_op(  # TODO: This should be slice not whatever is in base
                 name + "_start_slice_concat",
                 tuple(start_slice),
                 0,
-                cast_dtype=trt.int32,
+                cast_dtype=trt.DataType.INT32,
             )
             stop_slice_tensor = cat(
                 ctx,
@@ -134,7 +134,7 @@ def slice_op(  # TODO: This should be slice not whatever is in base
                 name + "_stop_slice_concat",
                 tuple(stop_slice),
                 0,
-                cast_dtype=trt.int32,
+                cast_dtype=trt.DataType.INT32,
             )
             stride_slice_tensor = cat(
                 ctx,
@@ -143,7 +143,7 @@ def slice_op(  # TODO: This should be slice not whatever is in base
                 name + "_stride_slice_concat",
                 tuple(stride_slice),
                 0,
-                cast_dtype=trt.int32,
+                cast_dtype=trt.DataType.INT32,
             )
 
             if isinstance(start, int) and start < 0:
@@ -289,7 +289,7 @@ def expand(
             name + "_shape_concat",
             target_shape_t,
             0,
-            cast_dtype=trt.int32,
+            cast_dtype=trt.DataType.INT32,
         )
         start_tensor = cat(
             ctx,
@@ -298,7 +298,7 @@ def expand(
             name + "_start_concat",
             start,
             0,
-            cast_dtype=trt.int32,
+            cast_dtype=trt.DataType.INT32,
         )
         stride_tensor = cat(
             ctx,
@@ -307,7 +307,7 @@ def expand(
             name + "_stride_concat",
             stride,
             0,
-            cast_dtype=trt.int32,
+            cast_dtype=trt.DataType.INT32,
         )
         layer = ctx.net.add_slice(
             input_t, start=trt.Dims(), shape=trt.Dims(), stride=trt.Dims()
@@ -447,7 +447,7 @@ def tile(
             name + "_shape_concat",
             tuple(shapes),
             0,
-            cast_dtype=trt.int32,
+            cast_dtype=trt.DataType.INT32,
         )
         start_tensor = cat(
             ctx,
@@ -456,7 +456,7 @@ def tile(
             name + "_start_concat",
             starts,
             0,
-            cast_dtype=trt.int32,
+            cast_dtype=trt.DataType.INT32,
         )
         stride_tensor = cat(
             ctx,
@@ -465,7 +465,7 @@ def tile(
             name + "_stride_concat",
             strides,
             0,
-            cast_dtype=trt.int32,
+            cast_dtype=trt.DataType.INT32,
         )
         layer.set_input(1, start_tensor)
         layer.set_input(2, shape_tensor)

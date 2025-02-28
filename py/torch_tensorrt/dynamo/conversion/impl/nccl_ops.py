@@ -55,7 +55,7 @@ def nccl_gather(
     group = trt.PluginField(
         "group", np.array(group, dtype=np.int32), trt.PluginFieldType.INT32
     )
-    p_dtype = trt.float32
+    p_dtype = trt.DataType.FLOAT
     pf_type = trt.PluginField(
         "type_id", np.array([int(p_dtype)], np.int32), trt.PluginFieldType.INT32
     )
@@ -94,7 +94,7 @@ def nccl_reduce_scatter(
         "group", np.array(group, dtype=np.int32), trt.PluginFieldType.INT32
     )
 
-    p_dtype = trt.float16
+    p_dtype = trt.DataType.HALF
     pf_dtype = trt.PluginField(
         "type_id", np.array([int(p_dtype)], np.int32), trt.PluginFieldType.INT32
     )

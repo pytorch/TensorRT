@@ -1451,8 +1451,8 @@ def acc_ops_logical_not(
     input_val = kwargs["input"]
     operation_type = trt.UnaryOperation.NOT
     # cast to bool type
-    if input_val.dtype in (trt.float32, trt.float16, trt.int32):
-        input_val = type_cast(network, target, f"{name}_input", input_val, trt.bool)
+    if input_val.dtype in (trt.DataType.FLOAT, trt.DataType.HALF, trt.DataType.INT32):
+        input_val = type_cast(network, target, f"{name}_input", input_val, trt.DataType.BOOL)
     return add_unary_layer(network, input_val, operation_type, target, name)
 
 
@@ -1478,7 +1478,7 @@ def acc_ops_logical_and(
         def check_is_bool(input_t):
             if isinstance(input_t, TRTTensor):
                 assert (
-                    input_t.dtype == trt.bool
+                    input_t.dtype == trt.DataType.BOOL
                 ), "We currently do not support input is non-bool"
             elif isinstance(input_t, torch.Tensor):
                 assert (
@@ -1495,10 +1495,10 @@ def acc_ops_logical_and(
     input_t = get_trt_tensor(network, input_t, f"{name}_input_t")
     other_t = get_trt_tensor(network, other_t, f"{name}_other_t")
 
-    if input_t.dtype != trt.bool:
-        input_t = type_cast(network, target, f"{name}_input", input_t, trt.bool)
-    if other_t.dtype != trt.bool:
-        other_t = type_cast(network, target, f"{name}_other", other_t, trt.bool)
+    if input_t.dtype != trt.DataType.BOOL:
+        input_t = type_cast(network, target, f"{name}_input", input_t, trt.DataType.BOOL)
+    if other_t.dtype != trt.DataType.BOOL:
+        other_t = type_cast(network, target, f"{name}_other", other_t, trt.DataType.BOOL)
     return add_binary_elementwise_layer(
         network, input_t, other_t, trt.ElementWiseOperation.AND, target, name
     )
@@ -1627,14 +1627,14 @@ def acc_ops_logical_or(
         elif other_t.dtype == torch.bool:
             other_t = other_t.to(torch.int32)
     other_t = get_trt_tensor(network, other_t, f"{name}_other_t")
-    if input_t.dtype != trt.bool:
+    if input_t.dtype != trt.DataType.BOOL:
         layer_i = network.add_identity(input_t)
-        layer_i.set_output_type(0, trt.bool)
+        layer_i.set_output_type(0, trt.DataType.BOOL)
         set_layer_name(layer_i, target, f"{name}_input_dtype_change")
         input_t = layer_i.get_output(0)
-    if other_t.dtype != trt.bool:
+    if other_t.dtype != trt.DataType.BOOL:
         layer_o = network.add_identity(other_t)
-        layer_o.set_output_type(0, trt.bool)
+        layer_o.set_output_type(0, trt.DataType.BOOL)
         set_layer_name(layer_o, target, f"{name}_other_dtype_change")
         other_t = layer_o.get_output(0)
 
@@ -1664,14 +1664,14 @@ def acc_ops_logical_xor(
         elif other_t.dtype == torch.bool:
             other_t = other_t.to(torch.int32)
     other_t = get_trt_tensor(network, other_t, f"{name}_other_t")
-    if input_t.dtype != trt.bool:
+    if input_t.dtype != trt.DataType.BOOL:
         layer_i = network.add_identity(input_t)
-        layer_i.set_output_type(0, trt.bool)
+        layer_i.set_output_type(0, trt.DataType.BOOL)
         set_layer_name(layer_i, target, f"{name}_input_dtype_change")
         input_t = layer_i.get_output(0)
-    if other_t.dtype != trt.bool:
+    if other_t.dtype != trt.DataType.BOOL:
         layer_o = network.add_identity(other_t)
-        layer_o.set_output_type(0, trt.bool)
+        layer_o.set_output_type(0, trt.DataType.BOOL)
         set_layer_name(layer_o, target, f"{name}_other_dtype_change")
         other_t = layer_o.get_output(0)
 
@@ -1732,7 +1732,7 @@ def acc_ops_any(
             "of the TensorRT region!"
         )
 
-    if input_t.dtype in (trt.float32, trt.float16, trt.int32):
+    if input_t.dtype in (trt.DataType.FLOAT, trt.DataType.HALF, trt.DataType.INT32):
         comp_t = torch.zeros(tuple([*input_t.shape])).to(
             unified_dtype_converter(input_t.dtype, Frameworks.TORCH)
         )
@@ -1746,7 +1746,7 @@ def acc_ops_any(
     else:
         not_output = input_t
     # cast bool result to int
-    int_output = type_cast(network, target, f"{name}_cast_int", not_output, trt.int32)
+    int_output = type_cast(network, target, f"{name}_cast_int", not_output, trt.DataType.INT32)
     # sum
     if "dim" in kwargs:
         kwargs_new = {
@@ -1758,7 +1758,7 @@ def acc_ops_any(
         kwargs_new = {"input": int_output}
     sum_output = acc_ops_sum(network, target, None, kwargs_new, name + "_sum")
     # cast int to bool
-    output = type_cast(network, target, f"{name}_cast_bool", sum_output, trt.bool)
+    output = type_cast(network, target, f"{name}_cast_bool", sum_output, trt.DataType.BOOL)
     output.name = output.name + "_any"
     return output
 
@@ -2512,11 +2512,11 @@ def acc_ops_where(
         condition_t = condition_t.to(torch.int32)
         condition_const = get_trt_tensor(network, condition_t, f"{name}_condition")
         condition_layer = network.add_identity(condition_const)
-        condition_layer.set_output_type(0, trt.bool)
+        condition_layer.set_output_type(0, trt.DataType.BOOL)
         set_layer_name(condition_layer, target, f"{name}_condition")
         condition_val = condition_layer.get_output(0)
     else:
-        assert condition_t.dtype == trt.bool, "mask dtype is not bool!"
+        assert condition_t.dtype == trt.DataType.BOOL, "mask dtype is not bool!"
         if condition_shape != output_shape:
             condition_val = acc_ops_expand_tensor(
                 network,
@@ -2603,11 +2603,11 @@ def acc_ops_masked_fill_tensor(
         mask_t = mask_t.to(torch.int32)
         mask_const = get_trt_tensor(network, mask_t, f"{name}_mask")
         mask_layer = network.add_identity(mask_const)
-        mask_layer.set_output_type(0, trt.bool)
+        mask_layer.set_output_type(0, trt.DataType.BOOL)
         set_layer_name(mask_layer, target, f"{name}_mask")
         mask_val = mask_layer.get_output(0)
     else:
-        assert mask_t.dtype == trt.bool, "mask dtype is not bool!"
+        assert mask_t.dtype == trt.DataType.BOOL, "mask dtype is not bool!"
         if mask_shape != shape:
             mask_val = acc_ops_expand_tensor(
                 network,
@@ -3616,9 +3616,9 @@ def acc_ops_einsum(
 
     if const_flag:
         for i, input_source in enumerate(input_val):
-            if input_source.dtype != trt.float32:
+            if input_source.dtype != trt.DataType.FLOAT:
                 input_val[i] = type_cast(
-                    network, target, f"{name}_input_cast{i}", input_source, trt.float32
+                    network, target, f"{name}_input_cast{i}", input_source, trt.DataType.FLOAT
                 )
     einsum_layer = network.add_einsum(inputs=input_val, equation=equation)
     return einsum_layer.get_output(0)
