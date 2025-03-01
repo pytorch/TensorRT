@@ -481,7 +481,7 @@ class ConverterRegistry:
                         return (
                             converters,
                             calling_convention,
-                            candidate.requires_output_allocator,
+                            False,
                         )
 
         raise KeyError(

@@ -16,7 +16,11 @@ def remove_num_users_is_0_nodes(
     output_node = list(gm.graph.nodes)[-1]
 
     for node in gm.graph.nodes:
-        if node != output_node and len(node.users) == 0:
+        if (
+            node != output_node
+            and len(node.users) == 0
+            and len(node.all_input_nodes) > 0
+        ):
             node_input = node.all_input_nodes[0]
             node.replace_all_uses_with(node_input)
             gm.graph.erase_node(node)
