@@ -2117,6 +2117,56 @@ class TestLowering(TestCase):
             msg="Scaled_dot_product_cudnn_attention TRT outputs don't match with the original model.",
         )
 
+    def test_lowering_cudnn_grid_sampler(self):
+        class TestModule(torch.nn.Module):
+            def forward(self, x, grid):
+                return torch.ops.aten.cudnn_grid_sampler.default(x, grid)
+
+        # Operations expected to be removed in the traced graph after decompositions
+        expected_ops = {torch.ops.aten.grid_sampler_2d.default}
+        unexpected_ops = {torch.ops.aten.cudnn_grid_sampler.default}
+
+        inputs = [
+            torch.randn(1, 3, 5, 7, device="cuda"),
+            torch.randn(1, 5, 7, 2, device="cuda"),
+        ]
+
+        exported_program = torch.export.export(TestModule(), tuple(inputs))
+        fx_graph = exported_program.module()
+        unexpected_ops_seen, expected_ops_unseen = lower_graph_testing(
+            fx_graph,
+            inputs,
+            expected_ops=expected_ops,
+            unexpected_ops=unexpected_ops,
+            min_block_size=1,
+        )
+
+        self.assertEqual(
+            len(unexpected_ops_seen),
+            0,
+            f"The following unexpected ops were encountered: {unexpected_ops_seen}",
+        )
+
+        self.assertEqual(
+            len(expected_ops_unseen),
+            0,
+            f"The following expected ops were not encountered: {expected_ops_unseen}",
+        )
+
+        torch._dynamo.reset()
+
+        # Validate that the results between Torch and Torch-TRT are similar
+        trt_model = torch_tensorrt.dynamo.compile(
+            exported_program, inputs, min_block_size=1
+        )
+        torch.testing.assert_close(
+            trt_model(*inputs),
+            fx_graph(*inputs),
+            rtol=RTOL,
+            atol=ATOL,
+            msg="Cudnn_grid_sampler TRT outputs don't match with the original model.",
+        )
+
 
 if __name__ == "__main__":
     run_tests()
