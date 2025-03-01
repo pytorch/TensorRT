@@ -207,6 +207,7 @@ class TRTTestCase(TestCase):
                 input_binding_names=list(interpreter_result.input_names),
                 output_binding_names=list(interpreter_result.output_names),
                 name="test_engine",
+                requires_output_allocator=interpreter_result.requires_output_allocator,
             )
             mod = mod.cuda()
             if pyt_inputs is not None:
@@ -289,6 +290,7 @@ class TRTTestCase(TestCase):
                 input_binding_names=list(interpreter_result.input_names),
                 output_binding_names=list(interpreter_result.output_names),
                 name="test_engine",
+                requires_output_allocator=interpreter_result.requires_output_allocator,
             )
             res_trt = trt_mod(*cuda_inputs).cpu()
             res_cpu = mod(*cuda_inputs).cpu()
