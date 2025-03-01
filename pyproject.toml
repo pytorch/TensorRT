@@ -8,8 +8,6 @@ requires = [
     "cffi>=1.15.1",
     "typing-extensions>=4.7.0",
     "future>=0.18.3",
-    "tensorrt-cu12>=10.9.0,<10.10.0",
-    "torch>=2.8.0.dev,<2.9.0",
     "pybind11==2.6.2",
     "numpy",
     "sympy",
@@ -55,11 +53,6 @@ keywords = [
     "inference",
 ]
 dependencies = [
-    "torch>=2.8.0.dev,<2.9.0",
-    "tensorrt>=10.9.0,<10.10.0",
-    "tensorrt-cu12>=10.9.0,<10.10.0",
-    "tensorrt-cu12-bindings>=10.9.0,<10.10.0",
-    "tensorrt-cu12-libs>=10.9.0,<10.10.0",
     "packaging>=23",
     "numpy",
     "typing-extensions>=4.7.0",
