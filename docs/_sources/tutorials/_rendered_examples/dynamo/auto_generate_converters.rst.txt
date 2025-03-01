@@ -24,7 +24,7 @@ Automatically Generate a Converter for a Custom Kernel
 ===================================================================
 
 We are going to demonstrate how to automatically generate a converter for a custom kernel using Torch-TensorRT using
-the new Python based plugin system in TensorRT 10.7.
+the new Python based plugin system in TensorRT 10.8.
 
 Torch-TensorRT supports falling back to PyTorch implementations of operations in the case that Torch-TensorRT
 does not know how to compile them in TensorRT. However, this comes at the cost of a graph break and will reduce the performance of the model.
@@ -40,7 +40,7 @@ For these cases, it is possible to use a TensorRT plugin to replace the operator
 the performance and resource overhead from a graph break.
 
 Previously this involved a complex process in not only building a performant kernel but setting it up to run in TensorRT (see: `Using Custom Kernels within TensorRT Engines with Torch-TensorRT <https://pytorch.org/TensorRT/tutorials/_rendered_examples/dynamo/custom_kernel_plugins.html>`_).
-With TensorRT 10.7, there is a new Python native plugin system which greatly streamlines this process. This
+With TensorRT 10.8, there is a new Python native plugin system which greatly streamlines this process. This
 plugin system also allows Torch-TensorRT to automatically generate the necessary conversion code to convert the
 operation in PyTorch to TensorRT.
 
@@ -132,7 +132,7 @@ in the course of the operation.
 
 Writing Plugins for TensorRT using the Quick Deploy Plugin system
 -------------------------------------------------------------------
-The quick deployment plugin system in TensorRT 10.7 allows for the creation of custom plugins in Python with significantly
+The quick deployment plugin system in TensorRT 10.8 allows for the creation of custom plugins in Python with significantly
 less boilerplate. It uses a similar system PyTorch where you define a function that describes the shape and data type transformations
 that the operator will perform and then define the code to launch the kernel given GPU memory handles.
 

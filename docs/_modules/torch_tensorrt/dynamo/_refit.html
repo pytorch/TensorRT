@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt.dynamo._refit &mdash; Torch-TensorRT v2.7.0.dev0+b43c4c2 documentation</title>
+  <title>torch_tensorrt.dynamo._refit &mdash; Torch-TensorRT v2.7.0.dev0+f4219f7 documentation</title>
   
 
   
@@ -290,7 +290,7 @@
               
               
                 <div class="version">
-                  v2.7.0.dev0+b43c4c2
+                  v2.7.0.dev0+f4219f7
                 </div>
               
             
@@ -883,9 +883,12 @@
                     <span class="k">try</span><span class="p">:</span>
                         <span class="n">weight_name_map</span> <span class="o">=</span> <span class="n">compiled_submodule</span><span class="o">.</span><span class="n">weight_name_map</span>
                     <span class="k">except</span> <span class="ne">AttributeError</span><span class="p">:</span>
-                        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
-                            <span class="s2">&quot;The module was compiled with an old version of Torch-TensorRT. Rebuilding the weight map.&quot;</span>
-                        <span class="p">)</span>
+                        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span>
+                            <span class="n">compiled_submodule</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">graph_module</span><span class="o">.</span><span class="n">GraphModule</span>
+                        <span class="p">):</span>
+                            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                                <span class="s2">&quot;The module was compiled with an old version of Torch-TensorRT. Rebuilding the weight map.&quot;</span>
+                            <span class="p">)</span>
                     <span class="k">if</span> <span class="ow">not</span> <span class="n">weight_name_map</span><span class="p">:</span>
                         <span class="n">use_weight_map_cache</span> <span class="o">=</span> <span class="kc">False</span>
                         <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>

@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Mutable Torch TensorRT Module &mdash; Torch-TensorRT v2.7.0.dev0+b43c4c2 documentation</title>
+  <title>Mutable Torch TensorRT Module &mdash; Torch-TensorRT v2.7.0.dev0+f4219f7 documentation</title>
   
 
   
@@ -293,7 +293,7 @@
               
               
                 <div class="version">
-                  v2.7.0.dev0+b43c4c2
+                  v2.7.0.dev0+f4219f7
                 </div>
               
             
@@ -501,10 +501,15 @@ to download the full example code</p>
 <p>Compiling a Torch-TensorRT module is straightforward, but modifying the compiled module can be challenging, especially when it comes to maintaining the state and connection between the PyTorch module and the corresponding Torch-TensorRT module.
 In Ahead-of-Time (AoT) scenarios, integrating Torch TensorRT with complex pipelines, such as the Hugging Face Stable Diffusion pipeline, becomes even more difficult.
 The Mutable Torch TensorRT Module is designed to address these challenges, making interaction with the Torch-TensorRT module easier than ever.</p>
-<p>In this tutorial, we are going to walk through
-1. Sample workflow of Mutable Torch TensorRT Module with ResNet 18
-2. Save a Mutable Torch TensorRT Module
-3. Integration with Huggingface pipeline in LoRA use case</p>
+<dl class="simple">
+<dt>In this tutorial, we are going to walk through</dt><dd><ol class="arabic simple">
+<li><p>Sample workflow of Mutable Torch TensorRT Module with ResNet 18</p></li>
+<li><p>Save a Mutable Torch TensorRT Module</p></li>
+<li><p>Integration with Huggingface pipeline in LoRA use case</p></li>
+<li><p>Usage of dynamic shape with Mutable Torch TensorRT Module</p></li>
+</ol>
+</dd>
+</dl>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">torch_tensorrt</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">torch_trt</span>
@@ -551,7 +556,7 @@ The Mutable Torch TensorRT Module is designed to address these challenges, makin
 </section>
 <section id="saving-mutable-torch-tensorrt-module">
 <h2>Saving Mutable Torch TensorRT Module<a class="headerlink" href="#saving-mutable-torch-tensorrt-module" title="Permalink to this heading">¶</a></h2>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Currently, saving is only enabled for C++ runtime, not python runtime.</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Currently, saving is only enabled when &quot;use_python_runtime&quot; = False in settings</span>
 <span class="n">torch_trt</span><span class="o">.</span><span class="n">MutableTorchTensorRTModule</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">mutable_module</span><span class="p">,</span> <span class="s2">&quot;mutable_module.pkl&quot;</span><span class="p">)</span>
 <span class="n">reload</span> <span class="o">=</span> <span class="n">torch_trt</span><span class="o">.</span><span class="n">MutableTorchTensorRTModule</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s2">&quot;mutable_module.pkl&quot;</span><span class="p">)</span>
 </pre></div>
@@ -559,9 +564,7 @@ The Mutable Torch TensorRT Module is designed to address these challenges, makin
 </section>
 <section id="stable-diffusion-with-huggingface">
 <h2>Stable Diffusion with Huggingface<a class="headerlink" href="#stable-diffusion-with-huggingface" title="Permalink to this heading">¶</a></h2>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># The LoRA checkpoint is from https://civitai.com/models/12597/moxin</span>
-
-<span class="kn">from</span><span class="w"> </span><span class="nn">diffusers</span><span class="w"> </span><span class="kn">import</span> <span class="n">DiffusionPipeline</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">diffusers</span><span class="w"> </span><span class="kn">import</span> <span class="n">DiffusionPipeline</span>
 
 <span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
     <span class="n">settings</span> <span class="o">=</span> <span class="p">{</span>
@@ -571,27 +574,47 @@ The Mutable Torch TensorRT Module is designed to address these challenges, makin
         <span class="s2">&quot;immutable_weights&quot;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
     <span class="p">}</span>
 
-    <span class="n">model_id</span> <span class="o">=</span> <span class="s2">&quot;runwayml/stable-diffusion-v1-5&quot;</span>
+    <span class="n">model_id</span> <span class="o">=</span> <span class="s2">&quot;stabilityai/stable-diffusion-xl-base-1.0&quot;</span>
     <span class="n">device</span> <span class="o">=</span> <span class="s2">&quot;cuda:0&quot;</span>
 
-    <span class="n">prompt</span> <span class="o">=</span> <span class="s2">&quot;house in forest, shuimobysim, wuchangshuo, best quality&quot;</span>
-    <span class="n">negative</span> <span class="o">=</span> <span class="s2">&quot;(worst quality:2), (low quality:2), (normal quality:2), lowres, normal quality, out of focus, cloudy, (watermark:2),&quot;</span>
+    <span class="n">prompt</span> <span class="o">=</span> <span class="s2">&quot;cinematic photo elsa, police uniform &lt;lora:princess_xl_v2:0.8&gt;, . 35mm photograph, film, bokeh, professional, 4k, highly detailed&quot;</span>
+    <span class="n">negative</span> <span class="o">=</span> <span class="s2">&quot;drawing, painting, crayon, sketch, graphite, impressionist, noisy, blurry, soft, deformed, ugly, nude&quot;</span>
 
-    <span class="n">pipe</span> <span class="o">=</span> <span class="n">DiffusionPipeline</span><span class="o">.</span><span class="n">from_pretrained</span><span class="p">(</span>
-        <span class="n">model_id</span><span class="p">,</span> <span class="n">revision</span><span class="o">=</span><span class="s2">&quot;fp16&quot;</span><span class="p">,</span> <span class="n">torch_dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float16</span>
-    <span class="p">)</span>
+    <span class="n">pipe</span> <span class="o">=</span> <span class="n">DiffusionPipeline</span><span class="o">.</span><span class="n">from_pretrained</span><span class="p">(</span><span class="n">model_id</span><span class="p">,</span> <span class="n">torch_dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float16</span><span class="p">)</span>
     <span class="n">pipe</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
 
     <span class="c1"># The only extra line you need</span>
     <span class="n">pipe</span><span class="o">.</span><span class="n">unet</span> <span class="o">=</span> <span class="n">torch_trt</span><span class="o">.</span><span class="n">MutableTorchTensorRTModule</span><span class="p">(</span><span class="n">pipe</span><span class="o">.</span><span class="n">unet</span><span class="p">,</span> <span class="o">**</span><span class="n">settings</span><span class="p">)</span>
-
-    <span class="n">image</span> <span class="o">=</span> <span class="n">pipe</span><span class="p">(</span><span class="n">prompt</span><span class="p">,</span> <span class="n">negative_prompt</span><span class="o">=</span><span class="n">negative</span><span class="p">,</span> <span class="n">num_inference_steps</span><span class="o">=</span><span class="mi">30</span><span class="p">)</span><span class="o">.</span><span class="n">images</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="n">BATCH</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">Dim</span><span class="p">(</span><span class="s2">&quot;BATCH&quot;</span><span class="p">,</span> <span class="nb">min</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="nb">max</span><span class="o">=</span><span class="mi">24</span><span class="p">)</span>
+    <span class="n">_HEIGHT</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">Dim</span><span class="p">(</span><span class="s2">&quot;_HEIGHT&quot;</span><span class="p">,</span> <span class="nb">min</span><span class="o">=</span><span class="mi">16</span><span class="p">,</span> <span class="nb">max</span><span class="o">=</span><span class="mi">32</span><span class="p">)</span>
+    <span class="n">_WIDTH</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">Dim</span><span class="p">(</span><span class="s2">&quot;_WIDTH&quot;</span><span class="p">,</span> <span class="nb">min</span><span class="o">=</span><span class="mi">16</span><span class="p">,</span> <span class="nb">max</span><span class="o">=</span><span class="mi">32</span><span class="p">)</span>
+    <span class="n">HEIGHT</span> <span class="o">=</span> <span class="mi">4</span> <span class="o">*</span> <span class="n">_HEIGHT</span>
+    <span class="n">WIDTH</span> <span class="o">=</span> <span class="mi">4</span> <span class="o">*</span> <span class="n">_WIDTH</span>
+    <span class="n">args_dynamic_shapes</span> <span class="o">=</span> <span class="p">({</span><span class="mi">0</span><span class="p">:</span> <span class="n">BATCH</span><span class="p">,</span> <span class="mi">2</span><span class="p">:</span> <span class="n">HEIGHT</span><span class="p">,</span> <span class="mi">3</span><span class="p">:</span> <span class="n">WIDTH</span><span class="p">},</span> <span class="p">{})</span>
+    <span class="n">kwargs_dynamic_shapes</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">&quot;encoder_hidden_states&quot;</span><span class="p">:</span> <span class="p">{</span><span class="mi">0</span><span class="p">:</span> <span class="n">BATCH</span><span class="p">},</span>
+        <span class="s2">&quot;added_cond_kwargs&quot;</span><span class="p">:</span> <span class="p">{</span>
+            <span class="s2">&quot;text_embeds&quot;</span><span class="p">:</span> <span class="p">{</span><span class="mi">0</span><span class="p">:</span> <span class="n">BATCH</span><span class="p">},</span>
+            <span class="s2">&quot;time_ids&quot;</span><span class="p">:</span> <span class="p">{</span><span class="mi">0</span><span class="p">:</span> <span class="n">BATCH</span><span class="p">},</span>
+        <span class="p">},</span>
+    <span class="p">}</span>
+    <span class="n">pipe</span><span class="o">.</span><span class="n">unet</span><span class="o">.</span><span class="n">set_expected_dynamic_shape_range</span><span class="p">(</span>
+        <span class="n">args_dynamic_shapes</span><span class="p">,</span> <span class="n">kwargs_dynamic_shapes</span>
+    <span class="p">)</span>
+    <span class="n">image</span> <span class="o">=</span> <span class="n">pipe</span><span class="p">(</span>
+        <span class="n">prompt</span><span class="p">,</span>
+        <span class="n">negative_prompt</span><span class="o">=</span><span class="n">negative</span><span class="p">,</span>
+        <span class="n">num_inference_steps</span><span class="o">=</span><span class="mi">30</span><span class="p">,</span>
+        <span class="n">height</span><span class="o">=</span><span class="mi">1024</span><span class="p">,</span>
+        <span class="n">width</span><span class="o">=</span><span class="mi">768</span><span class="p">,</span>
+        <span class="n">num_images_per_prompt</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+    <span class="p">)</span><span class="o">.</span><span class="n">images</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
     <span class="n">image</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="s2">&quot;./without_LoRA_mutable.jpg&quot;</span><span class="p">)</span>
 
     <span class="c1"># Standard Huggingface LoRA loading procedure</span>
     <span class="n">pipe</span><span class="o">.</span><span class="n">load_lora_weights</span><span class="p">(</span>
         <span class="s2">&quot;stablediffusionapi/load_lora_embeddings&quot;</span><span class="p">,</span>
-        <span class="n">weight_name</span><span class="o">=</span><span class="s2">&quot;moxin.safetensors&quot;</span><span class="p">,</span>
+        <span class="n">weight_name</span><span class="o">=</span><span class="s2">&quot;all-disney-princess-xl-lo.safetensors&quot;</span><span class="p">,</span>
         <span class="n">adapter_name</span><span class="o">=</span><span class="s2">&quot;lora1&quot;</span><span class="p">,</span>
     <span class="p">)</span>
     <span class="n">pipe</span><span class="o">.</span><span class="n">set_adapters</span><span class="p">([</span><span class="s2">&quot;lora1&quot;</span><span class="p">],</span> <span class="n">adapter_weights</span><span class="o">=</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
@@ -599,8 +622,115 @@ The Mutable Torch TensorRT Module is designed to address these challenges, makin
     <span class="n">pipe</span><span class="o">.</span><span class="n">unload_lora_weights</span><span class="p">()</span>
 
     <span class="c1"># Refit triggered</span>
-    <span class="n">image</span> <span class="o">=</span> <span class="n">pipe</span><span class="p">(</span><span class="n">prompt</span><span class="p">,</span> <span class="n">negative_prompt</span><span class="o">=</span><span class="n">negative</span><span class="p">,</span> <span class="n">num_inference_steps</span><span class="o">=</span><span class="mi">30</span><span class="p">)</span><span class="o">.</span><span class="n">images</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="n">image</span> <span class="o">=</span> <span class="n">pipe</span><span class="p">(</span>
+        <span class="n">prompt</span><span class="p">,</span>
+        <span class="n">negative_prompt</span><span class="o">=</span><span class="n">negative</span><span class="p">,</span>
+        <span class="n">num_inference_steps</span><span class="o">=</span><span class="mi">30</span><span class="p">,</span>
+        <span class="n">height</span><span class="o">=</span><span class="mi">1024</span><span class="p">,</span>
+        <span class="n">width</span><span class="o">=</span><span class="mi">1024</span><span class="p">,</span>
+        <span class="n">num_images_per_prompt</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+    <span class="p">)</span><span class="o">.</span><span class="n">images</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
     <span class="n">image</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="s2">&quot;./with_LoRA_mutable.jpg&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="use-mutable-torch-tensorrt-module-with-dynamic-shape">
+<h2>Use Mutable Torch TensorRT module with dynamic shape<a class="headerlink" href="#use-mutable-torch-tensorrt-module-with-dynamic-shape" title="Permalink to this heading">¶</a></h2>
+<p>When adding dynamic shape hint to MutableTorchTensorRTModule, The shape hint should EXACTLY follow the semantics of arg_inputs and kwarg_inputs passed to the forward function
+and should not omit any entries (except None in the kwarg_inputs). If there is a nested dict/list in the input, the dynamic shape for that entry should also be an nested dict/list.
+If the dynamic shape is not required for an input, an empty dictionary should be given as the shape hint for that input.
+Note that you should exclude keyword arguments with value None as those will be filtered out.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">Model</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">c</span><span class="o">=</span><span class="p">{}):</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">matmul</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">)</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">matmul</span><span class="p">(</span><span class="n">c</span><span class="p">[</span><span class="s2">&quot;a&quot;</span><span class="p">],</span> <span class="n">c</span><span class="p">[</span><span class="s2">&quot;b&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">T</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="n">c</span><span class="p">[</span><span class="s2">&quot;b&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">])</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">c</span><span class="p">[</span><span class="s2">&quot;b&quot;</span><span class="p">]</span>
+        <span class="k">return</span> <span class="n">x</span>
+
+
+<span class="n">device</span> <span class="o">=</span> <span class="s2">&quot;cuda:0&quot;</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">Model</span><span class="p">()</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+<span class="n">inputs</span> <span class="o">=</span> <span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">rand</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">3</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">),</span> <span class="n">torch</span><span class="o">.</span><span class="n">rand</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="mi">30</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">))</span>
+<span class="n">kwargs</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">&quot;c&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;a&quot;</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">rand</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">30</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">),</span> <span class="s2">&quot;b&quot;</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">rand</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">30</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">)},</span>
+<span class="p">}</span>
+<span class="n">dim_0</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">Dim</span><span class="p">(</span><span class="s2">&quot;dim&quot;</span><span class="p">,</span> <span class="nb">min</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="nb">max</span><span class="o">=</span><span class="mi">50</span><span class="p">)</span>
+<span class="n">dim_1</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">Dim</span><span class="p">(</span><span class="s2">&quot;dim&quot;</span><span class="p">,</span> <span class="nb">min</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="nb">max</span><span class="o">=</span><span class="mi">50</span><span class="p">)</span>
+<span class="n">dim_2</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">Dim</span><span class="p">(</span><span class="s2">&quot;dim2&quot;</span><span class="p">,</span> <span class="nb">min</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="nb">max</span><span class="o">=</span><span class="mi">50</span><span class="p">)</span>
+<span class="n">args_dynamic_shapes</span> <span class="o">=</span> <span class="p">({</span><span class="mi">1</span><span class="p">:</span> <span class="n">dim_1</span><span class="p">},</span> <span class="p">{</span><span class="mi">0</span><span class="p">:</span> <span class="n">dim_0</span><span class="p">})</span>
+<span class="n">kwarg_dynamic_shapes</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">&quot;c&quot;</span><span class="p">:</span> <span class="p">{</span>
+        <span class="s2">&quot;a&quot;</span><span class="p">:</span> <span class="p">{},</span>
+        <span class="s2">&quot;b&quot;</span><span class="p">:</span> <span class="p">{</span><span class="mi">0</span><span class="p">:</span> <span class="n">dim_2</span><span class="p">},</span>
+    <span class="p">},</span>  <span class="c1"># a&#39;s shape does not change so we give it an empty dict</span>
+<span class="p">}</span>
+<span class="c1"># Export the model first with custom dynamic shape constraints</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">torch_trt</span><span class="o">.</span><span class="n">MutableTorchTensorRTModule</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">debug</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">min_block_size</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+<span class="n">model</span><span class="o">.</span><span class="n">set_expected_dynamic_shape_range</span><span class="p">(</span><span class="n">args_dynamic_shapes</span><span class="p">,</span> <span class="n">kwarg_dynamic_shapes</span><span class="p">)</span>
+<span class="c1"># Compile</span>
+<span class="n">model</span><span class="p">(</span><span class="o">*</span><span class="n">inputs</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+<span class="c1"># Change input shape</span>
+<span class="n">inputs_2</span> <span class="o">=</span> <span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">rand</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">5</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">),</span> <span class="n">torch</span><span class="o">.</span><span class="n">rand</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">30</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">))</span>
+<span class="n">kwargs_2</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">&quot;c&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;a&quot;</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">rand</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">30</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">),</span> <span class="s2">&quot;b&quot;</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">rand</span><span class="p">(</span><span class="mi">5</span><span class="p">,</span> <span class="mi">30</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">)},</span>
+<span class="p">}</span>
+<span class="c1"># Run without recompiling</span>
+<span class="n">model</span><span class="p">(</span><span class="o">*</span><span class="n">inputs_2</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs_2</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="use-mutable-torch-tensorrt-module-with-persistent-cache">
+<h2>Use Mutable Torch TensorRT module with persistent cache<a class="headerlink" href="#use-mutable-torch-tensorrt-module-with-persistent-cache" title="Permalink to this heading">¶</a></h2>
+<p>Leveraging engine caching, we are able to shortcut the engine compilation and save much time.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo._defaults</span><span class="w"> </span><span class="kn">import</span> <span class="n">TIMING_CACHE_PATH</span>
+
+<span class="n">model</span> <span class="o">=</span> <span class="n">models</span><span class="o">.</span><span class="n">resnet18</span><span class="p">(</span><span class="n">pretrained</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">&quot;cuda&quot;</span><span class="p">)</span>
+
+<span class="n">times</span> <span class="o">=</span> <span class="p">[]</span>
+<span class="n">start</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">Event</span><span class="p">(</span><span class="n">enable_timing</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">end</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">Event</span><span class="p">(</span><span class="n">enable_timing</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+<span class="n">example_inputs</span> <span class="o">=</span> <span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">((</span><span class="mi">100</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">))</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">&quot;cuda&quot;</span><span class="p">),)</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">torch_trt</span><span class="o">.</span><span class="n">MutableTorchTensorRTModule</span><span class="p">(</span>
+    <span class="n">model</span><span class="p">,</span>
+    <span class="n">use_python_runtime</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">enabled_precisions</span><span class="o">=</span><span class="p">{</span><span class="n">torch</span><span class="o">.</span><span class="n">float</span><span class="p">},</span>
+    <span class="n">debug</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">min_block_size</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+    <span class="n">immutable_weights</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="n">cache_built_engines</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">reuse_cached_engines</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">engine_cache_size</span><span class="o">=</span><span class="mi">1</span> <span class="o">&lt;&lt;</span> <span class="mi">30</span><span class="p">,</span>  <span class="c1"># 1GB</span>
+<span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">remove_timing_cache</span><span class="p">(</span><span class="n">path</span><span class="o">=</span><span class="n">TIMING_CACHE_PATH</span><span class="p">):</span>
+    <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">path</span><span class="p">):</span>
+        <span class="n">os</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+
+
+<span class="n">remove_timing_cache</span><span class="p">()</span>
+
+<span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">4</span><span class="p">):</span>
+    <span class="n">inputs</span> <span class="o">=</span> <span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">rand</span><span class="p">((</span><span class="mi">100</span> <span class="o">+</span> <span class="n">i</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">))</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">&quot;cuda&quot;</span><span class="p">)]</span>
+
+    <span class="n">start</span><span class="o">.</span><span class="n">record</span><span class="p">()</span>
+    <span class="n">model</span><span class="p">(</span><span class="o">*</span><span class="n">inputs</span><span class="p">)</span>  <span class="c1"># Recompile</span>
+    <span class="n">end</span><span class="o">.</span><span class="n">record</span><span class="p">()</span>
+    <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">synchronize</span><span class="p">()</span>
+    <span class="n">times</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">start</span><span class="o">.</span><span class="n">elapsed_time</span><span class="p">(</span><span class="n">end</span><span class="p">))</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;----------------dynamo_compile----------------&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Without engine caching, used:&quot;</span><span class="p">,</span> <span class="n">times</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="s2">&quot;ms&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;With engine caching used:&quot;</span><span class="p">,</span> <span class="n">times</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="s2">&quot;ms&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;With engine caching used:&quot;</span><span class="p">,</span> <span class="n">times</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span> <span class="s2">&quot;ms&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;With engine caching used:&quot;</span><span class="p">,</span> <span class="n">times</span><span class="p">[</span><span class="mi">3</span><span class="p">],</span> <span class="s2">&quot;ms&quot;</span><span class="p">)</span>
 </pre></div>
 </div>
 <p class="sphx-glr-timing"><strong>Total running time of the script:</strong> ( 0 minutes  0.000 seconds)</p>
@@ -664,6 +794,8 @@ The Mutable Torch TensorRT Module is designed to address these challenges, makin
 <li><a class="reference internal" href="#make-modifications-to-the-mutable-module">Make modifications to the mutable module.</a></li>
 <li><a class="reference internal" href="#saving-mutable-torch-tensorrt-module">Saving Mutable Torch TensorRT Module</a></li>
 <li><a class="reference internal" href="#stable-diffusion-with-huggingface">Stable Diffusion with Huggingface</a></li>
+<li><a class="reference internal" href="#use-mutable-torch-tensorrt-module-with-dynamic-shape">Use Mutable Torch TensorRT module with dynamic shape</a></li>
+<li><a class="reference internal" href="#use-mutable-torch-tensorrt-module-with-persistent-cache">Use Mutable Torch TensorRT module with persistent cache</a></li>
 </ul>
 </li>
 </ul>
