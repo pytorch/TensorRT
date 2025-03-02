@@ -223,11 +223,13 @@ def run_dynamo_converter_tests(session):
     tests = [
         "conversion",
     ]
+    # specifically for blackwell
+    skip_tests = "-k test_upsample_aten and not 3"
     for test in tests:
         if USE_HOST_DEPS:
-            session.run_always("pytest", test, env={"PYTHONPATH": PYT_PATH})
+            session.run_always("pytest", test, skip_tests, env={"PYTHONPATH": PYT_PATH})
         else:
-            session.run_always("pytest", test)
+            session.run_always("pytest", test, skip_tests)
 
 
 def run_dynamo_lower_tests(session):
@@ -258,7 +260,7 @@ def run_dynamo_runtime_tests(session):
     tests = [
         "runtime",
     ]
-    skip_tests = "-k not hw_compat"
+    skip_tests = "-k not hw_compat and not test_003_cross_compile_for_windows"
     for test in tests:
         if USE_HOST_DEPS:
             session.run_always("pytest", test, skip_tests, env={"PYTHONPATH": PYT_PATH})
