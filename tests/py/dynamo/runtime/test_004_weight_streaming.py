@@ -291,10 +291,6 @@ class TestWeightStreamingPython(TestCase):
             ("cpp_runtime", False),
         ]
     )
-    @unittest.skipIf(
-        os.environ.get("CI_BUILD") == "1",
-        "Skipping test due to CI resource constraints",
-    )
     def test_runtime_state_change(self, _, use_python_runtime):
         class SampleModel(torch.nn.Module):
             def __init__(self):
@@ -333,7 +329,7 @@ class TestWeightStreamingPython(TestCase):
         kwarg_torchtrt_input = prepare_inputs(input_list[0][1])
 
         compile_spec = {
-            "inputs": [
+            "arg_inputs": [
                 torchtrt.Input(
                     min_shape=(1, 100),
                     opt_shape=(64, 100),
