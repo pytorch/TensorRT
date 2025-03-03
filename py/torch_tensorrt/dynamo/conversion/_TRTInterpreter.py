@@ -710,7 +710,11 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         self._create_timing_cache(
             builder_config, self.compilation_settings.timing_cache_path
         )
-
+        # TODO: Memory control prototyping. Under discussion
+        if self.compilation_settings.offload_module_to_cpu:
+            del self.module
+            gc.collect()
+            torch.cuda.empty_cache()
         serialized_engine = self.builder.build_serialized_network(
             self.ctx.net, builder_config
         )

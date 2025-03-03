@@ -413,6 +413,7 @@ def compile(
     strip_engine_weights: bool = _defaults.STRIP_ENGINE_WEIGHTS,
     immutable_weights: bool = _defaults.IMMUTABLE_WEIGHTS,
     enable_weight_streaming: bool = _defaults.ENABLE_WEIGHT_STREAMING,
+    offload_module_to_cpu: bool = _defaults.OFFLOAD_MODULE_TO_CPU,
     **kwargs: Any,
 ) -> torch.fx.GraphModule:
     """Compile an ExportedProgram module for NVIDIA GPUs using TensorRT
@@ -662,6 +663,7 @@ def compile(
         "immutable_weights": immutable_weights,
         "enable_cross_compile_for_windows": False,
         "enable_weight_streaming": enable_weight_streaming,
+        "offload_module_to_cpu": offload_module_to_cpu,
     }
 
     settings = CompilationSettings(**compilation_options)
@@ -672,6 +674,9 @@ def compile(
     )
 
     gm = exported_program.module()
+    # TODO: Memory control prototyping. Under discussion
+    if offload_module_to_cpu:
+        exported_program.module().to("cpu")
     logger.debug("Input graph: " + str(gm.graph))
 
     # Apply lowering on the graph module
@@ -808,6 +813,7 @@ def compile_module(
     trt_modules = {}
     # Iterate over all components that can be accelerated
     # Generate the corresponding TRT Module for those
+
     for name, _ in partitioned_module.named_children():
         submodule = getattr(partitioned_module, name)
         # filter on the GraphModule
