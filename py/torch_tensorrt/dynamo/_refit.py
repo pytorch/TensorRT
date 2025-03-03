@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import collections.abc
 import copy
+import gc
 import logging
 from typing import Any, List, Optional, Sequence, Tuple
 
@@ -313,6 +314,10 @@ def refit_module_weights(
         get_decompositions(settings.enable_experimental_decompositions)
     )
     new_gm = new_weight_module.module()
+    # TODO: Memory control prototyping. Under discussion
+    if settings.offload_module_to_cpu:
+        new_weight_module.module().to("cpu")
+
     logger.debug("Input graph: " + str(new_gm.graph))
     # Apply lowering on the graph module
 
@@ -468,11 +473,20 @@ def refit_module_weights(
                     settings=settings,
                     weight_name_map=None,
                 )
+        # TODO: Memory control prototyping. Under discussion
+        if settings.offload_module_to_cpu:
+            del new_submodule
+            gc.collect()
+            torch.cuda.empty_cache()
 
         # clear EXCLUDE_WEIGHTS flag
         serialization_config = engine.create_serialization_config()
         serialization_config.clear_flag(trt.SerializationFlag.EXCLUDE_WEIGHTS)
         serialized_engine = engine.serialize_with_config(serialization_config)
+
+        del engine
+        gc.collect()
+        torch.cuda.empty_cache()
 
         if isinstance(
             compiled_submodule, (PythonTorchTensorRTModule, TorchTensorRTModule)
