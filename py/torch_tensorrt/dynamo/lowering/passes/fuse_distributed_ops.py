@@ -49,7 +49,6 @@ def fuse_distributed_ops(
             == torch.ops._c10d_functional.wait_tensor.default
         ):
             wait_tensor_node = list(node.users)[0]
-            fused_op = None
             if node.target == torch.ops._c10d_functional.all_gather_into_tensor.default:
                 with gm.graph.inserting_after(wait_tensor_node):
                     fused_node = gm.graph.create_node(
@@ -58,11 +57,12 @@ def fuse_distributed_ops(
                         args=(node.args[0], node.args[1], node.args[2]),
                     )
             else:
-                fused_node = gm.graph.create_node(
-                    op="call_function",
-                    target=tensorrt_fused_nccl_reduce_scatter_op,  # Define your custom fused function
-                    args=(node.args[0], node.args[1], node.args[2], node.args[3]),
-                )
+                with gm.graph.inserting_after(wait_tensor_node):
+                    fused_node = gm.graph.create_node(
+                        op="call_function",
+                        target=tensorrt_fused_nccl_reduce_scatter_op,  # Define your custom fused function
+                        args=(node.args[0], node.args[1], node.args[2], node.args[3]),
+                    )
 
             wait_tensor_node.replace_all_uses_with(fused_node)
             fused_node.meta.update(node.meta)
