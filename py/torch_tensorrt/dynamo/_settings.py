@@ -25,6 +25,7 @@ from torch_tensorrt.dynamo._defaults import (
     MAX_AUX_STREAMS,
     MIN_BLOCK_SIZE,
     NUM_AVG_TIMING_ITERS,
+    OFFLOAD_MODULE_TO_CPU,
     OPTIMIZATION_LEVEL,
     PASS_THROUGH_BUILD_FAILURES,
     REFIT_IDENTICAL_ENGINE_WEIGHTS,
@@ -140,6 +141,7 @@ class CompilationSettings:
     use_aot_joint_export: bool = USE_AOT_JOINT_EXPORT
     tiling_optimization_level: str = TILING_OPTIMIZATION_LEVEL
     l2_limit_for_tiling: int = L2_LIMIT_FOR_TILING
+    offload_module_to_cpu: bool = OFFLOAD_MODULE_TO_CPU
 
 
 _SETTINGS_TO_BE_ENGINE_INVARIANT = (
