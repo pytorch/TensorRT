@@ -72,20 +72,15 @@ echo "Setting up the environment"
 
 OS="$(uname -s)"
 ARCH="$(uname -m)"
-PYTHON_VERSION="$(python3 -c 'import sys; print(f"cp{sys.version_info.major}{sys.version_info.minor}")')"
 
 
 #getting the file name for TensorRT-LLM download
-if [[ "$OS" == "Linux" && "$ARCH" == "x86_64" && "$PYTHON_VERSION" == "cp312" ]]; then
+if [[ "$OS" == "Linux" && "$ARCH" == "x86_64"]]; then
     FILE="tensorrt_llm-0.17.0.post1-cp312-cp312-linux_x86_64.whl"
-elif [[ "$OS" == "Linux" && "$ARCH" == "aarch64" && "$PYTHON_VERSION" == "cp312" ]]; then
+elif [[ "$OS" == "Linux" && "$ARCH" == "aarch64"]]; then
     FILE="tensorrt_llm-0.17.0.post1-cp312-cp312-linux_aarch64.whl"
-elif [[ "$OS" == "Linux" && "$ARCH" == "x86_64" && "$PYTHON_VERSION" == "cp310" ]]; then
-    FILE="tensorrt_llm-0.17.0.post1-cp310-cp310-linux_x86_64.whl"
-elif [[ "$OS" == "Linux" && "$ARCH" == "aarch64" && "$PYTHON_VERSION" == "cp310" ]]; then
-    FILE="tensorrt_llm-0.17.0.post1-cp310-cp310-linux_aarch64.whl"
 else:
-    echo "Unsupported platform: OS=$OS ARCH=$ARCH PYTHON=$PYTHON_VERSION"
+    echo "Unsupported platform: OS=$OS ARCH=$ARCH
     exit 1
 fi
 
