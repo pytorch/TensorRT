@@ -96,7 +96,7 @@ class CompilationSettings:
             True will enable cross-platform compatibility which allows the engine to be built on Linux and run on Windows
         tiling_optimization_level (str): The optimization level of tiling strategies. A higher level allows TensorRT to spend more time searching for better tiling strategy. We currently support ["none", "fast", "moderate", "full"].
         l2_limit_for_tiling (int): The target L2 cache usage limit (in bytes) for tiling optimization (default is -1 which means no limit).
-        USE_DISTRIBUTED_MODE_TRACE (bool): Use aot_export_joint_simple, else wrap backend with AOT_autograd, required for distributed tensors
+        use_distributed_mode_trace (bool): Use aot_export_joint_simple, else wrap backend with AOT_autograd, required for distributed tensors
     """
 
     enabled_precisions: Set[dtype] = field(default_factory=lambda: ENABLED_PRECISIONS)
@@ -137,13 +137,9 @@ class CompilationSettings:
     immutable_weights: bool = IMMUTABLE_WEIGHTS
     enable_weight_streaming: bool = ENABLE_WEIGHT_STREAMING
     enable_cross_compile_for_windows: bool = ENABLE_CROSS_COMPILE_FOR_WINDOWS
-<<<<<<< HEAD
-    use_aot_joint_export: bool = USE_AOT_JOINT_EXPORT
     tiling_optimization_level: str = TILING_OPTIMIZATION_LEVEL
     l2_limit_for_tiling: int = L2_LIMIT_FOR_TILING
-=======
     use_distributed_mode_trace: bool = USE_DISTRIBUTED_MODE_TRACE
->>>>>>> 3adafafc4 (restructuring the code to include option use_distributed_mode_trace)
 
 
 _SETTINGS_TO_BE_ENGINE_INVARIANT = (
