@@ -92,7 +92,7 @@ class CompilationSettings:
         enable_weight_streaming (bool): Enable weight streaming.
         enable_cross_compile_for_windows (bool): By default this is False means TensorRT engines can only be executed on the same platform where they were built.
             True will enable cross-platform compatibility which allows the engine to be built on Linux and run on Windows
-        use_distributed_mode_trace (bool): Use aot_export_joint_simple for models, else wrap backend with AOT_autograd if this is True as required for distributed tensors
+        use_distributed_mode_trace (bool): Using aot_autograd to trace the graph. Enable this only if the model includes distributed operations
     """
 
     enabled_precisions: Set[dtype] = field(default_factory=lambda: ENABLED_PRECISIONS)
