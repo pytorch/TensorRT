@@ -1,6 +1,7 @@
 import os
 import unittest
 
+import tensorrt as trt
 import torch
 import torch.nn as nn
 import torch_tensorrt as torchtrt
@@ -9,14 +10,12 @@ import torchvision.transforms as transforms
 from torch.nn import functional as F
 from torch_tensorrt.ts.logging import *
 
-import tensorrt as trt
-
 
 def find_repo_root(max_depth=10):
     dir_path = os.path.dirname(os.path.realpath(__file__))
     for i in range(max_depth):
         files = os.listdir(dir_path)
-        if "WORKSPACE" in files:
+        if "MODULE.bazel" in files:
             return dir_path
         else:
             dir_path = os.path.dirname(dir_path)
