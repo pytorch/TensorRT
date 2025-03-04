@@ -52,33 +52,35 @@ def aot_torch_tensorrt_aten_backend(
     gm: torch.fx.GraphModule, sample_inputs: Sequence[Any], **kwargs: Any
 ) -> torch.nn.Module:
     settings, engine_cache = parse_dynamo_kwargs(kwargs)
-    if settings.use_aot_joint_export:
-        return _pretraced_backend(gm, sample_inputs, settings, engine_cache)
-    logger.debug("Wrapping the backend with aot_autograd\n")
-    _pretraced_backend_autograd = functools.partial(
-        _pretraced_backend, settings=settings, engine_cache=engine_cache
-    )
-    settings_aot_autograd = {}
-    settings_aot_autograd["decompositions"] = get_decompositions(
-        settings.enable_experimental_decompositions
-    )
-    # This is added since detach lowering leads to alias nodes
-    # Error - View operation returned a tensor that is the same as the input base tensor
-    # torch nop_decompositions in torch/_decomp/decompositions.py
-    # transpose key deleted since not desirable to lower it to permute
-    to_delete = {
-        key
-        for key in settings_aot_autograd["decompositions"]
-        if "transpose" in key._name or "detach" in key._name
-    }
 
-    for key in to_delete:
-        del settings_aot_autograd["decompositions"][key]
+    if settings.use_distributed_mode_trace:
+        logger.debug(
+            "Wrapping the backend with aot_autograd for Distributed examples\n"
+        )
+        _pretraced_backend_autograd = functools.partial(
+            _pretraced_backend, settings=settings, engine_cache=engine_cache
+        )
+        settings_aot_autograd = {}
+        settings_aot_autograd["decompositions"] = get_decompositions(
+            settings.enable_experimental_decompositions
+        )
+        # This is added since detach lowering leads to alias nodes
+        # Error - View operation returned a tensor that is the same as the input base tensor
+        # torch nop_decompositions in torch/_decomp/decompositions.py
+        # transpose key deleted since not desirable to lower it to permute
+        to_delete = {
+            key
+            for key in settings_aot_autograd["decompositions"]
+            if "transpose" in key._name or "detach" in key._name
+        }
+        for key in to_delete:
+            del settings_aot_autograd["decompositions"][key]
 
-    return aot_autograd(
-        fw_compiler=_pretraced_backend_autograd,
-        decompositions=settings_aot_autograd["decompositions"],
-    )(gm, sample_inputs)
+        return aot_autograd(
+            fw_compiler=_pretraced_backend_autograd,
+            decompositions=settings_aot_autograd["decompositions"],
+        )(gm, sample_inputs)
+    return _pretraced_backend(gm, sample_inputs, settings, engine_cache)
 
 
 def _pretraced_backend(
@@ -129,7 +131,7 @@ def _pretraced_backend(
                     )
 
             # Invoke AOTAutograd to translate operators to aten
-            if settings.use_aot_joint_export:
+            if not settings.use_distributed_mode_trace:
                 gm = aot_export_joint_simple(
                     gm,
                     sample_inputs,

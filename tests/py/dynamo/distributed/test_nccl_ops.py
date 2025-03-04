@@ -17,7 +17,7 @@ from conversion.harness import DispatchTestCase
 
 
 class TestGatherNcclOpsConverter(DispatchTestCase):
-    @parameterized.expand([(8)])
+    @parameterized.expand([8])
     def test_nccl_ops(self, linear_layer_dim):
         class DistributedGatherModel(nn.Module):
             def __init__(self, input_dim):
@@ -42,7 +42,7 @@ class TestGatherNcclOpsConverter(DispatchTestCase):
             enable_passes=True,
         )
 
-    @parameterized.expand([(8)])
+    @parameterized.expand([8])
     def test_nccl_ops_scatter(self, linear_layer_dim):
 
         class DistributedReduceScatterModel(nn.Module):
