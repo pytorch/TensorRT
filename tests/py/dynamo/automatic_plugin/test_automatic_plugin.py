@@ -81,12 +81,3 @@ class TestAutomaticPlugin(DispatchTestCase):
 
 if __name__ == "__main__":
     run_tests()
-
-# Example Usage
-# A = torch.full((64, 64), 2, device="cuda", dtype=torch.float)
-# B = torch.full((64, 64), 3, device="cuda", dtype=torch.float)
-
-# C, D = torch.ops.torchtrt_ex.elementwise_add_mul.default(A, B)
-
-# print("C (Addition):", C)
-# print("D (Multiplication):", D)
