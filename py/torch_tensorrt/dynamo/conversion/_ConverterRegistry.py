@@ -80,7 +80,7 @@ class ConverterSupport:
             whether that node can be supported by its companion converter. Note that
             this function must not modify the node or its graph
         supports_dynamic_shapes: Boolean flag indicating if the converter has support for dynamic inputs.
-        requires_output_allocator: Boolean flag indicating if the converter requires to run in output allocator.
+        requires_output_allocator: Boolean flag indicating if the converter creates operators which require an Output Allocator to run (e.g. data dependent operators).
     """
 
     converter_implementation: ConverterImplSignature
@@ -215,7 +215,7 @@ def dynamo_tensorrt_converter(
         priority: Converter's level of priority relative to other converters with the
             same target
         supports_dynamic_shapes: Boolean flag indicating if the converter has support for dynamic shapes.
-        requires_output_allocator: Boolean flag indicating if the converter requires to run in output allocator.
+        requires_output_allocator: Boolean flag indicating if the converter creates operators which require an Output Allocator to run (e.g. data dependent operators).
     Returns:
         The converter being decorated
     """
@@ -410,7 +410,7 @@ class ConverterRegistry:
     def __getitem__(
         self, node: Node
     ) -> Tuple[
-        Any, CallingConvention, bool
+        Any, CallingConvention, Dict[str, bool]
     ]:  # TODO: Narrow to ConverterImplSignature this when we can remove FX converters
         """Get the first-found validated converter in any registry
 
@@ -468,7 +468,10 @@ class ConverterRegistry:
                             return (
                                 candidate.converter_implementation,
                                 calling_convention,
-                                candidate.requires_output_allocator,
+                                {
+                                    "supports_dynamic_shapes": candidate.supports_dynamic_shapes,
+                                    "requires_output_allocator": candidate.requires_output_allocator,
+                                },
                             )
                         else:
                             logger.debug(
@@ -481,7 +484,10 @@ class ConverterRegistry:
                         return (
                             converters,
                             calling_convention,
-                            False,
+                            {
+                                "supports_dynamic_shapes": False,
+                                "requires_output_allocator": False,
+                            },
                         )
 
         raise KeyError(
@@ -506,7 +512,7 @@ class ConverterRegistry:
     def get(
         self, node: Node, value: Optional[ConverterImplSignature] = None
     ) -> Union[
-        Any, Tuple[Any, CallingConvention, bool]
+        Any, Tuple[Any, CallingConvention, Dict[str, bool]]
     ]:  # TODO: Narrow to ConverterImplSignature this when we can remove FX converters
         """Get validated converter for input node with a default return"""
         try:

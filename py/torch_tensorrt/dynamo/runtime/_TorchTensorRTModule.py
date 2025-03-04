@@ -98,7 +98,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
             name (str): Name for module
             settings (torch_tensorrt.dynamo.CompilationSettings): Settings used to compile engine, assumes engine was built with default compilation settings if object not passed
             weight_name_map (dict): Mapping of engine weight name to state_dict weight name
-            requires_output_allocator (bool): Whether the engine requires an output allocator
+            requires_output_allocator (bool): Boolean flag indicating if the converter creates operators which require an Output Allocator to run (e.g. data dependent operators)
 
         Example:
 

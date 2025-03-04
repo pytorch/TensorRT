@@ -840,7 +840,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                 f"Conversion of module of type {submod_type} not currently supported!"
             )
 
-        converter, calling_convention, requires_output_allocator = converter_packet
+        converter, calling_convention, _ = converter_packet
 
         assert self._cur_node_name is not None
 
@@ -857,8 +857,8 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                 f"Conversion of function {torch.typename(target)} not currently supported!"
             )
 
-        converter, calling_convention, requires_output_allocator = converter_packet
-        if requires_output_allocator:
+        converter, calling_convention, converter_info = converter_packet
+        if converter_info.get("requires_output_allocator", False):
             self.ctx.requires_output_allocator = True
             _LOGGER.debug(f"{target} requires output allocator")
 
@@ -890,7 +890,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             raise UnsupportedOperatorException(
                 f"Conversion of method {target} not currently supported!"
             )
-        converter, calling_convention, requires_output_allocator = converter_packet
+        converter, calling_convention, _ = converter_packet
 
         if calling_convention is CallingConvention.LEGACY:
             return converter(self.ctx.net, target, args, kwargs, self._cur_node_name)
