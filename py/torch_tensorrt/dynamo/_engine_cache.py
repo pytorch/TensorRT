@@ -118,7 +118,7 @@ class BaseEngineCache(ABC):
             input_specs (Sequence[Input]): input specs of TRT engine
             compilation_settings (CompilationSettings): compilation settings of TRT engine
             weight_name_map (Optional[Dict[Any, Any]]): weight name map for refitting
-            requires_output_allocator (bool): whether the engine requires output allocator
+            requires_output_allocator (bool): Boolean flag indicating if the converter creates operators which require an Output Allocator to run (e.g. data dependent operators)
         Returns:
             bytes: packed blob
         """

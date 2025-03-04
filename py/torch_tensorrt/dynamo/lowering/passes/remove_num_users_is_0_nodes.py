@@ -13,16 +13,15 @@ def remove_num_users_is_0_nodes(
     gm: torch.fx.GraphModule, settings: CompilationSettings
 ) -> torch.fx.GraphModule:
     """Remove ops that [num_users=0] in the graph"""
-    output_node = list(gm.graph.nodes)[-1]
+    nodes = list(gm.graph.nodes)
+    output_node = nodes[-1]
 
-    for node in gm.graph.nodes:
+    for node in nodes[::-1]:
         if (
             node != output_node
             and len(node.users) == 0
             and len(node.all_input_nodes) > 0
         ):
-            node_input = node.all_input_nodes[0]
-            node.replace_all_uses_with(node_input)
             gm.graph.erase_node(node)
             gm = clean_up_graph_after_modifications(gm)
 
