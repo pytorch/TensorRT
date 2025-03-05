@@ -112,7 +112,6 @@ def lift(
     non_user_input_idx = 0
     for node in gm.graph.nodes:
         if node.op == "get_attr":
-
             lift_val = None
             input_kind = None
 

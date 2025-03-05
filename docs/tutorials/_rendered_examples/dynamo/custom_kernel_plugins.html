@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Using Custom Kernels within TensorRT Engines with Torch-TensorRT &mdash; Torch-TensorRT v2.7.0.dev0+cfdb585 documentation</title>
+  <title>Using Custom Kernels within TensorRT Engines with Torch-TensorRT &mdash; Torch-TensorRT v2.7.0.dev0+f4219f7 documentation</title>
   
 
   
@@ -293,7 +293,7 @@
               
               
                 <div class="version">
-                  v2.7.0.dev0+cfdb585
+                  v2.7.0.dev0+f4219f7
                 </div>
               
             
@@ -379,6 +379,7 @@
 <li class="toctree-l1"><a class="reference internal" href="torch_export_gpt2.html">Compiling GPT2 using the dynamo backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="torch_export_llama2.html">Compiling Llama2 using the dynamo backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="torch_export_sam2.html">Compiling SAM2 using the dynamo backend</a></li>
+<li class="toctree-l1"><a class="reference internal" href="torch_export_flux_dev.html">Compiling FLUX.1-dev model using the Torch-TensorRT dynamo backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../notebooks.html">Legacy notebooks</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Python API Documentation</span></p>
@@ -771,7 +772,6 @@ define systems to handle setting up the operator, calculating the effect of the 
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">cupy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">cp</span>  <span class="c1"># Needed to work around API gaps in PyTorch to build torch.Tensors around preallocated CUDA memory</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
-
 <span class="kn">import</span><span class="w"> </span><span class="nn">tensorrt</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">trt</span>
 
 
@@ -803,7 +803,6 @@ define systems to handle setting up the operator, calculating the effect of the 
         <span class="n">inputs</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">trt</span><span class="o">.</span><span class="n">DimsExprs</span><span class="p">],</span>
         <span class="n">exprBuilder</span><span class="p">:</span> <span class="n">trt</span><span class="o">.</span><span class="n">IExprBuilder</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">trt</span><span class="o">.</span><span class="n">DimsExprs</span><span class="p">:</span>
-
         <span class="n">output_dims</span> <span class="o">=</span> <span class="n">trt</span><span class="o">.</span><span class="n">DimsExprs</span><span class="p">(</span><span class="n">inputs</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
 
         <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">size</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">pads</span><span class="p">)</span> <span class="o">//</span> <span class="mi">2</span><span class="p">):</span>
@@ -859,7 +858,6 @@ define systems to handle setting up the operator, calculating the effect of the 
         <span class="n">workspace</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
         <span class="n">stream</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-
         <span class="c1"># Host code is slightly different as this will be run as part of the TRT execution</span>
         <span class="n">in_dtype</span> <span class="o">=</span> <span class="n">torchtrt</span><span class="o">.</span><span class="n">dtype</span><span class="o">.</span><span class="n">try_from</span><span class="p">(</span><span class="n">input_desc</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">type</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span>
 
@@ -982,7 +980,6 @@ More information on writing converters can be found <a class="reference external
     <span class="n">kwargs</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Argument</span><span class="p">],</span>
     <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
 <span class="p">):</span>
-
     <span class="c1"># How to retrieve a plugin if it is defined elsewhere (e.g. linked library)</span>
     <span class="n">plugin_registry</span> <span class="o">=</span> <span class="n">trt</span><span class="o">.</span><span class="n">get_plugin_registry</span><span class="p">()</span>
     <span class="n">plugin_creator</span> <span class="o">=</span> <span class="n">plugin_registry</span><span class="o">.</span><span class="n">get_plugin_creator</span><span class="p">(</span>

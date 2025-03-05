@@ -35,6 +35,160 @@ def test_check_output_equal():
         msg=f"test_check_output_equal is not correct.",
     )
 
+    torch.manual_seed(1)
+    c = {
+        "a": torch.rand(10, 30),
+        "b": [torch.rand(10, 30), torch.rand(5, 5)],
+        "c": {"a": torch.rand(10, 30), "b": [torch.rand(10, 30), torch.rand(5, 5)]},
+    }
+    assertions.assertFalse(
+        check_output_equal(a, c),
+        msg=f"test_check_output_equal is not correct.",
+    )
+
+
+@pytest.mark.unit
+def test_check_input_shape_dynamic():
+    torch.manual_seed(0)
+    a = {
+        "a": torch.rand(10, 3),
+        "b": [torch.rand(10, 30), torch.rand(5, 5)],
+        "c": {"a": torch.rand(10, 30), "b": [torch.rand(10, 30), torch.rand(5, 5)]},
+    }
+    torch.manual_seed(0)
+    b = {
+        "a": torch.rand(10, 30),
+        "b": [torch.rand(10, 30), torch.rand(5, 5)],
+        "c": {"a": torch.rand(10, 30), "b": [torch.rand(10, 30), torch.rand(5, 5)]},
+    }
+
+    dim = torch.export.Dim("dim", min=1, max=50)
+    dynamic_shape = {"a": {1: dim}, "b": [{}, {}], "c": {"a": {}, "b": [{}, {}]}}
+    assertions.assertFalse(
+        torch_trt.MutableTorchTensorRTModule._check_inputs_shape(a, b),
+        msg=f"test_check_input_shape_dynamic is not correct.",
+    )
+    assertions.assertTrue(
+        torch_trt.MutableTorchTensorRTModule._check_inputs_shape(a, b, dynamic_shape),
+        msg=f"test_check_input_shape_dynamic is not correct.",
+    )
+
+
+@pytest.mark.unit
+def test_model_complex_dynamic_shape():
+    device = "cuda:0"
+
+    class Model(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+
+        def forward(self, a, b, c=None):
+            x = torch.matmul(a, b)
+            x = torch.matmul(c["a"], c["b"][0].T)
+            x = 2 * c["b"][1]
+            return x
+
+    model = Model().eval().to(device)
+    inputs = [torch.rand(10, 3).to(device)]
+    kwargs = {
+        "b": torch.rand(3, 30).to(device),
+        "c": {
+            "a": torch.rand(10, 30).to(device),
+            "b": [torch.rand(10, 30).to(device), torch.rand(5, 3).to(device)],
+        },
+    }
+
+    dim = torch.export.Dim("dim", min=1, max=50)
+    dim2 = torch.export.Dim("dim2", min=1, max=50)
+    args_dynamic_shapes = ({1: dim},)
+    kwarg_dynamic_shapes = {
+        "b": {0: dim},
+        "c": {"a": {}, "b": [{}, {1: dim2}]},
+    }
+    # Export the model first with custom dynamic shape constraints
+    trt_gm = torch_trt.MutableTorchTensorRTModule(model, debug=True, min_block_size=1)
+    trt_gm.set_expected_dynamic_shape_range(args_dynamic_shapes, kwarg_dynamic_shapes)
+    # Run inference
+    trt_gm(*inputs, **kwargs)
+
+    inputs_2 = [torch.rand(10, 9).to(device)]
+    kwargs_2 = {
+        "b": torch.rand(9, 30).to(device),
+        "c": {
+            "a": torch.rand(10, 30).to(device),
+            "b": [torch.rand(10, 30).to(device), torch.rand(5, 20).to(device)],
+        },
+    }
+
+    kwargs = torch_trt.MutableTorchTensorRTModule._process_kwarg_inputs(kwargs_2)
+    trt_gm._validate_inputs(*inputs_2, **kwargs_2)
+    assertions.assertTrue(
+        trt_gm.refit_state.get_state() == RefitFlag.LIVE,
+        msg=f"Dynamic shape support of inputs_2 is not correct.",
+    )
+    trt_gm(*inputs_2, **kwargs_2)
+
+    # Change does not align with Dynamic Shape Hint
+    inputs_3 = [torch.rand(7, 9).to(device)]
+    kwargs_3 = {
+        "b": torch.rand(9, 30).to(device),
+        "c": {
+            "a": torch.rand(10, 30).to(device),
+            "b": [torch.rand(10, 30).to(device), torch.rand(5, 20).to(device)],
+        },
+    }
+
+    kwargs = torch_trt.MutableTorchTensorRTModule._process_kwarg_inputs(kwargs_3)
+    trt_gm._validate_inputs(*inputs_3, **kwargs_3)
+    assertions.assertTrue(
+        trt_gm.refit_state.get_state() == RefitFlag.NEEDS_RECOMPILE,
+        msg=f"Dynamic shape support of inputs_3 is not correct.",
+    )
+    trt_gm(*inputs_3, **kwargs_3)
+
+    # # Stored input is changed (inputs first dimension is 7)
+    inputs_4 = [torch.rand(7, 20).to(device)]
+    kwargs_4 = {
+        "b": torch.rand(20, 30).to(device),
+        "c": {
+            "a": torch.rand(10, 30).to(device),
+            "b": [torch.rand(10, 30).to(device), torch.rand(5, 20).to(device)],
+        },
+    }
+
+    kwargs = torch_trt.MutableTorchTensorRTModule._process_kwarg_inputs(kwargs_4)
+    trt_gm._validate_inputs(*inputs_4, **kwargs_4)
+    assertions.assertTrue(
+        trt_gm.refit_state.get_state() == RefitFlag.LIVE,
+        msg=f"Dynamic shape support of inputs_4 is not correct.",
+    )
+    trt_gm(*inputs_4, **kwargs_4)
+
+    # # Change outside of the dynamic range limit
+    inputs_5 = [torch.rand(7, 900).to(device)]
+    kwargs_5 = {
+        "b": torch.rand(900, 30).to(device),
+        "c": {
+            "a": torch.rand(10, 30).to(device),
+            "b": [torch.rand(10, 30).to(device), torch.rand(5, 20).to(device)],
+        },
+    }
+
+    kwargs = torch_trt.MutableTorchTensorRTModule._process_kwarg_inputs(kwargs_5)
+    trt_gm._validate_inputs(*inputs_5, **kwargs_5)
+    assertions.assertTrue(
+        trt_gm.refit_state.get_state() == RefitFlag.NEEDS_RECOMPILE,
+        msg=f"Dynamic shape support of inputs_5 is not correct.",
+    )
+    assertions.assertTrue(
+        trt_gm.arg_dynamic_shapes == None,
+        msg=f"Dynamic shape support of inputs_5 is not correct.",
+    )
+    assertions.assertTrue(
+        trt_gm.kwarg_dynamic_shapes == None,
+        msg=f"Dynamic shape support of inputs_5 is not correct.",
+    )
+
 
 @unittest.skipIf(
     not torch_trt.ENABLED_FEATURES.torch_tensorrt_runtime,
@@ -42,7 +196,6 @@ def test_check_output_equal():
 )
 @pytest.mark.unit
 def test_resnet18():
-
     torch.manual_seed(0)
     inputs = [torch.rand((1, 3, 224, 224)).to("cuda")]
 
@@ -79,7 +232,6 @@ def test_resnet18():
 )
 @pytest.mark.unit
 def test_save():
-
     torch.manual_seed(0)
     inputs = [torch.rand((1, 3, 224, 224)).to("cuda")]
 
@@ -116,7 +268,6 @@ def test_save():
 )
 @pytest.mark.unit
 def test_resnet18_modify_attribute():
-
     torch.manual_seed(0)
     inputs = [torch.rand((1, 3, 224, 224)).to("cuda")]
 
@@ -157,7 +308,6 @@ def test_resnet18_modify_attribute():
 )
 @pytest.mark.unit
 def test_resnet18_modify_attribute_no_refit():
-
     torch.manual_seed(0)
     inputs = [torch.rand((1, 3, 224, 224)).to("cuda")]
 
@@ -192,7 +342,7 @@ def test_resnet18_modify_attribute_no_refit():
     for expected_output, refitted_output in zip(expected_outputs, refitted_outputs):
         assertions.assertTrue(
             torch.allclose(expected_output, refitted_output, 1e-2, 1e-2),
-            msg=f"The output of refitted Mutable Module is not correct.",
+            msg=f"The output of original and refitted Mutable Module is not the same.",
         )
 
     # # Clean up model env
@@ -259,7 +409,7 @@ def test_custom_model_with_kwarg():
     )
     assertions.assertTrue(
         check_output_equal(expected_outputs, refitted_outputs),
-        msg=f"The output of saved and reloaded Mutable Module is not correct.",
+        msg=f"The output of original and refitted Mutable Module is not the same.",
     )
 
     # Clean up model env
@@ -322,7 +472,7 @@ def test_custom_model_with_inplace_init():
     expected_outputs, refitted_outputs = model(*args), mutable_module(*args)
     assertions.assertTrue(
         check_output_equal(expected_outputs, refitted_outputs),
-        msg=f"The output of saved and reloaded Mutable Module is not correct.",
+        msg=f"The output of original and refitted Mutable Module is not the same.",
     )
 
     # Clean up model env
@@ -385,7 +535,7 @@ def test_custom_model_with_init_recompile():
     expected_outputs, refitted_outputs = model(*args), mutable_module(*args)
     assertions.assertTrue(
         check_output_equal(expected_outputs, refitted_outputs),
-        msg=f"The output of saved and reloaded Mutable Module is not correct.",
+        msg=f"The output of original and refitted Mutable Module is not the same.",
     )
 
     # Clean up model env
@@ -455,7 +605,7 @@ def test_custom_model_with_kwarg_different_input():
     )
     assertions.assertTrue(
         check_output_equal(expected_outputs, refitted_outputs),
-        msg=f"The output of saved and reloaded Mutable Module is not correct.",
+        msg=f"The output of original and refitted Mutable Module is not the same.",
     )
 
     # Clean up model env

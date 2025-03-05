@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Automatically Generate a Converter for a Custom Kernel &mdash; Torch-TensorRT v2.7.0.dev0+cfdb585 documentation</title>
+  <title>Automatically Generate a Converter for a Custom Kernel &mdash; Torch-TensorRT v2.7.0.dev0+f4219f7 documentation</title>
   
 
   
@@ -293,7 +293,7 @@
               
               
                 <div class="version">
-                  v2.7.0.dev0+cfdb585
+                  v2.7.0.dev0+f4219f7
                 </div>
               
             
@@ -379,6 +379,7 @@
 <li class="toctree-l1"><a class="reference internal" href="torch_export_gpt2.html">Compiling GPT2 using the dynamo backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="torch_export_llama2.html">Compiling Llama2 using the dynamo backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="torch_export_sam2.html">Compiling SAM2 using the dynamo backend</a></li>
+<li class="toctree-l1"><a class="reference internal" href="torch_export_flux_dev.html">Compiling FLUX.1-dev model using the Torch-TensorRT dynamo backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../notebooks.html">Legacy notebooks</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Python API Documentation</span></p>
@@ -497,7 +498,7 @@ to download the full example code</p>
 <section class="sphx-glr-example-title" id="automatically-generate-a-converter-for-a-custom-kernel">
 <span id="auto-generate-converters"></span><span id="sphx-glr-tutorials-rendered-examples-dynamo-auto-generate-converters-py"></span><h1>Automatically Generate a Converter for a Custom Kernel<a class="headerlink" href="#automatically-generate-a-converter-for-a-custom-kernel" title="Permalink to this heading">¶</a></h1>
 <p>We are going to demonstrate how to automatically generate a converter for a custom kernel using Torch-TensorRT using
-the new Python based plugin system in TensorRT 10.7.</p>
+the new Python based plugin system in TensorRT 10.8.</p>
 <p>Torch-TensorRT supports falling back to PyTorch implementations of operations in the case that Torch-TensorRT
 does not know how to compile them in TensorRT. However, this comes at the cost of a graph break and will reduce the performance of the model.
 The easiest way to fix lack of support for ops is by adding a decomposition (see:
@@ -509,7 +510,7 @@ TensorRT cannot support it natively.</p>
 <p>For these cases, it is possible to use a TensorRT plugin to replace the operator <strong>inside</strong> the TensorRT engine, thereby avoiding
 the performance and resource overhead from a graph break.</p>
 <p>Previously this involved a complex process in not only building a performant kernel but setting it up to run in TensorRT (see: <a class="reference external" href="https://pytorch.org/TensorRT/tutorials/_rendered_examples/dynamo/custom_kernel_plugins.html">Using Custom Kernels within TensorRT Engines with Torch-TensorRT</a>).
-With TensorRT 10.7, there is a new Python native plugin system which greatly streamlines this process. This
+With TensorRT 10.8, there is a new Python native plugin system which greatly streamlines this process. This
 plugin system also allows Torch-TensorRT to automatically generate the necessary conversion code to convert the
 operation in PyTorch to TensorRT.</p>
 <section id="writing-custom-operators-in-pytorch">
@@ -523,7 +524,7 @@ transformations that the operator will perform. This meta-kernel is used by Dyna
 is necessary to define.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Tuple</span>
 
-<span class="kn">import</span><span class="w"> </span><span class="nn">tensorrt_bindings.plugin</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">trtp</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">tensorrt.plugin</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">trtp</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">torch_tensorrt</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">triton</span>
@@ -580,7 +581,7 @@ in the course of the operation.</p>
 </section>
 <section id="writing-plugins-for-tensorrt-using-the-quick-deploy-plugin-system">
 <h2>Writing Plugins for TensorRT using the Quick Deploy Plugin system<a class="headerlink" href="#writing-plugins-for-tensorrt-using-the-quick-deploy-plugin-system" title="Permalink to this heading">¶</a></h2>
-<p>The quick deployment plugin system in TensorRT 10.7 allows for the creation of custom plugins in Python with significantly
+<p>The quick deployment plugin system in TensorRT 10.8 allows for the creation of custom plugins in Python with significantly
 less boilerplate. It uses a similar system PyTorch where you define a function that describes the shape and data type transformations
 that the operator will perform and then define the code to launch the kernel given GPU memory handles.</p>
 <p>Just like the PyTorch meta kernel, there is no transformation in shape or data type between the input and output so

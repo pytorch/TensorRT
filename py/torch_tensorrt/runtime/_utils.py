@@ -145,7 +145,6 @@ def no_op_placeholder_for_execute_engine(
     serialized_metadata: str,
     serialized_target_platform: str,
 ) -> List[torch.Tensor]:
-
     raise RuntimeError(
         "The saved model is cross compiled for windows in Linux, should only be loadded in Windows via torch_tensorrt.load_cross_compiled_exported_program() api."
     )

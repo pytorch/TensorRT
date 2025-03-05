@@ -169,7 +169,7 @@ Program Listing for File ptq.h
    };
    
    template <typename Algorithm = nvinfer1::IInt8EntropyCalibrator2, typename DataLoader>
-   inline Int8Calibrator<Algorithm, DataLoader> make_int8_calibrator(
+   TORCH_TENSORRT_PTQ_DEPRECATION inline Int8Calibrator<Algorithm, DataLoader> make_int8_calibrator(
        DataLoader dataloader,
        const std::string& cache_file_path,
        bool use_cache) {
@@ -177,7 +177,8 @@ Program Listing for File ptq.h
    }
    
    template <typename Algorithm = nvinfer1::IInt8EntropyCalibrator2>
-   inline Int8CacheCalibrator<Algorithm> make_int8_cache_calibrator(const std::string& cache_file_path) {
+   TORCH_TENSORRT_PTQ_DEPRECATION inline Int8CacheCalibrator<Algorithm> make_int8_cache_calibrator(
+       const std::string& cache_file_path) {
      return Int8CacheCalibrator<Algorithm>(cache_file_path);
    }
    

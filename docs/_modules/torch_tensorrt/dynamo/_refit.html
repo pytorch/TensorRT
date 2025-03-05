@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt.dynamo._refit &mdash; Torch-TensorRT v2.7.0.dev0+cfdb585 documentation</title>
+  <title>torch_tensorrt.dynamo._refit &mdash; Torch-TensorRT v2.7.0.dev0+f4219f7 documentation</title>
   
 
   
@@ -290,7 +290,7 @@
               
               
                 <div class="version">
-                  v2.7.0.dev0+cfdb585
+                  v2.7.0.dev0+f4219f7
                 </div>
               
             
@@ -376,6 +376,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/torch_export_gpt2.html">Compiling GPT2 using the dynamo backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/torch_export_llama2.html">Compiling Llama2 using the dynamo backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/torch_export_sam2.html">Compiling SAM2 using the dynamo backend</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/torch_export_flux_dev.html">Compiling FLUX.1-dev model using the Torch-TensorRT dynamo backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/notebooks.html">Legacy notebooks</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Python API Documentation</span></p>
@@ -738,7 +739,6 @@
     <span class="c1"># Get the settings and check the setting to be uniform</span>
     <span class="n">settings</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">CompilationSettings</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
     <span class="k">if</span> <span class="n">inline_module</span><span class="p">:</span>
-
         <span class="c1"># Obtain the settings</span>
         <span class="n">compiled_submodules</span> <span class="o">=</span> <span class="p">[</span>
             <span class="p">(</span><span class="n">name</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;_engine&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">),</span> <span class="n">engine</span><span class="p">)</span>
@@ -849,7 +849,6 @@
     <span class="c1"># Generate the corresponding TRT Module for those</span>
 
     <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">new_submodule</span> <span class="ow">in</span> <span class="n">new_partitioned_module</span><span class="o">.</span><span class="n">named_children</span><span class="p">():</span>
-
         <span class="c1"># Refit each submodule</span>
         <span class="c1"># Extract engine from the submodule</span>
         <span class="k">try</span><span class="p">:</span>
@@ -884,9 +883,12 @@
                     <span class="k">try</span><span class="p">:</span>
                         <span class="n">weight_name_map</span> <span class="o">=</span> <span class="n">compiled_submodule</span><span class="o">.</span><span class="n">weight_name_map</span>
                     <span class="k">except</span> <span class="ne">AttributeError</span><span class="p">:</span>
-                        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
-                            <span class="s2">&quot;The module was compiled with an old version of Torch-TensorRT. Rebuilding the weight map.&quot;</span>
-                        <span class="p">)</span>
+                        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span>
+                            <span class="n">compiled_submodule</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">graph_module</span><span class="o">.</span><span class="n">GraphModule</span>
+                        <span class="p">):</span>
+                            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                                <span class="s2">&quot;The module was compiled with an old version of Torch-TensorRT. Rebuilding the weight map.&quot;</span>
+                            <span class="p">)</span>
                     <span class="k">if</span> <span class="ow">not</span> <span class="n">weight_name_map</span><span class="p">:</span>
                         <span class="n">use_weight_map_cache</span> <span class="o">=</span> <span class="kc">False</span>
                         <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>

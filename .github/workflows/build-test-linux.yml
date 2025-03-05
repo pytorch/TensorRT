@@ -23,6 +23,7 @@ jobs:
       test-infra-ref: main
       with-rocm: false
       with-cpu: false
+      python-versions: '["3.11"]'
 
   filter-matrix:
     needs: [generate-matrix]
@@ -32,7 +33,7 @@ jobs:
     steps:
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: '3.11'
       - uses: actions/checkout@v4
         with:
           repository: pytorch/tensorrt
@@ -140,6 +141,8 @@ jobs:
         python -m pip install -r requirements.txt
         cd dynamo
         python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/dynamo_converters_test_results.xml -n 4 conversion/
+        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/dynamo_converters_test_results.xml automatic_plugin/test_automatic_plugin.py
+        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/dynamo_converters_test_results.xml automatic_plugin/test_automatic_plugin_with_attrs.py
         popd
 
   tests-py-dynamo-fe:

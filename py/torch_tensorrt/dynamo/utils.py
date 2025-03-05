@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import gc
 import logging
 import warnings
 from dataclasses import fields, replace
@@ -11,6 +12,7 @@ import sympy
 import tensorrt as trt
 import torch
 from torch._subclasses.fake_tensor import FakeTensor
+from torch.fx.experimental.proxy_tensor import unset_fake_temporarily
 from torch_tensorrt._Device import Device
 from torch_tensorrt._enums import dtype
 from torch_tensorrt._features import ENABLED_FEATURES
@@ -30,6 +32,7 @@ COSINE_THRESHOLD = 0.99
 DYNAMIC_DIM = -1
 RTOL = 5e-3
 ATOL = 5e-3
+CPU_DEVICE = "cpu"
 
 
 class Frameworks(Enum):
@@ -79,6 +82,17 @@ if trt.__version__ >= "7.0":
         Frameworks.TORCH: torch.bool,
         Frameworks.TRT: trt.bool,
     }
+
+
+def delete_module(module: torch.fx.GraphModule) -> None:
+    """
+    This is a helper function to delete the instance of module. We first move it to CPU and then
+    delete the object. This function ensures the GPU memory occupied by the module is released effectively after this call
+    """
+    module.to(CPU_DEVICE)
+    del module
+    torch.cuda.empty_cache()
+    gc.collect()
 
 
 def use_python_runtime_parser(use_python_runtime: Optional[bool] = None) -> bool:
@@ -243,44 +257,54 @@ def prepare_inputs(
     inputs: Input | torch.Tensor | Sequence[Any] | Dict[Any, Any],
     disable_memory_format_check: bool = False,
 ) -> Any:
-    if isinstance(inputs, Input):
-        return inputs
+    """
+    We take a nested group of torch.Tensors or scalars and convert them into torchtrt.Input's
+    """
+    # Any tensors created inside this call will be FakeTensors if it's inside a torch.compile session
+    # So, we disable fake mode temporarily.
+    with unset_fake_temporarily():
+        if inputs is None:
+            return None
 
-    elif isinstance(inputs, torch.Tensor):
-        return Input.from_tensor(
-            inputs, disable_memory_format_check=disable_memory_format_check
-        )
+        elif isinstance(inputs, Input):
+            return inputs
 
-    elif isinstance(inputs, (list, tuple)):
-        torchtrt_input_list = []
-        for input_obj in inputs:
-            torchtrt_input = prepare_inputs(
-                input_obj, disable_memory_format_check=disable_memory_format_check
+        elif isinstance(inputs, (torch.Tensor, int, float, bool)):
+            return Input.from_tensor(
+                torch.tensor(inputs),
+                disable_memory_format_check=disable_memory_format_check,
             )
-            torchtrt_input_list.append(torchtrt_input)
 
-        return (
-            torchtrt_input_list
-            if isinstance(inputs, list)
-            else tuple(torchtrt_input_list)
-        )
+        elif isinstance(inputs, (list, tuple)):
+            torchtrt_input_list = []
+            for input_obj in inputs:
+                torchtrt_input = prepare_inputs(
+                    input_obj, disable_memory_format_check=disable_memory_format_check
+                )
+                torchtrt_input_list.append(torchtrt_input)
 
-    elif isinstance(inputs, dict):
-        torchtrt_inputs_dict: Dict[Any, Any] = dict()
-
-        for key, input_obj in inputs.items():
-            torchtrt_input = prepare_inputs(
-                input_obj, disable_memory_format_check=disable_memory_format_check
+            return (
+                torchtrt_input_list
+                if isinstance(inputs, list)
+                else tuple(torchtrt_input_list)
             )
-            torchtrt_inputs_dict[key] = torchtrt_input
 
-        return torchtrt_inputs_dict
+        elif isinstance(inputs, dict):
+            torchtrt_inputs_dict: Dict[Any, Any] = dict()
 
-    else:
-        raise ValueError(
-            f"Invalid input type {type(inputs)} encountered in the dynamo_compile input parsing. "
-            + "Allowed input types: {torch_tensorrt.Input, torch.Tensor, list, tuple, dict}"
-        )
+            for key, input_obj in inputs.items():
+                torchtrt_input = prepare_inputs(
+                    input_obj, disable_memory_format_check=disable_memory_format_check
+                )
+                torchtrt_inputs_dict[key] = torchtrt_input
+
+            return torchtrt_inputs_dict
+
+        else:
+            raise ValueError(
+                f"Invalid input type {type(inputs)} encountered in the dynamo_compile input parsing. "
+                + "Allowed input types: {torch_tensorrt.Input, torch.Tensor, list, tuple, dict}"
+            )
 
 
 def parse_complex_tensor_structs(
@@ -395,10 +419,13 @@ def unwrap_tensor_dtype(tensor: Union[torch.Tensor, FakeTensor, torch.SymInt]) -
     """
     Returns the dtype of torch.tensor or FakeTensor. For symbolic integers, we return int64
     """
-    if isinstance(tensor, (torch.Tensor, FakeTensor)):
-        return tensor.dtype
+    if isinstance(tensor, (torch.Tensor, FakeTensor, int, float, bool)):
+        return torch.tensor(tensor).dtype
     elif isinstance(tensor, torch.SymInt):
         return torch.int64
+    elif tensor is None:
+        # Case where we explicitly pass one of the inputs to be None (eg: FLUX.1-dev)
+        return None
     else:
         raise ValueError(f"Found invalid tensor type {type(tensor)}")
 
@@ -465,7 +492,7 @@ def to_torch_device(device: Optional[Union[Device, torch.device, str]]) -> torch
 
 
 def to_torch_tensorrt_device(
-    device: Optional[Union[Device, torch.device, str]]
+    device: Optional[Union[Device, torch.device, str]],
 ) -> Device:
     """Cast a device-type to torch_tensorrt.Device
 
@@ -633,7 +660,6 @@ def check_output_equal(
     rtol: float = RTOL,
     atol: float = ATOL,
 ) -> bool:
-
     if type(output1) != type(output2):
         logger.warning(
             "The output types are different. Check_output_equal will always return false."

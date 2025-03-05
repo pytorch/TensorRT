@@ -22,7 +22,6 @@ def arange(
     end: Union[int, TRTTensor],
     step: Union[int, TRTTensor],
 ) -> TRTTensor:
-
     if any(isinstance(tensor, TRTTensor) for tensor in (start, end, step)):
         start_rank_0 = get_trt_tensor(ctx, start, name + "_start_rank_0", min_rank=0)
         start_rank_1 = get_trt_tensor(ctx, start, name + "_start_rank_1", min_rank=1)

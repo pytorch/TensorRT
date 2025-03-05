@@ -375,7 +375,7 @@ TensorRT plugins refer `here <https://github.com/NVIDIA/TensorRT/tree/release/10
 define systems to handle setting up the operator, calculating the effect of the operation abstractly, serializing the op and the actual mechanics of calling the implementation of the op in the engine.
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 313-502
+.. GENERATED FROM PYTHON SOURCE LINES 313-499
 
 .. code-block:: python
 
@@ -385,7 +385,6 @@ define systems to handle setting up the operator, calculating the effect of the 
 
     import cupy as cp  # Needed to work around API gaps in PyTorch to build torch.Tensors around preallocated CUDA memory
     import numpy as np
-
     import tensorrt as trt
 
 
@@ -417,7 +416,6 @@ define systems to handle setting up the operator, calculating the effect of the 
             inputs: List[trt.DimsExprs],
             exprBuilder: trt.IExprBuilder,
         ) -> trt.DimsExprs:
-
             output_dims = trt.DimsExprs(inputs[0])
 
             for i in range(np.size(self.pads) // 2):
@@ -473,7 +471,6 @@ define systems to handle setting up the operator, calculating the effect of the 
             workspace: int,
             stream: int,
         ) -> None:
-
             # Host code is slightly different as this will be run as part of the TRT execution
             in_dtype = torchtrt.dtype.try_from(input_desc[0].type).to(np.dtype)
 
@@ -569,14 +566,14 @@ define systems to handle setting up the operator, calculating the effect of the 
 
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 503-507
+.. GENERATED FROM PYTHON SOURCE LINES 500-504
 
 Using Torch-TensorRT to Insert the Kernel
 -------------------------------------------
 Now with our TensorRT plugin, we can create a converter so that Torch-TensorRT knows to insert our plugin in place of our custom circular padding operator.
 More information on writing converters can be found `here <https://pytorch.org/TensorRT/contributors/dynamo_converters.html>`_
 
-.. GENERATED FROM PYTHON SOURCE LINES 507-569
+.. GENERATED FROM PYTHON SOURCE LINES 504-565
 
 .. code-block:: python
 
@@ -604,7 +601,6 @@ More information on writing converters can be found `here <https://pytorch.org/T
         kwargs: Dict[str, Argument],
         name: str,
     ):
-
         # How to retrieve a plugin if it is defined elsewhere (e.g. linked library)
         plugin_registry = trt.get_plugin_registry()
         plugin_creator = plugin_registry.get_plugin_creator(
@@ -643,11 +639,11 @@ More information on writing converters can be found `here <https://pytorch.org/T
 
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 570-571
+.. GENERATED FROM PYTHON SOURCE LINES 566-567
 
 Finally, we are now able to fully compile our model
 
-.. GENERATED FROM PYTHON SOURCE LINES 571-577
+.. GENERATED FROM PYTHON SOURCE LINES 567-573
 
 .. code-block:: python
 
@@ -658,7 +654,7 @@ Finally, we are now able to fully compile our model
         min_block_size=1,
     )
 
-.. GENERATED FROM PYTHON SOURCE LINES 578-610
+.. GENERATED FROM PYTHON SOURCE LINES 574-606
 
 .. code-block:: none
 
@@ -693,11 +689,11 @@ Finally, we are now able to fully compile our model
          - For minimal graph segmentation, select min_block_size=2 which would generate 1 TRT engine(s)
          - The current level of graph segmentation is equivalent to selecting min_block_size=2 which generates 1 TRT engine(s)
 
-.. GENERATED FROM PYTHON SOURCE LINES 612-613
+.. GENERATED FROM PYTHON SOURCE LINES 608-609
 
 As you can see, now there is only one subgraph created for the TensorRT engine that contains both our custom kernel and the native convolution operator.
 
-.. GENERATED FROM PYTHON SOURCE LINES 613-616
+.. GENERATED FROM PYTHON SOURCE LINES 609-612
 
 .. code-block:: python
 
@@ -705,7 +701,7 @@ As you can see, now there is only one subgraph created for the TensorRT engine t
     print(trt_model(ex_input))
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 617-638
+.. GENERATED FROM PYTHON SOURCE LINES 613-634
 
 .. code-block:: none
 
@@ -729,11 +725,11 @@ As you can see, now there is only one subgraph created for the TensorRT engine t
           [-4.3668, -4.1006, -5.1447],
           [-5.0352, -4.7689, -5.8131]]]], device='cuda:0')
 
-.. GENERATED FROM PYTHON SOURCE LINES 641-642
+.. GENERATED FROM PYTHON SOURCE LINES 637-638
 
 We can verify our implementation is run correctly by both TensorRT and PyTorch
 
-.. GENERATED FROM PYTHON SOURCE LINES 642-645
+.. GENERATED FROM PYTHON SOURCE LINES 638-641
 
 .. code-block:: python
 
@@ -741,7 +737,7 @@ We can verify our implementation is run correctly by both TensorRT and PyTorch
     print(my_model(ex_input) - trt_model(ex_input))
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 646-667
+.. GENERATED FROM PYTHON SOURCE LINES 642-663
 
 .. code-block:: none
 

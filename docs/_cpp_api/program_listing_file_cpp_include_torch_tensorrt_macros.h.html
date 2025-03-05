@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Program Listing for File macros.h &mdash; Torch-TensorRT v2.7.0.dev0+cfdb585 documentation</title>
+  <title>Program Listing for File macros.h &mdash; Torch-TensorRT v2.7.0.dev0+f4219f7 documentation</title>
   
 
   
@@ -291,7 +291,7 @@
               
               
                 <div class="version">
-                  v2.7.0.dev0+cfdb585
+                  v2.7.0.dev0+f4219f7
                 </div>
               
             
@@ -377,6 +377,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/torch_export_gpt2.html">Compiling GPT2 using the dynamo backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/torch_export_llama2.html">Compiling Llama2 using the dynamo backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/torch_export_sam2.html">Compiling SAM2 using the dynamo backend</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/torch_export_flux_dev.html">Compiling FLUX.1-dev model using the Torch-TensorRT dynamo backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../tutorials/notebooks.html">Legacy notebooks</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Python API Documentation</span></p>
@@ -522,6 +523,9 @@
 <span class="cp">  STR(TORCH_TENSORRT_MAJOR_VERSION) \</span>
 <span class="cp">  &quot;.&quot; STR(TORCH_TENSORRT_MINOR_VERSION) &quot;.&quot; STR(TORCH_TENSORRT_PATCH_VERSION)</span>
 
+<span class="cp">#define TORCH_TENSORRT_PTQ_DEPRECATION \</span>
+<span class="cp">  [[deprecated(                        \</span>
+<span class="cp">      &quot;Int8 PTQ Calibrator has been deprecated by TensorRT, please plan on porting to a NVIDIA Model Optimizer Toolkit based workflow. See: https:</span><span class="c1">//pytorch.org/TensorRT/tutorials/_rendered_examples/dynamo/vgg16_ptq.html for more details&quot;)]]</span>
 <span class="c1">// Setup namespace aliases for ease of use</span>
 <span class="k">namespace</span><span class="w"> </span><span class="nn">torch_tensorrt</span><span class="w"> </span><span class="p">{</span>
 <span class="k">namespace</span><span class="w"> </span><span class="nn">torchscript</span><span class="w"> </span><span class="p">{}</span>

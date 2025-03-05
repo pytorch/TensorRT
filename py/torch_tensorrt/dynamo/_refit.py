@@ -251,7 +251,6 @@ def refit_module_weights(
     # Get the settings and check the setting to be uniform
     settings: Optional[CompilationSettings] = None
     if inline_module:
-
         # Obtain the settings
         compiled_submodules = [
             (name.replace("_engine", ""), engine)
@@ -362,7 +361,6 @@ def refit_module_weights(
     # Generate the corresponding TRT Module for those
 
     for name, new_submodule in new_partitioned_module.named_children():
-
         # Refit each submodule
         # Extract engine from the submodule
         try:
@@ -397,9 +395,12 @@ def refit_module_weights(
                     try:
                         weight_name_map = compiled_submodule.weight_name_map
                     except AttributeError:
-                        logger.warning(
-                            "The module was compiled with an old version of Torch-TensorRT. Rebuilding the weight map."
-                        )
+                        if not isinstance(
+                            compiled_submodule, torch.fx.graph_module.GraphModule
+                        ):
+                            logger.warning(
+                                "The module was compiled with an old version of Torch-TensorRT. Rebuilding the weight map."
+                            )
                     if not weight_name_map:
                         use_weight_map_cache = False
                         logger.warning(
