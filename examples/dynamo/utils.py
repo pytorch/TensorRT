@@ -52,7 +52,9 @@ def generate(model, input_seq, max_tokens, eos_token_id):
 
     while True:
         outputs = model(input_seq)
-        logits = outputs.logits
+        # breakpoint()
+        logits = outputs[0]  # .logits
+
         next_token_logits = logits[:, -1, :]
         next_tokens = torch.argmax(next_token_logits, dim=-1)
         input_seq = torch.cat([input_seq, next_tokens[:, None]], dim=-1)
@@ -60,4 +62,4 @@ def generate(model, input_seq, max_tokens, eos_token_id):
         if stopping_criteria(input_seq, logits).item():
             break
 
-    return input_seq
+    return input_seq, logits

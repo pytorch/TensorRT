@@ -22,26 +22,51 @@ from utils import export_llm, generate
 # %%
 
 # Define the parameters and initialize the model
-MAX_TOKENS = 5
+MAX_TOKENS = 2
 DEVICE = torch.device("cuda:0")
 
 # Define the GPT2 model from hugging face
 # kv_cache is not supported in Torch-TRT currently.
 # CPU is used here so that GPU memory is reserved for TRT compilation.
-with torch.no_grad():
-    tokenizer = AutoTokenizer.from_pretrained("gpt2")
-    model = (
-        AutoModelForCausalLM.from_pretrained(
-            "gpt2",
-            pad_token_id=tokenizer.eos_token_id,
-            use_cache=False,
-            attn_implementation="sdpa",
-            # num_hidden_layers=2,
-        )
-        .eval()
-        .half()
-        .to(DEVICE)
-    )
+
+
+def get_model():
+
+    from model import LLamaTransformer, ModelArgs
+
+    default_dtype = torch.get_default_dtype()
+    model_kwargs = {
+        "max_position_embeddings": 2176,
+        "use_cache": False,
+    }  # 'num_hidden_layers': 1
+    model_config = ModelArgs.from_pretrained("llama3-8B", **model_kwargs)
+    get_model_from_config = LLamaTransformer.from_config
+    torch.set_default_dtype(model_config.torch_dtype)
+    model = get_model_from_config(model_config, trust_remote_code=True)
+    torch.set_default_dtype(default_dtype)
+
+    if hasattr(model, "post_init"):
+        model.post_init()
+
+    model.eval().cuda()
+    return model
+
+
+model = get_model()
+model = model.to(torch.float16)
+
+# breakpoint()
+# with torch.no_grad():
+#     model = (
+#         AutoModelForCausalLM.from_pretrained(
+#             llama_path, use_cache=False, attn_implementation="sdpa"
+#         )
+#         .eval()
+#         .half()
+#         .cuda()
+#     )
+llama_path = "meta-llama/Llama-3.2-1B-Instruct"
+tokenizer = AutoTokenizer.from_pretrained(llama_path)
 # %%
 # Tokenize a sample input prompt and get pytorch model outputs
 prompt = "What is parallel programming ?"
@@ -50,9 +75,7 @@ input_ids = model_inputs["input_ids"].to(DEVICE)
 
 # Auto-regressive generation loop for greedy decoding using PyTorch model
 # We use a custom generate function which is very similar to the huggingface one.
-pyt_gen_tokens, pyt_logits = generate(
-    model, input_ids, MAX_TOKENS, tokenizer.eos_token_id
-)
+# pyt_gen_tokens, pyt_logits = generate(model, input_ids, MAX_TOKENS, tokenizer.eos_token_id)
 # pyt_outputs = model(input_ids)
 # breakpoint()
 
@@ -82,6 +105,7 @@ csi = torch_tensorrt.dynamo.lowering.CachedSequenceInterface(
 # 2) Enable use_explicit_typing=True. Certain layers are explicitly casted to FP32 within the pytorch model and this flag respects this behavior during TRT compilation
 # 3) Enable use_fp32_acc=True. This ensures all the matmuls are accumulated in FP32 precision (similar to PyTorch)
 gpt2_ep = export_llm(model, input_ids, max_seq_len=1024)
+del model
 with torch_tensorrt.logging.debug():
     trt_model = torch_tensorrt.dynamo.compile(
         gpt2_ep,
@@ -117,13 +141,13 @@ def custom_generate(model, input_seq, csi, max_tokens, eos_token_id):
     while i < MAX_TOKENS:
         sequence_info = csi.info
         outputs = model(*csi.args)
-
-        logits = csi.info.unnest_sequences(outputs.logits)
+        # breakpoint()
+        logits = csi.info.unnest_sequences(outputs[0])  # .logits
         logits_last = (
             torch.stack([l_one_seq[-1] for l_one_seq in logits]).unsqueeze(1).float()
         )
         idx_next = logits_last.argmax(dim=-1, keepdim=False)
-        breakpoint()
+        # breakpoint()
         # next_token_logits = logits[:, -1, :]
         # breakpoint()
         # next_tokens = torch.argmax(next_token_logits, dim=-1)
@@ -141,9 +165,10 @@ def custom_generate(model, input_seq, csi, max_tokens, eos_token_id):
 trt_gen_tokens, trt_logits = custom_generate(
     trt_model, input_ids, csi, MAX_TOKENS, tokenizer.eos_token_id
 )
-print(pyt_gen_tokens)
+# breakpoint()
+# print(pyt_gen_tokens)
 print(trt_gen_tokens)
-breakpoint()
+# breakpoint()
 
 # Auto-regressive generation loop for greedy decoding using TensorRT model
 # We use a custom generate function which is very similar to the huggingface one.
@@ -155,10 +180,10 @@ breakpoint()
 # Decode the output sentences of PyTorch and TensorRT
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 print("=============================")
-print(
-    "Pytorch model generated text: ",
-    tokenizer.decode(pyt_gen_tokens[0], skip_special_tokens=True),
-)
+# print(
+#     "Pytorch model generated text: ",
+#     tokenizer.decode(pyt_gen_tokens[0], skip_special_tokens=True),
+# )
 print("=============================")
 print(
     "TensorRT model generated text: ",

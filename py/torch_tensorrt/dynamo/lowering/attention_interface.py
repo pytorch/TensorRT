@@ -43,6 +43,7 @@ class AttentionInfo:
     rope_theta: Optional[float] = None
     rope_scale: Optional[float] = None
     causal: bool = True
+    # attn_scale: float
 
 
 @dataclass

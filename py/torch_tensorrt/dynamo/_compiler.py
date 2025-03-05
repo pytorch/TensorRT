@@ -684,7 +684,7 @@ def compile(
     # Apply lowering on the graph module
     gm = post_lowering(gm, settings)
     logger.debug("Lowered Input graph: " + str(gm.graph))
-
+    # exported_program.module().to("cpu")
     trt_gm = compile_module(
         gm, trt_arg_inputs, trt_kwarg_inputs, settings, engine_cache
     )
@@ -803,7 +803,7 @@ def compile_module(
         )
 
     dryrun_tracker.unsupported_ops = supported_ops.unsupported_operators
-
+    breakpoint()
     # The global partitioner leaves non-TRT nodes as-is
     if not settings.use_fast_partitioner:
         dryrun_tracker.to_run_in_torch.extend(parse_non_trt_nodes(partitioned_module))

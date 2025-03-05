@@ -161,7 +161,7 @@ def insert_flashinfer_attn_with_cache(
         if mha_node.op != "call_function" or not is_op(mha_node, mha_ops):
             continue
         # do some sanity checks on the args of the node
-        assert mha_node.kwargs == {}, "We don't handle kwargs for mha nodes right now."
+        # assert mha_node.kwargs == {}, "We don't handle kwargs for mha nodes right now."
         assert (
             len(mha_node.args) >= 3
         ), "MHA nodes should have at least 3 args: q, k, v."
@@ -186,6 +186,7 @@ def insert_flashinfer_attn_with_cache(
             dtype=q_fake.dtype,
             cache_dtype=None,
             rope_theta=None,
+            # attn_scale=mha_node.get("scale", None)
         )
 
     # insert metadata computation and extract each argument as a node

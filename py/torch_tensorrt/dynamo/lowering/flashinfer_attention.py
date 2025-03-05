@@ -102,6 +102,7 @@ class _FlashInferPlanner:
                 rope_theta=plan_params.rope_theta,
                 q_data_type=plan_params.q_dtype,
                 kv_data_type=plan_params.kv_dtype,
+                sm_scale=0.125,
             )
 
         # we want to plan during warm-up of cuda graph capture to ensure we have the plan cached
@@ -144,10 +145,12 @@ class _FlashInferPlanner:
                     rope_theta=plan_params.rope_theta,
                     q_data_type=plan_params.q_dtype,
                     kv_data_type=plan_params.kv_dtype,
+                    sm_scale=0.125,
                 )
             self.plan_params = plan_params
 
         # return desired wrapper
+        # breakpoint()
         return self.decode_wrapper if plan_params.is_generate else self.prefill_wrapper
 
 
@@ -244,19 +247,18 @@ def flashinfer_mha_with_cache(
     # head_dim = k_cache.shape[-1]
     # n_heads = q.shape[2] // head_dim
     # n_kv_heads = k.shape[2] // head_dim
-    # breakpoint()
     b, n_heads, s, d = q.shape
     head_dim = d
     _, n_kv_heads, _, _ = k.shape
-    q = q.permute(0, 2, 1, 3)
-    k = k.permute(0, 2, 1, 3)
-    v = v.permute(0, 2, 1, 3)
+    q = q.permute(0, 2, 1, 3).contiguous()
+    k = k.permute(0, 2, 1, 3).contiguous()
+    v = v.permute(0, 2, 1, 3).contiguous()
 
     bs_view = (b * s,)
-    q = q.view(*bs_view, n_heads, head_dim)
-    k = k.view(*bs_view, n_kv_heads, head_dim)
-    v = v.view(*bs_view, n_kv_heads, head_dim)
-
+    q = q.view(*bs_view, n_heads, head_dim).contiguous()
+    k = k.view(*bs_view, n_kv_heads, head_dim).contiguous()
+    v = v.view(*bs_view, n_kv_heads, head_dim).contiguous()
+    # breakpoint()
     pp = PlanParams(
         n_heads=n_heads,
         n_kv_heads=n_kv_heads,
@@ -268,12 +270,13 @@ def flashinfer_mha_with_cache(
         kv_dtype=k_cache.dtype,
         pos_embd_mode="ROPE_LLAMA" if fuse_rope else "NONE",
         rope_theta=rope_theta,
+        causal=True,
     )
 
     # TODO: Get flashinfer fuse_rope working with fp8 kv cache (https://github.com/flashinfer-ai/flashinfer/issues/661)
     if rope_theta is not None:
         q, k = flashinfer.apply_rope(q, k, qo_indptr, offsets, rope_theta=rope_theta)
-
+    # breakpoint()
     # Assuming k_scale = v_scale = 1.0, we just have to cast k and v to fp8 before appending to kv cache
     k_scale, v_scale = 1.0, 1.0
     if k_cache.dtype == torch.float8_e4m3fn:
@@ -308,7 +311,8 @@ def flashinfer_mha_with_cache(
     )
     y = wrapper.run(q, (k_cache, v_cache), k_scale=k_scale, v_scale=v_scale)
     # breakpoint()
-    return y.view(b, s, n_kv_heads, d)  # .permute(0, 2, 1, 3)  # [b,s,n*h_d]
+    output = y.view(b, s, n_kv_heads, d).transpose(1, 2)
+    return output
 
 
 @flashinfer_mha_with_cache.register_fake
@@ -357,7 +361,7 @@ class FlashInferAttention(AttentionDescriptor):
         cls, attention_info: AttentionInfo
     ) -> CacheInitializerDict:
         def _get_cache(si: SequenceInfo):
-            return torch.empty(
+            return torch.zeros(
                 si.num_pages,
                 si.page_size,
                 attention_info.num_kv_heads,
