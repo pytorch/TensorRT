@@ -6,7 +6,6 @@ import numpy as np
 import tensorrt as trt
 import torch
 from torch.fx.node import Target
-
 from torch_tensorrt.dynamo.conversion import impl
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
 from torch_tensorrt.dynamo.conversion.converter_utils import (
@@ -44,6 +43,8 @@ def convNd(
 ) -> TRTTensor:
     if has_dynamic_shape(input.shape):
         assert input.shape[1] != -1, "Channel dim can't be dynamic for convolution."
+
+    num_dims = len(input.shape) - 2
 
     if is_conv1d:
         # Apply an unsqueeze operation to transform the conv1d problem into conv2d
@@ -104,7 +105,12 @@ def convNd(
         conv_layer.set_input(2, bias)
 
     # Cast certain fields to tuples, in accordance with TRT requirements
-    padding = (padding,) if isinstance(padding, int) else padding
+    if isinstance(padding, int):
+        padding = (padding,) * num_dims
+    elif isinstance(padding, (list, tuple)):
+        padding = tuple(padding)
+        if len(padding) == 1:
+            padding = (padding[0],) * num_dims
     stride = (stride,) if isinstance(stride, int) else stride
     dilation = (dilation,) if isinstance(dilation, int) else dilation
 
