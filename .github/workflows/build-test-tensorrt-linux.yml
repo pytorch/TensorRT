@@ -20,6 +20,7 @@ jobs:
       test-infra-ref: main
       with-rocm: false
       with-cpu: false
+      python-versions: '["3.11"]'
 
   generate-tensorrt-matrix:
     needs: [generate-matrix]
