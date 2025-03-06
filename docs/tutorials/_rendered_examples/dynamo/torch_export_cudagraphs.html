@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Torch Export with Cudagraphs &mdash; Torch-TensorRT v2.7.0.dev0+f4219f7 documentation</title>
+  <title>Torch Export with Cudagraphs &mdash; Torch-TensorRT v2.7.0.dev0+6a8ac45 documentation</title>
   
 
   
@@ -293,7 +293,7 @@
               
               
                 <div class="version">
-                  v2.7.0.dev0+f4219f7
+                  v2.7.0.dev0+6a8ac45
                 </div>
               
             
@@ -497,7 +497,10 @@ to download the full example code</p>
 </div>
 <section class="sphx-glr-example-title" id="torch-export-with-cudagraphs">
 <span id="torch-export-cudagraphs"></span><span id="sphx-glr-tutorials-rendered-examples-dynamo-torch-export-cudagraphs-py"></span><h1>Torch Export with Cudagraphs<a class="headerlink" href="#torch-export-with-cudagraphs" title="Permalink to this heading">¶</a></h1>
-<p>This interactive script is intended as an overview of the process by which the Torch-TensorRT Cudagraphs integration can be used in the <cite>ir=”dynamo”</cite> path. The functionality works similarly in the <cite>torch.compile</cite> path as well.</p>
+<p>CUDA Graphs allow multiple GPU operations to be launched through a single CPU operation, reducing launch overheads and improving GPU utilization. Torch-TensorRT provides a simple interface to enable CUDA graphs. This feature allows users to easily leverage the performance benefits of CUDA graphs without managing the complexities of capture and replay manually.</p>
+<img alt="../../../_images/cuda_graphs.png" src="../../../_images/cuda_graphs.png" />
+<p>This interactive script is intended as an overview of the process by which the Torch-TensorRT Cudagraphs integration can be used in the <cite>ir=”dynamo”</cite> path. The functionality works similarly in the
+<cite>torch.compile</cite> path as well.</p>
 <section id="imports-and-model-definition">
 <h2>Imports and Model Definition<a class="headerlink" href="#imports-and-model-definition" title="Permalink to this heading">¶</a></h2>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
@@ -556,19 +559,21 @@ to download the full example code</p>
     <span class="n">out_trt_3</span> <span class="o">=</span> <span class="n">cudagraphs_module</span><span class="p">(</span><span class="n">inputs_3</span><span class="p">)</span>
 </pre></div>
 </div>
+</section>
 <section id="cuda-graphs-with-module-that-contains-graph-breaks">
-<h3>Cuda graphs with module that contains graph breaks<a class="headerlink" href="#cuda-graphs-with-module-that-contains-graph-breaks" title="Permalink to this heading">¶</a></h3>
+<h2>Cuda graphs with module that contains graph breaks<a class="headerlink" href="#cuda-graphs-with-module-that-contains-graph-breaks" title="Permalink to this heading">¶</a></h2>
 <p>When CUDA Graphs are applied to a TensorRT model that contains graph breaks, each break introduces additional
 overhead. This occurs because graph breaks prevent the entire model from being executed as a single, continuous
 optimized unit. As a result, some of the performance benefits typically provided by CUDA Graphs, such as reduced
-kernel launch overhead and improved execution efficiency, may be diminished.
-Using a wrapped runtime module with CUDA Graphs allows you to encapsulate sequences of operations into graphs
-that can be executed efficiently, even in the presence of graph breaks.
-If TensorRT module has graph breaks, CUDA Graph context manager returns a wrapped_module. This module captures entire
-execution graph, enabling efficient replay during subsequent inferences by reducing kernel launch overheads
-and improving performance. Note that initializing with the wrapper module involves a warm-up phase where the
+kernel launch overhead and improved execution efficiency, may be diminished.</p>
+<p>Using a wrapped runtime module with CUDA Graphs allows you to encapsulate sequences of operations into graphs
+that can be executed efficiently, even in the presence of graph breaks. If TensorRT module has graph breaks, CUDA
+Graph context manager returns a wrapped_module. And this module captures entire execution graph, enabling efficient
+replay during subsequent inferences by reducing kernel launch overheads and improving performance.</p>
+<p>Note that initializing with the wrapper module involves a warm-up phase where the
 module is executed several times. This warm-up ensures that memory allocations and initializations are not
 recorded in CUDA Graphs, which helps maintain consistent execution paths and optimize performance.</p>
+<a class="reference internal image-reference" href="../../../_images/cuda_graphs_breaks.png"><img alt="../../../_images/cuda_graphs_breaks.png" class="align-left" src="../../../_images/cuda_graphs_breaks.png" style="width: 861.0px; height: 240.0px;" /></a>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">SampleModel</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
         <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">relu</span><span class="p">((</span><span class="n">x</span> <span class="o">+</span> <span class="mi">2</span><span class="p">)</span> <span class="o">*</span> <span class="mf">0.5</span><span class="p">)</span>
@@ -606,7 +611,6 @@ recorded in CUDA Graphs, which helps maintain consistent execution paths and opt
 </div>
 </div>
 <p class="sphx-glr-signature"><a class="reference external" href="https://sphinx-gallery.github.io">Gallery generated by Sphinx-Gallery</a></p>
-</section>
 </section>
 </section>
 
@@ -656,10 +660,8 @@ recorded in CUDA Graphs, which helps maintain consistent execution paths and opt
 <li><a class="reference internal" href="#">Torch Export with Cudagraphs</a><ul>
 <li><a class="reference internal" href="#imports-and-model-definition">Imports and Model Definition</a></li>
 <li><a class="reference internal" href="#compilation-with-torch-tensorrt-compile-using-default-settings">Compilation with <cite>torch_tensorrt.compile</cite> Using Default Settings</a></li>
-<li><a class="reference internal" href="#inference-using-the-cudagraphs-integration">Inference using the Cudagraphs Integration</a><ul>
+<li><a class="reference internal" href="#inference-using-the-cudagraphs-integration">Inference using the Cudagraphs Integration</a></li>
 <li><a class="reference internal" href="#cuda-graphs-with-module-that-contains-graph-breaks">Cuda graphs with module that contains graph breaks</a></li>
-</ul>
-</li>
 </ul>
 </li>
 </ul>

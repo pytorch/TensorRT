@@ -23,14 +23,19 @@
 Torch Export with Cudagraphs
 ======================================================
 
-This interactive script is intended as an overview of the process by which the Torch-TensorRT Cudagraphs integration can be used in the `ir="dynamo"` path. The functionality works similarly in the `torch.compile` path as well.
+CUDA Graphs allow multiple GPU operations to be launched through a single CPU operation, reducing launch overheads and improving GPU utilization. Torch-TensorRT provides a simple interface to enable CUDA graphs. This feature allows users to easily leverage the performance benefits of CUDA graphs without managing the complexities of capture and replay manually.
 
-.. GENERATED FROM PYTHON SOURCE LINES 11-13
+.. image:: /tutorials/images/cuda_graphs.png
+
+This interactive script is intended as an overview of the process by which the Torch-TensorRT Cudagraphs integration can be used in the `ir="dynamo"` path. The functionality works similarly in the
+`torch.compile` path as well.
+
+.. GENERATED FROM PYTHON SOURCE LINES 16-18
 
 Imports and Model Definition
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. GENERATED FROM PYTHON SOURCE LINES 13-18
+.. GENERATED FROM PYTHON SOURCE LINES 18-23
 
 .. code-block:: python
 
@@ -40,12 +45,12 @@ Imports and Model Definition
     import torchvision.models as models
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 19-21
+.. GENERATED FROM PYTHON SOURCE LINES 24-26
 
 Compilation with `torch_tensorrt.compile` Using Default Settings
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. GENERATED FROM PYTHON SOURCE LINES 21-28
+.. GENERATED FROM PYTHON SOURCE LINES 26-33
 
 .. code-block:: python
 
@@ -57,7 +62,7 @@ Compilation with `torch_tensorrt.compile` Using Default Settings
     inputs = torch.randn((16, 3, 224, 224)).cuda()
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 29-45
+.. GENERATED FROM PYTHON SOURCE LINES 34-50
 
 .. code-block:: python
 
@@ -78,12 +83,12 @@ Compilation with `torch_tensorrt.compile` Using Default Settings
     )
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 46-48
+.. GENERATED FROM PYTHON SOURCE LINES 51-53
 
 Inference using the Cudagraphs Integration
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. GENERATED FROM PYTHON SOURCE LINES 48-61
+.. GENERATED FROM PYTHON SOURCE LINES 53-66
 
 .. code-block:: python
 
@@ -101,7 +106,7 @@ Inference using the Cudagraphs Integration
     out_trt = opt(inputs)
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 62-71
+.. GENERATED FROM PYTHON SOURCE LINES 67-76
 
 .. code-block:: python
 
@@ -115,24 +120,30 @@ Inference using the Cudagraphs Integration
         out_trt_3 = cudagraphs_module(inputs_3)
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 72-86
+.. GENERATED FROM PYTHON SOURCE LINES 77-97
 
 Cuda graphs with module that contains graph breaks
-----------------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 When CUDA Graphs are applied to a TensorRT model that contains graph breaks, each break introduces additional
 overhead. This occurs because graph breaks prevent the entire model from being executed as a single, continuous
 optimized unit. As a result, some of the performance benefits typically provided by CUDA Graphs, such as reduced
 kernel launch overhead and improved execution efficiency, may be diminished.
+
 Using a wrapped runtime module with CUDA Graphs allows you to encapsulate sequences of operations into graphs
-that can be executed efficiently, even in the presence of graph breaks.
-If TensorRT module has graph breaks, CUDA Graph context manager returns a wrapped_module. This module captures entire
-execution graph, enabling efficient replay during subsequent inferences by reducing kernel launch overheads
-and improving performance. Note that initializing with the wrapper module involves a warm-up phase where the
+that can be executed efficiently, even in the presence of graph breaks. If TensorRT module has graph breaks, CUDA
+Graph context manager returns a wrapped_module. And this module captures entire execution graph, enabling efficient
+replay during subsequent inferences by reducing kernel launch overheads and improving performance.
+
+Note that initializing with the wrapper module involves a warm-up phase where the
 module is executed several times. This warm-up ensures that memory allocations and initializations are not
 recorded in CUDA Graphs, which helps maintain consistent execution paths and optimize performance.
 
-.. GENERATED FROM PYTHON SOURCE LINES 86-107
+.. image:: /tutorials/images/cuda_graphs_breaks.png
+   :scale: 60 %
+   :align: left
+
+.. GENERATED FROM PYTHON SOURCE LINES 97-118
 
 .. code-block:: python
 
@@ -158,11 +169,11 @@ recorded in CUDA Graphs, which helps maintain consistent execution paths and opt
     )
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 108-109
+.. GENERATED FROM PYTHON SOURCE LINES 119-120
 
 If module has graph breaks, whole submodules are recorded and replayed by cuda graphs
 
-.. GENERATED FROM PYTHON SOURCE LINES 109-113
+.. GENERATED FROM PYTHON SOURCE LINES 120-124
 
 .. code-block:: python
 
