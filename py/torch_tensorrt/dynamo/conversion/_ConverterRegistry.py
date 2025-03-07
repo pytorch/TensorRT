@@ -519,7 +519,7 @@ class ConverterRegistry:
     def get_all_converters_with_target(
         self, key: Target, return_registry_info: bool = False
     ) -> Tuple[
-        List[Any], Dict[str, int] | None
+        Union[List[Any], Dict[str, int], None]
     ]:  # TODO: Narrow to ConverterImplSignature this when we can remove FX converters
         """Get all converters across all registries for the target
 
