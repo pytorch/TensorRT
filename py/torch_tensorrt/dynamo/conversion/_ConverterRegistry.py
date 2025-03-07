@@ -18,6 +18,7 @@ from typing import (
     cast,
 )
 
+import tensorrt as trt
 import torch
 from torch import SymBool, SymFloat, SymInt
 from torch._ops import OpOverloadPacket
@@ -25,8 +26,6 @@ from torch.fx.node import Argument, Node, Target, _get_qualified_name
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
 from torch_tensorrt.fx.converter_registry import CONVERTERS as FX_CONVERTERS
-
-import tensorrt as trt
 
 logger = logging.getLogger(__name__)
 
@@ -81,6 +80,7 @@ class ConverterSupport:
             whether that node can be supported by its companion converter. Note that
             this function must not modify the node or its graph
         supports_dynamic_shapes: Boolean flag indicating if the converter has support for dynamic inputs.
+        requires_output_allocator: Boolean flag indicating if the converter creates operators which require an Output Allocator to run (e.g. data dependent operators).
     """
 
     converter_implementation: ConverterImplSignature
@@ -88,6 +88,7 @@ class ConverterSupport:
         default=lambda node, compilation_settings: True
     )
     supports_dynamic_shapes: bool = False
+    requires_output_allocator: bool = False
 
 
 # Dictionary representing Dynamo aten-only converters
@@ -197,6 +198,7 @@ def dynamo_tensorrt_converter(
     capability_validator: Optional[Callable[[Node, CompilationSettings], bool]] = None,
     priority: ConverterPriority = ConverterPriority.STANDARD,
     supports_dynamic_shapes: bool = False,
+    requires_output_allocator: bool = False,
 ) -> Callable[[ConverterImplSignature], ConverterImplSignature]:
     """Decorator for Dynamo TensorRT Converter
 
@@ -212,6 +214,8 @@ def dynamo_tensorrt_converter(
             this means all nodes of "key" kind can be supported by this converter
         priority: Converter's level of priority relative to other converters with the
             same target
+        supports_dynamic_shapes: Boolean flag indicating if the converter has support for dynamic shapes.
+        requires_output_allocator: Boolean flag indicating if the converter creates operators which require an Output Allocator to run (e.g. data dependent operators).
     Returns:
         The converter being decorated
     """
@@ -225,6 +229,7 @@ def dynamo_tensorrt_converter(
             converter_support = ConverterSupport(
                 converter_implementation=converter,
                 supports_dynamic_shapes=supports_dynamic_shapes,
+                requires_output_allocator=requires_output_allocator,
             )
         else:
             assert callable(
@@ -234,6 +239,7 @@ def dynamo_tensorrt_converter(
                 converter_implementation=converter,
                 capability_validator=capability_validator,
                 supports_dynamic_shapes=supports_dynamic_shapes,
+                requires_output_allocator=requires_output_allocator,
             )
 
         # OpOverloadPackets are only valid if they have a single overload, or
@@ -404,7 +410,7 @@ class ConverterRegistry:
     def __getitem__(
         self, node: Node
     ) -> Tuple[
-        Any, CallingConvention
+        Any, CallingConvention, Dict[str, bool]
     ]:  # TODO: Narrow to ConverterImplSignature this when we can remove FX converters
         """Get the first-found validated converter in any registry
 
@@ -462,6 +468,10 @@ class ConverterRegistry:
                             return (
                                 candidate.converter_implementation,
                                 calling_convention,
+                                {
+                                    "supports_dynamic_shapes": candidate.supports_dynamic_shapes,
+                                    "requires_output_allocator": candidate.requires_output_allocator,
+                                },
                             )
                         else:
                             logger.debug(
@@ -471,7 +481,14 @@ class ConverterRegistry:
                 else:
                     # Assuming FX converters don't have dynamic shapes supported
                     if not node_has_dynamic_shapes(node):
-                        return converters, calling_convention
+                        return (
+                            converters,
+                            calling_convention,
+                            {
+                                "supports_dynamic_shapes": False,
+                                "requires_output_allocator": False,
+                            },
+                        )
 
         raise KeyError(
             f"None of the converter registries have a validated entry for {key}, with node {node}"
@@ -495,7 +512,7 @@ class ConverterRegistry:
     def get(
         self, node: Node, value: Optional[ConverterImplSignature] = None
     ) -> Union[
-        Any, Tuple[Any, CallingConvention]
+        Any, Tuple[Any, CallingConvention, Dict[str, bool]]
     ]:  # TODO: Narrow to ConverterImplSignature this when we can remove FX converters
         """Get validated converter for input node with a default return"""
         try:

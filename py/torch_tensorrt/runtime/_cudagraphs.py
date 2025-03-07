@@ -74,7 +74,15 @@ class _CudagraphsContextManager(object):
 
         num_torch_module = 0
         num_trt_module = 0
-        for name, _ in self.compiled_module.named_children():
+        for name, module in self.compiled_module.named_children():
+            # need to disable cudagraphs if any model requires output allocator
+            if (
+                hasattr(module, "requires_output_allocator")
+                and module.requires_output_allocator
+            ):
+                raise RuntimeError(
+                    "There are converters that require Output Allocator. Please disable CUDA Graphs."
+                )
             if "_run_on_acc" in name:
                 num_trt_module += 1
             elif "_run_on_gpu" in name:
