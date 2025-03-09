@@ -1,3 +1,7 @@
+import copy
+import timeit
+
+import numpy as np
 import torch
 from transformers import StoppingCriteriaList
 from transformers.generation.stopping_criteria import (
@@ -37,7 +41,7 @@ def export_llm(model, inputs, min_seq_len=1, max_seq_len=16):
     return ep
 
 
-def generate(model, input_seq, max_tokens, eos_token_id):
+def generate(model, input_seq, max_tokens, eos_token_id, csi=None):
     """
     Greedy decoding of the model. This generates up to max_tokens.
     """
@@ -63,3 +67,48 @@ def generate(model, input_seq, max_tokens, eos_token_id):
             break
 
     return input_seq, logits
+
+
+def time_generate(
+    generate_fn, model, inputs, output_seq_length, eos_token_id, csi=None, iterations=10
+):
+    """
+    Measure the time for generating a sentence over certain number of iterations
+    """
+    timings = []
+    for _ in range(iterations):
+        start_time = timeit.default_timer()
+        inputs_copy = copy.copy(inputs)
+        _ = generate_fn(model, inputs_copy, output_seq_length, eos_token_id, csi=csi)
+        torch.cuda.synchronize()
+        end_time = timeit.default_timer()
+        timings.append(end_time - start_time)
+
+    return timings
+
+
+def recordStats(backend, timings, precision, batch_size=1, compile_time_s=None):
+    """
+    Records different timing stats and adds it to the result
+    """
+    times = np.array(timings)
+    speeds = batch_size / times
+    time_mean = np.mean(times)
+    time_med = np.median(times)
+    time_99th = np.percentile(times, 99)
+    time_std = np.std(times, ddof=0)
+    speed_mean = np.mean(speeds)
+    speed_med = np.median(speeds)
+
+    stats = {
+        "Backend": backend,
+        "Precision": precision,
+        "Batch size": batch_size,
+        "Median(FPS)": speed_med,
+        "Mean(FPS)": speed_mean,
+        "Median-Latency(ms)": time_med * 1000,
+        "Mean-Latency(ms)": time_mean * 1000,
+        "Latency-StdDev(ms)": time_std * 1000,
+        "Compile Time(s)": compile_time_s,
+    }
+    return stats

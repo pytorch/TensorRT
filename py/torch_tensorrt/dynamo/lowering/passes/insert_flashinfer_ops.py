@@ -1,3 +1,4 @@
+import copy
 import logging
 import operator
 from collections import defaultdict
@@ -86,7 +87,8 @@ def is_linear_op(node: Node, include_quantization: bool = False) -> bool:
     Using this function is preferred over `is_op` for linear ops to ensure all variants are covered.
     """
     lin_ops = {
-        torch.ops.aten.linear,
+        torch.ops.aten.linear.default,
+        torch.ops.aten.mm.default,
     }
 
     return is_op(node, lin_ops)
@@ -100,6 +102,7 @@ def _is_dist_lin_op(node: Node, exclude: Optional[List[Node]] = None) -> bool:
 
 def _bfs(node: Node, target: Callable, attr_next: str = "users") -> Node:
     queue = [node]
+    # breakpoint()
     while queue:
         cur_node = queue.pop(0)
         if target(cur_node):
@@ -171,21 +174,32 @@ def insert_flashinfer_attn_with_cache(
         ]  # other args expected
         if args_other != args_other_expected:
             logger.debug(f"Unexpected args for MHA node: {args_other}.")
-
+        # breakpoint()
+        for arg in mha_node.args[:3]:
+            mha_gemms[mha_node].append(
+                _bfs(
+                    arg,
+                    lambda n: _is_dist_lin_op(n, mha_gemms[mha_node]),
+                    "all_input_nodes",
+                )
+            )
+        # breakpoint()
+        mha_gemms[mha_node].append(_bfs(mha_node, _is_dist_lin_op, "users"))
         # get fake q tensor that is an MHA input node to retrieve head_dim, num_heads, and dtype
         # also retrieve fake tensor corresponding to output of k GEMM to infer number of kv heads
         q_fake = mha_node.args[0].meta["val"]
-        kv_gemm_fake = mha_node.args[1].meta[
+        kv_gemm_fake = mha_gemms[mha_node][1].meta[
             "val"
-        ]  # mha_gemms[mha_node][1].meta["val"]
+        ]  # mha_node.args[1].meta["val"]  #
+        # breakpoint()
 
         mha_info[mha_node] = AttentionInfo(
             num_heads=q_fake.shape[1],
-            num_kv_heads=kv_gemm_fake.shape[1],  # // q_fake.shape[3],
+            num_kv_heads=kv_gemm_fake.shape[-1] // q_fake.shape[3],
             head_dim=q_fake.shape[3],
             dtype=q_fake.dtype,
             cache_dtype=None,
-            rope_theta=None,
+            rope_theta=500000,
             # attn_scale=mha_node.get("scale", None)
         )
 
@@ -201,14 +215,16 @@ def insert_flashinfer_attn_with_cache(
                 cm.info.page_size,
             ),
         )
+        # breakpoint()
         metadata_nodes = [
             graph.call_function(operator.getitem, args=(ret_node, idx))
             for idx in range(num_metadata)
         ]
 
     buffer_in_lookup: Dict[str, Node] = {}
-
-    for idx, (mha_node, mha_node_info) in enumerate(mha_info.items()):
+    # breakpoint()
+    for idx, (mha_node, gemms) in enumerate(mha_gemms.items()):
+        qkv, out = gemms[:3], gemms[3]
         # setup + store cache initializers and caches as input nodes
         cache_in_nodes = []
         for k, fn in cm.attention_op.get_cache_initializers(mha_info[mha_node]).items():
@@ -237,18 +253,25 @@ def insert_flashinfer_attn_with_cache(
             mha_node_with_cache = graph.call_function(
                 cm.attention_op.get_attention_op(),
                 args=(
-                    *mha_node.all_input_nodes,
+                    *qkv,
                     *metadata_nodes,
                     *cache_in_nodes,
                     *buffer_in_nodes,
                     *constants,
                 ),
             )
+
+        if "val" in mha_node.meta:
+            mha_node_with_cache.meta["val"] = copy.copy(mha_node.meta["val"])
         mha_node.replace_all_uses_with(mha_node_with_cache)
         graph.erase_node(mha_node)
+
+        # # hook mha output directly to GEMM
+        # out.args = (mha_node_with_cache, *out.args[1:])
 
     gm = clean_up_graph_after_modifications(gm)
 
     cm.initialize_caches()
+
     logger.debug("After inserting MHA with KV cache: " + str(gm.graph))
     return gm

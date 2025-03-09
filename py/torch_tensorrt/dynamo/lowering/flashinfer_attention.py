@@ -102,7 +102,7 @@ class _FlashInferPlanner:
                 rope_theta=plan_params.rope_theta,
                 q_data_type=plan_params.q_dtype,
                 kv_data_type=plan_params.kv_dtype,
-                sm_scale=0.125,
+                sm_scale=0.0883,
             )
 
         # we want to plan during warm-up of cuda graph capture to ensure we have the plan cached
@@ -145,7 +145,7 @@ class _FlashInferPlanner:
                     rope_theta=plan_params.rope_theta,
                     q_data_type=plan_params.q_dtype,
                     kv_data_type=plan_params.kv_dtype,
-                    sm_scale=0.125,
+                    sm_scale=0.0883,
                 )
             self.plan_params = plan_params
 
@@ -172,6 +172,7 @@ def prepare_flashinfer_metadata(
     https://docs.flashinfer.ai/api/prefill.html#flashinfer.prefill.BatchPrefillWithPagedKVCacheWrapper.plan
     to understand the convention.
     """
+    # breakpoint()
     # reset the planner
     _GlobalFlashInferPlanner.reset()
 
@@ -242,23 +243,25 @@ def flashinfer_mha_with_cache(
     k_scale: float,
     v_scale: float,
 ) -> torch.Tensor:
-
-    # b, s, d = q.shape
+    # breakpoint()
+    # b, n_heads, s, d = q.shape
     # head_dim = k_cache.shape[-1]
-    # n_heads = q.shape[2] // head_dim
-    # n_kv_heads = k.shape[2] // head_dim
-    b, n_heads, s, d = q.shape
-    head_dim = d
-    _, n_kv_heads, _, _ = k.shape
-    q = q.permute(0, 2, 1, 3).contiguous()
-    k = k.permute(0, 2, 1, 3).contiguous()
-    v = v.permute(0, 2, 1, 3).contiguous()
+    # # n_heads = q.shape[2] // head_dim
+    # n_kv_heads = k.shape[1] // head_dim
+    # q = q.permute(0, 2, 1, 3)
+    # q = q.permute(0, 2, 1, 3)
+    # q = q.permute(0, 2, 1, 3)
+
+    b, s, d = q.shape
+    head_dim = k_cache.shape[-1]
+    n_heads = q.shape[2] // head_dim
+    n_kv_heads = k.shape[2] // head_dim
 
     bs_view = (b * s,)
-    q = q.view(*bs_view, n_heads, head_dim).contiguous()
-    k = k.view(*bs_view, n_kv_heads, head_dim).contiguous()
-    v = v.view(*bs_view, n_kv_heads, head_dim).contiguous()
-    # breakpoint()
+    q = q.view(*bs_view, n_heads, head_dim)
+    k = k.view(*bs_view, n_kv_heads, head_dim)
+    v = v.view(*bs_view, n_kv_heads, head_dim)
+
     pp = PlanParams(
         n_heads=n_heads,
         n_kv_heads=n_kv_heads,
@@ -270,13 +273,12 @@ def flashinfer_mha_with_cache(
         kv_dtype=k_cache.dtype,
         pos_embd_mode="ROPE_LLAMA" if fuse_rope else "NONE",
         rope_theta=rope_theta,
-        causal=True,
     )
 
     # TODO: Get flashinfer fuse_rope working with fp8 kv cache (https://github.com/flashinfer-ai/flashinfer/issues/661)
     if rope_theta is not None:
         q, k = flashinfer.apply_rope(q, k, qo_indptr, offsets, rope_theta=rope_theta)
-    # breakpoint()
+
     # Assuming k_scale = v_scale = 1.0, we just have to cast k and v to fp8 before appending to kv cache
     k_scale, v_scale = 1.0, 1.0
     if k_cache.dtype == torch.float8_e4m3fn:
@@ -310,9 +312,9 @@ def flashinfer_mha_with_cache(
         pp,
     )
     y = wrapper.run(q, (k_cache, v_cache), k_scale=k_scale, v_scale=v_scale)
-    # breakpoint()
-    output = y.view(b, s, n_kv_heads, d).transpose(1, 2)
-    return output
+    y = y.view(b, s, n_heads, head_dim)
+    y = y.permute(0, 2, 1, 3)
+    return y
 
 
 @flashinfer_mha_with_cache.register_fake

@@ -8,8 +8,13 @@ def clean_up_graph_after_modifications(
 ) -> torch.fx.GraphModule:
     """Runs dead-code elimination, linting, and recompilation for graph, in-place"""
     gm.graph.eliminate_dead_code()
-    gm.graph.lint()
+
     gm.recompile()
+    from torch.fx.passes.tools_common import legalize_graph
+
+    gm.delete_all_unused_submodules()
+    gm = legalize_graph(gm)
+    gm.graph.lint()
     return gm
 
 

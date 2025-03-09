@@ -450,6 +450,7 @@ def get_decompositions(
         decomp_table = {}
         for op in _collect_all_valid_cia_ops_for_aten_namespace():
             decomp_table[op] = _get_decomp_for_cia(op)
+        # breakpoint()
 
         DECOMP_TABLE_FILTERED: Dict[OpOverload, Callable[[Any], Any]] = {
             decomp: decomp_table[decomp]

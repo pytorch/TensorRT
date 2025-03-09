@@ -677,7 +677,7 @@ def compile(
     exported_program = exported_program.run_decompositions(
         get_decompositions(enable_experimental_decompositions)
     )
-
+    # breakpoint()
     gm = exported_program.module()
     logger.debug("Input graph: " + str(gm.graph))
 
@@ -803,7 +803,7 @@ def compile_module(
         )
 
     dryrun_tracker.unsupported_ops = supported_ops.unsupported_operators
-    breakpoint()
+    # breakpoint()
     # The global partitioner leaves non-TRT nodes as-is
     if not settings.use_fast_partitioner:
         dryrun_tracker.to_run_in_torch.extend(parse_non_trt_nodes(partitioned_module))
