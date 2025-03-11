@@ -678,7 +678,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                     ]
                     logger.warning(f"Moved all input Tensors to cuda:{device_id}")
 
-            if self.requires_output_allocator:
+            if self.requires_output_allocator:  # engine requires OA
                 if self.cudagraphs_enabled:
                     raise RuntimeError(
                         "This module requires OutputAllocator which is not compatible with CUDA Graphs. Please disable CUDA Graphs."
@@ -686,17 +686,18 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                 logger.debug("Using OutputAllocator in runtime.")
                 return run_output_allocator()
             else:
-                if self.cudagraphs_enabled and self.use_output_allocator_outputs:
-                    raise RuntimeError(
-                        "Both CUDA Graphs and OutputAllocator are enabled. Please disable either one."
-                    )
-                if self.use_output_allocator_outputs:
+                if self.use_output_allocator_outputs:  # users call OA context manager
+                    if self.cudagraphs_enabled:
+                        raise RuntimeError(
+                            "Both CUDA Graphs and OutputAllocator are enabled. Please disable either one."
+                        )
                     logger.debug("Using OutputAllocator in runtime.")
                     return run_output_allocator()
-                logger.debug(
-                    f"Using standard execution with cudagraphs={self.cudagraphs_enabled}."
-                )
-                return run_standard_execution()
+                else:
+                    logger.debug(
+                        f"Using standard execution with cudagraphs={self.cudagraphs_enabled}."
+                    )
+                    return run_standard_execution()
 
     def enable_profiling(self, profiler: "trt.IProfiler" = None) -> None:
         """

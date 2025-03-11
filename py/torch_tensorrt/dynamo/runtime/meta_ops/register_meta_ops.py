@@ -93,6 +93,9 @@ class FakeTRTEngine:
         self.serialized_metadata = engine_info[
             torch.ops.tensorrt.SERIALIZED_METADATA_IDX()
         ]
+        self.requires_output_allocator = engine_info[
+            torch.ops.tensorrt.REQUIRES_OUTPUT_ALLOCATOR_IDX()
+        ]
         self.target_platform = engine_info[torch.ops.tensorrt.TARGET_PLATFORM_IDX()]
 
     @classmethod

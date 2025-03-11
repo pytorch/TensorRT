@@ -1,6 +1,7 @@
 import pytest
 import torch
 import torch_tensorrt
+from parameterized import parameterized
 from torch.testing._internal.common_utils import TestCase, run_tests
 
 from ..testing_utilities import DECIMALS_OF_AGREEMENT
@@ -35,8 +36,14 @@ class DDSModel2(torch.nn.Module):
         return out
 
 
-class TestOutputAllocatorStaticModelPython(TestCase):
-    def test_cudagraphs(self):
+class TestOutputAllocatorStaticModel(TestCase):
+    @parameterized.expand(
+        [
+            ("python_runtime", True),
+            ("cpp_runtime", False),
+        ]
+    )
+    def test_cudagraphs_and_output_allocator(self, _, use_python_runtime):
         model = StaticModel().eval().cuda()
         inputs = [torch.randn((2, 3), dtype=torch.float).cuda()]
         compiled_model = torch_tensorrt.compile(
@@ -44,7 +51,7 @@ class TestOutputAllocatorStaticModelPython(TestCase):
             "dynamo",
             inputs,
             min_block_size=1,
-            use_python_runtime=True,
+            use_python_runtime=use_python_runtime,
         )
 
         ref_out = model(*inputs)
@@ -58,21 +65,8 @@ class TestOutputAllocatorStaticModelPython(TestCase):
             float(torch.max(torch.abs(ref_out - cg_out))),
             0,
             DECIMALS_OF_AGREEMENT,
-            msg="CUDA Graphs Python TRT outputs don't match with the original model.",
+            msg="CUDA Graphs runtime outputs don't match with the original model.",
         )
-
-    def test_output_allocator(self):
-        model = StaticModel().eval().cuda()
-        inputs = [torch.randn((2, 3), dtype=torch.float).cuda()]
-        compiled_model = torch_tensorrt.compile(
-            model,
-            "dynamo",
-            inputs,
-            min_block_size=1,
-            use_python_runtime=True,
-        )
-
-        ref_out = model(*inputs)
 
         with torch_tensorrt.runtime.enable_output_allocator(compiled_model):
             oa_out = compiled_model(*inputs)
@@ -81,10 +75,16 @@ class TestOutputAllocatorStaticModelPython(TestCase):
             float(torch.max(torch.abs(ref_out - oa_out))),
             0,
             DECIMALS_OF_AGREEMENT,
-            msg="Output Allocator Python TRT outputs don't match with the original model.",
+            msg="Output Allocator runtime outputs don't match with the original model.",
         )
 
-    def test_default(self):
+    @parameterized.expand(
+        [
+            ("python_runtime", True),
+            ("cpp_runtime", False),
+        ]
+    )
+    def test_default(self, _, use_python_runtime):
         """
         Static models use standard execution with cudagraphs=False by default.
         """
@@ -95,7 +95,7 @@ class TestOutputAllocatorStaticModelPython(TestCase):
             "dynamo",
             inputs,
             min_block_size=1,
-            use_python_runtime=True,
+            use_python_runtime=use_python_runtime,
         )
         standard_out = compiled_model(*inputs)
         ref_out = model(*inputs)
@@ -104,15 +104,16 @@ class TestOutputAllocatorStaticModelPython(TestCase):
             float(torch.max(torch.abs(ref_out - standard_out))),
             0,
             DECIMALS_OF_AGREEMENT,
-            msg="Default standard execution outputs don't match with the original model.",
+            msg="Default standard execution (cudagraphs=False) outputs don't match with the original model.",
         )
 
-    @pytest.mark.xfail(
-        strict=True,
-        raises=RuntimeError,
-        reason="Both CUDA Graphs and OutputAllocator are enabled. Please disable either one.",
+    @parameterized.expand(
+        [
+            ("python_runtime", True),
+            ("cpp_runtime", False),
+        ]
     )
-    def test_cudagraphs_and_output_allocator(self):
+    def test_combination_of_cg_and_oa(self, _, use_python_runtime):
         model = StaticModel().eval().cuda()
         inputs = [torch.randn((2, 3), dtype=torch.float).cuda()]
         compiled_model = torch_tensorrt.compile(
@@ -120,44 +121,38 @@ class TestOutputAllocatorStaticModelPython(TestCase):
             "dynamo",
             inputs,
             min_block_size=1,
-            use_python_runtime=True,
+            use_python_runtime=use_python_runtime,
         )
 
-        with torch_tensorrt.runtime.enable_cudagraphs(
-            compiled_model
-        ) as cudagraphs_module:
-            with torch_tensorrt.runtime.enable_output_allocator(cudagraphs_module):
-                out = cudagraphs_module(*inputs)
-
-    @pytest.mark.xfail(
-        strict=True,
-        raises=RuntimeError,
-        reason="Both CUDA Graphs and OutputAllocator are enabled. Please disable either one.",
-    )
-    def test_output_allocator_and_cudagraphs(self):
-        model = StaticModel().eval().cuda()
-        inputs = [torch.randn((2, 3), dtype=torch.float).cuda()]
-        compiled_model = torch_tensorrt.compile(
-            model,
-            "dynamo",
-            inputs,
-            min_block_size=1,
-            use_python_runtime=True,
-        )
-        with torch_tensorrt.runtime.enable_output_allocator(compiled_model):
+        with pytest.raises(
+            RuntimeError,
+            match="Both CUDA Graphs and OutputAllocator are enabled. Please disable either one.",
+        ):
             with torch_tensorrt.runtime.enable_cudagraphs(
                 compiled_model
             ) as cudagraphs_module:
-                out = cudagraphs_module(*inputs)
+                with torch_tensorrt.runtime.enable_output_allocator(cudagraphs_module):
+                    out = cudagraphs_module(*inputs)
+
+        with pytest.raises(
+            RuntimeError,
+            match="Both CUDA Graphs and OutputAllocator are enabled. Please disable either one.",
+        ):
+            with torch_tensorrt.runtime.enable_output_allocator(compiled_model):
+                with torch_tensorrt.runtime.enable_cudagraphs(
+                    compiled_model
+                ) as cudagraphs_module:
+                    out = cudagraphs_module(*inputs)
 
 
-class TestOutputAllocatorDDSModelPython(TestCase):
-    @pytest.mark.xfail(
-        strict=True,
-        raises=RuntimeError,
-        reason="This module requires OutputAllocator which is not compatible with CUDA Graphs. Please disable CUDA Graphs.",
+class TestOutputAllocatorDDSModel(TestCase):
+    @parameterized.expand(
+        [
+            ("python_runtime", True),
+            ("cpp_runtime", False),
+        ]
     )
-    def test_cudagraphs(self):
+    def test_cudagraphs_and_output_allocator(self, _, use_python_runtime):
         model = DDSModel().eval().cuda()
         inputs = (torch.randint(low=0, high=3, size=(10,), dtype=torch.int).to("cuda"),)
         compiled_model = torch_tensorrt.compile(
@@ -165,38 +160,37 @@ class TestOutputAllocatorDDSModelPython(TestCase):
             "dynamo",
             inputs,
             min_block_size=1,
-            use_python_runtime=True,
+            use_python_runtime=use_python_runtime,
         )
 
-        with torch_tensorrt.runtime.enable_cudagraphs(
-            compiled_model
-        ) as cudagraphs_module:
-            cg_out = cudagraphs_module(*inputs)
-
-    def test_output_allocator(self):
-        model = DDSModel().eval().cuda()
-        inputs = (torch.randint(low=0, high=3, size=(10,), dtype=torch.int).to("cuda"),)
-        compiled_model = torch_tensorrt.compile(
-            model,
-            "dynamo",
-            inputs,
-            min_block_size=1,
-            use_python_runtime=True,
-        )
-
-        ref_out = model(*inputs)
+        with pytest.raises(
+            RuntimeError,
+            match="There are converters that require Output Allocator. Please disable CUDA Graphs.",
+        ):
+            with torch_tensorrt.runtime.enable_cudagraphs(
+                compiled_model
+            ) as cudagraphs_module:
+                cg_out = cudagraphs_module(*inputs)
 
         with torch_tensorrt.runtime.enable_output_allocator(compiled_model):
             oa_out = compiled_model(*inputs)
+
+        ref_out = model(*inputs)
 
         self.assertAlmostEqual(
             float(torch.max(torch.abs(ref_out - oa_out))),
             0,
             DECIMALS_OF_AGREEMENT,
-            msg="Output Allocator Python TRT outputs don't match with the original model.",
+            msg="Output Allocator runtime outputs don't match with the original model.",
         )
 
-    def test_default(self):
+    @parameterized.expand(
+        [
+            ("python_runtime", True),
+            ("cpp_runtime", False),
+        ]
+    )
+    def test_default(self, _, use_python_runtime):
         """
         DDS models use OutputAllocator by default.
         """
@@ -207,7 +201,7 @@ class TestOutputAllocatorDDSModelPython(TestCase):
             "dynamo",
             inputs,
             min_block_size=1,
-            use_python_runtime=True,
+            use_python_runtime=use_python_runtime,
         )
         oa_out = compiled_model(*inputs)
         ref_out = model(*inputs)
@@ -216,15 +210,16 @@ class TestOutputAllocatorDDSModelPython(TestCase):
             float(torch.max(torch.abs(ref_out - oa_out))),
             0,
             DECIMALS_OF_AGREEMENT,
-            msg="Default Output Allocator Python TRT outputs don't match with the original model.",
+            msg="Default Output Allocator runtime outputs don't match with the original model.",
         )
 
-    @pytest.mark.xfail(
-        strict=True,
-        raises=RuntimeError,
-        reason="Both CUDA Graphs and OutputAllocator are enabled. Please disable either one.",
+    @parameterized.expand(
+        [
+            ("python_runtime", True),
+            ("cpp_runtime", False),
+        ]
     )
-    def test_cudagraphs_and_output_allocator(self):
+    def test_combination_of_cg_and_oa(self, _, use_python_runtime):
         model = DDSModel().eval().cuda()
         inputs = (torch.randint(low=0, high=3, size=(10,), dtype=torch.int).to("cuda"),)
         compiled_model = torch_tensorrt.compile(
@@ -232,44 +227,42 @@ class TestOutputAllocatorDDSModelPython(TestCase):
             "dynamo",
             inputs,
             min_block_size=1,
-            use_python_runtime=True,
+            use_python_runtime=use_python_runtime,
         )
 
-        with torch_tensorrt.runtime.enable_cudagraphs(
-            compiled_model
-        ) as cudagraphs_module:
-            with torch_tensorrt.runtime.enable_output_allocator(cudagraphs_module):
-                out = cudagraphs_module(*inputs)
-
-    @pytest.mark.xfail(
-        strict=True,
-        raises=RuntimeError,
-        reason="Both CUDA Graphs and OutputAllocator are enabled. Please disable either one.",
-    )
-    def test_output_allocator_and_cudagraphs(self):
-        model = DDSModel().eval().cuda()
-        inputs = (torch.randint(low=0, high=3, size=(10,), dtype=torch.int).to("cuda"),)
-        compiled_model = torch_tensorrt.compile(
-            model,
-            "dynamo",
-            inputs,
-            min_block_size=1,
-            use_python_runtime=True,
-        )
-        with torch_tensorrt.runtime.enable_output_allocator(compiled_model):
+        with pytest.raises(
+            RuntimeError,
+            match="There are converters that require Output Allocator. Please disable CUDA Graphs.",
+        ):
             with torch_tensorrt.runtime.enable_cudagraphs(
                 compiled_model
             ) as cudagraphs_module:
-                out = cudagraphs_module(*inputs)
+                with torch_tensorrt.runtime.enable_output_allocator(cudagraphs_module):
+                    out = cudagraphs_module(*inputs)
+
+        with pytest.raises(
+            RuntimeError,
+            match="There are converters that require Output Allocator. Please disable CUDA Graphs.",
+        ):
+            with torch_tensorrt.runtime.enable_output_allocator(compiled_model):
+                with torch_tensorrt.runtime.enable_cudagraphs(
+                    compiled_model
+                ) as cudagraphs_module:
+                    out = cudagraphs_module(*inputs)
 
 
-class TestOutputAllocatorNonDDSModelPython(TestCase):
-    @pytest.mark.xfail(
-        strict=True,
-        raises=RuntimeError,
-        reason="This module requires OutputAllocator which is not compatible with CUDA Graphs. Please disable CUDA Graphs.",
+class TestOutputAllocatorNonDDSModel(TestCase):
+    """
+    The NonDDSModel is a model that contains DDS op + reduction op.
+    """
+
+    @parameterized.expand(
+        [
+            ("python_runtime", True),
+            ("cpp_runtime", False),
+        ]
     )
-    def test_cudagraphs(self):
+    def test_cudagraphs_and_output_allocator(self, _, use_python_runtime):
         model = NonDDSModel().eval().cuda()
         inputs = (torch.randint(low=0, high=3, size=(10,), dtype=torch.int).to("cuda"),)
         compiled_model = torch_tensorrt.compile(
@@ -277,58 +270,48 @@ class TestOutputAllocatorNonDDSModelPython(TestCase):
             "dynamo",
             inputs,
             min_block_size=1,
-            use_python_runtime=True,
+            use_python_runtime=use_python_runtime,
         )
 
-        ref_out = model(*inputs)
-
-        with torch_tensorrt.runtime.enable_cudagraphs(
-            compiled_model
-        ) as cudagraphs_module:
-            cg_out = cudagraphs_module(*inputs)
-
-        self.assertAlmostEqual(
-            float(torch.max(torch.abs(ref_out - cg_out))),
-            0,
-            DECIMALS_OF_AGREEMENT,
-            msg="CUDA Graphs Python TRT outputs don't match with the original model.",
-        )
-
-    def test_output_allocator(self):
-        model = NonDDSModel().eval().cuda()
-        inputs = (torch.randint(low=0, high=3, size=(10,), dtype=torch.int).to("cuda"),)
-        compiled_model = torch_tensorrt.compile(
-            model,
-            "dynamo",
-            inputs,
-            min_block_size=1,
-            use_python_runtime=True,
-        )
-
-        ref_out = model(*inputs)
+        with pytest.raises(
+            RuntimeError,
+            match="There are converters that require Output Allocator. Please disable CUDA Graphs.",
+        ):
+            with torch_tensorrt.runtime.enable_cudagraphs(
+                compiled_model
+            ) as cudagraphs_module:
+                cg_out = cudagraphs_module(*inputs)
 
         with torch_tensorrt.runtime.enable_output_allocator(compiled_model):
             oa_out = compiled_model(*inputs)
+
+        ref_out = model(*inputs)
 
         self.assertAlmostEqual(
             float(torch.max(torch.abs(ref_out - oa_out))),
             0,
             DECIMALS_OF_AGREEMENT,
-            msg="Output Allocator Python TRT outputs don't match with the original model.",
+            msg="Output Allocator runtime outputs don't match with the original model.",
         )
 
-    def test_default(self):
+    @parameterized.expand(
+        [
+            ("python_runtime", True),
+            ("cpp_runtime", False),
+        ]
+    )
+    def test_default(self, _, use_python_runtime):
         """
         NonDDS models use standard execution with cudagraphs=False by default.
         """
-        model = DDSModel().eval().cuda()
+        model = NonDDSModel().eval().cuda()
         inputs = (torch.randint(low=0, high=3, size=(10,), dtype=torch.int).to("cuda"),)
         compiled_model = torch_tensorrt.compile(
             model,
             "dynamo",
             inputs,
             min_block_size=1,
-            use_python_runtime=True,
+            use_python_runtime=use_python_runtime,
         )
         standard_out = compiled_model(*inputs)
         ref_out = model(*inputs)
@@ -337,15 +320,16 @@ class TestOutputAllocatorNonDDSModelPython(TestCase):
             float(torch.max(torch.abs(ref_out - standard_out))),
             0,
             DECIMALS_OF_AGREEMENT,
-            msg="Default standard execution outputs don't match with the original model.",
+            msg="Default Output Allocator runtime outputs don't match with the original model.",
         )
 
-    @pytest.mark.xfail(
-        strict=True,
-        raises=RuntimeError,
-        reason="Both CUDA Graphs and OutputAllocator are enabled. Please disable either one.",
+    @parameterized.expand(
+        [
+            ("python_runtime", True),
+            ("cpp_runtime", False),
+        ]
     )
-    def test_cudagraphs_and_output_allocator(self):
+    def test_combination_of_cg_and_oa(self, _, use_python_runtime):
         model = NonDDSModel().eval().cuda()
         inputs = (torch.randint(low=0, high=3, size=(10,), dtype=torch.int).to("cuda"),)
         compiled_model = torch_tensorrt.compile(
@@ -353,44 +337,38 @@ class TestOutputAllocatorNonDDSModelPython(TestCase):
             "dynamo",
             inputs,
             min_block_size=1,
-            use_python_runtime=True,
+            use_python_runtime=use_python_runtime,
         )
 
-        with torch_tensorrt.runtime.enable_cudagraphs(
-            compiled_model
-        ) as cudagraphs_module:
-            with torch_tensorrt.runtime.enable_output_allocator(cudagraphs_module):
-                out = cudagraphs_module(*inputs)
-
-    @pytest.mark.xfail(
-        strict=True,
-        raises=RuntimeError,
-        reason="Both CUDA Graphs and OutputAllocator are enabled. Please disable either one.",
-    )
-    def test_output_allocator_and_cudagraphs(self):
-        model = NonDDSModel().eval().cuda()
-        inputs = (torch.randint(low=0, high=3, size=(10,), dtype=torch.int).to("cuda"),)
-        compiled_model = torch_tensorrt.compile(
-            model,
-            "dynamo",
-            inputs,
-            min_block_size=1,
-            use_python_runtime=True,
-        )
-        with torch_tensorrt.runtime.enable_output_allocator(compiled_model):
+        with pytest.raises(
+            RuntimeError,
+            match="There are converters that require Output Allocator. Please disable CUDA Graphs.",
+        ):
             with torch_tensorrt.runtime.enable_cudagraphs(
                 compiled_model
             ) as cudagraphs_module:
-                out = cudagraphs_module(*inputs)
+                with torch_tensorrt.runtime.enable_output_allocator(cudagraphs_module):
+                    out = cudagraphs_module(*inputs)
+
+        with pytest.raises(
+            RuntimeError,
+            match="There are converters that require Output Allocator. Please disable CUDA Graphs.",
+        ):
+            with torch_tensorrt.runtime.enable_output_allocator(compiled_model):
+                with torch_tensorrt.runtime.enable_cudagraphs(
+                    compiled_model
+                ) as cudagraphs_module:
+                    out = cudagraphs_module(*inputs)
 
 
-class TestOutputAllocatorDDSModelWithGraphBreakPython(TestCase):
-    @pytest.mark.xfail(
-        strict=True,
-        raises=RuntimeError,
-        reason="This module requires OutputAllocator which is not compatible with CUDA Graphs. Please disable CUDA Graphs.",
+class TestOutputAllocatorDDSModelWithGraphBreak(TestCase):
+    @parameterized.expand(
+        [
+            ("python_runtime", True),
+            ("cpp_runtime", False),
+        ]
     )
-    def test_cudagraphs(self):
+    def test_cudagraphs_and_output_allocator(self, _, use_python_runtime):
         model = DDSModel2().eval().cuda()
         inputs = (torch.randint(low=0, high=3, size=(10,), dtype=torch.int).to("cuda"),)
         compiled_model = torch_tensorrt.compile(
@@ -398,42 +376,40 @@ class TestOutputAllocatorDDSModelWithGraphBreakPython(TestCase):
             "dynamo",
             inputs,
             min_block_size=1,
-            use_python_runtime=True,
+            use_python_runtime=use_python_runtime,
             torch_executed_ops={"torch.ops.aten.abs.default"},
         )
 
-        with torch_tensorrt.runtime.enable_cudagraphs(
-            compiled_model
-        ) as cudagraphs_module:
-            cg_out = cudagraphs_module(*inputs)
-
-    def test_output_allocator(self):
-        model = DDSModel2().eval().cuda()
-        inputs = (torch.randint(low=0, high=3, size=(10,), dtype=torch.int).to("cuda"),)
-        compiled_model = torch_tensorrt.compile(
-            model,
-            "dynamo",
-            inputs,
-            min_block_size=1,
-            use_python_runtime=True,
-            torch_executed_ops={"torch.ops.aten.abs.default"},
-        )
-
-        ref_out = model(*inputs)
+        with pytest.raises(
+            RuntimeError,
+            match="There are converters that require Output Allocator. Please disable CUDA Graphs.",
+        ):
+            with torch_tensorrt.runtime.enable_cudagraphs(
+                compiled_model
+            ) as cudagraphs_module:
+                cg_out = cudagraphs_module(*inputs)
 
         with torch_tensorrt.runtime.enable_output_allocator(compiled_model):
             oa_out = compiled_model(*inputs)
+
+        ref_out = model(*inputs)
 
         self.assertAlmostEqual(
             float(torch.max(torch.abs(ref_out - oa_out))),
             0,
             DECIMALS_OF_AGREEMENT,
-            msg="Output Allocator Python TRT outputs don't match with the original model.",
+            msg="Output Allocator runtime outputs don't match with the original model.",
         )
 
-    def test_default(self):
+    @parameterized.expand(
+        [
+            ("python_runtime", True),
+            ("cpp_runtime", False),
+        ]
+    )
+    def test_default(self, _, use_python_runtime):
         """
-        Use OutputAllocator by default.
+        Use Output Allocator by default.
         """
         model = DDSModel2().eval().cuda()
         inputs = (torch.randint(low=0, high=3, size=(10,), dtype=torch.int).to("cuda"),)
@@ -442,7 +418,7 @@ class TestOutputAllocatorDDSModelWithGraphBreakPython(TestCase):
             "dynamo",
             inputs,
             min_block_size=1,
-            use_python_runtime=True,
+            use_python_runtime=use_python_runtime,
             torch_executed_ops={"torch.ops.aten.abs.default"},
         )
         oa_out = compiled_model(*inputs)
@@ -452,15 +428,16 @@ class TestOutputAllocatorDDSModelWithGraphBreakPython(TestCase):
             float(torch.max(torch.abs(ref_out - oa_out))),
             0,
             DECIMALS_OF_AGREEMENT,
-            msg="Default Output Allocator Python TRT outputs don't match with the original model.",
+            msg="Default Output Allocator runtime outputs don't match with the original model.",
         )
 
-    @pytest.mark.xfail(
-        strict=True,
-        raises=RuntimeError,
-        reason="Both CUDA Graphs and OutputAllocator are enabled. Please disable either one.",
+    @parameterized.expand(
+        [
+            ("python_runtime", True),
+            ("cpp_runtime", False),
+        ]
     )
-    def test_cudagraphs_and_output_allocator(self):
+    def test_combination_of_cg_and_oa(self, _, use_python_runtime):
         model = DDSModel2().eval().cuda()
         inputs = (torch.randint(low=0, high=3, size=(10,), dtype=torch.int).to("cuda"),)
         compiled_model = torch_tensorrt.compile(
@@ -468,37 +445,29 @@ class TestOutputAllocatorDDSModelWithGraphBreakPython(TestCase):
             "dynamo",
             inputs,
             min_block_size=1,
-            use_python_runtime=True,
+            use_python_runtime=use_python_runtime,
             torch_executed_ops={"torch.ops.aten.abs.default"},
         )
 
-        with torch_tensorrt.runtime.enable_cudagraphs(
-            compiled_model
-        ) as cudagraphs_module:
-            with torch_tensorrt.runtime.enable_output_allocator(cudagraphs_module):
-                out = cudagraphs_module(*inputs)
-
-    @pytest.mark.xfail(
-        strict=True,
-        raises=RuntimeError,
-        reason="Both CUDA Graphs and OutputAllocator are enabled. Please disable either one.",
-    )
-    def test_output_allocator_and_cudagraphs(self):
-        model = DDSModel2().eval().cuda()
-        inputs = (torch.randint(low=0, high=3, size=(10,), dtype=torch.int).to("cuda"),)
-        compiled_model = torch_tensorrt.compile(
-            model,
-            "dynamo",
-            inputs,
-            min_block_size=1,
-            use_python_runtime=True,
-            torch_executed_ops={"torch.ops.aten.abs.default"},
-        )
-        with torch_tensorrt.runtime.enable_output_allocator(compiled_model):
+        with pytest.raises(
+            RuntimeError,
+            match="There are converters that require Output Allocator. Please disable CUDA Graphs.",
+        ):
             with torch_tensorrt.runtime.enable_cudagraphs(
                 compiled_model
             ) as cudagraphs_module:
-                out = cudagraphs_module(*inputs)
+                with torch_tensorrt.runtime.enable_output_allocator(cudagraphs_module):
+                    out = cudagraphs_module(*inputs)
+
+        with pytest.raises(
+            RuntimeError,
+            match="There are converters that require Output Allocator. Please disable CUDA Graphs.",
+        ):
+            with torch_tensorrt.runtime.enable_output_allocator(compiled_model):
+                with torch_tensorrt.runtime.enable_cudagraphs(
+                    compiled_model
+                ) as cudagraphs_module:
+                    out = cudagraphs_module(*inputs)
 
 
 if __name__ == "__main__":
