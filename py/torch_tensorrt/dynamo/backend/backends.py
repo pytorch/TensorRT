@@ -14,7 +14,6 @@ from torch_tensorrt.dynamo import CompilationSettings
 from torch_tensorrt.dynamo._compiler import compile_module
 from torch_tensorrt.dynamo.lowering import (
     get_decompositions,
-    modify_reshape_complex_nodes,
     post_lowering,
     remove_detach,
     remove_sym_nodes,
@@ -71,7 +70,7 @@ def aot_torch_tensorrt_aten_backend(
         to_delete = {
             key
             for key in settings_aot_autograd["decompositions"]
-            if "transpose" in key._name or "detach" in key._name
+            if "detach" in key._name
         }
         for key in to_delete:
             del settings_aot_autograd["decompositions"][key]
@@ -120,16 +119,6 @@ def _pretraced_backend(
             # Remove detach nodes
             remove_detach(gm, settings)
 
-            complexInputIndices = []
-            for i, torch_input in enumerate(torch_inputs):
-                if torch_inputs[i].dtype == torch.complex64:
-                    complexInputIndices.append(i)
-                    torch_input_real = torch_inputs[i].real
-                    torch_input_imaginary = torch_inputs[i].imag
-                    torch_inputs[i] = torch.stack(
-                        (torch_input_real, torch_input_imaginary), dim=-1
-                    )
-
             # Invoke AOTAutograd to translate operators to aten
             if not settings.use_distributed_mode_trace:
                 gm = aot_export_joint_simple(
@@ -146,12 +135,6 @@ def _pretraced_backend(
             gm = post_lowering(gm, settings)
 
             logger.debug("Lowered Input graph:\n " + str(gm.graph))
-
-            if complexInputIndices:
-                modify_reshape_complex_nodes(gm, complexInputIndices)
-                logger.debug(
-                    "Input graph after modifying complex nodes:\n " + str(gm.graph)
-                )
 
             torchtrt_inputs = prepare_inputs(
                 torch_inputs, disable_memory_format_check=True
