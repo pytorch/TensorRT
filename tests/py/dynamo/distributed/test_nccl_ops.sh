@@ -88,11 +88,17 @@ fi
 URL="https://pypi.nvidia.com/tensorrt-llm/$FILE"
 echo "Downloading $FILE from $URL..."
 
-echo "Downloading ...."
+echo "Downloading here...."
 #Installing wget
 ensure_installed wget
-#Downloading the package
-wget "$URL"
+
+#Downloading the file
+filename=$(basename "$URL")
+if [ -f "$filename" ]; then
+    echo "File already exists: $filename"
+else
+    wget "$URL"
+fi
 echo "Download complete: $FILE"
 
 UNZIP_DIR="tensorrt_llm_unzip"
