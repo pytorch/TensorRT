@@ -81,7 +81,7 @@ class _CudagraphsContextManager(object):
                 and module.requires_output_allocator
             ):
                 raise RuntimeError(
-                    "There are converters that require Output Allocator. Please disable CUDA Graphs."
+                    "The model contains submodules that require a dynamic output allocator at runtime, which is incompatible with CUDA Graphs. Please disable CUDA Graphs."
                 )
             if "_run_on_acc" in name:
                 num_trt_module += 1

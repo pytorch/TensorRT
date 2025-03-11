@@ -16,7 +16,7 @@ namespace core {
 namespace runtime {
 
 using EngineID = int64_t;
-const std::string ABI_VERSION = "6";
+const std::string ABI_VERSION = "7";
 extern bool MULTI_DEVICE_SAFE_MODE;
 
 typedef enum {

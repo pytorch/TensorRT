@@ -520,19 +520,20 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
   if (compiled_engine->requires_output_allocator) { // engine requires OA
     if (cudagraphs_enabled) {
       TORCHTRT_THROW_ERROR(
-          "This module requires OutputAllocator which is not compatible with CUDA Graphs. Please disable CUDA Graphs.");
+          "The model contains submodules that require a dynamic output allocator at runtime, which is incompatible with CUDA Graphs. Please disable CUDA Graphs.");
     }
-    LOG_DEBUG("Using OutputAllocator in runtime.");
+    LOG_DEBUG("Using the dynamic allocator runtime mode.");
     return run_output_allocator();
   } else {
     if (compiled_engine->use_output_allocator_outputs) { // users call OA context manager
       if (cudagraphs_enabled) {
-        TORCHTRT_THROW_ERROR("Both CUDA Graphs and OutputAllocator are enabled. Please disable either one.");
+        TORCHTRT_THROW_ERROR(
+            "Both CUDA Graphs and dynamic output allocation are enabled, which are incompatible runtime modes. Please disable one of the two.");
       }
-      LOG_DEBUG("Using OutputAllocator in runtime.");
+      LOG_DEBUG("Using the dynamic allocator runtime mode.");
       return run_output_allocator();
     } else {
-      LOG_DEBUG("Using standard execution with cudagraphs=" << cudagraphs_enabled << ".");
+      LOG_DEBUG("Using the standard execution runtime mode with cudagraphs=" << cudagraphs_enabled << ".");
       return run_standard_execution();
     }
   }

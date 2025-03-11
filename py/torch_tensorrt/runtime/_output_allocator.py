@@ -33,7 +33,7 @@ class _OutputAllocatorContextManager(object):
 
     def set_output_allocator_output(self, enable: bool) -> None:
         for mod in self.rt_mods:
-            mod.set_output_allocator_outputs(enable)
+            mod.set_use_output_allocator(enable)
 
     def __enter__(self) -> "_OutputAllocatorContextManager":
         # Enable output_allocator for TRT submodules

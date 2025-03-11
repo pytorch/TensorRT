@@ -126,7 +126,7 @@ class TestOutputAllocatorStaticModel(TestCase):
 
         with pytest.raises(
             RuntimeError,
-            match="Both CUDA Graphs and OutputAllocator are enabled. Please disable either one.",
+            match="Both CUDA Graphs and dynamic output allocation are enabled, which are incompatible runtime modes. Please disable one of the two.",
         ):
             with torch_tensorrt.runtime.enable_cudagraphs(
                 compiled_model
@@ -136,7 +136,7 @@ class TestOutputAllocatorStaticModel(TestCase):
 
         with pytest.raises(
             RuntimeError,
-            match="Both CUDA Graphs and OutputAllocator are enabled. Please disable either one.",
+            match="Both CUDA Graphs and dynamic output allocation are enabled, which are incompatible runtime modes. Please disable one of the two.",
         ):
             with torch_tensorrt.runtime.enable_output_allocator(compiled_model):
                 with torch_tensorrt.runtime.enable_cudagraphs(
@@ -165,7 +165,7 @@ class TestOutputAllocatorDDSModel(TestCase):
 
         with pytest.raises(
             RuntimeError,
-            match="There are converters that require Output Allocator. Please disable CUDA Graphs.",
+            match="The model contains submodules that require a dynamic output allocator at runtime, which is incompatible with CUDA Graphs. Please disable CUDA Graphs.",
         ):
             with torch_tensorrt.runtime.enable_cudagraphs(
                 compiled_model
@@ -232,7 +232,7 @@ class TestOutputAllocatorDDSModel(TestCase):
 
         with pytest.raises(
             RuntimeError,
-            match="There are converters that require Output Allocator. Please disable CUDA Graphs.",
+            match="The model contains submodules that require a dynamic output allocator at runtime, which is incompatible with CUDA Graphs. Please disable CUDA Graphs.",
         ):
             with torch_tensorrt.runtime.enable_cudagraphs(
                 compiled_model
@@ -242,7 +242,7 @@ class TestOutputAllocatorDDSModel(TestCase):
 
         with pytest.raises(
             RuntimeError,
-            match="There are converters that require Output Allocator. Please disable CUDA Graphs.",
+            match="The model contains submodules that require a dynamic output allocator at runtime, which is incompatible with CUDA Graphs. Please disable CUDA Graphs.",
         ):
             with torch_tensorrt.runtime.enable_output_allocator(compiled_model):
                 with torch_tensorrt.runtime.enable_cudagraphs(
@@ -275,7 +275,7 @@ class TestOutputAllocatorNonDDSModel(TestCase):
 
         with pytest.raises(
             RuntimeError,
-            match="There are converters that require Output Allocator. Please disable CUDA Graphs.",
+            match="The model contains submodules that require a dynamic output allocator at runtime, which is incompatible with CUDA Graphs. Please disable CUDA Graphs.",
         ):
             with torch_tensorrt.runtime.enable_cudagraphs(
                 compiled_model
@@ -342,7 +342,7 @@ class TestOutputAllocatorNonDDSModel(TestCase):
 
         with pytest.raises(
             RuntimeError,
-            match="There are converters that require Output Allocator. Please disable CUDA Graphs.",
+            match="The model contains submodules that require a dynamic output allocator at runtime, which is incompatible with CUDA Graphs. Please disable CUDA Graphs.",
         ):
             with torch_tensorrt.runtime.enable_cudagraphs(
                 compiled_model
@@ -352,7 +352,7 @@ class TestOutputAllocatorNonDDSModel(TestCase):
 
         with pytest.raises(
             RuntimeError,
-            match="There are converters that require Output Allocator. Please disable CUDA Graphs.",
+            match="The model contains submodules that require a dynamic output allocator at runtime, which is incompatible with CUDA Graphs. Please disable CUDA Graphs.",
         ):
             with torch_tensorrt.runtime.enable_output_allocator(compiled_model):
                 with torch_tensorrt.runtime.enable_cudagraphs(
@@ -382,7 +382,7 @@ class TestOutputAllocatorDDSModelWithGraphBreak(TestCase):
 
         with pytest.raises(
             RuntimeError,
-            match="There are converters that require Output Allocator. Please disable CUDA Graphs.",
+            match="The model contains submodules that require a dynamic output allocator at runtime, which is incompatible with CUDA Graphs. Please disable CUDA Graphs.",
         ):
             with torch_tensorrt.runtime.enable_cudagraphs(
                 compiled_model
@@ -451,7 +451,7 @@ class TestOutputAllocatorDDSModelWithGraphBreak(TestCase):
 
         with pytest.raises(
             RuntimeError,
-            match="There are converters that require Output Allocator. Please disable CUDA Graphs.",
+            match="The model contains submodules that require a dynamic output allocator at runtime, which is incompatible with CUDA Graphs. Please disable CUDA Graphs.",
         ):
             with torch_tensorrt.runtime.enable_cudagraphs(
                 compiled_model
@@ -461,7 +461,7 @@ class TestOutputAllocatorDDSModelWithGraphBreak(TestCase):
 
         with pytest.raises(
             RuntimeError,
-            match="There are converters that require Output Allocator. Please disable CUDA Graphs.",
+            match="The model contains submodules that require a dynamic output allocator at runtime, which is incompatible with CUDA Graphs. Please disable CUDA Graphs.",
         ):
             with torch_tensorrt.runtime.enable_output_allocator(compiled_model):
                 with torch_tensorrt.runtime.enable_cudagraphs(

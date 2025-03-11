@@ -404,7 +404,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
     def set_pre_allocated_outputs(self, enable: bool) -> None:
         self.use_pre_allocated_outputs = enable
 
-    def set_output_allocator_outputs(self, enable: bool) -> None:
+    def set_use_output_allocator(self, enable: bool) -> None:
         self.use_output_allocator_outputs = enable
 
     def create_output_allocator(self) -> None:
@@ -683,21 +683,21 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
             if self.requires_output_allocator:  # engine requires OA
                 if self.cudagraphs_enabled:
                     raise RuntimeError(
-                        "This module requires OutputAllocator which is not compatible with CUDA Graphs. Please disable CUDA Graphs."
+                        "The model contains submodules that require a dynamic output allocator at runtime, which is incompatible with CUDA Graphs. Please disable CUDA Graphs."
                     )
-                logger.debug("Using OutputAllocator in runtime.")
+                logger.debug("Using the dynamic allocator runtime mode.")
                 return run_output_allocator()
             else:
                 if self.use_output_allocator_outputs:  # users call OA context manager
                     if self.cudagraphs_enabled:
                         raise RuntimeError(
-                            "Both CUDA Graphs and OutputAllocator are enabled. Please disable either one."
+                            "Both CUDA Graphs and dynamic output allocation are enabled, which are incompatible runtime modes. Please disable one of the two."
                         )
-                    logger.debug("Using OutputAllocator in runtime.")
+                    logger.debug("Using the dynamic allocator runtime mode.")
                     return run_output_allocator()
                 else:
                     logger.debug(
-                        f"Using standard execution with cudagraphs={self.cudagraphs_enabled}."
+                        f"Using the standard execution runtime mode with cudagraphs={self.cudagraphs_enabled}."
                     )
                     return run_standard_execution()
 

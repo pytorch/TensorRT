@@ -74,7 +74,7 @@ class CudaGraphsTorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         if self.cudagraph:
             self.cudagraph.reset()
 
-    def set_output_allocator_outputs(self, enable: bool) -> None:
+    def set_use_output_allocator(self, enable: bool) -> None:
         self.use_output_allocator_outputs = enable
 
     def forward(self, *inputs: torch.Tensor) -> torch.Tensor | Tuple[torch.Tensor, ...]:

@@ -293,7 +293,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
     def set_pre_allocated_outputs(self, enable: bool) -> None:
         self.engine.use_pre_allocated_outputs = enable
 
-    def set_output_allocator_outputs(self, enable: bool) -> None:
+    def set_use_output_allocator(self, enable: bool) -> None:
         self.engine.use_output_allocator_outputs = enable
 
     def forward(self, *inputs: Any) -> torch.Tensor | Tuple[torch.Tensor, ...]:
