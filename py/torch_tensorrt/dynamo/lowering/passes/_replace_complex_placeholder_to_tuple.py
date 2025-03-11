@@ -106,12 +106,7 @@ def update_node_meta(node: torch.fx.Node, fake_mode: FakeTensorMode) -> None:
 
     if op_target in shape_inference_funcs:
         new_shape = shape_inference_funcs[op_target](node)
-        new_node_dtype = None
-        if node.meta["val"].dtype == torch.complex64:
-            new_node_dtype = torch.float32
-        else:
-            new_node_dtype = torch.float64
-        real_tensor = torch.empty(new_shape, dtype=new_node_dtype)
+        real_tensor = torch.empty(new_shape, dtype=node.meta["val"].dtype)
         node.meta["val"] = fake_mode.from_tensor(real_tensor)
     else:
         print("No shape for the inference function", {op_name})
