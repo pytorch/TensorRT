@@ -68,6 +68,7 @@ jobs:
       SCRIPT: ${{ inputs.script }}
       RUNNER_TEST_RESULTS_DIR: /tmp/test_results
       ARCH: ${{ inputs.architecture }}
+      TENSORRT_VERSION: ${{ matrix.tensorrt.version }}
       DOWNLOAD_ARTIFACT_NAME: pytorch_tensorrt_${{ matrix.tensorrt.version }}_${{ matrix.python_version }}_${{ matrix.desired_cuda }}_${{ inputs.architecture }}
     name: ${{ inputs.job-name }}-${{ matrix.tensorrt.version }}-${{ matrix.python_version }}-${{ matrix.desired_cuda }}
     runs-on: ${{ matrix.validation_runner }}
