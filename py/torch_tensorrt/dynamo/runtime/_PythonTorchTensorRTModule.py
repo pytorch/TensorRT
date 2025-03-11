@@ -624,6 +624,8 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                         .detach()
                     )
                     prod = int(torch.prod(torch.tensor(shape)))
+                    # When using the OutputAllocator, the allocated buffer might be larger than the size of the output,
+                    # so we need to reshape the buffer to the output shape
                     output = output.reshape(-1).view(dtype)[:prod].reshape(shape)
                     outputs.append(output)
 

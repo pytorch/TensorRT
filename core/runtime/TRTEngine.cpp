@@ -42,7 +42,7 @@ void* DynamicOutputAllocator::reallocateOutputAsync(
   std::vector<int64_t> shape = {static_cast<int64_t>(size)};
   auto it = buffers.find(tensorName);
   if (it == buffers.end() || it->second.sizes() != shape) {
-    buffers[tensorName] = at::empty(shape, at::TensorOptions().dtype(dtypes.at(tensorName)).device(c10::kCUDA));
+    buffers[tensorName] = at::empty(shape, at::TensorOptions().dtype(dtypes.at(tensorName)).device(at::kCUDA));
     return buffers[tensorName].data_ptr();
   } else {
     return it->second.data_ptr();

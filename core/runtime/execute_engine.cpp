@@ -379,7 +379,7 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
     if (inputs.size() > 0) {
       current_device_id = inputs[0].device().index(); // Done this way to avoid a call to cudart
     } else {
-      current_device_id = c10::cuda::current_device();
+      current_device_id = at::cuda::current_device();
     }
 
     compiled_engine->caller_stream = c10::cuda::getCurrentCUDAStream(current_device_id);
@@ -428,11 +428,13 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
       for (int i = 0; i < dims.nbDims; ++i) {
         prod *= dims.d[i];
       }
-      std::vector<int64_t> dims_vec(dims.nbDims);
+      std::vector<int64_t> shape(dims.nbDims);
       for (int i = 0; i < dims.nbDims; ++i) {
-        dims_vec[i] = dims.d[i];
+        shape[i] = dims.d[i];
       }
-      output = output.reshape(-1).view(dtype).slice(0, 0, prod).reshape(dims_vec);
+      // When using the OutputAllocator, the allocated buffer might be larger than the size of the output,
+      // so we need to reshape the buffer to the output shape
+      output = output.reshape(-1).view(dtype).slice(0, 0, prod).reshape(shape);
       outputs.push_back(output);
     }
 
