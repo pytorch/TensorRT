@@ -1,5 +1,5 @@
 import logging
-from typing import Optional, Sequence, Union
+from typing import List, Optional, Sequence, Union
 
 import numpy as np
 import tensorrt as trt
@@ -475,51 +475,286 @@ def index_put_converter(
     source_ir: Optional[SourceIR],
     name: str,
     input_tensor: TRTTensor,
-    indices: Sequence[Union[TRTTensor, np.ndarray, torch.Tensor]],
+    input_indices: Sequence[Union[TRTTensor, torch.Tensor, np.ndarray, int, None]],
     values: TRTTensor,
     accumulate: bool = False,
 ) -> TRTTensor:
-    reshaped_indices = []
-    for i, each_idx in enumerate(indices):
-        idx_trt = get_trt_tensor(ctx, each_idx, f"{name}_idx_{i}")
-        idx_trt = impl.shuffle.reshape(
+    # Convert 'input_indices' to TRT tensors (or keep None as is)
+    indices: List[Optional[Union[TRTTensor, None]]] = []
+    for i, idx in enumerate(input_indices):
+        if idx is None:
+            indices.append(None)
+        else:
+            if not isinstance(idx, TRTTensor):
+                idx = get_trt_tensor(ctx, idx, f"{name}_index_{i}", min_rank=1)
+            if len(idx.shape) == 0 or not idx.shape:  # Reshape a scalar to (1,)
+                idx = impl.shuffle.reshape(
+                    ctx, target, source_ir, f"{name}_reshape_idx_{i}", idx, (1,)
+                )
+            indices.append(idx)
+
+    rank = len(input_tensor.shape)
+    # Pad the 'indices' list with None for remaining dimensions
+    indices = list(indices) + [None] * (rank - len(indices))
+
+    # Separate 'F' (Free) dimensions where None is used, and 'I' (Indexed) dimensions
+    F = [i for i in range(rank) if indices[i] is None]  # Free dimensions
+    I = [i for i in range(rank) if indices[i] is not None]  # Indexed dimensions
+    K = len(I)
+
+    # Determine the maximum size 'N' among the index tensors
+    if K > 0:
+        index_shapes = [tensor.shape[0] for tensor in indices if tensor is not None]
+        N = max(index_shapes) if index_shapes else 1
+    else:
+        N = 1
+
+    # Compute shapes and volume for the free dimensions
+    F_shapes = [input_tensor.shape[i] for i in F]
+    F_volume = trt.volume(F_shapes) if F_shapes else 1
+
+    # Process indexed dimensions (I)
+    I_tensors = []
+    for i in I:
+        idx = indices[i]
+        assert idx is not None
+        idx_reshaped = impl.shuffle.reshape(
+            ctx, target, source_ir, f"{name}_reshape_idx_I_{i}", idx, (idx.shape[0], 1)
+        )
+        expanded_idx = impl.slice.expand(
             ctx,
             target,
             source_ir,
-            f"{name}_reshape_idx_{i}",
-            idx_trt,
-            shape=(-1, 1),
+            f"{name}_expand_idx_I_{i}",
+            idx_reshaped,
+            (N, F_volume),
         )
-        reshaped_indices.append(idx_trt)
+        I_tensors.append(expanded_idx)
 
-    # Concat -> (N, K)
+    # Create a meshgrid for free dimensions (F)
+    if len(F) > 0:
+        arange_tensors = []
+        for dim in F:
+            dim_size = input_tensor.shape[dim]
+            arange_tensor = impl.arange.arange(
+                ctx, target, source_ir, f"{name}_arange_{dim}", 0, dim_size, 1
+            )
+            arange_tensors.append(arange_tensor)
+
+        meshgrid_tensors = []
+        for i, arange in enumerate(arange_tensors):
+            reshape_shape = [1] * len(F)
+            reshape_shape[i] = F_shapes[i]
+            arange_reshaped = impl.shuffle.reshape(
+                ctx,
+                target,
+                source_ir,
+                f"{name}_reshape_arange_F_{F[i]}",
+                arange,
+                tuple(reshape_shape),
+            )
+            expanded_arange = impl.slice.expand(
+                ctx,
+                target,
+                source_ir,
+                f"{name}_expand_arange_F_{F[i]}",
+                arange_reshaped,
+                tuple(F_shapes),
+            )
+            meshgrid_tensors.append(expanded_arange)
+
+        meshgrid_stacked = impl.cat.cat(
+            ctx,
+            target,
+            source_ir,
+            f"{name}_stack_meshgrid",
+            [
+                impl.shuffle.reshape(
+                    ctx,
+                    target,
+                    source_ir,
+                    f"{name}_reshape_mesh_{i}",
+                    t,
+                    (*F_shapes, 1),
+                )
+                for i, t in enumerate(meshgrid_tensors)
+            ],
+            dim=-1,
+        )
+        meshgrid_reshaped = impl.shuffle.reshape(
+            ctx,
+            target,
+            source_ir,
+            f"{name}_reshape_meshgrid",
+            meshgrid_stacked,
+            (F_volume, len(F)),
+        )
+        if K > 0:
+            meshgrid_expanded = impl.slice.expand(
+                ctx,
+                target,
+                source_ir,
+                f"{name}_expand_meshgrid",
+                meshgrid_reshaped,
+                (N, F_volume, len(F)),
+            )
+        else:
+            meshgrid_expanded = meshgrid_reshaped
+    else:
+        meshgrid_expanded = None
+
+    # Combine all indexed dimensions (I)
+    if K > 0:
+        I_combined = impl.cat.cat(
+            ctx,
+            target,
+            source_ir,
+            f"{name}_cat_I",
+            [
+                impl.shuffle.reshape(
+                    ctx, target, source_ir, f"{name}_reshape_I_{i}", t, (N, F_volume, 1)
+                )
+                for i, t in enumerate(I_tensors)
+            ],
+            dim=2,
+        )
+    else:
+        I_combined = None
+
+    # Build the final index list (ii_list) by slicing either I_combined or meshgrid_expanded
+    ii_list = []
+    i_idx = 0
+    f_idx = 0
+    for dim in range(rank):
+        unique_suffix = f"{dim}_{i_idx if dim in I else f_idx}"
+        if dim in I:
+            start = [0, 0, i_idx]
+            shape = [N, F_volume, 1]
+            stride = [1, 1, 1]
+            idx_tensor = impl.slice.slice(
+                ctx,
+                target,
+                source_ir,
+                f"{name}_slice_I_dim_{unique_suffix}",
+                I_combined,
+                start,
+                shape,
+                stride,
+            )
+            ii_list.append(idx_tensor)
+            i_idx += 1
+        else:
+            start = [0, 0, f_idx]
+            shape = [N, F_volume, 1]
+            stride = [1, 1, 1]
+            mesh_tensor = impl.slice.slice(
+                ctx,
+                target,
+                source_ir,
+                f"{name}_slice_F_dim_{unique_suffix}",
+                meshgrid_expanded,
+                start,
+                shape,
+                stride,
+            )
+            ii_list.append(mesh_tensor)
+            f_idx += 1
+
+    # Concatenate the final indices and reshape to (N * F_volume, rank)
     indices_cat = impl.cat.cat(
-        ctx, target, source_ir, f"{name}_cat_indices", reshaped_indices, dim=1
+        ctx, target, source_ir, f"{name}_cat_indices", ii_list, dim=2
     )
-
-    source_shape = tuple(input_tensor.shape)
-    k = len(indices)
-    leftover_dims = source_shape[k:]
-
-    index_shapes_py = [tuple(idx.shape) for idx in reshaped_indices]
-    N = index_shapes_py[0][0]
-    sub_tensor_shape = (N,) + leftover_dims
-
-    broadcasted_values = impl.slice.expand(
+    indices_cat = impl.shuffle.reshape(
         ctx,
         target,
         source_ir,
-        f"{name}_expand_values",
-        values,
-        sub_tensor_shape,
+        f"{name}_reshape_indices_cat",
+        indices_cat,
+        (N * F_volume, rank),
     )
 
+    if not isinstance(values, TRTTensor):
+        values = get_trt_tensor(ctx, values, f"{name}_values", min_rank=0)
+
+    # Define the expected shape based on (N,) + F_shapes
+    expected_shape = (N,) + tuple(F_shapes)
+
+    # Broadcast 'values' to match the expected shape
+    if len(values.shape) == 0 or values.shape == (1,):  # Scalar case
+        values_reshaped = impl.shuffle.reshape(
+            ctx, target, source_ir, f"{name}_reshape_scalar", values, (1,)
+        )
+        num_dims = len(expected_shape)
+        ones_shape = tuple([1] * num_dims)
+        values_reshaped = impl.shuffle.reshape(
+            ctx,
+            target,
+            source_ir,
+            f"{name}_reshape_to_ones",
+            values_reshaped,
+            ones_shape,
+        )
+        values_expanded = impl.slice.expand(
+            ctx,
+            target,
+            source_ir,
+            f"{name}_expand_values_scalar",
+            values_reshaped,
+            expected_shape,
+        )
+    else:  # Non-scalar case
+        values_shape = list(values.shape)
+
+        # Pad dimensions if necessary
+        if len(values_shape) < len(expected_shape):
+            values_shape = [1] * (
+                len(expected_shape) - len(values_shape)
+            ) + values_shape
+
+        # Calculate a broadcastable shape
+        broadcast_shape = []
+        for exp_dim, val_dim in zip(expected_shape, values_shape):
+            if val_dim == 1:
+                broadcast_shape.append(exp_dim)
+            elif val_dim == exp_dim:
+                broadcast_shape.append(val_dim)
+            else:
+                raise ValueError(f"Cannot broadcast {values_shape} to {expected_shape}")
+
+        # Reshape and then expand
+        values_reshaped = impl.shuffle.reshape(
+            ctx,
+            target,
+            source_ir,
+            f"{name}_reshape_values",
+            values,
+            tuple(broadcast_shape),
+        )
+        values_expanded = impl.slice.expand(
+            ctx,
+            target,
+            source_ir,
+            f"{name}_expand_values",
+            values_reshaped,
+            expected_shape,
+        )
+
+    # Flatten values to (N * F_volume,)
+    flattened_values = impl.shuffle.reshape(
+        ctx,
+        target,
+        source_ir,
+        f"{name}_flatten_values",
+        values_expanded,
+        (N * F_volume,),
+    )
+
+    # Perform Scatter ND operation
     scatter_layer = ctx.net.add_scatter(
         input_tensor,
         indices_cat,
-        broadcasted_values,
-        trt.ScatterMode.ND,
+        flattened_values,
+        trt.ScatterMode.ND if not accumulate else trt.ScatterMode.ND_ELEMENTWISE_ADD,
     )
-    scatter_layer.axis = 0
-    set_layer_name(scatter_layer, target, f"{name}_scatter_layer", source_ir)
+    set_layer_name(scatter_layer, target, f"{name}_scatter", source_ir)
     return scatter_layer.get_output(0)

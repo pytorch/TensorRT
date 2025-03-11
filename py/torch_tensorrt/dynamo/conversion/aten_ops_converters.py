@@ -810,19 +810,8 @@ def aten_ops_select(
     )
 
 
-def index_put_validator(
-    node: Node, settings: Optional[CompilationSettings] = None
-) -> bool:
-    if None in node.args[1]:
-        _LOGGER.debug("We do not support None index yet.")
-        return False
-    else:
-        return True
-
-
 @dynamo_tensorrt_converter(
     torch.ops.aten.index_put.default,
-    # capability_validator=index_put_validator,
 )
 @enforce_tensor_types(
     {
