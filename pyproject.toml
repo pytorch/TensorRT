@@ -110,7 +110,6 @@ index-strategy = "unsafe-best-match"                                    # Needed
 [tool.uv.sources]
 torch = [{ index = "pytorch-nightly-cu126" }]
 torchvision = [{ index = "pytorch-nightly-cu126" }]
-tensorrt-llm = [{ index = "nvidia" }]
 
 [[tool.uv.index]]
 name = "pytorch-nightly-cu126"
