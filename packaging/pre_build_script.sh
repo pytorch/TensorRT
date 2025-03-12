@@ -26,9 +26,9 @@ if [[ ${TENSORRT_VERSION} != "" ]]; then
   # example: __tensorrt_version__: ">=10.3.0,<=10.6.0"
   # replace: tensorrt-cu12>=10.3.0,<=10.6.0 to tensorrt-cu12==10.8.0
   current_version=$(cat dev_dep_versions.yml | grep __tensorrt_version__ | sed 's/__tensorrt_version__: //g' | sed 's/"//g')
-  sed -i -e "s/tensorrt-cu12${current_version}/tensorrt-cu12==${TENSORRT_VERSION}/g" \
-         -e "s/tensorrt-cu12-bindings${current_version}/tensorrt-cu12-bindings==${TENSORRT_VERSION}/g" \
-         -e "s/tensorrt-cu12-libs${current_version}/tensorrt-cu12-libs==${TENSORRT_VERSION}/g" \
+  sed -i -e "s/tensorrt-cu12==${current_version}/tensorrt-cu12==${TENSORRT_VERSION}/g" \
+         -e "s/tensorrt-cu12-bindings==${current_version}/tensorrt-cu12-bindings==${TENSORRT_VERSION}/g" \
+         -e "s/tensorrt-cu12-libs==${current_version}/tensorrt-cu12-libs==${TENSORRT_VERSION}/g" \
           pyproject.toml
 fi
 
