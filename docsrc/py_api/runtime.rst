@@ -19,11 +19,13 @@ Functions
 
 .. autofunction:: get_whole_cudagraphs_mode
 
-.. autofunction:: set_cudagraphs_modue
+.. autofunction:: set_cudagraphs_mode
 
 .. autofunction:: enable_pre_allocated_outputs
 
 .. autofunction:: weight_streaming
+
+.. autofunction:: enable_output_allocator
 
 Classes
 ---------
