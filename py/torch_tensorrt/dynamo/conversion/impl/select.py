@@ -2,6 +2,7 @@ import logging
 from typing import Optional, Sequence, Union
 
 import numpy as np
+import tensorrt as trt
 import torch
 from torch.fx.node import Target
 from torch_tensorrt.dynamo._SourceIR import SourceIR
@@ -22,8 +23,6 @@ from torch_tensorrt.fx.converters.converter_utils import (
     set_layer_name,
 )
 from torch_tensorrt.fx.types import TRTTensor
-
-import tensorrt as trt
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -463,6 +462,7 @@ def gather(
 ) -> TRTTensor:
     input_shape = input.shape
     dim = get_positive_dim(dim, len(input_shape))
+    index = cast_trt_tensor(ctx, index, trt.int32, name + "_cast_index_tensor")
     gather_layer = ctx.net.add_gather(input, index, axis=dim)
     gather_layer.mode = trt.GatherMode.ELEMENT
     set_layer_name(gather_layer, target, name + "_gather_layer_element", source_ir)

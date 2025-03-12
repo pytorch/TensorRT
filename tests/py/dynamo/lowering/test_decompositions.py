@@ -2117,6 +2117,86 @@ class TestLowering(TestCase):
             msg="Scaled_dot_product_cudnn_attention TRT outputs don't match with the original model.",
         )
 
+    @parameterized.expand(
+        [
+            ("float32_2d", torch.float32, (4, 4)),
+            ("float16_3d", torch.float16, (2, 3, 4)),
+        ]
+    )
+    def test_masked_scatter(self, _, dtype, shape):
+        """
+        Test that masked_scatter.default is correctly decomposed into
+        (cumsum, gather, where, etc.) and that final TRT results match PyTorch.
+        """
+
+        class TestModule(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+
+            def forward(self, x, mask, source):
+                return torch.ops.aten.masked_scatter.default(x, mask, source)
+
+        x = torch.randn(*shape, dtype=dtype, device="cuda")
+
+        mask = torch.rand(*shape, device="cuda") > 0.5
+        num_trues = mask.sum().item()
+        if num_trues == 0:
+            mask[0] = True
+            num_trues = 1
+        source = torch.arange(num_trues, dtype=dtype, device="cuda")
+
+        inputs = [x, mask, source]
+
+        fx_graph = torch.fx.symbolic_trace(TestModule())
+
+        expected_ops = {
+            torch.ops.aten.where.self,
+            torch.ops.aten.gather.default,
+            torch.ops.aten.cumsum.default,
+        }
+        unexpected_ops = {torch.ops.aten.masked_scatter.default}
+
+        unexpected_ops_seen, expected_ops_unseen = lower_graph_testing(
+            fx_graph,
+            inputs,
+            expected_ops=expected_ops,
+            unexpected_ops=unexpected_ops,
+            min_block_size=1,
+        )
+
+        self.assertEqual(
+            len(unexpected_ops_seen),
+            0,
+            f"The following unexpected ops were encountered: {unexpected_ops_seen}",
+        )
+
+        self.assertEqual(
+            len(expected_ops_unseen),
+            0,
+            f"The following expected ops were not encountered: {expected_ops_unseen}",
+        )
+
+        torch._dynamo.reset()
+
+        trt_model = torch_tensorrt.compile(
+            fx_graph,
+            "torch_compile",
+            inputs,
+            min_block_size=1,
+            pass_through_build_failures=True,
+        )
+        with torch.no_grad():
+            trt_results = trt_model(*inputs).detach().cpu()
+            torch_results = fx_graph(*inputs).detach().cpu()
+
+        max_diff = float(torch.max(torch.abs(trt_results - torch_results)))
+        self.assertAlmostEqual(
+            max_diff,
+            0,
+            DECIMALS_OF_AGREEMENT,
+            f"Masked_scatter TRT outputs don't match with the original model. (diff={max_diff})",
+        )
+
 
 if __name__ == "__main__":
     run_tests()
