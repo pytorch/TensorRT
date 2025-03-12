@@ -28,10 +28,6 @@ PYTHON_VERSIONS_DICT = {
 # please update the future tensorRT version you want to test here
 TENSORRT_VERSIONS_DICT = {
     "windows": {
-        "10.6.0": {
-            "urls": "https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.6.0/zip/TensorRT-10.6.0.26.Windows.win10.cuda-12.6.zip",
-            "strip_prefix": "TensorRT-10.6.0.26",
-        },
         "10.7.0": {
             "urls": "https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.7.0/zip/TensorRT-10.7.0.23.Windows.win10.cuda-12.6.zip",
             "strip_prefix": "TensorRT-10.7.0.23",
@@ -46,10 +42,6 @@ TENSORRT_VERSIONS_DICT = {
         },
     },
     "linux": {
-        "10.6.0": {
-            "urls": "https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.6.0/tars/TensorRT-10.6.0.26.Linux.x86_64-gnu.cuda-12.6.tar.gz",
-            "strip_prefix": "TensorRT-10.6.0.26",
-        },
         "10.7.0": {
             "urls": "https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.7.0/tars/TensorRT-10.7.0.23.Linux.x86_64-gnu.cuda-12.6.tar.gz",
             "strip_prefix": "TensorRT-10.7.0.23",
