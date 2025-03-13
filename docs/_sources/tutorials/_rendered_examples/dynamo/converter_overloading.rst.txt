@@ -93,26 +93,25 @@ At a code level, converter takes the current conversion state (``ConversionCtx``
 and returns the placeholder outputs for that operation, while as side-effect inserting the necessary TensorRT layers into the TensorRT network.
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 58-67
+.. GENERATED FROM PYTHON SOURCE LINES 58-66
 
 .. code-block:: python
 
 
     from typing import Dict, Sequence, Tuple, Union
 
+    import tensorrt as trt
     from torch.fx.node import Argument, Node, Target
     from torch_tensorrt.dynamo import CompilationSettings
     from torch_tensorrt.dynamo.conversion import ConversionContext
 
-    import tensorrt as trt
 
-
-.. GENERATED FROM PYTHON SOURCE LINES 68-70
+.. GENERATED FROM PYTHON SOURCE LINES 67-69
 
 Converter Metadata
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. GENERATED FROM PYTHON SOURCE LINES 70-85
+.. GENERATED FROM PYTHON SOURCE LINES 69-86
 
 .. code-block:: python
 
@@ -129,10 +128,12 @@ Converter Metadata
         supports_dynamic_shapes=True,
         # Set the priority of the converter to supersede the default one
         priority=torch_tensorrt.dynamo.conversion.ConverterPriority.HIGH,
+        # Whether the converter requires a dynamic output allocator to run (e.g. data dependent ops)
+        requires_output_allocator=True,
     )
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 86-102
+.. GENERATED FROM PYTHON SOURCE LINES 87-103
 
 For the decorator defining a converter, there is one required argument and a few optional ones.
 All converters need a target operator they will run against, the idea being that when there is an instance of ``torch.ops.aten.gelu.default`` in the graph, this converter will be called.
@@ -149,9 +150,9 @@ If this is set to ``False``, in cases where the inputs provided by the user are 
 
 Finally there is the ``priority`` argument, which is an enum from the ``torch_tensorrt.dynamo.conversion.ConverterPriority`` class that defines the priority of the converter. The two options are ``HIGH`` and ``STANDARD``.
 Converters registered with ``STANDARD`` will be appended to the converter list for a given operation, while converters registered with ``HIGH`` will be prepended to the list.
-Candidate converters are evalated for their suitablity in this priority order and the first converter that passes the validator is used.
+Candidate converters are evalated for their suitability in this priority order and the first converter that passes the validator is used.
 
-.. GENERATED FROM PYTHON SOURCE LINES 105-116
+.. GENERATED FROM PYTHON SOURCE LINES 106-117
 
 Converter Implementation
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -165,7 +166,7 @@ This allows developers to avoid the boilerplate of creating the TensorRT layers 
 The helper functions are located in the ``torch_tensorrt.dynamo.conversion.impl`` module and are designed to be composable and interoperable with raw-TensorRT implementations.
 In this case, we will use the Torch-TensorRT ``mul``, ``add`` and ``tanh`` functions from ``impl`` to implement our alternative GeLU layer.
 
-.. GENERATED FROM PYTHON SOURCE LINES 116-176
+.. GENERATED FROM PYTHON SOURCE LINES 117-177
 
 .. code-block:: python
 
@@ -230,14 +231,14 @@ In this case, we will use the Torch-TensorRT ``mul``, ``add`` and ``tanh`` funct
 
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 177-181
+.. GENERATED FROM PYTHON SOURCE LINES 178-182
 
 Using our Custom Converter
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 We can now recompile and see that our custom converter is being called to convert GeLU to TensorRT.
 
-.. GENERATED FROM PYTHON SOURCE LINES 181-188
+.. GENERATED FROM PYTHON SOURCE LINES 182-189
 
 .. code-block:: python
 
@@ -249,11 +250,11 @@ We can now recompile and see that our custom converter is being called to conver
     print(my_custom_gelu(ex_input))
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 189-190
+.. GENERATED FROM PYTHON SOURCE LINES 190-191
 
 We can verify that our implementation matches the TensorRT implementation for the ``tanh`` approximation.
 
-.. GENERATED FROM PYTHON SOURCE LINES 191-196
+.. GENERATED FROM PYTHON SOURCE LINES 192-197
 
 .. code-block:: python
 
@@ -263,11 +264,11 @@ We can verify that our implementation matches the TensorRT implementation for th
 
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 197-198
+.. GENERATED FROM PYTHON SOURCE LINES 198-199
 
 Finally, we want to verify that in the case that the ``approximate`` argument is not set to ``tanh``, our custom converter is not used.
 
-.. GENERATED FROM PYTHON SOURCE LINES 199-205
+.. GENERATED FROM PYTHON SOURCE LINES 200-206
 
 .. code-block:: python
 
@@ -278,12 +279,12 @@ Finally, we want to verify that in the case that the ``approximate`` argument is
     )
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 206-208
+.. GENERATED FROM PYTHON SOURCE LINES 207-209
 
 Notice that we don't see the print statement from our custom converter, indicating that it was not used. However, looking at the graph, we can still see that a TensorRT engine was created to run the GeLU operation.
 In this case, the validator for our custom converter returned ``False``, so the conversion system moved on to the next converter in the list, the standard GeLU converter and used that one to convert the operation.
 
-.. GENERATED FROM PYTHON SOURCE LINES 209-212
+.. GENERATED FROM PYTHON SOURCE LINES 210-213
 
 .. code-block:: python
 

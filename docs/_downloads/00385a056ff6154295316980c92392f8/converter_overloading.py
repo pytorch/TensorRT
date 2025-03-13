@@ -58,11 +58,10 @@ print(my_standard_gelu(ex_input))
 
 from typing import Dict, Sequence, Tuple, Union
 
+import tensorrt as trt
 from torch.fx.node import Argument, Node, Target
 from torch_tensorrt.dynamo import CompilationSettings
 from torch_tensorrt.dynamo.conversion import ConversionContext
-
-import tensorrt as trt
 
 # %%
 # Converter Metadata
@@ -80,6 +79,8 @@ import tensorrt as trt
     supports_dynamic_shapes=True,
     # Set the priority of the converter to supersede the default one
     priority=torch_tensorrt.dynamo.conversion.ConverterPriority.HIGH,
+    # Whether the converter requires a dynamic output allocator to run (e.g. data dependent ops)
+    requires_output_allocator=True,
 )
 
 # %%
@@ -98,7 +99,7 @@ import tensorrt as trt
 #
 # Finally there is the ``priority`` argument, which is an enum from the ``torch_tensorrt.dynamo.conversion.ConverterPriority`` class that defines the priority of the converter. The two options are ``HIGH`` and ``STANDARD``.
 # Converters registered with ``STANDARD`` will be appended to the converter list for a given operation, while converters registered with ``HIGH`` will be prepended to the list.
-# Candidate converters are evalated for their suitablity in this priority order and the first converter that passes the validator is used.
+# Candidate converters are evalated for their suitability in this priority order and the first converter that passes the validator is used.
 
 
 # %%

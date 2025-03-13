@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt.dynamo.runtime._TorchTensorRTModule &mdash; Torch-TensorRT v2.7.0.dev0+0f95b96 documentation</title>
+  <title>torch_tensorrt.dynamo.runtime._TorchTensorRTModule &mdash; Torch-TensorRT v2.7.0.dev0+10d7c61 documentation</title>
   
 
   
@@ -290,7 +290,7 @@
               
               
                 <div class="version">
-                  v2.7.0.dev0+0f95b96
+                  v2.7.0.dev0+10d7c61
                 </div>
               
             
@@ -522,6 +522,7 @@
 <span class="n">HW_COMPATIBLE_IDX</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span>  <span class="c1"># Not implemented</span>
 <span class="n">SERIALIZED_METADATA_IDX</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span>  <span class="c1"># Not implemented</span>
 <span class="n">TARGET_PLATFORM_IDX</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span>  <span class="c1"># Not implemented</span>
+<span class="n">REQUIRES_OUTPUT_ALLOCATOR_IDX</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span>  <span class="c1"># Not implemented</span>
 <span class="n">SERIALIZATION_LEN</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span>  <span class="c1"># Not implemented</span>
 
 <span class="k">if</span> <span class="n">ENABLED_FEATURES</span><span class="o">.</span><span class="n">torch_tensorrt_runtime</span><span class="p">:</span>
@@ -534,7 +535,10 @@
     <span class="n">HW_COMPATIBLE_IDX</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">HW_COMPATIBLE_IDX</span><span class="p">()</span>  <span class="c1"># 6</span>
     <span class="n">SERIALIZED_METADATA_IDX</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">SERIALIZED_METADATA_IDX</span><span class="p">()</span>  <span class="c1"># 7</span>
     <span class="n">TARGET_PLATFORM_IDX</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">TARGET_PLATFORM_IDX</span><span class="p">()</span>  <span class="c1"># 8</span>
-    <span class="n">SERIALIZATION_LEN</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">SERIALIZATION_LEN</span><span class="p">()</span>  <span class="c1"># 9</span>
+    <span class="n">REQUIRES_OUTPUT_ALLOCATOR_IDX</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">REQUIRES_OUTPUT_ALLOCATOR_IDX</span><span class="p">()</span>
+    <span class="p">)</span>  <span class="c1"># 9</span>
+    <span class="n">SERIALIZATION_LEN</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">SERIALIZATION_LEN</span><span class="p">()</span>  <span class="c1"># 10</span>
 
 
 <div class="viewcode-block" id="TorchTensorRTModule"><a class="viewcode-back" href="../../../../py_api/runtime.html#torch_tensorrt.runtime.TorchTensorRTModule">[docs]</a><span class="nd">@for_all_methods</span><span class="p">(</span><span class="n">needs_torch_tensorrt_runtime</span><span class="p">)</span>
@@ -567,6 +571,7 @@
         <span class="n">name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span><span class="p">,</span>
         <span class="n">settings</span><span class="p">:</span> <span class="n">CompilationSettings</span> <span class="o">=</span> <span class="n">CompilationSettings</span><span class="p">(),</span>  <span class="c1"># Assumes engine was built with default compilation settings if object not passed</span>
         <span class="n">weight_name_map</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">requires_output_allocator</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
     <span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Takes a name, target device, serialized TensorRT engine, and binding names / order and constructs</span>
 <span class="sd">        a PyTorch ``torch.nn.Module`` around it. Uses the Torch-TensorRT runtime extension to run the engines</span>
@@ -585,6 +590,7 @@
 <span class="sd">            name (str): Name for module</span>
 <span class="sd">            settings (torch_tensorrt.dynamo.CompilationSettings): Settings used to compile engine, assumes engine was built with default compilation settings if object not passed</span>
 <span class="sd">            weight_name_map (dict): Mapping of engine weight name to state_dict weight name</span>
+<span class="sd">            requires_output_allocator (bool): Boolean flag indicating if the converter creates operators which require an Output Allocator to run (e.g. data dependent operators)</span>
 
 <span class="sd">        Example:</span>
 
@@ -620,6 +626,7 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">weight_name_map</span> <span class="o">=</span> <span class="n">weight_name_map</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">serialized_engine</span> <span class="o">=</span> <span class="n">serialized_engine</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">engine</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">requires_output_allocator</span> <span class="o">=</span> <span class="n">requires_output_allocator</span>
 
         <span class="k">if</span> <span class="p">(</span>
             <span class="n">serialized_engine</span>
@@ -634,7 +641,10 @@
             <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">settings</span><span class="o">.</span><span class="n">device</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
             <span class="k">else</span> <span class="n">Device</span><span class="o">.</span><span class="n">_current_device</span><span class="p">()</span>
         <span class="p">)</span>
-        <span class="n">metadata</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;settings&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">settings</span><span class="p">,</span> <span class="s2">&quot;weight_name_map&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">weight_name_map</span><span class="p">}</span>
+        <span class="n">metadata</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">&quot;settings&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">settings</span><span class="p">,</span>
+            <span class="s2">&quot;weight_name_map&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">weight_name_map</span><span class="p">,</span>
+        <span class="p">}</span>
         <span class="n">target_platform</span> <span class="o">=</span> <span class="p">(</span>
             <span class="n">Platform</span><span class="o">.</span><span class="n">current_platform</span><span class="p">()</span>
             <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">settings</span><span class="o">.</span><span class="n">enable_cross_compile_for_windows</span>
@@ -659,6 +669,9 @@
         <span class="n">engine_info</span><span class="p">[</span><span class="n">HW_COMPATIBLE_IDX</span><span class="p">]</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">hardware_compatible</span><span class="p">))</span>
         <span class="n">engine_info</span><span class="p">[</span><span class="n">SERIALIZED_METADATA_IDX</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">encode_metadata</span><span class="p">(</span><span class="n">metadata</span><span class="p">)</span>
         <span class="n">engine_info</span><span class="p">[</span><span class="n">TARGET_PLATFORM_IDX</span><span class="p">]</span> <span class="o">=</span> <span class="n">target_platform</span><span class="o">.</span><span class="n">_to_serialized_rt_platform</span><span class="p">()</span>
+        <span class="n">engine_info</span><span class="p">[</span><span class="n">REQUIRES_OUTPUT_ALLOCATOR_IDX</span><span class="p">]</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span>
+            <span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">requires_output_allocator</span><span class="p">)</span>
+        <span class="p">)</span>
 
         <span class="k">return</span> <span class="n">engine_info</span>
 
@@ -744,7 +757,12 @@
                 <span class="n">serialized_engine_info</span><span class="p">[</span><span class="n">ENGINE_IDX</span><span class="p">]</span>
             <span class="p">)</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">engine</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">classes</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">Engine</span><span class="p">(</span><span class="n">serialized_engine_info</span><span class="p">)</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">hardware_compatible</span> <span class="o">=</span> <span class="nb">bool</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">state</span><span class="p">[</span><span class="mi">1</span><span class="p">][</span><span class="n">HW_COMPATIBLE_IDX</span><span class="p">]))</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">hardware_compatible</span> <span class="o">=</span> <span class="nb">bool</span><span class="p">(</span>
+                <span class="nb">int</span><span class="p">(</span><span class="n">serialized_engine_info</span><span class="p">[</span><span class="n">HW_COMPATIBLE_IDX</span><span class="p">])</span>
+            <span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">requires_output_allocator</span> <span class="o">=</span> <span class="nb">bool</span><span class="p">(</span>
+                <span class="nb">int</span><span class="p">(</span><span class="n">serialized_engine_info</span><span class="p">[</span><span class="n">REQUIRES_OUTPUT_ALLOCATOR_IDX</span><span class="p">])</span>
+            <span class="p">)</span>
 
             <span class="n">serialized_metadata</span> <span class="o">=</span> <span class="n">serialized_engine_info</span><span class="p">[</span><span class="n">SERIALIZED_METADATA_IDX</span><span class="p">]</span>
             <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">serialized_metadata</span><span class="p">,</span> <span class="nb">bytes</span><span class="p">)</span>
@@ -762,6 +780,9 @@
 
     <span class="k">def</span><span class="w"> </span><span class="nf">set_pre_allocated_outputs</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">enable</span><span class="p">:</span> <span class="nb">bool</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">engine</span><span class="o">.</span><span class="n">use_pre_allocated_outputs</span> <span class="o">=</span> <span class="n">enable</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">set_use_output_allocator</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">enable</span><span class="p">:</span> <span class="nb">bool</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">engine</span><span class="o">.</span><span class="n">use_output_allocator_outputs</span> <span class="o">=</span> <span class="n">enable</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">inputs</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span> <span class="o">|</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="o">...</span><span class="p">]:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Implementation of the forward pass for a TensorRT engine</span>

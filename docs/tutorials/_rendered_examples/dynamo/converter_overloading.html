@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Overloading Torch-TensorRT Converters with Custom Converters &mdash; Torch-TensorRT v2.7.0.dev0+0f95b96 documentation</title>
+  <title>Overloading Torch-TensorRT Converters with Custom Converters &mdash; Torch-TensorRT v2.7.0.dev0+10d7c61 documentation</title>
   
 
   
@@ -293,7 +293,7 @@
               
               
                 <div class="version">
-                  v2.7.0.dev0+0f95b96
+                  v2.7.0.dev0+10d7c61
                 </div>
               
             
@@ -540,11 +540,10 @@ At a code level, converter takes the current conversion state (<code class="docu
 and returns the placeholder outputs for that operation, while as side-effect inserting the necessary TensorRT layers into the TensorRT network.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">Sequence</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">,</span> <span class="n">Union</span>
 
+<span class="kn">import</span><span class="w"> </span><span class="nn">tensorrt</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">trt</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch.fx.node</span><span class="w"> </span><span class="kn">import</span> <span class="n">Argument</span><span class="p">,</span> <span class="n">Node</span><span class="p">,</span> <span class="n">Target</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo</span><span class="w"> </span><span class="kn">import</span> <span class="n">CompilationSettings</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.conversion</span><span class="w"> </span><span class="kn">import</span> <span class="n">ConversionContext</span>
-
-<span class="kn">import</span><span class="w"> </span><span class="nn">tensorrt</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">trt</span>
 </pre></div>
 </div>
 <section id="converter-metadata">
@@ -560,6 +559,8 @@ and returns the placeholder outputs for that operation, while as side-effect ins
     <span class="n">supports_dynamic_shapes</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
     <span class="c1"># Set the priority of the converter to supersede the default one</span>
     <span class="n">priority</span><span class="o">=</span><span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">dynamo</span><span class="o">.</span><span class="n">conversion</span><span class="o">.</span><span class="n">ConverterPriority</span><span class="o">.</span><span class="n">HIGH</span><span class="p">,</span>
+    <span class="c1"># Whether the converter requires a dynamic output allocator to run (e.g. data dependent ops)</span>
+    <span class="n">requires_output_allocator</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
 <span class="p">)</span>
 </pre></div>
 </div>
@@ -574,7 +575,7 @@ This is useful for cases where you want to use a custom converter only in specif
 If this is set to <code class="docutils literal notranslate"><span class="pre">False</span></code>, in cases where the inputs provided by the user are dynamic, this converter will be disabled. If there are no alternatives that support dynamic shape, the operation will be run in PyTorch.</p>
 <p>Finally there is the <code class="docutils literal notranslate"><span class="pre">priority</span></code> argument, which is an enum from the <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.dynamo.conversion.ConverterPriority</span></code> class that defines the priority of the converter. The two options are <code class="docutils literal notranslate"><span class="pre">HIGH</span></code> and <code class="docutils literal notranslate"><span class="pre">STANDARD</span></code>.
 Converters registered with <code class="docutils literal notranslate"><span class="pre">STANDARD</span></code> will be appended to the converter list for a given operation, while converters registered with <code class="docutils literal notranslate"><span class="pre">HIGH</span></code> will be prepended to the list.
-Candidate converters are evalated for their suitablity in this priority order and the first converter that passes the validator is used.</p>
+Candidate converters are evalated for their suitability in this priority order and the first converter that passes the validator is used.</p>
 </section>
 <section id="converter-implementation">
 <h3>Converter Implementation<a class="headerlink" href="#converter-implementation" title="Permalink to this heading">¶</a></h3>
