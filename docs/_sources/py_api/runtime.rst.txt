@@ -19,7 +19,7 @@ Functions
 
 .. autofunction:: get_whole_cudagraphs_mode
 
-.. autofunction:: set_cudagraphs_mode
+.. autofunction:: set_cudagraphs_modue
 
 .. autofunction:: enable_pre_allocated_outputs
 
