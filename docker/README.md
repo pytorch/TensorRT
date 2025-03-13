@@ -17,14 +17,14 @@ Note: By default the container uses the `cxx11-abi` version of Torch + Torch-TRT
 
 ### Instructions
 
-- The example below uses TensorRT 10.8.0.43
+- The example below uses TensorRT 10.9.0.34
 - See <a href="https://github.com/pytorch/TensorRT#dependencies">dependencies</a> for a list of current default dependencies.
 
 > From root of Torch-TensorRT repo
 
 Build:
 ```
-DOCKER_BUILDKIT=1 docker build --build-arg TENSORRT_VERSION=10.8.0 -f docker/Dockerfile -t torch_tensorrt:latest .
+DOCKER_BUILDKIT=1 docker build --build-arg TENSORRT_VERSION=10.9.0 -f docker/Dockerfile -t torch_tensorrt:latest .
 ```
 
 Run:
