@@ -62,6 +62,8 @@ class MutableTorchTensorRTModule(object):
         device: Optional[Union[Device, torch.device, str]] = _defaults.DEVICE,
         use_python_runtime: bool = _defaults.USE_PYTHON_RUNTIME,
         immutable_weights: bool = False,
+        strict: bool = True,
+        allow_complex_guards_as_runtime_asserts: bool = False,
         **kwargs: Any,
     ) -> None:
         """
@@ -125,6 +127,10 @@ class MutableTorchTensorRTModule(object):
         self.arg_inputs: tuple[Any, ...] = tuple()
         self.kwarg_inputs: dict[str, Any] = {}
         self.additional_settings = kwargs
+        self.strict = strict
+        self.allow_complex_guards_as_runtime_asserts = (
+            allow_complex_guards_as_runtime_asserts
+        )
         self.use_python_runtime = use_python_runtime
         self.trt_device = to_torch_tensorrt_device(device)
         assert (
@@ -262,9 +268,7 @@ class MutableTorchTensorRTModule(object):
         """
         self.original_model.to(to_torch_device(self.trt_device))
         if self.exp_program is None:
-            self.exp_program = torch.export.export(
-                self.original_model, self.arg_inputs, kwargs=self.kwarg_inputs
-            )
+            self.exp_program = self.get_exported_program()
         else:
             self.exp_program._state_dict = (
                 MutableTorchTensorRTModule._transform_state_dict(
@@ -283,6 +287,25 @@ class MutableTorchTensorRTModule(object):
         self.original_model.cpu()
         torch.cuda.empty_cache()
 
+    def get_exported_program(self) -> torch.export.ExportedProgram:
+        if self.allow_complex_guards_as_runtime_asserts:
+            return torch.export._trace._export(
+                self.original_model,
+                self.arg_inputs,
+                kwargs=self.kwarg_inputs,
+                dynamic_shapes=self._get_total_dynamic_shapes(),
+                strict=self.strict,
+                allow_complex_guards_as_runtime_asserts=self.allow_complex_guards_as_runtime_asserts,
+            )
+        else:
+            return torch.export.export(
+                self.original_model,
+                self.arg_inputs,
+                kwargs=self.kwarg_inputs,
+                dynamic_shapes=self._get_total_dynamic_shapes(),
+                strict=self.strict,
+            )
+
     def compile(self) -> None:
         """
         (Re)compile the TRT graph module using the PyTorch module.
@@ -292,15 +315,7 @@ class MutableTorchTensorRTModule(object):
         """
         # Export the module
         self.original_model.to(to_torch_device(self.trt_device))
-        self.exp_program = torch.export._trace._export(
-            self.original_model,
-            self.arg_inputs,
-            kwargs=self.kwarg_inputs,
-            dynamic_shapes=self._get_total_dynamic_shapes(),
-            strict=False,
-            allow_complex_guards_as_runtime_asserts=True,
-            # **self.additional_settings
-        )
+        self.exp_program = self.get_exported_program()
         self.gm = dynamo_compile(
             self.exp_program,
             arg_inputs=self.arg_inputs,
