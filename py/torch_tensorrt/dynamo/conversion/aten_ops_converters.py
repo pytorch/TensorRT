@@ -2468,13 +2468,14 @@ def aten_ops_convolution(
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     is_transposed = args[6]
+    is_conv1d = len(args[0].shape) == 3
     if not is_transposed:
         return impl.conv.convNd(
             ctx,
             target,
             source_ir=SourceIR.ATEN,
             name=name,
-            is_conv1d=len(args[3]) == 1,
+            is_conv1d=is_conv1d,
             input=args[0],
             weight=args[1],
             bias=args_bounds_check(args, 2, None),
@@ -2489,7 +2490,7 @@ def aten_ops_convolution(
             target,
             source_ir=SourceIR.ATEN,
             name=name,
-            is_deconv1d=len(args[3]) == 1,
+            is_deconv1d=is_conv1d,
             input=args[0],
             weight=args[1],
             bias=args_bounds_check(args, 2, None),

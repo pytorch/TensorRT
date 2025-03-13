@@ -111,8 +111,20 @@ def convNd(
         padding = tuple(padding)
         if len(padding) == 1:
             padding = (padding[0],) * num_dims
-    stride = (stride,) if isinstance(stride, int) else stride
-    dilation = (dilation,) if isinstance(dilation, int) else dilation
+
+    if isinstance(stride, int):
+        stride = (stride,) * num_dims
+    elif isinstance(stride, (list, tuple)):
+        stride = tuple(stride)
+        if len(stride) == 1:
+            stride = (stride[0],) * num_dims
+
+    if isinstance(dilation, int):
+        dilation = (dilation,) * num_dims
+    elif isinstance(dilation, (list, tuple)):
+        dilation = tuple(dilation)
+        if len(dilation) == 1:
+            dilation = (dilation[0],) * num_dims
 
     # Expand parameters manually for Conv1D computations
     if is_conv1d:
