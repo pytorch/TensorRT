@@ -17,19 +17,21 @@ from .remove_num_users_is_0_nodes import remove_num_users_is_0_nodes
 from .repair_input_as_output import repair_input_as_output
 from .replace_max_pool_with_indices import replace_max_pool_with_indices
 
-ATEN_POST_LOWERING_PASSES = DynamoPassManager.build_from_passlist(
-    [
-        remove_input_alias_fixing_clones,
-        constant_fold,
-        repair_input_as_output,
-        fuse_prims_broadcast,
-        fuse_distributed_ops,
-        replace_max_pool_with_indices,
-        remove_assert_nodes,
-        accumulate_fp32_matmul,
-        remove_num_users_is_0_nodes,
-    ]
-)
+pass_list = [
+    remove_input_alias_fixing_clones,
+    constant_fold,
+    repair_input_as_output,
+    fuse_prims_broadcast,
+    replace_max_pool_with_indices,
+    remove_assert_nodes,
+    accumulate_fp32_matmul,
+    remove_num_users_is_0_nodes,
+]
+
+if not is_tegra_platform():
+    pass_list.append(fuse_distributed_ops)
+
+ATEN_POST_LOWERING_PASSES = DynamoPassManager.build_from_passlist(pass_list)
 
 ATEN_PRE_LOWERING_PASSES = DynamoPassManager.build_from_passlist(
     [
