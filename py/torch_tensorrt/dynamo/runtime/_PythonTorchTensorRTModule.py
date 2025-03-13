@@ -23,6 +23,41 @@ from torch_tensorrt.runtime._utils import (
 logger = logging.getLogger(__name__)
 
 
+class DynamicOutputAllocator(trt.IOutputAllocator):  # type: ignore[misc]
+    def __init__(self, output_dtypes: Dict[str, torch.dtype]) -> None:
+        trt.IOutputAllocator.__init__(self)
+        self.buffers: Dict[str, torch.Tensor] = {}
+        self.shapes: Dict[str, Tuple[int, ...]] = {}
+        self.dtypes: Dict[str, torch.dtype] = output_dtypes
+
+    def reallocate_output_async(
+        self,
+        tensor_name: str,
+        memory: int,
+        size: int,
+        alignment: int,
+        stream: torch.cuda.Stream,
+    ) -> Any:
+        shape = (size,)
+        if tensor_name not in self.buffers:
+            self.buffers[tensor_name] = torch.empty(
+                shape,
+                dtype=self.dtypes[tensor_name],
+                device=torch.cuda.current_device(),
+            )
+        else:
+            if self.buffers[tensor_name].shape != shape:
+                self.buffers[tensor_name] = torch.empty(
+                    shape,
+                    dtype=self.dtypes[tensor_name],
+                    device=torch.cuda.current_device(),
+                )
+        return self.buffers[tensor_name].data_ptr()
+
+    def notify_shape(self, tensor_name: str, shape: Tuple[int, ...]) -> None:
+        self.shapes[tensor_name] = tuple(shape)
+
+
 class TorchTRTRuntimeStates:
     def __init__(self, new_cudagraphs: bool):
         # Indicates whether CUDAGraphs were enabled in the previous execute_engine
@@ -92,6 +127,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         name: str = "",
         settings: CompilationSettings = CompilationSettings(),
         weight_name_map: Optional[dict[Any, Any]] = None,
+        requires_output_allocator: bool = False,
     ):
         """Takes a name, target device, serialized TensorRT engine, and binding names / order and constructs
         a PyTorch ``torch.nn.Module`` around it. Uses TensorRT Python APIs to run the engine
@@ -105,6 +141,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
             name (str): Name for module
             settings (torch_tensorrt.dynamo.CompilationSettings): Settings used to compile engine, assumes engine was built with default compilation settings if object not passed
             weight_name_map (dict): Mapping of engine weight name to state_dict weight name
+            requires_output_allocator (bool): Boolean flag indicating if the converter creates operators which require an Output Allocator to run (e.g. data dependent operators)
 
         Example:
 
@@ -164,8 +201,14 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         self.runtime_states = TorchTRTRuntimeStates(
             torch_tensorrt.runtime.get_cudagraphs_mode()
         )
+
+        self.cudagraphs_enabled = False
         self.pre_allocated_outputs: List[torch.Tensor] = []
         self.use_pre_allocated_outputs = False
+
+        self.requires_output_allocator = requires_output_allocator
+        self.output_allocator: Optional[DynamicOutputAllocator] = None
+        self.use_output_allocator_outputs = False
 
         if self.serialized_engine is not None and not self.settings.lazy_engine_init:
             self.setup_engine()
@@ -237,6 +280,9 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
             self.engine.get_tensor_shape(output_name)
             for output_name in self.output_names
         ]
+
+        if self.requires_output_allocator:
+            self.create_output_allocator()
 
         if torch_tensorrt.runtime.get_cudagraphs_mode():
             self.cudagraph = torch.cuda.CUDAGraph()
@@ -358,27 +404,26 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
     def set_pre_allocated_outputs(self, enable: bool) -> None:
         self.use_pre_allocated_outputs = enable
 
-    def forward(self, *inputs: torch.Tensor) -> torch.Tensor | Tuple[torch.Tensor, ...]:
-        # Ensure inputs are available in all scopes and cast symbolic integers to Tensors
-        contiguous_inputs: List[torch.Tensor] = [
-            (i.contiguous() if isinstance(i, torch.Tensor) else torch.tensor(i).cuda())
-            for i in inputs
-        ]
-        with (
-            torch.autograd.profiler.record_function("PythonTorchTensorRTModule:Forward")
-            if self.profiling_enabled
-            else nullcontext()
-        ):
-            self._check_initialized()
+    def set_use_output_allocator(self, enable: bool) -> None:
+        self.use_output_allocator_outputs = enable
 
-            cudagraphs_enabled = torch_tensorrt.runtime.get_cudagraphs_mode()
+    def create_output_allocator(self) -> None:
+        if self.output_allocator is None:
+            output_dtypes_dict = {}
+            for o, output_name in enumerate(self.output_names):
+                output_dtypes_dict[output_name] = self.output_dtypes[o]
+            self.output_allocator = DynamicOutputAllocator(output_dtypes_dict)
+
+    def forward(self, *inputs: torch.Tensor) -> torch.Tensor | Tuple[torch.Tensor, ...]:
+
+        def run_standard_execution() -> torch.Tensor | Tuple[torch.Tensor, ...]:
             shape_changed = self.validate_input_shapes(inputs)
             (
                 need_cudagraphs_record,
                 can_use_pre_allocated_outputs,
                 need_cudagraphs_reset,
             ) = self.runtime_states.set_runtime_states(
-                cudagraphs_enabled, self.use_pre_allocated_outputs, shape_changed
+                self.cudagraphs_enabled, self.use_pre_allocated_outputs, shape_changed
             )
 
             if need_cudagraphs_reset and self.cudagraph:
@@ -388,38 +433,6 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
             if need_cudagraphs_record:
                 self._input_buffers = [None] * len(self.input_names)
                 self._output_buffers = [None] * len(self.output_names)
-
-            # If in safe mode, check at each iteration for whether a switch is required
-            if (
-                torch_tensorrt.runtime._multi_device_safe_mode._PY_RT_MULTI_DEVICE_SAFE_MODE
-            ):
-                curr_device_id = torch.cuda.current_device()
-                curr_device_properties = torch.cuda.get_device_properties(
-                    curr_device_id
-                )
-                logger.debug(f"Current Device: cuda:{curr_device_id}")
-
-                # If a switch is required, move all inputs to new device and set as active device
-                if _is_switch_required(
-                    curr_device_id,
-                    self.target_device_id,
-                    curr_device_properties,
-                    self.target_device_properties,
-                ):
-                    device_id, _ = _select_rt_device(
-                        curr_device_id,
-                        self.target_device_id,
-                        self.target_device_properties,
-                    )
-
-                    # Update current device
-                    device = torch.device(device_id)
-                    torch.cuda.set_device(device_id)
-
-                    contiguous_inputs = [
-                        tensor.to(device) for tensor in contiguous_inputs
-                    ]
-                    logger.warning(f"Moved all input Tensors to cuda:{device_id}")
 
             with (
                 torch.autograd.profiler.record_function(
@@ -433,7 +446,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                 ), f"Wrong number of inputs, expect {len(self.input_names)} get {len(contiguous_inputs)}."
 
                 self.setup_input_tensors(
-                    contiguous_inputs, cudagraphs_enabled, need_cudagraphs_record
+                    contiguous_inputs, self.cudagraphs_enabled, need_cudagraphs_record
                 )
 
                 if shape_changed:
@@ -469,7 +482,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                     if need_cudagraphs_record:
                         self._output_buffers[o] = outputs[o].clone()
 
-                    if cudagraphs_enabled:
+                    if self.cudagraphs_enabled:
                         self.context.set_tensor_address(
                             output_name, self._output_buffers[o].data_ptr()
                         )
@@ -495,7 +508,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                 self._engine_stream.wait_stream(self._caller_stream)
 
                 with torch.cuda.stream(self._engine_stream):
-                    if cudagraphs_enabled:
+                    if self.cudagraphs_enabled:
                         if need_cudagraphs_record:
                             self.cudagraph = torch.cuda.CUDAGraph()
 
@@ -527,7 +540,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
             if self.use_pre_allocated_outputs:
                 self.pre_allocated_outputs = self.create_output_tensors()
 
-            if cudagraphs_enabled:
+            if self.cudagraphs_enabled:
                 for idx, o in enumerate(outputs):
                     o.copy_(self._output_buffers[idx])
 
@@ -535,6 +548,158 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                 return outputs[0]
 
             return outputs
+
+        def run_output_allocator() -> torch.Tensor | Tuple[torch.Tensor, ...]:
+            assert (
+                not torch_tensorrt.runtime.get_cudagraphs_mode()
+            ), "CUDA Graphs are not compatible with OutputAllocator."
+            with (
+                torch.autograd.profiler.record_function(
+                    "PythonTorchTensorRTModule:ProcessInputs"
+                )
+                if self.profiling_enabled
+                else nullcontext()
+            ):
+                assert len(contiguous_inputs) == len(
+                    self.input_names
+                ), f"Wrong number of inputs, expect {len(self.input_names)} get {len(contiguous_inputs)}."
+
+                self.setup_input_tensors(contiguous_inputs, False, False)
+
+            with (
+                torch.autograd.profiler.record_function(
+                    "PythonTorchTensorRTModule:SetupOutputAllocator"
+                )
+                if self.profiling_enabled
+                else nullcontext()
+            ):
+                self.create_output_allocator()
+                # need to set output allocator every run
+                for output_name in self.output_names:
+                    if not self.context.set_output_allocator(
+                        output_name, self.output_allocator
+                    ):
+                        raise RuntimeError(
+                            f"Failed to set output allocator for {output_name}"
+                        )
+
+            with (
+                torch.autograd.profiler.record_function(
+                    "PythonTorchTensorRTModule:TensorRTRuntime"
+                )
+                if self.profiling_enabled
+                else nullcontext()
+            ):
+                self._caller_stream = torch.cuda.current_stream()
+                if (
+                    self._engine_stream == torch.cuda.default_stream()
+                    or self._engine_stream is None
+                ):
+                    self._engine_stream = torch.cuda.Stream()
+
+                self._engine_stream.wait_stream(self._caller_stream)
+
+                with torch.cuda.stream(self._engine_stream):
+                    self.context.execute_async_v3(
+                        self._engine_stream.cuda_stream
+                    )  # The OutputAllocator is called by execute_async_v3()
+
+                self._caller_stream.wait_stream(self._engine_stream)
+
+            with (
+                torch.autograd.profiler.record_function(
+                    "PythonTorchTensorRTModule:ProcessOutputs"
+                )
+                if self.profiling_enabled
+                else nullcontext()
+            ):
+                outputs = []
+                assert self.output_allocator is not None
+                for o, output_name in enumerate(self.output_names):
+                    shape = self.output_allocator.shapes.get(output_name, None)
+                    dtype = self.output_dtypes[o]
+                    output = (
+                        self.output_allocator.buffers.get(output_name, None)
+                        .clone()
+                        .detach()
+                    )
+                    prod = int(torch.prod(torch.tensor(shape)))
+                    # When using the OutputAllocator, the allocated buffer might be larger than the size of the output,
+                    # so we need to reshape the buffer to the output shape
+                    output = output.reshape(-1).view(dtype)[:prod].reshape(shape)
+                    outputs.append(output)
+
+            if len(outputs) == 1:
+                return outputs[0]
+
+            return outputs
+
+        self.cudagraphs_enabled = torch_tensorrt.runtime.get_cudagraphs_mode()
+
+        # Run forward function
+        contiguous_inputs: List[torch.Tensor] = [
+            (i.contiguous() if isinstance(i, torch.Tensor) else torch.tensor(i).cuda())
+            for i in inputs
+        ]
+        with (
+            torch.autograd.profiler.record_function("PythonTorchTensorRTModule:Forward")
+            if self.profiling_enabled
+            else nullcontext()
+        ):
+            self._check_initialized()
+
+            # If in safe mode, check at each iteration for whether a switch is required
+            if (
+                torch_tensorrt.runtime._multi_device_safe_mode._PY_RT_MULTI_DEVICE_SAFE_MODE
+            ):
+                curr_device_id = torch.cuda.current_device()
+                curr_device_properties = torch.cuda.get_device_properties(
+                    curr_device_id
+                )
+                logger.debug(f"Current Device: cuda:{curr_device_id}")
+
+                # If a switch is required, move all inputs to new device and set as active device
+                if _is_switch_required(
+                    curr_device_id,
+                    self.target_device_id,
+                    curr_device_properties,
+                    self.target_device_properties,
+                ):
+                    device_id, _ = _select_rt_device(
+                        curr_device_id,
+                        self.target_device_id,
+                        self.target_device_properties,
+                    )
+
+                    # Update current device
+                    device = torch.device(device_id)
+                    torch.cuda.set_device(device_id)
+
+                    contiguous_inputs = [
+                        tensor.to(device) for tensor in contiguous_inputs
+                    ]
+                    logger.warning(f"Moved all input Tensors to cuda:{device_id}")
+
+            if self.requires_output_allocator:  # engine requires OA
+                if self.cudagraphs_enabled:
+                    raise RuntimeError(
+                        "The model contains submodules that require a dynamic output allocator at runtime, which is incompatible with CUDA Graphs. Please disable CUDA Graphs."
+                    )
+                logger.debug("Using the dynamic allocator runtime mode.")
+                return run_output_allocator()
+            else:
+                if self.use_output_allocator_outputs:  # users call OA context manager
+                    if self.cudagraphs_enabled:
+                        raise RuntimeError(
+                            "Both CUDA Graphs and dynamic output allocation are enabled, which are incompatible runtime modes. Please disable one of the two."
+                        )
+                    logger.debug("Using the dynamic allocator runtime mode.")
+                    return run_output_allocator()
+                else:
+                    logger.debug(
+                        f"Using the standard execution runtime mode with cudagraphs={self.cudagraphs_enabled}."
+                    )
+                    return run_standard_execution()
 
     def enable_profiling(self, profiler: "trt.IProfiler" = None) -> None:
         """

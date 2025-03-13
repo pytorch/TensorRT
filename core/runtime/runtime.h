@@ -16,7 +16,7 @@ namespace core {
 namespace runtime {
 
 using EngineID = int64_t;
-const std::string ABI_VERSION = "6";
+const std::string ABI_VERSION = "7";
 extern bool MULTI_DEVICE_SAFE_MODE;
 
 typedef enum {
@@ -37,6 +37,7 @@ typedef enum {
   HW_COMPATIBLE_IDX,
   SERIALIZED_METADATA_IDX,
   TARGET_PLATFORM_IDX,
+  REQUIRES_OUTPUT_ALLOCATOR_IDX,
   SERIALIZATION_LEN, // NEVER USED FOR DATA, USED TO DETERMINE LENGTH OF SERIALIZED INFO
 } SerializedInfoIndex;
 

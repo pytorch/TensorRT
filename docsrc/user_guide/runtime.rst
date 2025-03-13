@@ -92,3 +92,44 @@ Cudagraphs can accelerate certain models by reducing kernel overheads, as docume
 In the current implementation, use of a new input shape (for instance in dynamic shape 
 cases), will cause the cudagraph to be re-recorded. Cudagraph recording is generally 
 not latency intensive, and future improvements include caching cudagraphs for multiple input shapes.
+
+Dynamic Output Allocation Mode
+------------------------------
+
+Dynamic output allocation is a feature in Torch-TensorRT which allows the output buffer of TensorRT engines to be
+dynamically allocated. This is useful for models with dynamic output shapes, especially ops with data-dependent shapes.
+Dynamic output allocation mode cannot be used in conjunction with CUDA Graphs nor pre-allocated outputs feature.
+Without dynamic output allocation, the output buffer is allocated based on the inferred output shape based on input size.
+
+There are two scenarios in which dynamic output allocation is enabled:
+
+1. The model has been identified at compile time to require dynamic output allocation for at least one TensorRT subgraph. 
+These models will engage the runtime mode automatically (with logging) and are incompatible with other runtime modes 
+such as CUDA Graphs.
+
+Converters can declare that subgraphs that they produce will require the output allocator using `requires_output_allocator=True` 
+there by forcing any model which utilizes the converter to automatically use the output allocator runtime mode. e.g.,
+
+.. code-block:: python
+
+    @dynamo_tensorrt_converter(
+        torch.ops.aten.nonzero.default,
+        supports_dynamic_shapes=True,
+        requires_output_allocator=True,
+    )
+    def aten_ops_nonzero(
+        ctx: ConversionContext,
+        target: Target,
+        args: Tuple[Argument, ...],
+        kwargs: Dict[str, Argument],
+        name: str,
+    ) -> Union[TRTTensor, Sequence[TRTTensor]]:
+        ...
+
+2. Users may manually enable dynamic output allocation mode via the ``torch_tensorrt.runtime.enable_output_allocator`` context manager.
+
+.. code-block:: python
+
+    # Enables Dynamic Output Allocation Mode, then resets the mode to its prior setting
+    with torch_tensorrt.runtime.enable_output_allocator(trt_module):
+        ...

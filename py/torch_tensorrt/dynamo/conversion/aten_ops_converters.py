@@ -3552,3 +3552,24 @@ def aten_ops_full(
         fill_value=args[1],
         dtype=kwargs.get("dtype", None),
     )
+
+
+@dynamo_tensorrt_converter(
+    torch.ops.aten.nonzero.default,
+    supports_dynamic_shapes=True,
+    requires_output_allocator=True,
+)
+def aten_ops_nonzero(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.unary.nonzero(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+    )

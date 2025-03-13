@@ -25,6 +25,7 @@ UnpackedCacheHit = Tuple[
     Sequence[Input],
     CompilationSettings,
     Optional[Dict[str, Any]],
+    bool,
 ]
 
 
@@ -106,6 +107,7 @@ class BaseEngineCache(ABC):
         input_specs: Sequence[Input],
         compilation_settings: CompilationSettings,
         weight_name_map: Optional[Dict[Any, Any]],
+        requires_output_allocator: bool,
     ) -> bytes:
         """Pack serialized engine, input names, output names, and weight map into a single blob
 
@@ -116,7 +118,7 @@ class BaseEngineCache(ABC):
             input_specs (Sequence[Input]): input specs of TRT engine
             compilation_settings (CompilationSettings): compilation settings of TRT engine
             weight_name_map (Optional[Dict[Any, Any]]): weight name map for refitting
-
+            requires_output_allocator (bool): Boolean flag indicating if the converter creates operators which require an Output Allocator to run (e.g. data dependent operators)
         Returns:
             bytes: packed blob
         """
@@ -130,6 +132,7 @@ class BaseEngineCache(ABC):
                 "input_specs": input_specs,
                 "compilation_settings": settings,
                 "weight_name_map": weight_name_map,
+                "requires_output_allocator": requires_output_allocator,
             }
         )
 
@@ -151,6 +154,7 @@ class BaseEngineCache(ABC):
             unpacked["input_specs"],
             unpacked["compilation_settings"],
             unpacked["weight_name_map"],
+            unpacked["requires_output_allocator"],
         )
 
     def insert(

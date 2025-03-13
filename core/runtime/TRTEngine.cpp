@@ -30,6 +30,29 @@ std::vector<std::string> split(const std::string& str, char delim) {
   return strings;
 }
 
+DynamicOutputAllocator::DynamicOutputAllocator(const std::unordered_map<std::string, at::ScalarType>& output_dtypes)
+    : dtypes(output_dtypes) {}
+
+void* DynamicOutputAllocator::reallocateOutputAsync(
+    char const* tensorName,
+    void* currentMemory,
+    uint64_t size,
+    uint64_t alignment,
+    cudaStream_t stream) {
+  std::vector<int64_t> shape = {static_cast<int64_t>(size)};
+  auto it = buffers.find(tensorName);
+  if (it == buffers.end() || it->second.sizes() != shape) {
+    buffers[tensorName] = at::empty(shape, at::TensorOptions().dtype(dtypes.at(tensorName)).device(at::kCUDA));
+    return buffers[tensorName].data_ptr();
+  } else {
+    return it->second.data_ptr();
+  }
+}
+
+void DynamicOutputAllocator::notifyShape(char const* tensorName, nvinfer1::Dims const& dims) noexcept {
+  shapes[tensorName] = dims;
+}
+
 TRTEngine::TRTEngine(
     const std::string& serialized_engine,
     const RTDevice& cuda_device,
@@ -37,6 +60,7 @@ TRTEngine::TRTEngine(
     const std::vector<std::string>& _out_binding_names,
     const Platform& target_platform,
     bool hardware_compatible,
+    bool requires_output_allocator,
     const std::string& serialized_metadata)
     : TRTEngine(
           "deserialized_trt",
@@ -46,6 +70,7 @@ TRTEngine::TRTEngine(
           _out_binding_names,
           target_platform,
           hardware_compatible,
+          requires_output_allocator,
           serialized_metadata) {}
 
 TRTEngine::TRTEngine(std::vector<std::string> serialized_info)
@@ -57,6 +82,7 @@ TRTEngine::TRTEngine(std::vector<std::string> serialized_info)
           split(serialized_info[OUTPUT_BINDING_NAMES_IDX], BINDING_DELIM),
           Platform(serialized_info[TARGET_PLATFORM_IDX]),
           static_cast<bool>(std::stoi(serialized_info[HW_COMPATIBLE_IDX])),
+          static_cast<bool>(std::stoi(serialized_info[REQUIRES_OUTPUT_ALLOCATOR_IDX])),
           serialized_info[SERIALIZED_METADATA_IDX]) {}
 
 TRTEngine::TRTEngine(
@@ -67,6 +93,7 @@ TRTEngine::TRTEngine(
     const std::vector<std::string>& _out_binding_names,
     const Platform& target_platform,
     bool hardware_compatible,
+    bool requires_output_allocator,
     const std::string& serialized_metadata) {
   TORCHTRT_CHECK(
       is_supported_on_current_platform(target_platform),
@@ -79,6 +106,7 @@ TRTEngine::TRTEngine(
   TORCHTRT_CHECK(most_compatible_device, "No compatible device was found for instantiating TensorRT engine");
 
   this->serialized_metadata = serialized_metadata;
+  this->requires_output_allocator = requires_output_allocator;
   device_info = most_compatible_device.value();
   multi_gpu_device_check();
   set_rt_device(device_info);
@@ -397,6 +425,7 @@ FlattenedState TRTEngine::__obj_flatten__() {
       std::tuple("out_binding_names", serialized_info[OUTPUT_BINDING_NAMES_IDX]),
       std::tuple("hardware_compatible", serialized_info[HW_COMPATIBLE_IDX]),
       std::tuple("serialized_metadata", serialized_info[SERIALIZED_METADATA_IDX]),
+      std::tuple("requires_output_allocator", serialized_info[REQUIRES_OUTPUT_ALLOCATOR_IDX]),
       std::tuple("target_platform", serialized_info[TARGET_PLATFORM_IDX]));
 }
 
@@ -417,6 +446,7 @@ std::vector<std::string> TRTEngine::serialize() {
   serialized_info[INPUT_BINDING_NAMES_IDX] = serialize_bindings(this->in_binding_names);
   serialized_info[OUTPUT_BINDING_NAMES_IDX] = serialize_bindings(this->out_binding_names);
   serialized_info[HW_COMPATIBLE_IDX] = this->hardware_compatible ? "1" : "0";
+  serialized_info[REQUIRES_OUTPUT_ALLOCATOR_IDX] = this->requires_output_allocator ? "1" : "0";
   serialized_info[SERIALIZED_METADATA_IDX] = this->serialized_metadata;
   serialized_info[TARGET_PLATFORM_IDX] = this->target_platform.serialize();
 

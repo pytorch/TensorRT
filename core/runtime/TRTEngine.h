@@ -27,6 +27,7 @@ using FlattenedState = std::tuple<
     std::tuple<std::string, std::string>, // input binding names
     std::tuple<std::string, std::string>, // output binding names
     std::tuple<std::string, std::string>, // HW compatibility
+    std::tuple<std::string, std::string>, // requires_output_allocator
     std::tuple<std::string, std::string>, // serialized metadata
     std::tuple<std::string, std::string>>; // Platform
 
@@ -69,6 +70,33 @@ struct TorchTRTRuntimeStates {
   }
 };
 
+class DynamicOutputAllocator : public nvinfer1::IOutputAllocator {
+ public:
+  DynamicOutputAllocator(const std::unordered_map<std::string, at::ScalarType>& output_dtypes);
+
+  void* reallocateOutputAsync(
+      char const* tensorName,
+      void* currentMemory,
+      uint64_t size,
+      uint64_t alignment,
+      cudaStream_t stream) override;
+
+  void notifyShape(char const* tensorName, nvinfer1::Dims const& dims) noexcept override;
+
+  const std::unordered_map<std::string, at::Tensor>& getBuffers() const {
+    return buffers;
+  }
+
+  const std::unordered_map<std::string, nvinfer1::Dims>& getShapes() const {
+    return shapes;
+  }
+
+ private:
+  std::unordered_map<std::string, at::ScalarType> dtypes;
+  std::unordered_map<std::string, at::Tensor> buffers;
+  std::unordered_map<std::string, nvinfer1::Dims> shapes;
+};
+
 struct TRTEngine : torch::CustomClassHolder {
   // Each engine needs it's own runtime object
   std::shared_ptr<nvinfer1::IRuntime> rt;
@@ -99,6 +127,7 @@ struct TRTEngine : torch::CustomClassHolder {
       const std::vector<std::string>& out_binding_names,
       const Platform& target_platform = get_current_platform(),
       bool hardware_compatible = false,
+      bool requires_output_allocator = false,
       const std::string& serialized_metadata = "");
 
   TRTEngine(std::vector<std::string> serialized_info);
@@ -111,6 +140,7 @@ struct TRTEngine : torch::CustomClassHolder {
       const std::vector<std::string>& out_binding_names,
       const Platform& target_platform = get_current_platform(),
       bool hardware_compatible = false,
+      bool requires_output_allocator = false,
       const std::string& serialized_metadata = "");
 
   TRTEngine& operator=(const TRTEngine& other);
@@ -145,6 +175,11 @@ struct TRTEngine : torch::CustomClassHolder {
   std::string shape_key = "None";
   bool use_pre_allocated_outputs = false;
   std::vector<at::Tensor> pre_allocated_outputs;
+
+  // Output Allocator-Related Functionality
+  bool requires_output_allocator = false; // engine requires output allocator
+  bool use_output_allocator_outputs = false; // users specify to use output allocator
+  std::shared_ptr<DynamicOutputAllocator> output_allocator;
 
   // TODO: Implement a call method
   // c10::List<at::Tensor> Run(c10::List<at::Tensor> inputs);

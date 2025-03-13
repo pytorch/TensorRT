@@ -13,6 +13,7 @@ from .pass_manager import DynamoPassManager
 from .remove_assert_nodes import remove_assert_nodes
 from .remove_detach import remove_detach
 from .remove_input_alias_fixing_clones import remove_input_alias_fixing_clones
+from .remove_num_users_is_0_nodes import remove_num_users_is_0_nodes
 from .repair_input_as_output import repair_input_as_output
 from .replace_max_pool_with_indices import replace_max_pool_with_indices
 
@@ -24,6 +25,7 @@ pass_list = [
     replace_max_pool_with_indices,
     remove_assert_nodes,
     accumulate_fp32_matmul,
+    remove_num_users_is_0_nodes,
 ]
 
 if not is_tegra_platform():
