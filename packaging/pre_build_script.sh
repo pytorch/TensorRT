@@ -22,14 +22,14 @@ export TORCH_BUILD_NUMBER=$(python -c "import torch, urllib.parse as ul; print(u
 export TORCH_INSTALL_PATH=$(python -c "import torch, os; print(os.path.dirname(torch.__file__))")
 
 if [[ ${TENSORRT_VERSION} != "" ]]; then
-  # this is the upgraded TensorRT version, replace current tensorrt version to the upgrade tensorRT version in the pyproject.toml
-  # example: __tensorrt_version__: ">=10.3.0,<=10.6.0"
-  # replace: tensorrt-cu12>=10.3.0,<=10.6.0 to tensorrt-cu12==10.8.0
-  current_version=$(cat dev_dep_versions.yml | grep __tensorrt_version__ | sed 's/__tensorrt_version__: //g' | sed 's/"//g')
-  sed -i -e "s/tensorrt-cu12${current_version}/tensorrt-cu12==${TENSORRT_VERSION}/g" \
-         -e "s/tensorrt-cu12-bindings${current_version}/tensorrt-cu12-bindings==${TENSORRT_VERSION}/g" \
-         -e "s/tensorrt-cu12-libs${current_version}/tensorrt-cu12-libs==${TENSORRT_VERSION}/g" \
-          pyproject.toml
+  # Replace dependencies in the original pyproject.toml with the current TensorRT version. It is used for CI tests of different TensorRT versions.
+  # For example, if the current testing TensorRT version is 10.7.0, but the pyproject.toml tensorrt>=10.8.0,<10.9.0, then the following sed command
+  # will replace tensorrt>=10.8.0,<10.9.0 with tensorrt==10.7.0
+  sed -i -e "s/tensorrt>=.*,<.*\"/tensorrt>=${TENSORRT_VERSION},<$(echo "${TENSORRT_VERSION}" | awk -F. '{print $1"."$2+1".0"}')\"/g" \
+         -e "s/tensorrt-cu12>=.*,<.*\"/tensorrt-cu12>=${TENSORRT_VERSION},<$(echo "${TENSORRT_VERSION}" | awk -F. '{print $1"."$2+1".0"}')\"/g" \
+         -e "s/tensorrt-cu12-bindings>=.*,<.*\"/tensorrt-cu12-bindings>=${TENSORRT_VERSION},<$(echo "${TENSORRT_VERSION}" | awk -F. '{print $1"."$2+1".0"}')\"/g" \
+         -e "s/tensorrt-cu12-libs>=.*,<.*\"/tensorrt-cu12-libs>=${TENSORRT_VERSION},<$(echo "${TENSORRT_VERSION}" | awk -F. '{print $1"."$2+1".0"}')\"/g" \
+         pyproject.toml
 fi
 
 if [[ "${CU_VERSION::4}" < "cu12" ]]; then
