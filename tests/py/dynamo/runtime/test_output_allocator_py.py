@@ -20,7 +20,12 @@ class DDSModel(torch.nn.Module):
         return torch.ops.aten.nonzero.default(input)
 
 
-class NonDDSModel(torch.nn.Module):
+class DDSOpWithReductionOpModel(torch.nn.Module):
+    """
+    DDSOpWithReductionOpModel is a model that contains DDS op + reduction op.
+    Since nonzero requires output allocator, this model will use output allocator by default.
+    """
+
     def forward(self, inputs):
         out = torch.ops.aten.nonzero.default(inputs)
         out = torch.ops.aten.sum.dim_IntList(out, 0)
@@ -251,9 +256,9 @@ class TestOutputAllocatorDDSModel(TestCase):
                     out = cudagraphs_module(*inputs)
 
 
-class TestOutputAllocatorNonDDSModel(TestCase):
+class TestOutputAllocatorDDSOpWithReductionOpModel(TestCase):
     """
-    The NonDDSModel is a model that contains DDS op + reduction op.
+    The DDSOpWithReductionOpModel is a model that contains DDS op + reduction op.
     """
 
     @parameterized.expand(
@@ -263,7 +268,7 @@ class TestOutputAllocatorNonDDSModel(TestCase):
         ]
     )
     def test_cudagraphs_and_output_allocator(self, _, use_python_runtime):
-        model = NonDDSModel().eval().cuda()
+        model = DDSOpWithReductionOpModel().eval().cuda()
         inputs = (torch.randint(low=0, high=3, size=(10,), dtype=torch.int).to("cuda"),)
         compiled_model = torch_tensorrt.compile(
             model,
@@ -302,9 +307,9 @@ class TestOutputAllocatorNonDDSModel(TestCase):
     )
     def test_default(self, _, use_python_runtime):
         """
-        NonDDS models use standard execution with cudagraphs=False by default.
+        The DDSOpWithReductionOpModel is a model that contains nonzero op + reduction op, in which nonzero op requires output allocator.
         """
-        model = NonDDSModel().eval().cuda()
+        model = DDSOpWithReductionOpModel().eval().cuda()
         inputs = (torch.randint(low=0, high=3, size=(10,), dtype=torch.int).to("cuda"),)
         compiled_model = torch_tensorrt.compile(
             model,
@@ -313,11 +318,11 @@ class TestOutputAllocatorNonDDSModel(TestCase):
             min_block_size=1,
             use_python_runtime=use_python_runtime,
         )
-        standard_out = compiled_model(*inputs)
+        oa_out = compiled_model(*inputs)
         ref_out = model(*inputs)
 
         self.assertAlmostEqual(
-            float(torch.max(torch.abs(ref_out - standard_out))),
+            float(torch.max(torch.abs(ref_out - oa_out))),
             0,
             DECIMALS_OF_AGREEMENT,
             msg="Default Output Allocator runtime outputs don't match with the original model.",
@@ -330,7 +335,7 @@ class TestOutputAllocatorNonDDSModel(TestCase):
         ]
     )
     def test_combination_of_cg_and_oa(self, _, use_python_runtime):
-        model = NonDDSModel().eval().cuda()
+        model = DDSOpWithReductionOpModel().eval().cuda()
         inputs = (torch.randint(low=0, high=3, size=(10,), dtype=torch.int).to("cuda"),)
         compiled_model = torch_tensorrt.compile(
             model,
