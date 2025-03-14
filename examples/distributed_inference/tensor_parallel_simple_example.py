@@ -31,7 +31,7 @@ def compile_tp_model(tp_model, backend):
 
     try:
         return torch.compile(
-            tp_model, backend=backend, options=compile_options, dynamic=False
+            tp_model, backend=backend, options=compile_options, dynamic=None
         )
     except RuntimeError as e:
         if (
@@ -43,7 +43,7 @@ def compile_tp_model(tp_model, backend):
             )
             compile_options["use_distributed_mode_trace"] = True
             return torch.compile(
-                tp_model, backend=backend, options=compile_options, dynamic=False
+                tp_model, backend=backend, options=compile_options, dynamic=None
             )
         else:
             logger.debug("The distributed model fails with the following error")
