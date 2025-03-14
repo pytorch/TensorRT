@@ -1,11 +1,6 @@
-#if defined(__GNUC__) && !defined(__clang__)
-#if __GNUC__ >= 13
+// Include cstdint for GCC 13+ or Clang 13+
+#if (defined(__GNUC__) && !defined(__clang__) && (__GNUC__ >= 13)) || (defined(__clang__) && (__clang_major__ >= 13))
 #include <cstdint>
-#endif
-#elif defined(__clang__)
-#if __clang_major__ >= 13
-#include <cstdint>
-#endif
 #endif
 #pragma once
 
