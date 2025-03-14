@@ -1,3 +1,7 @@
+"""
+This file contains the Tensor parallel simple model example used for tensor parallel distribution
+"""
+
 import time
 
 import tensorrt as trt
@@ -15,7 +19,6 @@ from torch.distributed.tensor.parallel import (
 device_mesh, _world_size, _rank, logger = initialize_distributed_env(
     "./tensor_parallel_simple_example"
 )
-import tensorrt_llm
 
 """
 This example copies some code from https://github.com/pytorch/examples/blob/main/distributed/tensor_parallelism/tensor_parallel_example.py
