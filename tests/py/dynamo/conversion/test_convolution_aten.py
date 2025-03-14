@@ -1,7 +1,6 @@
 import torch
 from parameterized import param, parameterized
 from torch.testing._internal.common_utils import run_tests
-
 from torch_tensorrt import Input
 
 from .harness import DispatchTestCase
@@ -133,8 +132,13 @@ class TestConvolutionConverter(DispatchTestCase):
             ("default", 1),
             param("no_bias", 1, bias=False),
             ("tuple_parameters", 1, (1, 1), (1, 1)),
+            param("list_stride", 2, stride=[2]),
             param("non_zero_padding", 1, padding=1),
-            param("dilation", 1, dilation=2),
+            param("list_zero_padding", 1, padding=[0]),
+            param("list_non_padding", 1, padding=[1]),
+            param("dilation", 2, dilation=3),
+            param("tuple_dilation", 2, dilation=(3, 3)),
+            param("list_dilation", 2, dilation=[3]),
             param("groups", 1, groups=3),
         ]
     )
@@ -204,8 +208,12 @@ class TestConvolutionConverter(DispatchTestCase):
             ("default", 1),
             param("no_bias", 1, bias=False),
             ("tuple_parameters", 1, (1, 1, 1), (1, 1, 1)),
+            param("list_stride", 2, stride=[2]),
             param("non_zero_padding", 1, padding=1),
-            param("dilation", 1, dilation=2),
+            param("list_zero_padding", 1, padding=[0]),
+            param("list_non_padding", 1, padding=[1]),
+            param("dilation", 2, dilation=2),
+            param("list_dilation", 2, dilation=[2]),
             ## TODO TRT 8.4.1 will trigger issue with this test. T127981773
             # param("groups", 1, groups=3),
         ]
