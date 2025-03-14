@@ -40,6 +40,7 @@ Model Zoo
 * :ref:`_torch_export_flux_dev`: Compiling FLUX.1-dev model using AOT workflow (`ir=dynamo`)
 
 
+
 .. raw:: html
 
     <div class="sphx-glr-thumbnails">
@@ -149,7 +150,7 @@ Model Zoo
 
 .. raw:: html
 
-    <div class="sphx-glr-thumbcontainer" tooltip="This interactive script is intended as an overview of the process by which the Torch-TensorRT C...">
+    <div class="sphx-glr-thumbcontainer" tooltip="CUDA Graphs allow multiple GPU operations to be launched through a single CPU operation, reduci...">
 
 .. only:: html
 
@@ -200,40 +201,6 @@ Model Zoo
 
 .. raw:: html
 
-    <div class="sphx-glr-thumbcontainer" tooltip="This example illustrates the state of the art model FLUX.1-dev optimized using Torch-TensorRT.">
-
-.. only:: html
-
-  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_torch_export_flux_dev_thumb.png
-    :alt:
-
-  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_torch_export_flux_dev.py`
-
-.. raw:: html
-
-      <div class="sphx-glr-thumbnail-title">Compiling FLUX.1-dev model using the Torch-TensorRT dynamo backend</div>
-    </div>
-
-
-.. raw:: html
-
-    <div class="sphx-glr-thumbcontainer" tooltip="We are going to demonstrate how we can easily use Mutable Torch TensorRT Module to compile, int...">
-
-.. only:: html
-
-  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_mutable_torchtrt_module_example_thumb.png
-    :alt:
-
-  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_mutable_torchtrt_module_example.py`
-
-.. raw:: html
-
-      <div class="sphx-glr-thumbnail-title">Mutable Torch TensorRT Module</div>
-    </div>
-
-
-.. raw:: html
-
     <div class="sphx-glr-thumbcontainer" tooltip="This interactive script is intended as a sample of the Torch-TensorRT workflow with torch.compi...">
 
 .. only:: html
@@ -246,6 +213,23 @@ Model Zoo
 .. raw:: html
 
       <div class="sphx-glr-thumbnail-title">Compiling ResNet with dynamic shapes using the torch.compile backend</div>
+    </div>
+
+
+.. raw:: html
+
+    <div class="sphx-glr-thumbcontainer" tooltip="This example illustrates the state of the art model FLUX.1-dev optimized using Torch-TensorRT.">
+
+.. only:: html
+
+  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_torch_export_flux_dev_thumb.png
+    :alt:
+
+  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_torch_export_flux_dev.py`
+
+.. raw:: html
+
+      <div class="sphx-glr-thumbnail-title">Compiling FLUX.1-dev model using the Torch-TensorRT dynamo backend</div>
     </div>
 
 
@@ -302,6 +286,23 @@ Model Zoo
 
 .. raw:: html
 
+    <div class="sphx-glr-thumbcontainer" tooltip="We are going to demonstrate how to automatically generate a plugin for a custom kernel using To...">
+
+.. only:: html
+
+  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_auto_generate_plugin_thumb.png
+    :alt:
+
+  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_auto_generate_plugin.py`
+
+.. raw:: html
+
+      <div class="sphx-glr-thumbnail-title">Automatically Generate a Plugin for a Custom Kernel</div>
+    </div>
+
+
+.. raw:: html
+
     <div class="sphx-glr-thumbcontainer" tooltip="If for some reason you want to change the conversion behavior of a specific PyTorch operation t...">
 
 .. only:: html
@@ -331,6 +332,23 @@ Model Zoo
 .. raw:: html
 
       <div class="sphx-glr-thumbnail-title">Weight Streaming</div>
+    </div>
+
+
+.. raw:: html
+
+    <div class="sphx-glr-thumbcontainer" tooltip="We are going to demonstrate how we can easily use Mutable Torch TensorRT Module to compile, int...">
+
+.. only:: html
+
+  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_mutable_torchtrt_module_example_thumb.png
+    :alt:
+
+  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_mutable_torchtrt_module_example.py`
+
+.. raw:: html
+
+      <div class="sphx-glr-thumbnail-title">Mutable Torch TensorRT Module</div>
     </div>
 
 

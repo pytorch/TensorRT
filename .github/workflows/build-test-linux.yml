@@ -23,6 +23,7 @@ jobs:
       test-infra-ref: main
       with-rocm: false
       with-cpu: false
+      python-versions: '["3.11", "3.12", "3.10", "3.9"]'
 
   filter-matrix:
     needs: [generate-matrix]
@@ -32,7 +33,7 @@ jobs:
     steps:
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: '3.11'
       - uses: actions/checkout@v4
         with:
           repository: pytorch/tensorrt

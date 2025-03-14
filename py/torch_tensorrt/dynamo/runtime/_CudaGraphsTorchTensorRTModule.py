@@ -32,6 +32,7 @@ class CudaGraphsTorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         self._input_buffers: List[torch.Tensor] = []
         self._output_buffers: List[torch.Tensor] = []
         self.cudagraph: Optional[torch.cuda.CUDAGraph] = None
+        self.use_output_allocator_outputs = False
         self.shape_key: Optional[str] = None
         self._caller_stream: Optional[torch.cuda.Stream] = None
         self._engine_stream: Optional[torch.cuda.Stream] = None
@@ -72,6 +73,9 @@ class CudaGraphsTorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
     def __del__(self) -> None:
         if self.cudagraph:
             self.cudagraph.reset()
+
+    def set_use_output_allocator(self, enable: bool) -> None:
+        self.use_output_allocator_outputs = enable
 
     def forward(self, *inputs: torch.Tensor) -> torch.Tensor | Tuple[torch.Tensor, ...]:
         cudagraphs_enabled = torch_tensorrt.runtime.get_whole_cudagraphs_mode()
@@ -115,12 +119,12 @@ class CudaGraphsTorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
                     contiguous_inputs[i].dtype == self.inputs[i].dtype
                 ), f"Dtype mismatch for {i}th input. Expect {self.inputs[i].dtype}, got {contiguous_inputs[i].dtype}."
 
-            if need_cudagraphs_record:
-                # If cudagraphs is enabled, this memory is reserved for future cudagraph runs
-                # Clone is required to avoid re-using user-provided GPU memory
-                self._input_buffers[i] = contiguous_inputs[i].clone()
-            else:
-                self._input_buffers[i].copy_(contiguous_inputs[i])
+                if need_cudagraphs_record:
+                    # If cudagraphs is enabled, this memory is reserved for future cudagraph runs
+                    # Clone is required to avoid re-using user-provided GPU memory
+                    self._input_buffers[i] = contiguous_inputs[i].clone()
+                else:
+                    self._input_buffers[i].copy_(contiguous_inputs[i])
 
             self._caller_stream = torch.cuda.current_stream()
             if (

@@ -1,15 +1,15 @@
-FROM pytorch/manylinux2_28-builder:cuda12.6
+FROM pytorch/manylinux2_28-builder:cuda12.8
 
 RUN yum install -y ninja-build
 
 # download TensorRT tarball
-RUN wget -q https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.7.0/tars/TensorRT-10.7.0.23.Linux.x86_64-gnu.cuda-12.6.tar.gz \
-&& gunzip TensorRT-10.7.0.23.Linux.x86_64-gnu.cuda-12.6.tar.gz \
-&& tar -xvf TensorRT-10.7.0.23.Linux.x86_64-gnu.cuda-12.6.tar \
-&& rm TensorRT-10.7.0.23.Linux.x86_64-gnu.cuda-12.6.tar
+RUN wget -q https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.9.0/tars/TensorRT-10.9.0.34.Linux.x86_64-gnu.cuda-12.8.tar.gz \
+&& gunzip TensorRT-10.9.0.34.Linux.x86_64-gnu.cuda-12.8.tar.gz \
+&& tar -xvf TensorRT-10.9.0.34.Linux.x86_64-gnu.cuda-12.8.tar \
+&& rm TensorRT-10.9.0.34.Linux.x86_64-gnu.cuda-12.8.tar
 
-ENV TENSORRT_DIR=/TensorRT-10.7.0.23
-ENV TENSORRT_VERSION=10.7.0
+ENV TENSORRT_DIR=/TensorRT-10.9.0.34
+ENV TENSORRT_VERSION=10.9.0
 
 RUN wget https://github.com/bazelbuild/bazelisk/releases/download/v1.17.0/bazelisk-linux-amd64 \
     && mv bazelisk-linux-amd64 /usr/bin/bazel \

@@ -1,5 +1,5 @@
-py38
 py39
 py310
 py311
+py312
 libtorchtrt_pre_cxx11_abi

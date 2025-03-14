@@ -89,6 +89,7 @@ static auto TORCHTRT_UNUSED TRTEngineTSRegistrtion =
         .def("get_engine_layer_info", &TRTEngine::get_engine_layer_info)
         .def("infer_outputs", &TRTEngine::infer_outputs)
         .def_readwrite("use_pre_allocated_outputs", &TRTEngine::use_pre_allocated_outputs)
+        .def_readwrite("use_output_allocator_outputs", &TRTEngine::use_output_allocator_outputs)
         .def_property(
             "device_memory_budget",
             &TRTEngine::get_device_memory_budget,
@@ -130,6 +131,7 @@ TORCH_LIBRARY(tensorrt, m) {
   m.def("HW_COMPATIBLE_IDX", []() -> int64_t { return HW_COMPATIBLE_IDX; });
   m.def("SERIALIZED_METADATA_IDX", []() -> int64_t { return SERIALIZED_METADATA_IDX; });
   m.def("TARGET_PLATFORM_IDX", []() -> int64_t { return TARGET_PLATFORM_IDX; });
+  m.def("REQUIRES_OUTPUT_ALLOCATOR_IDX", []() -> int64_t { return REQUIRES_OUTPUT_ALLOCATOR_IDX; });
   m.def("SERIALIZATION_LEN", []() -> int64_t { return SERIALIZATION_LEN; });
   m.def("_platform_linux_x86_64", []() -> std::string {
     auto it = get_platform_name_map().find(Platform::PlatformEnum::kLINUX_X86_64);

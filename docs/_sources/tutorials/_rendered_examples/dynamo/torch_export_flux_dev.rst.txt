@@ -28,11 +28,11 @@ Torch-TensorRT.
 
 **FLUX.1 [dev]** is a 12 billion parameter rectified flow transformer capable of generating images from text descriptions. It is an open-weight, guidance-distilled model for non-commercial applications.
 
-Install the following dependencies before compilation
+To run this demo, you need to have access to Flux model (request for access if you do not have it already on the `FLUX.1-dev <https://huggingface.co/black-forest-labs/FLUX.1-dev>`_ page) and install the following dependencies
 
 .. code-block:: python
 
-    pip install sentencepiece=="0.2.0" transformers=="4.48.2" accelerate=="1.3.0" diffusers=="0.32.2"
+    pip install sentencepiece=="0.2.0" transformers=="4.48.2" accelerate=="1.3.0" diffusers=="0.32.2" protobuf=="5.29.3"
 
 There are different components of the ``FLUX.1-dev`` pipeline such as ``transformer``, ``vae``, ``text_encoder``, ``tokenizer`` and ``scheduler``. In this example,
 we demonstrate optimizing the ``transformer`` component of the model (which typically consumes >95% of the e2e diffusion latency)
@@ -60,7 +60,7 @@ Load the ``FLUX-1.dev`` pretrained pipeline using ``FluxPipeline`` class.
 ``FluxPipeline`` includes different components such as ``transformer``, ``vae``, ``text_encoder``, ``tokenizer`` and ``scheduler`` necessary
 to generate an image. We load the weights in ``FP16`` precision using ``torch_dtype`` argument
 
-.. GENERATED FROM PYTHON SOURCE LINES 36-47
+.. GENERATED FROM PYTHON SOURCE LINES 36-46
 
 .. code-block:: python
 
@@ -69,21 +69,20 @@ to generate an image. We load the weights in ``FP16`` precision using ``torch_dt
         "black-forest-labs/FLUX.1-dev",
         torch_dtype=torch.float16,
     )
-    pipe.to(DEVICE).to(torch.float16)
+
     # Store the config and transformer backbone
     config = pipe.transformer.config
-    backbone = pipe.transformer
+    backbone = pipe.transformer.to(DEVICE)
 
 
-
-.. GENERATED FROM PYTHON SOURCE LINES 48-52
+.. GENERATED FROM PYTHON SOURCE LINES 47-51
 
 Export the backbone using torch.export
 --------------------------------------------------
 Define the dummy inputs and their respective dynamic shapes. We export the transformer backbone with dynamic shapes with a ``batch_size=2``
 due to `0/1 specialization <https://docs.google.com/document/d/16VPOa3d-Liikf48teAOmxLc92rgvJdfosIy-yoT38Io/edit?fbclid=IwAR3HNwmmexcitV0pbZm_x1a4ykdXZ9th_eJWK-3hBtVgKnrkmemz6Pm5jRQ&tab=t.0#heading=h.ez923tomjvyk>`_
 
-.. GENERATED FROM PYTHON SOURCE LINES 52-93
+.. GENERATED FROM PYTHON SOURCE LINES 51-96
 
 .. code-block:: python
 
@@ -101,6 +100,8 @@ due to `0/1 specialization <https://docs.google.com/document/d/16VPOa3d-Liikf48t
         "txt_ids": {0: SEQ_LEN},
         "img_ids": {0: IMG_ID},
         "guidance": {0: BATCH},
+        "joint_attention_kwargs": {},
+        "return_dict": None,
     }
     # The guidance factor is of type torch.float32
     dummy_inputs = {
@@ -117,6 +118,8 @@ due to `0/1 specialization <https://docs.google.com/document/d/16VPOa3d-Liikf48t
         "txt_ids": torch.randn((512, 3), dtype=torch.float16).to(DEVICE),
         "img_ids": torch.randn((4096, 3), dtype=torch.float16).to(DEVICE),
         "guidance": torch.tensor([1.0, 1.0], dtype=torch.float32).to(DEVICE),
+        "joint_attention_kwargs": {},
+        "return_dict": False,
     }
     # This will create an exported program which is going to be compiled with Torch-TensorRT
     ep = _export(
@@ -129,7 +132,7 @@ due to `0/1 specialization <https://docs.google.com/document/d/16VPOa3d-Liikf48t
     )
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 94-104
+.. GENERATED FROM PYTHON SOURCE LINES 97-107
 
 Torch-TensorRT compilation
 ---------------------------
@@ -142,7 +145,7 @@ We also enable explicit typing to ensure TensorRT respects the datatypes set by 
 Since this is a 12 billion parameter model, it takes around 20-30 min to compile on H100 GPU. The model is completely convertible and results in
 a single TensorRT engine.
 
-.. GENERATED FROM PYTHON SOURCE LINES 104-114
+.. GENERATED FROM PYTHON SOURCE LINES 107-117
 
 .. code-block:: python
 
@@ -157,31 +160,34 @@ a single TensorRT engine.
     )
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 115-119
+.. GENERATED FROM PYTHON SOURCE LINES 118-122
 
 Post Processing
 ---------------------------
 Release the GPU memory occupied by the exported program and the pipe.transformer
 Set the transformer in the Flux pipeline to the Torch-TRT compiled model
 
-.. GENERATED FROM PYTHON SOURCE LINES 119-124
+.. GENERATED FROM PYTHON SOURCE LINES 122-130
 
 .. code-block:: python
 
-    backbone.to("cpu")
+
     del ep
+    backbone.to("cpu")
+    pipe.to(DEVICE)
+    torch.cuda.empty_cache()
     pipe.transformer = trt_gm
     pipe.transformer.config = config
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 125-129
+.. GENERATED FROM PYTHON SOURCE LINES 131-135
 
 Image generation using prompt
 ---------------------------
 Provide a prompt and the file name of the image to be generated. Here we use the
 prompt ``A golden retriever holding a sign to code``.
 
-.. GENERATED FROM PYTHON SOURCE LINES 129-146
+.. GENERATED FROM PYTHON SOURCE LINES 135-152
 
 .. code-block:: python
 
@@ -203,7 +209,7 @@ prompt ``A golden retriever holding a sign to code``.
     generate_image(pipe, ["A golden retriever holding a sign to code"], "dog_code")
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 147-151
+.. GENERATED FROM PYTHON SOURCE LINES 153-157
 
 The generated image is as shown below
 

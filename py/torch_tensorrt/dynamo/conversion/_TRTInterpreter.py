@@ -64,6 +64,7 @@ class TRTInterpreterResult(NamedTuple):
     input_names: Sequence[str]
     output_names: Sequence[str]
     weight_name_map: Optional[dict[Any, Any]]
+    requires_output_allocator: bool
 
 
 class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
@@ -375,7 +376,10 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
 
     @staticmethod
     def find_weight(
-        weight_name: str, np_map: dict[str, Any], state_dict: dict[str, Any]
+        weight_name: str,
+        np_map: dict[str, Any],
+        state_dict: dict[str, Any],
+        device: torch.device,
     ) -> str:
         """
         We need to build map from engine weight name to state_dict weight name.
@@ -385,19 +389,21 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         np_map: the map from weight name to np values in INetworkDefinition
         state_dict: state of the graph module
         """
-        network_weight = torch.from_numpy(np_map[weight_name]).cuda()
+        network_weight = torch.from_numpy(np_map[weight_name]).to(device)
         for sd_w_name, sd_weight in state_dict.items():
-            if TRTInterpreter.check_weight_equal(sd_weight, network_weight):
+            if TRTInterpreter.check_weight_equal(sd_weight, network_weight, device):
                 del state_dict[sd_w_name]
                 return sd_w_name
         return ""
 
     @staticmethod
     def check_weight_equal(
-        sd_weight: torch.tensor, network_weight: Union[torch.Tensor, np.ndarray]
+        sd_weight: torch.tensor,
+        network_weight: Union[torch.Tensor, np.ndarray],
+        device: torch.device,
     ) -> Any:
         if not isinstance(network_weight, torch.Tensor):
-            network_weight = torch.from_numpy(network_weight).cuda()
+            network_weight = torch.from_numpy(network_weight).to(device)
         try:
             return sd_weight.shape == network_weight.shape and torch.all(
                 torch.abs(sd_weight - network_weight) < 0.01
@@ -530,10 +536,10 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                 # There is no direct connection in batch_norm layer. So skip it
                 pass
             elif sd_weight_name not in sd or not TRTInterpreter.check_weight_equal(
-                sd[sd_weight_name], np_map[engine_weight_name]
+                sd[sd_weight_name], np_map[engine_weight_name], torch_device
             ):
                 weight_name_map[engine_weight_name] = TRTInterpreter.find_weight(
-                    engine_weight_name, np_map, sd
+                    engine_weight_name, np_map, sd, torch_device
                 )
                 if (
                     weight_name_map[engine_weight_name] != ""
@@ -577,6 +583,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                 self.input_specs,
                 self.compilation_settings,
                 self.weight_name_map,
+                self.ctx.requires_output_allocator,
             ),
         )
 
@@ -591,6 +598,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                 cached_engine_input_specs,
                 engine_compilation_settings,
                 self.weight_name_map,
+                self.ctx.requires_output_allocator,
             ) = cached_data
 
             setting_compatiblity, incompattible_settings = settings_are_compatible(
@@ -652,6 +660,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                 self._input_names,
                 self._output_names,
                 self.weight_name_map,
+                self.ctx.requires_output_allocator,
             )
         return None
 
@@ -737,6 +746,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             self._input_names,
             self._output_names,
             self.weight_name_map,
+            self.ctx.requires_output_allocator,
         )
 
     def run_node(self, n: torch.fx.Node) -> torch.fx.Node:
@@ -830,7 +840,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                 f"Conversion of module of type {submod_type} not currently supported!"
             )
 
-        converter, calling_convention = converter_packet
+        converter, calling_convention, _ = converter_packet
 
         assert self._cur_node_name is not None
 
@@ -847,7 +857,10 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                 f"Conversion of function {torch.typename(target)} not currently supported!"
             )
 
-        converter, calling_convention = converter_packet
+        converter, calling_convention, converter_info = converter_packet
+        if converter_info.get("requires_output_allocator", False):
+            self.ctx.requires_output_allocator = True
+            _LOGGER.debug(f"{target} requires output allocator")
 
         if calling_convention is CallingConvention.LEGACY:
             return converter(self.ctx.net, target, args, kwargs, self._cur_node_name)
@@ -877,7 +890,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             raise UnsupportedOperatorException(
                 f"Conversion of method {target} not currently supported!"
             )
-        converter, calling_convention = converter_packet
+        converter, calling_convention, _ = converter_packet
 
         if calling_convention is CallingConvention.LEGACY:
             return converter(self.ctx.net, target, args, kwargs, self._cur_node_name)

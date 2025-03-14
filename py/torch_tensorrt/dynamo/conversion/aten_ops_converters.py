@@ -810,43 +810,8 @@ def aten_ops_select(
     )
 
 
-def index_put_validator(
-    node: Node, settings: Optional[CompilationSettings] = None
-) -> bool:
-    if args_bounds_check(node.args, 3, False):  # Check if accumulate is valid
-        _LOGGER.debug("We do not support accumulate=True for aten.index_put operation")
-        accumulate_valid = False
-    else:
-        accumulate_valid = True
-
-    # Retrieve input tensor's meta information
-    input_meta = node.args[0].meta.get("tensor_meta")
-    if not input_meta:
-        _LOGGER.warning(
-            "Meta information of input is missing. Unable to validate if broadcasting is needed, falling back to PyTorch operation."
-        )
-        return False
-
-    input_shape = input_meta.shape
-    input_num_dims = len(input_shape)
-
-    # Check if broadcasting is valid
-    indices_num_dims = len(node.args[1])
-    if indices_num_dims == input_num_dims:
-        broadcast_valid = True
-    else:
-        _LOGGER.debug(
-            "We do not support broadcasting when the number of index dimensions does not match the number of input tensor dimensions."
-        )
-        broadcast_valid = False
-
-    # Return validation result
-    return accumulate_valid and broadcast_valid
-
-
 @dynamo_tensorrt_converter(
     torch.ops.aten.index_put.default,
-    capability_validator=index_put_validator,
 )
 @enforce_tensor_types(
     {
@@ -2468,13 +2433,14 @@ def aten_ops_convolution(
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     is_transposed = args[6]
+    is_conv1d = len(args[0].shape) == 3
     if not is_transposed:
         return impl.conv.convNd(
             ctx,
             target,
             source_ir=SourceIR.ATEN,
             name=name,
-            is_conv1d=len(args[3]) == 1,
+            is_conv1d=is_conv1d,
             input=args[0],
             weight=args[1],
             bias=args_bounds_check(args, 2, None),
@@ -2489,7 +2455,7 @@ def aten_ops_convolution(
             target,
             source_ir=SourceIR.ATEN,
             name=name,
-            is_deconv1d=len(args[3]) == 1,
+            is_deconv1d=is_conv1d,
             input=args[0],
             weight=args[1],
             bias=args_bounds_check(args, 2, None),
@@ -3551,4 +3517,25 @@ def aten_ops_full(
         shape=args[0],
         fill_value=args[1],
         dtype=kwargs.get("dtype", None),
+    )
+
+
+@dynamo_tensorrt_converter(
+    torch.ops.aten.nonzero.default,
+    supports_dynamic_shapes=True,
+    requires_output_allocator=True,
+)
+def aten_ops_nonzero(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.unary.nonzero(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
     )
