@@ -11,9 +11,11 @@ class ConversionContext:
     Args:
         net: TensorRT Network being built
         compilation_settings: Settings selected by the user for compilation
+        requires_output_allocator: Boolean flag indicating if the converter creates operators which require an Output Allocator to run (e.g. data dependent operators)
     """
 
     net: TRTNetwork
     compilation_settings: CompilationSettings = field(
         default_factory=CompilationSettings
     )
+    requires_output_allocator: bool = False

@@ -3,6 +3,7 @@ from typing import Callable, Optional, Sequence, Union
 
 import torch
 from torch_tensorrt.dynamo._settings import CompilationSettings
+from torch_tensorrt.dynamo.utils import is_tegra_platform
 
 from .accumulate_fp32_matmul import accumulate_fp32_matmul
 from .constant_folding import constant_fold
@@ -12,21 +13,25 @@ from .pass_manager import DynamoPassManager
 from .remove_assert_nodes import remove_assert_nodes
 from .remove_detach import remove_detach
 from .remove_input_alias_fixing_clones import remove_input_alias_fixing_clones
+from .remove_num_users_is_0_nodes import remove_num_users_is_0_nodes
 from .repair_input_as_output import repair_input_as_output
 from .replace_max_pool_with_indices import replace_max_pool_with_indices
 
-ATEN_POST_LOWERING_PASSES = DynamoPassManager.build_from_passlist(
-    [
-        remove_input_alias_fixing_clones,
-        constant_fold,
-        repair_input_as_output,
-        fuse_prims_broadcast,
-        fuse_distributed_ops,
-        replace_max_pool_with_indices,
-        remove_assert_nodes,
-        accumulate_fp32_matmul,
-    ]
-)
+pass_list = [
+    remove_input_alias_fixing_clones,
+    constant_fold,
+    repair_input_as_output,
+    fuse_prims_broadcast,
+    replace_max_pool_with_indices,
+    remove_assert_nodes,
+    accumulate_fp32_matmul,
+    remove_num_users_is_0_nodes,
+]
+
+if not is_tegra_platform():
+    pass_list.append(fuse_distributed_ops)
+
+ATEN_POST_LOWERING_PASSES = DynamoPassManager.build_from_passlist(pass_list)
 
 ATEN_PRE_LOWERING_PASSES = DynamoPassManager.build_from_passlist(
     [

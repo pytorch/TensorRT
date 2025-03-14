@@ -34,6 +34,7 @@ OUTPUT_BINDING_NAMES_IDX = -1  # Not implemented
 HW_COMPATIBLE_IDX = -1  # Not implemented
 SERIALIZED_METADATA_IDX = -1  # Not implemented
 TARGET_PLATFORM_IDX = -1  # Not implemented
+REQUIRES_OUTPUT_ALLOCATOR_IDX = -1  # Not implemented
 SERIALIZATION_LEN = -1  # Not implemented
 
 if ENABLED_FEATURES.torch_tensorrt_runtime:
@@ -46,7 +47,10 @@ if ENABLED_FEATURES.torch_tensorrt_runtime:
     HW_COMPATIBLE_IDX = torch.ops.tensorrt.HW_COMPATIBLE_IDX()  # 6
     SERIALIZED_METADATA_IDX = torch.ops.tensorrt.SERIALIZED_METADATA_IDX()  # 7
     TARGET_PLATFORM_IDX = torch.ops.tensorrt.TARGET_PLATFORM_IDX()  # 8
-    SERIALIZATION_LEN = torch.ops.tensorrt.SERIALIZATION_LEN()  # 9
+    REQUIRES_OUTPUT_ALLOCATOR_IDX = (
+        torch.ops.tensorrt.REQUIRES_OUTPUT_ALLOCATOR_IDX()
+    )  # 9
+    SERIALIZATION_LEN = torch.ops.tensorrt.SERIALIZATION_LEN()  # 10
 
 
 @for_all_methods(needs_torch_tensorrt_runtime)
@@ -79,6 +83,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         name: str = "",
         settings: CompilationSettings = CompilationSettings(),  # Assumes engine was built with default compilation settings if object not passed
         weight_name_map: Optional[dict[Any, Any]] = None,
+        requires_output_allocator: bool = False,
     ):
         """Takes a name, target device, serialized TensorRT engine, and binding names / order and constructs
         a PyTorch ``torch.nn.Module`` around it. Uses the Torch-TensorRT runtime extension to run the engines
@@ -97,6 +102,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
             name (str): Name for module
             settings (torch_tensorrt.dynamo.CompilationSettings): Settings used to compile engine, assumes engine was built with default compilation settings if object not passed
             weight_name_map (dict): Mapping of engine weight name to state_dict weight name
+            requires_output_allocator (bool): Boolean flag indicating if the converter creates operators which require an Output Allocator to run (e.g. data dependent operators)
 
         Example:
 
@@ -132,6 +138,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         self.weight_name_map = weight_name_map
         self.serialized_engine = serialized_engine
         self.engine = None
+        self.requires_output_allocator = requires_output_allocator
 
         if (
             serialized_engine
@@ -146,7 +153,10 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
             if self.settings.device is not None
             else Device._current_device()
         )
-        metadata = {"settings": self.settings, "weight_name_map": self.weight_name_map}
+        metadata = {
+            "settings": self.settings,
+            "weight_name_map": self.weight_name_map,
+        }
         target_platform = (
             Platform.current_platform()
             if not self.settings.enable_cross_compile_for_windows
@@ -171,6 +181,9 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         engine_info[HW_COMPATIBLE_IDX] = str(int(self.hardware_compatible))
         engine_info[SERIALIZED_METADATA_IDX] = self.encode_metadata(metadata)
         engine_info[TARGET_PLATFORM_IDX] = target_platform._to_serialized_rt_platform()
+        engine_info[REQUIRES_OUTPUT_ALLOCATOR_IDX] = str(
+            int(self.requires_output_allocator)
+        )
 
         return engine_info
 
@@ -256,7 +269,12 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
                 serialized_engine_info[ENGINE_IDX]
             )
             self.engine = torch.classes.tensorrt.Engine(serialized_engine_info)
-            self.hardware_compatible = bool(int(state[1][HW_COMPATIBLE_IDX]))
+            self.hardware_compatible = bool(
+                int(serialized_engine_info[HW_COMPATIBLE_IDX])
+            )
+            self.requires_output_allocator = bool(
+                int(serialized_engine_info[REQUIRES_OUTPUT_ALLOCATOR_IDX])
+            )
 
             serialized_metadata = serialized_engine_info[SERIALIZED_METADATA_IDX]
             assert isinstance(serialized_metadata, bytes)
@@ -274,6 +292,9 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
 
     def set_pre_allocated_outputs(self, enable: bool) -> None:
         self.engine.use_pre_allocated_outputs = enable
+
+    def set_use_output_allocator(self, enable: bool) -> None:
+        self.engine.use_output_allocator_outputs = enable
 
     def forward(self, *inputs: Any) -> torch.Tensor | Tuple[torch.Tensor, ...]:
         """Implementation of the forward pass for a TensorRT engine

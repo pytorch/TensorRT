@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt.dynamo.runtime._PythonTorchTensorRTModule &mdash; Torch-TensorRT v2.7.0.dev0+f7aab56 documentation</title>
+  <title>torch_tensorrt.dynamo.runtime._PythonTorchTensorRTModule &mdash; Torch-TensorRT v2.7.0.dev0+1cd215d documentation</title>
   
 
   
@@ -290,7 +290,7 @@
               
               
                 <div class="version">
-                  v2.7.0.dev0+f7aab56
+                  v2.7.0.dev0+1cd215d
                 </div>
               
             
@@ -511,6 +511,41 @@
 <span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
 
 
+<span class="k">class</span><span class="w"> </span><span class="nc">DynamicOutputAllocator</span><span class="p">(</span><span class="n">trt</span><span class="o">.</span><span class="n">IOutputAllocator</span><span class="p">):</span>  <span class="c1"># type: ignore[misc]</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">output_dtypes</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">dtype</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">trt</span><span class="o">.</span><span class="n">IOutputAllocator</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">buffers</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">shapes</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">]]</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">dtypes</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">dtype</span><span class="p">]</span> <span class="o">=</span> <span class="n">output_dtypes</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">reallocate_output_async</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">tensor_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">memory</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">size</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">alignment</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">stream</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">Stream</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+        <span class="n">shape</span> <span class="o">=</span> <span class="p">(</span><span class="n">size</span><span class="p">,)</span>
+        <span class="k">if</span> <span class="n">tensor_name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">buffers</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">buffers</span><span class="p">[</span><span class="n">tensor_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">empty</span><span class="p">(</span>
+                <span class="n">shape</span><span class="p">,</span>
+                <span class="n">dtype</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">dtypes</span><span class="p">[</span><span class="n">tensor_name</span><span class="p">],</span>
+                <span class="n">device</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">current_device</span><span class="p">(),</span>
+            <span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">buffers</span><span class="p">[</span><span class="n">tensor_name</span><span class="p">]</span><span class="o">.</span><span class="n">shape</span> <span class="o">!=</span> <span class="n">shape</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">buffers</span><span class="p">[</span><span class="n">tensor_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">empty</span><span class="p">(</span>
+                    <span class="n">shape</span><span class="p">,</span>
+                    <span class="n">dtype</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">dtypes</span><span class="p">[</span><span class="n">tensor_name</span><span class="p">],</span>
+                    <span class="n">device</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">current_device</span><span class="p">(),</span>
+                <span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">buffers</span><span class="p">[</span><span class="n">tensor_name</span><span class="p">]</span><span class="o">.</span><span class="n">data_ptr</span><span class="p">()</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">notify_shape</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">tensor_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">shape</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">shapes</span><span class="p">[</span><span class="n">tensor_name</span><span class="p">]</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">shape</span><span class="p">)</span>
+
+
 <span class="k">class</span><span class="w"> </span><span class="nc">TorchTRTRuntimeStates</span><span class="p">:</span>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">new_cudagraphs</span><span class="p">:</span> <span class="nb">bool</span><span class="p">):</span>
         <span class="c1"># Indicates whether CUDAGraphs were enabled in the previous execute_engine</span>
@@ -580,6 +615,7 @@
         <span class="n">name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span><span class="p">,</span>
         <span class="n">settings</span><span class="p">:</span> <span class="n">CompilationSettings</span> <span class="o">=</span> <span class="n">CompilationSettings</span><span class="p">(),</span>
         <span class="n">weight_name_map</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">requires_output_allocator</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
     <span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Takes a name, target device, serialized TensorRT engine, and binding names / order and constructs</span>
 <span class="sd">        a PyTorch ``torch.nn.Module`` around it. Uses TensorRT Python APIs to run the engine</span>
@@ -593,6 +629,7 @@
 <span class="sd">            name (str): Name for module</span>
 <span class="sd">            settings (torch_tensorrt.dynamo.CompilationSettings): Settings used to compile engine, assumes engine was built with default compilation settings if object not passed</span>
 <span class="sd">            weight_name_map (dict): Mapping of engine weight name to state_dict weight name</span>
+<span class="sd">            requires_output_allocator (bool): Boolean flag indicating if the converter creates operators which require an Output Allocator to run (e.g. data dependent operators)</span>
 
 <span class="sd">        Example:</span>
 
@@ -652,8 +689,14 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">runtime_states</span> <span class="o">=</span> <span class="n">TorchTRTRuntimeStates</span><span class="p">(</span>
             <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">runtime</span><span class="o">.</span><span class="n">get_cudagraphs_mode</span><span class="p">()</span>
         <span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">cudagraphs_enabled</span> <span class="o">=</span> <span class="kc">False</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">pre_allocated_outputs</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">use_pre_allocated_outputs</span> <span class="o">=</span> <span class="kc">False</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">requires_output_allocator</span> <span class="o">=</span> <span class="n">requires_output_allocator</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">output_allocator</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">DynamicOutputAllocator</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">use_output_allocator_outputs</span> <span class="o">=</span> <span class="kc">False</span>
 
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">serialized_engine</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">settings</span><span class="o">.</span><span class="n">lazy_engine_init</span><span class="p">:</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">setup_engine</span><span class="p">()</span></div>
@@ -725,6 +768,9 @@
             <span class="bp">self</span><span class="o">.</span><span class="n">engine</span><span class="o">.</span><span class="n">get_tensor_shape</span><span class="p">(</span><span class="n">output_name</span><span class="p">)</span>
             <span class="k">for</span> <span class="n">output_name</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">output_names</span>
         <span class="p">]</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">requires_output_allocator</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">create_output_allocator</span><span class="p">()</span>
 
         <span class="k">if</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">runtime</span><span class="o">.</span><span class="n">get_cudagraphs_mode</span><span class="p">():</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">cudagraph</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">CUDAGraph</span><span class="p">()</span>
@@ -846,27 +892,26 @@
     <span class="k">def</span><span class="w"> </span><span class="nf">set_pre_allocated_outputs</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">enable</span><span class="p">:</span> <span class="nb">bool</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">use_pre_allocated_outputs</span> <span class="o">=</span> <span class="n">enable</span>
 
-<div class="viewcode-block" id="PythonTorchTensorRTModule.forward"><a class="viewcode-back" href="../../../../py_api/runtime.html#torch_tensorrt.runtime.PythonTorchTensorRTModule.forward">[docs]</a>    <span class="k">def</span><span class="w"> </span><span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">inputs</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span> <span class="o">|</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="o">...</span><span class="p">]:</span>
-        <span class="c1"># Ensure inputs are available in all scopes and cast symbolic integers to Tensors</span>
-        <span class="n">contiguous_inputs</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span>
-            <span class="p">(</span><span class="n">i</span><span class="o">.</span><span class="n">contiguous</span><span class="p">()</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">)</span> <span class="k">else</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="n">i</span><span class="p">)</span><span class="o">.</span><span class="n">cuda</span><span class="p">())</span>
-            <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">inputs</span>
-        <span class="p">]</span>
-        <span class="k">with</span> <span class="p">(</span>
-            <span class="n">torch</span><span class="o">.</span><span class="n">autograd</span><span class="o">.</span><span class="n">profiler</span><span class="o">.</span><span class="n">record_function</span><span class="p">(</span><span class="s2">&quot;PythonTorchTensorRTModule:Forward&quot;</span><span class="p">)</span>
-            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">profiling_enabled</span>
-            <span class="k">else</span> <span class="n">nullcontext</span><span class="p">()</span>
-        <span class="p">):</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_check_initialized</span><span class="p">()</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">set_use_output_allocator</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">enable</span><span class="p">:</span> <span class="nb">bool</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">use_output_allocator_outputs</span> <span class="o">=</span> <span class="n">enable</span>
 
-            <span class="n">cudagraphs_enabled</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">runtime</span><span class="o">.</span><span class="n">get_cudagraphs_mode</span><span class="p">()</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">create_output_allocator</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">output_allocator</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">output_dtypes_dict</span> <span class="o">=</span> <span class="p">{}</span>
+            <span class="k">for</span> <span class="n">o</span><span class="p">,</span> <span class="n">output_name</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">output_names</span><span class="p">):</span>
+                <span class="n">output_dtypes_dict</span><span class="p">[</span><span class="n">output_name</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">output_dtypes</span><span class="p">[</span><span class="n">o</span><span class="p">]</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">output_allocator</span> <span class="o">=</span> <span class="n">DynamicOutputAllocator</span><span class="p">(</span><span class="n">output_dtypes_dict</span><span class="p">)</span>
+
+<div class="viewcode-block" id="PythonTorchTensorRTModule.forward"><a class="viewcode-back" href="../../../../py_api/runtime.html#torch_tensorrt.runtime.PythonTorchTensorRTModule.forward">[docs]</a>    <span class="k">def</span><span class="w"> </span><span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">inputs</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span> <span class="o">|</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="o">...</span><span class="p">]:</span>
+
+        <span class="k">def</span><span class="w"> </span><span class="nf">run_standard_execution</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span> <span class="o">|</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="o">...</span><span class="p">]:</span>
             <span class="n">shape_changed</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">validate_input_shapes</span><span class="p">(</span><span class="n">inputs</span><span class="p">)</span>
             <span class="p">(</span>
                 <span class="n">need_cudagraphs_record</span><span class="p">,</span>
                 <span class="n">can_use_pre_allocated_outputs</span><span class="p">,</span>
                 <span class="n">need_cudagraphs_reset</span><span class="p">,</span>
             <span class="p">)</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">runtime_states</span><span class="o">.</span><span class="n">set_runtime_states</span><span class="p">(</span>
-                <span class="n">cudagraphs_enabled</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">use_pre_allocated_outputs</span><span class="p">,</span> <span class="n">shape_changed</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">cudagraphs_enabled</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">use_pre_allocated_outputs</span><span class="p">,</span> <span class="n">shape_changed</span>
             <span class="p">)</span>
 
             <span class="k">if</span> <span class="n">need_cudagraphs_reset</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">cudagraph</span><span class="p">:</span>
@@ -876,38 +921,6 @@
             <span class="k">if</span> <span class="n">need_cudagraphs_record</span><span class="p">:</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">_input_buffers</span> <span class="o">=</span> <span class="p">[</span><span class="kc">None</span><span class="p">]</span> <span class="o">*</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">input_names</span><span class="p">)</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">_output_buffers</span> <span class="o">=</span> <span class="p">[</span><span class="kc">None</span><span class="p">]</span> <span class="o">*</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">output_names</span><span class="p">)</span>
-
-            <span class="c1"># If in safe mode, check at each iteration for whether a switch is required</span>
-            <span class="k">if</span> <span class="p">(</span>
-                <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">runtime</span><span class="o">.</span><span class="n">_multi_device_safe_mode</span><span class="o">.</span><span class="n">_PY_RT_MULTI_DEVICE_SAFE_MODE</span>
-            <span class="p">):</span>
-                <span class="n">curr_device_id</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">current_device</span><span class="p">()</span>
-                <span class="n">curr_device_properties</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">get_device_properties</span><span class="p">(</span>
-                    <span class="n">curr_device_id</span>
-                <span class="p">)</span>
-                <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Current Device: cuda:</span><span class="si">{</span><span class="n">curr_device_id</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-
-                <span class="c1"># If a switch is required, move all inputs to new device and set as active device</span>
-                <span class="k">if</span> <span class="n">_is_switch_required</span><span class="p">(</span>
-                    <span class="n">curr_device_id</span><span class="p">,</span>
-                    <span class="bp">self</span><span class="o">.</span><span class="n">target_device_id</span><span class="p">,</span>
-                    <span class="n">curr_device_properties</span><span class="p">,</span>
-                    <span class="bp">self</span><span class="o">.</span><span class="n">target_device_properties</span><span class="p">,</span>
-                <span class="p">):</span>
-                    <span class="n">device_id</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">_select_rt_device</span><span class="p">(</span>
-                        <span class="n">curr_device_id</span><span class="p">,</span>
-                        <span class="bp">self</span><span class="o">.</span><span class="n">target_device_id</span><span class="p">,</span>
-                        <span class="bp">self</span><span class="o">.</span><span class="n">target_device_properties</span><span class="p">,</span>
-                    <span class="p">)</span>
-
-                    <span class="c1"># Update current device</span>
-                    <span class="n">device</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">(</span><span class="n">device_id</span><span class="p">)</span>
-                    <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">set_device</span><span class="p">(</span><span class="n">device_id</span><span class="p">)</span>
-
-                    <span class="n">contiguous_inputs</span> <span class="o">=</span> <span class="p">[</span>
-                        <span class="n">tensor</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">)</span> <span class="k">for</span> <span class="n">tensor</span> <span class="ow">in</span> <span class="n">contiguous_inputs</span>
-                    <span class="p">]</span>
-                    <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Moved all input Tensors to cuda:</span><span class="si">{</span><span class="n">device_id</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 
             <span class="k">with</span> <span class="p">(</span>
                 <span class="n">torch</span><span class="o">.</span><span class="n">autograd</span><span class="o">.</span><span class="n">profiler</span><span class="o">.</span><span class="n">record_function</span><span class="p">(</span>
@@ -921,7 +934,7 @@
                 <span class="p">),</span> <span class="sa">f</span><span class="s2">&quot;Wrong number of inputs, expect </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">input_names</span><span class="p">)</span><span class="si">}</span><span class="s2"> get </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">contiguous_inputs</span><span class="p">)</span><span class="si">}</span><span class="s2">.&quot;</span>
 
                 <span class="bp">self</span><span class="o">.</span><span class="n">setup_input_tensors</span><span class="p">(</span>
-                    <span class="n">contiguous_inputs</span><span class="p">,</span> <span class="n">cudagraphs_enabled</span><span class="p">,</span> <span class="n">need_cudagraphs_record</span>
+                    <span class="n">contiguous_inputs</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">cudagraphs_enabled</span><span class="p">,</span> <span class="n">need_cudagraphs_record</span>
                 <span class="p">)</span>
 
                 <span class="k">if</span> <span class="n">shape_changed</span><span class="p">:</span>
@@ -957,7 +970,7 @@
                     <span class="k">if</span> <span class="n">need_cudagraphs_record</span><span class="p">:</span>
                         <span class="bp">self</span><span class="o">.</span><span class="n">_output_buffers</span><span class="p">[</span><span class="n">o</span><span class="p">]</span> <span class="o">=</span> <span class="n">outputs</span><span class="p">[</span><span class="n">o</span><span class="p">]</span><span class="o">.</span><span class="n">clone</span><span class="p">()</span>
 
-                    <span class="k">if</span> <span class="n">cudagraphs_enabled</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">cudagraphs_enabled</span><span class="p">:</span>
                         <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">set_tensor_address</span><span class="p">(</span>
                             <span class="n">output_name</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_output_buffers</span><span class="p">[</span><span class="n">o</span><span class="p">]</span><span class="o">.</span><span class="n">data_ptr</span><span class="p">()</span>
                         <span class="p">)</span>
@@ -983,7 +996,7 @@
                 <span class="bp">self</span><span class="o">.</span><span class="n">_engine_stream</span><span class="o">.</span><span class="n">wait_stream</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_caller_stream</span><span class="p">)</span>
 
                 <span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">stream</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_engine_stream</span><span class="p">):</span>
-                    <span class="k">if</span> <span class="n">cudagraphs_enabled</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">cudagraphs_enabled</span><span class="p">:</span>
                         <span class="k">if</span> <span class="n">need_cudagraphs_record</span><span class="p">:</span>
                             <span class="bp">self</span><span class="o">.</span><span class="n">cudagraph</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">CUDAGraph</span><span class="p">()</span>
 
@@ -1015,14 +1028,166 @@
             <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">use_pre_allocated_outputs</span><span class="p">:</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">pre_allocated_outputs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_output_tensors</span><span class="p">()</span>
 
-            <span class="k">if</span> <span class="n">cudagraphs_enabled</span><span class="p">:</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">cudagraphs_enabled</span><span class="p">:</span>
                 <span class="k">for</span> <span class="n">idx</span><span class="p">,</span> <span class="n">o</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">outputs</span><span class="p">):</span>
                     <span class="n">o</span><span class="o">.</span><span class="n">copy_</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_output_buffers</span><span class="p">[</span><span class="n">idx</span><span class="p">])</span>
 
             <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">outputs</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
                 <span class="k">return</span> <span class="n">outputs</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
 
-            <span class="k">return</span> <span class="n">outputs</span></div>
+            <span class="k">return</span> <span class="n">outputs</span>
+
+        <span class="k">def</span><span class="w"> </span><span class="nf">run_output_allocator</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span> <span class="o">|</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="o">...</span><span class="p">]:</span>
+            <span class="k">assert</span> <span class="p">(</span>
+                <span class="ow">not</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">runtime</span><span class="o">.</span><span class="n">get_cudagraphs_mode</span><span class="p">()</span>
+            <span class="p">),</span> <span class="s2">&quot;CUDA Graphs are not compatible with OutputAllocator.&quot;</span>
+            <span class="k">with</span> <span class="p">(</span>
+                <span class="n">torch</span><span class="o">.</span><span class="n">autograd</span><span class="o">.</span><span class="n">profiler</span><span class="o">.</span><span class="n">record_function</span><span class="p">(</span>
+                    <span class="s2">&quot;PythonTorchTensorRTModule:ProcessInputs&quot;</span>
+                <span class="p">)</span>
+                <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">profiling_enabled</span>
+                <span class="k">else</span> <span class="n">nullcontext</span><span class="p">()</span>
+            <span class="p">):</span>
+                <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">contiguous_inputs</span><span class="p">)</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">input_names</span>
+                <span class="p">),</span> <span class="sa">f</span><span class="s2">&quot;Wrong number of inputs, expect </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">input_names</span><span class="p">)</span><span class="si">}</span><span class="s2"> get </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">contiguous_inputs</span><span class="p">)</span><span class="si">}</span><span class="s2">.&quot;</span>
+
+                <span class="bp">self</span><span class="o">.</span><span class="n">setup_input_tensors</span><span class="p">(</span><span class="n">contiguous_inputs</span><span class="p">,</span> <span class="kc">False</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
+
+            <span class="k">with</span> <span class="p">(</span>
+                <span class="n">torch</span><span class="o">.</span><span class="n">autograd</span><span class="o">.</span><span class="n">profiler</span><span class="o">.</span><span class="n">record_function</span><span class="p">(</span>
+                    <span class="s2">&quot;PythonTorchTensorRTModule:SetupOutputAllocator&quot;</span>
+                <span class="p">)</span>
+                <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">profiling_enabled</span>
+                <span class="k">else</span> <span class="n">nullcontext</span><span class="p">()</span>
+            <span class="p">):</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">create_output_allocator</span><span class="p">()</span>
+                <span class="c1"># need to set output allocator every run</span>
+                <span class="k">for</span> <span class="n">output_name</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">output_names</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">set_output_allocator</span><span class="p">(</span>
+                        <span class="n">output_name</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">output_allocator</span>
+                    <span class="p">):</span>
+                        <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
+                            <span class="sa">f</span><span class="s2">&quot;Failed to set output allocator for </span><span class="si">{</span><span class="n">output_name</span><span class="si">}</span><span class="s2">&quot;</span>
+                        <span class="p">)</span>
+
+            <span class="k">with</span> <span class="p">(</span>
+                <span class="n">torch</span><span class="o">.</span><span class="n">autograd</span><span class="o">.</span><span class="n">profiler</span><span class="o">.</span><span class="n">record_function</span><span class="p">(</span>
+                    <span class="s2">&quot;PythonTorchTensorRTModule:TensorRTRuntime&quot;</span>
+                <span class="p">)</span>
+                <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">profiling_enabled</span>
+                <span class="k">else</span> <span class="n">nullcontext</span><span class="p">()</span>
+            <span class="p">):</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_caller_stream</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">current_stream</span><span class="p">()</span>
+                <span class="k">if</span> <span class="p">(</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_engine_stream</span> <span class="o">==</span> <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">default_stream</span><span class="p">()</span>
+                    <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">_engine_stream</span> <span class="ow">is</span> <span class="kc">None</span>
+                <span class="p">):</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_engine_stream</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">Stream</span><span class="p">()</span>
+
+                <span class="bp">self</span><span class="o">.</span><span class="n">_engine_stream</span><span class="o">.</span><span class="n">wait_stream</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_caller_stream</span><span class="p">)</span>
+
+                <span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">stream</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_engine_stream</span><span class="p">):</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">execute_async_v3</span><span class="p">(</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">_engine_stream</span><span class="o">.</span><span class="n">cuda_stream</span>
+                    <span class="p">)</span>  <span class="c1"># The OutputAllocator is called by execute_async_v3()</span>
+
+                <span class="bp">self</span><span class="o">.</span><span class="n">_caller_stream</span><span class="o">.</span><span class="n">wait_stream</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_engine_stream</span><span class="p">)</span>
+
+            <span class="k">with</span> <span class="p">(</span>
+                <span class="n">torch</span><span class="o">.</span><span class="n">autograd</span><span class="o">.</span><span class="n">profiler</span><span class="o">.</span><span class="n">record_function</span><span class="p">(</span>
+                    <span class="s2">&quot;PythonTorchTensorRTModule:ProcessOutputs&quot;</span>
+                <span class="p">)</span>
+                <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">profiling_enabled</span>
+                <span class="k">else</span> <span class="n">nullcontext</span><span class="p">()</span>
+            <span class="p">):</span>
+                <span class="n">outputs</span> <span class="o">=</span> <span class="p">[]</span>
+                <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">output_allocator</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+                <span class="k">for</span> <span class="n">o</span><span class="p">,</span> <span class="n">output_name</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">output_names</span><span class="p">):</span>
+                    <span class="n">shape</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">output_allocator</span><span class="o">.</span><span class="n">shapes</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">output_name</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+                    <span class="n">dtype</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">output_dtypes</span><span class="p">[</span><span class="n">o</span><span class="p">]</span>
+                    <span class="n">output</span> <span class="o">=</span> <span class="p">(</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">output_allocator</span><span class="o">.</span><span class="n">buffers</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">output_name</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+                        <span class="o">.</span><span class="n">clone</span><span class="p">()</span>
+                        <span class="o">.</span><span class="n">detach</span><span class="p">()</span>
+                    <span class="p">)</span>
+                    <span class="n">prod</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">prod</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="n">shape</span><span class="p">)))</span>
+                    <span class="c1"># When using the OutputAllocator, the allocated buffer might be larger than the size of the output,</span>
+                    <span class="c1"># so we need to reshape the buffer to the output shape</span>
+                    <span class="n">output</span> <span class="o">=</span> <span class="n">output</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="n">dtype</span><span class="p">)[:</span><span class="n">prod</span><span class="p">]</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">shape</span><span class="p">)</span>
+                    <span class="n">outputs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">output</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">outputs</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">outputs</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+
+            <span class="k">return</span> <span class="n">outputs</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">cudagraphs_enabled</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">runtime</span><span class="o">.</span><span class="n">get_cudagraphs_mode</span><span class="p">()</span>
+
+        <span class="c1"># Run forward function</span>
+        <span class="n">contiguous_inputs</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="p">(</span><span class="n">i</span><span class="o">.</span><span class="n">contiguous</span><span class="p">()</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">)</span> <span class="k">else</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="n">i</span><span class="p">)</span><span class="o">.</span><span class="n">cuda</span><span class="p">())</span>
+            <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">inputs</span>
+        <span class="p">]</span>
+        <span class="k">with</span> <span class="p">(</span>
+            <span class="n">torch</span><span class="o">.</span><span class="n">autograd</span><span class="o">.</span><span class="n">profiler</span><span class="o">.</span><span class="n">record_function</span><span class="p">(</span><span class="s2">&quot;PythonTorchTensorRTModule:Forward&quot;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">profiling_enabled</span>
+            <span class="k">else</span> <span class="n">nullcontext</span><span class="p">()</span>
+        <span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_check_initialized</span><span class="p">()</span>
+
+            <span class="c1"># If in safe mode, check at each iteration for whether a switch is required</span>
+            <span class="k">if</span> <span class="p">(</span>
+                <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">runtime</span><span class="o">.</span><span class="n">_multi_device_safe_mode</span><span class="o">.</span><span class="n">_PY_RT_MULTI_DEVICE_SAFE_MODE</span>
+            <span class="p">):</span>
+                <span class="n">curr_device_id</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">current_device</span><span class="p">()</span>
+                <span class="n">curr_device_properties</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">get_device_properties</span><span class="p">(</span>
+                    <span class="n">curr_device_id</span>
+                <span class="p">)</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Current Device: cuda:</span><span class="si">{</span><span class="n">curr_device_id</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+                <span class="c1"># If a switch is required, move all inputs to new device and set as active device</span>
+                <span class="k">if</span> <span class="n">_is_switch_required</span><span class="p">(</span>
+                    <span class="n">curr_device_id</span><span class="p">,</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">target_device_id</span><span class="p">,</span>
+                    <span class="n">curr_device_properties</span><span class="p">,</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">target_device_properties</span><span class="p">,</span>
+                <span class="p">):</span>
+                    <span class="n">device_id</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">_select_rt_device</span><span class="p">(</span>
+                        <span class="n">curr_device_id</span><span class="p">,</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">target_device_id</span><span class="p">,</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">target_device_properties</span><span class="p">,</span>
+                    <span class="p">)</span>
+
+                    <span class="c1"># Update current device</span>
+                    <span class="n">device</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">(</span><span class="n">device_id</span><span class="p">)</span>
+                    <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">set_device</span><span class="p">(</span><span class="n">device_id</span><span class="p">)</span>
+
+                    <span class="n">contiguous_inputs</span> <span class="o">=</span> <span class="p">[</span>
+                        <span class="n">tensor</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">)</span> <span class="k">for</span> <span class="n">tensor</span> <span class="ow">in</span> <span class="n">contiguous_inputs</span>
+                    <span class="p">]</span>
+                    <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Moved all input Tensors to cuda:</span><span class="si">{</span><span class="n">device_id</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">requires_output_allocator</span><span class="p">:</span>  <span class="c1"># engine requires OA</span>
+                <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">cudagraphs_enabled</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
+                        <span class="s2">&quot;The model contains submodules that require a dynamic output allocator at runtime, which is incompatible with CUDA Graphs. Please disable CUDA Graphs.&quot;</span>
+                    <span class="p">)</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Using the dynamic allocator runtime mode.&quot;</span><span class="p">)</span>
+                <span class="k">return</span> <span class="n">run_output_allocator</span><span class="p">()</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">use_output_allocator_outputs</span><span class="p">:</span>  <span class="c1"># users call OA context manager</span>
+                    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">cudagraphs_enabled</span><span class="p">:</span>
+                        <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
+                            <span class="s2">&quot;Both CUDA Graphs and dynamic output allocation are enabled, which are incompatible runtime modes. Please disable one of the two.&quot;</span>
+                        <span class="p">)</span>
+                    <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Using the dynamic allocator runtime mode.&quot;</span><span class="p">)</span>
+                    <span class="k">return</span> <span class="n">run_output_allocator</span><span class="p">()</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                        <span class="sa">f</span><span class="s2">&quot;Using the standard execution runtime mode with cudagraphs=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">cudagraphs_enabled</span><span class="si">}</span><span class="s2">.&quot;</span>
+                    <span class="p">)</span>
+                    <span class="k">return</span> <span class="n">run_standard_execution</span><span class="p">()</span></div>
 
 <div class="viewcode-block" id="PythonTorchTensorRTModule.enable_profiling"><a class="viewcode-back" href="../../../../py_api/runtime.html#torch_tensorrt.runtime.PythonTorchTensorRTModule.enable_profiling">[docs]</a>    <span class="k">def</span><span class="w"> </span><span class="nf">enable_profiling</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">profiler</span><span class="p">:</span> <span class="s2">&quot;trt.IProfiler&quot;</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>

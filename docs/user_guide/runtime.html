@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Deploying Torch-TensorRT Programs &mdash; Torch-TensorRT v2.7.0.dev0+f7aab56 documentation</title>
+  <title>Deploying Torch-TensorRT Programs &mdash; Torch-TensorRT v2.7.0.dev0+1cd215d documentation</title>
   
 
   
@@ -293,7 +293,7 @@
               
               
                 <div class="version">
-                  v2.7.0.dev0+f7aab56
+                  v2.7.0.dev0+1cd215d
                 </div>
               
             
@@ -572,6 +572,42 @@ the runtime uses cudagraphs to accelerate inference in certain cases.</p>
 cases), will cause the cudagraph to be re-recorded. Cudagraph recording is generally
 not latency intensive, and future improvements include caching cudagraphs for multiple input shapes.</p>
 </section>
+<section id="dynamic-output-allocation-mode">
+<h2>Dynamic Output Allocation Mode<a class="headerlink" href="#dynamic-output-allocation-mode" title="Permalink to this heading">¶</a></h2>
+<p>Dynamic output allocation is a feature in Torch-TensorRT which allows the output buffer of TensorRT engines to be
+dynamically allocated. This is useful for models with dynamic output shapes, especially ops with data-dependent shapes.
+Dynamic output allocation mode cannot be used in conjunction with CUDA Graphs nor pre-allocated outputs feature.
+Without dynamic output allocation, the output buffer is allocated based on the inferred output shape based on input size.</p>
+<p>There are two scenarios in which dynamic output allocation is enabled:</p>
+<p>1. The model has been identified at compile time to require dynamic output allocation for at least one TensorRT subgraph.
+These models will engage the runtime mode automatically (with logging) and are incompatible with other runtime modes
+such as CUDA Graphs.</p>
+<p>Converters can declare that subgraphs that they produce will require the output allocator using <cite>requires_output_allocator=True</cite>
+there by forcing any model which utilizes the converter to automatically use the output allocator runtime mode. e.g.,</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="nd">@dynamo_tensorrt_converter</span><span class="p">(</span>
+    <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">aten</span><span class="o">.</span><span class="n">nonzero</span><span class="o">.</span><span class="n">default</span><span class="p">,</span>
+    <span class="n">supports_dynamic_shapes</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">requires_output_allocator</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">aten_ops_nonzero</span><span class="p">(</span>
+    <span class="n">ctx</span><span class="p">:</span> <span class="n">ConversionContext</span><span class="p">,</span>
+    <span class="n">target</span><span class="p">:</span> <span class="n">Target</span><span class="p">,</span>
+    <span class="n">args</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Argument</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span>
+    <span class="n">kwargs</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Argument</span><span class="p">],</span>
+    <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Union</span><span class="p">[</span><span class="n">TRTTensor</span><span class="p">,</span> <span class="n">Sequence</span><span class="p">[</span><span class="n">TRTTensor</span><span class="p">]]:</span>
+    <span class="o">...</span>
+</pre></div>
+</div>
+<ol class="arabic simple" start="2">
+<li><p>Users may manually enable dynamic output allocation mode via the <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.runtime.enable_output_allocator</span></code> context manager.</p></li>
+</ol>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Enables Dynamic Output Allocation Mode, then resets the mode to its prior setting</span>
+<span class="k">with</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">runtime</span><span class="o">.</span><span class="n">enable_output_allocator</span><span class="p">(</span><span class="n">trt_module</span><span class="p">):</span>
+    <span class="o">...</span>
+</pre></div>
+</div>
+</section>
 </section>
 
 
@@ -623,6 +659,7 @@ not latency intensive, and future improvements include caching cudagraphs for mu
 <li><a class="reference internal" href="#plugin-library">Plugin Library</a></li>
 <li><a class="reference internal" href="#multi-device-safe-mode">Multi Device Safe Mode</a></li>
 <li><a class="reference internal" href="#cudagraphs-mode">Cudagraphs Mode</a></li>
+<li><a class="reference internal" href="#dynamic-output-allocation-mode">Dynamic Output Allocation Mode</a></li>
 </ul>
 </li>
 </ul>
