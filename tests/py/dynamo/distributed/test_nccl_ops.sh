@@ -88,7 +88,6 @@ fi
 URL="https://pypi.nvidia.com/tensorrt-llm/$FILE"
 echo "Downloading $FILE from $URL..."
 
-echo "Downloading here...."
 #Installing wget
 ensure_installed wget
 
