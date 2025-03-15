@@ -29,6 +29,7 @@ def _generate_plugin_converter(
     capability_validator: Optional[Callable[[Node, CompilationSettings], bool]] = None,
     priority: ConverterPriority = ConverterPriority.STANDARD,
     supports_dynamic_shapes: bool = False,
+    requires_output_allocator: bool = False,
 ) -> DynamoConverterImplSignature:
     torch_target = getattr(getattr(torch.ops, namespace), op_name)
     overload_str = overload if overload else ""
@@ -87,6 +88,7 @@ def _generate_plugin_converter(
         capability_validator=capability_validator,
         priority=priority,
         supports_dynamic_shapes=supports_dynamic_shapes,
+        requires_output_allocator=requires_output_allocator,
     )(custom_kernel_converter)
     assert (
         torch_overload in DYNAMO_CONVERTERS
@@ -99,6 +101,7 @@ def generate_plugin_converter(
     capability_validator: Optional[Callable[[Node, CompilationSettings], bool]] = None,
     priority: ConverterPriority = ConverterPriority.STANDARD,
     supports_dynamic_shapes: bool = False,
+    requires_output_allocator: bool = False,
 ) -> DynamoConverterImplSignature:
     plugin_ns, plugin_name = plugin_id.split("::")
     return _generate_plugin_converter(
@@ -107,4 +110,5 @@ def generate_plugin_converter(
         capability_validator=capability_validator,
         priority=priority,
         supports_dynamic_shapes=supports_dynamic_shapes,
+        requires_output_allocator=requires_output_allocator,
     )
