@@ -4,7 +4,7 @@ import tensorrt as trt
 import torch
 import torch.nn as nn
 import torch_tensorrt
-from tensor_parallel_initialize_dist import initialize_distributed_env
+from distributed_utils import initialize_distributed_env
 from torch.distributed._tensor import Shard
 from torch.distributed.tensor.parallel import (
     ColwiseParallel,
@@ -15,10 +15,6 @@ from torch.distributed.tensor.parallel import (
 device_mesh, _world_size, _rank, logger = initialize_distributed_env(
     "./tensor_parallel_simple_example"
 )
-
-"""
-This example copies some code from https://github.com/pytorch/examples/blob/main/distributed/tensor_parallelism/tensor_parallel_example.py
-"""
 
 
 def compile_tp_model(tp_model, backend):
@@ -50,6 +46,11 @@ def compile_tp_model(tp_model, backend):
             raise
 
 
+"""
+This example copies some code from https://github.com/pytorch/examples/blob/main/distributed/tensor_parallelism/tensor_parallel_example.py
+"""
+
+
 class ToyModel(nn.Module):
     """MLP based model"""
 
@@ -69,10 +70,6 @@ class ToyModel(nn.Module):
 
 
 logger.info(f"Starting PyTorch TP example on rank {_rank}.")
-assert (
-    _world_size % 2 == 0
-), f"TP examples require even number of GPUs, but got {_world_size} gpus"
-
 
 # # create model and move it to GPU - init"cuda"_mesh has already mapped GPU ids.
 tp_model = ToyModel().to("cuda")
