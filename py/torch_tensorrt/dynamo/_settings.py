@@ -24,6 +24,7 @@ from torch_tensorrt.dynamo._defaults import (
     MAX_AUX_STREAMS,
     MIN_BLOCK_SIZE,
     NUM_AVG_TIMING_ITERS,
+    OFFLOAD_MODULE_TO_CPU,
     OPTIMIZATION_LEVEL,
     PASS_THROUGH_BUILD_FAILURES,
     REFIT_IDENTICAL_ENGINE_WEIGHTS,
@@ -134,6 +135,7 @@ class CompilationSettings:
     enable_weight_streaming: bool = ENABLE_WEIGHT_STREAMING
     enable_cross_compile_for_windows: bool = ENABLE_CROSS_COMPILE_FOR_WINDOWS
     use_aot_joint_export: bool = USE_AOT_JOINT_EXPORT
+    offload_module_to_cpu: bool = OFFLOAD_MODULE_TO_CPU
 
 
 _SETTINGS_TO_BE_ENGINE_INVARIANT = (
