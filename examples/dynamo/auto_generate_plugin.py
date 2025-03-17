@@ -108,14 +108,17 @@ torch_tensorrt.dynamo.conversion.plugins.generate_plugin(
 # # -------------------------------------------------------------------
 # # Given that we have defined the custom operator in PyTorch and TensorRT, we can now generate the converter for the operation.
 # # As long as the namespace and names match, the following function will automatically generate the converter for the operation.
+# # If plugins require an output allocator to dynamically allocate output buffers, like data dependent operators, please set requires_output_allocator to True.
 torch_tensorrt.dynamo.conversion.plugins.generate_plugin_converter(
-    "torchtrt_ex::elementwise_scale_mul", supports_dynamic_shapes=True
+    "torchtrt_ex::elementwise_scale_mul",
+    supports_dynamic_shapes=True,
+    requires_output_allocator=False,
 )
 
 
 # # %%
 # # Above two commands can be replaced with the following single one line:
-# torch_tensorrt.dynamo.conversion.plugins.custom_op("torchtrt_ex::elementwise_scale_mul", supports_dynamic_shapes=True)
+# torch_tensorrt.dynamo.conversion.plugins.custom_op("torchtrt_ex::elementwise_scale_mul", supports_dynamic_shapes=True, requires_output_allocator=False)
 
 
 # %%

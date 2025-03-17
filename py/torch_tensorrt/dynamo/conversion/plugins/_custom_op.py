@@ -14,6 +14,7 @@ def custom_op(
     capability_validator: Optional[Callable[[Node, CompilationSettings], bool]] = None,
     priority: ConverterPriority = ConverterPriority.STANDARD,
     supports_dynamic_shapes: bool = False,
+    requires_output_allocator: bool = False,
 ) -> None:
     """
     Generate the Plugin and corresponding Plugin Converter using external kernels and TensorRT Quick Deployable Plugin APIs.
@@ -26,8 +27,13 @@ def custom_op(
             partitioner will make sure this Node is run in PyTorch in the compiled graph.
         priority: Allows developers to override existing converters in the converter registry
         supports_dynamic_shapes: if dynamic shape is supported
+        requires_output_allocator: if the converter creates operators which require an Output Allocator to run (e.g. data dependent operators)
     """
     generate_plugin(op_name)
     generate_plugin_converter(
-        op_name, capability_validator, priority, supports_dynamic_shapes
+        op_name,
+        capability_validator,
+        priority,
+        supports_dynamic_shapes,
+        requires_output_allocator,
     )
