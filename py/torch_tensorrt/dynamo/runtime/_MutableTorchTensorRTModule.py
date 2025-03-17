@@ -92,6 +92,8 @@ class MutableTorchTensorRTModule(object):
         dryrun: bool = _defaults.DRYRUN,
         hardware_compatible: bool = _defaults.HARDWARE_COMPATIBLE,
         timing_cache_path: str = _defaults.TIMING_CACHE_PATH,
+        tiling_optimization_level: Optional[int] = _defaults.TILING_OPTIMIZATION_LEVEL,
+        l2_limit_for_tiling: Optional[int] = _defaults.L2_LIMIT_FOR_TILING,
         **kwargs: Any,
     ) -> None:
         """
@@ -133,6 +135,8 @@ class MutableTorchTensorRTModule(object):
             hardware_compatible (bool): Build the TensorRT engines compatible with GPU architectures other than that of the GPU on which the engine was built (currently works for NVIDIA Ampere and newer)
             timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation
             lazy_engine_init (bool): Defer setting up engines until the compilation of all engines is complete. Can allow larger models with multiple graph breaks to compile but can lead to oversubscription of GPU memory at runtime.
+            tiling_optimization_level (Optional[int]): The optimization level of tiling strategies. A Higher level allows TensorRT to spend more time searching for better optimization strategy. (We currently support [0, 1, 2, 3], default is 0)
+            l2_limit_for_tiling (Optional[int]): The target L2 cache usage limit (in bytes) for tiling optimization (default is -1 which means no limit).
             **kwargs: Any,
         Returns:
             MutableTorchTensorRTModule
@@ -193,6 +197,8 @@ class MutableTorchTensorRTModule(object):
             "dryrun": dryrun,
             "hardware_compatible": hardware_compatible,
             "timing_cache_path": timing_cache_path,
+            "tiling_optimization_level": tiling_optimization_level,
+            "l2_limit_for_tiling": l2_limit_for_tiling,
         }
         self.arg_dynamic_shapes: Optional[tuple[Any]] = None
         self.kwarg_dynamic_shapes: Optional[dict[Any, Any]] = None
