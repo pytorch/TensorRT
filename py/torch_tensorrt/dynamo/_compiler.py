@@ -96,8 +96,8 @@ def cross_compile_for_windows(
     strip_engine_weights: bool = _defaults.STRIP_ENGINE_WEIGHTS,
     immutable_weights: bool = _defaults.IMMUTABLE_WEIGHTS,
     enable_weight_streaming: bool = _defaults.ENABLE_WEIGHT_STREAMING,
-    tiling_optimization_level: Optional[int] = _defaults.TILING_OPTIMIZATION_LEVEL,
-    l2_limit_for_tiling: Optional[int] = _defaults.L2_LIMIT_FOR_TILING,
+    tiling_optimization_level: int = _defaults.TILING_OPTIMIZATION_LEVEL,
+    l2_limit_for_tiling: int = _defaults.L2_LIMIT_FOR_TILING,
     **kwargs: Any,
 ) -> torch.fx.GraphModule:
     """Compile an ExportedProgram module using TensorRT in Linux for Inference in Windows
@@ -171,8 +171,8 @@ def cross_compile_for_windows(
         strip_engine_weights (bool): Strip engine weights from the serialized engine. This is useful when the engine is to be deployed in an environment where the weights are not required.
         immutable_weights (bool): Build non-refittable engines. This is useful for some layers that are not refittable. If this argument is set to true, `strip_engine_weights` and `refit_identical_engine_weights` will be ignored.
         enable_weight_streaming (bool): Enable weight streaming.
-        tiling_optimization_level (Optional[int]): The optimization level of tiling strategies. A Higher level allows TensorRT to spend more time searching for better optimization strategy. (We currently support [0, 1, 2, 3], default is 0)
-        l2_limit_for_tiling (Optional[int]): The target L2 cache usage limit (in bytes) for tiling optimization (default is -1 which means no limit).
+        tiling_optimization_level (int): The optimization level of tiling strategies. A Higher level allows TensorRT to spend more time searching for better optimization strategy. (We currently support [0, 1, 2, 3], default is 0)
+        l2_limit_for_tiling (int): The target L2 cache usage limit (in bytes) for tiling optimization (default is -1 which means no limit).
         **kwargs: Any,
     Returns:
         torch.fx.GraphModule: Compiled FX Module, when run it will execute via TensorRT
@@ -419,8 +419,8 @@ def compile(
     strip_engine_weights: bool = _defaults.STRIP_ENGINE_WEIGHTS,
     immutable_weights: bool = _defaults.IMMUTABLE_WEIGHTS,
     enable_weight_streaming: bool = _defaults.ENABLE_WEIGHT_STREAMING,
-    tiling_optimization_level: Optional[int] = _defaults.TILING_OPTIMIZATION_LEVEL,
-    l2_limit_for_tiling: Optional[int] = _defaults.L2_LIMIT_FOR_TILING,
+    tiling_optimization_level: int = _defaults.TILING_OPTIMIZATION_LEVEL,
+    l2_limit_for_tiling: int = _defaults.L2_LIMIT_FOR_TILING,
     **kwargs: Any,
 ) -> torch.fx.GraphModule:
     """Compile an ExportedProgram module for NVIDIA GPUs using TensorRT
@@ -496,8 +496,8 @@ def compile(
         strip_engine_weights (bool): Strip engine weights from the serialized engine. This is useful when the engine is to be deployed in an environment where the weights are not required.
         immutable_weights (bool): Build non-refittable engines. This is useful for some layers that are not refittable. If this argument is set to true, `strip_engine_weights` and `refit_identical_engine_weights` will be ignored.
         enable_weight_streaming (bool): Enable weight streaming.
-        tiling_optimization_level (Optional[int]): The optimization level of tiling strategies. A Higher level allows TensorRT to spend more time searching for better optimization strategy. (We currently support [0, 1, 2, 3], default is 0)
-        l2_limit_for_tiling (Optional[int]): The target L2 cache usage limit (in bytes) for tiling optimization (default is -1 which means no limit).
+        tiling_optimization_level (int): The optimization level of tiling strategies. A Higher level allows TensorRT to spend more time searching for better optimization strategy. (We currently support [0, 1, 2, 3], default is 0)
+        l2_limit_for_tiling (int): The target L2 cache usage limit (in bytes) for tiling optimization (default is -1 which means no limit).
         **kwargs: Any,
     Returns:
         torch.fx.GraphModule: Compiled FX Module, when run it will execute via TensorRT
@@ -962,8 +962,8 @@ def convert_exported_program_to_serialized_trt_engine(
     strip_engine_weights: bool = _defaults.STRIP_ENGINE_WEIGHTS,
     immutable_weights: bool = _defaults.IMMUTABLE_WEIGHTS,
     enable_weight_streaming: bool = _defaults.ENABLE_WEIGHT_STREAMING,
-    tiling_optimization_level: Optional[int] = _defaults.TILING_OPTIMIZATION_LEVEL,
-    l2_limit_for_tiling: Optional[int] = _defaults.L2_LIMIT_FOR_TILING,
+    tiling_optimization_level: int = _defaults.TILING_OPTIMIZATION_LEVEL,
+    l2_limit_for_tiling: int = _defaults.L2_LIMIT_FOR_TILING,
     **kwargs: Any,
 ) -> bytes:
     """Convert an ExportedProgram to a serialized TensorRT engine
@@ -1027,8 +1027,8 @@ def convert_exported_program_to_serialized_trt_engine(
         strip_engine_weights (bool): Strip engine weights from the serialized engine. This is useful when the engine is to be deployed in an environment where the weights are not required.
         immutable_weights (bool): Build non-refittable engines. This is useful for some layers that are not refittable. If this argument is set to true, `strip_engine_weights` and `refit_identical_engine_weights` will be ignored.
         enable_weight_streaming (bool): Enable weight streaming.
-        tiling_optimization_level (Optional[int]): The optimization level of tiling strategies. A Higher level allows TensorRT to spend more time searching for better optimization strategy. (We currently support [0, 1, 2, 3], default is 0)
-        l2_limit_for_tiling (Optional[int]): The target L2 cache usage limit (in bytes) for tiling optimization (default is -1 which means no limit).
+        tiling_optimization_level (int): The optimization level of tiling strategies. A Higher level allows TensorRT to spend more time searching for better optimization strategy. (We currently support [0, 1, 2, 3], default is 0)
+        l2_limit_for_tiling (int): The target L2 cache usage limit (in bytes) for tiling optimization (default is -1 which means no limit).
     Returns:
         bytes: Serialized TensorRT engine, can either be saved to a file or deserialized via TensorRT APIs
     """
