@@ -132,7 +132,7 @@ in the course of the operation.
 Here we use automatic plugin creation feature in Torch-TensorRT which enables plugin registration using
 TensorRT QDP APIs
 
-.. GENERATED FROM PYTHON SOURCE LINES 101-121
+.. GENERATED FROM PYTHON SOURCE LINES 101-124
 
 .. code-block:: python
 
@@ -146,18 +146,21 @@ TensorRT QDP APIs
     # # -------------------------------------------------------------------
     # # Given that we have defined the custom operator in PyTorch and TensorRT, we can now generate the converter for the operation.
     # # As long as the namespace and names match, the following function will automatically generate the converter for the operation.
+    # # If plugins require an output allocator to dynamically allocate output buffers, like data dependent operators, please set requires_output_allocator to True.
     torch_tensorrt.dynamo.conversion.plugins.generate_plugin_converter(
-        "torchtrt_ex::elementwise_scale_mul", supports_dynamic_shapes=True
+        "torchtrt_ex::elementwise_scale_mul",
+        supports_dynamic_shapes=True,
+        requires_output_allocator=False,
     )
 
 
     # # %%
     # # Above two commands can be replaced with the following single one line:
-    # torch_tensorrt.dynamo.conversion.plugins.custom_op("torchtrt_ex::elementwise_scale_mul", supports_dynamic_shapes=True)
+    # torch_tensorrt.dynamo.conversion.plugins.custom_op("torchtrt_ex::elementwise_scale_mul", supports_dynamic_shapes=True, requires_output_allocator=False)
 
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 122-128
+.. GENERATED FROM PYTHON SOURCE LINES 125-131
 
 Using our converter with a model
 -------------------------------------------------------------------
@@ -166,7 +169,7 @@ Now we can use our custom operator in a model and compile it with Torch-TensorRT
 We can see that the custom operator is used as one of the operations in the forward pass of the model.
 The process of compiling the model at this point is identical to standard Torch-TensorRT usage.
 
-.. GENERATED FROM PYTHON SOURCE LINES 128-152
+.. GENERATED FROM PYTHON SOURCE LINES 131-155
 
 .. code-block:: python
 

@@ -6,7 +6,7 @@ import nox
 
 # Use system installed Python packages
 PYT_PATH = (
-    "/usr/local/lib/python3.10/dist-packages"
+    "/usr/local/lib/python3.12/dist-packages"
     if not "PYT_PATH" in os.environ
     else os.environ["PYT_PATH"]
 )

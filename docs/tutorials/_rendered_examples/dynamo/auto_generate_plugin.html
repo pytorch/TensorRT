@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Automatically Generate a Plugin for a Custom Kernel &mdash; Torch-TensorRT v2.7.0.dev0+1f8a158 documentation</title>
+  <title>Automatically Generate a Plugin for a Custom Kernel &mdash; Torch-TensorRT v2.7.0.dev0+b5692d3 documentation</title>
   
 
   
@@ -291,7 +291,7 @@
               
               
                 <div class="version">
-                  v2.7.0.dev0+1f8a158
+                  v2.7.0.dev0+b5692d3
                 </div>
               
             
@@ -587,14 +587,17 @@ TensorRT QDP APIs</p>
 <span class="c1"># # -------------------------------------------------------------------</span>
 <span class="c1"># # Given that we have defined the custom operator in PyTorch and TensorRT, we can now generate the converter for the operation.</span>
 <span class="c1"># # As long as the namespace and names match, the following function will automatically generate the converter for the operation.</span>
+<span class="c1"># # If plugins require an output allocator to dynamically allocate output buffers, like data dependent operators, please set requires_output_allocator to True.</span>
 <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">dynamo</span><span class="o">.</span><span class="n">conversion</span><span class="o">.</span><span class="n">plugins</span><span class="o">.</span><span class="n">generate_plugin_converter</span><span class="p">(</span>
-    <span class="s2">&quot;torchtrt_ex::elementwise_scale_mul&quot;</span><span class="p">,</span> <span class="n">supports_dynamic_shapes</span><span class="o">=</span><span class="kc">True</span>
+    <span class="s2">&quot;torchtrt_ex::elementwise_scale_mul&quot;</span><span class="p">,</span>
+    <span class="n">supports_dynamic_shapes</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">requires_output_allocator</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
 <span class="p">)</span>
 
 
 <span class="c1"># # %%</span>
 <span class="c1"># # Above two commands can be replaced with the following single one line:</span>
-<span class="c1"># torch_tensorrt.dynamo.conversion.plugins.custom_op(&quot;torchtrt_ex::elementwise_scale_mul&quot;, supports_dynamic_shapes=True)</span>
+<span class="c1"># torch_tensorrt.dynamo.conversion.plugins.custom_op(&quot;torchtrt_ex::elementwise_scale_mul&quot;, supports_dynamic_shapes=True, requires_output_allocator=False)</span>
 </pre></div>
 </div>
 </section>
