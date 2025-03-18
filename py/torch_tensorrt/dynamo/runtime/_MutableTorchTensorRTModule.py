@@ -6,6 +6,7 @@ from typing import Any, Dict, Iterator, Optional, Union
 
 import numpy as np
 import torch
+import torch_tensorrt
 from torch_tensorrt._Device import Device
 from torch_tensorrt.dynamo import _defaults
 from torch_tensorrt.dynamo._compiler import compile as dynamo_compile
@@ -61,6 +62,7 @@ class MutableTorchTensorRTModule(object):
         *,
         device: Optional[Union[Device, torch.device, str]] = _defaults.DEVICE,
         use_python_runtime: bool = _defaults.USE_PYTHON_RUNTIME,
+        enable_cuda_graph: bool = True,
         immutable_weights: bool = False,
         strict: bool = True,
         allow_complex_guards_as_runtime_asserts: bool = False,
@@ -127,6 +129,7 @@ class MutableTorchTensorRTModule(object):
         self.arg_inputs: tuple[Any, ...] = tuple()
         self.kwarg_inputs: dict[str, Any] = {}
         self.additional_settings = kwargs
+        self.enable_cuda_graph = enable_cuda_graph
         self.strict = strict
         self.allow_complex_guards_as_runtime_asserts = (
             allow_complex_guards_as_runtime_asserts
@@ -142,7 +145,11 @@ class MutableTorchTensorRTModule(object):
         self.run_info: Optional[tuple[Any, ...]] = None
         self.state_dict_metadata: dict[str, torch.Size] = {}
         self._store_state_dict_metadata()
-
+        self.enable_weight_streaming = (
+            kwargs["enable_weight_streaming"]
+            if "enable_weight_streaming" in kwargs
+            else False
+        )
         cls = self.__class__
         self.__class__ = type(
             self.original_model.__class__.__name__,
@@ -193,7 +200,7 @@ class MutableTorchTensorRTModule(object):
 
         self.refit_state.set_state(RefitFlag.NEEDS_RECOMPILE)
 
-    def _get_total_dynamic_shapes(self) -> Union[dict[str, Any], None]:
+    def _get_total_dynamic_shapes(self) -> dict[str, Any] | None:
         if not self.arg_dynamic_shapes and not self.kwarg_dynamic_shapes:
             return None
         total_dynamic_shape = {}
@@ -266,8 +273,9 @@ class MutableTorchTensorRTModule(object):
         MutableTorchTensorRTModule automatically catches weight value updates and call this function to refit the module.
         If it fails to catch the changes, please call this function manually to update the TRT graph module.
         """
-        self.original_model.to(to_torch_device(self.trt_device))
+
         if self.exp_program is None:
+            self.original_model.to(to_torch_device(self.trt_device))
             self.exp_program = self.get_exported_program()
         else:
             self.exp_program._state_dict = (
@@ -275,6 +283,7 @@ class MutableTorchTensorRTModule(object):
                     self.original_model.state_dict()
                 )
             )
+            self.exp_program.module().to(to_torch_device(self.trt_device))
         self.gm = refit_module_weights(
             self.gm,
             self.exp_program,
@@ -284,7 +293,7 @@ class MutableTorchTensorRTModule(object):
             in_place=True,
         )
 
-        self.original_model.cpu()
+        self.original_model.to("cpu")
         torch.cuda.empty_cache()
 
     def get_exported_program(self) -> torch.export.ExportedProgram:
@@ -324,8 +333,15 @@ class MutableTorchTensorRTModule(object):
             use_python_runtime=self.use_python_runtime,
             **self.additional_settings,
         )
-        self.original_model.cpu()
+        self.original_model.to("cpu")
         torch.cuda.empty_cache()
+        # torch_tensorrt.runtime.set_cudagraphs_mode(self.enable_cuda_graph)
+        # if self.enable_cuda_graph:
+        #     self.gm = torch_tensorrt.runtime.enable_cudagraphs(self.gm)
+        if self.enable_weight_streaming:
+            self.weight_streaming_ctx = torch_tensorrt.runtime.weight_streaming(self.gm)
+            requested_budget = int(16 * 2 << 20)
+            self.weight_streaming_ctx.device_budget = requested_budget
 
     def _validate_inputs(self, *args: Any, **kwargs: Any) -> None:
 
@@ -446,14 +462,21 @@ class MutableTorchTensorRTModule(object):
                 self._store_state_dict_metadata()
             self.refit_state.set_state(RefitFlag.LIVE)
 
+        # weight_streaming_ctx = self.weight_streaming_ctx if self.enable_weight_streaming else None
         result = self.gm(*args, **kwargs)
         # Storing inputs and outputs for verification when the state is unknown
         self.run_info = (args, kwargs, result)
         return result
 
-    def to(self, device: str) -> None:
-        logger.warning("Original PyTorch model is moved. CPU offload may failed.")
-        self.original_model.to(device)
+    def to(self, *args: Any, **kwargs: Any) -> None:
+        logger.warning(
+            "Trying to move the original PyTorch model. This will cause CPU offloading failing and increase GPU memory usage."
+            + "If this is absolute necessary, please call module.pytorch_model.to(...)"
+        )
+
+    @property
+    def device(self) -> torch.device:
+        return to_torch_device(self.trt_device)
 
     def __deepcopy__(self, memo: Any) -> Any:
         cls = self.__class__
