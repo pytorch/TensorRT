@@ -41,6 +41,7 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     get_node_io,
     get_node_name,
     get_trt_tensor,
+    to_torch,
 )
 from torch_tensorrt.dynamo.utils import DYNAMIC_DIM, get_model_device, to_torch_device
 from torch_tensorrt.fx.observer import Observer
@@ -869,8 +870,6 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
 
     def get_attr(self, target: str, args: Any, kwargs: Any) -> np.ndarray:
         with _disable_current_modes():
-            from torch_tensorrt.dynamo.conversion.converter_utils import to_numpy
-
             frozen_attr = self.fetch_attr(target)
 
             if isinstance(frozen_attr, torch.nn.Parameter):
@@ -878,9 +877,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             else:
                 constant_tensor = frozen_attr
 
-            network_constant = to_numpy(constant_tensor)
-
-        return network_constant
+        return to_torch(constant_tensor)
 
     def call_method(self, target: str, args: Any, kwargs: Any) -> Any:
         assert isinstance(target, str)

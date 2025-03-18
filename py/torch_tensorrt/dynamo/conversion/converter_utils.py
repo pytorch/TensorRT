@@ -344,10 +344,13 @@ def create_constant(
     # Rank 0 constant is required in IFillLayer inputs.
     if min_rank == 0:
         shape = trt.Dims()
-    numpy_value = to_numpy(value, dtype)
+
+    torch_value = to_torch(value, dtype)
+    trt_dtype = _enums.dtype._from(torch_value.dtype).to(trt.DataType, use_default=True)
+    weights = trt.Weights(trt_dtype, torch_value.data_ptr(), torch_value.numel())
     constant = ctx.net.add_constant(
-        shape if isinstance(value, (int, float, bool)) else value.shape,
-        numpy_value.copy() if isinstance(numpy_value, np.ndarray) else numpy_value,
+        shape if isinstance(value, (int, float, bool)) else list(torch_value.shape),
+        weights,
     )
     constant.name = name
     return constant.get_output(0)
@@ -564,6 +567,9 @@ def to_numpy(
             value = value.dequantize()
         elif value.dtype == torch.bfloat16:
             # TODO: Remove when numpy has a BF16 type
+            _LOGGER.warning(
+                "Requested a conversion of bfloat16 tensor from torch to numpy which isn't supported. Casting this tensor to FP32 precision currently. Please use to_torch() API for better data representation",
+            )
             value = value.to(torch.float)
 
         output = value.cpu().detach().contiguous().numpy()
@@ -586,6 +592,51 @@ def to_numpy(
     else:
         raise AssertionError(
             f"to_numpy can only be called on None, bool, int, float, np.ndarray, or torch.Tensor, got: {value}"
+        )
+
+
+def to_torch(
+    value: Optional[Union[torch.Tensor, np.ndarray, int, float, bool]],
+    dtype: Optional[Union[torch.dtype, np.dtype, TRTDataType, _enums.dtype]] = None,
+) -> Optional[np.ndarray]:
+    """
+    Convert a Numpy array, or scalar to a PyTorch tensor and move it to CPU
+    Args:
+        value (Optional[Union[torch.Tensor, np.ndarray, int, float, bool]]):
+            A PyTorch tensor, Numpy array, int, float, or bool
+        dtype (Optional[Union[torch.dtype, np.dtype, TRTDataType]]):
+            If a dtype is given, we will convert the type of the given `value` to this dtype.
+    Returns:
+        A Numpy array or None, if the input was None.
+    """
+
+    cpu_device = torch.device("cpu")
+    if value is None:
+        return None
+
+    elif isinstance(value, torch.Tensor):
+        return value.to(cpu_device)
+
+    elif isinstance(value, np.ndarray):
+        output = torch.from_numpy(value).to(cpu_device)
+        return (
+            output.to(_enums.dtype._from(dtype).to(torch.dtype, use_default=True))
+            if dtype
+            else output
+        )
+
+    elif isinstance(value, int):
+        return torch.tensor([value], device=cpu_device, dtype=torch.int32)
+
+    elif isinstance(value, float):
+        return torch.tensor([value], device=cpu_device, dtype=torch.float32)
+
+    elif isinstance(value, bool):
+        return torch.tensor([value], device=cpu_device, dtype=torch.bool)
+
+    else:
+        raise AssertionError(
+            f"to_torch can only be called on None, bool, int, float, np.ndarray, or torch.Tensor, got an object of type: {type(value)}"
         )
 
 

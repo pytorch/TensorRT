@@ -182,3 +182,47 @@ def test_resnet18_half(ir):
 
     # Clean up model env
     torch._dynamo.reset()
+
+
+@pytest.mark.unit
+def test_bf16_model(ir):
+    class MyModule(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.conv = torch.nn.Conv2d(3, 16, 3, stride=1, bias=True)
+            self.relu = torch.nn.ReLU()
+
+        def forward(self, x):
+            out = self.conv(x)
+            out = self.relu(out)
+            return out
+
+    model = MyModule().eval().cuda().to(torch.bfloat16)
+    input = torch.randn((1, 3, 224, 224)).to("cuda").to(torch.bfloat16)
+
+    compile_spec = {
+        "inputs": [
+            torchtrt.Input(
+                input.shape, dtype=torch.bfloat16, format=torch.contiguous_format
+            )
+        ],
+        "device": torchtrt.Device("cuda:0"),
+        "enabled_precisions": {torch.float32},
+        "ir": ir,
+        "pass_through_build_failures": True,
+        "min_block_size": 1,
+        "cache_built_engines": False,
+        "reuse_cached_engines": False,
+        "use_explicit_typing": True,
+    }
+
+    trt_mod = torchtrt.compile(model, **compile_spec)
+    cos_sim = cosine_similarity(model(input), trt_mod(input))
+    breakpoint()
+    assertions.assertTrue(
+        cos_sim > COSINE_THRESHOLD,
+        msg=f"BF16 model TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
+    )
+
+    # Clean up model env
+    torch._dynamo.reset()
