@@ -63,10 +63,11 @@ class MutableTorchTensorRTModule(object):
         *,
         device: Optional[Union[Device, torch.device, str]] = _defaults.DEVICE,
         use_python_runtime: bool = _defaults.USE_PYTHON_RUNTIME,
-        enable_cuda_graph: bool = True,
+        enable_cuda_graph: bool = False,
         immutable_weights: bool = False,
         strict: bool = True,
         allow_complex_guards_as_runtime_asserts: bool = False,
+        weight_streaming_budget: Optional[int] = None,
         **kwargs: Any,
     ) -> None:
         """
@@ -130,7 +131,6 @@ class MutableTorchTensorRTModule(object):
         self.arg_inputs: tuple[Any, ...] = tuple()
         self.kwarg_inputs: dict[str, Any] = {}
         self.additional_settings = kwargs
-        self.enable_cuda_graph = enable_cuda_graph
         self.strict = strict
         self.allow_complex_guards_as_runtime_asserts = (
             allow_complex_guards_as_runtime_asserts
@@ -143,6 +143,7 @@ class MutableTorchTensorRTModule(object):
 
         self.arg_dynamic_shapes: Optional[tuple[Any]] = None
         self.kwarg_dynamic_shapes: Optional[dict[Any, Any]] = None
+        self.serializable_dynamic_shapes_dims: dict[str, tuple[str, int, int]] = {}
         self.run_info: Optional[tuple[Any, ...]] = None
         self.state_dict_metadata: dict[str, torch.Size] = {}
         self._store_state_dict_metadata()
@@ -151,6 +152,15 @@ class MutableTorchTensorRTModule(object):
             if "enable_weight_streaming" in kwargs
             else False
         )
+        self.weight_streaming_ctx = None
+        self.weight_streaming_budget = weight_streaming_budget
+        if self.enable_weight_streaming:
+            if weight_streaming_budget is None:
+                logger.warning(
+                    "Weight stremaing budget is not set. Using auto weight streaming budget"
+                )
+        self.enable_cuda_graph = enable_cuda_graph
+
         cls = self.__class__
         self.__class__ = type(
             self.original_model.__class__.__name__,
@@ -339,9 +349,20 @@ class MutableTorchTensorRTModule(object):
         if self.enable_cuda_graph:
             self._enable_cuda_graph()
         if self.enable_weight_streaming:
-            self.weight_streaming_ctx = torch_tensorrt.runtime.weight_streaming(self.gm)
-            requested_budget = int(16 * 2 << 20)
-            self.weight_streaming_ctx.device_budget = requested_budget
+            self.set_weight_streaming_ctx(self.weight_streaming_budget)
+
+    def set_weight_streaming_ctx(self, requested_budget: Optional[int] = None) -> None:
+        """
+        Set the weight streaming budget. If budget is not set, then automatic weight streaming budget
+        is used.
+        """
+        self.weight_streaming_ctx = torch_tensorrt.runtime.weight_streaming(self.gm)
+        requested_budget = (
+            requested_budget
+            if requested_budget is not None
+            else self.weight_streaming_ctx.get_automatic_weight_streaming_budget()
+        )
+        self.weight_streaming_ctx.device_budget = requested_budget
 
     def _enable_cuda_graph(self) -> None:
         self.gm = get_cuda_graph_module(self.gm)
@@ -465,7 +486,9 @@ class MutableTorchTensorRTModule(object):
                 self._store_state_dict_metadata()
             self.refit_state.set_state(RefitFlag.LIVE)
 
-        # weight_streaming_ctx = self.weight_streaming_ctx if self.enable_weight_streaming else None
+        weight_streaming_ctx = (
+            self.weight_streaming_ctx if self.enable_weight_streaming else None
+        )
         result = self.gm(*args, **kwargs)
         # Storing inputs and outputs for verification when the state is unknown
         self.run_info = (args, kwargs, result)
@@ -605,6 +628,45 @@ class MutableTorchTensorRTModule(object):
 
         return True
 
+    def serialize_dynamic_shapes(self) -> None:
+        dims = self.serializable_dynamic_shapes_dims
+
+        def resursivly_serialize_dynamic_shape(obj: Any) -> None:
+            if isinstance(obj, dict):
+                for axis, v in obj.items():
+                    if isinstance(v, torch.export.dynamic_shapes._Dim):
+                        name = str(v).split("'")[1].split(".")[-1]
+                        # We use string of the hash to be the unique identifier of Dim object
+                        dims.setdefault(str(hash(v)), (name, v.min, v.max))
+                        obj[axis] = str(hash(v))
+                    else:
+                        resursivly_serialize_dynamic_shape(v)
+            if isinstance(obj, (tuple, list)):
+                for v in obj:
+                    resursivly_serialize_dynamic_shape(v)
+
+        resursivly_serialize_dynamic_shape(self.arg_dynamic_shapes)
+        resursivly_serialize_dynamic_shape(self.kwarg_dynamic_shapes)
+
+    def deserialize_dynamic_shapes(self) -> None:
+        dims = self.serializable_dynamic_shapes_dims
+
+        def resursivly_deserialize_dynamic_shape(obj: Any) -> None:
+            if isinstance(obj, dict):
+                for axis, v in obj.items():
+                    if isinstance(v, str):
+                        obj[axis] = torch.export.Dim(
+                            dims[v][0], min=dims[v][1], max=dims[v][2]
+                        )
+                    else:
+                        resursivly_deserialize_dynamic_shape(v)
+            if isinstance(obj, (tuple, list)):
+                for v in obj:
+                    resursivly_deserialize_dynamic_shape(v)
+
+        resursivly_deserialize_dynamic_shape(self.arg_dynamic_shapes)
+        resursivly_deserialize_dynamic_shape(self.kwarg_dynamic_shapes)
+
     @staticmethod
     def save(module: Any, path: str) -> None:
         # Cast the object back to MutableTorchTensorRTModule to save
@@ -616,7 +678,8 @@ class MutableTorchTensorRTModule(object):
         exp_program = module.exp_program
         module.pytorch_model = None
         module.exp_program = None
-        torch.save(module, path)
+        module.serialize_dynamic_shapes()
+        torch.save(module, path, pickle_protocol=4)
         # Restore deleted attributes
         module.exp_program = exp_program
         module.pytorch_model = _make_refit_change_trigger(
@@ -650,6 +713,7 @@ class MutableTorchTensorRTModule(object):
             (cls, module.original_model.__class__),
             {},
         )
+        module.deserialize_dynamic_shapes()
         module.init_finished = True
         return module
 
