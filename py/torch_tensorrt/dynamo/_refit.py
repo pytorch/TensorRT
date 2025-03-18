@@ -323,37 +323,62 @@ def refit_module_weights(
 
     new_gm = post_lowering(new_gm, settings)
 
-    logger.info("Compilation Settings: %s\n", settings)
+    logger.debug("Lowered Input graph: " + str(new_gm.graph))
 
     # Set torch-executed ops
-    CONVERTERS.set_disallowed_targets(settings.torch_executed_ops)
+    CONVERTERS.set_compilation_settings(settings)
+
+    # Check the number of supported operations in the graph
+    num_supported_ops, total_ops = partitioning.get_graph_converter_support(
+        new_gm, settings.debug, settings.torch_executed_ops
+    )
+
+    if num_supported_ops == 0 or (
+        num_supported_ops < settings.min_block_size and not settings.dryrun
+    ):
+        logger.warning(
+            f"{num_supported_ops} supported operations detected in subgraph containing {total_ops} computational nodes. "
+            f"Skipping this subgraph, since min_block_size was detected to be {settings.min_block_size}"
+        )
+        return new_gm
+    else:
+        logger.debug(
+            f"Detected support for {num_supported_ops} operators out of {total_ops} in subgraph."
+        )
 
     # If specified, try using the fast partitioner and fall back to the global one on failure
     if settings.use_fast_partitioner:
         try:
+            logger.info("Partitioning the graph via the fast partitioner")
             new_partitioned_module, supported_ops = partitioning.fast_partition(
                 new_gm,
                 verbose=settings.debug,
                 min_block_size=settings.min_block_size,
                 torch_executed_ops=settings.torch_executed_ops,
+                require_full_compilation=settings.require_full_compilation,
+                skip_fusion=(num_supported_ops == total_ops),
             )
+
         except torch.fx.passes.splitter_base.FxNetSplitterInternalError:
             logger.error(
                 "Partitioning failed on the subgraph with fast partition. See trace above. "
-                + "Retrying with global partition.",
+                "Retrying with global partition.",
                 exc_info=True,
             )
 
             settings.use_fast_partitioner = False
 
     if not settings.use_fast_partitioner:
+        logger.info("Partitioning the graph via the global partitioner")
         new_partitioned_module, supported_ops = partitioning.global_partition(
             new_gm,
             verbose=settings.debug,
             min_block_size=settings.min_block_size,
             torch_executed_ops=settings.torch_executed_ops,
+            require_full_compilation=settings.require_full_compilation,
         )
 
+    # Done Partition
     if inline_module:
         # Preprocess the partitioned module to be in the same format as the inline module
         inline_torch_modules(new_partitioned_module)
@@ -500,6 +525,12 @@ def refit_module_weights(
             new_engine_info[ENGINE_IDX] = bytes(serialized_engine)
             refitted_engine = torch.classes.tensorrt.Engine(tuple(new_engine_info))
             setattr(compiled_module, f"{name}_engine", refitted_engine)
+
+    # TODO: Memory control prototyping. Under discussion
+    if settings.offload_module_to_cpu:
+        del new_partitioned_module
+        gc.collect()
+        torch.cuda.empty_cache()
 
     if verify_output and arg_inputs is not None:
         if check_module_output(
