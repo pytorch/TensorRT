@@ -95,8 +95,8 @@ def load_lora(path):
 
 
 generate_image(["Test"], 2)
-load_lora("")
-generate_image(["A golden retriever holding a sign to code"], 2)
+# load_lora("")
+# generate_image(["A golden retriever holding a sign to code"], 2)
 
 # Create Gradio interface
 with gr.Blocks(title="Flux Demo with Torch-TensorRT") as demo:
