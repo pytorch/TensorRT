@@ -330,26 +330,19 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             builder_config.set_flag(trt.BuilderFlag.WEIGHT_STREAMING)
 
         if version.parse(trt.__version__) >= version.parse("10.8"):
-            if self.compilation_settings.tiling_optimization_level == 0:
-                builder_config.tiling_optimization_level = (
-                    trt.TilingOptimizationLevel.NONE
-                )
-            elif self.compilation_settings.tiling_optimization_level == 1:
-                builder_config.tiling_optimization_level = (
-                    trt.TilingOptimizationLevel.FAST
-                )
-            elif self.compilation_settings.tiling_optimization_level == 2:
-                builder_config.tiling_optimization_level = (
-                    trt.TilingOptimizationLevel.MODERATE
-                )
-            elif self.compilation_settings.tiling_optimization_level == 3:
-                builder_config.tiling_optimization_level = (
-                    trt.TilingOptimizationLevel.FULL
-                )
-            else:
-                raise ValueError(
-                    f"Invalid tiling optimization level: {self.compilation_settings.tiling_optimization_level}. A valid value should be in [0, 1, 2, 3]."
-                )
+            TilingOptimizationLevel = {
+                "none": trt.TilingOptimizationLevel.NONE,
+                "fast": trt.TilingOptimizationLevel.FAST,
+                "moderate": trt.TilingOptimizationLevel.MODERATE,
+                "full": trt.TilingOptimizationLevel.FULL,
+            }
+            assert (
+                self.compilation_settings.tiling_optimization_level
+                in TilingOptimizationLevel
+            ), f"Invalid tiling optimization level: {self.compilation_settings.tiling_optimization_level}. We currently support {TilingOptimizationLevel.keys()}."
+            builder_config.tiling_optimization_level = TilingOptimizationLevel[
+                self.compilation_settings.tiling_optimization_level
+            ]
 
             builder_config.l2_limit_for_tiling = (
                 self.compilation_settings.l2_limit_for_tiling

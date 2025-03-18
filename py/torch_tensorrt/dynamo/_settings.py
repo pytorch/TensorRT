@@ -95,7 +95,7 @@ class CompilationSettings:
         enable_cross_compile_for_windows (bool): By default this is False means TensorRT engines can only be executed on the same platform where they were built.
             True will enable cross-platform compatibility which allows the engine to be built on Linux and run on Windows
         use_aot_joint_export (bool): Use aot_export_joint_simple, else wrap backend with AOT_autograd, required for distributed tensors
-        tiling_optimization_level (int): The optimization level of tiling strategies. A Higher level allows TensorRT to spend more time searching for better optimization strategy. (We currently support [0, 1, 2, 3], default is 0)
+        tiling_optimization_level (str): The optimization level of tiling strategies. A higher level allows TensorRT to spend more time searching for better tiling strategy. We currently support ["none", "fast", "moderate", "full"].
         l2_limit_for_tiling (int): The target L2 cache usage limit (in bytes) for tiling optimization (default is -1 which means no limit).
     """
 
@@ -138,7 +138,7 @@ class CompilationSettings:
     enable_weight_streaming: bool = ENABLE_WEIGHT_STREAMING
     enable_cross_compile_for_windows: bool = ENABLE_CROSS_COMPILE_FOR_WINDOWS
     use_aot_joint_export: bool = USE_AOT_JOINT_EXPORT
-    tiling_optimization_level: int = TILING_OPTIMIZATION_LEVEL
+    tiling_optimization_level: str = TILING_OPTIMIZATION_LEVEL
     l2_limit_for_tiling: int = L2_LIMIT_FOR_TILING
 
 
