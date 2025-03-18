@@ -4,7 +4,6 @@ import logging
 from enum import Enum, auto
 from typing import Any, Optional, Type, Union
 
-import ml_dtypes
 import numpy as np
 import tensorrt as trt
 import torch
@@ -417,8 +416,10 @@ class dtype(Enum):
                 return np.float64
             elif self == dtype.b:
                 return np.bool_
-            elif self == dtype.bf16:
-                return ml_dtypes.bfloat16
+            # TODO: Consider using ml_dtypes when issues like this are resolved:
+            # https://github.com/pytorch/pytorch/issues/109873
+            # elif self == dtype.bf16:
+            #    return ml_dtypes.bfloat16
             elif use_default:
                 return np.float32
             else:
