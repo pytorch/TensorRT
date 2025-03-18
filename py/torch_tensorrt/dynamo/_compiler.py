@@ -552,15 +552,6 @@ def compile(
             )
 
     if (
-        not immutable_weights
-        and not refit_identical_engine_weights
-        and enable_weight_streaming
-    ):
-        raise ValueError(
-            "TensorRT's `REFIT` flag is not compatible with `enable_weight_streaming=True` for now. This issue was reported on https://github.com/pytorch/TensorRT/issues/3305"
-        )
-
-    if (
         "enable_cross_compile_for_windows" in kwargs.keys()
         and kwargs["enable_cross_compile_for_windows"]
     ):
