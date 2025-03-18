@@ -16,6 +16,7 @@ from torch_tensorrt.dynamo.utils import (
     to_torch_device,
     to_torch_tensorrt_device,
 )
+from torch_tensorrt.runtime._cudagraphs import get_cuda_graph_module
 
 logger = logging.getLogger(__name__)
 
@@ -335,13 +336,15 @@ class MutableTorchTensorRTModule(object):
         )
         self.original_model.to("cpu")
         torch.cuda.empty_cache()
-        # torch_tensorrt.runtime.set_cudagraphs_mode(self.enable_cuda_graph)
-        # if self.enable_cuda_graph:
-        #     self.gm = torch_tensorrt.runtime.enable_cudagraphs(self.gm)
+        if self.enable_cuda_graph:
+            self._enable_cuda_graph()
         if self.enable_weight_streaming:
             self.weight_streaming_ctx = torch_tensorrt.runtime.weight_streaming(self.gm)
             requested_budget = int(16 * 2 << 20)
             self.weight_streaming_ctx.device_budget = requested_budget
+
+    def _enable_cuda_graph(self) -> None:
+        self.gm = get_cuda_graph_module(self.gm)
 
     def _validate_inputs(self, *args: Any, **kwargs: Any) -> None:
 
