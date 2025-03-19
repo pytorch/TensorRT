@@ -96,6 +96,7 @@ def cross_compile_for_windows(
     strip_engine_weights: bool = _defaults.STRIP_ENGINE_WEIGHTS,
     immutable_weights: bool = _defaults.IMMUTABLE_WEIGHTS,
     enable_weight_streaming: bool = _defaults.ENABLE_WEIGHT_STREAMING,
+    use_aot_joint_export: bool = _defaults.USE_AOT_JOINT_EXPORT,
     **kwargs: Any,
 ) -> torch.fx.GraphModule:
     """Compile an ExportedProgram module using TensorRT in Linux for Inference in Windows
@@ -169,6 +170,7 @@ def cross_compile_for_windows(
         strip_engine_weights (bool): Strip engine weights from the serialized engine. This is useful when the engine is to be deployed in an environment where the weights are not required.
         immutable_weights (bool): Build non-refittable engines. This is useful for some layers that are not refittable. If this argument is set to true, `strip_engine_weights` and `refit_identical_engine_weights` will be ignored.
         enable_weight_streaming (bool): Enable weight streaming.
+        use_aot_joint_export (bool): Use aot_export_joint_simple, else wrap backend with AOT_autograd, required for distributed tensors
         **kwargs: Any,
     Returns:
         torch.fx.GraphModule: Compiled FX Module, when run it will execute via TensorRT
@@ -326,6 +328,7 @@ def cross_compile_for_windows(
         "immutable_weights": immutable_weights,
         "enable_cross_compile_for_windows": True,
         "enable_weight_streaming": enable_weight_streaming,
+        "use_aot_joint_export": use_aot_joint_export,
     }
 
     # disable the following settings is not supported for cross compilation for windows feature
@@ -413,6 +416,7 @@ def compile(
     strip_engine_weights: bool = _defaults.STRIP_ENGINE_WEIGHTS,
     immutable_weights: bool = _defaults.IMMUTABLE_WEIGHTS,
     enable_weight_streaming: bool = _defaults.ENABLE_WEIGHT_STREAMING,
+    use_aot_joint_export: bool = _defaults.USE_AOT_JOINT_EXPORT,
     **kwargs: Any,
 ) -> torch.fx.GraphModule:
     """Compile an ExportedProgram module for NVIDIA GPUs using TensorRT
@@ -488,6 +492,7 @@ def compile(
         strip_engine_weights (bool): Strip engine weights from the serialized engine. This is useful when the engine is to be deployed in an environment where the weights are not required.
         immutable_weights (bool): Build non-refittable engines. This is useful for some layers that are not refittable. If this argument is set to true, `strip_engine_weights` and `refit_identical_engine_weights` will be ignored.
         enable_weight_streaming (bool): Enable weight streaming.
+
         **kwargs: Any,
     Returns:
         torch.fx.GraphModule: Compiled FX Module, when run it will execute via TensorRT
@@ -662,6 +667,7 @@ def compile(
         "immutable_weights": immutable_weights,
         "enable_cross_compile_for_windows": False,
         "enable_weight_streaming": enable_weight_streaming,
+        "use_aot_joint_export": use_aot_joint_export,
     }
 
     settings = CompilationSettings(**compilation_options)
@@ -950,6 +956,7 @@ def convert_exported_program_to_serialized_trt_engine(
     strip_engine_weights: bool = _defaults.STRIP_ENGINE_WEIGHTS,
     immutable_weights: bool = _defaults.IMMUTABLE_WEIGHTS,
     enable_weight_streaming: bool = _defaults.ENABLE_WEIGHT_STREAMING,
+    use_aot_joint_export: bool = _defaults.USE_AOT_JOINT_EXPORT,
     **kwargs: Any,
 ) -> bytes:
     """Convert an ExportedProgram to a serialized TensorRT engine
@@ -1013,6 +1020,7 @@ def convert_exported_program_to_serialized_trt_engine(
         strip_engine_weights (bool): Strip engine weights from the serialized engine. This is useful when the engine is to be deployed in an environment where the weights are not required.
         immutable_weights (bool): Build non-refittable engines. This is useful for some layers that are not refittable. If this argument is set to true, `strip_engine_weights` and `refit_identical_engine_weights` will be ignored.
         enable_weight_streaming (bool): Enable weight streaming.
+        use_aot_joint_export (bool): Use aot_export_joint_simple, else wrap backend with AOT_autograd, required for distributed tensors
     Returns:
         bytes: Serialized TensorRT engine, can either be saved to a file or deserialized via TensorRT APIs
     """
@@ -1129,6 +1137,7 @@ def convert_exported_program_to_serialized_trt_engine(
         "strip_engine_weights": strip_engine_weights,
         "immutable_weights": immutable_weights,
         "enable_weight_streaming": enable_weight_streaming,
+        "use_aot_joint_export": use_aot_joint_export,
     }
 
     settings = CompilationSettings(**compilation_options)

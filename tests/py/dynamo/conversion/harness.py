@@ -353,6 +353,7 @@ class DispatchTestCase(TRTTestCase):
         enable_passes: bool,
         propagate_shapes: bool = False,
         settings: CompilationSettings = CompilationSettings(),
+        fuse_distributed_ops: bool = False,
         torch_export_dynamic_shapes: Optional[Any] = None,
     ):
         mod = mod.eval()
@@ -368,6 +369,16 @@ class DispatchTestCase(TRTTestCase):
                 tuple(torch_export_inputs),
                 dynamic_shapes=torch_export_dynamic_shapes,
             )
+            if fuse_distributed_ops:
+                from torch_tensorrt.dynamo.lowering.passes.fuse_distributed_ops import (
+                    fuse_distributed_ops,
+                )
+
+                gm = exported_program.graph_module
+                gm = fuse_distributed_ops(gm, settings)
+                exported_program = exported_program.run_decompositions(
+                    get_decompositions(False)
+                )
             if enable_passes:
                 exported_program = pre_export_lowering(exported_program, settings)
                 exported_program = exported_program.run_decompositions(
@@ -406,6 +417,7 @@ class DispatchTestCase(TRTTestCase):
         propagate_shapes=False,
         int32_reqd=False,
         immutable_weights=True,
+        fuse_distributed_ops=False,
     ):
         # TODO: lan to remove this and set use_dynamo_traccer to True by default
         # once all the converter test files are moved to use_dynamo_tracer
@@ -426,6 +438,7 @@ class DispatchTestCase(TRTTestCase):
             enable_passes=enable_passes,
             propagate_shapes=propagate_shapes,
             settings=compilation_settings,
+            fuse_distributed_ops=fuse_distributed_ops,
         )
 
         num_inputs = len(inputs)
