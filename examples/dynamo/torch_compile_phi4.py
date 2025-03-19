@@ -1,10 +1,10 @@
 """
-.. _torch_compile_phi3_vision:
+.. _torch_compile_phi4:
 
-Compiling Phi 3 vision model from Hugging Face using the Torch-TensorRT `torch.compile` Backend
+Compiling Phi 4 model from Hugging Face using the Torch-TensorRT `torch.compile` Backend
 ======================================================
 
-This script is intended as a sample of the Torch-TensorRT workflow with `torch.compile` on a Phi 3 vision model from Hugging Face.
+This script is intended as a sample of the Torch-TensorRT workflow with `torch.compile` on a Phi 4 model from Hugging Face.
 """
 
 # %%
@@ -21,7 +21,7 @@ from transformers import AutoModelForCausalLM, AutoProcessor
 # Load the pre-trained model weights from Hugging Face
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-model_id = "microsoft/Phi-3-vision-128k-instruct"
+model_id = "microsoft/Phi-4-multimodal-instruct"
 processor = AutoProcessor.from_pretrained(model_id, trust_remote_code=True)
 model = AutoModelForCausalLM.from_pretrained(
     model_id, trust_remote_code=True, torch_dtype="auto"
