@@ -9,6 +9,7 @@ import numpy as np
 import tensorrt as trt
 import torch
 import torch_tensorrt.dynamo.conversion.impl as impl
+from torch.fx.experimental.proxy_tensor import unset_fake_temporarily
 from torch.fx.node import Argument, Target
 from torch.fx.passes.shape_prop import TensorMetadata
 from torch_tensorrt import _enums
@@ -629,33 +630,37 @@ def to_torch(
     """
 
     cpu_device = torch.device("cpu")
-    if value is None:
-        return None
+    torch_dtype = (
+        _enums.dtype._from(dtype).to(torch.dtype, use_default=True) if dtype else None
+    )
 
-    elif isinstance(value, torch.Tensor):
-        return value.to(cpu_device).contiguous()
+    with unset_fake_temporarily():
+        if value is None:
+            return None
 
-    elif isinstance(value, np.ndarray):
-        output = torch.from_numpy(value).to(cpu_device).contiguous()
-        return (
-            output.to(_enums.dtype._from(dtype).to(torch.dtype, use_default=True))
-            if dtype
-            else output
-        )
+        elif isinstance(value, torch.Tensor):
+            output = torch.atleast_1d(value).to(cpu_device).contiguous()
 
-    elif isinstance(value, int):
-        return torch.tensor([value], device=cpu_device, dtype=torch.int32)
+        elif isinstance(value, np.ndarray):
+            output = (
+                torch.atleast_1d(torch.from_numpy(value)).to(cpu_device).contiguous()
+            )
 
-    elif isinstance(value, float):
-        return torch.tensor([value], device=cpu_device, dtype=torch.float32)
+        elif isinstance(value, int):
+            output = torch.tensor([value], device=cpu_device, dtype=torch.int32)
 
-    elif isinstance(value, bool):
-        return torch.tensor([value], device=cpu_device, dtype=torch.bool)
+        elif isinstance(value, float):
+            output = torch.tensor([value], device=cpu_device, dtype=torch.float32)
 
-    else:
-        raise AssertionError(
-            f"to_torch can only be called on None, bool, int, float, np.ndarray, or torch.Tensor, got an object of type: {type(value)}"
-        )
+        elif isinstance(value, bool):
+            output = torch.tensor([value], device=cpu_device, dtype=torch.bool)
+
+        else:
+            raise AssertionError(
+                f"to_torch can only be called on None, bool, int, float, np.ndarray, or torch.Tensor, got an object of type: {type(value)}"
+            )
+
+        return output.to(torch_dtype) if torch_dtype else output
 
 
 def flatten_dims(
