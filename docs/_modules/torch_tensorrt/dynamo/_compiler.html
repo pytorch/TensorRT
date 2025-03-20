@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt.dynamo._compiler &mdash; Torch-TensorRT v2.7.0.dev0+43ab919 documentation</title>
+  <title>torch_tensorrt.dynamo._compiler &mdash; Torch-TensorRT v2.7.0.dev0+656bb9e documentation</title>
   
 
   
@@ -290,7 +290,7 @@
               
               
                 <div class="version">
-                  v2.7.0.dev0+43ab919
+                  v2.7.0.dev0+656bb9e
                 </div>
               
             
@@ -584,6 +584,8 @@
     <span class="n">strip_engine_weights</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">STRIP_ENGINE_WEIGHTS</span><span class="p">,</span>
     <span class="n">immutable_weights</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">IMMUTABLE_WEIGHTS</span><span class="p">,</span>
     <span class="n">enable_weight_streaming</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">ENABLE_WEIGHT_STREAMING</span><span class="p">,</span>
+    <span class="n">tiling_optimization_level</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">TILING_OPTIMIZATION_LEVEL</span><span class="p">,</span>
+    <span class="n">l2_limit_for_tiling</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">L2_LIMIT_FOR_TILING</span><span class="p">,</span>
     <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Compile an ExportedProgram module using TensorRT in Linux for Inference in Windows</span>
@@ -657,6 +659,8 @@
 <span class="sd">        strip_engine_weights (bool): Strip engine weights from the serialized engine. This is useful when the engine is to be deployed in an environment where the weights are not required.</span>
 <span class="sd">        immutable_weights (bool): Build non-refittable engines. This is useful for some layers that are not refittable. If this argument is set to true, `strip_engine_weights` and `refit_identical_engine_weights` will be ignored.</span>
 <span class="sd">        enable_weight_streaming (bool): Enable weight streaming.</span>
+<span class="sd">        tiling_optimization_level (str): The optimization level of tiling strategies. A higher level allows TensorRT to spend more time searching for better tiling strategy. We currently support [&quot;none&quot;, &quot;fast&quot;, &quot;moderate&quot;, &quot;full&quot;].</span>
+<span class="sd">        l2_limit_for_tiling (int): The target L2 cache usage limit (in bytes) for tiling optimization (default is -1 which means no limit).</span>
 <span class="sd">        **kwargs: Any,</span>
 <span class="sd">    Returns:</span>
 <span class="sd">        torch.fx.GraphModule: Compiled FX Module, when run it will execute via TensorRT</span>
@@ -814,6 +818,8 @@
         <span class="s2">&quot;immutable_weights&quot;</span><span class="p">:</span> <span class="n">immutable_weights</span><span class="p">,</span>
         <span class="s2">&quot;enable_cross_compile_for_windows&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
         <span class="s2">&quot;enable_weight_streaming&quot;</span><span class="p">:</span> <span class="n">enable_weight_streaming</span><span class="p">,</span>
+        <span class="s2">&quot;tiling_optimization_level&quot;</span><span class="p">:</span> <span class="n">tiling_optimization_level</span><span class="p">,</span>
+        <span class="s2">&quot;l2_limit_for_tiling&quot;</span><span class="p">:</span> <span class="n">l2_limit_for_tiling</span><span class="p">,</span>
     <span class="p">}</span>
 
     <span class="c1"># disable the following settings is not supported for cross compilation for windows feature</span>
@@ -901,6 +907,8 @@
     <span class="n">strip_engine_weights</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">STRIP_ENGINE_WEIGHTS</span><span class="p">,</span>
     <span class="n">immutable_weights</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">IMMUTABLE_WEIGHTS</span><span class="p">,</span>
     <span class="n">enable_weight_streaming</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">ENABLE_WEIGHT_STREAMING</span><span class="p">,</span>
+    <span class="n">tiling_optimization_level</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">TILING_OPTIMIZATION_LEVEL</span><span class="p">,</span>
+    <span class="n">l2_limit_for_tiling</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">L2_LIMIT_FOR_TILING</span><span class="p">,</span>
     <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Compile an ExportedProgram module for NVIDIA GPUs using TensorRT</span>
@@ -976,6 +984,8 @@
 <span class="sd">        strip_engine_weights (bool): Strip engine weights from the serialized engine. This is useful when the engine is to be deployed in an environment where the weights are not required.</span>
 <span class="sd">        immutable_weights (bool): Build non-refittable engines. This is useful for some layers that are not refittable. If this argument is set to true, `strip_engine_weights` and `refit_identical_engine_weights` will be ignored.</span>
 <span class="sd">        enable_weight_streaming (bool): Enable weight streaming.</span>
+<span class="sd">        tiling_optimization_level (str): The optimization level of tiling strategies. A higher level allows TensorRT to spend more time searching for better tiling strategy. We currently support [&quot;none&quot;, &quot;fast&quot;, &quot;moderate&quot;, &quot;full&quot;].</span>
+<span class="sd">        l2_limit_for_tiling (int): The target L2 cache usage limit (in bytes) for tiling optimization (default is -1 which means no limit).</span>
 <span class="sd">        **kwargs: Any,</span>
 <span class="sd">    Returns:</span>
 <span class="sd">        torch.fx.GraphModule: Compiled FX Module, when run it will execute via TensorRT</span>
@@ -1150,6 +1160,8 @@
         <span class="s2">&quot;immutable_weights&quot;</span><span class="p">:</span> <span class="n">immutable_weights</span><span class="p">,</span>
         <span class="s2">&quot;enable_cross_compile_for_windows&quot;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
         <span class="s2">&quot;enable_weight_streaming&quot;</span><span class="p">:</span> <span class="n">enable_weight_streaming</span><span class="p">,</span>
+        <span class="s2">&quot;tiling_optimization_level&quot;</span><span class="p">:</span> <span class="n">tiling_optimization_level</span><span class="p">,</span>
+        <span class="s2">&quot;l2_limit_for_tiling&quot;</span><span class="p">:</span> <span class="n">l2_limit_for_tiling</span><span class="p">,</span>
     <span class="p">}</span>
 
     <span class="n">settings</span> <span class="o">=</span> <span class="n">CompilationSettings</span><span class="p">(</span><span class="o">**</span><span class="n">compilation_options</span><span class="p">)</span>
@@ -1438,6 +1450,8 @@
     <span class="n">strip_engine_weights</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">STRIP_ENGINE_WEIGHTS</span><span class="p">,</span>
     <span class="n">immutable_weights</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">IMMUTABLE_WEIGHTS</span><span class="p">,</span>
     <span class="n">enable_weight_streaming</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">ENABLE_WEIGHT_STREAMING</span><span class="p">,</span>
+    <span class="n">tiling_optimization_level</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">TILING_OPTIMIZATION_LEVEL</span><span class="p">,</span>
+    <span class="n">l2_limit_for_tiling</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">L2_LIMIT_FOR_TILING</span><span class="p">,</span>
     <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bytes</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Convert an ExportedProgram to a serialized TensorRT engine</span>
@@ -1501,6 +1515,8 @@
 <span class="sd">        strip_engine_weights (bool): Strip engine weights from the serialized engine. This is useful when the engine is to be deployed in an environment where the weights are not required.</span>
 <span class="sd">        immutable_weights (bool): Build non-refittable engines. This is useful for some layers that are not refittable. If this argument is set to true, `strip_engine_weights` and `refit_identical_engine_weights` will be ignored.</span>
 <span class="sd">        enable_weight_streaming (bool): Enable weight streaming.</span>
+<span class="sd">        tiling_optimization_level (str): The optimization level of tiling strategies. A higher level allows TensorRT to spend more time searching for better tiling strategy. We currently support [&quot;none&quot;, &quot;fast&quot;, &quot;moderate&quot;, &quot;full&quot;].</span>
+<span class="sd">        l2_limit_for_tiling (int): The target L2 cache usage limit (in bytes) for tiling optimization (default is -1 which means no limit).</span>
 <span class="sd">    Returns:</span>
 <span class="sd">        bytes: Serialized TensorRT engine, can either be saved to a file or deserialized via TensorRT APIs</span>
 <span class="sd">    &quot;&quot;&quot;</span>
@@ -1617,6 +1633,8 @@
         <span class="s2">&quot;strip_engine_weights&quot;</span><span class="p">:</span> <span class="n">strip_engine_weights</span><span class="p">,</span>
         <span class="s2">&quot;immutable_weights&quot;</span><span class="p">:</span> <span class="n">immutable_weights</span><span class="p">,</span>
         <span class="s2">&quot;enable_weight_streaming&quot;</span><span class="p">:</span> <span class="n">enable_weight_streaming</span><span class="p">,</span>
+        <span class="s2">&quot;tiling_optimization_level&quot;</span><span class="p">:</span> <span class="n">tiling_optimization_level</span><span class="p">,</span>
+        <span class="s2">&quot;l2_limit_for_tiling&quot;</span><span class="p">:</span> <span class="n">l2_limit_for_tiling</span><span class="p">,</span>
     <span class="p">}</span>
 
     <span class="n">settings</span> <span class="o">=</span> <span class="n">CompilationSettings</span><span class="p">(</span><span class="o">**</span><span class="n">compilation_options</span><span class="p">)</span>
