@@ -2,6 +2,7 @@ import time
 
 import tensorrt as trt
 import torch
+import torch.distributed as dist
 import torch.nn as nn
 import torch_tensorrt
 from tensor_parallel_initialize_dist import initialize_distributed_env
@@ -19,35 +20,6 @@ device_mesh, _world_size, _rank, logger = initialize_distributed_env(
 """
 This example copies some code from https://github.com/pytorch/examples/blob/main/distributed/tensor_parallelism/tensor_parallel_example.py
 """
-
-
-def compile_tp_model(tp_model, backend):
-    compile_options = {
-        "truncate_long_and_double": True,
-        "enabled_precisions": {torch.float32, torch.float16},
-        "use_python_runtime": True,
-        "min_block_size": 1,
-    }
-
-    try:
-        return torch.compile(
-            tp_model, backend=backend, options=compile_options, dynamic=None
-        )
-    except RuntimeError as e:
-        if (
-            "aot_export is not currently supported with traceable tensor subclass"
-            in str(e)
-        ):
-            logger.warning(
-                "It is recommended to run the model with use_distributed_mode_trace=True. Running with that option"
-            )
-            compile_options["use_distributed_mode_trace"] = True
-            return torch.compile(
-                tp_model, backend=backend, options=compile_options, dynamic=None
-            )
-        else:
-            logger.debug("The distributed model fails with the following error")
-            raise
 
 
 class ToyModel(nn.Module):
@@ -93,20 +65,37 @@ torch.manual_seed(0)
 inp = torch.rand(20, 10, device="cuda")
 python_result = tp_model(inp)
 
-compile_tp_model(tp_model, backend="torch_tensorrt")
+backend = "torch_tensorrt"
+tp_model = torch.compile(
+    tp_model,
+    backend=backend,
+    options={
+        "truncate_long_and_double": True,
+        "enabled_precisions": {torch.float32, torch.float16},
+        "use_python_runtime": True,
+        "min_block_size": 1,
+        "use_distributed_mode_trace": True,
+    },
+    dynamic=None,
+)
 
-for i in range(10):
-    # For TP, input needs to be same across all TP ranks.
-    # Setting the random seed is to mimic the behavior of dataloader.
-    torch.manual_seed(i)
-    inp = torch.rand(20, 10, device="cuda")
-    start = time.time()
-    output = tp_model(inp)
-    end = time.time()
-    if i == 0:
-        logger.info(f"Compilation time is {end-start}")
-        assert (
-            python_result - output
-        ).std() < 0.01, "Compilation result is not correct."
-    elif _rank == 0:
-        logger.info(f"Inference time is {end-start}")
+try:
+    for i in range(10):
+        # For TP, input needs to be same across all TP ranks.
+        # Setting the random seed is to mimic the behavior of dataloader.
+        torch.manual_seed(i)
+        inp = torch.rand(20, 10, device="cuda")
+        start = time.time()
+        output = tp_model(inp)
+        end = time.time()
+        if i == 0:
+            logger.info(f"Compilation time is {end-start}")
+            assert (
+                python_result - output
+            ).std() < 0.01, "Compilation result is not correct."
+        elif _rank == 0:
+            logger.info(f"Inference time is {end-start}")
+finally:
+    # This cleans up the distributed process group
+    if dist.is_initialized():
+        dist.destroy_process_group()

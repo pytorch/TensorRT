@@ -10,6 +10,7 @@ import torch._dynamo as td
 from torch._dynamo.backends.common import aot_autograd
 from torch._dynamo.utils import detect_fake_mode
 from torch._functorch.aot_autograd import aot_export_joint_simple
+from torch.distributed.tensor import DTensor
 from torch_tensorrt.dynamo import CompilationSettings
 from torch_tensorrt.dynamo._compiler import compile_module
 from torch_tensorrt.dynamo.lowering import (
@@ -79,6 +80,10 @@ def aot_torch_tensorrt_aten_backend(
             fw_compiler=_pretraced_backend_autograd,
             decompositions=settings_aot_autograd["decompositions"],
         )(gm, sample_inputs)
+    if any(isinstance(tensor, DTensor) for tensor in sample_inputs):
+        logger.warning(
+            "It is recommended to run the model with use_distributed_mode_trace = True since there are distributed tensors in the input which is not supported in aot_export_joint_simple"
+        )
     return _pretraced_backend(gm, sample_inputs, settings, engine_cache)
 
 
