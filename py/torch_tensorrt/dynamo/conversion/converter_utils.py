@@ -355,7 +355,11 @@ def create_constant(
             numpy_value = torch_value.numpy()
 
         constant = ctx.net.add_constant(
-            shape if isinstance(value, (int, float, bool)) else list(torch_value.shape),
+            (
+                shape
+                if isinstance(value, (int, float, bool)) or min_rank == 0
+                else list(torch_value.shape)
+            ),
             numpy_value,
         )
         constant.name = name
