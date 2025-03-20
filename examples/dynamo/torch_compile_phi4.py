@@ -23,15 +23,23 @@ from transformers import AutoModelForCausalLM, AutoProcessor
 
 model_id = "microsoft/Phi-4-multimodal-instruct"
 processor = AutoProcessor.from_pretrained(model_id, trust_remote_code=True)
-model = AutoModelForCausalLM.from_pretrained(
-    model_id, trust_remote_code=True, torch_dtype="auto"
-).cuda()
+model = (
+    AutoModelForCausalLM.from_pretrained(
+        model_id, trust_remote_code=True, torch_dtype="auto"
+    )
+    .eval()
+    .cuda()
+)
 
 # %%
 # Compile the model with torch.compile, using Torch-TensorRT backend
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-model = torch.compile(model, backend="tensorrt")
+model.forward = torch.compile(
+    model.forward,
+    backend="tensorrt",
+    options={"debug": True, "min_block_size": 1, "use_python_runtime": True},
+)
 
 # %%
 # Write prompt and load image
