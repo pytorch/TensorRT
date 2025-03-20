@@ -81,7 +81,9 @@ def replace_rmsnorm(
                                     weight_mul_node.replace_all_uses_with(
                                         flashinfer_rmsnorm_node
                                     )
-                                    flashinfer_rmsnorm_node.meta.update(node.meta)
+                                    flashinfer_rmsnorm_node.meta.update(
+                                        weight_mul_node.meta
+                                    )
 
                                     modified_graph = True
 
@@ -94,8 +96,6 @@ def replace_rmsnorm(
                                     gm.graph.erase_node(mean_node)
                                     gm.graph.erase_node(pow_node)
                                     gm.graph.erase_node(node)
-
-                                    print(" good match!")
 
     if modified_graph:
         gm = clean_up_graph_after_modifications(gm)
