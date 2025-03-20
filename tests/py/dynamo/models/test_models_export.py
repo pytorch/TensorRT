@@ -206,7 +206,6 @@ def test_resnet18_half(ir):
 def test_base_fp8(ir):
     import modelopt.torch.quantization as mtq
     from modelopt.torch.quantization.utils import export_torch_mode
-    from torch.export._trace import _export
 
     class SimpleNetwork(torch.nn.Module):
         def __init__(self):
@@ -234,7 +233,7 @@ def test_base_fp8(ir):
 
     with torch.no_grad():
         with export_torch_mode():
-            exp_program = _export(model, (input_tensor,))
+            exp_program = torch.export.export(model, (input_tensor,), strict=False)
             trt_model = torchtrt.dynamo.compile(
                 exp_program,
                 inputs=[input_tensor],
