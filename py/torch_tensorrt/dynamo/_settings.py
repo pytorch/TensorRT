@@ -35,7 +35,7 @@ from torch_tensorrt.dynamo._defaults import (
     TILING_OPTIMIZATION_LEVEL,
     TIMING_CACHE_PATH,
     TRUNCATE_DOUBLE,
-    USE_AOT_JOINT_EXPORT,
+    USE_DISTRIBUTED_MODE_TRACE,
     USE_EXPLICIT_TYPING,
     USE_FAST_PARTITIONER,
     USE_FP32_ACC,
@@ -94,9 +94,9 @@ class CompilationSettings:
         enable_weight_streaming (bool): Enable weight streaming.
         enable_cross_compile_for_windows (bool): By default this is False means TensorRT engines can only be executed on the same platform where they were built.
             True will enable cross-platform compatibility which allows the engine to be built on Linux and run on Windows
-        use_aot_joint_export (bool): Use aot_export_joint_simple, else wrap backend with AOT_autograd, required for distributed tensors
         tiling_optimization_level (str): The optimization level of tiling strategies. A higher level allows TensorRT to spend more time searching for better tiling strategy. We currently support ["none", "fast", "moderate", "full"].
         l2_limit_for_tiling (int): The target L2 cache usage limit (in bytes) for tiling optimization (default is -1 which means no limit).
+        use_distributed_mode_trace (bool):  Using aot_autograd to trace the graph. This is enabled when DTensors or distributed tensors are present in distributed model
     """
 
     enabled_precisions: Set[dtype] = field(default_factory=lambda: ENABLED_PRECISIONS)
@@ -137,9 +137,9 @@ class CompilationSettings:
     immutable_weights: bool = IMMUTABLE_WEIGHTS
     enable_weight_streaming: bool = ENABLE_WEIGHT_STREAMING
     enable_cross_compile_for_windows: bool = ENABLE_CROSS_COMPILE_FOR_WINDOWS
-    use_aot_joint_export: bool = USE_AOT_JOINT_EXPORT
     tiling_optimization_level: str = TILING_OPTIMIZATION_LEVEL
     l2_limit_for_tiling: int = L2_LIMIT_FOR_TILING
+    use_distributed_mode_trace: bool = USE_DISTRIBUTED_MODE_TRACE
 
 
 _SETTINGS_TO_BE_ENGINE_INVARIANT = (
