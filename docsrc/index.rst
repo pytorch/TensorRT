@@ -68,6 +68,7 @@ Tutorials
 * :ref:`mutable_torchtrt_module_example`
 * :ref:`weight_streaming_example`
 * :ref:`pre_allocated_output_example`
+* :ref:`tensor_parallel_llama3`
 
 .. toctree::
    :caption: Tutorials
@@ -87,6 +88,7 @@ Tutorials
    tutorials/_rendered_examples/dynamo/mutable_torchtrt_module_example
    tutorials/_rendered_examples/dynamo/weight_streaming_example
    tutorials/_rendered_examples/dynamo/pre_allocated_output_example
+   tutorials/_rendered_examples/distributed_inference/tensor_parallel_llama3
 
 Dynamo Frontend
 ----------------
