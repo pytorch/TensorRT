@@ -35,6 +35,7 @@ class PlanParams:
     rope_theta: Optional[float] = None
     rope_scale: Optional[float] = None
     causal: bool = True
+    sm_scale: Optional[float] = None
 
     def __hash__(self):
         """Convert all fields to a string representation and concatenate them."""
@@ -102,7 +103,7 @@ class _FlashInferPlanner:
                 rope_theta=plan_params.rope_theta,
                 q_data_type=plan_params.q_dtype,
                 kv_data_type=plan_params.kv_dtype,
-                sm_scale=0.0883,
+                sm_scale=plan_params.sm_scale,
             )
 
         # we want to plan during warm-up of cuda graph capture to ensure we have the plan cached
@@ -145,7 +146,7 @@ class _FlashInferPlanner:
                     rope_theta=plan_params.rope_theta,
                     q_data_type=plan_params.q_dtype,
                     kv_data_type=plan_params.kv_dtype,
-                    sm_scale=0.0883,
+                    sm_scale=plan_params.sm_scale,
                 )
             self.plan_params = plan_params
 
@@ -242,20 +243,22 @@ def flashinfer_mha_with_cache(
     rope_theta: Optional[float],
     k_scale: float,
     v_scale: float,
+    sm_scale: float,
 ) -> torch.Tensor:
-    # breakpoint()
-    # b, n_heads, s, d = q.shape
-    # head_dim = k_cache.shape[-1]
-    # # n_heads = q.shape[2] // head_dim
-    # n_kv_heads = k.shape[1] // head_dim
-    # q = q.permute(0, 2, 1, 3)
-    # q = q.permute(0, 2, 1, 3)
-    # q = q.permute(0, 2, 1, 3)
 
-    b, s, d = q.shape
-    head_dim = k_cache.shape[-1]
-    n_heads = q.shape[2] // head_dim
-    n_kv_heads = k.shape[2] // head_dim
+    n_heads, n_kv_heads = 0, 0
+    if q.ndim == 4:
+        # HF attention format
+        b, n_heads, s, head_dim = q.shape
+        _, n_kv_heads, s, _ = k.shape
+        q = q.permute(0, 2, 1, 3)
+        k = k.permute(0, 2, 1, 3)
+        v = v.permute(0, 2, 1, 3)
+    else:
+        b, s, _ = q.shape
+        n_kv_heads = k_cache.shape[2]
+        head_dim = k.shape[-1] // n_kv_heads
+        n_heads = q.shape[-1] // head_dim
 
     bs_view = (b * s,)
     q = q.view(*bs_view, n_heads, head_dim)
@@ -273,11 +276,14 @@ def flashinfer_mha_with_cache(
         kv_dtype=k_cache.dtype,
         pos_embd_mode="ROPE_LLAMA" if fuse_rope else "NONE",
         rope_theta=rope_theta,
+        sm_scale=sm_scale,
     )
 
     # TODO: Get flashinfer fuse_rope working with fp8 kv cache (https://github.com/flashinfer-ai/flashinfer/issues/661)
     if rope_theta is not None:
-        q, k = flashinfer.apply_rope(q, k, qo_indptr, offsets, rope_theta=rope_theta)
+        q, k = flashinfer.apply_rope(
+            q, k, qo_indptr, offsets, rope_scale=1.0, rope_theta=rope_theta
+        )
 
     # Assuming k_scale = v_scale = 1.0, we just have to cast k and v to fp8 before appending to kv cache
     k_scale, v_scale = 1.0, 1.0
@@ -312,8 +318,13 @@ def flashinfer_mha_with_cache(
         pp,
     )
     y = wrapper.run(q, (k_cache, v_cache), k_scale=k_scale, v_scale=v_scale)
+    # breakpoint()
+
+    # For HF models
     y = y.view(b, s, n_heads, head_dim)
     y = y.permute(0, 2, 1, 3)
+    # y = y.view(b, s, n_heads*head_dim) # .unsqueeze(0)
+
     return y
 
 
@@ -339,6 +350,7 @@ def flashinfer_mha_with_cache_fake(
     rope_theta: Optional[float],
     k_scale: float,
     v_scale: float,
+    sm_scale: float,
 ) -> torch.Tensor:
     return torch.empty_like(q.contiguous())
 
@@ -390,4 +402,5 @@ class FlashInferAttention(AttentionDescriptor):
             attention_info.rope_theta,  # rope_theta
             1.0,  # k_scale
             1.0,  # v_scale
+            attention_info.sm_scale,  # sm_scale
         ]

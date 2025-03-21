@@ -53,9 +53,15 @@ def generate(model, input_seq, max_tokens, eos_token_id, csi=None):
             EosTokenCriteria(eos_token_id=eos_token_id),
         ]
     )
-
-    while True:
+    iter_time = []
+    i = 0
+    while i < max_tokens:
+        start_time = timeit.default_timer()
+        # print(f"=== Input shape: {input_seq.shape}" )
         outputs = model(input_seq)
+        torch.cuda.synchronize()
+        end_time = timeit.default_timer()
+        iter_time.append(end_time - start_time)
         # breakpoint()
         logits = outputs[0]  # .logits
 
@@ -63,10 +69,11 @@ def generate(model, input_seq, max_tokens, eos_token_id, csi=None):
         next_tokens = torch.argmax(next_token_logits, dim=-1)
         input_seq = torch.cat([input_seq, next_tokens[:, None]], dim=-1)
         # TODO: Handle batch in this check
-        if stopping_criteria(input_seq, logits).item():
-            break
-
-    return input_seq, logits
+        i += 1
+        # if stopping_criteria(input_seq, logits).item():
+        #     break
+    # breakpoint()
+    return input_seq, iter_time
 
 
 def time_generate(
@@ -79,10 +86,13 @@ def time_generate(
     for _ in range(iterations):
         start_time = timeit.default_timer()
         inputs_copy = copy.copy(inputs)
-        _ = generate_fn(model, inputs_copy, output_seq_length, eos_token_id, csi=csi)
+        _, iter_time = generate_fn(
+            model, inputs_copy, output_seq_length, eos_token_id, csi=csi
+        )
         torch.cuda.synchronize()
         end_time = timeit.default_timer()
         timings.append(end_time - start_time)
+    # breakpoint()
 
     return timings
 

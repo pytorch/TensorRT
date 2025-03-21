@@ -78,16 +78,51 @@ def get_model(args):
         if args.model == "autodeploy_llama3":
             model = get_autodeploy_llama3()
             model = model.to(torch.float16)
-        elif args.model == "llama3":
+        elif args.model == "meta-llama/Llama-3.2-1B-Instruct":
             model = (
                 AutoModelForCausalLM.from_pretrained(
-                    args.model, use_cache=False, attn_implementation="sdpa"
+                    args.model,
+                    use_cache=False,
+                    attn_implementation="sdpa",  # num_hidden_layers=1
                 )
                 .eval()
                 .half()
                 .cuda()
             )
             model = model.to(torch.float16)
+        elif args.model == "meta-llama/Llama-3.2-3B-Instruct":
+            model = (
+                AutoModelForCausalLM.from_pretrained(
+                    args.model,
+                    use_cache=False,
+                    attn_implementation="sdpa",  # num_hidden_layers=1
+                )
+                .eval()
+                .half()
+                .cuda()
+            )
+            model = model.to(torch.float16)
+        elif args.model == "meta-llama/Llama-3.1-8B-Instruct":
+            model = (
+                AutoModelForCausalLM.from_pretrained(
+                    args.model,
+                    use_cache=False,
+                    attn_implementation="sdpa",  # num_hidden_layers=1
+                )
+                .eval()
+                .half()
+                .cuda()
+            )
+            model = model.to(torch.float16)
+        elif args.model == "google/gemma-3-1b-it":
+            model = (
+                AutoModelForCausalLM.from_pretrained(
+                    "google/gemma-3-1b-it", use_cache=False, attn_implementation="sdpa"
+                )
+                .eval()
+                .half()
+                .cuda()
+            )
 
     return model
 
@@ -106,24 +141,25 @@ def compile_torchtrt(model, input_ids):
     csi = torch_tensorrt.dynamo.lowering.CachedSequenceInterface(
         AttentionRegistry.get("FlashInfer"), sequence_info=sequence_info, device=DEVICE
     )
-    gpt2_ep = export_llm(model, input_ids, max_seq_len=1024)
+    gpt2_ep = export_llm(model, input_ids, max_seq_len=256)
     del model
-    # with torch_tensorrt.logging.debug():
-    trt_model = torch_tensorrt.dynamo.compile(
-        gpt2_ep,
-        inputs=[input_ids],
-        enabled_precisions={torch.float16},
-        truncate_double=True,
-        device=DEVICE,
-        disable_tf32=True,
-        # use_explicit_typing=True,
-        use_python_runtime=True,
-        # use_fp32_acc=True,
-        # debug=True,
-        insert_flashinfer_ops=True,
-        cached_seq_interface=csi,
-        # min_block_size=1e7,
-    )
+    with torch_tensorrt.logging.debug():
+        trt_model = torch_tensorrt.dynamo.compile(
+            gpt2_ep,
+            inputs=[input_ids],
+            enabled_precisions={torch.float16},
+            truncate_double=True,
+            device=DEVICE,
+            disable_tf32=True,
+            # use_explicit_typing=True,
+            use_python_runtime=True,
+            # use_fp32_acc=True,
+            debug=True,
+            insert_flashinfer_ops=True,
+            cached_seq_interface=csi,
+            # min_block_size=1e7,
+        )
+
     return trt_model, csi
 
 
@@ -142,10 +178,16 @@ def custom_generate(model, input_seq, max_tokens, eos_token_id, csi):
     csi.info.reset()
     csi.info.nest_sequences(input_seq)
     i = 0
+    iter_time = []
     while i < MAX_TOKENS:
         sequence_info = csi.info
-        # print(f"==========Input shape: {csi.args[0].shape}, seq_len : {csi.args[1]}, cache_loc: {csi.args[3]}, k_cache/v_cache shape: {csi.args[5].shape}, num args: {len(csi.args)}")
+        start_time = timeit.default_timer()
+        # print(f"=== Input shape: {csi.args[0].shape}")
+        # breakpoint()
         outputs = model(*csi.args)
+        torch.cuda.synchronize()
+        end_time = timeit.default_timer()
+        iter_time.append(end_time - start_time)
         logits = csi.info.unnest_sequences(outputs[0])
         logits_last = (
             torch.stack([l_one_seq[-1] for l_one_seq in logits]).unsqueeze(1).float()
@@ -154,12 +196,12 @@ def custom_generate(model, input_seq, max_tokens, eos_token_id, csi):
         sequence_info.update_pos(sequence_info.sequence_lengths)
         sequence_info.nest_sequences(idx_next)
         input_seq = torch.cat([input_seq, idx_next], dim=-1)
-        # TODO: Handle batch in this check
-        if stopping_criteria(input_seq, logits).item():
-            break
+        # # TODO: Handle batch in this check
+        # if stopping_criteria(input_seq, logits).item():
+        #     break
         i += 1
 
-    return input_seq, logits
+    return input_seq, iter_time
 
 
 def print_outputs(pyt_gen_tokens, trt_gen_tokens, tokenizer):
@@ -196,7 +238,7 @@ if __name__ == "__main__":
     )
     arg_parser.add_argument("--precision", type=str, default="FP16", help="Prompt")
     arg_parser.add_argument(
-        "--iterations", type=int, default=1, help="no. of iterations to run"
+        "--iterations", type=int, default=5, help="no. of iterations to run"
     )
     args = arg_parser.parse_args()
     model = get_model(args)
@@ -208,13 +250,13 @@ if __name__ == "__main__":
     input_ids = model_inputs["input_ids"].to(DEVICE)
 
     # Pyt
-    pyt_gen_tokens, pyt_logits = generate(
-        model, input_ids, MAX_TOKENS, tokenizer.eos_token_id
+    pyt_gen_tokens, pyt_iter_time = generate(
+        model, input_ids.clone(), MAX_TOKENS, tokenizer.eos_token_id
     )
     pyt_timings = time_generate(
         generate,
         model,
-        input_ids,
+        input_ids.clone(),
         MAX_TOKENS,
         tokenizer.eos_token_id,
         csi=None,
@@ -227,12 +269,13 @@ if __name__ == "__main__":
     # TRT
     trt_model, csi = compile_torchtrt(model, input_ids)
     trt_gen_tokens, trt_logits = custom_generate(
-        trt_model, input_ids, MAX_TOKENS, tokenizer.eos_token_id, csi
+        trt_model, input_ids.clone(), MAX_TOKENS, tokenizer.eos_token_id, csi
     )
+
     trt_timings = time_generate(
         custom_generate,
         trt_model,
-        input_ids,
+        input_ids.clone(),
         MAX_TOKENS,
         tokenizer.eos_token_id,
         csi=csi,

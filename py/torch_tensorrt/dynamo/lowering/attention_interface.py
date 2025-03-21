@@ -39,11 +39,11 @@ class AttentionInfo:
     num_kv_heads: int
     head_dim: int
     dtype: torch.dtype
+    sm_scale: Optional[float] = None
     cache_dtype: Optional[torch.dtype] = None
     rope_theta: Optional[float] = None
     rope_scale: Optional[float] = None
     causal: bool = True
-    # attn_scale: float
 
 
 @dataclass

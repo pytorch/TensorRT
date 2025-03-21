@@ -26,7 +26,7 @@ ATEN_POST_LOWERING_PASSES = DynamoPassManager.build_from_passlist(
         fuse_distributed_ops,
         replace_max_pool_with_indices,
         lower_scaled_dot_product_attention,
-        # view_to_reshape,
+        view_to_reshape,
         remove_assert_scalar,
         accumulate_fp32_matmul,
     ]
