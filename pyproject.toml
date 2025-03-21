@@ -9,7 +9,7 @@ requires = [
     "typing-extensions>=4.7.0",
     "future>=0.18.3",
     "tensorrt-cu12>=10.9.0,<10.10.0",
-    "torch>=2.7.0.dev,<2.8.0",
+    "torch>=2.7.0,<2.8.0",
     "pybind11==2.6.2",
     "numpy",
     "sympy",
@@ -55,7 +55,7 @@ keywords = [
     "inference",
 ]
 dependencies = [
-    "torch>=2.7.0.dev,<2.8.0",
+    "torch>=2.7.0,<2.8.0",
     "tensorrt>=10.9.0,<10.10.0",
     "tensorrt-cu12>=10.9.0,<10.10.0",
     "tensorrt-cu12-bindings>=10.9.0,<10.10.0",
@@ -108,12 +108,12 @@ prerelease = "if-necessary-or-explicit"
 index-strategy = "unsafe-best-match"                                    # Needed for TRT-LLM
 
 [tool.uv.sources]
-torch = [{ index = "pytorch-nightly-cu126" }]
-torchvision = [{ index = "pytorch-nightly-cu126" }]
+torch = [{ index = "pytorch-test-cu128" }]
+torchvision = [{ index = "pytorch-test-cu128" }]
 
 [[tool.uv.index]]
-name = "pytorch-nightly-cu126"
-url = "https://download.pytorch.org/whl/nightly/cu126"
+name = "pytorch-test-cu128"
+url = "https://download.pytorch.org/whl/test/cu128"
 explicit = false
 
 [[tool.uv.index]]
@@ -150,7 +150,6 @@ explicit = false
 # name = "pytorch-release-cu118"
 # url = "https://download.pytorch.org/whl/cu118"
 # explicit = false
-
 
 [tool.ruff]
 # NOTE: Synchoronize the ignores with .flake8
