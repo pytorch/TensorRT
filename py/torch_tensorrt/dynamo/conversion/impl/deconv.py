@@ -6,13 +6,12 @@ import numpy as np
 import tensorrt as trt
 import torch
 from torch.fx.node import Target
-
 from torch_tensorrt.dynamo.conversion import impl
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
 from torch_tensorrt.dynamo.conversion.converter_utils import (
     extend_attr_to_tuple,
     get_trt_tensor,
-    to_numpy,
+    to_torch,
 )
 from torch_tensorrt.fx.converters.converter_utils import (
     SourceIR,
@@ -53,7 +52,8 @@ def deconvNd(
     # Process bias terms
     if isinstance(bias, (torch.Tensor, np.ndarray)):
         # Transform the bias constant into a Numpy array
-        bias = to_numpy(bias)
+        bias = to_torch(bias, dtype=input.dtype)
+        bias = get_trt_tensor(ctx, bias, f"{name}_bias")
 
     elif isinstance(bias, TRTTensor):
         bias = get_trt_tensor(ctx, bias, f"{name}_bias")
@@ -73,12 +73,12 @@ def deconvNd(
             )
 
     elif isinstance(weight, (torch.Tensor, np.ndarray)):
-        # Transform the weight constant into a Numpy array
-        weight = to_numpy(weight)
-
+        weight = to_torch(weight, dtype=input.dtype)
         # Append new dimension (unsqueeze) if the deconvolution is 1d
         if is_deconv1d:
-            weight = np.expand_dims(weight, axis=-1)
+            weight = torch.unsqueeze(weight, -1)
+
+        weight = get_trt_tensor(ctx, weight, f"{name}_weight")
 
     else:
         raise RuntimeError(
