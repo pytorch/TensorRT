@@ -341,42 +341,44 @@ def create_constant(
     Returns:
         A TensorRT ITensor that represents the given value.
     """
-    shape = (1,)
-    # Rank 0 constant is required in IFillLayer inputs.
-    if min_rank == 0:
-        shape = trt.Dims()
+    with unset_fake_temporarily():
+        shape = (1,)
 
-    torch_value = to_torch(value, dtype)
-    if torch_value is not None:
-        if torch_value.dtype == torch.bfloat16:
-            torch_value_fp32 = torch_value.to(torch.float32)
-            numpy_value = torch_value_fp32.numpy()
-        else:
-            numpy_value = torch_value.numpy()
+        # Rank 0 constant is required in IFillLayer inputs.
+        if min_rank == 0:
+            shape = trt.Dims()
 
-        constant = ctx.net.add_constant(
-            (
-                shape
-                if isinstance(value, (int, float, bool)) or min_rank == 0
-                else list(torch_value.shape)
-            ),
-            numpy_value,
-        )
-        constant.name = name
+        torch_value = to_torch(value, dtype)
+        if torch_value is not None:
+            if torch_value.dtype == torch.bfloat16:
+                torch_value_fp32 = torch_value.to(torch.float32)
+                numpy_value = torch_value_fp32.numpy()
+            else:
+                numpy_value = torch_value.numpy()
 
-        if torch_value.dtype == torch.bfloat16:
-            return cast_trt_tensor(
-                ctx,
-                constant.get_output(0),
-                trt.DataType.BF16,
-                name + "_bf16_cast",
+            constant = ctx.net.add_constant(
+                (
+                    shape
+                    if isinstance(value, (int, float, bool)) or min_rank == 0
+                    else list(torch_value.shape)
+                ),
+                numpy_value,
             )
+            constant.name = name
 
-        return constant.get_output(0)
-    else:
-        raise ValueError(
-            f"Cannot convert tensor '{name}' to a TensorRT constant because its value is None."
-        )
+            if torch_value.dtype == torch.bfloat16:
+                return cast_trt_tensor(
+                    ctx,
+                    constant.get_output(0),
+                    trt.DataType.BF16,
+                    name + "_bf16_cast",
+                )
+
+            return constant.get_output(0)
+        else:
+            raise ValueError(
+                f"Cannot convert tensor '{name}' to a TensorRT constant because its value is None."
+            )
 
 
 def get_trt_tensor(
@@ -621,7 +623,7 @@ def to_numpy(
 def to_torch(
     value: Optional[Union[torch.Tensor, np.ndarray, int, float, bool]],
     dtype: Optional[Union[torch.dtype, np.dtype, TRTDataType, _enums.dtype]] = None,
-) -> Optional[np.ndarray]:
+) -> Optional[torch.Tensor]:
     """
     Convert a Numpy array, or scalar to a PyTorch tensor and move it to CPU
     Args:
@@ -630,7 +632,7 @@ def to_torch(
         dtype (Optional[Union[torch.dtype, np.dtype, TRTDataType]]):
             If a dtype is given, we will convert the type of the given `value` to this dtype.
     Returns:
-        A Numpy array or None, if the input was None.
+        A PyTorch tensor or None, if the input was None.
     """
 
     cpu_device = torch.device("cpu")
@@ -643,12 +645,10 @@ def to_torch(
             return None
 
         elif isinstance(value, torch.Tensor):
-            output = torch.atleast_1d(value).to(cpu_device).contiguous()
+            output = value.to(cpu_device).contiguous()
 
         elif isinstance(value, np.ndarray):
-            output = (
-                torch.atleast_1d(torch.from_numpy(value)).to(cpu_device).contiguous()
-            )
+            output = torch.from_numpy(value).to(cpu_device).contiguous()
 
         elif isinstance(value, int):
             output = torch.tensor([value], device=cpu_device, dtype=torch.int32)
