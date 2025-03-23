@@ -55,6 +55,7 @@ def test_mapping():
         debug=debug,
         min_block_size=min_block_size,
         immutable_weights=False,
+        offload_module_to_cpu=False,
     )
     settings = trt_gm._run_on_acc_0.settings
     runtime = trt.Runtime(TRT_LOGGER)
@@ -106,6 +107,7 @@ def test_refit_one_engine_with_weightmap():
         debug=debug,
         min_block_size=min_block_size,
         immutable_weights=False,
+        offload_module_to_cpu=False,
     )
 
     new_trt_gm = refit_module_weights(
@@ -155,6 +157,7 @@ def test_refit_one_engine_no_map_with_weightmap():
         debug=debug,
         min_block_size=min_block_size,
         immutable_weights=False,
+        offload_module_to_cpu=False,
     )
 
     trt_gm._run_on_acc_0.weight_name_map = None
@@ -205,6 +208,7 @@ def test_refit_one_engine_with_wrong_weightmap():
         debug=debug,
         min_block_size=min_block_size,
         immutable_weights=False,
+        offload_module_to_cpu=False,
     )
     # Manually Deleted all batch norm layer. This suppose to fail the fast refit
     trt_gm._run_on_acc_0.weight_name_map = {
@@ -262,6 +266,7 @@ def test_refit_one_engine_bert_with_weightmap():
         debug=debug,
         min_block_size=min_block_size,
         immutable_weights=False,
+        offload_module_to_cpu=False,
     )
 
     new_trt_gm = refit_module_weights(
@@ -294,7 +299,7 @@ def test_refit_one_engine_bert_with_weightmap():
     "TorchScript Frontend is not available",
 )
 @pytest.mark.unit
-def test_refit_one_engine_inline_runtime__with_weightmap():
+def test_refit_one_engine_inline_runtime_with_weightmap():
     trt_ep_path = os.path.join(tempfile.gettempdir(), "compiled.ep")
     model = models.resnet18(pretrained=False).eval().to("cuda")
     model2 = models.resnet18(pretrained=True).eval().to("cuda")
@@ -315,6 +320,7 @@ def test_refit_one_engine_inline_runtime__with_weightmap():
         debug=debug,
         min_block_size=min_block_size,
         immutable_weights=False,
+        offload_module_to_cpu=False,
     )
     torchtrt.save(trt_gm, trt_ep_path)
     trt_gm = torch.export.load(trt_ep_path)
@@ -360,6 +366,7 @@ def test_refit_one_engine_python_runtime_with_weightmap():
         debug=debug,
         min_block_size=min_block_size,
         immutable_weights=False,
+        offload_module_to_cpu=False,
     )
 
     new_trt_gm = refit_module_weights(
@@ -431,6 +438,7 @@ def test_refit_multiple_engine_with_weightmap():
         immutable_weights=False,
         torch_executed_ops=torch_executed_ops,
         reuse_cached_engines=False,
+        offload_module_to_cpu=False,
     )
 
     new_trt_gm = refit_module_weights(
@@ -479,6 +487,7 @@ def test_refit_one_engine_without_weightmap():
         debug=debug,
         min_block_size=min_block_size,
         immutable_weights=False,
+        offload_module_to_cpu=False,
     )
 
     new_trt_gm = refit_module_weights(
@@ -530,6 +539,7 @@ def test_refit_one_engine_bert_without_weightmap():
         debug=debug,
         min_block_size=min_block_size,
         immutable_weights=False,
+        offload_module_to_cpu=False,
     )
 
     new_trt_gm = refit_module_weights(
@@ -583,6 +593,7 @@ def test_refit_one_engine_inline_runtime_without_weightmap():
         debug=debug,
         min_block_size=min_block_size,
         immutable_weights=False,
+        offload_module_to_cpu=False,
     )
     torchtrt.save(trt_gm, trt_ep_path)
     trt_gm = torch.export.load(trt_ep_path)
@@ -628,6 +639,7 @@ def test_refit_one_engine_python_runtime_without_weightmap():
         debug=debug,
         min_block_size=min_block_size,
         immutable_weights=False,
+        offload_module_to_cpu=False,
     )
 
     new_trt_gm = refit_module_weights(
@@ -699,6 +711,7 @@ def test_refit_multiple_engine_without_weightmap():
         immutable_weights=False,
         torch_executed_ops=torch_executed_ops,
         reuse_cached_engines=False,
+        offload_module_to_cpu=False,
     )
 
     new_trt_gm = refit_module_weights(
