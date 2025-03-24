@@ -5,9 +5,9 @@ set -x
 TOP_DIR=$(cd $(dirname $0); pwd)/..
 
 if [[ -z "${USE_PRE_CXX11}" ]]; then
-    BUILD_CMD="python -m pip wheel .  --extra-index-url https://download.pytorch.org/whl/nightly/cu124 -w dist"
+    BUILD_CMD="python -m pip wheel .  --extra-index-url https://download.pytorch.org/whl/nightly/cu128 -w dist"
 else
-    BUILD_CMD="python -m pip wheel . --config-setting="--build-option=--use-pre-cxx11-abi" --extra-index-url https://download.pytorch.org/whl/nightly/cu124 -w dist"
+    BUILD_CMD="python -m pip wheel . --config-setting="--build-option=--use-pre-cxx11-abi" --extra-index-url https://download.pytorch.org/whl/nightly/cu128 -w dist"
 fi
 
 # TensorRT restricts our pip version
