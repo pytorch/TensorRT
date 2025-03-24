@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Installation &mdash; Torch-TensorRT v2.7.0.dev0+35c489d documentation</title>
+  <title>Installation &mdash; Torch-TensorRT v2.7.0.dev0+bc67a5b documentation</title>
   
 
   
@@ -293,7 +293,7 @@
               
               
                 <div class="version">
-                  v2.7.0.dev0+35c489d
+                  v2.7.0.dev0+bc67a5b
                 </div>
               
             
@@ -524,7 +524,7 @@
 <section id="installing-nightly-builds">
 <h3>Installing Nightly Builds<a class="headerlink" href="#installing-nightly-builds" title="Permalink to this heading">¶</a></h3>
 <p>Torch-TensorRT distributed nightlies targeting the PyTorch nightly. These can be installed from the PyTorch nightly package index (separated by CUDA version)</p>
-<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>--pre<span class="w"> </span>torch<span class="w"> </span>torch-tensorrt<span class="w"> </span>tensorrt<span class="w"> </span>--extra-index-url<span class="w"> </span>https://download.pytorch.org/whl/nightly/cu124
+<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>--pre<span class="w"> </span>torch<span class="w"> </span>torch-tensorrt<span class="w"> </span>tensorrt<span class="w"> </span>--extra-index-url<span class="w"> </span>https://download.pytorch.org/whl/nightly/cu128
 </pre></div>
 </div>
 </section>
@@ -601,7 +601,7 @@ point the WORKSPACE file to the URL of the tarball or download the tarball for T
 <h4>Building the Package<a class="headerlink" href="#building-the-package" title="Permalink to this heading">¶</a></h4>
 <p>Once the WORKSPACE has been configured properly, all that is required to build torch-tensorrt is the following command</p>
 <blockquote>
-<div><div class="highlight-sh notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>--pre<span class="w"> </span>.<span class="w"> </span>--extra-index-url<span class="w"> </span>https://download.pytorch.org/whl/nightly/cu124
+<div><div class="highlight-sh notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>--pre<span class="w"> </span>.<span class="w"> </span>--extra-index-url<span class="w"> </span>https://download.pytorch.org/whl/nightly/cu128
 </pre></div>
 </div>
 </div></blockquote>
@@ -613,7 +613,7 @@ point the WORKSPACE file to the URL of the tarball or download the tarball for T
 </div></blockquote>
 <p>To build the wheel file</p>
 <blockquote>
-<div><div class="highlight-sh notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>wheel<span class="w"> </span>--no-deps<span class="w"> </span>--pre<span class="w"> </span>.<span class="w"> </span>--extra-index-url<span class="w"> </span>https://download.pytorch.org/whl/nightly/cu124<span class="w"> </span>-w<span class="w"> </span>dist
+<div><div class="highlight-sh notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>wheel<span class="w"> </span>--no-deps<span class="w"> </span>--pre<span class="w"> </span>.<span class="w"> </span>--extra-index-url<span class="w"> </span>https://download.pytorch.org/whl/nightly/cu128<span class="w"> </span>-w<span class="w"> </span>dist
 </pre></div>
 </div>
 </div></blockquote>
@@ -627,7 +627,7 @@ point the WORKSPACE file to the URL of the tarball or download the tarball for T
 and the Torch-TensorRT runtime, the default executor for modules compiled with Torch-TensorRT, be it with the TorchScript or Dynamo frontend.</p>
 <p>In the case you may want a build which does not require C++ you can disable these features and avoid building these components. As a result, the only available runtime will be the Python based on
 which has implications for features like serialization.</p>
-<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span><span class="nv">PYTHON_ONLY</span><span class="o">=</span><span class="m">1</span><span class="w"> </span>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>--pre<span class="w"> </span>.<span class="w"> </span>--extra-index-url<span class="w"> </span>https://download.pytorch.org/whl/nightly/cu124
+<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span><span class="nv">PYTHON_ONLY</span><span class="o">=</span><span class="m">1</span><span class="w"> </span>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>--pre<span class="w"> </span>.<span class="w"> </span>--extra-index-url<span class="w"> </span>https://download.pytorch.org/whl/nightly/cu128
 </pre></div>
 </div>
 </section>
@@ -635,7 +635,7 @@ which has implications for features like serialization.</p>
 <h5>No TorchScript Frontend<a class="headerlink" href="#no-torchscript-frontend" title="Permalink to this heading">¶</a></h5>
 <p>The TorchScript frontend is a legacy feature of Torch-TensorRT which is now in maintenance as TorchDynamo has become the preferred compiler technology for this project. It contains quite a bit
 of C++ code that is no longer necessary for most users. Therefore you can exclude this component from your build to speed up build times. The C++ based runtime will still be available to use.</p>
-<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span><span class="nv">NO_TORCHSCRIPT</span><span class="o">=</span><span class="m">1</span><span class="w"> </span>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>--pre<span class="w"> </span>.<span class="w"> </span>--extra-index-url<span class="w"> </span>https://download.pytorch.org/whl/nightly/cu124
+<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span><span class="nv">NO_TORCHSCRIPT</span><span class="o">=</span><span class="m">1</span><span class="w"> </span>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>--pre<span class="w"> </span>.<span class="w"> </span>--extra-index-url<span class="w"> </span>https://download.pytorch.org/whl/nightly/cu128
 </pre></div>
 </div>
 </section>
@@ -731,7 +731,7 @@ recommended commands:</p>
 <ul class="simple">
 <li><p>Open the app “x64 Native Tools Command Prompt for VS 2022” - note that Admin privileges may be necessary</p></li>
 <li><p>Ensure Bazelisk (Bazel launcher) is installed on your machine and available from the command line. Package installers such as Chocolatey can be used to install Bazelisk</p></li>
-<li><p>Install latest version of Torch (i.e. with <code class="docutils literal notranslate"><span class="pre">pip</span> <span class="pre">install</span> <span class="pre">--pre</span> <span class="pre">torch</span> <span class="pre">--index-url</span> <span class="pre">https://download.pytorch.org/whl/nightly/cu124</span></code>)</p></li>
+<li><p>Install latest version of Torch (i.e. with <code class="docutils literal notranslate"><span class="pre">pip</span> <span class="pre">install</span> <span class="pre">--pre</span> <span class="pre">torch</span> <span class="pre">--index-url</span> <span class="pre">https://download.pytorch.org/whl/nightly/cu128</span></code>)</p></li>
 <li><p>Clone the Torch-TensorRT repository and navigate to its root directory</p></li>
 <li><p>Run <code class="docutils literal notranslate"><span class="pre">pip</span> <span class="pre">install</span> <span class="pre">ninja</span> <span class="pre">wheel</span> <span class="pre">setuptools</span></code></p></li>
 <li><p>Run <code class="docutils literal notranslate"><span class="pre">pip</span> <span class="pre">install</span> <span class="pre">--pre</span> <span class="pre">-r</span> <span class="pre">py/requirements.txt</span></code></p></li>
