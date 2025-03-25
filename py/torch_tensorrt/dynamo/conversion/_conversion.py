@@ -53,6 +53,7 @@ def interpret_module_to_result(
     Returns:
         TRTInterpreterResult
     """
+    breakpoint()
     output_dtypes = infer_module_output_dtypes(
         module, truncate_double=settings.truncate_double
     )

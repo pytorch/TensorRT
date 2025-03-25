@@ -72,39 +72,67 @@ def add_graph_input(
     return in_node
 
 
-def get_all_input_output_nodes(graph: Graph) -> Tuple[List[Node], List[Node]]:
-    input_nodes: List[Node] = graph.find_nodes(op="placeholder")
-    output_nodes: List[Node] = graph.find_nodes(op="output")
-    return (input_nodes, output_nodes)
+# def get_all_input_output_nodes(graph: Graph) -> Tuple[List[Node], List[Node]]:
+#     input_nodes: List[Node] = graph.find_nodes(op="placeholder")
+#     output_nodes: List[Node] = graph.find_nodes(op="output")
+#     return (input_nodes, output_nodes)
 
 
-def is_op(node: Node, ops: Union[OpOverloadPacket, Iterable[OpOverloadPacket]]) -> bool:
-    """Check if the node is a call to one of the ops."""
-    if node.op != "call_function":
-        return False
+# def is_op(node: Node, ops: Union[OpOverloadPacket, Iterable[OpOverloadPacket]]) -> bool:
+#     """Check if the node is a call to one of the ops."""
+#     if node.op != "call_function":
+#         return False
 
-    # check if it's a single op that's provided
-    if isinstance(ops, OpOverloadPacket):
-        ops = [ops]
+#     # check if it's a single op that's provided
+#     if isinstance(ops, OpOverloadPacket):
+#         ops = [ops]
 
-    # check if it's the op itself instead of an overload
-    if any(node.target == op for op in ops):
-        return True
-    return False
-    # check the overloads
-    # return any(node.target == getattr(op, overload) for op in ops) # for overload in op
+#     # check if it's the op itself instead of an overload
+#     if any(node.target == op for op in ops):
+#         return True
+#     return False
+#     # check the overloads
+#     # return any(node.target == getattr(op, overload) for op in ops) # for overload in op
 
 
-def is_linear_op(node: Node, include_quantization: bool = False) -> bool:
-    """Check if the node is a linear op.
+# def is_linear_op(node: Node, include_quantization: bool = False) -> bool:
+#     """Check if the node is a linear op.
 
-    Using this function is preferred over `is_op` for linear ops to ensure all variants are covered.
-    """
-    lin_ops = {
-        torch.ops.aten.linear.default,
-        # torch.ops.linear.simple,
-    }
-    return is_op(node, lin_ops)
+#     Using this function is preferred over `is_op` for linear ops to ensure all variants are covered.
+#     """
+#     lin_ops = {
+#         torch.ops.aten.linear.default,
+#         # torch.ops.linear.simple,
+#     }
+#     return is_op(node, lin_ops)
+
+
+# def is_dist_op(node: Node) -> bool:
+#     """Check if the node is a distributed op."""
+#     dist_ops = {
+#         torch.ops.dist.all_gather,
+#         torch.ops.dist.all_reduce,
+#     }
+#     return is_op(node, dist_ops)
+
+
+# def _is_dist_lin_op(node: Node, exclude: Optional[List[Node]] = None) -> bool:
+#     return node not in (exclude or []) and (
+#         is_linear_op(node, include_quantization=True)
+#     )
+
+
+# def _bfs(node: Node, target: Callable, attr_next: str = "users") -> Node:
+#     queue = [node]
+#     while queue:
+#         cur_node = queue.pop(0)
+#         if target(cur_node):
+#             return cur_node
+#         queue.extend(getattr(cur_node, attr_next))
+#     raise RuntimeError(f"Could not find node with target condition {target}.")
+
+
+# ====================================================== Above autodeploy
 
 
 def is_dist_op(node: Node) -> bool:
@@ -116,9 +144,45 @@ def is_dist_op(node: Node) -> bool:
     return is_op(node, dist_ops)
 
 
+def is_linear_op(node: Node, include_quantization: bool = False) -> bool:
+    """Check if the node is a linear op.
+
+    Using this function is preferred over `is_op` for linear ops to ensure all variants are covered.
+    """
+    lin_ops = {
+        torch.ops.aten.mm.default,
+    }
+
+    return is_op(node, lin_ops)
+
+
+def is_permute_op(node: Node, include_quantization: bool = False) -> bool:
+    """Check if the node is a permute op.
+
+    Using this function is preferred over `is_op` for permute ops to ensure all variants are covered.
+    """
+    permute_ops = {
+        torch.ops.aten.permute.default,
+    }
+
+    return is_op(node, permute_ops)
+
+
 def _is_dist_lin_op(node: Node, exclude: Optional[List[Node]] = None) -> bool:
     return node not in (exclude or []) and (
         is_linear_op(node, include_quantization=True)
+    )
+
+
+def _bfs_for_permute(node: Node, target: Callable, attr_next: str = "users") -> Node:
+    queue = [node]
+    while queue:
+        cur_node = queue.pop(0)
+        if target(cur_node):
+            return cur_node
+        queue.extend(getattr(cur_node, attr_next))
+    raise RuntimeError(
+        f"Could not find permute node with target condition {target} from the current node: {node}"
     )
 
 
@@ -127,91 +191,33 @@ def _bfs(node: Node, target: Callable, attr_next: str = "users") -> Node:
     while queue:
         cur_node = queue.pop(0)
         if target(cur_node):
-            return cur_node
+            permute_node = _bfs_for_permute(cur_node, is_permute_op, "users")
+            return (cur_node, permute_node)
+
         queue.extend(getattr(cur_node, attr_next))
     raise RuntimeError(f"Could not find node with target condition {target}.")
 
 
-# ====================================================== Above autodeploy
+def is_op(node: Node, ops: Union[OpOverloadPacket, Iterable[OpOverloadPacket]]) -> bool:
+    """Check if the node is a call to one of the ops."""
+    if node.op != "call_function":
+        return False
+    # check if it's a single op that's provided
+    if isinstance(ops, OpOverloadPacket):
+        ops = [ops]
 
-# def is_dist_op(node: Node) -> bool:
-#     """Check if the node is a distributed op."""
-#     dist_ops = {
-#         torch.ops.dist.all_gather,
-#         torch.ops.dist.all_reduce,
-#     }
-#     return is_op(node, dist_ops)
+    # check if it's the op itself instead of an overload
+    if any(node.target == op for op in ops):
+        return True
 
-
-# def is_linear_op(node: Node, include_quantization: bool = False) -> bool:
-#     """Check if the node is a linear op.
-
-#     Using this function is preferred over `is_op` for linear ops to ensure all variants are covered.
-#     """
-#     lin_ops = {
-#         # torch.ops.aten.view.default,
-#         torch.ops.aten.mm.default,
-#     }
-
-#     return is_op(node, lin_ops)
-
-# def is_permute_op(node: Node, include_quantization: bool = False) -> bool:
-#     """Check if the node is a permute op.
-
-#     Using this function is preferred over `is_op` for permute ops to ensure all variants are covered.
-#     """
-#     permute_ops = {
-#         torch.ops.aten.permute.default,
-#     }
-
-#     return is_op(node, permute_ops)
+    return False
 
 
-# def _is_dist_lin_op(node: Node, exclude: Optional[List[Node]] = None) -> bool:
-#     return node not in (exclude or []) and (
-#         is_linear_op(node, include_quantization=True)
-#     )
+def get_all_input_output_nodes(graph: Graph) -> Tuple[List[Node], List[Node]]:
+    input_nodes: List[Node] = graph.find_nodes(op="placeholder")
+    output_nodes: List[Node] = graph.find_nodes(op="output")
+    return (input_nodes, output_nodes)
 
-# def _bfs_for_permute(node: Node, target: Callable, attr_next: str = "users") -> Node:
-#     queue = [node]
-#     while queue:
-#         cur_node = queue.pop(0)
-#         if target(cur_node):
-#             return cur_node
-#         queue.extend(getattr(cur_node, attr_next))
-#     raise RuntimeError(f"Could not find permute node with target condition {target} from the current node: {node}")
-
-# def _bfs(node: Node, target: Callable, attr_next: str = "users") -> Node:
-#     queue = [node]
-#     while queue:
-#         cur_node = queue.pop(0)
-#         if target(cur_node):
-#             permute_node = _bfs_for_permute(cur_node, is_permute_op, "users")
-#             return (cur_node, permute_node)
-
-#         queue.extend(getattr(cur_node, attr_next))
-#     raise RuntimeError(f"Could not find node with target condition {target}.")
-
-
-# def is_op(node: Node, ops: Union[OpOverloadPacket, Iterable[OpOverloadPacket]]) -> bool:
-#     """Check if the node is a call to one of the ops."""
-#     if node.op != "call_function":
-#         return False
-#     # check if it's a single op that's provided
-#     if isinstance(ops, OpOverloadPacket):
-#         ops = [ops]
-
-#     # check if it's the op itself instead of an overload
-#     if any(node.target == op for op in ops):
-#         return True
-
-#     return False
-
-
-# def get_all_input_output_nodes(graph: Graph) -> Tuple[List[Node], List[Node]]:
-#     input_nodes: List[Node] = graph.find_nodes(op="placeholder")
-#     output_nodes: List[Node] = graph.find_nodes(op="output")
-#     return (input_nodes, output_nodes)
 
 # # Auto-deploy pass
 # def insert_flashinfer_attn_with_cache(
@@ -392,7 +398,7 @@ def insert_flashinfer_attn_with_cache(
         ]  # other args expected
         if args_other != args_other_expected:
             logger.debug(f"Unexpected args for MHA node: {args_other}.")
-
+        # breakpoint()
         for arg in mha_node.args[:3]:
             mha_gemms[mha_node].append(
                 _bfs(
@@ -409,6 +415,7 @@ def insert_flashinfer_attn_with_cache(
         # kv_gemm_fake = mha_gemms[mha_node][1][1].meta[
         #     "val"
         # ]  # mha_node.args[1].meta["val"]  #
+        # breakpoint()
         q_fake = mha_gemms[mha_node][0][1].meta["val"]
         num_q_heads = q_fake.shape[1]
         head_dim = q_fake.shape[-1]

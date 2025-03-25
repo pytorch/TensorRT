@@ -83,7 +83,8 @@ def get_model(args):
                 AutoModelForCausalLM.from_pretrained(
                     args.model,
                     use_cache=False,
-                    attn_implementation="sdpa",  # num_hidden_layers=1
+                    attn_implementation="sdpa",
+                    num_hidden_layers=2,
                 )
                 .eval()
                 .half()
@@ -95,7 +96,8 @@ def get_model(args):
                 AutoModelForCausalLM.from_pretrained(
                     args.model,
                     use_cache=False,
-                    attn_implementation="sdpa",  # num_hidden_layers=1
+                    attn_implementation="sdpa",
+                    # num_hidden_layers=2
                 )
                 .eval()
                 .half()
