@@ -123,7 +123,7 @@ def construct_refit_mapping_from_weight_name_map(
             engine_weight_map[engine_weight_name] = (
                 state_dict[sd_weight_name]
                 if state_dict[sd_weight_name].device == device
-                else state_dict[sd_weight_name].to("device")
+                else state_dict[sd_weight_name].to(device)
             )
 
         engine_weight_map[engine_weight_name] = (

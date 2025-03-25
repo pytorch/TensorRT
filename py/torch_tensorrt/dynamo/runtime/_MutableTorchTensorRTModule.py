@@ -7,6 +7,7 @@ from typing import Any, Dict, Iterator, Optional, Union
 import numpy as np
 import torch
 import torch_tensorrt
+from torch.export._trace import _export
 from torch_tensorrt._Device import Device
 from torch_tensorrt.dynamo import _defaults
 from torch_tensorrt.dynamo._compiler import compile as dynamo_compile
@@ -309,7 +310,7 @@ class MutableTorchTensorRTModule(object):
 
     def get_exported_program(self) -> torch.export.ExportedProgram:
         if self.allow_complex_guards_as_runtime_asserts:
-            return torch.export._trace._export(
+            return _export(
                 self.original_model,
                 self.arg_inputs,
                 kwargs=self.kwarg_inputs,
