@@ -203,17 +203,17 @@ def slice_scatter_decomposition(
     if step is None:
         step = 1
 
-    # Ensure start, end, and step are all integers
-    assert isinstance(start, int), "start must be an integer"
-    assert isinstance(end, int), "end must be an integer"
-    assert isinstance(step, int), "step must be an integer"
-
     src_dim = src_tensor.shape
     # step == 0 is not a valid torch case
     # also src_dim should be equal to slice dimension
 
     if start == 0 and end == dim_size and step == 1:
         return src_tensor
+
+    # Ensure start, end, and step are all integers
+    assert isinstance(start, int), "start must be an integer"
+    assert isinstance(end, int), "end must be an integer"
+    assert isinstance(step, int), "step must be an integer"
 
     cat_tensors = []
     index_tensor_shape = []

@@ -329,6 +329,25 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         if self.compilation_settings.enable_weight_streaming:
             builder_config.set_flag(trt.BuilderFlag.WEIGHT_STREAMING)
 
+        if version.parse(trt.__version__) >= version.parse("10.8"):
+            TilingOptimizationLevel = {
+                "none": trt.TilingOptimizationLevel.NONE,
+                "fast": trt.TilingOptimizationLevel.FAST,
+                "moderate": trt.TilingOptimizationLevel.MODERATE,
+                "full": trt.TilingOptimizationLevel.FULL,
+            }
+            assert (
+                self.compilation_settings.tiling_optimization_level
+                in TilingOptimizationLevel
+            ), f"Invalid tiling optimization level: {self.compilation_settings.tiling_optimization_level}. We currently support {TilingOptimizationLevel.keys()}."
+            builder_config.tiling_optimization_level = TilingOptimizationLevel[
+                self.compilation_settings.tiling_optimization_level
+            ]
+
+            builder_config.l2_limit_for_tiling = (
+                self.compilation_settings.l2_limit_for_tiling
+            )
+
         return builder_config
 
     def _create_timing_cache(

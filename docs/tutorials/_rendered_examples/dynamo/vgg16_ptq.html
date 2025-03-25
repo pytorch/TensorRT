@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Deploy Quantized Models using Torch-TensorRT &mdash; Torch-TensorRT v2.7.0.dev0+b5692d3 documentation</title>
+  <title>Deploy Quantized Models using Torch-TensorRT &mdash; Torch-TensorRT v2.7.0.dev0+bc67a5b documentation</title>
   
 
   
@@ -293,7 +293,7 @@
               
               
                 <div class="version">
-                  v2.7.0.dev0+b5692d3
+                  v2.7.0.dev0+bc67a5b
                 </div>
               
             
@@ -721,10 +721,8 @@ to download the full example code</p>
     <span class="k">with</span> <span class="n">export_torch_mode</span><span class="p">():</span>
         <span class="c1"># Compile the model with Torch-TensorRT Dynamo backend</span>
         <span class="n">input_tensor</span> <span class="o">=</span> <span class="n">images</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
-        <span class="c1"># torch.export.export() failed due to RuntimeError: Attempting to use FunctionalTensor on its own. Instead, please use it with a corresponding FunctionalTensorMode()</span>
-        <span class="kn">from</span><span class="w"> </span><span class="nn">torch.export._trace</span><span class="w"> </span><span class="kn">import</span> <span class="n">_export</span>
 
-        <span class="n">exp_program</span> <span class="o">=</span> <span class="n">_export</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="p">(</span><span class="n">input_tensor</span><span class="p">,))</span>
+        <span class="n">exp_program</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">export</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="p">(</span><span class="n">input_tensor</span><span class="p">,),</span> <span class="n">strict</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">quantize_type</span> <span class="o">==</span> <span class="s2">&quot;int8&quot;</span><span class="p">:</span>
             <span class="n">enabled_precisions</span> <span class="o">=</span> <span class="p">{</span><span class="n">torch</span><span class="o">.</span><span class="n">int8</span><span class="p">}</span>
         <span class="k">elif</span> <span class="n">args</span><span class="o">.</span><span class="n">quantize_type</span> <span class="o">==</span> <span class="s2">&quot;fp8&quot;</span><span class="p">:</span>

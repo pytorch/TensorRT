@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt.dynamo._settings &mdash; Torch-TensorRT v2.7.0.dev0+b5692d3 documentation</title>
+  <title>torch_tensorrt.dynamo._settings &mdash; Torch-TensorRT v2.7.0.dev0+bc67a5b documentation</title>
   
 
   
@@ -290,7 +290,7 @@
               
               
                 <div class="version">
-                  v2.7.0.dev0+b5692d3
+                  v2.7.0.dev0+bc67a5b
                 </div>
               
             
@@ -508,6 +508,7 @@
     <span class="n">ENGINE_CAPABILITY</span><span class="p">,</span>
     <span class="n">HARDWARE_COMPATIBLE</span><span class="p">,</span>
     <span class="n">IMMUTABLE_WEIGHTS</span><span class="p">,</span>
+    <span class="n">L2_LIMIT_FOR_TILING</span><span class="p">,</span>
     <span class="n">LAZY_ENGINE_INIT</span><span class="p">,</span>
     <span class="n">MAX_AUX_STREAMS</span><span class="p">,</span>
     <span class="n">MIN_BLOCK_SIZE</span><span class="p">,</span>
@@ -519,6 +520,7 @@
     <span class="n">REUSE_CACHED_ENGINES</span><span class="p">,</span>
     <span class="n">SPARSE_WEIGHTS</span><span class="p">,</span>
     <span class="n">STRIP_ENGINE_WEIGHTS</span><span class="p">,</span>
+    <span class="n">TILING_OPTIMIZATION_LEVEL</span><span class="p">,</span>
     <span class="n">TIMING_CACHE_PATH</span><span class="p">,</span>
     <span class="n">TRUNCATE_DOUBLE</span><span class="p">,</span>
     <span class="n">USE_AOT_JOINT_EXPORT</span><span class="p">,</span>
@@ -581,6 +583,8 @@
 <span class="sd">        enable_cross_compile_for_windows (bool): By default this is False means TensorRT engines can only be executed on the same platform where they were built.</span>
 <span class="sd">            True will enable cross-platform compatibility which allows the engine to be built on Linux and run on Windows</span>
 <span class="sd">        use_aot_joint_export (bool): Use aot_export_joint_simple, else wrap backend with AOT_autograd, required for distributed tensors</span>
+<span class="sd">        tiling_optimization_level (str): The optimization level of tiling strategies. A higher level allows TensorRT to spend more time searching for better tiling strategy. We currently support [&quot;none&quot;, &quot;fast&quot;, &quot;moderate&quot;, &quot;full&quot;].</span>
+<span class="sd">        l2_limit_for_tiling (int): The target L2 cache usage limit (in bytes) for tiling optimization (default is -1 which means no limit).</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">enabled_precisions</span><span class="p">:</span> <span class="n">Set</span><span class="p">[</span><span class="n">dtype</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="k">lambda</span><span class="p">:</span> <span class="n">ENABLED_PRECISIONS</span><span class="p">)</span>
@@ -621,7 +625,9 @@
     <span class="n">immutable_weights</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">IMMUTABLE_WEIGHTS</span>
     <span class="n">enable_weight_streaming</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">ENABLE_WEIGHT_STREAMING</span>
     <span class="n">enable_cross_compile_for_windows</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">ENABLE_CROSS_COMPILE_FOR_WINDOWS</span>
-    <span class="n">use_aot_joint_export</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">USE_AOT_JOINT_EXPORT</span></div>
+    <span class="n">use_aot_joint_export</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">USE_AOT_JOINT_EXPORT</span>
+    <span class="n">tiling_optimization_level</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">TILING_OPTIMIZATION_LEVEL</span>
+    <span class="n">l2_limit_for_tiling</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">L2_LIMIT_FOR_TILING</span></div>
 
 
 <span class="n">_SETTINGS_TO_BE_ENGINE_INVARIANT</span> <span class="o">=</span> <span class="p">(</span>
@@ -637,6 +643,8 @@
     <span class="s2">&quot;strip_engine_weights&quot;</span><span class="p">,</span>  <span class="c1"># TODO: @Evan to remove this after implementing caching weight-stripped engines as default?</span>
     <span class="s2">&quot;immutable_weights&quot;</span><span class="p">,</span>
     <span class="s2">&quot;enable_weight_streaming&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;tiling_optimization_level&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;l2_limit_for_tiling&quot;</span><span class="p">,</span>
 <span class="p">)</span>
 
 
