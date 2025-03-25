@@ -3,11 +3,10 @@ from enum import IntEnum, IntFlag, auto
 from typing import Optional, Tuple, Union
 
 import numpy as np
+import tensorrt as trt
 from torch.fx.node import Argument, Target
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
 from torch_tensorrt.fx.converters.converter_utils import SourceIR, set_layer_name
-
-import tensorrt as trt
 
 
 # class for AllReduce
@@ -94,7 +93,7 @@ def nccl_reduce_scatter(
         "group", np.array(group, dtype=np.int32), trt.PluginFieldType.INT32
     )
 
-    p_dtype = trt.float16
+    p_dtype = trt.float32
     pf_dtype = trt.PluginField(
         "type_id", np.array([int(p_dtype)], np.int32), trt.PluginFieldType.INT32
     )
