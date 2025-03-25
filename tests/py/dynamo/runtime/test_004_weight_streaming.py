@@ -6,6 +6,7 @@ import torch
 import torch_tensorrt as torchtrt
 from parameterized import parameterized
 from torch.testing._internal.common_utils import TestCase, run_tests
+from torch_tensorrt.dynamo.utils import prepare_inputs
 
 INPUT_SIZE = (64, 100)
 
@@ -290,10 +291,6 @@ class TestWeightStreamingPython(TestCase):
             ("cpp_runtime", False),
         ]
     )
-    @unittest.skipIf(
-        os.environ.get("CI_BUILD") == "1",
-        "Skipping test due to CI resource constraints",
-    )
     def test_runtime_state_change(self, _, use_python_runtime):
         class SampleModel(torch.nn.Module):
             def __init__(self):
@@ -302,45 +299,62 @@ class TestWeightStreamingPython(TestCase):
                 self.layer2 = torch.nn.Linear(128, 64)
                 self.relu = torch.nn.ReLU()
 
-            def forward(self, x):
+            def forward(self, x, b=None, c=None, d=None, e=[]):
                 out = self.layer1(x)
+                out = out + b
+                if c is not None:
+                    out = out * c
                 out = self.relu((out + 2.0) * 0.05)
+                if d is not None:
+                    out = out - d["value"] + d["value2"]
                 out = self.layer2(out)
+                for n in e:
+                    out += n
                 return out
 
-        inputs = torchtrt.Input(
-            min_shape=(1, 100),
-            opt_shape=(64, 100),
-            max_shape=(128, 100),
-            dtype=torch.float,
-            name="x",
-        )
         model = SampleModel().eval().cuda()
         input_list = []
-        input_list.append(torch.randn((8, 100)).cuda())
-        input_list.append(torch.randn((12, 100)).cuda())
-        input_list.append(torch.randn((12, 100)).cuda())
-        input_list.append(torch.randn((8, 100)).cuda())
-        input_list.append(torch.randn((8, 100)).cuda())
+        for batch_size in [8, 12, 12, 8, 8]:
+            args = [torch.rand((batch_size, 100)).to("cuda")]
+            kwargs = {
+                "b": torch.rand((1, 128)).to("cuda"),
+                "d": {
+                    "value": torch.rand(1).to("cuda"),
+                    "value2": torch.tensor(1.2).to("cuda"),
+                },
+                "e": [torch.rand(1).to("cuda"), torch.rand(1).to("cuda")],
+            }
+            input_list.append((args, kwargs))
 
-        dynamic_shapes = (
-            {
-                0: torch.export.Dim("batch_size", min=1, max=128),
-            },
-        )
-        exp_program = torch.export.export(
-            model, (input_list[0],), dynamic_shapes=dynamic_shapes
-        )
+        kwarg_torchtrt_input = prepare_inputs(input_list[0][1])
 
+        compile_spec = {
+            "arg_inputs": [
+                torchtrt.Input(
+                    min_shape=(1, 100),
+                    opt_shape=(64, 100),
+                    max_shape=(128, 100),
+                    dtype=torch.float32,
+                    name="x",
+                ),
+            ],
+            "kwarg_inputs": kwarg_torchtrt_input,
+            "device": torchtrt.Device("cuda:0"),
+            "enabled_precisions": {torch.float},
+            "pass_through_build_failures": True,
+            "min_block_size": 1,
+            "ir": "dynamo",
+            "cache_built_engines": False,
+            "reuse_cached_engines": False,
+            "use_explicit_typing": True,
+            "enable_weight_streaming": True,
+            "torch_executed_ops": {"torch.ops.aten.mul.Tensor"},
+            "use_python_runtime": use_python_runtime,
+        }
+        exp_program = torchtrt.dynamo.trace(model, **compile_spec)
         optimized_model = torchtrt.dynamo.compile(
             exp_program,
-            inputs,
-            min_block_size=1,
-            pass_through_build_failures=True,
-            use_explicit_typing=True,
-            enable_weight_streaming=True,
-            torch_executed_ops={"torch.ops.aten.mul.Tensor"},
-            use_python_runtime=use_python_runtime,
+            **compile_spec,
         )
 
         # List of tuples representing different configurations for three features:
@@ -361,12 +375,12 @@ class TestWeightStreamingPython(TestCase):
             for i in range(len(input_list)):
                 if enable_weight_streaming and i == 4:
                     weight_streaming_ctx.device_budget = int(streamable_budget * 0.6)
-                out_list.append(optimized_model(input_list[i]))
+                out_list.append(optimized_model(*input_list[i][0], **input_list[i][1]))
             return out_list
 
         ref_out_list = []
         for i in range(len(input_list)):
-            ref_out_list.append(model(input_list[i]))
+            ref_out_list.append(model(*input_list[i][0], **input_list[i][1]))
 
         pre_allocated_output_ctx = torchtrt.runtime.enable_pre_allocated_outputs(
             optimized_model

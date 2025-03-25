@@ -5,7 +5,7 @@ import torch
 import torch.distributed as dist
 import torch.nn as nn
 import torch_tensorrt
-from tensor_parallel_initialize_dist import initialize_distributed_env
+from distributed_utils import initialize_distributed_env
 from torch.distributed._tensor import Shard
 from torch.distributed.tensor.parallel import (
     ColwiseParallel,
@@ -41,10 +41,6 @@ class ToyModel(nn.Module):
 
 
 logger.info(f"Starting PyTorch TP example on rank {_rank}.")
-assert (
-    _world_size % 2 == 0
-), f"TP examples require even number of GPUs, but got {_world_size} gpus"
-
 
 # # create model and move it to GPU - init"cuda"_mesh has already mapped GPU ids.
 tp_model = ToyModel().to("cuda")

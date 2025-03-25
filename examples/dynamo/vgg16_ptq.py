@@ -233,10 +233,8 @@ with torch.no_grad():
     with export_torch_mode():
         # Compile the model with Torch-TensorRT Dynamo backend
         input_tensor = images.cuda()
-        # torch.export.export() failed due to RuntimeError: Attempting to use FunctionalTensor on its own. Instead, please use it with a corresponding FunctionalTensorMode()
-        from torch.export._trace import _export
 
-        exp_program = _export(model, (input_tensor,))
+        exp_program = torch.export.export(model, (input_tensor,), strict=False)
         if args.quantize_type == "int8":
             enabled_precisions = {torch.int8}
         elif args.quantize_type == "fp8":
