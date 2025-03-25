@@ -17,7 +17,6 @@ from torch_tensorrt.dynamo.utils import (
     to_torch_device,
     to_torch_tensorrt_device,
 )
-from torch_tensorrt.runtime._cudagraphs import get_cuda_graph_module
 
 logger = logging.getLogger(__name__)
 
@@ -64,7 +63,6 @@ class MutableTorchTensorRTModule(object):
         *,
         device: Optional[Union[Device, torch.device, str]] = _defaults.DEVICE,
         use_python_runtime: bool = _defaults.USE_PYTHON_RUNTIME,
-        enable_cuda_graph: bool = False,
         immutable_weights: bool = False,
         strict: bool = True,
         allow_complex_guards_as_runtime_asserts: bool = False,
@@ -160,7 +158,6 @@ class MutableTorchTensorRTModule(object):
                 logger.warning(
                     "Weight stremaing budget is not set. Using auto weight streaming budget"
                 )
-        self.enable_cuda_graph = enable_cuda_graph
 
         cls = self.__class__
         self.__class__ = type(
@@ -347,8 +344,6 @@ class MutableTorchTensorRTModule(object):
         )
         self.original_model.to("cpu")
         torch.cuda.empty_cache()
-        if self.enable_cuda_graph:
-            self._enable_cuda_graph()
         if self.enable_weight_streaming:
             self.set_weight_streaming_ctx(self.weight_streaming_budget)
 
@@ -364,9 +359,6 @@ class MutableTorchTensorRTModule(object):
             else self.weight_streaming_ctx.get_automatic_weight_streaming_budget()
         )
         self.weight_streaming_ctx.device_budget = requested_budget
-
-    def _enable_cuda_graph(self) -> None:
-        self.gm = get_cuda_graph_module(self.gm)
 
     def _validate_inputs(self, *args: Any, **kwargs: Any) -> None:
 

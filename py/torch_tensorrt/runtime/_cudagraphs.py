@@ -69,8 +69,15 @@ class _CudagraphsContextManager(object):
         self.old_mode = _PY_RT_CUDAGRAPHS
         self.compiled_module = compiled_module
         self.cudagraphs_module: Optional[CudaGraphsTorchTensorRTModule] = None
+        self.old_module = None
 
     def __enter__(self) -> torch.nn.Module | torch.fx.GraphModule:
+
+        if isinstance(self.compiled_module, torch_tensorrt.MutableTorchTensorRTModule):
+            self.old_module = self.compiled_module.gm
+            self.compiled_module.gm = get_cuda_graph_module(self.compiled_module.gm)
+            return self.compiled_module
+
         return get_cuda_graph_module(self.compiled_module)
 
     def __exit__(self, *args: Any) -> None:
@@ -79,6 +86,8 @@ class _CudagraphsContextManager(object):
         # __del__ is not entirely predictable, so we reset cudagraph here
         if self.cudagraphs_module:
             self.cudagraphs_module._reset_captured_graph()
+        if self.old_module:  # MutableTorchTRTModule
+            self.compiled_module.gm = self.old_module
 
 
 def get_cuda_graph_module(
