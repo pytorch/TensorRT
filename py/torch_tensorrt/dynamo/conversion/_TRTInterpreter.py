@@ -492,14 +492,12 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         # Stage 1: Name mapping
         torch_device = to_torch_device(self.compilation_settings.device)
         gm_is_on_cuda = get_model_device(self.module).type == "cuda"
-        if not gm_is_on_cuda:
-            # If the model original position is on CPU, move it GPU
-            sd = {
-                k: v.reshape(-1).to(torch_device)
-                for k, v in self.module.state_dict().items()
-            }
-        else:
-            sd = {k: v.reshape(-1) for k, v in self.module.state_dict().items()}
+        # If the model original position is on CPU, move it GPU
+        sd = {
+            k: v.reshape(-1).to(torch_device)
+            for k, v in self.module.state_dict().items()
+        }
+
         weight_name_map: dict[str, Any] = {}
         np_map = {}
         constant_mapping = {}
@@ -737,7 +735,11 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         self._create_timing_cache(
             builder_config, self.compilation_settings.timing_cache_path
         )
-
+        # TODO: Memory control prototyping. Under discussion
+        if self.compilation_settings.offload_module_to_cpu:
+            del self.module
+            gc.collect()
+            torch.cuda.empty_cache()
         serialized_engine = self.builder.build_serialized_network(
             self.ctx.net, builder_config
         )
