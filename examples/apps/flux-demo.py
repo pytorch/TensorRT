@@ -41,7 +41,7 @@ settings = {
     "use_fp32_acc": True,
     "use_explicit_typing": True,
     "debug": False,
-    "use_python_runtime": False,
+    "use_python_runtime": True,
     "immutable_weights": False,
     # "cache_built_engines": True,
     # "reuse_cached_engines": True,

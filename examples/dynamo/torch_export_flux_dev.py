@@ -112,6 +112,7 @@ trt_gm = torch_tensorrt.dynamo.compile(
     min_block_size=1,
     use_fp32_acc=True,
     use_explicit_typing=True,
+    use_python_runtime=True,
 )
 
 # %%
@@ -126,7 +127,7 @@ pipe.to(DEVICE)
 torch.cuda.empty_cache()
 pipe.transformer = trt_gm
 pipe.transformer.config = config
-
+trt_gm.device = torch.device("cuda")
 # %%
 # Image generation using prompt
 # ---------------------------
