@@ -21,6 +21,7 @@ import numpy as np
 import tensorrt as trt
 import torch
 import torch.fx
+from torch.fx.experimental.proxy_tensor import unset_fake_temporarily
 from torch.fx.node import _get_qualified_name
 from torch.fx.passes.shape_prop import TensorMetadata
 from torch.utils._python_dispatch import _disable_current_modes
@@ -409,12 +410,13 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         np_map: the map from weight name to np values in INetworkDefinition
         state_dict: state of the graph module
         """
-        network_weight = torch.from_numpy(np_map[weight_name]).to(device)
-        for sd_w_name, sd_weight in state_dict.items():
-            if TRTInterpreter.check_weight_equal(sd_weight, network_weight, device):
-                del state_dict[sd_w_name]
-                return sd_w_name
-        return ""
+        with unset_fake_temporarily():
+            network_weight = torch.from_numpy(np_map[weight_name]).to(device)
+            for sd_w_name, sd_weight in state_dict.items():
+                if TRTInterpreter.check_weight_equal(sd_weight, network_weight, device):
+                    del state_dict[sd_w_name]
+                    return sd_w_name
+            return ""
 
     @staticmethod
     def check_weight_equal(
@@ -422,14 +424,15 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         network_weight: Union[torch.Tensor, np.ndarray],
         device: torch.device,
     ) -> Any:
-        if not isinstance(network_weight, torch.Tensor):
-            network_weight = torch.from_numpy(network_weight).to(device)
-        try:
-            return sd_weight.shape == network_weight.shape and torch.all(
-                torch.abs(sd_weight - network_weight) < 0.01
-            )
-        except Exception:
-            return torch.all(sd_weight == network_weight)
+        with unset_fake_temporarily():
+            if not isinstance(network_weight, torch.Tensor):
+                network_weight = torch.from_numpy(network_weight).to(device)
+            try:
+                return sd_weight.shape == network_weight.shape and torch.all(
+                    torch.abs(sd_weight - network_weight) < 0.01
+                )
+            except Exception:
+                return torch.all(sd_weight == network_weight)
 
     def _save_weight_mapping(self) -> None:
         """

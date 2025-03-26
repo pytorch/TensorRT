@@ -342,13 +342,20 @@ def create_constant(
         A TensorRT ITensor that represents the given value.
     """
     with unset_fake_temporarily():
-        shape = (1,)
-
-        # Rank 0 constant is required in IFillLayer inputs.
-        if min_rank == 0:
-            shape = trt.Dims()
 
         torch_value = to_torch(value, dtype)
+        if torch_value.dtype == torch.float64:
+            raise ValueError(
+                "TensorRT does not support float64 (double) precision. To resolve this, please set truncate_double=True in your compilation settings and re-run the model."
+            )
+        # Rank 0 constant is required in IFillLayer inputs.
+        if min_rank == 0 and isinstance(value, (int, float, bool)):
+            shape = trt.Dims()
+        elif list(torch_value.shape) == []:
+            shape = (1,)
+        else:
+            shape = list(torch_value.shape)
+        # breakpoint()
         if torch_value is not None:
             if torch_value.dtype == torch.bfloat16:
                 torch_value_fp32 = torch_value.to(torch.float32)
@@ -357,11 +364,7 @@ def create_constant(
                 numpy_value = torch_value.numpy()
 
             constant = ctx.net.add_constant(
-                (
-                    shape
-                    if isinstance(value, (int, float, bool)) or min_rank == 0
-                    else list(torch_value.shape)
-                ),
+                shape,
                 numpy_value,
             )
             constant.name = name
