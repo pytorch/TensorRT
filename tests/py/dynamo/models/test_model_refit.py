@@ -763,6 +763,7 @@ def test_refit_cumsum_fallback():
             debug=True,
             min_block_size=1,
             immutable_weights=False,
+            offload_module_to_cpu=False,
         )
 
     num_pyt_segments = len(

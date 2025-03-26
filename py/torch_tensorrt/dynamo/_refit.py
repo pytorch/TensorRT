@@ -509,22 +509,21 @@ def refit_module_weights(
         serialization_config.clear_flag(trt.SerializationFlag.EXCLUDE_WEIGHTS)
         serialized_engine = engine.serialize_with_config(serialization_config)
 
-        del engine
-        gc.collect()
-        torch.cuda.empty_cache()
-
-        if isinstance(
-            compiled_submodule, (PythonTorchTensorRTModule, TorchTensorRTModule)
-        ):
+        if isinstance(compiled_submodule, PythonTorchTensorRTModule):
+            compiled_submodule.serialized_engine = bytes(serialized_engine)
+        elif isinstance(compiled_submodule, TorchTensorRTModule):
             compiled_submodule.engine = None  # Clear the engine for TorchTensorRTModule, otherwise it won't be updated
             compiled_submodule.serialized_engine = bytes(serialized_engine)
             compiled_submodule.setup_engine()
-
         elif inline_module:
             new_engine_info = list(engine_info)
             new_engine_info[ENGINE_IDX] = bytes(serialized_engine)
             refitted_engine = torch.classes.tensorrt.Engine(tuple(new_engine_info))
             setattr(compiled_module, f"{name}_engine", refitted_engine)
+
+        del engine
+        gc.collect()
+        torch.cuda.empty_cache()
 
     # TODO: Memory control prototyping. Under discussion
     if settings.offload_module_to_cpu:
