@@ -691,6 +691,9 @@ def compile(
     )
 
     gm = exported_program.module()
+    # TODO: Memory control prototyping. Under discussion
+    if offload_module_to_cpu:
+        exported_program.module().to("cpu")
     logger.debug("Input graph: " + str(gm.graph))
 
     # Apply lowering on the graph module
