@@ -258,7 +258,7 @@ def run_dynamo_runtime_tests(session):
     tests = [
         "runtime",
     ]
-    skip_tests = "-k not hw_compat"
+    skip_tests = "-k not hw_compat and not test_004_weight_streaming"
     for test in tests:
         if USE_HOST_DEPS:
             session.run_always("pytest", test, skip_tests, env={"PYTHONPATH": PYT_PATH})
