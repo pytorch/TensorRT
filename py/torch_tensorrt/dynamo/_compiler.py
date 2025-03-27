@@ -421,7 +421,6 @@ def compile(
     enable_weight_streaming: bool = _defaults.ENABLE_WEIGHT_STREAMING,
     tiling_optimization_level: str = _defaults.TILING_OPTIMIZATION_LEVEL,
     l2_limit_for_tiling: int = _defaults.L2_LIMIT_FOR_TILING,
-    offload_module_to_cpu: bool = _defaults.OFFLOAD_MODULE_TO_CPU,
     **kwargs: Any,
 ) -> torch.fx.GraphModule:
     """Compile an ExportedProgram module for NVIDIA GPUs using TensorRT
@@ -666,7 +665,6 @@ def compile(
         "enable_weight_streaming": enable_weight_streaming,
         "tiling_optimization_level": tiling_optimization_level,
         "l2_limit_for_tiling": l2_limit_for_tiling,
-        "offload_module_to_cpu": offload_module_to_cpu,
     }
 
     settings = CompilationSettings(**compilation_options)
@@ -677,9 +675,11 @@ def compile(
     )
 
     gm = exported_program.module()
-    # TODO: Memory control prototyping. Under discussion
-    if offload_module_to_cpu:
-        exported_program.module().to("cpu")
+    # Move the weights in the state_dict to CPU
+    exported_program.module().to("cpu")
+    logger.info(
+        "The model is moved to CPU during compilation. If you want to keep the model on GPU, call module.to('cuda') on the model after compilation."
+    )
     logger.debug("Input graph: " + str(gm.graph))
 
     # Apply lowering on the graph module
