@@ -355,7 +355,7 @@ def create_constant(
             shape = trt.Dims()
         else:
             shape = list(torch_value.shape)
-        # breakpoint()
+
         if torch_value is not None:
             if torch_value.dtype == torch.bfloat16:
                 torch_value_fp32 = torch_value.to(torch.float32)
