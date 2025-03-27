@@ -566,6 +566,15 @@ def scaled_dot_product_cudnn_attention_decomposition(
     return attn, None, None, None, 0, 0, None, None, None
 
 
+@register_torch_trt_decomposition(
+    aten.cudnn_grid_sampler, registry=TORCH_TRT_DECOMPOSITIONS
+)
+def cudnn_grid_sampler_decomposition(
+    x: torch.Tensor, grid: torch.Tensor
+) -> torch.Tensor:
+    return torch.grid_sampler_2d(x, grid, 0, 0, True)
+
+
 def get_decompositions(
     enable_experimental_decompositions: bool = False,
 ) -> Dict[OpOverload, Callable[[Any], Any]]:
