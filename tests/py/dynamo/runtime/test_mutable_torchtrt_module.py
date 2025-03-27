@@ -75,7 +75,7 @@ def test_check_input_shape_dynamic():
 
 
 @pytest.mark.unit
-def test_model_complex_dynamic_shape():
+def test_model_complex_dynamic_shape_with_saving():
     device = "cuda:0"
 
     class Model(torch.nn.Module):
@@ -110,6 +110,13 @@ def test_model_complex_dynamic_shape():
     trt_gm.set_expected_dynamic_shape_range(args_dynamic_shapes, kwarg_dynamic_shapes)
     # Run inference
     trt_gm(*inputs, **kwargs)
+
+    try:
+        save_path = os.path.join(tempfile.gettempdir(), "mutable_module.pkl")
+        torch_trt.MutableTorchTensorRTModule.save(mutable_module, save_path)
+        model = torch_trt.MutableTorchTensorRTModule.load("mutable_module.pkl")
+    except Exception as e:
+        assert "Module saving and reloading with dynamic shape failed."
 
     inputs_2 = [torch.rand(10, 9).to(device)]
     kwargs_2 = {
