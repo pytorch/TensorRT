@@ -55,7 +55,6 @@ def test_mapping():
         debug=debug,
         min_block_size=min_block_size,
         immutable_weights=False,
-        offload_module_to_cpu=False,
     )
     settings = trt_gm._run_on_acc_0.settings
     runtime = trt.Runtime(TRT_LOGGER)
@@ -94,7 +93,7 @@ def test_refit_one_engine_with_weightmap():
     enabled_precisions = {torch.float}
     debug = False
     min_block_size = 1
-    use_python_runtime = False
+    use_python_runtime = True
 
     exp_program = torch.export.export(model, tuple(inputs))
     exp_program2 = torch.export.export(model2, tuple(inputs))
@@ -107,7 +106,6 @@ def test_refit_one_engine_with_weightmap():
         debug=debug,
         min_block_size=min_block_size,
         immutable_weights=False,
-        offload_module_to_cpu=False,
     )
 
     new_trt_gm = refit_module_weights(
@@ -119,6 +117,7 @@ def test_refit_one_engine_with_weightmap():
     )
 
     # Check the output
+    model2.to("cuda")
     expected_outputs, refitted_outputs = exp_program2.module()(*inputs), new_trt_gm(
         *inputs
     )
@@ -157,7 +156,6 @@ def test_refit_one_engine_no_map_with_weightmap():
         debug=debug,
         min_block_size=min_block_size,
         immutable_weights=False,
-        offload_module_to_cpu=False,
     )
 
     trt_gm._run_on_acc_0.weight_name_map = None
@@ -170,6 +168,7 @@ def test_refit_one_engine_no_map_with_weightmap():
     )
 
     # Check the output
+    model2.to("cuda")
     expected_outputs, refitted_outputs = exp_program2.module()(*inputs), new_trt_gm(
         *inputs
     )
@@ -195,7 +194,7 @@ def test_refit_one_engine_with_wrong_weightmap():
     enabled_precisions = {torch.float}
     debug = False
     min_block_size = 1
-    use_python_runtime = False
+    use_python_runtime = True
 
     exp_program = torch.export.export(model, tuple(inputs))
     exp_program2 = torch.export.export(model2, tuple(inputs))
@@ -208,7 +207,6 @@ def test_refit_one_engine_with_wrong_weightmap():
         debug=debug,
         min_block_size=min_block_size,
         immutable_weights=False,
-        offload_module_to_cpu=False,
     )
     # Manually Deleted all batch norm layer. This suppose to fail the fast refit
     trt_gm._run_on_acc_0.weight_name_map = {
@@ -225,6 +223,7 @@ def test_refit_one_engine_with_wrong_weightmap():
     )
 
     # Check the output
+    model2.to("cuda")
     expected_outputs, refitted_outputs = exp_program2.module()(*inputs), new_trt_gm(
         *inputs
     )
@@ -253,7 +252,7 @@ def test_refit_one_engine_bert_with_weightmap():
     enabled_precisions = {torch.float}
     debug = False
     min_block_size = 1
-    use_python_runtime = False
+    use_python_runtime = True
 
     exp_program = torch.export.export(model, tuple(inputs))
     exp_program2 = torch.export.export(model2, tuple(inputs))
@@ -266,7 +265,6 @@ def test_refit_one_engine_bert_with_weightmap():
         debug=debug,
         min_block_size=min_block_size,
         immutable_weights=False,
-        offload_module_to_cpu=False,
     )
 
     new_trt_gm = refit_module_weights(
@@ -277,6 +275,7 @@ def test_refit_one_engine_bert_with_weightmap():
     )
 
     # Check the output
+    model2.to("cuda")
     expected_outputs, refitted_outputs = exp_program2.module()(*inputs), new_trt_gm(
         *inputs
     )
@@ -320,7 +319,6 @@ def test_refit_one_engine_inline_runtime_with_weightmap():
         debug=debug,
         min_block_size=min_block_size,
         immutable_weights=False,
-        offload_module_to_cpu=False,
     )
     torchtrt.save(trt_gm, trt_ep_path)
     trt_gm = torch.export.load(trt_ep_path)
@@ -332,6 +330,7 @@ def test_refit_one_engine_inline_runtime_with_weightmap():
     )
 
     # Check the output
+    model2.to("cuda")
     expected_outputs, refitted_outputs = exp_program2.module()(*inputs), new_trt_gm(
         *inputs
     )
@@ -366,7 +365,6 @@ def test_refit_one_engine_python_runtime_with_weightmap():
         debug=debug,
         min_block_size=min_block_size,
         immutable_weights=False,
-        offload_module_to_cpu=False,
     )
 
     new_trt_gm = refit_module_weights(
@@ -377,6 +375,7 @@ def test_refit_one_engine_python_runtime_with_weightmap():
     )
 
     # Check the output
+    model2.to("cuda")
     expected_outputs, refitted_outputs = exp_program2.module()(*inputs), new_trt_gm(
         *inputs
     )
@@ -438,7 +437,6 @@ def test_refit_multiple_engine_with_weightmap():
         immutable_weights=False,
         torch_executed_ops=torch_executed_ops,
         reuse_cached_engines=False,
-        offload_module_to_cpu=False,
     )
 
     new_trt_gm = refit_module_weights(
@@ -449,6 +447,7 @@ def test_refit_multiple_engine_with_weightmap():
     )
 
     # Check the output
+    model2.to("cuda")
     expected_outputs, refitted_outputs = exp_program2.module()(*inputs), new_trt_gm(
         *inputs
     )
@@ -487,7 +486,6 @@ def test_refit_one_engine_without_weightmap():
         debug=debug,
         min_block_size=min_block_size,
         immutable_weights=False,
-        offload_module_to_cpu=False,
     )
 
     new_trt_gm = refit_module_weights(
@@ -498,6 +496,7 @@ def test_refit_one_engine_without_weightmap():
     )
 
     # Check the output
+    model2.to("cuda")
     expected_outputs, refitted_outputs = exp_program2.module()(*inputs), new_trt_gm(
         *inputs
     )
@@ -539,7 +538,6 @@ def test_refit_one_engine_bert_without_weightmap():
         debug=debug,
         min_block_size=min_block_size,
         immutable_weights=False,
-        offload_module_to_cpu=False,
     )
 
     new_trt_gm = refit_module_weights(
@@ -550,6 +548,7 @@ def test_refit_one_engine_bert_without_weightmap():
     )
 
     # Check the output
+    model2.to("cuda")
     expected_outputs, refitted_outputs = exp_program2.module()(*inputs), new_trt_gm(
         *inputs
     )
@@ -593,7 +592,6 @@ def test_refit_one_engine_inline_runtime_without_weightmap():
         debug=debug,
         min_block_size=min_block_size,
         immutable_weights=False,
-        offload_module_to_cpu=False,
     )
     torchtrt.save(trt_gm, trt_ep_path)
     trt_gm = torch.export.load(trt_ep_path)
@@ -605,6 +603,7 @@ def test_refit_one_engine_inline_runtime_without_weightmap():
     )
 
     # Check the output
+    model2.to("cuda")
     expected_outputs, refitted_outputs = exp_program2.module()(*inputs), new_trt_gm(
         *inputs
     )
@@ -639,7 +638,6 @@ def test_refit_one_engine_python_runtime_without_weightmap():
         debug=debug,
         min_block_size=min_block_size,
         immutable_weights=False,
-        offload_module_to_cpu=False,
     )
 
     new_trt_gm = refit_module_weights(
@@ -650,6 +648,7 @@ def test_refit_one_engine_python_runtime_without_weightmap():
     )
 
     # Check the output
+    model2.to("cuda")
     expected_outputs, refitted_outputs = exp_program2.module()(*inputs), new_trt_gm(
         *inputs
     )
@@ -711,7 +710,6 @@ def test_refit_multiple_engine_without_weightmap():
         immutable_weights=False,
         torch_executed_ops=torch_executed_ops,
         reuse_cached_engines=False,
-        offload_module_to_cpu=False,
     )
 
     new_trt_gm = refit_module_weights(
@@ -722,6 +720,7 @@ def test_refit_multiple_engine_without_weightmap():
     )
 
     # Check the output
+    model2.to("cuda")
     expected_outputs, refitted_outputs = exp_program2.module()(*inputs), new_trt_gm(
         *inputs
     )
@@ -763,7 +762,6 @@ def test_refit_cumsum_fallback():
             debug=True,
             min_block_size=1,
             immutable_weights=False,
-            offload_module_to_cpu=False,
         )
 
     num_pyt_segments = len(
@@ -777,6 +775,7 @@ def test_refit_cumsum_fallback():
     )
 
     # Check the output
+    model.to("cuda")
     pyt_outputs, trt_outputs = exp_program.module()(*inputs), trt_gm(*inputs)
     for pyt_output, trt_output in zip(pyt_outputs, trt_outputs):
         assertions.assertTrue(

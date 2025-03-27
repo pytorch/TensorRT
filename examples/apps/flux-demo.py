@@ -3,8 +3,7 @@ import os
 import gradio as gr
 import torch
 import torch_tensorrt
-from diffusers import FluxPipeline, StableDiffusionPipeline
-from torch.export._trace import _export
+from diffusers import FluxPipeline
 
 DEVICE = "cuda:0"
 pipe = FluxPipeline.from_pretrained(
@@ -43,13 +42,7 @@ settings = {
     "debug": False,
     "use_python_runtime": True,
     "immutable_weights": False,
-    # "cache_built_engines": True,
-    # "reuse_cached_engines": True,
-    # "timing_cache_path": "/home/engine_cache/flux.bin",
-    # "engine_cache_size": 40 * 1 << 30,
-    # "enable_weight_streaming": True,
-    # "weight_streaming_budget": 8 * 1 << 30
-    # "enable_cuda_graph": True,
+    "enable_cuda_graph": True,
 }
 
 trt_gm = torch_tensorrt.MutableTorchTensorRTModule(backbone, **settings)
@@ -69,7 +62,6 @@ def generate_image(prompt, inference_step, batch_size=2):
 
 generate_image(["Test"], 2)
 torch.cuda.empty_cache()
-# torch_tensorrt.MutableTorchTensorRTModule.save(trt_gm, "weight_streaming_Flux.pkl")
 
 
 def model_change(model):
@@ -97,8 +89,6 @@ def load_lora(path):
 
 
 generate_image(["Test"], 2)
-# load_lora("")
-# generate_image(["A golden retriever holding a sign to code"], 2)
 
 # Create Gradio interface
 with gr.Blocks(title="Flux Demo with Torch-TensorRT") as demo:
