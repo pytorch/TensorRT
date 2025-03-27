@@ -352,7 +352,7 @@ def create_constant(
         if min_rank == 0 and isinstance(value, (int, float, bool)):
             shape = trt.Dims()
         elif list(torch_value.shape) == []:
-            shape = (1,)
+            shape = trt.Dims()
         else:
             shape = list(torch_value.shape)
         # breakpoint()

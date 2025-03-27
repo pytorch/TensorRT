@@ -9,6 +9,7 @@ import numpy as np
 import tensorrt as trt
 import torch
 from torch.export import ExportedProgram
+from torch.fx.experimental.proxy_tensor import unset_fake_temporarily
 from torch_tensorrt._enums import dtype
 from torch_tensorrt._Input import Input
 from torch_tensorrt.dynamo import partitioning
@@ -144,71 +145,72 @@ def _refit_single_trt_engine_with_gm(
     Refit a TensorRT Engine in place
     """
 
-    refitted = set()
-    torch_device = get_model_device(new_gm)
-    refitter = trt.Refitter(old_engine, TRT_LOGGER)
-    weight_list = refitter.get_all_weights()
+    with unset_fake_temporarily():
+        refitted = set()
+        torch_device = get_model_device(new_gm)
+        refitter = trt.Refitter(old_engine, TRT_LOGGER)
+        weight_list = refitter.get_all_weights()
 
-    if weight_name_map:
-        # Get the refitting mapping
-        trt_wt_location = (
-            trt.TensorLocation.DEVICE
-            if torch_device.type == "cuda"
-            else trt.TensorLocation.HOST
-        )
-
-        constant_mapping: dict[str, Any] = weight_name_map.pop(
-            "constant_mapping", {}
-        )  # type: ignore
-        mapping = construct_refit_mapping_from_weight_name_map(
-            weight_name_map, new_gm.state_dict()
-        )
-        constant_mapping_with_type = {}
-
-        for constant_name, val in constant_mapping.items():
-            np_weight_type = val.dtype
-            val_tensor = torch.from_numpy(val).cuda()
-            trt_dtype = dtype.try_from(np_weight_type).to(trt.DataType)
-            torch_dtype = dtype.try_from(np_weight_type).to(torch.dtype)
-            constant_mapping_with_type[constant_name] = (
-                val_tensor.clone().reshape(-1).contiguous().to(torch_dtype),
-                trt_dtype,
+        if weight_name_map:
+            # Get the refitting mapping
+            trt_wt_location = (
+                trt.TensorLocation.DEVICE
+                if torch_device.type == "cuda"
+                else trt.TensorLocation.HOST
             )
 
-        mapping.update(constant_mapping_with_type)
-
-        for layer_name in weight_list:
-            if layer_name not in mapping:
-                logger.warning(f"{layer_name} is not found in weight mapping.")
-                continue
-            # Use Numpy to create weights
-            weight, weight_dtype = mapping[layer_name]
-            trt_wt_tensor = trt.Weights(
-                weight_dtype, weight.data_ptr(), torch.numel(weight)
+            constant_mapping: dict[str, Any] = weight_name_map.pop(
+                "constant_mapping", {}
+            )  # type: ignore
+            mapping = construct_refit_mapping_from_weight_name_map(
+                weight_name_map, new_gm.state_dict()
             )
-            refitter.set_named_weights(layer_name, trt_wt_tensor, trt_wt_location)
-        assert (
-            len(refitter.get_missing_weights()) == 0
-        ), "Fast refitting failed due to incomplete mapping"
+            constant_mapping_with_type = {}
 
-    else:
-        mapping = construct_refit_mapping(new_gm, input_list, settings)
-        trt_wt_location = trt.TensorLocation.HOST
-        for layer_name in weight_list:
-            if layer_name not in mapping:
-                raise AssertionError(f"{layer_name} is not found in weight mapping")
-            # Use Numpy to create weights
-            weight, datatype = mapping[layer_name]
-            trt_wt_tensor = trt.Weights(datatype, weight.ctypes.data, weight.size)
-            refitter.set_named_weights(layer_name, trt_wt_tensor, trt_wt_location)
-            refitted.add(layer_name)
+            for constant_name, val in constant_mapping.items():
+                np_weight_type = val.dtype
+                val_tensor = torch.from_numpy(val).cuda()
+                trt_dtype = dtype.try_from(np_weight_type).to(trt.DataType)
+                torch_dtype = dtype.try_from(np_weight_type).to(torch.dtype)
+                constant_mapping_with_type[constant_name] = (
+                    val_tensor.clone().reshape(-1).contiguous().to(torch_dtype),
+                    trt_dtype,
+                )
 
-        if len(refitted) != len(weight_list):
-            logger.warning("Not all weights have been refitted!!!")
+            mapping.update(constant_mapping_with_type)
 
-    if not refitter.refit_cuda_engine():
-        logger.error("Error: failed to refit new weights.")
-        raise AssertionError("Refitting failed.")
+            for layer_name in weight_list:
+                if layer_name not in mapping:
+                    logger.warning(f"{layer_name} is not found in weight mapping.")
+                    continue
+                # Use Numpy to create weights
+                weight, weight_dtype = mapping[layer_name]
+                trt_wt_tensor = trt.Weights(
+                    weight_dtype, weight.data_ptr(), torch.numel(weight)
+                )
+                refitter.set_named_weights(layer_name, trt_wt_tensor, trt_wt_location)
+            assert (
+                len(refitter.get_missing_weights()) == 0
+            ), "Fast refitting failed due to incomplete mapping"
+
+        else:
+            mapping = construct_refit_mapping(new_gm, input_list, settings)
+            trt_wt_location = trt.TensorLocation.HOST
+            for layer_name in weight_list:
+                if layer_name not in mapping:
+                    raise AssertionError(f"{layer_name} is not found in weight mapping")
+                # Use Numpy to create weights
+                weight, datatype = mapping[layer_name]
+                trt_wt_tensor = trt.Weights(datatype, weight.ctypes.data, weight.size)
+                refitter.set_named_weights(layer_name, trt_wt_tensor, trt_wt_location)
+                refitted.add(layer_name)
+
+            if len(refitted) != len(weight_list):
+                logger.warning("Not all weights have been refitted!!!")
+
+        if not refitter.refit_cuda_engine():
+            logger.error("Error: failed to refit new weights.")
+            raise AssertionError("Refitting failed.")
 
 
 def refit_module_weights(
