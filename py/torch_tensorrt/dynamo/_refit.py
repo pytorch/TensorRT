@@ -37,7 +37,9 @@ from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (
     TorchTensorRTModule,
 )
 from torch_tensorrt.dynamo.utils import (
+    CPU_DEVICE,
     check_module_output,
+    delete_module,
     get_model_device,
     get_torch_inputs,
     set_log_level,
@@ -290,9 +292,6 @@ def refit_module_weights(
         get_decompositions(settings.enable_experimental_decompositions)
     )
     new_gm = new_weight_module.module()
-    # TODO: Memory control prototyping. Under discussion
-    if settings.offload_module_to_cpu:
-        new_weight_module.module().to("cpu")
 
     logger.debug("Input graph: " + str(new_gm.graph))
     # Apply lowering on the graph module
@@ -371,7 +370,7 @@ def refit_module_weights(
 
     # Iterate over all components that can be accelerated
     # Generate the corresponding TRT Module for those
-
+    new_weight_module.module().to(CPU_DEVICE)
     for name, new_submodule in new_partitioned_module.named_children():
         # Refit each submodule
         # Extract engine from the submodule
@@ -474,11 +473,7 @@ def refit_module_weights(
                     settings=settings,
                     weight_name_map=None,
                 )
-        # TODO: Memory control prototyping. Under discussion
-        if settings.offload_module_to_cpu:
-            del new_submodule
-            gc.collect()
-            torch.cuda.empty_cache()
+        delete_module(new_submodule)
 
         # clear EXCLUDE_WEIGHTS flag
         serialization_config = engine.create_serialization_config()
@@ -501,13 +496,10 @@ def refit_module_weights(
         gc.collect()
         torch.cuda.empty_cache()
 
-    # TODO: Memory control prototyping. Under discussion
-    if settings.offload_module_to_cpu:
-        del new_partitioned_module
-        gc.collect()
-        torch.cuda.empty_cache()
+    delete_module(new_partitioned_module)
 
     if verify_output and arg_inputs is not None:
+        new_gm.to(torch.cuda.current_device())
         if check_module_output(
             new_module=new_gm,
             refitted_module=compiled_module,
@@ -515,6 +507,7 @@ def refit_module_weights(
             kwarg_inputs=torch_kwarg_inputs,
         ):
             logger.info("Refitting Succeed!")
+            new_gm.to(CPU_DEVICE)
         else:
             if weight_name_map:
                 logger.warning(
@@ -530,6 +523,7 @@ def refit_module_weights(
                     in_place=in_place,
                 )
             logger.error("Refitting Failed! The outputs do not match.")
+            new_gm.to(CPU_DEVICE)
     else:
         logger.info("Refitting Completed! Output verification skipped.")
 
