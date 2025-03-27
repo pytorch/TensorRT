@@ -13,7 +13,7 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     cast_trt_tensor,
     extend_attr_to_tuple,
     get_trt_tensor,
-    to_numpy,
+    to_torch,
 )
 from torch_tensorrt.fx.converters.converter_utils import (
     get_dyn_range,
@@ -45,7 +45,6 @@ def convNd(
         assert input.shape[1] != -1, "Channel dim can't be dynamic for convolution."
 
     num_dims = len(input.shape) - 2
-
     if is_conv1d:
         # Apply an unsqueeze operation to transform the conv1d problem into conv2d
         input = impl.unsqueeze.unsqueeze(
@@ -54,8 +53,8 @@ def convNd(
 
     # Process bias terms
     if isinstance(bias, (torch.Tensor, np.ndarray)):
-        # Transform the bias constant into a Numpy array
-        bias = to_numpy(bias, dtype=input.dtype)
+        bias = to_torch(bias, dtype=input.dtype)
+        bias = get_trt_tensor(ctx, bias, f"{name}_bias")
 
     elif isinstance(bias, TRTTensor):
         bias = get_trt_tensor(ctx, bias, f"{name}_bias")
@@ -74,12 +73,11 @@ def convNd(
                 ctx, target, source_ir, weight.name + "_unsqueeze_conv1d", weight, -1
             )
     elif isinstance(weight, (torch.Tensor, np.ndarray)):
-        # Transform the weight constant into a Numpy array
-        weight = to_numpy(weight, dtype=input.dtype)
-
+        weight = to_torch(weight, dtype=input.dtype)
         # Append new dimension (unsqueeze) if the convolution is 1d
         if is_conv1d:
-            weight = np.expand_dims(weight, -1)
+            weight = torch.unsqueeze(weight, -1)
+        weight = get_trt_tensor(ctx, weight, f"{name}_weight")
 
     else:
         raise RuntimeError(
