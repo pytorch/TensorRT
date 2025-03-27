@@ -690,7 +690,6 @@ def compile(
 
     gm = exported_program.module()
     # Move the weights in the state_dict to CPU
-    exported_program.module().to("cpu")
     logger.info(
         "The model is moved to CPU during compilation. If you want to keep the model on GPU, call module.to('cuda') on the model after compilation."
     )
