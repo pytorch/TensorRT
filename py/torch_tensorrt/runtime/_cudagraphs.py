@@ -77,8 +77,8 @@ class _CudagraphsContextManager(object):
             self.old_module = self.compiled_module.gm
             self.compiled_module.gm = get_cuda_graph_module(self.compiled_module.gm)
             return self.compiled_module
-
-        return get_cuda_graph_module(self.compiled_module)
+        else:
+            return get_cuda_graph_module(self.compiled_module)
 
     def __exit__(self, *args: Any) -> None:
         # Set cudagraphs back to old mode

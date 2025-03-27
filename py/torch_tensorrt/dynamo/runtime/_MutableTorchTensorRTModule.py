@@ -209,7 +209,7 @@ class MutableTorchTensorRTModule(object):
 
         self.refit_state.set_state(RefitFlag.NEEDS_RECOMPILE)
 
-    def _get_total_dynamic_shapes(self) -> dict[str, Any] | None:
+    def _get_total_dynamic_shapes(self) -> Union[dict[str, Any], None]:
         if not self.arg_dynamic_shapes and not self.kwarg_dynamic_shapes:
             return None
         total_dynamic_shape = {}
@@ -490,7 +490,8 @@ class MutableTorchTensorRTModule(object):
     def to(self, *args: Any, **kwargs: Any) -> None:
         logger.warning(
             "Trying to move the original PyTorch model. This will cause CPU offloading failing and increase GPU memory usage."
-            + "If this is absolute necessary, please call module.pytorch_model.to(...)"
+            + "If this is absolute necessary, please call module.pytorch_model.to(...) \n"
+            + "The model is still on the original device."
         )
 
     @property
