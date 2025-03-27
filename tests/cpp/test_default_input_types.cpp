@@ -1,6 +1,8 @@
 #include "cpp_api_test.h"
 #include "torch_tensorrt/logging.h"
 
+#ifndef DISABLE_TEST_IN_CI
+
 TEST_P(CppAPITests, InputsUseDefaultFP32) {
   torch_tensorrt::logging::set_reportable_log_level(torch_tensorrt::logging::Level::kINFO);
 
@@ -117,3 +119,5 @@ INSTANTIATE_TEST_SUITE_P(
     CompiledModuleForwardIsCloseSuite,
     CppAPITests,
     testing::Values(PathAndInput({"tests/modules/resnet18_traced.jit.pt", {{1, 3, 224, 224}}, {at::kFloat}})));
+
+#endif
