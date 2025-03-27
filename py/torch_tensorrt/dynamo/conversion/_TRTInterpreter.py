@@ -42,7 +42,7 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     get_node_name,
     get_trt_tensor,
 )
-from torch_tensorrt.dynamo.utils import DYNAMIC_DIM, get_model_device, to_torch_device
+from torch_tensorrt.dynamo.utils import DYNAMIC_DIM, delete_module, to_torch_device
 from torch_tensorrt.fx.observer import Observer
 from torch_tensorrt.logging import TRT_LOGGER
 
@@ -487,8 +487,6 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         _LOGGER.info("Building weight name mapping...")
         # Stage 1: Name mapping
         torch_device = to_torch_device(self.compilation_settings.device)
-        gm_is_on_cuda = get_model_device(self.module).type == "cuda"
-        # If the model original position is on CPU, move it GPU
         sd = {
             k: v.reshape(-1).to(torch_device)
             for k, v in self.module.state_dict().items()
@@ -731,11 +729,8 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         self._create_timing_cache(
             builder_config, self.compilation_settings.timing_cache_path
         )
-        # TODO: Memory control prototyping. Under discussion
-        if self.compilation_settings.offload_module_to_cpu:
-            del self.module
-            gc.collect()
-            torch.cuda.empty_cache()
+
+        delete_module(self.module)
         serialized_engine = self.builder.build_serialized_network(
             self.ctx.net, builder_config
         )
