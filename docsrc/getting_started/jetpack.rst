@@ -87,7 +87,7 @@ Install pip and required python packages:
 .. code-block:: sh
 
    # install pytorch from nvidia jetson distribution: https://pypi.jetson-ai-lab.dev/jp6/cu126/
-    pip3 install torch --index-url https://pypi.jetson-ai-lab.dev/jp6/cu126/
+    pip3 install torch torchvision torchaudio --index-url https://pypi.jetson-ai-lab.dev/jp6/cu126/
 
 .. code-block:: sh
 
