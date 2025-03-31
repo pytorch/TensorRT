@@ -1,5 +1,5 @@
 """
-.. _auto_generate_converters:
+.. _auto_generate_plugins:
 
 Automatically Generate a Plugin for a Custom Kernel
 ===================================================================
