@@ -1,4 +1,4 @@
-import os
+import time
 
 import gradio as gr
 import torch
@@ -51,13 +51,15 @@ pipe.transformer = trt_gm
 
 
 def generate_image(prompt, inference_step, batch_size=2):
+    start_time = time.time()
     image = pipe(
         prompt,
         output_type="pil",
         num_inference_steps=inference_step,
         num_images_per_prompt=batch_size,
     ).images
-    return image
+    end_time = time.time()
+    return image, end_time - start_time
 
 
 generate_image(["Test"], 2)
@@ -87,8 +89,6 @@ def load_lora(path):
     generate_image(["Test"], 2)
     print("Refitting Finished!")
 
-
-generate_image(["Test"], 2)
 
 # Create Gradio interface
 with gr.Blocks(title="Flux Demo with Torch-TensorRT") as demo:
@@ -125,9 +125,20 @@ with gr.Blocks(title="Flux Demo with Torch-TensorRT") as demo:
         with gr.Column():
             # Output component
             output_image = gr.Gallery(label="Generated Image")
+            time_taken = gr.Textbox(
+                label="Generation Time (seconds)", interactive=False
+            )
 
     # Connect the button to the generation function
     model_dropdown.change(model_change, inputs=[model_dropdown])
+    load_lora_btn.click(
+        fn=load_lora,
+        inputs=[
+            lora_upload_path,
+        ],
+    )
+
+    # Update generate button click to include time output
     generate_btn.click(
         fn=generate_image,
         inputs=[
@@ -135,13 +146,7 @@ with gr.Blocks(title="Flux Demo with Torch-TensorRT") as demo:
             num_steps,
             batch_size,
         ],
-        outputs=output_image,
-    )
-    load_lora_btn.click(
-        fn=load_lora,
-        inputs=[
-            lora_upload_path,
-        ],
+        outputs=[output_image, time_taken],
     )
 
 # Launch the interface
