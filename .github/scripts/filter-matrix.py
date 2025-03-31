@@ -4,7 +4,7 @@ import argparse
 import json
 import sys
 
-disabled_python_versions = "3.13"
+disabled_python_versions = ["3.13"]
 
 
 def main(args: list[str]) -> None:
