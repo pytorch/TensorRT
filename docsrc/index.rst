@@ -65,6 +65,8 @@ Tutorials
 * :ref:`torch_export_cudagraphs`
 * :ref:`converter_overloading`
 * :ref:`custom_kernel_plugins`
+* :ref:`auto_generate_converters`
+* :ref:`auto_generate_plugins`
 * :ref:`mutable_torchtrt_module_example`
 * :ref:`weight_streaming_example`
 * :ref:`pre_allocated_output_example`
@@ -84,6 +86,7 @@ Tutorials
    tutorials/_rendered_examples/dynamo/converter_overloading
    tutorials/_rendered_examples/dynamo/custom_kernel_plugins
    tutorials/_rendered_examples/dynamo/auto_generate_converters
+   tutorials/_rendered_examples/dynamo/auto_generate_plugin
    tutorials/_rendered_examples/dynamo/mutable_torchtrt_module_example
    tutorials/_rendered_examples/dynamo/weight_streaming_example
    tutorials/_rendered_examples/dynamo/pre_allocated_output_example
