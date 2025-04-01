@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt.dynamo._refit &mdash; Torch-TensorRT v2.7.0.dev0+bffe240 documentation</title>
+  <title>torch_tensorrt.dynamo._refit &mdash; Torch-TensorRT v2.7.0.dev0+dbd3944 documentation</title>
   
 
   
@@ -290,7 +290,7 @@
               
               
                 <div class="version">
-                  v2.7.0.dev0+bffe240
+                  v2.7.0.dev0+dbd3944
                 </div>
               
             
@@ -345,6 +345,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/converter_overloading.html">Overloading Torch-TensorRT Converters with Custom Converters</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/custom_kernel_plugins.html">Using Custom Kernels within TensorRT Engines with Torch-TensorRT</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/auto_generate_converters.html">Automatically Generate a Converter for a Custom Kernel</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/auto_generate_plugins.html">Automatically Generate a Plugin for a Custom Kernel</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/mutable_torchtrt_module_example.html">Mutable Torch TensorRT Module</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/weight_streaming_example.html">Weight Streaming</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/pre_allocated_output_example.html">Pre-allocated output buffer</a></li>
@@ -497,6 +498,7 @@
 <span class="kn">import</span><span class="w"> </span><span class="nn">tensorrt</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">trt</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch.export</span><span class="w"> </span><span class="kn">import</span> <span class="n">ExportedProgram</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch.fx.experimental.proxy_tensor</span><span class="w"> </span><span class="kn">import</span> <span class="n">unset_fake_temporarily</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt._enums</span><span class="w"> </span><span class="kn">import</span> <span class="n">dtype</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt._Input</span><span class="w"> </span><span class="kn">import</span> <span class="n">Input</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo</span><span class="w"> </span><span class="kn">import</span> <span class="n">partitioning</span>
@@ -632,71 +634,72 @@
 <span class="sd">    Refit a TensorRT Engine in place</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
-    <span class="n">refitted</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
-    <span class="n">torch_device</span> <span class="o">=</span> <span class="n">get_model_device</span><span class="p">(</span><span class="n">new_gm</span><span class="p">)</span>
-    <span class="n">refitter</span> <span class="o">=</span> <span class="n">trt</span><span class="o">.</span><span class="n">Refitter</span><span class="p">(</span><span class="n">old_engine</span><span class="p">,</span> <span class="n">TRT_LOGGER</span><span class="p">)</span>
-    <span class="n">weight_list</span> <span class="o">=</span> <span class="n">refitter</span><span class="o">.</span><span class="n">get_all_weights</span><span class="p">()</span>
+    <span class="k">with</span> <span class="n">unset_fake_temporarily</span><span class="p">():</span>
+        <span class="n">refitted</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+        <span class="n">torch_device</span> <span class="o">=</span> <span class="n">get_model_device</span><span class="p">(</span><span class="n">new_gm</span><span class="p">)</span>
+        <span class="n">refitter</span> <span class="o">=</span> <span class="n">trt</span><span class="o">.</span><span class="n">Refitter</span><span class="p">(</span><span class="n">old_engine</span><span class="p">,</span> <span class="n">TRT_LOGGER</span><span class="p">)</span>
+        <span class="n">weight_list</span> <span class="o">=</span> <span class="n">refitter</span><span class="o">.</span><span class="n">get_all_weights</span><span class="p">()</span>
 
-    <span class="k">if</span> <span class="n">weight_name_map</span><span class="p">:</span>
-        <span class="c1"># Get the refitting mapping</span>
-        <span class="n">trt_wt_location</span> <span class="o">=</span> <span class="p">(</span>
-            <span class="n">trt</span><span class="o">.</span><span class="n">TensorLocation</span><span class="o">.</span><span class="n">DEVICE</span>
-            <span class="k">if</span> <span class="n">torch_device</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="s2">&quot;cuda&quot;</span>
-            <span class="k">else</span> <span class="n">trt</span><span class="o">.</span><span class="n">TensorLocation</span><span class="o">.</span><span class="n">HOST</span>
-        <span class="p">)</span>
-
-        <span class="n">constant_mapping</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="n">weight_name_map</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span>
-            <span class="s2">&quot;constant_mapping&quot;</span><span class="p">,</span> <span class="p">{}</span>
-        <span class="p">)</span>  <span class="c1"># type: ignore</span>
-        <span class="n">mapping</span> <span class="o">=</span> <span class="n">construct_refit_mapping_from_weight_name_map</span><span class="p">(</span>
-            <span class="n">weight_name_map</span><span class="p">,</span> <span class="n">new_gm</span><span class="o">.</span><span class="n">state_dict</span><span class="p">()</span>
-        <span class="p">)</span>
-        <span class="n">constant_mapping_with_type</span> <span class="o">=</span> <span class="p">{}</span>
-
-        <span class="k">for</span> <span class="n">constant_name</span><span class="p">,</span> <span class="n">val</span> <span class="ow">in</span> <span class="n">constant_mapping</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
-            <span class="n">np_weight_type</span> <span class="o">=</span> <span class="n">val</span><span class="o">.</span><span class="n">dtype</span>
-            <span class="n">val_tensor</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">from_numpy</span><span class="p">(</span><span class="n">val</span><span class="p">)</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
-            <span class="n">trt_dtype</span> <span class="o">=</span> <span class="n">dtype</span><span class="o">.</span><span class="n">try_from</span><span class="p">(</span><span class="n">np_weight_type</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">trt</span><span class="o">.</span><span class="n">DataType</span><span class="p">)</span>
-            <span class="n">torch_dtype</span> <span class="o">=</span> <span class="n">dtype</span><span class="o">.</span><span class="n">try_from</span><span class="p">(</span><span class="n">np_weight_type</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span>
-            <span class="n">constant_mapping_with_type</span><span class="p">[</span><span class="n">constant_name</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
-                <span class="n">val_tensor</span><span class="o">.</span><span class="n">clone</span><span class="p">()</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">contiguous</span><span class="p">()</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">torch_dtype</span><span class="p">),</span>
-                <span class="n">trt_dtype</span><span class="p">,</span>
+        <span class="k">if</span> <span class="n">weight_name_map</span><span class="p">:</span>
+            <span class="c1"># Get the refitting mapping</span>
+            <span class="n">trt_wt_location</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">trt</span><span class="o">.</span><span class="n">TensorLocation</span><span class="o">.</span><span class="n">DEVICE</span>
+                <span class="k">if</span> <span class="n">torch_device</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="s2">&quot;cuda&quot;</span>
+                <span class="k">else</span> <span class="n">trt</span><span class="o">.</span><span class="n">TensorLocation</span><span class="o">.</span><span class="n">HOST</span>
             <span class="p">)</span>
 
-        <span class="n">mapping</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">constant_mapping_with_type</span><span class="p">)</span>
-
-        <span class="k">for</span> <span class="n">layer_name</span> <span class="ow">in</span> <span class="n">weight_list</span><span class="p">:</span>
-            <span class="k">if</span> <span class="n">layer_name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">mapping</span><span class="p">:</span>
-                <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">layer_name</span><span class="si">}</span><span class="s2"> is not found in weight mapping.&quot;</span><span class="p">)</span>
-                <span class="k">continue</span>
-            <span class="c1"># Use Numpy to create weights</span>
-            <span class="n">weight</span><span class="p">,</span> <span class="n">weight_dtype</span> <span class="o">=</span> <span class="n">mapping</span><span class="p">[</span><span class="n">layer_name</span><span class="p">]</span>
-            <span class="n">trt_wt_tensor</span> <span class="o">=</span> <span class="n">trt</span><span class="o">.</span><span class="n">Weights</span><span class="p">(</span>
-                <span class="n">weight_dtype</span><span class="p">,</span> <span class="n">weight</span><span class="o">.</span><span class="n">data_ptr</span><span class="p">(),</span> <span class="n">torch</span><span class="o">.</span><span class="n">numel</span><span class="p">(</span><span class="n">weight</span><span class="p">)</span>
+            <span class="n">constant_mapping</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="n">weight_name_map</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span>
+                <span class="s2">&quot;constant_mapping&quot;</span><span class="p">,</span> <span class="p">{}</span>
+            <span class="p">)</span>  <span class="c1"># type: ignore</span>
+            <span class="n">mapping</span> <span class="o">=</span> <span class="n">construct_refit_mapping_from_weight_name_map</span><span class="p">(</span>
+                <span class="n">weight_name_map</span><span class="p">,</span> <span class="n">new_gm</span><span class="o">.</span><span class="n">state_dict</span><span class="p">()</span>
             <span class="p">)</span>
-            <span class="n">refitter</span><span class="o">.</span><span class="n">set_named_weights</span><span class="p">(</span><span class="n">layer_name</span><span class="p">,</span> <span class="n">trt_wt_tensor</span><span class="p">,</span> <span class="n">trt_wt_location</span><span class="p">)</span>
-        <span class="k">assert</span> <span class="p">(</span>
-            <span class="nb">len</span><span class="p">(</span><span class="n">refitter</span><span class="o">.</span><span class="n">get_missing_weights</span><span class="p">())</span> <span class="o">==</span> <span class="mi">0</span>
-        <span class="p">),</span> <span class="s2">&quot;Fast refitting failed due to incomplete mapping&quot;</span>
+            <span class="n">constant_mapping_with_type</span> <span class="o">=</span> <span class="p">{}</span>
 
-    <span class="k">else</span><span class="p">:</span>
-        <span class="n">mapping</span> <span class="o">=</span> <span class="n">construct_refit_mapping</span><span class="p">(</span><span class="n">new_gm</span><span class="p">,</span> <span class="n">input_list</span><span class="p">,</span> <span class="n">settings</span><span class="p">)</span>
-        <span class="n">trt_wt_location</span> <span class="o">=</span> <span class="n">trt</span><span class="o">.</span><span class="n">TensorLocation</span><span class="o">.</span><span class="n">HOST</span>
-        <span class="k">for</span> <span class="n">layer_name</span> <span class="ow">in</span> <span class="n">weight_list</span><span class="p">:</span>
-            <span class="k">if</span> <span class="n">layer_name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">mapping</span><span class="p">:</span>
-                <span class="k">raise</span> <span class="ne">AssertionError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">layer_name</span><span class="si">}</span><span class="s2"> is not found in weight mapping&quot;</span><span class="p">)</span>
-            <span class="c1"># Use Numpy to create weights</span>
-            <span class="n">weight</span><span class="p">,</span> <span class="n">datatype</span> <span class="o">=</span> <span class="n">mapping</span><span class="p">[</span><span class="n">layer_name</span><span class="p">]</span>
-            <span class="n">trt_wt_tensor</span> <span class="o">=</span> <span class="n">trt</span><span class="o">.</span><span class="n">Weights</span><span class="p">(</span><span class="n">datatype</span><span class="p">,</span> <span class="n">weight</span><span class="o">.</span><span class="n">ctypes</span><span class="o">.</span><span class="n">data</span><span class="p">,</span> <span class="n">weight</span><span class="o">.</span><span class="n">size</span><span class="p">)</span>
-            <span class="n">refitter</span><span class="o">.</span><span class="n">set_named_weights</span><span class="p">(</span><span class="n">layer_name</span><span class="p">,</span> <span class="n">trt_wt_tensor</span><span class="p">,</span> <span class="n">trt_wt_location</span><span class="p">)</span>
-            <span class="n">refitted</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">layer_name</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">constant_name</span><span class="p">,</span> <span class="n">val</span> <span class="ow">in</span> <span class="n">constant_mapping</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+                <span class="n">np_weight_type</span> <span class="o">=</span> <span class="n">val</span><span class="o">.</span><span class="n">dtype</span>
+                <span class="n">val_tensor</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">from_numpy</span><span class="p">(</span><span class="n">val</span><span class="p">)</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
+                <span class="n">trt_dtype</span> <span class="o">=</span> <span class="n">dtype</span><span class="o">.</span><span class="n">try_from</span><span class="p">(</span><span class="n">np_weight_type</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">trt</span><span class="o">.</span><span class="n">DataType</span><span class="p">)</span>
+                <span class="n">torch_dtype</span> <span class="o">=</span> <span class="n">dtype</span><span class="o">.</span><span class="n">try_from</span><span class="p">(</span><span class="n">np_weight_type</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span>
+                <span class="n">constant_mapping_with_type</span><span class="p">[</span><span class="n">constant_name</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+                    <span class="n">val_tensor</span><span class="o">.</span><span class="n">clone</span><span class="p">()</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">contiguous</span><span class="p">()</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">torch_dtype</span><span class="p">),</span>
+                    <span class="n">trt_dtype</span><span class="p">,</span>
+                <span class="p">)</span>
 
-        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">refitted</span><span class="p">)</span> <span class="o">!=</span> <span class="nb">len</span><span class="p">(</span><span class="n">weight_list</span><span class="p">):</span>
-            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Not all weights have been refitted!!!&quot;</span><span class="p">)</span>
+            <span class="n">mapping</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">constant_mapping_with_type</span><span class="p">)</span>
 
-    <span class="k">if</span> <span class="ow">not</span> <span class="n">refitter</span><span class="o">.</span><span class="n">refit_cuda_engine</span><span class="p">():</span>
-        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Error: failed to refit new weights.&quot;</span><span class="p">)</span>
-        <span class="k">raise</span> <span class="ne">AssertionError</span><span class="p">(</span><span class="s2">&quot;Refitting failed.&quot;</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">layer_name</span> <span class="ow">in</span> <span class="n">weight_list</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">layer_name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">mapping</span><span class="p">:</span>
+                    <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">layer_name</span><span class="si">}</span><span class="s2"> is not found in weight mapping.&quot;</span><span class="p">)</span>
+                    <span class="k">continue</span>
+                <span class="c1"># Use Numpy to create weights</span>
+                <span class="n">weight</span><span class="p">,</span> <span class="n">weight_dtype</span> <span class="o">=</span> <span class="n">mapping</span><span class="p">[</span><span class="n">layer_name</span><span class="p">]</span>
+                <span class="n">trt_wt_tensor</span> <span class="o">=</span> <span class="n">trt</span><span class="o">.</span><span class="n">Weights</span><span class="p">(</span>
+                    <span class="n">weight_dtype</span><span class="p">,</span> <span class="n">weight</span><span class="o">.</span><span class="n">data_ptr</span><span class="p">(),</span> <span class="n">torch</span><span class="o">.</span><span class="n">numel</span><span class="p">(</span><span class="n">weight</span><span class="p">)</span>
+                <span class="p">)</span>
+                <span class="n">refitter</span><span class="o">.</span><span class="n">set_named_weights</span><span class="p">(</span><span class="n">layer_name</span><span class="p">,</span> <span class="n">trt_wt_tensor</span><span class="p">,</span> <span class="n">trt_wt_location</span><span class="p">)</span>
+            <span class="k">assert</span> <span class="p">(</span>
+                <span class="nb">len</span><span class="p">(</span><span class="n">refitter</span><span class="o">.</span><span class="n">get_missing_weights</span><span class="p">())</span> <span class="o">==</span> <span class="mi">0</span>
+            <span class="p">),</span> <span class="s2">&quot;Fast refitting failed due to incomplete mapping&quot;</span>
+
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">mapping</span> <span class="o">=</span> <span class="n">construct_refit_mapping</span><span class="p">(</span><span class="n">new_gm</span><span class="p">,</span> <span class="n">input_list</span><span class="p">,</span> <span class="n">settings</span><span class="p">)</span>
+            <span class="n">trt_wt_location</span> <span class="o">=</span> <span class="n">trt</span><span class="o">.</span><span class="n">TensorLocation</span><span class="o">.</span><span class="n">HOST</span>
+            <span class="k">for</span> <span class="n">layer_name</span> <span class="ow">in</span> <span class="n">weight_list</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">layer_name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">mapping</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="ne">AssertionError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">layer_name</span><span class="si">}</span><span class="s2"> is not found in weight mapping&quot;</span><span class="p">)</span>
+                <span class="c1"># Use Numpy to create weights</span>
+                <span class="n">weight</span><span class="p">,</span> <span class="n">datatype</span> <span class="o">=</span> <span class="n">mapping</span><span class="p">[</span><span class="n">layer_name</span><span class="p">]</span>
+                <span class="n">trt_wt_tensor</span> <span class="o">=</span> <span class="n">trt</span><span class="o">.</span><span class="n">Weights</span><span class="p">(</span><span class="n">datatype</span><span class="p">,</span> <span class="n">weight</span><span class="o">.</span><span class="n">ctypes</span><span class="o">.</span><span class="n">data</span><span class="p">,</span> <span class="n">weight</span><span class="o">.</span><span class="n">size</span><span class="p">)</span>
+                <span class="n">refitter</span><span class="o">.</span><span class="n">set_named_weights</span><span class="p">(</span><span class="n">layer_name</span><span class="p">,</span> <span class="n">trt_wt_tensor</span><span class="p">,</span> <span class="n">trt_wt_location</span><span class="p">)</span>
+                <span class="n">refitted</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">layer_name</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">refitted</span><span class="p">)</span> <span class="o">!=</span> <span class="nb">len</span><span class="p">(</span><span class="n">weight_list</span><span class="p">):</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Not all weights have been refitted!!!&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">refitter</span><span class="o">.</span><span class="n">refit_cuda_engine</span><span class="p">():</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Error: failed to refit new weights.&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">AssertionError</span><span class="p">(</span><span class="s2">&quot;Refitting failed.&quot;</span><span class="p">)</span>
 
 
 <div class="viewcode-block" id="refit_module_weights"><a class="viewcode-back" href="../../../py_api/dynamo.html#torch_tensorrt.dynamo.refit_module_weights">[docs]</a><span class="k">def</span><span class="w"> </span><span class="nf">refit_module_weights</span><span class="p">(</span>

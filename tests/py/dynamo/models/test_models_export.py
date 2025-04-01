@@ -249,6 +249,7 @@ def test_base_fp8(ir):
 
 @unittest.skipIf(
     platform.system() != "Linux"
+    or torch.cuda.get_device_capability() < (8, 9)
     or not importlib.util.find_spec("modelopt")
     or Version(metadata.version("nvidia-modelopt")) < Version("0.17.0"),
     "modelopt 0.17.0 or later is required, Int8 quantization is supported in modelopt since 0.17.0 or later for linux",
@@ -257,7 +258,6 @@ def test_base_fp8(ir):
 def test_base_int8(ir):
     import modelopt.torch.quantization as mtq
     from modelopt.torch.quantization.utils import export_torch_mode
-    from torch.export._trace import _export
 
     class SimpleNetwork(torch.nn.Module):
         def __init__(self):
@@ -285,7 +285,7 @@ def test_base_int8(ir):
 
     with torch.no_grad():
         with export_torch_mode():
-            exp_program = _export(model, (input_tensor,))
+            exp_program = torch.export.export(model, (input_tensor,))
             trt_model = torchtrt.dynamo.compile(
                 exp_program,
                 inputs=[input_tensor],
@@ -294,6 +294,7 @@ def test_base_int8(ir):
                 debug=True,
                 cache_built_engines=False,
                 reuse_cached_engines=False,
+                truncate_double=True,
             )
             outputs_trt = trt_model(input_tensor)
             assert torch.allclose(output_pyt, outputs_trt, rtol=5e-3, atol=1e-2)
