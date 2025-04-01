@@ -2,6 +2,7 @@ import time
 
 import tensorrt as trt
 import torch
+import torch.distributed as dist
 import torch.nn as nn
 import torch_tensorrt
 from tensor_parallel_initialize_dist import initialize_distributed_env
@@ -15,7 +16,6 @@ from torch.distributed.tensor.parallel import (
 device_mesh, _world_size, _rank, logger = initialize_distributed_env(
     "./tensor_parallel_simple_example"
 )
-import tensorrt_llm
 
 """
 This example copies some code from https://github.com/pytorch/examples/blob/main/distributed/tensor_parallelism/tensor_parallel_example.py
@@ -65,7 +65,6 @@ torch.manual_seed(0)
 inp = torch.rand(20, 10, device="cuda")
 python_result = tp_model(inp)
 
-
 backend = "torch_tensorrt"
 tp_model = torch.compile(
     tp_model,
@@ -75,23 +74,28 @@ tp_model = torch.compile(
         "enabled_precisions": {torch.float32, torch.float16},
         "use_python_runtime": True,
         "min_block_size": 1,
-        "use_aot_joint_export": False,
+        "use_distributed_mode_trace": True,
     },
-    dynamic=False,
+    dynamic=None,
 )
 
-for i in range(10):
-    # For TP, input needs to be same across all TP ranks.
-    # Setting the random seed is to mimic the behavior of dataloader.
-    torch.manual_seed(i)
-    inp = torch.rand(20, 10, device="cuda")
-    start = time.time()
-    output = tp_model(inp)
-    end = time.time()
-    if i == 0:
-        logger.info(f"Compilation time is {end-start}")
-        assert (
-            python_result - output
-        ).std() < 0.01, "Compilation result is not correct."
-    elif _rank == 0:
-        logger.info(f"Inference time is {end-start}")
+try:
+    for i in range(10):
+        # For TP, input needs to be same across all TP ranks.
+        # Setting the random seed is to mimic the behavior of dataloader.
+        torch.manual_seed(i)
+        inp = torch.rand(20, 10, device="cuda")
+        start = time.time()
+        output = tp_model(inp)
+        end = time.time()
+        if i == 0:
+            logger.info(f"Compilation time is {end-start}")
+            assert (
+                python_result - output
+            ).std() < 0.01, "Compilation result is not correct."
+        elif _rank == 0:
+            logger.info(f"Inference time is {end-start}")
+finally:
+    # This cleans up the distributed process group
+    if dist.is_initialized():
+        dist.destroy_process_group()
