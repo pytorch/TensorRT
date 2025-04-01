@@ -93,7 +93,7 @@ def test_refit_one_engine_with_weightmap():
     enabled_precisions = {torch.float}
     debug = False
     min_block_size = 1
-    use_python_runtime = False
+    use_python_runtime = True
 
     exp_program = torch.export.export(model, tuple(inputs))
     exp_program2 = torch.export.export(model2, tuple(inputs))
@@ -117,6 +117,7 @@ def test_refit_one_engine_with_weightmap():
     )
 
     # Check the output
+    model2.to("cuda")
     expected_outputs, refitted_outputs = exp_program2.module()(*inputs), new_trt_gm(
         *inputs
     )
@@ -167,6 +168,7 @@ def test_refit_one_engine_no_map_with_weightmap():
     )
 
     # Check the output
+    model2.to("cuda")
     expected_outputs, refitted_outputs = exp_program2.module()(*inputs), new_trt_gm(
         *inputs
     )
@@ -192,7 +194,7 @@ def test_refit_one_engine_with_wrong_weightmap():
     enabled_precisions = {torch.float}
     debug = False
     min_block_size = 1
-    use_python_runtime = False
+    use_python_runtime = True
 
     exp_program = torch.export.export(model, tuple(inputs))
     exp_program2 = torch.export.export(model2, tuple(inputs))
@@ -221,6 +223,7 @@ def test_refit_one_engine_with_wrong_weightmap():
     )
 
     # Check the output
+    model2.to("cuda")
     expected_outputs, refitted_outputs = exp_program2.module()(*inputs), new_trt_gm(
         *inputs
     )
@@ -249,7 +252,7 @@ def test_refit_one_engine_bert_with_weightmap():
     enabled_precisions = {torch.float}
     debug = False
     min_block_size = 1
-    use_python_runtime = False
+    use_python_runtime = True
 
     exp_program = torch.export.export(model, tuple(inputs))
     exp_program2 = torch.export.export(model2, tuple(inputs))
@@ -272,6 +275,7 @@ def test_refit_one_engine_bert_with_weightmap():
     )
 
     # Check the output
+    model2.to("cuda")
     expected_outputs, refitted_outputs = exp_program2.module()(*inputs), new_trt_gm(
         *inputs
     )
@@ -294,7 +298,7 @@ def test_refit_one_engine_bert_with_weightmap():
     "TorchScript Frontend is not available",
 )
 @pytest.mark.unit
-def test_refit_one_engine_inline_runtime__with_weightmap():
+def test_refit_one_engine_inline_runtime_with_weightmap():
     trt_ep_path = os.path.join(tempfile.gettempdir(), "compiled.ep")
     model = models.resnet18(pretrained=False).eval().to("cuda")
     model2 = models.resnet18(pretrained=True).eval().to("cuda")
@@ -326,6 +330,7 @@ def test_refit_one_engine_inline_runtime__with_weightmap():
     )
 
     # Check the output
+    model2.to("cuda")
     expected_outputs, refitted_outputs = exp_program2.module()(*inputs), new_trt_gm(
         *inputs
     )
@@ -370,6 +375,7 @@ def test_refit_one_engine_python_runtime_with_weightmap():
     )
 
     # Check the output
+    model2.to("cuda")
     expected_outputs, refitted_outputs = exp_program2.module()(*inputs), new_trt_gm(
         *inputs
     )
@@ -441,6 +447,7 @@ def test_refit_multiple_engine_with_weightmap():
     )
 
     # Check the output
+    model2.to("cuda")
     expected_outputs, refitted_outputs = exp_program2.module()(*inputs), new_trt_gm(
         *inputs
     )
@@ -489,6 +496,7 @@ def test_refit_one_engine_without_weightmap():
     )
 
     # Check the output
+    model2.to("cuda")
     expected_outputs, refitted_outputs = exp_program2.module()(*inputs), new_trt_gm(
         *inputs
     )
@@ -540,6 +548,7 @@ def test_refit_one_engine_bert_without_weightmap():
     )
 
     # Check the output
+    model2.to("cuda")
     expected_outputs, refitted_outputs = exp_program2.module()(*inputs), new_trt_gm(
         *inputs
     )
@@ -594,6 +603,7 @@ def test_refit_one_engine_inline_runtime_without_weightmap():
     )
 
     # Check the output
+    model2.to("cuda")
     expected_outputs, refitted_outputs = exp_program2.module()(*inputs), new_trt_gm(
         *inputs
     )
@@ -638,6 +648,7 @@ def test_refit_one_engine_python_runtime_without_weightmap():
     )
 
     # Check the output
+    model2.to("cuda")
     expected_outputs, refitted_outputs = exp_program2.module()(*inputs), new_trt_gm(
         *inputs
     )
@@ -709,6 +720,7 @@ def test_refit_multiple_engine_without_weightmap():
     )
 
     # Check the output
+    model2.to("cuda")
     expected_outputs, refitted_outputs = exp_program2.module()(*inputs), new_trt_gm(
         *inputs
     )
@@ -763,6 +775,7 @@ def test_refit_cumsum_fallback():
     )
 
     # Check the output
+    model.to("cuda")
     pyt_outputs, trt_outputs = exp_program.module()(*inputs), trt_gm(*inputs)
     for pyt_output, trt_output in zip(pyt_outputs, trt_outputs):
         assertions.assertTrue(

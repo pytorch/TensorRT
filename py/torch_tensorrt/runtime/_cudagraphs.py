@@ -68,51 +68,66 @@ class _CudagraphsContextManager(object):
         global _PY_RT_CUDAGRAPHS
         self.old_mode = _PY_RT_CUDAGRAPHS
         self.compiled_module = compiled_module
+        self.old_module = None
 
-    def __enter__(self) -> torch.nn.Module:
-        global _PY_RT_CUDAGRAPHS
+    def __enter__(self) -> torch.nn.Module | torch.fx.GraphModule:
 
-        num_torch_module = 0
-        num_trt_module = 0
-        for name, module in self.compiled_module.named_children():
-            # need to disable cudagraphs if any model requires output allocator
-            if (
-                hasattr(module, "requires_output_allocator")
-                and module.requires_output_allocator
-            ):
-                raise RuntimeError(
-                    "The model contains submodules that require a dynamic output allocator at runtime, which is incompatible with CUDA Graphs. Please disable CUDA Graphs."
-                )
-            if "_run_on_acc" in name:
-                num_trt_module += 1
-            elif "_run_on_gpu" in name:
-                num_torch_module += 1
-
-        if num_torch_module > 0:
-            # Set whole cudagraphs mode and returns wrapped module
-            _PY_RT_CUDAGRAPHS = CudaGraphsMode.WHOLE_GRAPH_CUDAGRAPHS
-            # Set new mode for C++
-            if torch_tensorrt.ENABLED_FEATURES.torch_tensorrt_runtime:
-                torch.ops.tensorrt.set_cudagraphs_mode(_PY_RT_CUDAGRAPHS)
-
-            logger.debug(
-                "Found pytorch subgraphs in module, wrapping module in CudaGraphsTorchTensorRTModule"
-            )
-            return CudaGraphsTorchTensorRTModule(self.compiled_module)
-        else:
-            if num_trt_module > 0:
-                logger.debug("No graph breaks detected, using runtime cudagraphs mode")
-            else:
-                logger.debug(
-                    "Please consider dynamo if there is graph breaks. Using runtime cudagraphs mode"
-                )
-            # Enable cudagraphs for TRT submodule
-            set_cudagraphs_mode(True)
+        if isinstance(self.compiled_module, torch_tensorrt.MutableTorchTensorRTModule):
+            self.old_module = self.compiled_module.gm
+            self.compiled_module.gm = get_cuda_graph_module(self.compiled_module.gm)
             return self.compiled_module
+        else:
+            return get_cuda_graph_module(self.compiled_module)
 
     def __exit__(self, *args: Any) -> None:
         # Set cudagraphs back to old mode
         set_cudagraphs_mode(self.old_mode)
+        if self.old_module:  # MutableTorchTRTModule
+            self.compiled_module.gm = self.old_module
+
+
+def get_cuda_graph_module(
+    compiled_module: torch.fx.GraphModule,
+) -> torch.nn.Module | torch.fx.GraphModule:
+    global _PY_RT_CUDAGRAPHS
+
+    num_torch_module = 0
+    num_trt_module = 0
+    for name, module in compiled_module.named_children():
+        # need to disable cudagraphs if any model requires output allocator
+        if (
+            hasattr(module, "requires_output_allocator")
+            and module.requires_output_allocator
+        ):
+            raise RuntimeError(
+                "The model contains submodules that require a dynamic output allocator at runtime, which is incompatible with CUDA Graphs. Please disable CUDA Graphs."
+            )
+        if "_run_on_acc" in name:
+            num_trt_module += 1
+        elif "_run_on_gpu" in name:
+            num_torch_module += 1
+
+    if num_torch_module > 0:
+        # Set whole cudagraphs mode and returns wrapped module
+        _PY_RT_CUDAGRAPHS = CudaGraphsMode.WHOLE_GRAPH_CUDAGRAPHS
+        # Set new mode for C++
+        if torch_tensorrt.ENABLED_FEATURES.torch_tensorrt_runtime:
+            torch.ops.tensorrt.set_cudagraphs_mode(_PY_RT_CUDAGRAPHS)
+
+        logger.debug(
+            "Found pytorch subgraphs in module, wrapping module in CudaGraphsTorchTensorRTModule"
+        )
+        return CudaGraphsTorchTensorRTModule(compiled_module)
+    else:
+        if num_trt_module > 0:
+            logger.debug("No graph breaks detected, using runtime cudagraphs mode")
+        else:
+            logger.debug(
+                "Please consider dynamo if there is graph breaks. Using runtime cudagraphs mode"
+            )
+        # Enable cudagraphs for TRT submodule
+        set_cudagraphs_mode(True)
+        return compiled_module
 
 
 def enable_cudagraphs(
