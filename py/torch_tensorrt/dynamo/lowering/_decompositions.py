@@ -440,9 +440,9 @@ def view_decomposition(x: torch.Tensor, size: List[torch.SymInt]) -> torch.Tenso
     return aten._reshape_copy.default(x, size)
 
 
-@register_torch_trt_decomposition(
-    aten.scaled_dot_product_attention, registry=TORCH_TRT_DECOMPOSITIONS
-)
+# @register_torch_trt_decomposition(
+#     aten.scaled_dot_product_attention, registry=TORCH_TRT_DECOMPOSITIONS
+# )
 def scaled_dot_product_attention_decomposition(
     query: torch.Tensor,
     key: torch.Tensor,
@@ -486,9 +486,9 @@ def scaled_dot_product_attention_decomposition(
     return attn_weight @ value
 
 
-@register_torch_trt_decomposition(
-    aten._scaled_dot_product_flash_attention, registry=TORCH_TRT_DECOMPOSITIONS
-)
+# @register_torch_trt_decomposition(
+#     aten._scaled_dot_product_flash_attention, registry=TORCH_TRT_DECOMPOSITIONS
+# )
 def scaled_dot_product_flash_attention_decomposition(
     query: torch.Tensor,
     key: torch.Tensor,
@@ -515,9 +515,9 @@ def scaled_dot_product_flash_attention_decomposition(
     return attn, None, None, None, 0, 0, None, None, None
 
 
-@register_torch_trt_decomposition(
-    aten._scaled_dot_product_efficient_attention, registry=TORCH_TRT_DECOMPOSITIONS
-)
+# @register_torch_trt_decomposition(
+#     aten._scaled_dot_product_efficient_attention, registry=TORCH_TRT_DECOMPOSITIONS
+# )
 def scaled_dot_product_efficient_attention_decomposition(
     query: torch.Tensor,
     key: torch.Tensor,
@@ -535,9 +535,9 @@ def scaled_dot_product_efficient_attention_decomposition(
     return attn, None, None, None
 
 
-@register_torch_trt_decomposition(
-    aten._scaled_dot_product_cudnn_attention, registry=TORCH_TRT_DECOMPOSITIONS
-)
+# @register_torch_trt_decomposition(
+#     aten._scaled_dot_product_cudnn_attention, registry=TORCH_TRT_DECOMPOSITIONS
+# )
 def scaled_dot_product_cudnn_attention_decomposition(
     query: torch.Tensor,
     key: torch.Tensor,

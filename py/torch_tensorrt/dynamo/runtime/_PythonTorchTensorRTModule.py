@@ -476,6 +476,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                         raise ValueError(
                             "Encountered dynamic output shapes during runtime. This could mean the network has data-dependent output shapes which is not currently supported."
                         )
+
                     outputs = self.create_output_tensors()
 
                 for o, output_name in enumerate(self.output_names):

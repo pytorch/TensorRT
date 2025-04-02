@@ -159,6 +159,10 @@ TORCH_LIBRARY_IMPL(tensorrt, CompositeExplicitAutograd, m) {
   m.impl("execute_engine", execute_engine);
 }
 
+TORCH_LIBRARY_IMPL(tensorrt, Meta, m) {
+  m.impl("execute_engine", execute_engine);
+}
+
 } // namespace
 } // namespace runtime
 } // namespace core
