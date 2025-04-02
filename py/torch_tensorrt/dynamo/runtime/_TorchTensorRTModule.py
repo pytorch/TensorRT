@@ -209,6 +209,9 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
 
         return budget_bytes
 
+    def reset_cudagraph(self) -> None:
+        self.engine.reset_cudagraph()
+
     def setup_engine(self) -> None:
         """
         Setup engine for a module which has deferred engine setup.

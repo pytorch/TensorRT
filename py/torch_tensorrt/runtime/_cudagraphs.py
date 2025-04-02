@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Union
+from typing import Any, Optional, Union
 
 import torch
 import torch_tensorrt
@@ -68,6 +68,7 @@ class _CudagraphsContextManager(object):
         global _PY_RT_CUDAGRAPHS
         self.old_mode = _PY_RT_CUDAGRAPHS
         self.compiled_module = compiled_module
+        self.cudagraphs_module: Optional[CudaGraphsTorchTensorRTModule] = None
 
     def __enter__(self) -> torch.nn.Module:
         global _PY_RT_CUDAGRAPHS
@@ -98,7 +99,8 @@ class _CudagraphsContextManager(object):
             logger.debug(
                 "Found pytorch subgraphs in module, wrapping module in CudaGraphsTorchTensorRTModule"
             )
-            return CudaGraphsTorchTensorRTModule(self.compiled_module)
+            self.cudagraphs_module = CudaGraphsTorchTensorRTModule(self.compiled_module)
+            return self.cudagraphs_module
         else:
             if num_trt_module > 0:
                 logger.debug("No graph breaks detected, using runtime cudagraphs mode")
@@ -113,6 +115,9 @@ class _CudagraphsContextManager(object):
     def __exit__(self, *args: Any) -> None:
         # Set cudagraphs back to old mode
         set_cudagraphs_mode(self.old_mode)
+        # __del__ is not entirely predictable, so we reset cudagraph here
+        if self.cudagraphs_module:
+            self.cudagraphs_module.reset_cudagraph()
 
 
 def enable_cudagraphs(

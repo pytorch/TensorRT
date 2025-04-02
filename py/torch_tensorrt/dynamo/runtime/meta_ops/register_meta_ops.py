@@ -142,6 +142,9 @@ class FakeTRTEngine:
     def infer_outputs(self, input_shapes: List[Any]) -> Any:
         pass
 
+    def reset_cudagraph(self) -> Any:
+        pass
+
     def __setstate__(self, serialized_state: List[str]) -> Any:
         pass
 
