@@ -103,13 +103,13 @@ class CudaGraphsTorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
 
         return False
 
-    def reset_cudagraph(self) -> None:
+    def reset_captured_graph(self) -> None:
         if self.cudagraph:
             self.cudagraph.reset()
             self.cudagraph = None
 
     def __del__(self) -> None:
-        self.reset_cudagraph()
+        self.reset_captured_graph()
 
     def set_use_output_allocator(self, enable: bool) -> None:
         self.use_output_allocator_outputs = enable
@@ -123,7 +123,7 @@ class CudaGraphsTorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
             shape_changed = self.validate_input_shapes(inputs)
             need_cudagraphs_record = shape_changed or self.is_weight_streaming_set
             if need_cudagraphs_record:
-                self.reset_cudagraph()
+                self.reset_captured_graph()
                 self._input_buffers = [None] * len(inputs)
 
             self.is_weight_streaming_set = False
@@ -199,5 +199,5 @@ class CudaGraphsTorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
                 return outputs[0]
             return outputs
         else:
-            self.reset_cudagraph()
+            self.reset_captured_graph()
             return self.compiled_module(*args, **kwargs)

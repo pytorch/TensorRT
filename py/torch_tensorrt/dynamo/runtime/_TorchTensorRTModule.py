@@ -209,8 +209,8 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
 
         return budget_bytes
 
-    def reset_cudagraph(self) -> None:
-        self.engine.reset_cudagraph()
+    def reset_captured_graph(self) -> None:
+        self.engine.reset_captured_graph()
 
     def setup_engine(self) -> None:
         """

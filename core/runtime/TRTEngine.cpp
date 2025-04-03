@@ -453,7 +453,7 @@ std::vector<std::string> TRTEngine::serialize() {
   return serialized_info;
 }
 
-void TRTEngine::reset_cudagraph() {
+void TRTEngine::reset_captured_graph() {
   cudagraph.reset();
 }
 

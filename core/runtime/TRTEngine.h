@@ -185,7 +185,7 @@ struct TRTEngine : torch::CustomClassHolder {
   // c10::List<at::Tensor> Run(c10::List<at::Tensor> inputs);
 
   void set_profiling_paths();
-  void reset_cudagraph();
+  void reset_captured_graph();
 #ifndef NDEBUG
   bool profile_execution = true;
 #else
