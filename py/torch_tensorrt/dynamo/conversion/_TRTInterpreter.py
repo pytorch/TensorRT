@@ -425,6 +425,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         device: torch.device,
     ) -> Any:
         with unset_fake_temporarily():
+            sd_weight = sd_weight.to(device)
             if not isinstance(network_weight, torch.Tensor):
                 network_weight = torch.from_numpy(network_weight).to(device)
             try:
