@@ -228,6 +228,28 @@ class TestBinaryOpConverters(DispatchTestCase):
         ]
         self.run_test_with_dynamic_shape(Op(), input_specs)
 
+    @parameterized.expand(
+        [
+            (f"bf16_{op[0].__name__}_one_constant", op[0])
+            for op in elementwise_ops
+            if op[0].__name__ not in ["pow.Tensor_Tensor", "fmod.Tensor"]
+        ]
+    )
+    def test_elementwise_ops_bf16(self, _, orig_op):
+        class TestModule(nn.Module):
+            def __init__(self, orig_op):
+                super().__init__()
+                self.constant = torch.randn(1)
+                self.orig_op = orig_op
+
+            def forward(self, x):
+                x = self.orig_op(x, self.constant)
+                return self.orig_op(x, -2)
+
+        m = TestModule(orig_op)
+        inputs = [torch.randn(2, 2, dtype=torch.bfloat16)]
+        self.run_test(m, inputs)
+
 
 if __name__ == "__main__":
     run_tests()
