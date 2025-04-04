@@ -117,7 +117,7 @@ class _CudagraphsContextManager(object):
         set_cudagraphs_mode(self.old_mode)
         # __del__ is not entirely predictable, so we reset cudagraph here
         if self.cudagraphs_module:
-            self.cudagraphs_module.reset_captured_graph()
+            self.cudagraphs_module._reset_captured_graph()
 
 
 def enable_cudagraphs(
