@@ -194,6 +194,12 @@ class TestIndexPutConverter(DispatchTestCase):
                     dtype=torch.int32,
                 ),
             ),
+            param(
+                test_name="4d_indices_none_none_multiple_idx_broadcast_error",
+                source_tensor=torch.zeros([1, 2, 5, 3], dtype=torch.float32),
+                indices_tensor=(None, None, torch.tensor([0, 1, 2], dtype=torch.int64)),
+                value_tensor=torch.randn([2, 3, 3], dtype=torch.float32),
+            ),
             # param(
             #     test_name="2d_indices_accumulate_True",
             #     source_tensor=torch.zeros([5, 5], dtype=torch.int32),
