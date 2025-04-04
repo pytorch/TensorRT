@@ -52,6 +52,7 @@ def test_base_full_compile(ir):
 
     deser_trt_module = torchtrt.load(trt_ep_path).module()
     # Check Pyt and TRT exported program outputs
+    model.cuda()
     cos_sim = cosine_similarity(model(input), trt_module(input)[0])
     assertions.assertTrue(
         cos_sim > COSINE_THRESHOLD,
@@ -106,6 +107,7 @@ def test_base_full_compile_multiple_outputs(ir):
 
     deser_trt_module = torchtrt.load(trt_ep_path).module()
     # Check Pyt and TRT exported program outputs
+    model.cuda()
     outputs_pyt = model(input)
     outputs_trt = trt_module(input)
     for idx in range(len(outputs_pyt)):
@@ -162,8 +164,9 @@ def test_no_compile(ir):
     trt_module = torchtrt.dynamo.compile(exp_program, **compile_spec)
     torchtrt.save(trt_module, trt_ep_path)
 
-    deser_trt_module = torchtrt.load(trt_ep_path).module()
+    deser_trt_module = torchtrt.load(trt_ep_path).module().cuda()
     # Check Pyt and TRT exported program outputs
+    model.cuda()
     outputs_pyt = model(input)
     outputs_trt = trt_module(input)
     for idx in range(len(outputs_pyt)):
@@ -173,7 +176,7 @@ def test_no_compile(ir):
             msg=f"test_no_compile TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
         )
 
-    # # Check Pyt and deserialized TRT exported program outputs
+    # Check Pyt and deserialized TRT exported program outputs
     outputs_trt_deser = deser_trt_module(input)
     for idx in range(len(outputs_pyt)):
         cos_sim = cosine_similarity(outputs_pyt[idx], outputs_trt_deser[idx])
@@ -224,6 +227,7 @@ def test_hybrid_relu_fallback(ir):
     torchtrt.save(trt_module, trt_ep_path)
 
     deser_trt_module = torchtrt.load(trt_ep_path).module()
+    model.cuda()
     outputs_pyt = model(input)
     outputs_trt = trt_module(input)
     for idx in range(len(outputs_pyt)):
@@ -267,6 +271,7 @@ def test_resnet18(ir):
     torchtrt.save(trt_module, trt_ep_path)
 
     deser_trt_module = torchtrt.load(trt_ep_path).module()
+    model.cuda()
     outputs_pyt = model(input)
     outputs_trt = trt_module(input)
     cos_sim = cosine_similarity(outputs_pyt, outputs_trt[0])
@@ -312,6 +317,7 @@ def test_resnet18_dynamic(ir):
     torchtrt.save(trt_module, trt_ep_path)
     # TODO: Enable this serialization issues are fixed
     # deser_trt_module = torchtrt.load(trt_ep_path).module()
+    model.cuda()
     outputs_pyt = model(input)
     outputs_trt = trt_module(input)
     cos_sim = cosine_similarity(outputs_pyt, outputs_trt[0])
@@ -362,6 +368,7 @@ def test_hybrid_conv_fallback(ir):
     torchtrt.save(trt_module, trt_ep_path)
 
     deser_trt_module = torchtrt.load(trt_ep_path).module()
+    model.cuda()
     outputs_pyt = model(input)
     outputs_trt = trt_module(input)
 
@@ -420,6 +427,7 @@ def test_arange_export(ir):
     torchtrt.save(trt_module, trt_ep_path)
 
     deser_trt_module = torchtrt.load(trt_ep_path).module()
+    model.cuda()
     outputs_pyt = model(input)
     outputs_trt = trt_module(input)
 

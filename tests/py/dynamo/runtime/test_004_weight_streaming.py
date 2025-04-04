@@ -69,7 +69,7 @@ class TestWeightStreamingPython(TestCase):
 
         # Weight streaming budget is reverted after the exit from weight streaming context
         assert weight_streaming_ctx.device_budget == requested_budget
-
+        model.cuda()
         ref = model(*input)
         out = optimized_model(*input)
 
@@ -129,7 +129,7 @@ class TestWeightStreamingPython(TestCase):
             assert weight_streaming_ctx.device_budget == requested_budget
 
             out = optimized_model(*input)
-
+        model.cuda()
         ref = model(*input)
         torch.testing.assert_close(
             out.cpu(),
@@ -168,6 +168,7 @@ class TestWeightStreamingPython(TestCase):
         )
 
         # Setting weight streaming context to unsupported module
+        model.cuda()
         with torchtrt.runtime.weight_streaming(model) as weight_streaming_ctx:
             streamable_budget = weight_streaming_ctx.total_device_budget
             assert streamable_budget == 0
@@ -222,7 +223,7 @@ class TestWeightStreamingPython(TestCase):
                 # Budget distribution to multiple submodule may result in integer differences of at most 1
                 assert abs(weight_streaming_ctx.device_budget - requested_budget) <= 1
                 out = optimized_model(*input)
-
+        model.cuda()
         ref = model(*input)
         torch.testing.assert_close(
             out.cpu(),
@@ -273,7 +274,7 @@ class TestWeightStreamingPython(TestCase):
                 weight_streaming_ctx.device_budget = requested_budget
                 for _ in range(4):
                     out = cudagraphs_module(*input)
-
+        model.cuda()
         ref = model(*input)
         torch.testing.assert_close(
             out.cpu(),
@@ -356,7 +357,7 @@ class TestWeightStreamingPython(TestCase):
             exp_program,
             **compile_spec,
         )
-
+        model.cuda()
         # List of tuples representing different configurations for three features:
         # Cuda graphs, pre-allocated output buffer, weight streaming change
         states = list(itertools.product((True, False), repeat=3))
