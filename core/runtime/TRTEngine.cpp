@@ -453,6 +453,10 @@ std::vector<std::string> TRTEngine::serialize() {
   return serialized_info;
 }
 
+void TRTEngine::reset_captured_graph() {
+  cudagraph.reset();
+}
+
 } // namespace runtime
 } // namespace core
 } // namespace torch_tensorrt
