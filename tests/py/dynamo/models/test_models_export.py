@@ -10,7 +10,6 @@ import torch
 import torch_tensorrt as torchtrt
 import torchvision.models as models
 from torch_tensorrt.dynamo.utils import COSINE_THRESHOLD, cosine_similarity
-from transformers import BertModel
 
 from packaging.version import Version
 
@@ -114,12 +113,18 @@ def test_efficientnet_b0(ir):
 
 
 @pytest.mark.unit
+@unittest.skipIf(
+    not importlib.util.find_spec("transformers"),
+    "transformers is required to run this test",
+)
 def test_bert_base_uncased(ir):
+    from transformers import BertModel
+
     model = (
         BertModel.from_pretrained("bert-base-uncased", return_dict=False).cuda().eval()
     )
-    input = torch.randint(0, 1, (1, 14), dtype=torch.int32).to("cuda")
-    input2 = torch.randint(0, 1, (1, 14), dtype=torch.int32).to("cuda")
+    input = torch.randint(0, 2, (1, 14), dtype=torch.int32).to("cuda")
+    input2 = torch.randint(0, 2, (1, 14), dtype=torch.int32).to("cuda")
 
     compile_spec = {
         "inputs": [

@@ -1,3 +1,4 @@
+import importlib
 import os
 import tempfile
 import unittest
@@ -21,7 +22,6 @@ from torch_tensorrt.dynamo.lowering import (
     pre_export_lowering,
 )
 from torch_tensorrt.logging import TRT_LOGGER
-from transformers import BertModel
 
 assertions = unittest.TestCase()
 
@@ -238,8 +238,14 @@ def test_refit_one_engine_with_wrong_weightmap():
     not torch_trt.ENABLED_FEATURES.torch_tensorrt_runtime,
     "TorchScript Frontend is not available",
 )
+@unittest.skipIf(
+    not importlib.util.find_spec("transformers"),
+    "transformers is required to run this test",
+)
 @pytest.mark.unit
 def test_refit_one_engine_bert_with_weightmap():
+    from transformers import BertModel
+
     inputs = [
         torch.randint(0, 2, (1, 14), dtype=torch.int32).to("cuda"),
     ]
@@ -506,8 +512,14 @@ def test_refit_one_engine_without_weightmap():
     not torch_trt.ENABLED_FEATURES.torch_tensorrt_runtime,
     "TorchScript Frontend is not available",
 )
+@unittest.skipIf(
+    not importlib.util.find_spec("transformers"),
+    "transformers is required to run this test",
+)
 @pytest.mark.unit
 def test_refit_one_engine_bert_without_weightmap():
+    from transformers import BertModel
+
     inputs = [
         torch.randint(0, 2, (1, 14), dtype=torch.int32).to("cuda"),
     ]
