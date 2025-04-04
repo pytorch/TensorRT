@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt.dynamo.runtime._PythonTorchTensorRTModule &mdash; Torch-TensorRT v2.7.0.dev0+76a776e documentation</title>
+  <title>torch_tensorrt.dynamo.runtime._PythonTorchTensorRTModule &mdash; Torch-TensorRT v2.7.0.dev0+297adef documentation</title>
   
 
   
@@ -290,7 +290,7 @@
               
               
                 <div class="version">
-                  v2.7.0.dev0+76a776e
+                  v2.7.0.dev0+297adef
                 </div>
               
             
@@ -822,9 +822,13 @@
         <span class="n">result</span><span class="o">.</span><span class="n">__setstate__</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">__getstate__</span><span class="p">())</span>
         <span class="k">return</span> <span class="n">result</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="fm">__del__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_reset_captured_graph</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">cudagraph</span><span class="p">:</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">cudagraph</span><span class="o">.</span><span class="n">reset</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">cudagraph</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__del__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_reset_captured_graph</span><span class="p">()</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">setup_input_tensors</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
@@ -915,9 +919,8 @@
                 <span class="bp">self</span><span class="o">.</span><span class="n">cudagraphs_enabled</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">use_pre_allocated_outputs</span><span class="p">,</span> <span class="n">shape_changed</span>
             <span class="p">)</span>
 
-            <span class="k">if</span> <span class="n">need_cudagraphs_reset</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">cudagraph</span><span class="p">:</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">cudagraph</span><span class="o">.</span><span class="n">reset</span><span class="p">()</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">cudagraph</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="k">if</span> <span class="n">need_cudagraphs_reset</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_reset_captured_graph</span><span class="p">()</span>
 
             <span class="k">if</span> <span class="n">need_cudagraphs_record</span><span class="p">:</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">_input_buffers</span> <span class="o">=</span> <span class="p">[</span><span class="kc">None</span><span class="p">]</span> <span class="o">*</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">input_names</span><span class="p">)</span>
