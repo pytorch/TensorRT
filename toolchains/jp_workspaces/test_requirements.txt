@@ -1,9 +1,12 @@
-expecttest==0.1.6
-networkx==2.8.8
-numpy<2.0.0
+--index-url https://pypi.jetson-ai-lab.dev/jp6/cu126
+expecttest>=0.1.6
+networkx>=2.8.8
+numpy
 parameterized>=0.2.0
 pytest>=8.2.1
 pytest-xdist>=3.6.1
 pyyaml
 transformers
-# TODO: currently timm torchvision nvidia-modelopt does not have distributions for jetson
+timm
+torchvision
+# TODO: currently nvidia-modelopt does not have distributions for jetson
