@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt.runtime._weight_streaming &mdash; Torch-TensorRT v2.7.0.dev0+76a776e documentation</title>
+  <title>torch_tensorrt.runtime._weight_streaming &mdash; Torch-TensorRT v2.7.0.dev0+297adef documentation</title>
   
 
   
@@ -290,7 +290,7 @@
               
               
                 <div class="version">
-                  v2.7.0.dev0+76a776e
+                  v2.7.0.dev0+297adef
                 </div>
               
             
@@ -565,12 +565,15 @@
             <span class="nb">int</span><span class="p">(</span><span class="n">streamable_bytes</span> <span class="o">/</span> <span class="n">total_bytes</span> <span class="o">*</span> <span class="n">requested_budget</span><span class="p">)</span>
             <span class="k">for</span> <span class="n">streamable_bytes</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">streamable_budget</span>
         <span class="p">]</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">cuda_graphs_module</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">cuda_graphs_module</span><span class="o">.</span><span class="n">is_weight_streaming_set</span> <span class="o">=</span> <span class="kc">True</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">cuda_graphs_module</span><span class="o">.</span><span class="n">_reset_captured_graph</span><span class="p">()</span>
+
         <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">rt_mod</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">rt_mods</span><span class="p">):</span>
+            <span class="n">rt_mod</span><span class="o">.</span><span class="n">_reset_captured_graph</span><span class="p">()</span>
             <span class="n">ws_budget_bytes</span> <span class="o">+=</span> <span class="n">rt_mod</span><span class="o">.</span><span class="n">set_device_memory_budget</span><span class="p">(</span><span class="n">normalized_size</span><span class="p">[</span><span class="n">i</span><span class="p">])</span>
             <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Set weight streaming size </span><span class="si">{</span><span class="n">normalized_size</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="si">}</span><span class="s2"> for </span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 
-        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">cuda_graphs_module</span><span class="p">:</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">cuda_graphs_module</span><span class="o">.</span><span class="n">is_weight_streaming_set</span> <span class="o">=</span> <span class="kc">True</span>
         <span class="k">return</span> <span class="n">ws_budget_bytes</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__setattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
