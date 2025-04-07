@@ -736,8 +736,8 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         self._create_timing_cache(
             builder_config, self.compilation_settings.timing_cache_path
         )
-
-        delete_module(self.module)
+        if self.compilation_settings.offload_module_to_cpu:
+            delete_module(self.module)
         serialized_engine = self.builder.build_serialized_network(
             self.ctx.net, builder_config
         )
