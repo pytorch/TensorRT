@@ -102,12 +102,12 @@ def recordStats(backend, timings, precision, batch_size=1, compile_time_s=None):
     """
     times = np.array(timings)
     speeds = batch_size / times
-    time_mean = np.mean(times)
-    time_med = np.median(times)
-    time_99th = np.percentile(times, 99)
-    time_std = np.std(times, ddof=0)
-    speed_mean = np.mean(speeds)
-    speed_med = np.median(speeds)
+    time_mean = np.mean(times).item()
+    time_med = np.median(times).item()
+    time_99th = np.percentile(times, 99).item()
+    time_std = np.std(times, ddof=0).item()
+    speed_mean = np.mean(speeds).item()
+    speed_med = np.median(speeds).item()
 
     stats = {
         "Backend": backend,

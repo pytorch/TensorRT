@@ -38,6 +38,8 @@ def test_base_dynamic(ir):
         "min_block_size": 1,
         "cache_built_engines": False,
         "reuse_cached_engines": False,
+        "disable_runtime_buffers": True,
+        "use_python_runtime": True,
     }
     if ir == "torch_compile":
         input_bs4 = torch.randn((4, 3, 224, 224)).to("cuda")
@@ -94,6 +96,8 @@ def test_base_dynamic_fallback(ir):
         "min_block_size": 1,
         "cache_built_engines": False,
         "reuse_cached_engines": False,
+        "disable_runtime_buffers": True,
+        "use_python_runtime": True,
     }
 
     if ir == "torch_compile":
@@ -147,6 +151,8 @@ def test_view(ir):
         "min_block_size": 1,
         "cache_built_engines": False,
         "reuse_cached_engines": False,
+        "disable_runtime_buffers": True,
+        "use_python_runtime": True,
     }
 
     if ir == "torch_compile":
@@ -192,6 +198,8 @@ def test_resnet_dynamic(ir):
         "min_block_size": 1,
         "cache_built_engines": False,
         "reuse_cached_engines": False,
+        "disable_runtime_buffers": True,
+        "use_python_runtime": True,
     }
 
     if ir == "torch_compile":
@@ -256,6 +264,8 @@ def test_view(ir):
         "min_block_size": 1,
         "cache_built_engines": False,
         "reuse_cached_engines": False,
+        "disable_runtime_buffers": True,
+        "use_python_runtime": True,
     }
 
     trt_mod = torchtrt.compile(model, **compile_spec)
@@ -290,6 +300,8 @@ def test_linear(ir):
         "min_block_size": 1,
         "cache_built_engines": False,
         "reuse_cached_engines": False,
+        "disable_runtime_buffers": True,
+        "use_python_runtime": True,
     }
     inputs_bs2 = torch.randn(2, 2, 10).to("cuda")
     if ir == "torch_compile":
@@ -346,26 +358,30 @@ def test_dynamic_with_fallback_shape_tensor_pass_through(ir):
         "torch_executed_ops": {"torch.ops.aten.add.Tensor"},
         "cache_built_engines": False,
         "reuse_cached_engines": False,
+        "disable_runtime_buffers": True,
+        "use_python_runtime": True,
+        "debug": True,
     }
+    # breakpoint()
+    with torchtrt.logging.debug():
+        # Compile the model
+        if ir == "torch_compile":
+            torch._dynamo.mark_dynamic(input_bs4, 0, min=4, max=1024)
+            trt_model = torch.compile(model, backend="tensorrt", options=compile_spec)
+            trt_model(input_bs4)
+        elif ir == "dynamo":
+            compile_spec["inputs"] = [
+                torchtrt.Input(
+                    min_shape=(1, 3, 224, 224),
+                    opt_shape=(4, 3, 224, 224),
+                    max_shape=(1024, 3, 224, 224),
+                    dtype=torch.float32,
+                    name="x",
+                )
+            ]
+            trt_model = torchtrt.compile(model, **compile_spec)
 
-    # Compile the model
-    if ir == "torch_compile":
-        torch._dynamo.mark_dynamic(input_bs4, 0, min=4, max=1024)
-        trt_model = torch.compile(model, backend="tensorrt", options=compile_spec)
-        trt_model(input_bs4)
-    elif ir == "dynamo":
-        compile_spec["inputs"] = [
-            torchtrt.Input(
-                min_shape=(1, 3, 224, 224),
-                opt_shape=(4, 3, 224, 224),
-                max_shape=(1024, 3, 224, 224),
-                dtype=torch.float32,
-                name="x",
-            )
-        ]
-        trt_model = torchtrt.compile(model, **compile_spec)
 
-    trt_model(input_bs4)
 
     input_bs6 = torch.randn((6, 3, 224, 224)).to("cuda")
     cos_sim = cosine_similarity(model(input_bs6), trt_model(input_bs6))

@@ -266,13 +266,14 @@ def run_dynamo(model, input_tensors, params, precision, batch_size):
     )
     if params["is_text_llm"]:
         return run_hf_dynamo(model, input_tensors, params, precision, batch_size)
-
+    # pyt_outputs = model(*input_tensors)
     start_compile = timeit.default_timer()
+    # with torchtrt.logging.debug():
     model = torchtrt.compile(
         model,
         inputs=input_tensors,
         ir="dynamo",
-        enabled_precisions={precision_to_dtype(precision)},
+        enabled_precisions={precision_to_dtype(precision)}, #{torch.float32}, 
         min_block_size=params.get("min_block_size", 1),
         debug=False,
         truncate_long_and_double=params.get("truncate", False),
@@ -284,7 +285,12 @@ def run_dynamo(model, input_tensors, params, precision, batch_size):
         cache_built_engines=params.get("cache_built_engines", False),
         reuse_cached_engines=params.get("reuse_cached_engines", False),
         use_python_runtime=params.get("use_python_runtime", False),
+        # torch_executed_ops={"torch.ops.aten.add.Tensor"},
+        # use_fp32_acc=True,
+        # use_explicit_typing=True,
+        disable_runtime_buffers=False
     )
+
     end_compile = timeit.default_timer()
     compile_time_s = end_compile - start_compile
     iters = params.get("iterations", 20)

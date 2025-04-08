@@ -421,6 +421,7 @@ def compile(
     enable_weight_streaming: bool = _defaults.ENABLE_WEIGHT_STREAMING,
     tiling_optimization_level: str = _defaults.TILING_OPTIMIZATION_LEVEL,
     l2_limit_for_tiling: int = _defaults.L2_LIMIT_FOR_TILING,
+    disable_runtime_buffers: bool = _defaults.DISABLE_RUNTIME_BUFFERS,
     **kwargs: Any,
 ) -> torch.fx.GraphModule:
     """Compile an ExportedProgram module for NVIDIA GPUs using TensorRT
@@ -674,6 +675,7 @@ def compile(
         "enable_weight_streaming": enable_weight_streaming,
         "tiling_optimization_level": tiling_optimization_level,
         "l2_limit_for_tiling": l2_limit_for_tiling,
+        "disable_runtime_buffers": disable_runtime_buffers,
     }
 
     settings = CompilationSettings(**compilation_options)
@@ -716,6 +718,7 @@ def compile_module(
     Returns:
         Compiled FX GraphModule
     """
+ 
     dryrun_tracker = DryRunTracker()
     if sample_kwarg_inputs is None:
         sample_kwarg_inputs = {}
@@ -747,7 +750,7 @@ def compile_module(
             f"{num_supported_ops} supported operations detected in subgraph containing {total_ops} computational nodes. "
             f"Skipping this subgraph, since min_block_size was detected to be {settings.min_block_size}"
         )
-        return gm
+        return torch.compile(gm, dynamic=True)
     else:
         logger.debug(
             f"Detected support for {num_supported_ops} operators out of {total_ops} in subgraph."
@@ -820,6 +823,7 @@ def compile_module(
     trt_modules = {}
     # Iterate over all components that can be accelerated
     # Generate the corresponding TRT Module for those
+    breakpoint()
     for name, _ in partitioned_module.named_children():
         submodule = getattr(partitioned_module, name)
         # filter on the GraphModule
@@ -833,6 +837,8 @@ def compile_module(
                 str(name),
                 str(submodule.graph),
             )
+            breakpoint()
+            setattr(partitioned_module, name, torch.compile(submodule, dynamic=True))
             continue
 
         if name not in submodule_node_dict:

@@ -42,6 +42,7 @@ from torch_tensorrt.dynamo._defaults import (
     USE_PYTHON_RUNTIME,
     VERSION_COMPATIBLE,
     WORKSPACE_SIZE,
+    DISABLE_RUNTIME_BUFFERS,
     default_device,
 )
 
@@ -140,6 +141,7 @@ class CompilationSettings:
     tiling_optimization_level: str = TILING_OPTIMIZATION_LEVEL
     l2_limit_for_tiling: int = L2_LIMIT_FOR_TILING
     use_distributed_mode_trace: bool = USE_DISTRIBUTED_MODE_TRACE
+    disable_runtime_buffers: bool = DISABLE_RUNTIME_BUFFERS
 
 
 _SETTINGS_TO_BE_ENGINE_INVARIANT = (

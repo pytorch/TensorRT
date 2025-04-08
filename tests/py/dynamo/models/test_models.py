@@ -31,6 +31,8 @@ def test_resnet18(ir):
         "optimization_level": 1,
         "cache_built_engines": False,
         "reuse_cached_engines": False,
+        "disable_runtime_buffers": True,
+        "use_python_runtime": True,
     }
 
     trt_mod = torchtrt.compile(model, **compile_spec)
@@ -63,6 +65,8 @@ def test_mobilenet_v2(ir):
         "min_block_size": 10,
         "cache_built_engines": False,
         "reuse_cached_engines": False,
+        "disable_runtime_buffers": True,
+        "use_python_runtime": True,
     }
 
     trt_mod = torchtrt.compile(model, **compile_spec)
@@ -95,6 +99,8 @@ def test_efficientnet_b0(ir):
         "min_block_size": 10,
         "cache_built_engines": False,
         "reuse_cached_engines": False,
+        "disable_runtime_buffers": True,
+        "use_python_runtime": True,
     }
 
     trt_mod = torchtrt.compile(model, **compile_spec)
@@ -136,6 +142,8 @@ def test_bert_base_uncased(ir):
         "min_block_size": 15,
         "cache_built_engines": False,
         "reuse_cached_engines": False,
+        "disable_runtime_buffers": True,
+        "use_python_runtime": True,
     }
     trt_mod = torchtrt.compile(model, **compile_spec)
 
@@ -171,6 +179,8 @@ def test_resnet18_half(ir):
         "optimization_level": 1,
         "cache_built_engines": False,
         "reuse_cached_engines": False,
+        "disable_runtime_buffers": True,
+        "use_python_runtime": True,
     }
 
     trt_mod = torchtrt.compile(model, **compile_spec)
@@ -214,6 +224,8 @@ def test_bf16_model(ir):
         "cache_built_engines": False,
         "reuse_cached_engines": False,
         "use_explicit_typing": True,
+        "disable_runtime_buffers": True,
+        "use_python_runtime": True,
     }
 
     trt_mod = torchtrt.compile(model, **compile_spec)
@@ -260,6 +272,8 @@ def test_bf16_fallback_model(ir):
         "cache_built_engines": False,
         "reuse_cached_engines": False,
         "use_explicit_typing": True,
+        "disable_runtime_buffers": True,
+        "use_python_runtime": True,
         "torch_executed_ops": {"torch.ops.aten.relu.default"},
     }
 

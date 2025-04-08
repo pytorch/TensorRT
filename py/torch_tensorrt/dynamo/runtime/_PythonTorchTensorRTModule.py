@@ -642,6 +642,180 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
             (i.contiguous() if isinstance(i, torch.Tensor) else torch.tensor(i).cuda())
             for i in inputs
         ]
+
+        if self.settings.disable_runtime_buffers:
+            # Set inputs
+            for i, input_name in enumerate(self.input_names):
+                self.context.set_input_shape(
+                        input_name, tuple(contiguous_inputs[i].shape)
+                    )
+                self.context.set_tensor_address(
+                        input_name, contiguous_inputs[i].data_ptr()
+                    )
+
+            # Set outputs
+            self.output_shapes = [
+                        tuple(self.context.get_tensor_shape(output_name))
+                        for output_name in self.output_names
+                ]
+
+            outputs = self.create_output_tensors()
+            for o, output_name in enumerate(self.output_names):
+                self.context.set_tensor_address(
+                    output_name, outputs[o].data_ptr()
+                )
+
+            # Set the right stream and perform inference
+            # self._caller_stream = torch.cuda.current_stream()
+            # # breakpoint()
+            # if (
+            #     self._engine_stream == torch.cuda.default_stream()
+            #     or self._engine_stream is None
+            # ):
+            #     self._engine_stream = torch.cuda.Stream()
+
+            # self._engine_stream.wait_stream(self._caller_stream)
+
+            # with torch.cuda.stream(self._engine_stream):
+            #     self.context.execute_async_v3(self._engine_stream.cuda_stream)
+            
+            # self._caller_stream.wait_stream(self._engine_stream)
+
+            self._engine_stream = torch.cuda.default_stream()
+            with torch.cuda.stream(self._engine_stream):
+                self.context.execute_async_v3(self._engine_stream.cuda_stream)
+
+
+            # # Set the right stream and perform inference
+            # shape_changed = self.validate_input_shapes(inputs)
+            # (
+            #     need_cudagraphs_record,
+            #     can_use_pre_allocated_outputs,
+            #     need_cudagraphs_reset,
+            # ) = self.runtime_states.set_runtime_states(
+            #     self.cudagraphs_enabled, self.use_pre_allocated_outputs, shape_changed
+            # )
+
+            # if need_cudagraphs_reset and self.cudagraph:
+            #     self.cudagraph.reset()
+            #     self.cudagraph = None
+
+            # if need_cudagraphs_record:
+            #     self._input_buffers = [None] * len(self.input_names)
+            #     self._output_buffers = [None] * len(self.output_names)
+
+            # with (
+            #     torch.autograd.profiler.record_function(
+            #         "PythonTorchTensorRTModule:ProcessInputs"
+            #     )
+            #     if self.profiling_enabled
+            #     else nullcontext()
+            # ):
+            #     assert len(contiguous_inputs) == len(
+            #         self.input_names
+            #     ), f"Wrong number of inputs, expect {len(self.input_names)} get {len(contiguous_inputs)}."
+
+            #     self.setup_input_tensors(
+            #         contiguous_inputs, self.cudagraphs_enabled, need_cudagraphs_record
+            #     )
+            #     if shape_changed:
+            #         # Check if input shapes can be inferred.
+            #         uninferred_input_names = self.context.infer_shapes()
+            #         if uninferred_input_names:
+            #             logger.warning(
+            #                 f"The shapes of the inputs: {uninferred_input_names} cannot be inferred and could lead to undefined behavior. \
+            #                         This could happen if the input tensor addresses/shapes haven't been configured correctly"
+            #             )
+            
+            # with (
+            #     torch.autograd.profiler.record_function(
+            #         "PythonTorchTensorRTModule:ProcessOutputs"
+            #     )
+            #     if self.profiling_enabled
+            #     else nullcontext()
+            # ):
+            #     if can_use_pre_allocated_outputs:
+            #         outputs = self.pre_allocated_outputs
+            #     else:
+            #         self.output_shapes = [
+            #             tuple(self.context.get_tensor_shape(output_name))
+            #             for output_name in self.output_names
+            #         ]
+            #         if DYNAMIC_DIM in self.output_shapes:
+            #             raise ValueError(
+            #                 "Encountered dynamic output shapes during runtime. This could mean the network has data-dependent output shapes which is not currently supported."
+            #             )
+
+            #         outputs = self.create_output_tensors()
+
+            #     for o, output_name in enumerate(self.output_names):
+            #         if need_cudagraphs_record:
+            #             self._output_buffers[o] = outputs[o].clone()
+
+            #         if self.cudagraphs_enabled:
+            #             self.context.set_tensor_address(
+            #                 output_name, self._output_buffers[o].data_ptr()
+            #             )
+            #         else:
+            #             self.context.set_tensor_address(
+            #                 output_name, outputs[o].data_ptr()
+            #             )
+            
+            # with (
+            #     torch.autograd.profiler.record_function(
+            #         "PythonTorchTensorRTModule:TensorRTRuntime"
+            #     )
+            #     if self.profiling_enabled
+            #     else nullcontext()
+            # ):
+            #     self._caller_stream = torch.cuda.current_stream()
+            #     if (
+            #         self._engine_stream == torch.cuda.default_stream()
+            #         or self._engine_stream is None
+            #     ):
+            #         self._engine_stream = torch.cuda.Stream()
+
+            #     self._engine_stream.wait_stream(self._caller_stream)
+
+            #     with torch.cuda.stream(self._engine_stream):
+            #         if self.cudagraphs_enabled:
+            #             if need_cudagraphs_record:
+            #                 self.cudagraph = torch.cuda.CUDAGraph()
+
+            #                 if self.profiling_enabled:
+            #                     self.cudagraph.enable_debug_mode()
+
+            #                 with torch.cuda.graph(
+            #                     self.cudagraph, stream=self._engine_stream
+            #                 ):
+            #                     self.context.execute_async_v3(
+            #                         self._engine_stream.cuda_stream
+            #                     )
+
+            #                 if self.profiling_enabled:
+            #                     import tempfile
+
+            #                     with tempfile.TemporaryDirectory() as tmpdir:
+            #                         self.cudagraph.debug_dump(
+            #                             f"{tempdir}/{self.name}_cudagraph.dot"
+            #                         )
+
+            #             self.cudagraph.replay()  # type: ignore
+
+            #         else:
+            #             self.context.execute_async_v3(self._engine_stream.cuda_stream)
+
+            #     self._caller_stream.wait_stream(self._engine_stream)
+            
+        
+            
+
+            if len(outputs) == 1:
+                return outputs[0]
+
+            return outputs
+            
+            
         with (
             torch.autograd.profiler.record_function("PythonTorchTensorRTModule:Forward")
             if self.profiling_enabled
