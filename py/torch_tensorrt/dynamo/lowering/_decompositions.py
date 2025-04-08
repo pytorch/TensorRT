@@ -196,8 +196,10 @@ def slice_scatter_decomposition(
 ) -> torch.Tensor:
     dim_size = input_tensor.shape[dim]
     device_input_tensor = input_tensor.device
+
+    start = 0 if start is None else start  # Ensure start is int
     start = get_positive_dim(start, input_tensor.shape[dim])
-    if end is None:
+    if end is None:  # Ensure end is int
         end = dim_size
     end = get_positive_dim(end, input_tensor.shape[dim])
     if step is None:
@@ -584,34 +586,41 @@ def masked_scatter_decomposition(
     source: torch.Tensor,
 ) -> torch.Tensor:
     """
-    Performs an operation equivalent to `input[mask] = source`.
+    Decomposition of `aten.masked_scatter` for TensorRT.
+
+    Emulates the behavior of `input[mask] = source` using only TensorRT-compatible ops.
+
     Steps:
-      1) Broadcast `input` and `mask` to a common shape
-      2) Flatten them
-      3) Convert `mask` to int64, compute its cumsum, and subtract 1 to get gather indices
-      4) Use `gather` to select elements from `source`
-      5) Use `torch.where` to place gathered elements where `mask` is True
-      6) Reshape the result to the original shape
+      1) Broadcast `input` and `mask` to a common shape.
+      2) Flatten all tensors for uniform indexing.
+      3) Compute gather indices for `source` by applying cumsum to the boolean mask.
+         - Use `masked_fill` to avoid invalid indices in positions where `mask` is False.
+      4) Gather values from `source` at valid positions.
+      5) Use `torch.where` to insert gathered values into `input` where `mask` is True.
+      6) Reshape the result back to the original broadcasted shape.
     """
 
-    # 1) Broadcast `input` and `mask` to a common shape
+    # 1) Broadcast input and mask to the same shape
     input_b, mask_b = aten.broadcast_tensors([input, mask])
 
-    # 2) Flatten the broadcasted tensors and the source tensor
+    # 2) Flatten tensors for element-wise operations
     input_flat = input_b.flatten()
     mask_flat = mask_b.flatten()
     source_flat = source.flatten()
 
-    # 3) Compute gather indices: (cumsum of mask as int64) - 1
-    source_idx = mask_flat.to(torch.int64).cumsum(0) - 1
+    # 3) Compute gather indices from cumsum of the mask
+    # Subtract 1 so that the first True position maps to index 0 in source
+    source_idx = mask_flat.cumsum(0) - 1
+    # Set gather index to 0 where mask is False (these will be ignored later)
+    safe_idx = source_idx.masked_fill(~mask_flat, 0)
 
-    # 4) Gather elements from source_flat using these indices
-    gathered = source_flat.gather(0, source_idx)
+    # 4) Gather values from source using computed indices
+    gathered = source_flat.gather(0, safe_idx)
 
-    # 5) Replace positions where mask is True with gathered values, otherwise keep original
+    # 5) Replace masked positions in input with gathered values
     replaced = torch.where(mask_flat, gathered, input_flat)
 
-    # 6) Reshape the result back to the broadcasted shape
+    # 6) Reshape the result to match the original broadcasted shape
     return replaced.view(input_b.shape)
 
 

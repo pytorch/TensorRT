@@ -344,6 +344,10 @@ def create_constant(
     with unset_fake_temporarily():
 
         torch_value = to_torch(value, dtype)
+        if torch_value is None:
+            raise ValueError(
+                f"Cannot convert tensor '{name}' to a TensorRT constant because its value is None."
+            )
         if torch_value.dtype == torch.float64:
             raise ValueError(
                 "TensorRT does not support float64 (double) precision. To resolve this, please set truncate_double=True in your compilation settings and re-run the model."
@@ -1065,3 +1069,42 @@ def load_tensorrt_llm() -> bool:
             )
             return False
     return False
+
+
+def promote_trt_tensors_to_same_dtype(
+    ctx: ConversionContext, lhs: TRTTensor, rhs: TRTTensor, name_prefix: str
+) -> tuple[TRTTensor, TRTTensor]:
+    """
+    Promotes two TensorRT tensors to a common data type to ensure type compatibility
+    during operations (e.g., select, where, etc.), following simplified PyTorch promotion rules.
+
+    Args:
+        ctx: Conversion context containing the TRT network definition.
+        lhs: The left-hand-side TensorRT tensor.
+        rhs: The right-hand-side TensorRT tensor.
+        name_prefix: A prefix string used to name any cast operations.
+
+    Returns:
+        A tuple of (lhs_cast, rhs_cast) TensorRT tensors, both cast to the promoted dtype.
+    """
+
+    # Define supported float types (TensorRT supports float16 and float32)
+    float_types = {trt.float16, trt.float32}
+
+    # Case 1: If either tensor is a float, promote to the wider float type
+    if lhs.dtype in float_types or rhs.dtype in float_types:
+        # Prefer float32 if either tensor is float32
+        if lhs.dtype == trt.float32 or rhs.dtype == trt.float32:
+            promoted_dtype = trt.float32
+        else:
+            promoted_dtype = trt.float16
+    else:
+        # Case 2: If both tensors are int types (e.g., int32, int64), promote to int32
+        # (Note: TensorRT does not support int64 for many ops like select/where)
+        promoted_dtype = trt.int32
+
+    # Cast both tensors to the promoted dtype
+    lhs_cast = cast_trt_tensor(ctx, lhs, promoted_dtype, f"{name_prefix}lhs_cast")
+    rhs_cast = cast_trt_tensor(ctx, rhs, promoted_dtype, f"{name_prefix}rhs_cast")
+
+    return lhs_cast, rhs_cast
