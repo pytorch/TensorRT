@@ -575,6 +575,46 @@ def cudnn_grid_sampler_decomposition(
     return torch.grid_sampler_2d(x, grid, 0, 0, True)
 
 
+@register_torch_trt_decomposition(
+    aten.masked_scatter, registry=TORCH_TRT_DECOMPOSITIONS
+)
+def masked_scatter_decomposition(
+    input: torch.Tensor,
+    mask: torch.Tensor,
+    source: torch.Tensor,
+) -> torch.Tensor:
+    """
+    Performs an operation equivalent to `input[mask] = source`.
+    Steps:
+      1) Broadcast `input` and `mask` to a common shape
+      2) Flatten them
+      3) Convert `mask` to int64, compute its cumsum, and subtract 1 to get gather indices
+      4) Use `gather` to select elements from `source`
+      5) Use `torch.where` to place gathered elements where `mask` is True
+      6) Reshape the result to the original shape
+    """
+
+    # 1) Broadcast `input` and `mask` to a common shape
+    input_b, mask_b = aten.broadcast_tensors([input, mask])
+
+    # 2) Flatten the broadcasted tensors and the source tensor
+    input_flat = input_b.flatten()
+    mask_flat = mask_b.flatten()
+    source_flat = source.flatten()
+
+    # 3) Compute gather indices: (cumsum of mask as int64) - 1
+    source_idx = mask_flat.to(torch.int64).cumsum(0) - 1
+
+    # 4) Gather elements from source_flat using these indices
+    gathered = source_flat.gather(0, source_idx)
+
+    # 5) Replace positions where mask is True with gathered values, otherwise keep original
+    replaced = torch.where(mask_flat, gathered, input_flat)
+
+    # 6) Reshape the result back to the broadcasted shape
+    return replaced.view(input_b.shape)
+
+
 def get_decompositions(
     enable_experimental_decompositions: bool = False,
 ) -> Dict[OpOverload, Callable[[Any], Any]]:
