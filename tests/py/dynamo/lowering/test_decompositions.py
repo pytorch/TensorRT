@@ -2167,7 +2167,6 @@ class TestLowering(TestCase):
             msg="Cudnn_grid_sampler TRT outputs don't match with the original model.",
         )
 
-
     @parameterized.expand(
         [
             ("float32_2d", torch.float32, (4, 4)),
