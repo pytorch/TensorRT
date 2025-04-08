@@ -23,7 +23,6 @@ jobs:
       test-infra-ref: main
       with-rocm: false
       with-cpu: false
-      python-versions: '["3.13", "3.13t"]'
 
   filter-matrix:
     needs: [generate-matrix]

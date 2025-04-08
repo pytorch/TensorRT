@@ -422,11 +422,6 @@ def generate_wheels_matrix(
         # Define default python version
         python_versions = list(PYTHON_ARCHES)
 
-        # If the list of python versions is set explicitly by the caller, stick with it instead
-        # of trying to add more versions behind the scene
-        if channel == NIGHTLY and (os in (LINUX, MACOS_ARM64, LINUX_AARCH64)):
-            python_versions += ["3.13"]
-
     if os == LINUX:
         # NOTE: We only build manywheel packages for linux
         package_type = "manywheel"
@@ -456,7 +451,7 @@ def generate_wheels_matrix(
             arches += [XPU]
 
     if limit_pr_builds:
-        python_versions = [python_versions[0]]
+        python_versions = ["3.11"]
 
     global WHEEL_CONTAINER_IMAGES
 
