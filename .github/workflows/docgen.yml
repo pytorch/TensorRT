@@ -35,7 +35,7 @@ jobs:
             - name: Install base deps
               run: |
                   python3 -m pip install pip --upgrade
-                  python3 -m pip install pyyaml numpy torch --pre --extra-index-url https://download.pytorch.org/whl/nightly/cu126
+                  python3 -m pip install pyyaml numpy torch --pre --extra-index-url https://download.pytorch.org/whl/nightly/cu128
                   ./packaging/pre_build_script.sh
             - name: Get HEAD SHA
               id: vars
@@ -44,7 +44,7 @@ jobs:
               env:
                   USE_PRE_CXX11_ABI: 0
               run: |
-                  python3 -m pip install --pre . --extra-index-url https://download.pytorch.org/whl/nightly/cu126
+                  python3 -m pip install --pre . --extra-index-url https://download.pytorch.org/whl/nightly/cu128
             - name: Generate New Docs
               run: |
                   cd docsrc
