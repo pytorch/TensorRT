@@ -8,6 +8,6 @@ pytest>=8.2.1
 pytest-xdist>=3.6.1
 pyyaml
 timm>=1.0.3
-transformers==4.49.0; python_version < "3.13t"
+transformers==4.49.0; python_version < "3.13"
 nvidia-modelopt[deploy,hf,torch]~=0.17.0; python_version < "3.13"
 --extra-index-url https://pypi.nvidia.com
