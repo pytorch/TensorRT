@@ -18,16 +18,16 @@ import os
 import sys
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
+PYTHON_VERSIONS_FOR_PR_BUILD = ["3.11"]
 PYTHON_ARCHES_DICT = {
     "nightly": ["3.9", "3.10", "3.11", "3.12", "3.13", "3.13t"],
     "test": ["3.9", "3.10", "3.11", "3.12", "3.13", "3.13t"],
     "release": ["3.9", "3.10", "3.11", "3.12", "3.13"],
 }
-PYTHON_VERSIONS_FOR_PR_BUILD = ["3.11"]
 CUDA_ARCHES_DICT = {
     "nightly": ["11.8", "12.6", "12.8"],
     "test": ["11.8", "12.6", "12.8"],
-    "release": ["11.8", "12.6", "12.8"],
+    "release": ["11.8", "12.4", "12.6"],
 }
 ROCM_ARCHES_DICT = {
     "nightly": ["6.1", "6.2"],
