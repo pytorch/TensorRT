@@ -22,7 +22,7 @@ assertions = unittest.TestCase()
     "ModelOpt is required to run this test",
 )
 @pytest.mark.unit
-def test_base_fp8(ir):
+def test_base_fp8():
     import modelopt.torch.quantization as mtq
     from modelopt.torch.quantization.utils import export_torch_mode
 
@@ -73,7 +73,7 @@ def test_base_fp8(ir):
     "modelopt 0.17.0 or later is required, Int8 quantization is supported in modelopt since 0.17.0 or later for linux",
 )
 @pytest.mark.unit
-def test_base_int8(ir):
+def test_base_int8():
     import modelopt.torch.quantization as mtq
     from modelopt.torch.quantization.utils import export_torch_mode
 
