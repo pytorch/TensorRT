@@ -13,6 +13,7 @@ requires = [
     "pybind11==2.6.2",
     "numpy",
     "sympy",
+    "safetensors>=0.5.3"
 ]
 build-backend = "setuptools.build_meta"
 
