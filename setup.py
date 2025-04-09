@@ -18,12 +18,12 @@ import setuptools
 import torch
 import yaml
 from setuptools import Extension, find_namespace_packages, setup
+from setuptools.command.bdist_wheel import bdist_wheel
 from setuptools.command.build_ext import build_ext
 from setuptools.command.develop import develop
 from setuptools.command.editable_wheel import editable_wheel
 from setuptools.command.install import install
 from torch.utils.cpp_extension import IS_WINDOWS, BuildExtension, CUDAExtension
-from wheel.bdist_wheel import bdist_wheel
 
 __version__: str = "0.0.0"
 __cuda_version__: str = "0.0"
