@@ -278,10 +278,10 @@ Model Zoo
 
 .. only:: html
 
-  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_auto_generate_plugin_thumb.png
+  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_auto_generate_plugins_thumb.png
     :alt:
 
-  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_auto_generate_plugin.py`
+  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_auto_generate_plugins.py`
 
 .. raw:: html
 
@@ -430,7 +430,7 @@ Model Zoo
    /tutorials/_rendered_examples/dynamo/torch_export_gpt2
    /tutorials/_rendered_examples/dynamo/torch_export_llama2
    /tutorials/_rendered_examples/dynamo/auto_generate_converters
-   /tutorials/_rendered_examples/dynamo/auto_generate_plugin
+   /tutorials/_rendered_examples/dynamo/auto_generate_plugins
    /tutorials/_rendered_examples/dynamo/converter_overloading
    /tutorials/_rendered_examples/dynamo/weight_streaming_example
    /tutorials/_rendered_examples/dynamo/mutable_torchtrt_module_example

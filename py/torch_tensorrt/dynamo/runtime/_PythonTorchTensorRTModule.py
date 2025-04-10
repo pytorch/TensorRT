@@ -333,9 +333,13 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         result.__setstate__(self.__getstate__())
         return result
 
-    def __del__(self) -> None:
+    def _reset_captured_graph(self) -> None:
         if self.cudagraph:
             self.cudagraph.reset()
+            self.cudagraph = None
+
+    def __del__(self) -> None:
+        self._reset_captured_graph()
 
     def setup_input_tensors(
         self,
@@ -426,9 +430,8 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                 self.cudagraphs_enabled, self.use_pre_allocated_outputs, shape_changed
             )
 
-            if need_cudagraphs_reset and self.cudagraph:
-                self.cudagraph.reset()
-                self.cudagraph = None
+            if need_cudagraphs_reset:
+                self._reset_captured_graph()
 
             if need_cudagraphs_record:
                 self._input_buffers = [None] * len(self.input_names)

@@ -76,12 +76,15 @@ class _WeightStreamingContextManager(object):
             int(streamable_bytes / total_bytes * requested_budget)
             for streamable_bytes in self.streamable_budget
         ]
+        if self.cuda_graphs_module:
+            self.cuda_graphs_module.is_weight_streaming_set = True
+            self.cuda_graphs_module._reset_captured_graph()
+
         for i, (name, rt_mod) in enumerate(self.rt_mods):
+            rt_mod._reset_captured_graph()
             ws_budget_bytes += rt_mod.set_device_memory_budget(normalized_size[i])
             logger.debug(f"Set weight streaming size {normalized_size[i]} for {name}")
 
-        if self.cuda_graphs_module:
-            self.cuda_graphs_module.is_weight_streaming_set = True
         return ws_budget_bytes
 
     def __setattr__(self, name: str, value: Any) -> None:
