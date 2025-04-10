@@ -10,7 +10,7 @@ With this release it incorporates:
 CUDA 12.6
 TensorRT 10.3
 cuDNN 9.3
-DLFW 24.09
+DLFW 24.0
 
 You can find more details for the JetPack 6.2:
 
@@ -101,10 +101,9 @@ Install pip and required python packages:
 Build and Install torch_tensorrt wheel file
 
 
-Since torch_tensorrt version has dependencies on torch version. torch version supported by JetPack6.2 is from DLFW 24.08/24.09(torch 2.6.0).
+Since torch_tensorrt version has dependencies on torch version. torch version supported by JetPack 6.2 is from DLFW 24.0 (torch 2.6.0) or distributed wheels https://pypi.jetson-ai-lab.dev/jp6/cu126
 
 Please make sure to build torch_tensorrt wheel file from source release/2.6 branch
-(TODO: lanl to update the branch name once release/ngc branch is available)
 
 .. code-block:: sh
 
