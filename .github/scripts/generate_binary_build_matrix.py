@@ -20,8 +20,8 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 
 PYTHON_VERSIONS_FOR_PR_BUILD = ["3.11"]
 PYTHON_ARCHES_DICT = {
-    "nightly": ["3.9", "3.10", "3.11", "3.12", "3.13", "3.13t"],
-    "test": ["3.9", "3.10", "3.11", "3.12", "3.13", "3.13t"],
+    "nightly": ["3.9", "3.10", "3.11", "3.12", "3.13"],
+    "test": ["3.9", "3.10", "3.11", "3.12", "3.13"],
     "release": ["3.9", "3.10", "3.11", "3.12", "3.13"],
 }
 CUDA_ARCHES_DICT = {
