@@ -101,7 +101,7 @@ Install pip and required python packages:
 Build and Install torch_tensorrt wheel file
 
 
-Since torch_tensorrt version has dependencies on torch version. torch version supported by JetPack 6.2 is from DLFW 24.0 (torch 2.6.0) or distributed wheels https://pypi.jetson-ai-lab.dev/jp6/cu126
+Since torch_tensorrt version has dependencies on torch version. torch version supported by JetPack 6.2 is from NVIDA NGC 24.0 (torch 2.6.0) or distributed wheels https://pypi.jetson-ai-lab.dev/jp6/cu126
 
 Please make sure to build torch_tensorrt wheel file from source release/2.6 branch
 
