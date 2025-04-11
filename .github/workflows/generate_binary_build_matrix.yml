@@ -42,6 +42,7 @@ on:
       use-only-dl-pytorch-org:
         description: "Use only download.pytorch.org when generating wheel install command?"
         default: "false"
+        required: false
         type: string
       build-python-only:
         description: "Generate binary build matrix for a python only package (i.e. only one python version)"
@@ -72,16 +73,13 @@ jobs:
     steps:
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: "3.11"
       - name: Checkout test-infra repository
         uses: actions/checkout@v4
         with:
           repository: ${{ inputs.test-infra-repository }}
           ref: ${{ inputs.test-infra-ref }}
       - uses: ./.github/actions/set-channel
-      - uses: actions/checkout@v4
-        with:
-          repository: pytorch/tensorrt
       - name: Generate test matrix
         id: generate
         env:
@@ -103,6 +101,7 @@ jobs:
           PYTHON_VERSIONS: ${{ inputs.python-versions }}
         run: |
           set -eou pipefail
+          ls -la .
           MATRIX_BLOB="$(python3 .github/scripts/generate_binary_build_matrix.py)"
           echo "${MATRIX_BLOB}"
           echo "matrix=${MATRIX_BLOB}" >> "${GITHUB_OUTPUT}"

@@ -2,6 +2,9 @@
 
 """Generates a matrix to be utilized through github actions
 
+Important. After making changes to this file please run following command:
+python -m tools.tests.test_generate_binary_build_matrix --update-reference-files
+
 Will output a condensed version of the matrix if on a pull request that only
 includes the latest version of python we support built on four different
 architectures:
@@ -11,12 +14,12 @@ architectures:
     * Latest XPU
 """
 
-
 import argparse
 import json
 import os
 import sys
 from typing import Any, Callable, Dict, List, Optional, Tuple
+
 
 PYTHON_ARCHES_DICT = {
     "nightly": ["3.9", "3.10", "3.11", "3.12"],
@@ -26,16 +29,30 @@ PYTHON_ARCHES_DICT = {
 CUDA_ARCHES_DICT = {
     "nightly": ["11.8", "12.6", "12.8"],
     "test": ["11.8", "12.6", "12.8"],
-    "release": ["11.8", "12.6", "12.8"],
+    "release": ["11.8", "12.4", "12.6"],
 }
 ROCM_ARCHES_DICT = {
-    "nightly": ["6.1", "6.2"],
-    "test": ["6.1", "6.2"],
-    "release": ["6.1", "6.2"],
+    "nightly": ["6.2.4", "6.3"],
+    "test": ["6.2.4", "6.3"],
+    "release": ["6.1", "6.2.4"],
 }
 
+CUDA_CUDNN_VERSIONS = {
+    "11.8": {"cuda": "11.8.0", "cudnn": "9"},
+    "12.4": {"cuda": "12.4.1", "cudnn": "9"},
+    "12.6": {"cuda": "12.6.3", "cudnn": "9"},
+    "12.8": {"cuda": "12.8.0", "cudnn": "9"},
+}
+
+STABLE_CUDA_VERSIONS = {
+    "nightly": "12.6",
+    "test": "12.6",
+    "release": "12.4",
+}
+
+CUDA_AARCH64_ARCHES = ["12.8-aarch64", "12.6-aarch64", "11.8-aarch64"]
+
 PACKAGE_TYPES = ["wheel", "conda", "libtorch"]
-PRE_CXX11_ABI = "pre-cxx11"
 CXX11_ABI = "cxx11-abi"
 RELEASE = "release"
 DEBUG = "debug"
@@ -59,7 +76,7 @@ XPU = "xpu"
 
 CURRENT_NIGHTLY_VERSION = "2.8.0"
 CURRENT_CANDIDATE_VERSION = "2.7.0"
-CURRENT_STABLE_VERSION = "2.7.0"
+CURRENT_STABLE_VERSION = "2.6.0"
 CURRENT_VERSION = CURRENT_STABLE_VERSION
 
 # By default use Nightly for CUDA arches
@@ -94,7 +111,7 @@ def arch_type(arch_version: str) -> str:
         return ROCM
     elif arch_version == CPU_AARCH64:
         return CPU_AARCH64
-    elif arch_version == CUDA_AARCH64:
+    elif arch_version in CUDA_AARCH64_ARCHES:
         return CUDA_AARCH64
     elif arch_version == XPU:
         return XPU
@@ -140,11 +157,14 @@ def initialize_globals(channel: str, build_python_only: bool) -> None:
     else:
         PYTHON_ARCHES = PYTHON_ARCHES_DICT[channel]
     WHEEL_CONTAINER_IMAGES = {
-        "11.8": "pytorch/manylinux2_28-builder:cuda11.8",
-        "12.1": "pytorch/manylinux2_28-builder:cuda12.1",
-        "12.4": "pytorch/manylinux2_28-builder:cuda12.4",
-        "12.6": "pytorch/manylinux2_28-builder:cuda12.6",
-        "12.8": "pytorch/manylinux2_28-builder:cuda12.8",
+        **{
+            gpu_arch: f"pytorch/manylinux2_28-builder:cuda{gpu_arch}"
+            for gpu_arch in CUDA_ARCHES
+        },
+        **{
+            gpu_arch: f"pytorch/manylinuxaarch64-builder:cuda{gpu_arch.replace('-aarch64', '')}"
+            for gpu_arch in CUDA_AARCH64_ARCHES
+        },
         **{
             gpu_arch: f"pytorch/manylinux2_28-builder:rocm{gpu_arch}"
             for gpu_arch in ROCM_ARCHES
@@ -153,26 +173,17 @@ def initialize_globals(channel: str, build_python_only: bool) -> None:
         XPU: "pytorch/manylinux2_28-builder:xpu",
         # TODO: Migrate CUDA_AARCH64 image to manylinux2_28_aarch64-builder:cuda12.4
         CPU_AARCH64: "pytorch/manylinux2_28_aarch64-builder:cpu-aarch64",
-        CUDA_AARCH64: "pytorch/manylinuxaarch64-builder:cuda12.4",
+        CUDA_AARCH64: "pytorch/manylinuxaarch64-builder:cuda12.6",
     }
     LIBTORCH_CONTAINER_IMAGES = {
-        **{
-            (gpu_arch, PRE_CXX11_ABI): f"pytorch/manylinux2_28-builder:cuda{gpu_arch}"
-            for gpu_arch in CUDA_ARCHES
-        },
         **{
             (gpu_arch, CXX11_ABI): f"pytorch/libtorch-cxx11-builder:cuda{gpu_arch}"
             for gpu_arch in CUDA_ARCHES
         },
         **{
-            (gpu_arch, PRE_CXX11_ABI): f"pytorch/manylinux2_28-builder:rocm{gpu_arch}"
-            for gpu_arch in ROCM_ARCHES
-        },
-        **{
             (gpu_arch, CXX11_ABI): f"pytorch/libtorch-cxx11-builder:rocm{gpu_arch}"
             for gpu_arch in ROCM_ARCHES
         },
-        (CPU, PRE_CXX11_ABI): "pytorch/manylinux2_28-builder:cpu",
         (CPU, CXX11_ABI): "pytorch/libtorch-cxx11-builder:cpu",
     }
 
@@ -181,7 +192,7 @@ def translate_desired_cuda(gpu_arch_type: str, gpu_arch_version: str) -> str:
     return {
         CPU: "cpu",
         CPU_AARCH64: CPU,
-        CUDA_AARCH64: "cu124",
+        CUDA_AARCH64: f"cu{gpu_arch_version.replace('-aarch64', '').replace('.', '')}",
         CUDA: f"cu{gpu_arch_version.replace('.', '')}",
         ROCM: f"rocm{gpu_arch_version}",
         XPU: "xpu",
@@ -272,7 +283,7 @@ def get_wheel_install_command(
             return f"{WHL_INSTALL_BASE} {PACKAGES_TO_INSTALL_WHL} --index-url {get_base_download_url_for_repo('whl', channel, gpu_arch_type, desired_cuda)}_pypi_pkg"  # noqa: E501
         else:
             raise ValueError(
-                "Split build is not supported for this configuration. It is only supported for CUDA 11.8, 12.4, 12.6, 12.8 on Linux nightly builds."  # noqa: E501
+                "Split build is not supported for this configuration. It is only supported for CUDA 11.8, 12.4, 12.6 on Linux nightly builds."  # noqa: E501
             )
     if (
         channel == RELEASE
@@ -343,7 +354,7 @@ def generate_libtorch_matrix(
         if os == WINDOWS:
             abi_versions = [RELEASE, DEBUG]
         elif os == LINUX:
-            abi_versions = [PRE_CXX11_ABI, CXX11_ABI]
+            abi_versions = [CXX11_ABI]
         elif os in [MACOS_ARM64]:
             abi_versions = [CXX11_ABI]
         else:
@@ -422,11 +433,6 @@ def generate_wheels_matrix(
         # Define default python version
         python_versions = list(PYTHON_ARCHES)
 
-        # If the list of python versions is set explicitly by the caller, stick with it instead
-        # of trying to add more versions behind the scene
-        if channel == NIGHTLY and (os in (LINUX, MACOS_ARM64, LINUX_AARCH64)):
-            python_versions += ["3.13"]
-
     if os == LINUX:
         # NOTE: We only build manywheel packages for linux
         package_type = "manywheel"
@@ -442,7 +448,11 @@ def generate_wheels_matrix(
         if os == LINUX_AARCH64:
             # Only want the one arch as the CPU type is different and
             # uses different build/test scripts
-            arches = [CPU_AARCH64, CUDA_AARCH64]
+            arches = []
+            if with_cpu == ENABLE:
+                arches += [CPU_AARCH64]
+            elif with_cuda == ENABLE:
+                arches += CUDA_AARCH64_ARCHES
 
         if with_cuda == ENABLE:
             upload_to_base_bucket = "no"
@@ -463,14 +473,14 @@ def generate_wheels_matrix(
     ret: List[Dict[str, Any]] = []
     for python_version in python_versions:
         for arch_version in arches:
-            # TODO: Enable Python 3.13 support for ROCM
-            if arch_version in ROCM_ARCHES and python_version == "3.13":
-                continue
-
             gpu_arch_type = arch_type(arch_version)
             gpu_arch_version = (
                 "" if arch_version in [CPU, CPU_AARCH64, XPU] else arch_version
             )
+
+            # TODO: Enable python 3.13t on cpu-s390x or Windows
+            if (gpu_arch_type == "cpu-s390x") and python_version == "3.13t":
+                continue
 
             desired_cuda = translate_desired_cuda(gpu_arch_type, gpu_arch_version)
             entry = {
