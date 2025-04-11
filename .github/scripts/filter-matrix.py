@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
+from typing import List
 
 import argparse
 import json
 import sys
 
 disabled_python_versions = "3.13"
+cpu_tag = "cpu"
 
 
-def main(args: list[str]) -> None:
+def main(args: List[str]) -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--matrix",
@@ -24,7 +26,8 @@ def main(args: list[str]) -> None:
     includes = matrix_dict["include"]
     filtered_includes = []
     for item in includes:
-        if item["python_version"] not in disabled_python_versions:
+        if all([item["python_version"] not in disabled_python_versions,
+                item["desired_cuda"] != cpu_tag]):
             filtered_includes.append(item)
     filtered_matrix_dict = {}
     filtered_matrix_dict["include"] = filtered_includes

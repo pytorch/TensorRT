@@ -5,10 +5,18 @@ set -x
 # Install dependencies
 python3 -m pip install pyyaml
 
-yum install -y ninja-build gettext
+PLATFORM="amd64"
 
-wget https://github.com/bazelbuild/bazelisk/releases/download/v1.17.0/bazelisk-linux-amd64 \
-    && mv bazelisk-linux-amd64 /usr/bin/bazel \
+if [[ $(uname -m) == "aarch64" ]]; then
+  PLATFORM="arm64"
+  rm -rf /opt/openssl # probs unsafe but not sure why there is a different openssl version
+fi
+
+dnf update -y openssl-libs krb5-libs
+dnf install -y ninja-build gettext
+
+wget https://github.com/bazelbuild/bazelisk/releases/download/v1.26.0/bazelisk-linux-${PLATFORM} \
+    && mv bazelisk-linux-${PLATFORM} /usr/bin/bazel \
     && chmod +x /usr/bin/bazel
 
 TORCH_TORCHVISION=$(grep "^torch" py/requirements.txt)
