@@ -109,7 +109,9 @@ def construct_refit_mapping(
 
 
 def construct_refit_mapping_from_weight_name_map(
-    weight_name_map: dict[Any, Any], state_dict: dict[Any, Any]
+    weight_name_map: dict[Any, Any],
+    state_dict: dict[Any, Any],
+    settings: CompilationSettings,
 ) -> dict[Any, Any]:
     engine_weight_map = {}
     for engine_weight_name, (sd_weight_name, np_weight_type) in weight_name_map.items():
@@ -120,7 +122,9 @@ def construct_refit_mapping_from_weight_name_map(
             # If weights is not in sd, we can leave it unchanged
             continue
         else:
-            engine_weight_map[engine_weight_name] = state_dict[sd_weight_name]
+            engine_weight_map[engine_weight_name] = state_dict[sd_weight_name].to(
+                to_torch_device(settings.device)
+            )
 
         engine_weight_map[engine_weight_name] = (
             engine_weight_map[engine_weight_name]
@@ -163,7 +167,7 @@ def _refit_single_trt_engine_with_gm(
                 "constant_mapping", {}
             )  # type: ignore
             mapping = construct_refit_mapping_from_weight_name_map(
-                weight_name_map, new_gm.state_dict()
+                weight_name_map, new_gm.state_dict(), settings
             )
             constant_mapping_with_type = {}
 
