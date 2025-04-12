@@ -24,3 +24,4 @@ pip install sentencepiece=="0.2.0" transformers=="4.48.2" accelerate=="1.3.0" di
 
 pip install notebook
 pip install gradio safetensors peft pyinstrument
+pip install nvidia-modelopt onnx torchprofile pulp onnxruntime
