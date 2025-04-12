@@ -419,7 +419,9 @@ def unwrap_tensor_dtype(tensor: Union[torch.Tensor, FakeTensor, torch.SymInt]) -
     """
     Returns the dtype of torch.tensor or FakeTensor. For symbolic integers, we return int64
     """
-    if isinstance(tensor, (torch.Tensor, FakeTensor, int, float, bool)):
+    if isinstance(tensor, (torch.Tensor, FakeTensor)):
+        return tensor.dtype
+    elif isinstance(tensor, (int, float, bool)):
         return torch.tensor(tensor).dtype
     elif isinstance(tensor, torch.SymInt):
         return torch.int64
@@ -791,6 +793,8 @@ def get_output_dtypes(output: Any, truncate_doulbe: bool = False) -> List[dtype]
                     output_dtypes.append(dtype.float32)
                 else:
                     output_dtypes.append(dtype._from(output_meta.dtype))
+            elif isinstance(output_meta, torch.SymInt):
+                output_dtypes.append(dtype.int64)
         elif "tensor_meta" in output.meta:
             output_meta = output.meta["tensor_meta"]
             output_dtypes.append(dtype._from(output_meta.dtype))
