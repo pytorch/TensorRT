@@ -500,6 +500,7 @@ def compile(
         enable_weight_streaming (bool): Enable weight streaming.
         tiling_optimization_level (str): The optimization level of tiling strategies. A higher level allows TensorRT to spend more time searching for better tiling strategy. We currently support ["none", "fast", "moderate", "full"].
         l2_limit_for_tiling (int): The target L2 cache usage limit (in bytes) for tiling optimization (default is -1 which means no limit).
+        offload_module_to_cpu (bool): Offload the module to CPU. This is useful when we need to minimize GPU memory usage.
         **kwargs: Any,
     Returns:
         torch.fx.GraphModule: Compiled FX Module, when run it will execute via TensorRT
@@ -678,17 +679,24 @@ def compile(
     )
 
     gm = exported_program.module()
-    # Move the weights in the state_dict to CPU
     logger.debug("Input graph: " + str(gm.graph))
 
     # Apply lowering on the graph module
     gm = post_lowering(gm, settings)
     logger.debug("Lowered Input graph: " + str(gm.graph))
+
+    # Move the weights in the state_dict to CPU
     if offload_module_to_cpu:
         exported_program.module().to(CPU_DEVICE)
         logger.info(
-            "The model is offloaded to CPU during compilation. If you want to keep the model on GPU, set offload_module_to_cpu=False."
+            "The PyTorch model was moved to the CPU to allocate all GPU memory to TensorRT. To retain the model on the GPU, set offload_module_to_cpu=False"
         )
+    else:
+        remaining_memory, total_memory = torch.cuda.mem_get_info()
+        if remaining_memory < total_memory // 2:
+            logger.warning(
+                "Remaining GPU memory may not be enough to compile the TensorRT engine for this model resulting in an OOM error, Consider setting offload_module_to_cpu=True"
+            )
     trt_gm = compile_module(
         gm, trt_arg_inputs, trt_kwarg_inputs, settings, engine_cache
     )
@@ -833,7 +841,7 @@ def compile_module(
                 str(name),
                 str(submodule.graph),
             )
-            submodule.to(torch.cuda.current_device())
+            submodule.to(to_torch_device(settings.device))
             continue
 
         if name not in submodule_node_dict:
