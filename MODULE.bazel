@@ -80,13 +80,13 @@ http_archive(
 # It is possible to specify a wheel file to use as the libtorch source by providing the URL below and
 # using the build flag `--//toolchains/dep_src:torch="whl"`
 
-# http_archive(
-#     name = "torch_whl",
-#     build_file = "@//third_party/libtorch:BUILD",
-#     strip_prefix = "torch",
-#     type = "zip",
-#     urls = ["https://pypi.jetson-ai-lab.dev/jp6/cu126/+f/52c/2cbdd62b78f32/torch-2.7.0-cp310-cp310-linux_aarch64.whl#sha256=52c2cbdd62b78f32c51fa178212e4721241a2ba9e0c4d7d690dd808bd890d51b"],
-# )
+http_archive(
+    name = "torch_whl",
+    build_file = "@//third_party/libtorch:BUILD",
+    strip_prefix = "torch",
+    type = "zip",
+    urls = ["https://download.pytorch.org/whl/nightly/cu128/torch-2.8.0.dev20250415%2Bcu128-cp310-cp310-manylinux_2_28_aarch64.whl"],
+)
 
 # Download these tarballs manually from the NVIDIA website
 # Either place them in the distdir directory in third_party and use the --distdir flag

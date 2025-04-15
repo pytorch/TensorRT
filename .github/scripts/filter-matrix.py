@@ -26,8 +26,12 @@ def main(args: List[str]) -> None:
     includes = matrix_dict["include"]
     filtered_includes = []
     for item in includes:
-        if all([item["python_version"] not in disabled_python_versions,
-                item["desired_cuda"] != cpu_tag]):
+        if all(
+            [
+                item["python_version"] not in disabled_python_versions,
+                item["desired_cuda"] != cpu_tag
+            ]
+        ):
             filtered_includes.append(item)
     filtered_matrix_dict = {}
     filtered_matrix_dict["include"] = filtered_includes

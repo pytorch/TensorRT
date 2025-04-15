@@ -188,6 +188,10 @@ def build_libtorchtrt_cxx11_abi(
     if IS_JETPACK:
         cmd.append("--config=jetpack")
 
+    if IS_SBSA:
+        if CI_BUILD:
+            cmd.append("--//toolchains/dep_src:torch=whl")
+
     if CI_BUILD:
         cmd.append("--platforms=//toolchains:ci_rhel_x86_64_linux")
         print("CI based build")
@@ -456,14 +460,6 @@ package_dir = {
 package_data = {}
 
 if not (PY_ONLY or NO_TS):
-    tensorrt_windows_external_dir = (
-        lambda: subprocess.check_output(
-            [BAZEL_EXE, "query", "@tensorrt_win//:nvinfer", "--output", "location"]
-        )
-        .decode("ascii")
-        .strip()
-        .split("/BUILD.bazel")[0]
-    )
 
     tensorrt_x86_64_external_dir = (
         lambda: subprocess.check_output(
@@ -493,15 +489,15 @@ if not (PY_ONLY or NO_TS):
     )
 
     if IS_SBSA:
-        tensorrt_linux_external_dir = tensorrt_sbsa_external_dir()
+        tensorrt_linux_external_dir = tensorrt_sbsa_external_dir
     elif IS_JETPACK:
-        tensorrt_linux_external_dir = tensorrt_jetpack_external_dir()
+        tensorrt_linux_external_dir = tensorrt_jetpack_external_dir
     else:
-        tensorrt_linux_external_dir = tensorrt_x86_64_external_dir()
+        tensorrt_linux_external_dir = tensorrt_x86_64_external_dir
 
     tensorrt_windows_external_dir = (
         lambda: subprocess.check_output(
-            [BAZEL_EXE, "query", "@tensorrt_windows//:nvinfer", "--output", "location"]
+            [BAZEL_EXE, "query", "@tensorrt_win//:nvinfer", "--output", "location"]
         )
         .decode("ascii")
         .strip()
