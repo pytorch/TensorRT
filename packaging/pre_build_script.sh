@@ -5,6 +5,8 @@ set -x
 # Install dependencies
 python3 -m pip install pyyaml
 
+install -y ninja-build gettext
+
 PLATFORM="amd64"
 PLATFORM=x86_64
 BAZEL_PLATFORM=amd64
