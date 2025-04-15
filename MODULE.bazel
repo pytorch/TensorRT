@@ -59,13 +59,6 @@ http_archive(
 )
 
 http_archive(
-    name = "libtorch_pre_cxx11_abi",
-    build_file = "@//third_party/libtorch:BUILD",
-    strip_prefix = "libtorch",
-    urls = ["https://download.pytorch.org/libtorch/nightly/cu128/libtorch-shared-with-deps-latest.zip"],
-)
-
-http_archive(
     name = "libtorch_win",
     build_file = "@//third_party/libtorch:BUILD",
     strip_prefix = "libtorch",
