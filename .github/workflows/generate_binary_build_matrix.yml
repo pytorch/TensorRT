@@ -42,6 +42,7 @@ on:
       use-only-dl-pytorch-org:
         description: "Use only download.pytorch.org when generating wheel install command?"
         default: "false"
+        required: false
         type: string
       build-python-only:
         description: "Generate binary build matrix for a python only package (i.e. only one python version)"
@@ -72,16 +73,16 @@ jobs:
     steps:
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: "3.11"
       - name: Checkout test-infra repository
         uses: actions/checkout@v4
         with:
           repository: ${{ inputs.test-infra-repository }}
           ref: ${{ inputs.test-infra-ref }}
-      - uses: ./.github/actions/set-channel
       - uses: actions/checkout@v4
         with:
           repository: pytorch/tensorrt
+      - uses: pytorch/test-infra/.github/actions/set-channel@main
       - name: Generate test matrix
         id: generate
         env:

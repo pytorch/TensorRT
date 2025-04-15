@@ -3,9 +3,9 @@ load("@rules_cc//cc:defs.bzl", "cc_binary")
 package(default_visibility = ["//visibility:public"])
 
 config_setting(
-    name = "use_pre_cxx11_abi",
-    values = {
-        "define": "abi=pre_cxx11_abi",
+    name = "use_torch_whl",
+    flag_values = {
+        "//toolchains/dep_src:torch": "whl"
     },
 )
 
@@ -37,11 +37,11 @@ cc_binary(
     ] + select({
         ":windows": [
             "@libtorch_win//:caffe2",
-            "@libtorch_win//:libtorch",
+            "@libtorch_win//:libtorch"
         ],
-        ":use_pre_cxx11_abi": [
-            "@libtorch_pre_cxx11_abi//:caffe2",
-            "@libtorch_pre_cxx11_abi//:libtorch",
+        ":use_torch_whl": [
+            "@torch_whl//:caffe2",
+            "@torch_whl//:libtorch"
         ],
         "//conditions:default": [
             "@libtorch",

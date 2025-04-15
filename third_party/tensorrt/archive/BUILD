@@ -3,11 +3,13 @@ load("@rules_cc//cc:defs.bzl", "cc_import", "cc_library")
 package(default_visibility = ["//visibility:public"])
 
 config_setting(
-    name = "aarch64_linux",
+    name = "jetpack",
     constraint_values = [
         "@platforms//cpu:aarch64",
-        "@platforms//os:linux",
     ],
+    flag_values = {
+        "@//toolchains/dep_collection:compute_libs": "jetpack"
+    },
 )
 
 config_setting(
@@ -58,6 +60,7 @@ cc_library(
         "nvinfer_lib",
     ] + select({
         ":windows": ["@cuda_win//:cudart", "nvinfer_static_lib"],
+        ":jetpack": ["@cuda_l4t//:cudart", "nvinfer_static_lib"],
         "//conditions:default": ["@cuda//:cudart"],
     }),
 )
@@ -200,6 +203,7 @@ cc_library(
         "nvinfer",
     ] + select({
         ":windows": ["@cuda_win//:cudart"],
+        ":jetpack": ["@cuda_l4t//:cudart"],
         "//conditions:default": ["@cuda//:cudart"],
     }),
     alwayslink = True,

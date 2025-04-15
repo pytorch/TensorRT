@@ -1,4 +1,4 @@
-name: Build and test Linux wheels
+name: Build and test Linux x86-64 wheels
 
 on:
   pull_request:
@@ -33,7 +33,7 @@ jobs:
     steps:
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: "3.11"
       - uses: actions/checkout@v4
         with:
           repository: pytorch/tensorrt

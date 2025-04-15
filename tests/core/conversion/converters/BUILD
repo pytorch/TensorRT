@@ -1,9 +1,9 @@
 load("//tests/core/conversion/converters:converter_test.bzl", "converter_test")
 
 config_setting(
-    name = "use_pre_cxx11_abi",
+    name = "use_torch_whl",
     values = {
-        "define": "abi=pre_cxx11_abi",
+        "define": "torch_src=whl",
     },
 )
 
