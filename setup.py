@@ -79,12 +79,13 @@ load_dep_info()
 dir_path = os.path.join(str(get_root_dir()), "py")
 
 PRE_CXX11_ABI = False
-JETPACK_VERSION = None
+IS_JETPACK = False
 PY_ONLY = False
 NO_TS = False
 LEGACY = False
 RELEASE = False
 CI_BUILD = False
+IS_SBSA = False
 
 if "--fx-only" in sys.argv:
     PY_ONLY = True
@@ -121,6 +122,9 @@ if (release_env_var := os.environ.get("RELEASE")) is not None:
 if (gpu_arch_version := os.environ.get("CU_VERSION")) is None:
     gpu_arch_version = f"cu{__cuda_version__.replace('.','')}"
 
+if (jetpack := os.environ.get("JETPACK_BUILD")) is None:
+    if jetpack == "1":
+        IS_JETPACK = True
 
 if RELEASE:
     __version__ = os.environ.get("BUILD_VERSION")
@@ -136,40 +140,12 @@ if (ci_env_var := os.environ.get("CI_BUILD")) is not None:
     if ci_env_var == "1":
         CI_BUILD = True
 
-if "--use-pre-cxx11-abi" in sys.argv:
-    sys.argv.remove("--use-pre-cxx11-abi")
-    PRE_CXX11_ABI = True
-
-if (pre_cxx11_abi_env_var := os.environ.get("USE_PRE_CXX11_ABI")) is not None:
-    if pre_cxx11_abi_env_var == "1":
-        PRE_CXX11_ABI = True
-
 if platform.uname().processor == "aarch64":
-    if "--jetpack-version" in sys.argv:
-        version_idx = sys.argv.index("--jetpack-version") + 1
-        version = sys.argv[version_idx]
-        sys.argv.remove(version)
-        sys.argv.remove("--jetpack-version")
-        if version == "4.5":
-            JETPACK_VERSION = "4.5"
-        elif version == "4.6":
-            JETPACK_VERSION = "4.6"
-        elif version == "5.0":
-            JETPACK_VERSION = "5.0"
-        elif version == "6.1":
-            JETPACK_VERSION = "6.1"
-
-    if not JETPACK_VERSION:
-        warnings.warn(
-            "Assuming jetpack version to be 6.1, if not use the --jetpack-version option"
-        )
-        JETPACK_VERSION = "6.1"
-
-    if PRE_CXX11_ABI:
-        warnings.warn(
-            "Jetson platform detected. Please remove --use-pre-cxx11-abi flag if you are using it."
-        )
-
+    if "--jetpack" in sys.argv:
+        sys.argv.remove("--jetpack")
+        IS_JETPACK = True
+    else:
+        IS_SBSA = True
 
 BAZEL_EXE = None
 if not PY_ONLY:
@@ -204,30 +180,13 @@ def build_libtorchtrt_cxx11_abi(
     if target_python:
         cmd.append("--config=python")
 
-    if pre_cxx11_abi:
-        cmd.append("--config=pre_cxx11_abi")
-        print("using PRE CXX11 ABI build")
-    else:
-        cmd.append("--config=cxx11_abi")
-        print("using CXX11 ABI build")
-
     if IS_WINDOWS:
         cmd.append("--config=windows")
     else:
         cmd.append("--config=linux")
 
-    if JETPACK_VERSION == "4.5":
-        cmd.append("--platforms=//toolchains:jetpack_4.5")
-        print("Jetpack version: 4.5")
-    elif JETPACK_VERSION == "4.6":
-        cmd.append("--platforms=//toolchains:jetpack_4.6")
-        print("Jetpack version: 4.6")
-    elif JETPACK_VERSION == "5.0":
-        cmd.append("--platforms=//toolchains:jetpack_5.0")
-        print("Jetpack version: 5.0")
-    elif JETPACK_VERSION == "6.1":
-        cmd.append("--platforms=//toolchains:jetpack_6.1")
-        print("Jetpack version: 6.1")
+    if IS_JETPACK:
+        cmd.append("--config=jetpack")
 
     if CI_BUILD:
         cmd.append("--platforms=//toolchains:ci_rhel_x86_64_linux")
@@ -497,7 +456,16 @@ package_dir = {
 package_data = {}
 
 if not (PY_ONLY or NO_TS):
-    tensorrt_linux_external_dir = (
+    tensorrt_windows_external_dir = (
+        lambda: subprocess.check_output(
+            [BAZEL_EXE, "query", "@tensorrt_win//:nvinfer", "--output", "location"]
+        )
+        .decode("ascii")
+        .strip()
+        .split("/BUILD.bazel")[0]
+    )
+
+    tensorrt_x86_64_external_dir = (
         lambda: subprocess.check_output(
             [BAZEL_EXE, "query", "@tensorrt//:nvinfer", "--output", "location"]
         )
@@ -505,9 +473,35 @@ if not (PY_ONLY or NO_TS):
         .strip()
         .split("/BUILD.bazel")[0]
     )
+
+    tensorrt_sbsa_external_dir = (
+        lambda: subprocess.check_output(
+            [BAZEL_EXE, "query", "@tensorrt_sbsa//:nvinfer", "--output", "location"]
+        )
+        .decode("ascii")
+        .strip()
+        .split("/BUILD.bazel")[0]
+    )
+
+    tensorrt_jetpack_external_dir = (
+        lambda: subprocess.check_output(
+            [BAZEL_EXE, "query", "@tensorrt_l4t//:nvinfer", "--output", "location"]
+        )
+        .decode("ascii")
+        .strip()
+        .split("/BUILD.bazel")[0]
+    )
+
+    if IS_SBSA:
+        tensorrt_linux_external_dir = tensorrt_sbsa_external_dir()
+    elif IS_JETPACK:
+        tensorrt_linux_external_dir = tensorrt_jetpack_external_dir()
+    else:
+        tensorrt_linux_external_dir = tensorrt_x86_64_external_dir()
+
     tensorrt_windows_external_dir = (
         lambda: subprocess.check_output(
-            [BAZEL_EXE, "query", "@tensorrt_win//:nvinfer", "--output", "location"]
+            [BAZEL_EXE, "query", "@tensorrt_windows//:nvinfer", "--output", "location"]
         )
         .decode("ascii")
         .strip()

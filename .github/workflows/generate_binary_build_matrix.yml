@@ -79,7 +79,10 @@ jobs:
         with:
           repository: ${{ inputs.test-infra-repository }}
           ref: ${{ inputs.test-infra-ref }}
-      - uses: ./.github/actions/set-channel
+      - uses: actions/checkout@v4
+        with:
+          repository: pytorch/tensorrt
+      - uses: pytorch/test-infra/.github/actions/set-channel@main
       - name: Generate test matrix
         id: generate
         env:
@@ -101,7 +104,6 @@ jobs:
           PYTHON_VERSIONS: ${{ inputs.python-versions }}
         run: |
           set -eou pipefail
-          ls -la .
           MATRIX_BLOB="$(python3 .github/scripts/generate_binary_build_matrix.py)"
           echo "${MATRIX_BLOB}"
           echo "matrix=${MATRIX_BLOB}" >> "${GITHUB_OUTPUT}"
