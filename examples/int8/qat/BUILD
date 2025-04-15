@@ -15,7 +15,7 @@ config_setting(
         "@platforms//cpu:aarch64",
     ],
     flag_values = {
-        "//toolchains/dep_collection:compute_lib_collection": "default"
+        "//toolchains/dep_collection:compute_libs": "default"
     },
 )
 
@@ -25,7 +25,7 @@ config_setting(
         "@platforms//cpu:aarch64",
     ],
     flag_values = {
-        "//toolchains/dep_collection:compute_lib_collection": "jetpack"
+        "//toolchains/dep_collection:compute_libs": "jetpack"
     },
 )
 
