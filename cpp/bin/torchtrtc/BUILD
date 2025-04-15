@@ -5,7 +5,7 @@ package(default_visibility = ["//visibility:public"])
 config_setting(
     name = "use_torch_whl",
     flag_values = {
-        "//toolchains/build_srcs:torch": "whl"
+        "//toolchains/dep_src:torch": "whl"
     },
 )
 

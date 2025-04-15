@@ -1,5 +1,5 @@
 # buildifier: disable=module-docstring
-BuildSrcInfo = provider(doc = "", fields = ["type"])
+DepSrcInfo = provider(doc = "", fields = ["type"])
 
 src_types = ["archive", "whl", "local"]
 
@@ -10,9 +10,9 @@ def _impl(ctx):
              ", ".join(src_types) + "} but was set to unallowed value " +
              src)
 
-    return BuildSrcInfo(type = src)
+    return DepSrcInfo(type = src)
 
-build_src = rule(
+dep_src = rule(
     implementation = _impl,
     build_setting = config.string(flag = True),
 )

@@ -5,7 +5,7 @@ package(default_visibility = ["//visibility:public"])
 config_setting(
     name = "use_torch_whl",
     flag_values = {
-        "//toolchains/build_srcs:torch": "whl"
+        "//toolchains/dep_src:torch": "whl"
     },
 )
 
@@ -15,7 +15,7 @@ config_setting(
         "@platforms//cpu:aarch64",
     ],
     flag_values = {
-        "//toolchains/dep_collection:compute_lib_collection": "datacenter"
+        "//toolchains/dep_collection:compute_lib_collection": "default"
     },
 )
 
@@ -69,7 +69,7 @@ cc_binary(
         }) + select({
             ":windows": ["@tensorrt_win//:nvinfer"],
             ":sbsa": ["@tensorrt_sbsa//:nvinfer"],
-            ":jetpack": ["@tensorrt_jetpack//:nvinfer"],
+            ":jetpack": ["@tensorrt_l4t//:nvinfer"],
             "//conditions:default": ["@tensorrt//:nvinfer"],
         })
 )

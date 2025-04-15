@@ -3,7 +3,7 @@ load("@rules_cc//cc:defs.bzl", "cc_test")
 config_setting(
     name = "use_torch_whl",
     flag_values = {
-        "//toolchains/build_srcs:torch": "whl"
+        "//toolchains/dep_src:torch": "whl"
     },
 )
 
@@ -13,7 +13,7 @@ config_setting(
         "@platforms//cpu:aarch64",
     ],
     flag_values = {
-        "//toolchains/dep_collection:compute_lib_collection": "datacenter"
+        "//toolchains/dep_collection:compute_lib_collection": "default"
     },
 )
 

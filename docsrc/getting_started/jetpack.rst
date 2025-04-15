@@ -1,4 +1,4 @@
-.. _Torch_TensorRT_in_JetPack_6.1
+.. _Torch_TensorRT_in_l4t_6.1
 
 Overview
 ##################
@@ -116,4 +116,3 @@ Please make sure to build torch_tensorrt wheel file from source release/2.5 bran
     cat toolchains/jp_workspaces/MODULE.bazel.tmpl | envsubst > MODULE.bazel
     # build and install torch_tensorrt wheel file
     python setup.py install --user
-
