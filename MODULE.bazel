@@ -27,7 +27,7 @@ local_repository = use_repo_rule("@bazel_tools//tools/build_defs/repo:local.bzl"
 # External dependency for torch_tensorrt if you already have precompiled binaries.
 local_repository(
     name = "torch_tensorrt",
-    path = "/opt/conda/lib/python3.8/site-packages/torch_tensorrt",
+    path = "/opt/conda/lib/python3.10/site-packages/torch_tensorrt",
 )
 
 
@@ -37,7 +37,7 @@ new_local_repository = use_repo_rule("@bazel_tools//tools/build_defs/repo:local.
 new_local_repository(
     name = "cuda",
     build_file = "@//third_party/cuda:BUILD",
-    path = "",
+    path = "/usr/local/cuda-12.8",
 )
 
 new_local_repository(
@@ -57,7 +57,19 @@ http_archive(
     name = "libtorch",
     build_file = "@//third_party/libtorch:BUILD",
     strip_prefix = "libtorch",
+<<<<<<< HEAD
     urls = ["https://download.pytorch.org/libtorch///libtorch-cxx11-abi-shared-with-deps-latest.zip"],
+=======
+    urls = ["https://download.pytorch.org/libtorch/nightly/cu128/libtorch-cxx11-abi-shared-with-deps-latest.zip"],
+)
+
+http_archive(
+    name = "torch_whl",
+    build_file = "@//third_party/libtorch:BUILD",
+    strip_prefix = "torch",
+    type = "zip",
+    urls = ["https://download.pytorch.org/whl/nightly/cu128/torch-2.8.0.dev20250414%2Bcu128-cp39-cp39-manylinux_2_28_aarch64.whl"],
+>>>>>>> 75173f897 (infra: bazel aarch64 colocation)
 )
 
 # Download these tarballs manually from the NVIDIA website
@@ -70,6 +82,15 @@ http_archive(
     strip_prefix = "TensorRT-10.9.0.34",
     urls = [
         "https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.9.0/tars/TensorRT-10.9.0.34.Linux.x86_64-gnu.cuda-12.8.tar.gz",
+    ],
+)
+
+http_archive(
+    name = "tensorrt_sbsa",
+    build_file = "@//third_party/tensorrt/archive:BUILD",
+    strip_prefix = "TensorRT-10.9.0.34",
+    urls = [
+        "https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.9.0/tars/TensorRT-10.9.0.34.Linux.aarch64-gnu.cuda-12.8.tar.gz",
     ],
 )
 
@@ -94,6 +115,7 @@ http_archive(
 # x86_64 python distribution. If using NVIDIA's version just point to the root of the package
 # for both versions here and do not use --config=pre-cxx11-abi
 
+<<<<<<< HEAD
 new_local_repository(
     name = "libtorch_win",
     path = "",
@@ -105,6 +127,19 @@ new_local_repository(
     path = "",
     build_file = "third_party/libtorch/BUILD"
 )
+=======
+# new_local_repository(
+#    name = "libtorch",
+#    path = "/workspace/tensorrt/.venv/lib/python3.9/site-packages/torch",
+#    build_file = "third_party/libtorch/BUILD"
+# )
+
+# new_local_repository(
+#     name = "libtorch_pre_cxx11_abi",
+#     path = "",
+#     build_file = "third_party/libtorch/BUILD"
+# )
+>>>>>>> 75173f897 (infra: bazel aarch64 colocation)
 
 #new_local_repository(
 #   name = "tensorrt",

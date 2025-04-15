@@ -6,17 +6,17 @@ set -x
 python3 -m pip install pyyaml
 
 PLATFORM="amd64"
-
+PLATFORM=x86_64
+BAZEL_PLATFORM=amd64
 if [[ $(uname -m) == "aarch64" ]]; then
-  PLATFORM="arm64"
-  rm -rf /opt/openssl # probs unsafe but not sure why there is a different openssl version
+    PLATFORM=aarch64
+    BAZEL_PLATFORM=arm64
+
+    rm -rf /opt/openssl # Not sure whats up with the openssl mismatch
 fi
 
-dnf update -y openssl-libs krb5-libs
-dnf install -y ninja-build gettext
-
-wget https://github.com/bazelbuild/bazelisk/releases/download/v1.26.0/bazelisk-linux-${PLATFORM} \
-    && mv bazelisk-linux-${PLATFORM} /usr/bin/bazel \
+wget https://github.com/bazelbuild/bazelisk/releases/download/v1.25.0/bazelisk-linux-${BAZEL_PLATFORM} \
+    && mv bazelisk-linux-${BAZEL_PLATFORM} /usr/bin/bazel \
     && chmod +x /usr/bin/bazel
 
 TORCH_TORCHVISION=$(grep "^torch" py/requirements.txt)

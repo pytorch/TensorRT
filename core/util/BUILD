@@ -4,9 +4,29 @@ load("@rules_pkg//:pkg.bzl", "pkg_tar")
 package(default_visibility = ["//visibility:public"])
 
 config_setting(
-    name = "use_pre_cxx11_abi",
-    values = {
-        "define": "abi=pre_cxx11_abi",
+    name = "use_torch_whl",
+    flag_values = {
+        "//toolchains/build_srcs:torch": "whl"
+    },
+)
+
+config_setting(
+    name = "sbsa",
+    constraint_values = [
+        "@platforms//cpu:aarch64",
+    ],
+    flag_values = {
+        "//toolchains/dep_collection:compute_lib_collection": "datacenter"
+    },
+)
+
+config_setting(
+    name = "jetpack",
+    constraint_values = [
+        "@platforms//cpu:aarch64",
+    ],
+    flag_values = {
+        "//toolchains/dep_collection:compute_lib_collection": "jetpack"
     },
 )
 
@@ -41,7 +61,7 @@ cc_library(
         ":macros",
     ] + select({
         ":windows": ["@libtorch_win//:libtorch"],
-        ":use_pre_cxx11_abi": ["@libtorch_pre_cxx11_abi//:libtorch"],
+        ":use_torch_whl": ["@torch_whl//:libtorch"],
         "//conditions:default": ["@libtorch"],
     }),
 )
@@ -74,9 +94,9 @@ cc_library(
         "build_info.h",
     ],
     deps = select({
-        ":windows": ["@tensorrt_win//:nvinfer", "@libtorch_win//:libtorch"],
-        ":use_pre_cxx11_abi": ["@tensorrt//:nvinfer", "@libtorch_pre_cxx11_abi//:libtorch"],
-        "//conditions:default": ["@tensorrt//:nvinfer", "@libtorch"],
+        ":windows": ["@libtorch_win//:libtorch"],
+        ":use_torch_whl": ["@torch_whl//:libtorch"],
+        "//conditions:default": ["@libtorch"],
     }),
 )
 
@@ -92,9 +112,14 @@ cc_library(
         ":macros",
         "//core/util/logging",
     ] + select({
-        ":windows": ["@tensorrt_win//:nvinfer", "@libtorch_win//:libtorch"],
-        ":use_pre_cxx11_abi": ["@tensorrt//:nvinfer", "@libtorch_pre_cxx11_abi//:libtorch"],
-        "//conditions:default": ["@tensorrt//:nvinfer", "@libtorch"],
+        ":windows": ["@tensorrt_win//:nvinfer"],
+        ":sbsa": ["@tensorrt_sbsa//:nvinfer"],
+        ":jetpack": ["@tensorrt_jetpack//:nvinfer"],
+        "//conditions:default": ["@tensorrt//:nvinfer"],
+    }) + select({
+        ":windows": ["@libtorch_win//:libtorch"],
+        ":use_torch_whl": ["@torch_whl//:libtorch"],
+        "//conditions:default": ["@libtorch"],
     }),
     alwayslink = True,
 )
