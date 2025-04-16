@@ -30,6 +30,10 @@ assertions = unittest.TestCase()
     not torch_trt.ENABLED_FEATURES.torch_tensorrt_runtime,
     "TorchScript Frontend is not available",
 )
+@unittest.skipIf(
+    not torch_trt.ENABLED_FEATURES.refit,
+    "Refit feature is not supported in Python 3.13 or higher",
+)
 @pytest.mark.unit
 def test_mapping():
     model = models.resnet18(pretrained=False).eval().to("cuda")
@@ -85,6 +89,10 @@ def test_mapping():
     not torch_trt.ENABLED_FEATURES.torch_tensorrt_runtime,
     "TorchScript Frontend is not available",
 )
+@unittest.skipIf(
+    not torch_trt.ENABLED_FEATURES.refit,
+    "Refit feature is not supported in Python 3.13 or higher",
+)
 @pytest.mark.unit
 def test_refit_one_engine_with_weightmap():
     model = models.resnet18(pretrained=False).eval().to("cuda")
@@ -133,6 +141,10 @@ def test_refit_one_engine_with_weightmap():
 @unittest.skipIf(
     not torch_trt.ENABLED_FEATURES.torch_tensorrt_runtime,
     "TorchScript Frontend is not available",
+)
+@unittest.skipIf(
+    not torch_trt.ENABLED_FEATURES.refit,
+    "Refit feature is not supported in Python 3.13 or higher",
 )
 @pytest.mark.unit
 def test_refit_one_engine_no_map_with_weightmap():
@@ -183,6 +195,10 @@ def test_refit_one_engine_no_map_with_weightmap():
 @unittest.skipIf(
     not torch_trt.ENABLED_FEATURES.torch_tensorrt_runtime,
     "TorchScript Frontend is not available",
+)
+@unittest.skipIf(
+    not torch_trt.ENABLED_FEATURES.refit,
+    "Refit feature is not supported in Python 3.13 or higher",
 )
 @pytest.mark.unit
 def test_refit_one_engine_with_wrong_weightmap():
@@ -242,6 +258,10 @@ def test_refit_one_engine_with_wrong_weightmap():
     not importlib.util.find_spec("transformers"),
     "transformers is required to run this test",
 )
+@unittest.skipIf(
+    not torch_trt.ENABLED_FEATURES.refit,
+    "Refit feature is not supported in Python 3.13 or higher",
+)
 @pytest.mark.unit
 def test_refit_one_engine_bert_with_weightmap():
     from transformers import BertModel
@@ -299,6 +319,10 @@ def test_refit_one_engine_bert_with_weightmap():
     not torch_trt.ENABLED_FEATURES.torch_tensorrt_runtime,
     "TorchScript Frontend is not available",
 )
+@unittest.skipIf(
+    not torch_trt.ENABLED_FEATURES.refit,
+    "Refit feature is not supported in Python 3.13 or higher",
+)
 @pytest.mark.unit
 def test_refit_one_engine_inline_runtime__with_weightmap():
     trt_ep_path = os.path.join(tempfile.gettempdir(), "compiled.ep")
@@ -345,6 +369,10 @@ def test_refit_one_engine_inline_runtime__with_weightmap():
     torch._dynamo.reset()
 
 
+@unittest.skipIf(
+    not torch_trt.ENABLED_FEATURES.refit,
+    "Refit feature is not supported in Python 3.13 or higher",
+)
 @pytest.mark.unit
 def test_refit_one_engine_python_runtime_with_weightmap():
     model = models.resnet18(pretrained=False).eval().to("cuda")
@@ -392,6 +420,10 @@ def test_refit_one_engine_python_runtime_with_weightmap():
 @unittest.skipIf(
     not torch_trt.ENABLED_FEATURES.torch_tensorrt_runtime,
     "TorchScript Frontend is not available",
+)
+@unittest.skipIf(
+    not torch_trt.ENABLED_FEATURES.refit,
+    "Refit feature is not supported in Python 3.13 or higher",
 )
 @pytest.mark.unit
 def test_refit_multiple_engine_with_weightmap():
@@ -464,6 +496,10 @@ def test_refit_multiple_engine_with_weightmap():
     not torch_trt.ENABLED_FEATURES.torch_tensorrt_runtime,
     "TorchScript Frontend is not available",
 )
+@unittest.skipIf(
+    not torch_trt.ENABLED_FEATURES.refit,
+    "Refit feature is not supported in Python 3.13 or higher",
+)
 @pytest.mark.unit
 def test_refit_one_engine_without_weightmap():
     model = models.resnet18(pretrained=True).eval().to("cuda")
@@ -515,6 +551,10 @@ def test_refit_one_engine_without_weightmap():
 @unittest.skipIf(
     not importlib.util.find_spec("transformers"),
     "transformers is required to run this test",
+)
+@unittest.skipIf(
+    not torch_trt.ENABLED_FEATURES.refit,
+    "Refit feature is not supported in Python 3.13 or higher",
 )
 @pytest.mark.unit
 def test_refit_one_engine_bert_without_weightmap():
@@ -573,6 +613,10 @@ def test_refit_one_engine_bert_without_weightmap():
     not torch_trt.ENABLED_FEATURES.torch_tensorrt_runtime,
     "TorchScript Frontend is not available",
 )
+@unittest.skipIf(
+    not torch_trt.ENABLED_FEATURES.refit,
+    "Refit feature is not supported in Python 3.13 or higher",
+)
 @pytest.mark.unit
 def test_refit_one_engine_inline_runtime_without_weightmap():
     trt_ep_path = os.path.join(tempfile.gettempdir(), "compiled.ep")
@@ -619,6 +663,10 @@ def test_refit_one_engine_inline_runtime_without_weightmap():
     torch._dynamo.reset()
 
 
+@unittest.skipIf(
+    not torch_trt.ENABLED_FEATURES.refit,
+    "Refit feature is not supported in Python 3.13 or higher",
+)
 @pytest.mark.unit
 def test_refit_one_engine_python_runtime_without_weightmap():
     model = models.resnet18(pretrained=True).eval().to("cuda")
@@ -666,6 +714,10 @@ def test_refit_one_engine_python_runtime_without_weightmap():
 @unittest.skipIf(
     not torch_trt.ENABLED_FEATURES.torch_tensorrt_runtime,
     "TorchScript Frontend is not available",
+)
+@unittest.skipIf(
+    not torch_trt.ENABLED_FEATURES.refit,
+    "Refit feature is not supported in Python 3.13 or higher",
 )
 @pytest.mark.unit
 def test_refit_multiple_engine_without_weightmap():
@@ -734,6 +786,10 @@ def test_refit_multiple_engine_without_weightmap():
     torch._dynamo.reset()
 
 
+@unittest.skipIf(
+    not torch_trt.ENABLED_FEATURES.refit,
+    "Refit feature is not supported in Python 3.13 or higher",
+)
 @pytest.mark.unit
 def test_refit_cumsum_fallback():
     class net(nn.Module):

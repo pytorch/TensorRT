@@ -26,6 +26,7 @@ from torch.fx.node import _get_qualified_name
 from torch.fx.passes.shape_prop import TensorMetadata
 from torch.utils._python_dispatch import _disable_current_modes
 from torch_tensorrt._enums import dtype
+from torch_tensorrt._features import needs_refit
 from torch_tensorrt._Input import Input
 from torch_tensorrt.dynamo import _defaults
 from torch_tensorrt.dynamo._engine_cache import BaseEngineCache
@@ -434,6 +435,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             except Exception:
                 return torch.all(sd_weight == network_weight)
 
+    @needs_refit
     def _save_weight_mapping(self) -> None:
         """
         Construct the weight name mapping from engine weight name to state_dict weight name.
@@ -578,6 +580,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         gc.collect()
         torch.cuda.empty_cache()
 
+    @needs_refit
     def _insert_engine_to_cache(self, hash_val: str, serialized_engine: bytes) -> None:
         # TODO: @Evan is waiting for TRT's feature to cache the weight-stripped engine
         # if not self.compilation_settings.strip_engine_weights:
@@ -605,6 +608,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             ),
         )
 
+    @needs_refit
     def _pull_cached_engine(self, hash_val: str) -> Optional[TRTInterpreterResult]:
         # query the cached TRT engine
         cached_data = self.engine_cache.check(hash_val)  # type: ignore[union-attr]
@@ -715,7 +719,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                 if self.compilation_settings.reuse_cached_engines:
                     interpreter_result = self._pull_cached_engine(hash_val)
                     if interpreter_result is not None:  # hit the cache
-                        return interpreter_result
+                        return interpreter_result  # type: ignore[no-any-return]
 
         self._construct_trt_network_def()
 
