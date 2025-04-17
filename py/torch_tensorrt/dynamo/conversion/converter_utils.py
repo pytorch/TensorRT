@@ -1008,87 +1008,51 @@ def args_bounds_check(
     return args[i] if len(args) > i and args[i] is not None else replacement
 
 
-def install_wget(platform: str) -> None:
-    if shutil.which("wget"):
-        _LOGGER.debug("wget is already installed")
-        return
-    if platform.startswith("linux"):
-        try:
-            # if its root
-            if os.geteuid() == 0:
-                subprocess.run(["apt-get", "update"], check=True)
-                subprocess.run(["apt-get", "install", "-y", "wget"], check=True)
-            else:
-                _LOGGER.debug("Please run with sudo permissions")
-                subprocess.run(["sudo", "apt-get", "update"], check=True)
-                subprocess.run(["sudo", "apt-get", "install", "-y", "wget"], check=True)
-        except subprocess.CalledProcessError as e:
-            _LOGGER.debug("Error installing wget:", e)
-
-
-def install_mpi(platform: str) -> None:
-    if platform.startswith("linux"):
-        try:
-            # if its root
-            if os.geteuid() == 0:
-                subprocess.run(["apt-get", "update"], check=True)
-                subprocess.run(["apt-get", "install", "-y", "libmpich-dev"], check=True)
-                subprocess.run(
-                    ["apt-get", "install", "-y", "libopenmpi-dev"], check=True
-                )
-            else:
-                _LOGGER.debug("Please run with sudo permissions")
-                subprocess.run(["sudo", "apt-get", "update"], check=True)
-                subprocess.run(
-                    ["sudo", "apt-get", "install", "-y", "libmpich-dev"], check=True
-                )
-                subprocess.run(
-                    ["sudo", "apt-get", "install", "-y", "libopenmpi-dev"], check=True
-                )
-        except subprocess.CalledProcessError as e:
-            _LOGGER.debug("Error installing mpi libs:", e)
-
-
 def download_plugin_lib_path(py_version: str, platform: str) -> str:
     plugin_lib_path = None
-    if py_version not in ("cp310", "cp312"):
-        _LOGGER.warning(
-            "No available wheel for python versions other than py3.10 and py3.12"
-        )
-    install_wget(platform)
+
+    # Downloading TRT-LLM lib
+    # TODO: check how to fix the 0.18.0 hardcode below
     base_url = "https://pypi.nvidia.com/tensorrt-llm/"
-    file_name = f"tensorrt_llm-0.17.0.post1-{py_version}-{py_version}-{platform}.whl"
+    file_name = f"tensorrt_llm-0.18.0.post1-{py_version}-{py_version}-{platform}.whl"
     download_url = base_url + file_name
     cmd = ["wget", download_url]
-    try:
-        if not (os.path.exists(file_name)):
-            _LOGGER.info(f"Running command: {' '.join(cmd)}")
-            subprocess.run(cmd)
-            _LOGGER.info("Download complete of wheel")
-        if os.path.exists(file_name):
-            _LOGGER.info("filename now present")
-            if os.path.exists("./tensorrt_llm/libs/libnvinfer_plugin_tensorrt_llm.so"):
-                plugin_lib_path = (
-                    "./tensorrt_llm/libs/" + "libnvinfer_plugin_tensorrt_llm.so"
-                )
-            else:
-                import zipfile
+    if not (os.path.exists(file_name)):
+        try:
+            subprocess.run(cmd, check=True)
+            _LOGGER.debug("Download succeeded and TRT-LLM wheel is now present")
+        except subprocess.CalledProcessError as e:
+            _LOGGER.error(
+                "Download failed (file not found or connection issue). Error code:",
+                e.returncode,
+            )
+        except FileNotFoundError:
+            _LOGGER.error("wget is required but not found. Please install wget.")
 
-                with zipfile.ZipFile(file_name, "r") as zip_ref:
-                    zip_ref.extractall(".")  # Extract to a folder named 'tensorrt_llm'
-                    plugin_lib_path = (
-                        "./tensorrt_llm/libs/" + "libnvinfer_plugin_tensorrt_llm.so"
-                    )
-    except subprocess.CalledProcessError as e:
-        _LOGGER.debug(f"Error occurred while trying to download: {e}")
-    except Exception as e:
-        _LOGGER.debug(f"An unexpected error occurred: {e}")
+    # Proceeding with the unzip of the wheel file
+    # This will exist if the filename was already downloaded
+    if os.path.exists("./tensorrt_llm/libs/libnvinfer_plugin_tensorrt_llm.so"):
+        plugin_lib_path = "./tensorrt_llm/libs/" + "libnvinfer_plugin_tensorrt_llm.so"
+    else:
+        try:
+            import zipfile
+        except:
+            raise ImportError(
+                "zipfile module is required but not found. Please install zipfile"
+            )
+        with zipfile.ZipFile(file_name, "r") as zip_ref:
+            zip_ref.extractall(".")  # Extract to a folder named 'tensorrt_llm'
+            plugin_lib_path = (
+                "./tensorrt_llm/libs/" + "libnvinfer_plugin_tensorrt_llm.so"
+            )
     return plugin_lib_path
 
 
 def load_tensorrt_llm() -> bool:
     """
     Attempts to load the TensorRT-LLM plugin and initialize it.
+    Either the env variable TRTLLM_PLUGINS_PATH specifies the path
+    If the above is not, the user can specify USE_TRTLLM_PLUGINS as either of 1, true, yes, on to download the TRT-LLM distribution and load it
 
     Returns:
         bool: True if the plugin was successfully loaded and initialized, False otherwise.
@@ -1098,8 +1062,9 @@ def load_tensorrt_llm() -> bool:
         _LOGGER.warning(
             "Please set the TRTLLM_PLUGINS_PATH to the directory containing libnvinfer_plugin_tensorrt_llm.so to use converters for torch.distributed ops or else set the USE_TRTLLM_PLUGINS variable to download the shared library",
         )
-        for key, value in os.environ.items():
-            print(f"{key}: {value}")
+        # for key, value in os.environ.items():
+        #     print(f"{key}: {value}")
+        # this option can be used by user if TRTLLM_PLUGINS_PATH is not set by user
         use_trtllm_plugin = os.environ.get("USE_TRTLLM_PLUGINS", "0").lower() in (
             "1",
             "true",
@@ -1112,14 +1077,14 @@ def load_tensorrt_llm() -> bool:
             )
             return False
         else:
-            py_version = f"cp{sys.version_info.major}{sys.version_info.minor}"
+            # this is used as the default py version
+            py_version = f"cp312"
             platform = Platform.current_platform()
 
             platform = str(platform).lower()
             plugin_lib_path = download_plugin_lib_path(py_version, platform)
     try:
-        # Load the shared
-        install_mpi(platform)
+        # Load the shared TRT-LLM file
         handle = ctypes.CDLL(plugin_lib_path)
         _LOGGER.info(f"Successfully loaded plugin library: {plugin_lib_path}")
     except OSError as e_os_error:
