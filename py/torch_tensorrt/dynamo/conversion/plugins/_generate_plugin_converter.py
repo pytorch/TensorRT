@@ -1,4 +1,5 @@
 import logging
+import uuid
 from typing import Callable, Dict, Optional, Sequence, Tuple, Union
 
 import numpy as np
@@ -46,11 +47,15 @@ def _generate_plugin_converter(
         kwargs: Dict[str, Argument],
         name: str,
     ) -> Union[trt.ITensor, Sequence[trt.ITensor]]:
+
         plugin = getattr(getattr(trtp.op, namespace), op_name)
+
         tensor_inputs = plugin.input_tensor_names
         tensor_args = args[0 : len(tensor_inputs)]
+
+        unique_id = uuid.uuid4()
         itensor_args = [
-            get_trt_tensor(ctx, t, f"{t_name}")
+            get_trt_tensor(ctx, t, f"{t_name}_{unique_id}")
             for (t, t_name) in zip(tensor_args, tensor_inputs)
         ]
 
