@@ -16,6 +16,10 @@ assertions = unittest.TestCase()
 
 
 class TestWeightStrippedEngine(TestCase):
+    @unittest.skipIf(
+        not torch_trt.ENABLED_FEATURES.refit,
+        "Engine caching requires refit feature that is not supported in Python 3.13 or higher",
+    )
     def test_three_ways_to_compile(self):
         pyt_model = models.resnet18(pretrained=True).eval().to("cuda")
         example_inputs = (torch.randn((100, 3, 224, 224)).to("cuda"),)
@@ -57,6 +61,10 @@ class TestWeightStrippedEngine(TestCase):
             gm1_output, gm2_output, 1e-2, 1e-2
         ), "gm2_output is not correct"
 
+    @unittest.skipIf(
+        not torch_trt.ENABLED_FEATURES.refit,
+        "Engine caching requires refit feature that is not supported in Python 3.13 or higher",
+    )
     def test_three_ways_to_compile_weight_stripped_engine(self):
         pyt_model = models.resnet18(pretrained=True).eval().to("cuda")
         example_inputs = (torch.randn((100, 3, 224, 224)).to("cuda"),)
@@ -89,6 +97,10 @@ class TestWeightStrippedEngine(TestCase):
             gm1_output.sum(), 0, msg="gm1_output should be all zeros"
         )
 
+    @unittest.skipIf(
+        not torch_trt.ENABLED_FEATURES.refit,
+        "Engine caching requires refit feature that is not supported in Python 3.13 or higher",
+    )
     def test_weight_stripped_engine_sizes(self):
         pyt_model = models.resnet18(pretrained=True).eval().to("cuda")
         example_inputs = (torch.randn((100, 3, 224, 224)).to("cuda"),)
@@ -126,6 +138,10 @@ class TestWeightStrippedEngine(TestCase):
             msg=f"Weight-stripped refit-identical engine size is not smaller than the weight included engine size. Weight included engine size: {len(bytes(weight_included_engine))}, weight-stripped refit-identical engine size: {len(bytes(weight_stripped_refit_identical_engine))}",
         )
 
+    @unittest.skipIf(
+        not torch_trt.ENABLED_FEATURES.refit,
+        "Engine caching requires refit feature that is not supported in Python 3.13 or higher",
+    )
     def test_weight_stripped_engine_results(self):
         pyt_model = models.resnet18(pretrained=True).eval().to("cuda")
         example_inputs = (torch.randn((100, 3, 224, 224)).to("cuda"),)
@@ -187,6 +203,10 @@ class TestWeightStrippedEngine(TestCase):
     @unittest.skip(
         "For now, torch-trt will save weighted engine if strip_engine_weights is False. In the near future, we plan to save weight-stripped engine regardless of strip_engine_weights, which is pending on TRT's feature development: NVBug #4914602"
     )
+    @unittest.skipIf(
+        not torch_trt.ENABLED_FEATURES.refit,
+        "Engine caching requires refit feature that is not supported in Python 3.13 or higher",
+    )
     def test_engine_caching_saves_weight_stripped_engine(self):
         pyt_model = models.resnet18(pretrained=True).eval().to("cuda")
         example_inputs = (torch.randn((100, 3, 224, 224)).to("cuda"),)
@@ -233,6 +253,10 @@ class TestWeightStrippedEngine(TestCase):
             msg=f"cached engine size is not smaller than the weight included engine size. Weight included engine size: {len(bytes(weight_included_engine))}, cached stripped engine size: {len(bytes(cached_stripped_engine))}",
         )
 
+    @unittest.skipIf(
+        not torch_trt.ENABLED_FEATURES.refit,
+        "Engine caching requires refit feature that is not supported in Python 3.13 or higher",
+    )
     def test_dynamo_compile_with_refittable_weight_stripped_engine(self):
         pyt_model = models.resnet18(pretrained=True).eval().to("cuda")
         example_inputs = (torch.randn((100, 3, 224, 224)).to("cuda"),)
@@ -397,6 +421,10 @@ class TestWeightStrippedEngine(TestCase):
             msg=f"Engine caching didn't speed up the compilation. Time taken without engine caching: {times[0]} ms, time taken with engine caching: {times[2]} ms",
         )
 
+    @unittest.skipIf(
+        not torch_trt.ENABLED_FEATURES.refit,
+        "Engine caching requires refit feature that is not supported in Python 3.13 or higher",
+    )
     def test_different_args_dont_share_cached_engine(self):
         class MyModel(torch.nn.Module):
             def __init__(self):
@@ -446,6 +474,10 @@ class TestWeightStrippedEngine(TestCase):
             msg=f"It has {len(os.listdir(engine_cache_dir))} cached engine(s) but should have 2 engines",
         )
 
+    @unittest.skipIf(
+        not torch_trt.ENABLED_FEATURES.refit,
+        "Engine caching requires refit feature that is not supported in Python 3.13 or higher",
+    )
     def test_constant_mul_in_refitting(self):
         class MyModel(torch.nn.Module):
             def __init__(self):
@@ -483,6 +515,10 @@ class TestWeightStrippedEngine(TestCase):
             msg=f"TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
         )
 
+    @unittest.skipIf(
+        not torch_trt.ENABLED_FEATURES.refit,
+        "Engine caching requires refit feature that is not supported in Python 3.13 or higher",
+    )
     def test_two_TRTRuntime_in_refitting(self):
         pyt_model = models.resnet18(pretrained=True).eval().to("cuda")
         example_inputs = (torch.randn((100, 3, 224, 224)).to("cuda"),)
@@ -523,6 +559,10 @@ class TestWeightStrippedEngine(TestCase):
             )
 
     @unittest.skip("Waiting for implementation")
+    @unittest.skipIf(
+        not torch_trt.ENABLED_FEATURES.refit,
+        "Engine caching requires refit feature that is not supported in Python 3.13 or higher",
+    )
     def test_refit_identical_engine_weights(self):
         pyt_model = models.resnet18(pretrained=True).eval().to("cuda")
         example_inputs = (torch.randn((100, 3, 224, 224)).to("cuda"),)
