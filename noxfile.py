@@ -21,11 +21,6 @@ TOP_DIR = (
 )
 print(f"Test root directory {TOP_DIR}")
 
-# Set the USE_PRE_CXX11=1 to use pre_cxx11_abi
-USE_PRE_CXX11 = 0 if not "USE_PRE_CXX11" in os.environ else os.environ["USE_PRE_CXX11"]
-if USE_PRE_CXX11:
-    print("Using pre cxx11 abi")
-
 # Set the USE_HOST_DEPS=1 to use host dependencies for tests
 USE_HOST_DEPS = 0 if not "USE_HOST_DEPS" in os.environ else os.environ["USE_HOST_DEPS"]
 if USE_HOST_DEPS:
@@ -61,10 +56,7 @@ def download_models(session):
 def install_torch_trt(session):
     print("Installing latest torch-tensorrt build")
     session.chdir(os.path.join(TOP_DIR, "py"))
-    if USE_PRE_CXX11:
-        session.run("python", "setup.py", "develop", "--use-pre-cxx11-abi")
-    else:
-        session.run("python", "setup.py", "develop")
+    session.run("python", "setup.py", "develop")
 
 
 def train_model(session):

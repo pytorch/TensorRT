@@ -206,7 +206,7 @@ jobs:
               ${CONDA_RUN} python setup.py bdist_wheel --release
 
               cp bazel-bin/libtorchtrt.tar.gz \
-              release/tarball/libtorchtrt-${BUILD_VERSION}-pre-cxx11-abi-tensorrt${TRT_VERSION}-cuda${CU_VERSION:2}-libtorch${PYTORCH_VERSION}-x86_64-linux.tar.gz
+              release/tarball/libtorchtrt-${BUILD_VERSION}-tensorrt${TRT_VERSION}-cuda${CU_VERSION:2}-libtorch${PYTORCH_VERSION}-x86_64-linux.tar.gz
 
               ${CONDA_RUN} python -m pip install auditwheel
               ${CONDA_RUN} python -m auditwheel repair \
@@ -240,12 +240,12 @@ jobs:
         with:
           name: ${{ env.ARTIFACT_NAME }}
           path: ${{ inputs.repository }}/release/wheel/
-      - name: Upload pre-cxx11 tarball to GitHub
+      - name: Upload cxx11 tarball to GitHub
         if: ${{ inputs.cxx11-tarball-release != 'true' && env.PYTHON_VERSION == '3.11' }}
         continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
-          name: pre-cxx11-tarball-${{ env.PYTHON_VERSION }}-${{ env.CU_VERSION }}
+          name: cxx11-tarball-${{ env.PYTHON_VERSION }}-${{ env.CU_VERSION }}
           path: ${{ inputs.repository }}/release/tarball/
       - name: Upload cxx11 tarball to GitHub
         if: ${{ inputs.cxx11-tarball-release == 'true' }}

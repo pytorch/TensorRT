@@ -2,13 +2,6 @@ load("@rules_cc//cc:defs.bzl", "cc_test")
 load("//tests/core/partitioning:partitioning_test.bzl", "partitioning_test")
 
 config_setting(
-    name = "use_pre_cxx11_abi",
-    values = {
-        "define": "abi=pre_cxx11_abi",
-    },
-)
-
-config_setting(
     name = "windows",
     constraint_values = [
         "@platforms//os:windows",
@@ -62,7 +55,6 @@ cc_test(
         "@googletest//:gtest_main",
     ] + select({
         ":windows": ["@libtorch_win//:libtorch"],
-        ":use_pre_cxx11_abi": ["@libtorch_pre_cxx11_abi//:libtorch"],
         "//conditions:default": ["@libtorch"],
     }),
 )
@@ -78,7 +70,6 @@ cc_test(
         "@googletest//:gtest_main",
     ] + select({
         ":windows": ["@libtorch_win//:libtorch"],
-        ":use_pre_cxx11_abi": ["@libtorch_pre_cxx11_abi//:libtorch"],
         "//conditions:default": ["@libtorch"],
     }),
 )
@@ -94,7 +85,6 @@ cc_test(
         "@googletest//:gtest_main",
     ] + select({
         ":windows": ["@libtorch_win//:libtorch"],
-        ":use_pre_cxx11_abi": ["@libtorch_pre_cxx11_abi//:libtorch"],
         "//conditions:default": ["@libtorch"],
     }),
 )
@@ -110,7 +100,6 @@ cc_test(
         "@googletest//:gtest_main",
     ] + select({
         ":windows": ["@libtorch_win//:libtorch"],
-        ":use_pre_cxx11_abi": ["@libtorch_pre_cxx11_abi//:libtorch"],
         "//conditions:default": ["@libtorch"],
     }),
 )
