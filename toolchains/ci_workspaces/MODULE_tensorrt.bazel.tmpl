@@ -87,21 +87,10 @@ http_archive(
 # Locally installed dependencies (use in cases of custom dependencies or aarch64)
 ####################################################################################
 
-# NOTE: In the case you are using just the pre-cxx11-abi path or just the cxx11 abi path
-# with your local libtorch, just point deps at the same path to satisfy bazel.
-
-# NOTE: NVIDIA's aarch64 PyTorch (python) wheel file uses the CXX11 ABI unlike PyTorch's standard
-# x86_64 python distribution. If using NVIDIA's version just point to the root of the package
-# for both versions here and do not use --config=pre-cxx11-abi
+# NOTE: In the case you are using just the cxx11 abi path with your local libtorch, just point deps at the same path to satisfy bazel.
 
 new_local_repository(
     name = "libtorch_win",
-    path = "${TORCH_INSTALL_PATH}",
-    build_file = "third_party/libtorch/BUILD"
-)
-
-new_local_repository(
-    name = "libtorch_pre_cxx11_abi",
     path = "${TORCH_INSTALL_PATH}",
     build_file = "third_party/libtorch/BUILD"
 )

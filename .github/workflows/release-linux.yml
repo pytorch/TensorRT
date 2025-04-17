@@ -97,7 +97,7 @@ jobs:
           echo "matrix=${MATRIX_BLOB}" >> "${GITHUB_OUTPUT}"
 
   release-other-artifacts:
-    name: Release torch-tensorrt wheel and pre-cxx11 tarball artifacts
+    name: Release torch-tensorrt wheel and cxx11 tarball artifacts
     needs: [generate-release-wheel-matrix]
     strategy:
       fail-fast: false
