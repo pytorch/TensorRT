@@ -1014,7 +1014,7 @@ def download_plugin_lib_path(py_version: str, platform: str) -> str:
     # Downloading TRT-LLM lib
     # TODO: check how to fix the 0.18.0 hardcode below
     base_url = "https://pypi.nvidia.com/tensorrt-llm/"
-    file_name = f"tensorrt_llm-0.18.0.post1-{py_version}-{py_version}-{platform}.whl"
+    file_name = f"tensorrt_llm-0.18.0-{py_version}-{py_version}-{platform}.whl"
     download_url = base_url + file_name
     cmd = ["wget", download_url]
     if not (os.path.exists(file_name)):
@@ -1051,19 +1051,14 @@ def download_plugin_lib_path(py_version: str, platform: str) -> str:
 def load_tensorrt_llm() -> bool:
     """
     Attempts to load the TensorRT-LLM plugin and initialize it.
-    Either the env variable TRTLLM_PLUGINS_PATH specifies the path
-    If the above is not, the user can specify USE_TRTLLM_PLUGINS as either of 1, true, yes, on to download the TRT-LLM distribution and load it
+    Either the env variable TRTLLM_PLUGINS_PATH can specify the path
+    Or the user can specify USE_TRTLLM_PLUGINS as either of (1, true, yes, on) to download the TRT-LLM distribution and load it
 
     Returns:
         bool: True if the plugin was successfully loaded and initialized, False otherwise.
     """
     plugin_lib_path = os.environ.get("TRTLLM_PLUGINS_PATH")
     if not plugin_lib_path:
-        _LOGGER.warning(
-            "Please set the TRTLLM_PLUGINS_PATH to the directory containing libnvinfer_plugin_tensorrt_llm.so to use converters for torch.distributed ops or else set the USE_TRTLLM_PLUGINS variable to download the shared library",
-        )
-        # for key, value in os.environ.items():
-        #     print(f"{key}: {value}")
         # this option can be used by user if TRTLLM_PLUGINS_PATH is not set by user
         use_trtllm_plugin = os.environ.get("USE_TRTLLM_PLUGINS", "0").lower() in (
             "1",
@@ -1073,7 +1068,7 @@ def load_tensorrt_llm() -> bool:
         )
         if not use_trtllm_plugin:
             _LOGGER.warning(
-                "Neither TRTLLM_PLUGIN_PATH is set nor is it directed to download the shared library"
+                "Neither TRTLLM_PLUGIN_PATH is set nor is it directed to download the shared library. Please set either of the two to use TRT-LLM libraries in torchTRT"
             )
             return False
         else:
@@ -1083,16 +1078,25 @@ def load_tensorrt_llm() -> bool:
 
             platform = str(platform).lower()
             plugin_lib_path = download_plugin_lib_path(py_version, platform)
+
     try:
         # Load the shared TRT-LLM file
         handle = ctypes.CDLL(plugin_lib_path)
         _LOGGER.info(f"Successfully loaded plugin library: {plugin_lib_path}")
     except OSError as e_os_error:
-        _LOGGER.error(
-            f"Failed to load libnvinfer_plugin_tensorrt_llm.so from {plugin_lib_path}"
-            f"Ensure the path is correct and the library is compatible",
-            exc_info=e_os_error,
-        )
+        if "libmpi" in str(e_os_error):
+            _LOGGER.warning(
+                f"Failed to load libnvinfer_plugin_tensorrt_llm.so from {plugin_lib_path}. "
+                f"The dependency libmpi.so is missing. "
+                f"Please install the packages libmpich-dev and libopenmpi-dev.",
+                exc_info=e_os_error,
+            )
+        else:
+            _LOGGER.warning(
+                f"Failed to load libnvinfer_plugin_tensorrt_llm.so from {plugin_lib_path}"
+                f"Ensure the path is correct and the library is compatible",
+                exc_info=e_os_error,
+            )
         return False
 
     try:
@@ -1121,3 +1125,4 @@ def load_tensorrt_llm() -> bool:
             exc_info=e_initialization_error,
         )
         return False
+    return False
