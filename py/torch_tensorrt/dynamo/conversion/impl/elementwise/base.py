@@ -3,6 +3,7 @@ import warnings
 from typing import Any, Callable, Optional, Union
 
 import numpy as np
+import tensorrt as trt
 import torch
 from torch.fx.node import Target
 from torch_tensorrt import _enums
@@ -15,10 +16,9 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     get_trt_tensor,
     has_dynamic_shape,
     set_layer_name,
+    to_torch,
 )
 from torch_tensorrt.dynamo.types import TRTElementWiseOp, TRTTensor
-
-import tensorrt as trt
 
 
 def get_python_op_from_trt_elementwise_op(
@@ -125,10 +125,9 @@ def convert_binary_elementwise(
     # dtype but we don't have a way to detect whether it makes sense for the
     # scalar to be float or half. Hence we go with the lhs dtype.
     if is_lhs_trt_tensor and isinstance(rhs_val, (float, int, bool)):
-        rhs_val = np.array([rhs_val], dtype=_enums.dtype._from(lhs_dtype).to(np.dtype))
+        rhs_val = to_torch(rhs_val, dtype=lhs_dtype)
     if is_rhs_trt_tensor and isinstance(lhs_val, (float, int, bool)):
-        lhs_val = np.array([lhs_val], dtype=_enums.dtype._from(rhs_dtype).to(np.dtype))
-
+        lhs_val = to_torch(lhs_val, dtype=rhs_dtype)
     lhs_val = get_trt_tensor(ctx, lhs_val, f"{name}_lhs", lhs_dtype)
     rhs_val = get_trt_tensor(ctx, rhs_val, f"{name}_rhs", rhs_dtype)
 
