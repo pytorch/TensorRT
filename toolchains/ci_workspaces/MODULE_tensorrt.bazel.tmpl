@@ -87,7 +87,7 @@ http_archive(
 # Locally installed dependencies (use in cases of custom dependencies or aarch64)
 ####################################################################################
 
-# NOTE: In the case you are using just the cxx11 abi path with your local libtorch, just point deps at the same path to satisfy bazel.
+# NOTE: If you are using a local build of torch, just point the Libtorch dep to that path.
 
 new_local_repository(
     name = "libtorch_win",
