@@ -128,24 +128,3 @@ def _get_most_compatible_device(
                 best_match = candidate
 
     return best_match
-
-
-@torch.library.custom_op(
-    "tensorrt::no_op_placeholder_for_execute_engine", mutates_args=()
-)
-def no_op_placeholder_for_execute_engine(
-    inputs: List[torch.Tensor],
-    abi_version: str,
-    name: str,
-    serialized_device_info: str,
-    serialized_engine: str,
-    serialized_in_binding_names: str,
-    serialized_out_binding_names: str,
-    serialized_hardware_compatible: str,
-    serialized_metadata: str,
-    serialized_target_platform: str,
-    serialized_require_output_allocator: str,
-) -> List[torch.Tensor]:
-    raise RuntimeError(
-        "The saved model is cross compiled for windows in Linux, should only be loadded in Windows via torch_tensorrt.load_cross_compiled_exported_program() api."
-    )
