@@ -3,7 +3,6 @@ from typing import Dict, List, Tuple
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from transformers import BertConfig, BertModel, BertTokenizer
 
 
 # Sample Pool Model (for testing plugin serialization)
@@ -165,6 +164,8 @@ class ListInputTupleOutput(nn.Module):
 
 
 def BertModule():
+    from transformers import BertConfig, BertModel, BertTokenizer
+
     enc = BertTokenizer.from_pretrained("google-bert/bert-base-uncased")
     text = "[CLS] Who was Jim Henson ? [SEP] Jim Henson was a puppeteer [SEP]"
     tokenized_text = enc.tokenize(text)
