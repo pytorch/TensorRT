@@ -36,7 +36,6 @@ ROCM_ARCHES_DICT = {
 }
 
 PACKAGE_TYPES = ["wheel", "conda", "libtorch"]
-PRE_CXX11_ABI = "pre-cxx11"
 CXX11_ABI = "cxx11-abi"
 RELEASE = "release"
 DEBUG = "debug"
@@ -141,11 +140,10 @@ def initialize_globals(channel: str, build_python_only: bool) -> None:
     else:
         PYTHON_ARCHES = PYTHON_ARCHES_DICT[channel]
     WHEEL_CONTAINER_IMAGES = {
-        "11.8": "pytorch/manylinux2_28-builder:cuda11.8",
-        "12.1": "pytorch/manylinux2_28-builder:cuda12.1",
-        "12.4": "pytorch/manylinux2_28-builder:cuda12.4",
-        "12.6": "pytorch/manylinux2_28-builder:cuda12.6",
-        "12.8": "pytorch/manylinux2_28-builder:cuda12.8",
+        **{
+            gpu_arch: f"pytorch/manylinux2_28-builder:cuda{gpu_arch}"
+            for gpu_arch in CUDA_ARCHES
+        },
         **{
             gpu_arch: f"pytorch/manylinux2_28-builder:rocm{gpu_arch}"
             for gpu_arch in ROCM_ARCHES
@@ -154,26 +152,17 @@ def initialize_globals(channel: str, build_python_only: bool) -> None:
         XPU: "pytorch/manylinux2_28-builder:xpu",
         # TODO: Migrate CUDA_AARCH64 image to manylinux2_28_aarch64-builder:cuda12.4
         CPU_AARCH64: "pytorch/manylinux2_28_aarch64-builder:cpu-aarch64",
-        CUDA_AARCH64: "pytorch/manylinuxaarch64-builder:cuda12.4",
+        CUDA_AARCH64: "pytorch/manylinuxaarch64-builder:cuda12.6",
     }
     LIBTORCH_CONTAINER_IMAGES = {
-        **{
-            (gpu_arch, PRE_CXX11_ABI): f"pytorch/manylinux2_28-builder:cuda{gpu_arch}"
-            for gpu_arch in CUDA_ARCHES
-        },
         **{
             (gpu_arch, CXX11_ABI): f"pytorch/libtorch-cxx11-builder:cuda{gpu_arch}"
             for gpu_arch in CUDA_ARCHES
         },
         **{
-            (gpu_arch, PRE_CXX11_ABI): f"pytorch/manylinux2_28-builder:rocm{gpu_arch}"
-            for gpu_arch in ROCM_ARCHES
-        },
-        **{
             (gpu_arch, CXX11_ABI): f"pytorch/libtorch-cxx11-builder:rocm{gpu_arch}"
             for gpu_arch in ROCM_ARCHES
         },
-        (CPU, PRE_CXX11_ABI): "pytorch/manylinux2_28-builder:cpu",
         (CPU, CXX11_ABI): "pytorch/libtorch-cxx11-builder:cpu",
     }
 
@@ -344,7 +333,7 @@ def generate_libtorch_matrix(
         if os == WINDOWS:
             abi_versions = [RELEASE, DEBUG]
         elif os == LINUX:
-            abi_versions = [PRE_CXX11_ABI, CXX11_ABI]
+            abi_versions = [CXX11_ABI]
         elif os in [MACOS_ARM64]:
             abi_versions = [CXX11_ABI]
         else:

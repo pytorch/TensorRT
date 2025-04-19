@@ -1,13 +1,6 @@
 load("//tests/core/conversion/converters:converter_test.bzl", "converter_test")
 
 config_setting(
-    name = "use_pre_cxx11_abi",
-    values = {
-        "define": "abi=pre_cxx11_abi",
-    },
-)
-
-config_setting(
     name = "windows",
     constraint_values = [
         "@platforms//os:windows",

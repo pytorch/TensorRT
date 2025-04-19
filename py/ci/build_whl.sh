@@ -94,22 +94,3 @@ libtorchtrt() {
     TORCH_VERSION=$(${PY_DIR}/bin/python -c "from torch import __version__;print(__version__.split('+')[0])")
     cp ${PROJECT_DIR}/bazel-bin/libtorchtrt.tar.gz ${PROJECT_DIR}/py/wheelhouse/libtorchtrt-${TORCHTRT_VERSION}-tensorrt${TRT_VERSION}-cuda${CUDA_VERSION}-libtorch${TORCH_VERSION}-x86_64-linux.tar.gz
 }
-
-libtorchtrt_pre_cxx11_abi() {
-    cd ${PROJECT_DIR}/py
-    mkdir -p ${PROJECT_DIR}/py/wheelhouse
-    PY_BUILD_CODE=cp310-cp310
-    PY_VERSION=3.10
-    PY_NAME=python${PY_VERSION}
-    PY_DIR=/opt/python/${PY_BUILD_CODE}
-    PY_PKG_DIR=${PY_DIR}/lib/${PY_NAME}/site-packages/
-    ${PY_DIR}/bin/python -m pip install --upgrade pip
-    ${PY_DIR}/bin/python -m pip install -r ${PROJECT_DIR}/py/requirements.txt
-    ${PY_DIR}/bin/python -m pip install setuptools wheel auditwheel
-    bazel build //:libtorchtrt --config pre_cxx11_abi --platforms //toolchains:ci_rhel_x86_64_linux -c opt --noshow_progress
-    CUDA_VERSION=$(cd ${PROJECT_DIR} && ${PY_DIR}/bin/python3 -c "import versions; versions.cuda_version()")
-    TORCHTRT_VERSION=$(cd ${PROJECT_DIR} && ${PY_DIR}/bin/python3 -c "import versions; versions.torch_tensorrt_version_release()")
-    TRT_VERSION=$(cd ${PROJECT_DIR} && ${PY_DIR}/bin/python3 -c "import versions; versions.tensorrt_version()")
-    TORCH_VERSION=$(${PY_DIR}/bin/python -c "from torch import __version__;print(__version__.split('+')[0])")
-    cp ${PROJECT_DIR}/bazel-bin/libtorchtrt.tar.gz ${PROJECT_DIR}/py/wheelhouse/libtorchtrt-${TORCHTRT_VERSION}-pre-cxx11-abi-tensorrt${TRT_VERSION}-cuda${CUDA_VERSION}-libtorch${TORCH_VERSION}-x86_64-linux.tar.gz
-}

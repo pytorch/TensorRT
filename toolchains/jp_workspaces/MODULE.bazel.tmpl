@@ -47,15 +47,8 @@ new_local_repository(
 )
 
 new_local_repository(
-    name = "libtorch_pre_cxx11_abi",
-    path = "${TORCH_INSTALL_PATH}",
-    build_file = "third_party/libtorch/BUILD"
-)
-
-new_local_repository(
    name = "tensorrt",
    path = "/usr/",
    build_file = "@//third_party/tensorrt/local:BUILD"
 )
 
- 

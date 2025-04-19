@@ -78,7 +78,6 @@ load_dep_info()
 
 dir_path = os.path.join(str(get_root_dir()), "py")
 
-PRE_CXX11_ABI = False
 JETPACK_VERSION = None
 PY_ONLY = False
 NO_TS = False
@@ -136,14 +135,6 @@ if (ci_env_var := os.environ.get("CI_BUILD")) is not None:
     if ci_env_var == "1":
         CI_BUILD = True
 
-if "--use-pre-cxx11-abi" in sys.argv:
-    sys.argv.remove("--use-pre-cxx11-abi")
-    PRE_CXX11_ABI = True
-
-if (pre_cxx11_abi_env_var := os.environ.get("USE_PRE_CXX11_ABI")) is not None:
-    if pre_cxx11_abi_env_var == "1":
-        PRE_CXX11_ABI = True
-
 if platform.uname().processor == "aarch64":
     if "--jetpack-version" in sys.argv:
         version_idx = sys.argv.index("--jetpack-version") + 1
@@ -165,11 +156,6 @@ if platform.uname().processor == "aarch64":
         )
         JETPACK_VERSION = "6.1"
 
-    if PRE_CXX11_ABI:
-        warnings.warn(
-            "Jetson platform detected. Please remove --use-pre-cxx11-abi flag if you are using it."
-        )
-
 
 BAZEL_EXE = None
 if not PY_ONLY:
@@ -184,7 +170,6 @@ if not PY_ONLY:
 def build_libtorchtrt_cxx11_abi(
     develop=True,
     use_dist_dir=True,
-    pre_cxx11_abi=False,
     rt_only=False,
     target_python=True,
 ):
@@ -203,13 +188,6 @@ def build_libtorchtrt_cxx11_abi(
 
     if target_python:
         cmd.append("--config=python")
-
-    if pre_cxx11_abi:
-        cmd.append("--config=pre_cxx11_abi")
-        print("using PRE CXX11 ABI build")
-    else:
-        cmd.append("--config=cxx11_abi")
-        print("using CXX11 ABI build")
 
     if IS_WINDOWS:
         cmd.append("--config=windows")
@@ -301,10 +279,7 @@ class DevelopCommand(develop):
 
     def run(self):
         if not PY_ONLY:
-            global PRE_CXX11_ABI
-            build_libtorchtrt_cxx11_abi(
-                develop=True, pre_cxx11_abi=PRE_CXX11_ABI, rt_only=NO_TS
-            )
+            build_libtorchtrt_cxx11_abi(develop=True, rt_only=NO_TS)
             copy_libtorchtrt(rt_only=NO_TS)
 
         gen_version_file()
@@ -324,10 +299,7 @@ class InstallCommand(install):
 
     def run(self):
         if not PY_ONLY:
-            global PRE_CXX11_ABI
-            build_libtorchtrt_cxx11_abi(
-                develop=False, pre_cxx11_abi=PRE_CXX11_ABI, rt_only=NO_TS
-            )
+            build_libtorchtrt_cxx11_abi(develop=False, rt_only=NO_TS)
             copy_libtorchtrt(rt_only=NO_TS)
 
         gen_version_file()
@@ -347,10 +319,7 @@ class BdistCommand(bdist_wheel):
 
     def run(self):
         if not PY_ONLY:
-            global PRE_CXX11_ABI
-            build_libtorchtrt_cxx11_abi(
-                develop=False, pre_cxx11_abi=PRE_CXX11_ABI, rt_only=NO_TS
-            )
+            build_libtorchtrt_cxx11_abi(develop=False, rt_only=NO_TS)
             copy_libtorchtrt(rt_only=NO_TS)
 
         gen_version_file()
@@ -373,10 +342,7 @@ class EditableWheelCommand(editable_wheel):
             gen_version_file()
             editable_wheel.run(self)
         else:
-            global PRE_CXX11_ABI
-            build_libtorchtrt_cxx11_abi(
-                develop=True, pre_cxx11_abi=PRE_CXX11_ABI, rt_only=NO_TS
-            )
+            build_libtorchtrt_cxx11_abi(develop=True, rt_only=NO_TS)
             gen_version_file()
             copy_libtorchtrt(rt_only=NO_TS)
             editable_wheel.run(self)
@@ -568,11 +534,7 @@ if not (PY_ONLY or NO_TS):
                     "-Wno-deprecated",
                     "-Wno-deprecated-declarations",
                 ]
-                + (
-                    ["-D_GLIBCXX_USE_CXX11_ABI=0"]
-                    if PRE_CXX11_ABI
-                    else ["-D_GLIBCXX_USE_CXX11_ABI=1"]
-                )
+                + ["-D_GLIBCXX_USE_CXX11_ABI=1"]
             ),
             extra_link_args=(
                 []
@@ -591,11 +553,7 @@ if not (PY_ONLY or NO_TS):
                     "-Xlinker",
                     "-export-dynamic",
                 ]
-                + (
-                    ["-D_GLIBCXX_USE_CXX11_ABI=0"]
-                    if PRE_CXX11_ABI
-                    else ["-D_GLIBCXX_USE_CXX11_ABI=1"]
-                )
+                + ["-D_GLIBCXX_USE_CXX11_ABI=1"]
             ),
             undef_macros=["NDEBUG"],
         )
