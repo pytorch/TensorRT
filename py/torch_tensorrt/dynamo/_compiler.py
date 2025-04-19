@@ -1206,7 +1206,7 @@ def save_cross_compiled_exported_program(
 
     from torch_tensorrt.dynamo._exporter import export
 
-    exp_program = export(gm, cross_compile_flag=True)
+    exp_program = export(gm, cross_compile_module=True)
     torch.export.save(exp_program, file_path)
     logger.debug(f"successfully saved the module for windows at {file_path}")
 
