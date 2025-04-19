@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
-from typing import Any, Dict
 
+import numpy as np
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.fx.types import TRTNetwork
 
@@ -20,4 +20,4 @@ class ConversionContext:
         default_factory=CompilationSettings
     )
     requires_output_allocator: bool = False
-    mapping: Dict[str, Any] = field(default_factory=dict)
+    mapping: dict[str, np.array] = field(default_factory=dict)
