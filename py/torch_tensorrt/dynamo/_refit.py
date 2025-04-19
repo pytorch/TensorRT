@@ -5,7 +5,6 @@ import copy
 import logging
 from typing import Any, List, Optional, Sequence, Tuple
 
-import numpy as np
 import tensorrt as trt
 import torch
 from torch.export import ExportedProgram
@@ -53,7 +52,7 @@ def construct_refit_mapping(
     module: torch.fx.GraphModule,
     inputs: Sequence[Input],
     settings: CompilationSettings = CompilationSettings(),
-) -> dict[str, np.ndarray]:
+) -> Any:
     """Find out the weight mapping between weight in exported program and TensorRT engine
     Args:
         module: FX GraphModule to interpret
@@ -93,8 +92,8 @@ def construct_refit_mapping_from_weight_name_map(
             # If weights is not in sd, we can leave it unchanged
             continue
         else:
-            trt_dtype = dtype.try_from(np_weight_type).to(trt.DataType)
-            torch_dtype = dtype.try_from(np_weight_type).to(torch.dtype)
+            trt_dtype = dtype._from(np_weight_type).to(trt.DataType)
+            torch_dtype = dtype._from(np_weight_type).to(torch.dtype)
             engine_weight_map[engine_weight_name] = state_dict[sd_weight_name].to(
                 to_torch_device(settings.device)
             )
@@ -148,8 +147,8 @@ def _refit_single_trt_engine_with_gm(
             for constant_name, val in constant_mapping.items():
                 np_weight_type = val.dtype
                 val_tensor = torch.from_numpy(val).cuda()
-                trt_dtype = dtype.try_from(np_weight_type).to(trt.DataType)
-                torch_dtype = dtype.try_from(np_weight_type).to(torch.dtype)
+                trt_dtype = dtype._from(np_weight_type).to(trt.DataType)
+                torch_dtype = dtype._from(np_weight_type).to(torch.dtype)
                 constant_mapping_with_type[constant_name] = (
                     val_tensor.clone().reshape(-1).contiguous().to(torch_dtype),
                     trt_dtype,
@@ -179,7 +178,7 @@ def _refit_single_trt_engine_with_gm(
                     raise AssertionError(f"{layer_name} is not found in weight mapping")
                 # Use Numpy to create weights
                 weight = mapping[layer_name]
-                trt_dtype = dtype.try_from(weight.dtype).to(trt.DataType)
+                trt_dtype = dtype._from(weight.dtype).to(trt.DataType)
                 trt_wt_tensor = trt.Weights(trt_dtype, weight.ctypes.data, weight.size)
                 refitter.set_named_weights(layer_name, trt_wt_tensor, trt_wt_location)
                 refitted.add(layer_name)
