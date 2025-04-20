@@ -1,4 +1,5 @@
-setuptools==70.2.0
-numpy<2.0.0
+--index-url https://pypi.jetson-ai-lab.dev/jp6/cu126
+setuptools>=70.2.0
+numpy
 packaging
 pyyaml
