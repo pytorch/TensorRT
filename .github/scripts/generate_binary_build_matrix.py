@@ -18,15 +18,16 @@ import os
 import sys
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
+PYTHON_VERSIONS_FOR_PR_BUILD = ["3.11"]
 PYTHON_ARCHES_DICT = {
-    "nightly": ["3.9", "3.10", "3.11", "3.12"],
-    "test": ["3.9", "3.10", "3.11", "3.12"],
-    "release": ["3.9", "3.10", "3.11", "3.12"],
+    "nightly": ["3.9", "3.10", "3.11", "3.12", "3.13"],
+    "test": ["3.9", "3.10", "3.11", "3.12", "3.13"],
+    "release": ["3.9", "3.10", "3.11", "3.12", "3.13"],
 }
 CUDA_ARCHES_DICT = {
     "nightly": ["11.8", "12.6", "12.8"],
     "test": ["11.8", "12.6", "12.8"],
-    "release": ["11.8", "12.6", "12.8"],
+    "release": ["11.8", "12.4", "12.6"],
 }
 ROCM_ARCHES_DICT = {
     "nightly": ["6.1", "6.2"],
@@ -422,11 +423,6 @@ def generate_wheels_matrix(
         # Define default python version
         python_versions = list(PYTHON_ARCHES)
 
-        # If the list of python versions is set explicitly by the caller, stick with it instead
-        # of trying to add more versions behind the scene
-        if channel == NIGHTLY and (os in (LINUX, MACOS_ARM64, LINUX_AARCH64)):
-            python_versions += ["3.13"]
-
     if os == LINUX:
         # NOTE: We only build manywheel packages for linux
         package_type = "manywheel"
@@ -456,7 +452,7 @@ def generate_wheels_matrix(
             arches += [XPU]
 
     if limit_pr_builds:
-        python_versions = [python_versions[0]]
+        python_versions = PYTHON_VERSIONS_FOR_PR_BUILD
 
     global WHEEL_CONTAINER_IMAGES
 

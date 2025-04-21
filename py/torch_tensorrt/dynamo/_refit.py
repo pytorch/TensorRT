@@ -11,6 +11,7 @@ import torch
 from torch.export import ExportedProgram
 from torch.fx.experimental.proxy_tensor import unset_fake_temporarily
 from torch_tensorrt._enums import dtype
+from torch_tensorrt._features import needs_refit
 from torch_tensorrt._Input import Input
 from torch_tensorrt.dynamo import partitioning
 from torch_tensorrt.dynamo._exporter import inline_torch_modules
@@ -47,6 +48,7 @@ from torch_tensorrt.logging import TRT_LOGGER
 logger = logging.getLogger(__name__)
 
 
+@needs_refit
 def construct_refit_mapping(
     module: torch.fx.GraphModule,
     inputs: Sequence[Input],
@@ -108,8 +110,11 @@ def construct_refit_mapping(
     return weight_map
 
 
+@needs_refit
 def construct_refit_mapping_from_weight_name_map(
-    weight_name_map: dict[Any, Any], state_dict: dict[Any, Any]
+    weight_name_map: dict[Any, Any],
+    state_dict: dict[Any, Any],
+    settings: CompilationSettings,
 ) -> dict[Any, Any]:
     engine_weight_map = {}
     for engine_weight_name, (sd_weight_name, np_weight_type) in weight_name_map.items():
@@ -120,7 +125,9 @@ def construct_refit_mapping_from_weight_name_map(
             # If weights is not in sd, we can leave it unchanged
             continue
         else:
-            engine_weight_map[engine_weight_name] = state_dict[sd_weight_name]
+            engine_weight_map[engine_weight_name] = state_dict[sd_weight_name].to(
+                to_torch_device(settings.device)
+            )
 
         engine_weight_map[engine_weight_name] = (
             engine_weight_map[engine_weight_name]
@@ -134,6 +141,7 @@ def construct_refit_mapping_from_weight_name_map(
     return engine_weight_map
 
 
+@needs_refit
 def _refit_single_trt_engine_with_gm(
     new_gm: torch.fx.GraphModule,
     old_engine: trt.ICudaEngine,
@@ -163,7 +171,7 @@ def _refit_single_trt_engine_with_gm(
                 "constant_mapping", {}
             )  # type: ignore
             mapping = construct_refit_mapping_from_weight_name_map(
-                weight_name_map, new_gm.state_dict()
+                weight_name_map, new_gm.state_dict(), settings
             )
             constant_mapping_with_type = {}
 
@@ -177,21 +185,41 @@ def _refit_single_trt_engine_with_gm(
                     trt_dtype,
                 )
 
-            mapping.update(constant_mapping_with_type)
-
-            for layer_name in weight_list:
-                if layer_name not in mapping:
-                    logger.warning(f"{layer_name} is not found in weight mapping.")
-                    continue
-                # Use Numpy to create weights
-                weight, weight_dtype = mapping[layer_name]
-                trt_wt_tensor = trt.Weights(
-                    weight_dtype, weight.data_ptr(), torch.numel(weight)
+                constant_mapping: dict[str, Any] = weight_name_map.pop(
+                    "constant_mapping", {}
+                )  # type: ignore
+                mapping = construct_refit_mapping_from_weight_name_map(
+                    weight_name_map, new_gm.state_dict()
                 )
-                refitter.set_named_weights(layer_name, trt_wt_tensor, trt_wt_location)
-            assert (
-                len(refitter.get_missing_weights()) == 0
-            ), "Fast refitting failed due to incomplete mapping"
+                constant_mapping_with_type = {}
+
+                for constant_name, val in constant_mapping.items():
+                    np_weight_type = val.dtype
+                    val_tensor = torch.from_numpy(val).cuda()
+                    trt_dtype = dtype.try_from(np_weight_type).to(trt.DataType)
+                    torch_dtype = dtype.try_from(np_weight_type).to(torch.dtype)
+                    constant_mapping_with_type[constant_name] = (
+                        val_tensor.clone().reshape(-1).contiguous().to(torch_dtype),
+                        trt_dtype,
+                    )
+
+                mapping.update(constant_mapping_with_type)
+
+                for layer_name in weight_list:
+                    if layer_name not in mapping:
+                        logger.warning(f"{layer_name} is not found in weight mapping.")
+                        continue
+                    # Use Numpy to create weights
+                    weight, weight_dtype = mapping[layer_name]
+                    trt_wt_tensor = trt.Weights(
+                        weight_dtype, weight.data_ptr(), torch.numel(weight)
+                    )
+                    refitter.set_named_weights(
+                        layer_name, trt_wt_tensor, trt_wt_location
+                    )
+                assert (
+                    len(refitter.get_missing_weights()) == 0
+                ), "Fast refitting failed due to incomplete mapping"
 
         else:
             mapping = construct_refit_mapping(new_gm, input_list, settings)
@@ -213,6 +241,7 @@ def _refit_single_trt_engine_with_gm(
             raise AssertionError("Refitting failed.")
 
 
+@needs_refit
 def refit_module_weights(
     compiled_module: torch.fx.GraphModule | ExportedProgram,
     new_weight_module: ExportedProgram,

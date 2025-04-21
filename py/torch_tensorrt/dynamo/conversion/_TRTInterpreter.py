@@ -26,6 +26,7 @@ from torch.fx.node import _get_qualified_name
 from torch.fx.passes.shape_prop import TensorMetadata
 from torch.utils._python_dispatch import _disable_current_modes
 from torch_tensorrt._enums import dtype
+from torch_tensorrt._features import needs_refit
 from torch_tensorrt._Input import Input
 from torch_tensorrt.dynamo import _defaults
 from torch_tensorrt.dynamo._engine_cache import BaseEngineCache
@@ -44,7 +45,7 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     get_trt_tensor,
     to_torch,
 )
-from torch_tensorrt.dynamo.utils import DYNAMIC_DIM, get_model_device, to_torch_device
+from torch_tensorrt.dynamo.utils import DYNAMIC_DIM, to_torch_device
 from torch_tensorrt.fx.observer import Observer
 from torch_tensorrt.logging import TRT_LOGGER
 
@@ -434,6 +435,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             except Exception:
                 return torch.all(sd_weight == network_weight)
 
+    @needs_refit
     def _save_weight_mapping(self) -> None:
         """
         Construct the weight name mapping from engine weight name to state_dict weight name.
@@ -491,15 +493,10 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         _LOGGER.info("Building weight name mapping...")
         # Stage 1: Name mapping
         torch_device = to_torch_device(self.compilation_settings.device)
-        gm_is_on_cuda = get_model_device(self.module).type == "cuda"
-        if not gm_is_on_cuda:
-            # If the model original position is on CPU, move it GPU
-            sd = {
-                k: v.reshape(-1).to(torch_device)
-                for k, v in self.module.state_dict().items()
-            }
-        else:
-            sd = {k: v.reshape(-1) for k, v in self.module.state_dict().items()}
+        sd = {
+            k: v.reshape(-1).to(torch_device)
+            for k, v in self.module.state_dict().items()
+        }
         weight_name_map: dict[str, Any] = {}
         np_map = {}
         constant_mapping = {}
@@ -583,6 +580,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         gc.collect()
         torch.cuda.empty_cache()
 
+    @needs_refit
     def _insert_engine_to_cache(self, hash_val: str, serialized_engine: bytes) -> None:
         # TODO: @Evan is waiting for TRT's feature to cache the weight-stripped engine
         # if not self.compilation_settings.strip_engine_weights:
@@ -610,6 +608,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             ),
         )
 
+    @needs_refit
     def _pull_cached_engine(self, hash_val: str) -> Optional[TRTInterpreterResult]:
         # query the cached TRT engine
         cached_data = self.engine_cache.check(hash_val)  # type: ignore[union-attr]
@@ -720,7 +719,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                 if self.compilation_settings.reuse_cached_engines:
                     interpreter_result = self._pull_cached_engine(hash_val)
                     if interpreter_result is not None:  # hit the cache
-                        return interpreter_result
+                        return interpreter_result  # type: ignore[no-any-return]
 
         self._construct_trt_network_def()
 
