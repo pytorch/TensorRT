@@ -15,7 +15,7 @@ def sanitized_torch_version() -> Any:
     )
 
 
-def check_cross_compile_trt_win_lib(lib_name):
+def check_cross_compile_trt_win_lib():
     if sys.platform.startswith("linux"):
         LINUX_PATHS = ["/usr/local/cuda-12.8/lib64", "/usr/lib", "/usr/lib64"]
 
