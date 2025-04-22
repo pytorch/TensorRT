@@ -16,6 +16,6 @@ def initialize_kvcache(max_seq_len, device):
     )
 
 
-kv_cache_manager = initialize_kvcache(105, torch.device("cuda:0"))
+kv_cache_manager = initialize_kvcache(2176, torch.device("cuda:0"))
 
 from .insert_flashinfer_ops import *

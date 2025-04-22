@@ -65,7 +65,7 @@ def add_graph_input(
 
     # set fake tensor information if all required information is available
     fake_mode: Optional[FakeTensorMode] = _detect_fake_mode_from_gm(gm)
-    if fake_mode and val:
+    if fake_mode and isinstance(val, torch.Tensor):
         fake_tensor: FakeTensor = fake_mode.from_tensor(val, static_shapes=True)
         in_node.meta["val"] = fake_tensor
         in_node.meta["tensor_meta"] = _extract_tensor_metadata(fake_tensor)
@@ -230,16 +230,21 @@ def insert_flashinfer_attn_with_cache(
     # insert metadata computation and extract each argument as a node
     mha_0 = next(iter(mha_info.keys()))
     get_metadata, num_metadata = cm.attention_op.get_prepare_metadata_op()
+
     with graph.inserting_before(mha_0):
+        additional_inputs = []
+        for name in cm.info.extra_arg_names:
+            val = getattr(cm.info, name)
+            additional_inputs.append(add_graph_input(gm, name, val))
         ret_node = graph.call_function(
             get_metadata,
             args=(
                 input_nodes[0],
-                *(add_graph_input(gm, name) for name in cm.info.extra_arg_names),
+                *additional_inputs, #(add_graph_input(gm, name) for name in cm.info.extra_arg_names),
                 cm.info.page_size,
             ),
         )
-        # breakpoint()
+
         metadata_nodes = [
             graph.call_function(operator.getitem, args=(ret_node, idx))
             for idx in range(num_metadata)
@@ -248,7 +253,6 @@ def insert_flashinfer_attn_with_cache(
     buffer_in_lookup: Dict[str, Node] = {}
 
     for idx, (mha_node, gemms) in enumerate(mha_gemms.items()):
-        # breakpoint()
         qkv = [ele[1] for ele in gemms[:3]]
 
         # setup + store cache initializers and caches as input nodes
@@ -256,7 +260,8 @@ def insert_flashinfer_attn_with_cache(
         for k, fn in cm.attention_op.get_cache_initializers(mha_info[mha_node]).items():
             k_indexed = f"{k}_{idx}"
             cm.add_cache(k_indexed, fn)
-            cache_in_nodes.append(add_graph_input(gm, k_indexed))
+            val = fn(cm.info)
+            cache_in_nodes.append(add_graph_input(gm, k_indexed, val))
 
         # setup + store global buffer initializers and buffers as input nodes
         # NOTE: we have to check against existing keys to make sure nothing is registered twice...
@@ -266,7 +271,8 @@ def insert_flashinfer_attn_with_cache(
         ).items():
             if k not in buffer_in_lookup:
                 cm.add_cache(k, fn)
-                buffer_in_lookup[k] = add_graph_input(gm, k)
+                val = fn(cm.info)
+                buffer_in_lookup[k] = add_graph_input(gm, k, val)
             buffer_in_nodes.append(
                 buffer_in_lookup[k]
             )  # store buffer nodes for this op
