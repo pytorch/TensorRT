@@ -43,8 +43,13 @@ _TS_FE_AVAIL = os.path.isfile(linked_file_full_path)
 _TORCHTRT_RT_AVAIL = _TS_FE_AVAIL or os.path.isfile(linked_file_runtime_full_path)
 _DYNAMO_FE_AVAIL = version.parse(sanitized_torch_version()) >= version.parse("2.1.dev")
 _FX_FE_AVAIL = True
+<<<<<<< HEAD
 _REFIT_AVAIL = True
 _WINDOWS_CROSS_COMPILE = check_cross_compile_trt_win_lib
+=======
+_REFIT_AVAIL = version.parse(sys.version.split()[0]) < version.parse("3.13")
+_WINDOWS_CROSS_COMPILE = check_cross_compile_trt_win_lib()
+>>>>>>> 0e180c5f1 (correcting CI failures)
 
 if importlib.util.find_spec("tensorrt.plugin"):
     _QDP_PLUGIN_AVAIL = True
