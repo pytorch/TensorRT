@@ -462,6 +462,7 @@ def gather(
 ) -> TRTTensor:
     input_shape = input.shape
     dim = get_positive_dim(dim, len(input_shape))
+    index = cast_trt_tensor(ctx, index, trt.int32, name + "_cast_index_tensor")
     gather_layer = ctx.net.add_gather(input, index, axis=dim)
     gather_layer.mode = trt.GatherMode.ELEMENT
     set_layer_name(gather_layer, target, name + "_gather_layer_element", source_ir)
