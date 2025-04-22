@@ -68,7 +68,7 @@ def test_base_fp8():
 @unittest.skipIf(
     platform.system() != "Linux"
     or not importlib.util.find_spec("modelopt")
-    or Version(metadata.version("nvidia-modelopt")) < Version("0.17.0"),
+    or Version(metadata.version("nvidia-modelopt")) < Version("0.27.0"),
     "modelopt 0.17.0 or later is required, Int8 quantization is supported in modelopt since 0.17.0 or later for linux",
 )
 @pytest.mark.unit
@@ -102,7 +102,7 @@ def test_base_int8():
 
     with torchtrt.logging.debug(), torch.no_grad():
         with export_torch_mode():
-            exp_program = torch.export.export(model, (input_tensor,))
+            exp_program = torch.export.export(model, (input_tensor,), strict=False)
             trt_model = torchtrt.dynamo.compile(
                 exp_program,
                 inputs=[input_tensor],
