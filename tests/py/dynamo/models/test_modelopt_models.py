@@ -100,7 +100,7 @@ def test_base_int8():
     # model has INT8 qdq nodes at this point
     output_pyt = model(input_tensor)
 
-    with torch.no_grad():
+    with torchtrt.logging.debug(), torch.no_grad():
         with export_torch_mode():
             exp_program = torch.export.export(model, (input_tensor,))
             trt_model = torchtrt.dynamo.compile(
@@ -111,6 +111,7 @@ def test_base_int8():
                 cache_built_engines=False,
                 reuse_cached_engines=False,
                 truncate_double=True,
+                debug=True,
             )
             outputs_trt = trt_model(input_tensor)
             assert torch.allclose(output_pyt, outputs_trt, rtol=5e-3, atol=1e-2)

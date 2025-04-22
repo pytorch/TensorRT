@@ -45,7 +45,9 @@ def quantize(
             max_bound = 448
 
         amax = to_torch(amax, None)
+        print(f"=========== AMAX: {amax}")
         scale = torch.divide(amax, max_bound)
+        print(f"=========== SCALE: {scale}")
         scale = get_trt_tensor(ctx, scale, name + "_scale")
         # Add Q node
         quantize_layer = ctx.net.add_quantize(input_tensor, scale)
