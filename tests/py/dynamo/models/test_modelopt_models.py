@@ -58,7 +58,6 @@ def test_base_fp8():
                 inputs=[input_tensor],
                 enabled_precisions={torch.float8_e4m3fn},
                 min_block_size=1,
-                debug=True,
                 cache_built_engines=False,
                 reuse_cached_engines=False,
             )
@@ -109,7 +108,6 @@ def test_base_int8():
                 inputs=[input_tensor],
                 enabled_precisions={torch.int8},
                 min_block_size=1,
-                debug=True,
                 cache_built_engines=False,
                 reuse_cached_engines=False,
                 truncate_double=True,
