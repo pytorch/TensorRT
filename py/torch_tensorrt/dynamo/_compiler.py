@@ -11,6 +11,7 @@ from torch.export import ExportedProgram
 from torch.fx.node import Target
 from torch_tensorrt._Device import Device
 from torch_tensorrt._enums import EngineCapability, dtype
+from torch_tensorrt._features import needs_cross_compile
 from torch_tensorrt._Input import Input
 from torch_tensorrt.dynamo import _defaults, partitioning
 from torch_tensorrt.dynamo._DryRunTracker import (
@@ -49,6 +50,7 @@ from torch_tensorrt.dynamo.utils import (
 logger = logging.getLogger(__name__)
 
 
+@needs_cross_compile
 def cross_compile_for_windows(
     exported_program: ExportedProgram,
     inputs: Optional[Sequence[Sequence[Any]]] = None,
@@ -1190,6 +1192,7 @@ def convert_exported_program_to_serialized_trt_engine(
     return serialized_engine
 
 
+@needs_cross_compile
 def save_cross_compiled_exported_program(
     gm: torch.fx.GraphModule,
     file_path: str,
@@ -1211,6 +1214,7 @@ def save_cross_compiled_exported_program(
     logger.debug(f"successfully saved the module for windows at {file_path}")
 
 
+@needs_cross_compile
 def load_cross_compiled_exported_program(file_path: str = "") -> Any:
     """
     Load an ExportedProgram file in Windows which was previously cross compiled in Linux
