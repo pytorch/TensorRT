@@ -7,6 +7,7 @@ import pytest
 import torch
 import torch_tensorrt
 from torch.testing._internal.common_utils import TestCase
+from torch_tensorrt._utils import check_cross_compile_trt_win_lib
 
 from ..testing_utilities import DECIMALS_OF_AGREEMENT
 
@@ -15,6 +16,10 @@ class TestCrossCompileSaveForWindows(TestCase):
     @unittest.skipIf(
         platform.system() != "Linux" or platform.architecture()[0] != "64bit",
         "Cross compile for windows can only be enabled on linux x86-64 platform",
+    )
+    @unittest.skipIf(
+        not (check_cross_compile_trt_win_lib()),
+        "TRT windows lib for cross compile not found",
     )
     @pytest.mark.unit
     def test_cross_compile_for_windows(self):
@@ -39,6 +44,10 @@ class TestCrossCompileSaveForWindows(TestCase):
     @unittest.skipIf(
         platform.system() != "Linux" or platform.architecture()[0] != "64bit",
         "Cross compile for windows can only be enabled on linux x86-64 platform",
+    )
+    @unittest.skipIf(
+        not (check_cross_compile_trt_win_lib()),
+        "TRT windows lib for cross compile not found",
     )
     @pytest.mark.unit
     def test_dynamo_cross_compile_for_windows(self):
@@ -67,6 +76,10 @@ class TestCrossCompileSaveForWindows(TestCase):
     @unittest.skipIf(
         platform.system() != "Linux" or platform.architecture()[0] != "64bit",
         "Cross compile for windows can only be enabled on linux x86-64 platform",
+    )
+    @unittest.skipIf(
+        not (check_cross_compile_trt_win_lib()),
+        "TRT windows lib for cross compile not found",
     )
     @pytest.mark.unit
     def test_dynamo_cross_compile_for_windows_multiple_output(self):

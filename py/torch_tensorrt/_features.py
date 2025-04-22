@@ -3,7 +3,10 @@ import sys
 from collections import namedtuple
 from typing import Any, Callable, Dict, List, Optional, Type, TypeVar
 
-from torch_tensorrt._utils import sanitized_torch_version
+from torch_tensorrt._utils import (
+    check_cross_compile_trt_win_lib,
+    sanitized_torch_version,
+)
 
 from packaging import version
 
@@ -15,6 +18,7 @@ FeatureSet = namedtuple(
         "dynamo_frontend",
         "fx_frontend",
         "refit",
+        "windows_cross_compile",
     ],
 )
 
@@ -38,9 +42,15 @@ _TORCHTRT_RT_AVAIL = _TS_FE_AVAIL or os.path.isfile(linked_file_runtime_full_pat
 _DYNAMO_FE_AVAIL = version.parse(sanitized_torch_version()) >= version.parse("2.1.dev")
 _FX_FE_AVAIL = True
 _REFIT_AVAIL = True
+_WINDOWS_CROSS_COMPILE = check_cross_compile_trt_win_lib()
 
 ENABLED_FEATURES = FeatureSet(
-    _TS_FE_AVAIL, _TORCHTRT_RT_AVAIL, _DYNAMO_FE_AVAIL, _FX_FE_AVAIL, _REFIT_AVAIL
+    _TS_FE_AVAIL,
+    _TORCHTRT_RT_AVAIL,
+    _DYNAMO_FE_AVAIL,
+    _FX_FE_AVAIL,
+    _REFIT_AVAIL,
+    _WINDOWS_CROSS_COMPILE,
 )
 
 
@@ -73,6 +83,22 @@ def needs_refit(f: Callable[..., Any]) -> Callable[..., Any]:
             def not_implemented(*args: List[Any], **kwargs: Dict[str, Any]) -> Any:
                 raise NotImplementedError(
                     "Refit feature is currently not available in Python 3.13 or higher"
+                )
+
+            return not_implemented(*args, **kwargs)
+
+    return wrapper
+
+
+def needs_cross_compile(f: Callable[..., Any]) -> Callable[..., Any]:
+    def wrapper(*args: List[Any], **kwargs: Dict[str, Any]) -> Any:
+        if ENABLED_FEATURES.windows_cross_compile:
+            return f(*args, **kwargs)
+        else:
+
+            def not_implemented(*args: List[Any], **kwargs: Dict[str, Any]) -> Any:
+                raise NotImplementedError(
+                    "Windows cross compilation feature is not available"
                 )
 
             return not_implemented(*args, **kwargs)
