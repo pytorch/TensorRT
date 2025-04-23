@@ -51,16 +51,17 @@ class PaliGemmaWrapper(nn.Module):
         # 4. Insert image features at image token positions (using masked_scatter)
         special_image_mask = (input_ids == self.model.config.image_token_index).unsqueeze(-1)
         special_image_mask = special_image_mask.expand_as(inputs_embeds).to(inputs_embeds.device)
+        special_image_mask = special_image_mask.expand_as(inputs_embeds)
         
         # Ensure image features and embeddings have compatible formats
         image_features = image_features.to(inputs_embeds.device, inputs_embeds.dtype)
         
         # Insert image features using masked_scatter (applied directly without condition checks)
-        inputs_embeds = inputs_embeds.masked_scatter(special_image_mask, image_features)
+        # inputs_embeds = inputs_embeds.masked_scatter(special_image_mask, image_features)
         
         # 5. Process attention mask
         if attention_mask is None:
-            attention_mask = torch.ones_like(input_ids, device=input_ids.device)
+            attention_mask = torch.ones_like(input_ids, device=input_ids.device, dtype=torch.int64)
             
         # 6. Calculate logits through language model
         outputs = self.model.language_model(
@@ -200,16 +201,30 @@ def test_unified_model(compiled_model, original_wrapper, processor, test_image, 
             return original_wrapper(
                 input_ids=inputs["input_ids"],
                 pixel_values=inputs["pixel_values"].half(),
-                attention_mask=inputs["attention_mask"]
+                attention_mask=inputs["attention_mask"].to(torch.float16)
             )
     
     # Run compiled model
     def run_compiled():
         with torch.inference_mode():
+            # Prepare inputs for TensorRT engine
+            input_ids_rt = inputs["input_ids"]            # Long type is acceptable (allowed in enabled_precisions)
+            pixel_values_rt = inputs["pixel_values"].half()  # float16
+            
+            # Build a 4D attention mask to match the compilation profile
+            # Shape: [batch, 1, seq_len, ext_seq_len]
+            batch_rt, seq_len_rt = input_ids_rt.shape
+            ext_seq_len_rt = seq_len_rt + 100  # Matching the logic used for dummy mask
+            attention_mask_rt = torch.ones(
+                batch_rt, 1, seq_len_rt, ext_seq_len_rt,
+                dtype=torch.float16,
+                device=input_ids_rt.device
+            )
+            
             return compiled_model(
-                inputs["input_ids"],
-                inputs["pixel_values"].half(),
-                attention_mask=inputs["attention_mask"]
+                input_ids_rt,
+                pixel_values_rt,
+                attention_mask_rt
             )
     
     # Validate accuracy
