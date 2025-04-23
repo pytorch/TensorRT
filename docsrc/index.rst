@@ -39,6 +39,7 @@ User Guide
 * :ref:`runtime`
 * :ref:`using_dla`
 * :ref:`mixed_precision`
+* :ref:`debugging`
 
 .. toctree::
    :caption: User Guide
@@ -51,6 +52,7 @@ User Guide
    user_guide/runtime
    user_guide/using_dla
    user_guide/mixed_precision
+   user_guide/debugging
 
 
 Tutorials
