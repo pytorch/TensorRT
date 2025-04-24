@@ -84,6 +84,9 @@ def quantize(
         elif num_bits == 8 and exponent_bits == 4:
             dtype = trt.DataType.FP8
 
+        if not isinstance(input_tensor, TRTTensor):
+            input_tensor = get_trt_tensor(ctx, input_tensor, name + "_quantize_input")
+
         quantize_layer = ctx.net.add_quantize(input_tensor, scale, dtype)
 
         set_layer_name(quantize_layer, target, name + "_quantize", source_ir)
@@ -93,11 +96,8 @@ def quantize(
             q_output, scale, output_type=input_tensor.dtype
         )
         set_layer_name(dequantize_layer, target, name + "_dequantize", source_ir)
-        if num_bits == 8 and exponent_bits == 0:
-            dequantize_layer.precision = trt.DataType.INT8
-        elif num_bits == 8 and exponent_bits == 4:
-            # Set DQ layer precision to FP8
-            dequantize_layer.precision = trt.DataType.FP8
+        dequantize_layer.precision = dtype
+
         dq_output = dequantize_layer.get_output(0)
 
         return dq_output
