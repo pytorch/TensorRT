@@ -815,7 +815,6 @@ def test_refit_cumsum_fallback():
             exp_program,
             tuple(inputs),
             enabled_precisions={torch.float},
-            debug=True,
             min_block_size=1,
             immutable_weights=False,
         )
