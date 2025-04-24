@@ -254,7 +254,6 @@ def test_base_fp8(ir):
 
 @unittest.skipIf(
     platform.system() != "Linux"
-    or torch.cuda.get_device_capability() < (8, 9)
     or not importlib.util.find_spec("modelopt")
     or Version(metadata.version("nvidia-modelopt")) < Version("0.17.0"),
     "modelopt 0.17.0 or later is required, Int8 quantization is supported in modelopt since 0.17.0 or later for linux",
