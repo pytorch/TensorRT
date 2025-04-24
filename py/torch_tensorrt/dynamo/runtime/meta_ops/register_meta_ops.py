@@ -142,8 +142,32 @@ class FakeTRTEngine:
     def infer_outputs(self, input_shapes: List[Any]) -> Any:
         pass
 
+    def reset_captured_graph(self) -> Any:
+        pass
+
     def __setstate__(self, serialized_state: List[str]) -> Any:
         pass
 
     def __getstate__(self) -> Any:
         pass
+
+
+@torch.library.custom_op(
+    "tensorrt::no_op_placeholder_for_execute_engine", mutates_args=()
+)
+def no_op_placeholder_for_execute_engine(
+    inputs: List[torch.Tensor],
+    abi_version: str,
+    name: str,
+    serialized_device_info: str,
+    serialized_engine: str,
+    serialized_in_binding_names: str,
+    serialized_out_binding_names: str,
+    serialized_hardware_compatible: str,
+    serialized_metadata: str,
+    serialized_target_platform: str,
+    serialized_require_output_allocator: str,
+) -> List[torch.Tensor]:
+    raise RuntimeError(
+        "The saved model is cross compiled for windows in Linux, should only be loadded in Windows via torch_tensorrt.load_cross_compiled_exported_program() api."
+    )

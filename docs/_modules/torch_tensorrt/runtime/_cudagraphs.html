@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt.runtime._cudagraphs &mdash; Torch-TensorRT v2.7.0.dev0+bffe240 documentation</title>
+  <title>torch_tensorrt.runtime._cudagraphs &mdash; Torch-TensorRT v2.8.0.dev0+3b30409 documentation</title>
   
 
   
@@ -290,7 +290,7 @@
               
               
                 <div class="version">
-                  v2.7.0.dev0+bffe240
+                  v2.8.0.dev0+3b30409
                 </div>
               
             
@@ -345,6 +345,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/converter_overloading.html">Overloading Torch-TensorRT Converters with Custom Converters</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/custom_kernel_plugins.html">Using Custom Kernels within TensorRT Engines with Torch-TensorRT</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/auto_generate_converters.html">Automatically Generate a Converter for a Custom Kernel</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/auto_generate_plugins.html">Automatically Generate a Plugin for a Custom Kernel</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/mutable_torchtrt_module_example.html">Mutable Torch TensorRT Module</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/weight_streaming_example.html">Weight Streaming</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/pre_allocated_output_example.html">Pre-allocated output buffer</a></li>
@@ -487,7 +488,7 @@
               
   <h1>Source code for torch_tensorrt.runtime._cudagraphs</h1><div class="highlight"><pre>
 <span></span><span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Union</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Union</span>
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">torch_tensorrt</span>
@@ -556,6 +557,7 @@
         <span class="k">global</span> <span class="n">_PY_RT_CUDAGRAPHS</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">old_mode</span> <span class="o">=</span> <span class="n">_PY_RT_CUDAGRAPHS</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">compiled_module</span> <span class="o">=</span> <span class="n">compiled_module</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cudagraphs_module</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">CudaGraphsTorchTensorRTModule</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__enter__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">:</span>
         <span class="k">global</span> <span class="n">_PY_RT_CUDAGRAPHS</span>
@@ -586,7 +588,8 @@
             <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
                 <span class="s2">&quot;Found pytorch subgraphs in module, wrapping module in CudaGraphsTorchTensorRTModule&quot;</span>
             <span class="p">)</span>
-            <span class="k">return</span> <span class="n">CudaGraphsTorchTensorRTModule</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">compiled_module</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">cudagraphs_module</span> <span class="o">=</span> <span class="n">CudaGraphsTorchTensorRTModule</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">compiled_module</span><span class="p">)</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">cudagraphs_module</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="k">if</span> <span class="n">num_trt_module</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
                 <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;No graph breaks detected, using runtime cudagraphs mode&quot;</span><span class="p">)</span>
@@ -601,6 +604,9 @@
     <span class="k">def</span><span class="w"> </span><span class="fm">__exit__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="c1"># Set cudagraphs back to old mode</span>
         <span class="n">set_cudagraphs_mode</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">old_mode</span><span class="p">)</span>
+        <span class="c1"># __del__ is not entirely predictable, so we reset cudagraph here</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">cudagraphs_module</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">cudagraphs_module</span><span class="o">.</span><span class="n">_reset_captured_graph</span><span class="p">()</span>
 
 
 <div class="viewcode-block" id="enable_cudagraphs"><a class="viewcode-back" href="../../../py_api/runtime.html#torch_tensorrt.runtime.enable_cudagraphs">[docs]</a><span class="k">def</span><span class="w"> </span><span class="nf">enable_cudagraphs</span><span class="p">(</span>

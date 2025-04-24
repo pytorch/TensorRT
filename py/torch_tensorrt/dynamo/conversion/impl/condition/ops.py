@@ -11,6 +11,7 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     cast_trt_tensor,
     get_trt_tensor,
     prepend_ones,
+    promote_trt_tensors_to_same_dtype,
     set_layer_name,
 )
 from torch_tensorrt.dynamo.conversion.impl.elementwise import ne
@@ -56,6 +57,9 @@ def where(
     diff = max_shape_len - len(y_shape)
     if diff > 0:
         other = prepend_ones(ctx, other, f"{name}_other_broadcast", diff)
+
+    # Ensure that input and other have the same TRT dtype
+    input, other = promote_trt_tensors_to_same_dtype(ctx, input, other, name)
 
     return select(ctx, target, source_ir, name, input, other, condition)
 
