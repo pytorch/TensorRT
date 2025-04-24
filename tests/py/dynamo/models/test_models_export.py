@@ -290,7 +290,7 @@ def test_base_int8(ir):
 
     with torch.no_grad():
         with export_torch_mode():
-            exp_program = torch.export.export(model, (input_tensor,))
+            exp_program = torch.export.export(model, (input_tensor,), strict=False)
             trt_model = torchtrt.dynamo.compile(
                 exp_program,
                 inputs=[input_tensor],
