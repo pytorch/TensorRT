@@ -10,7 +10,7 @@ pipe = FluxPipeline.from_pretrained(
     "black-forest-labs/FLUX.1-dev",
     torch_dtype=torch.float16,
 )
-pipe.to(DEVICE).to(torch.float16)
+pipe.to(torch.float16)
 backbone = pipe.transformer
 
 
@@ -44,10 +44,11 @@ settings = {
     "immutable_weights": False,
     "enable_cuda_graph": True,
 }
-
+backbone.to(DEVICE)
 trt_gm = torch_tensorrt.MutableTorchTensorRTModule(backbone, **settings)
 trt_gm.set_expected_dynamic_shape_range((), dynamic_shapes)
 pipe.transformer = trt_gm
+pipe.to(DEVICE)
 
 
 def generate_image(prompt, inference_step, batch_size=2):
