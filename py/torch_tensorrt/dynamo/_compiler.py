@@ -892,7 +892,7 @@ def compile_module(
         parse_graph_io(submodule, subgraph_data)
         dryrun_tracker.tensorrt_graph_count += 1
         dryrun_tracker.per_subgraph_data.append(subgraph_data)
-
+        torch.cuda.empty_cache()
         # Create TRT engines from submodule
         if not settings.dryrun:
             trt_module = convert_module(
