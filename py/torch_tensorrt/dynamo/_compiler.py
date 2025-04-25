@@ -502,7 +502,7 @@ def compile(
         enable_weight_streaming (bool): Enable weight streaming.
         tiling_optimization_level (str): The optimization level of tiling strategies. A higher level allows TensorRT to spend more time searching for better tiling strategy. We currently support ["none", "fast", "moderate", "full"].
         l2_limit_for_tiling (int): The target L2 cache usage limit (in bytes) for tiling optimization (default is -1 which means no limit).
-       ç
+        use_distributed_mode_trace (bool):  Using aot_autograd to trace the graph. This is enabled when DTensors or distributed tensors are present in distributed model
         **kwargs: Any,
     Returns:
         torch.fx.GraphModule: Compiled FX Module, when run it will execute via TensorRT
