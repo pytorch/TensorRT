@@ -37,7 +37,7 @@ _TS_FE_AVAIL = os.path.isfile(linked_file_full_path)
 _TORCHTRT_RT_AVAIL = _TS_FE_AVAIL or os.path.isfile(linked_file_runtime_full_path)
 _DYNAMO_FE_AVAIL = version.parse(sanitized_torch_version()) >= version.parse("2.1.dev")
 _FX_FE_AVAIL = True
-_REFIT_AVAIL = version.parse(sys.version.split()[0]) < version.parse("3.13")
+_REFIT_AVAIL = True
 
 ENABLED_FEATURES = FeatureSet(
     _TS_FE_AVAIL, _TORCHTRT_RT_AVAIL, _DYNAMO_FE_AVAIL, _FX_FE_AVAIL, _REFIT_AVAIL

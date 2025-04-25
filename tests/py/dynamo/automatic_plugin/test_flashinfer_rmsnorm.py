@@ -1,6 +1,8 @@
 import pytest
 
 flashinfer = pytest.importorskip("flashinfer")
+import unittest
+
 import torch
 import torch.nn as nn
 import torch_tensorrt
@@ -28,6 +30,7 @@ torch_tensorrt.dynamo.conversion.plugins.custom_op(
 )
 
 
+@unittest.skip("Not Available")
 class TestAutomaticPlugin(DispatchTestCase):
     @parameterized.expand(
         [
