@@ -62,18 +62,6 @@ def construct_refit_mapping(
     Returns:
         Mapping from weight name in TensorRT to actual weight value in np.ndarray
     """
-    MODULE_MAP = {
-        "SCALE": (trt.IScaleLayer, [("scale", "SCALE"), ("shift", "SHIFT")]),
-        "CONVOLUTION": (
-            trt.IConvolutionLayer,
-            [("kernel", "KERNEL"), ("bias", "BIAS")],
-        ),
-        "DECONVOLUTION": (
-            trt.IDeconvolutionLayer,
-            [("kernel", "KERNEL"), ("bias", "BIAS")],
-        ),
-        "CONSTANT": (trt.IConstantLayer, [("weights", "CONSTANT")]),
-    }
 
     output_dtypes = infer_module_output_dtypes(
         module,
@@ -81,7 +69,6 @@ def construct_refit_mapping(
     )
 
     # Use Interpreter
-    weight_map = {}
     interpreter = TRTInterpreter(
         module,
         inputs,
@@ -90,24 +77,8 @@ def construct_refit_mapping(
         compilation_settings=settings,
     )
     interpreter._construct_trt_network_def()
-    net = interpreter.ctx.net
-    for i in range(net.num_layers):
-        layer = net[i]
-        layer_type: str = layer.type.name
-        if layer_type in MODULE_MAP:
-            # Cast the parent class to child class to access attributes
-            # For example: ILayer does not have ILayer.kernel/ILayer.bias
-            # So we cast it to IConvolutionLayer and access the attributes
-            layer.__class__ = MODULE_MAP[layer_type][0]
-            for weight_type, weight_name in MODULE_MAP[layer_type][1]:
-                weight = layer.__getattribute__(weight_type).copy()
-                weight_dtype = dtype.try_from(weight.dtype).to(trt.DataType)
-                weight_map[f"{layer.name} {weight_name}"] = (
-                    weight,
-                    weight_dtype,
-                )
 
-    return weight_map
+    return interpreter.ctx.mapping
 
 
 @needs_refit
@@ -118,13 +89,12 @@ def construct_refit_mapping_from_weight_name_map(
 ) -> dict[Any, Any]:
     engine_weight_map = {}
     for engine_weight_name, (sd_weight_name, np_weight_type) in weight_name_map.items():
-        trt_dtype = dtype.try_from(np_weight_type).to(trt.DataType)
-        torch_dtype = dtype.try_from(np_weight_type).to(torch.dtype)
-
         if sd_weight_name not in state_dict:
             # If weights is not in sd, we can leave it unchanged
             continue
         else:
+            trt_dtype = dtype._from(np_weight_type).to(trt.DataType)
+            torch_dtype = dtype._from(np_weight_type).to(torch.dtype)
             engine_weight_map[engine_weight_name] = state_dict[sd_weight_name].to(
                 to_torch_device(settings.device)
             )
@@ -178,8 +148,8 @@ def _refit_single_trt_engine_with_gm(
             for constant_name, val in constant_mapping.items():
                 np_weight_type = val.dtype
                 val_tensor = torch.from_numpy(val).cuda()
-                trt_dtype = dtype.try_from(np_weight_type).to(trt.DataType)
-                torch_dtype = dtype.try_from(np_weight_type).to(torch.dtype)
+                trt_dtype = dtype._from(np_weight_type).to(trt.DataType)
+                torch_dtype = dtype._from(np_weight_type).to(torch.dtype)
                 constant_mapping_with_type[constant_name] = (
                     val_tensor.clone().reshape(-1).contiguous().to(torch_dtype),
                     trt_dtype,
@@ -208,8 +178,9 @@ def _refit_single_trt_engine_with_gm(
                 if layer_name not in mapping:
                     raise AssertionError(f"{layer_name} is not found in weight mapping")
                 # Use Numpy to create weights
-                weight, datatype = mapping[layer_name]
-                trt_wt_tensor = trt.Weights(datatype, weight.ctypes.data, weight.size)
+                weight = mapping[layer_name]
+                trt_dtype = dtype._from(weight.dtype).to(trt.DataType)
+                trt_wt_tensor = trt.Weights(trt_dtype, weight.ctypes.data, weight.size)
                 refitter.set_named_weights(layer_name, trt_wt_tensor, trt_wt_location)
                 refitted.add(layer_name)
 
