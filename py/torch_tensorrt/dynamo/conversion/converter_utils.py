@@ -367,6 +367,7 @@ def create_constant(
             else:
                 numpy_value = torch_value.numpy()
 
+            ctx.mapping[name + " CONSTANT"] = numpy_value.reshape(-1)
             constant = ctx.net.add_constant(
                 shape,
                 numpy_value,
