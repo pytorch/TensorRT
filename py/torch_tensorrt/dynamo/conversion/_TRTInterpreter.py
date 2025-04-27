@@ -345,9 +345,10 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                 self.compilation_settings.tiling_optimization_level
             ]
 
-            builder_config.l2_limit_for_tiling = (
-                self.compilation_settings.l2_limit_for_tiling
-            )
+            if self.compilation_settings.l2_limit_for_tiling != -1:
+                builder_config.l2_limit_for_tiling = (
+                    self.compilation_settings.l2_limit_for_tiling
+                )
 
         return builder_config
 
