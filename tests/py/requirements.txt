@@ -10,5 +10,4 @@ pyyaml
 timm>=1.0.3
 flashinfer-python;  python_version < "3.13"
 transformers==4.49.0
-nvidia-modelopt[all]; python_version < "3.13"
 --extra-index-url https://pypi.nvidia.com
