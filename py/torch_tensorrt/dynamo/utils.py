@@ -7,10 +7,12 @@ import os
 import shutil
 import subprocess
 import sys
+import urllib.request
 import warnings
 from dataclasses import fields, replace
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
+from urllib.error import URLError
 
 import numpy as np
 import sympy
@@ -827,18 +829,21 @@ def download_plugin_lib_path(py_version: str, platform: str) -> str:
     base_url = "https://pypi.nvidia.com/tensorrt-llm/"
     file_name = f"tensorrt_llm-0.18.0-{py_version}-{py_version}-{platform}.whl"
     download_url = base_url + file_name
-    cmd = ["wget", download_url]
     if not (os.path.exists(file_name)):
         try:
-            subprocess.run(cmd, check=True)
+            logger.debug(f"Downloading {download_url} ...")
+            urllib.request.urlretrieve(download_url, file_name)
             logger.debug("Download succeeded and TRT-LLM wheel is now present")
-        except subprocess.CalledProcessError as e:
+        except urllib.error.HTTPError as e:
             logger.error(
-                "Download failed (file not found or connection issue). Error code:",
-                e.returncode,
+                f"HTTP error {e.code} when trying to download {download_url}: {e.reason}"
             )
-        except FileNotFoundError:
-            logger.error("wget is required but not found. Please install wget.")
+        except urllib.error.URLError as e:
+            logger.error(
+                f"URL error when trying to download {download_url}: {e.reason}"
+            )
+        except OSError as e:
+            logger.error(f"Local file write error: {e}")
 
     # Proceeding with the unzip of the wheel file
     # This will exist if the filename was already downloaded
