@@ -21,6 +21,7 @@ import numpy as np
 import tensorrt as trt
 import torch
 import torch.fx
+from torch.fx.experimental.proxy_tensor import unset_fake_temporarily
 from torch.fx.node import _get_qualified_name
 from torch.fx.passes.shape_prop import TensorMetadata
 from torch.utils._python_dispatch import _disable_current_modes
@@ -42,6 +43,7 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     get_node_io,
     get_node_name,
     get_trt_tensor,
+    to_torch,
 )
 from torch_tensorrt.dynamo.utils import DYNAMIC_DIM, to_torch_device
 from torch_tensorrt.fx.observer import Observer
@@ -410,12 +412,13 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         np_map: the map from weight name to np values in INetworkDefinition
         state_dict: state of the graph module
         """
-        network_weight = torch.from_numpy(np_map[weight_name]).to(device)
-        for sd_w_name, sd_weight in state_dict.items():
-            if TRTInterpreter.check_weight_equal(sd_weight, network_weight, device):
-                del state_dict[sd_w_name]
-                return sd_w_name
-        return ""
+        with unset_fake_temporarily():
+            network_weight = torch.from_numpy(np_map[weight_name]).to(device)
+            for sd_w_name, sd_weight in state_dict.items():
+                if TRTInterpreter.check_weight_equal(sd_weight, network_weight, device):
+                    del state_dict[sd_w_name]
+                    return sd_w_name
+            return ""
 
     @staticmethod
     def check_weight_equal(
@@ -423,14 +426,15 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         network_weight: Union[torch.Tensor, np.ndarray],
         device: torch.device,
     ) -> Any:
-        if not isinstance(network_weight, torch.Tensor):
-            network_weight = torch.from_numpy(network_weight).to(device)
-        try:
-            return sd_weight.shape == network_weight.shape and torch.all(
-                torch.abs(sd_weight - network_weight) < 0.01
-            )
-        except Exception:
-            return torch.all(sd_weight == network_weight)
+        with unset_fake_temporarily():
+            if not isinstance(network_weight, torch.Tensor):
+                network_weight = torch.from_numpy(network_weight).to(device)
+            try:
+                return sd_weight.shape == network_weight.shape and torch.all(
+                    torch.abs(sd_weight - network_weight) < 0.01
+                )
+            except Exception:
+                return torch.all(sd_weight == network_weight)
 
     @needs_refit
     def _save_weight_mapping(self) -> None:
@@ -495,19 +499,15 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             for k, v in self.module.state_dict().items()
         }
         weight_name_map: dict[str, Any] = {}
-        np_map = {}
-        constant_mapping = {}
+        np_map = self.ctx.mapping
+        constant_mapping = {k: v for k, v in np_map.items() if v.size == 1}
         net = self.ctx.net
         for i in range(net.num_layers):
             layer = net[i]
             layer_type: str = layer.type.name
             if layer_type in MODULE_MAP:
-                layer.__class__ = MODULE_MAP[layer_type][0]
                 # Name mapping
                 for weight_type, weight_name, torch_attr in MODULE_MAP[layer_type][1]:
-                    weight = layer.__getattribute__(weight_type).copy()
-                    if weight.size == 0:
-                        continue
                     engine_weight_name = f"{layer.name} {weight_name}"
                     # Infer the corresponding weight name(s) in state_dict
                     sd_weight_name_list = (
@@ -535,17 +535,15 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                         elif "bias" in suffix:
                             sd_weight_name = f"{sd_weight_name}.bias"
                         else:
-                            # Save the constant weights for future fast refit
                             sd_weight_name = f"{sd_weight_name}.unknown"
-                            constant_mapping[engine_weight_name] = weight
                     elif layer_type == "SCALE":
                         # Batch norm needs all weights to calculate scale and shift
                         sd_weight_name = [f"{sd_weight_name}.{n}" for n in torch_attr]
                     else:
                         sd_weight_name = f"{sd_weight_name}.{torch_attr}"
 
-                    weight_name_map[engine_weight_name] = sd_weight_name
-                    np_map[engine_weight_name] = weight
+                    if engine_weight_name in np_map:
+                        weight_name_map[engine_weight_name] = sd_weight_name
 
         # Stage 2: Value mapping
         for engine_weight_name, sd_weight_name in weight_name_map.items():
@@ -887,9 +885,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             return converter(self.ctx, target, args, kwargs, self._cur_node_name)
 
     def get_attr(self, target: str, args: Any, kwargs: Any) -> np.ndarray:
-        with _disable_current_modes():
-            from torch_tensorrt.dynamo.conversion.converter_utils import to_numpy
-
+        with _disable_current_modes(), unset_fake_temporarily():
             frozen_attr = self.fetch_attr(target)
 
             if isinstance(frozen_attr, torch.nn.Parameter):
@@ -897,9 +893,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             else:
                 constant_tensor = frozen_attr
 
-            network_constant = to_numpy(constant_tensor)
-
-        return network_constant
+        return to_torch(constant_tensor)
 
     def call_method(self, target: str, args: Any, kwargs: Any) -> Any:
         assert isinstance(target, str)
