@@ -358,31 +358,27 @@ def create_constant(
             shape = trt.Dims()
         else:
             shape = list(torch_value.shape)
-        if torch_value is not None:
-            if torch_value.dtype == torch.bfloat16:
-                torch_value_fp32 = torch_value.to(torch.float32)
-                numpy_value = torch_value_fp32.numpy()
-            else:
-                numpy_value = torch_value.numpy()
 
-            ctx.mapping[name + " CONSTANT"] = numpy_value.reshape(-1)
-            constant = ctx.net.add_constant(
-                shape,
-                numpy_value,
-            )
-            constant.name = name
-            if torch_value.dtype == torch.bfloat16:
-                return cast_trt_tensor(
-                    ctx,
-                    constant.get_output(0),
-                    trt.DataType.BF16,
-                    name + "_bf16_cast",
-                )
-            return constant.get_output(0)
+        if torch_value.dtype == torch.bfloat16:
+            torch_value_fp32 = torch_value.to(torch.float32)
+            numpy_value = torch_value_fp32.numpy()
         else:
-            raise ValueError(
-                f"Cannot convert tensor '{name}' to a TensorRT constant because its value is None."
+            numpy_value = torch_value.numpy()
+
+        ctx.mapping[name + " CONSTANT"] = numpy_value.reshape(-1)
+        constant = ctx.net.add_constant(
+            shape,
+            numpy_value,
+        )
+        constant.name = name
+        if torch_value.dtype == torch.bfloat16:
+            return cast_trt_tensor(
+                ctx,
+                constant.get_output(0),
+                trt.DataType.BF16,
+                name + "_bf16_cast",
             )
+        return constant.get_output(0)
 
 
 def get_trt_tensor(
@@ -421,53 +417,6 @@ def get_trt_tensor(
         return input_val
     else:
         raise AssertionError(f"Cannot convert {input_val} to TRT constant")
-
-
-def to_torch(
-    value: Optional[Union[torch.Tensor, np.ndarray, int, float, bool]],
-    dtype: Optional[Union[torch.dtype, np.dtype, TRTDataType, _enums.dtype]] = None,
-) -> Optional[torch.Tensor]:
-    """
-    Convert a Numpy array, or scalar to a PyTorch tensor and move it to CPU
-    Args:
-        value (Optional[Union[torch.Tensor, np.ndarray, int, float, bool]]):
-            A PyTorch tensor, Numpy array, int, float, or bool
-        dtype (Optional[Union[torch.dtype, np.dtype, TRTDataType]]):
-            If a dtype is given, we will convert the type of the given `value` to this dtype.
-    Returns:
-        A PyTorch tensor or None, if the input was None.
-    """
-
-    cpu_device = torch.device("cpu")
-    torch_dtype = (
-        _enums.dtype._from(dtype).to(torch.dtype, use_default=True) if dtype else None
-    )
-
-    with unset_fake_temporarily():
-        if value is None:
-            return None
-
-        elif isinstance(value, torch.Tensor):
-            output = value.to(cpu_device).contiguous()
-
-        elif isinstance(value, np.ndarray):
-            output = torch.from_numpy(value).to(cpu_device).contiguous()
-
-        elif isinstance(value, int):
-            output = torch.tensor([value], device=cpu_device, dtype=torch.int32)
-
-        elif isinstance(value, float):
-            output = torch.tensor([value], device=cpu_device, dtype=torch.float32)
-
-        elif isinstance(value, bool):
-            output = torch.tensor([value], device=cpu_device, dtype=torch.bool)
-
-        else:
-            raise AssertionError(
-                f"to_torch can only be called on None, bool, int, float, np.ndarray, or torch.Tensor, got an object of type: {type(value)}"
-            )
-
-        return output.to(torch_dtype) if torch_dtype else output
 
 
 @overload
@@ -633,42 +582,92 @@ def to_numpy(
     Returns:
         A Numpy array or None, if the input was None.
     """
-    output = None
+    with unset_fake_temporarily():
+        output = None
 
-    if value is None or isinstance(value, np.ndarray):
-        output = value
+        if value is None or isinstance(value, np.ndarray):
+            output = value
 
-    elif isinstance(value, torch.Tensor):
-        if value.is_quantized:
-            value = value.dequantize()
-        elif value.dtype == torch.bfloat16:
-            # TODO: Remove when numpy has a BF16 type
-            _LOGGER.warning(
-                "Requested a conversion of bfloat16 tensor from torch to numpy which isn't supported. Casting this tensor to FP32 precision currently. Please use to_torch() API for better data representation",
+        elif isinstance(value, torch.Tensor):
+            if value.is_quantized:
+                value = value.dequantize()
+            elif value.dtype == torch.bfloat16:
+                # TODO: Remove when numpy has a BF16 type
+                _LOGGER.warning(
+                    "Requested a conversion of bfloat16 tensor from torch to numpy which isn't supported. Casting this tensor to FP32 precision currently. Please use to_torch() API for better data representation",
+                )
+                value = value.to(torch.float)
+
+            output = value.cpu().detach().contiguous().numpy()
+
+        elif isinstance(value, int):
+            output = np.array([value], dtype=np.int32)
+
+        elif isinstance(value, float):
+            output = np.array([value], dtype=np.float32)
+
+        elif isinstance(value, bool):
+            output = np.array([value], dtype=np.bool_)
+
+        if isinstance(output, np.ndarray) or output is None:
+            return (
+                output
+                if (dtype is None or output is None)
+                else output.astype(
+                    _enums.dtype._from(dtype).to(np.dtype, use_default=True)
+                )
             )
-            value = value.to(torch.float)
+        else:
+            raise AssertionError(
+                f"to_numpy can only be called on None, bool, int, float, np.ndarray, or torch.Tensor, got: {value}"
+            )
 
-        output = value.cpu().detach().contiguous().numpy()
 
-    elif isinstance(value, int):
-        output = np.array([value], dtype=np.int32)
+def to_torch(
+    value: Optional[Union[torch.Tensor, np.ndarray, int, float, bool]],
+    dtype: Optional[Union[torch.dtype, np.dtype, TRTDataType, _enums.dtype]] = None,
+) -> Optional[torch.Tensor]:
+    """
+    Convert a Numpy array, or scalar to a PyTorch tensor and move it to CPU
+    Args:
+        value (Optional[Union[torch.Tensor, np.ndarray, int, float, bool]]):
+            A PyTorch tensor, Numpy array, int, float, or bool
+        dtype (Optional[Union[torch.dtype, np.dtype, TRTDataType]]):
+            If a dtype is given, we will convert the type of the given `value` to this dtype.
+    Returns:
+        A PyTorch tensor or None, if the input was None.
+    """
 
-    elif isinstance(value, float):
-        output = np.array([value], dtype=np.float32)
+    cpu_device = torch.device("cpu")
+    torch_dtype = (
+        _enums.dtype._from(dtype).to(torch.dtype, use_default=True) if dtype else None
+    )
 
-    elif isinstance(value, bool):
-        output = np.array([value], dtype=np.bool_)
+    with unset_fake_temporarily():
+        if value is None:
+            return None
 
-    if isinstance(output, np.ndarray) or output is None:
-        return (
-            output
-            if (dtype is None or output is None)
-            else output.astype(_enums.dtype._from(dtype).to(np.dtype, use_default=True))
-        )
-    else:
-        raise AssertionError(
-            f"to_numpy can only be called on None, bool, int, float, np.ndarray, or torch.Tensor, got: {value}"
-        )
+        elif isinstance(value, torch.Tensor):
+            output = value.to(cpu_device).contiguous()
+
+        elif isinstance(value, np.ndarray):
+            output = torch.from_numpy(value).to(cpu_device).contiguous()
+
+        elif isinstance(value, int):
+            output = torch.tensor([value], device=cpu_device, dtype=torch.int32)
+
+        elif isinstance(value, float):
+            output = torch.tensor([value], device=cpu_device, dtype=torch.float32)
+
+        elif isinstance(value, bool):
+            output = torch.tensor([value], device=cpu_device, dtype=torch.bool)
+
+        else:
+            raise AssertionError(
+                f"to_torch can only be called on None, bool, int, float, np.ndarray, or torch.Tensor, got an object of type: {type(value)}"
+            )
+
+        return output.to(torch_dtype) if torch_dtype else output
 
 
 def flatten_dims(

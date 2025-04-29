@@ -2,10 +2,9 @@
 from copy import deepcopy
 
 import torch
+import torch_tensorrt
 from torch.testing._internal.common_utils import TestCase, run_tests
 from torch_tensorrt.dynamo.partitioning import fast_partition
-
-import torch_tensorrt
 
 from ..testing_utilities import DECIMALS_OF_AGREEMENT, lower_graph_testing
 
@@ -51,7 +50,6 @@ class TestTRTModuleNextCompilation(TestCase):
             pass_through_build_failures=True,
             torch_executed_ops={"torch.ops.aten.add.Tensor"},
             use_python_runtime=False,
-            debug=True,
         )
         optimized_model_results = optimized_model(*inputs).detach().cpu()
         torch_model_results = fx_graph(*inputs).detach().cpu()
@@ -132,7 +130,6 @@ class TestTRTModuleNextCompilation(TestCase):
             pass_through_build_failures=True,
             torch_executed_ops={"torch.ops.aten.add.Tensor"},
             use_python_runtime=False,
-            debug=True,
         )
         optimized_model_results = optimized_model(*inputs).detach().cpu()
         torch_model_results = model(*inputs).detach().cpu()
@@ -177,7 +174,6 @@ class TestCompilationOptions(TestCase):
             optimization_level=4,
             version_compatible=True,
             max_aux_streams=5,
-            debug=True,
         )
         optimized_model_results = optimized_model(*inputs).detach().cpu()
         torch_model_results = fx_graph(*inputs).detach().cpu()
@@ -225,7 +221,6 @@ class Test64BitInput(TestCase):
             min_block_size=1,
             pass_through_build_failures=True,
             truncate_double=True,
-            debug=True,
         )
         optimized_model_results = optimized_model(*inputs).detach().cpu()
         torch_model_results = fx_graph(*inputs).detach().cpu()
@@ -298,7 +293,6 @@ class Test64BitInput(TestCase):
             min_block_size=1,
             pass_through_build_failures=True,
             truncate_double=False,
-            debug=True,
             torch_executed_ops={"torch.ops.aten.add.Tensor"},
         )
         optimized_model_results = optimized_model(*inputs).detach().cpu()

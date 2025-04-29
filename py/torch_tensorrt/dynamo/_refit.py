@@ -48,7 +48,7 @@ from torch_tensorrt.logging import TRT_LOGGER
 logger = logging.getLogger(__name__)
 
 
-@needs_refit
+@needs_refit  # type: ignore
 def construct_refit_mapping(
     module: torch.fx.GraphModule,
     inputs: Sequence[Input],
@@ -81,7 +81,7 @@ def construct_refit_mapping(
     return interpreter.ctx.mapping
 
 
-@needs_refit
+@needs_refit  # type: ignore
 def construct_refit_mapping_from_weight_name_map(
     weight_name_map: dict[Any, Any],
     state_dict: dict[Any, Any],
@@ -111,7 +111,7 @@ def construct_refit_mapping_from_weight_name_map(
     return engine_weight_map
 
 
-@needs_refit
+@needs_refit  # type: ignore
 def _refit_single_trt_engine_with_gm(
     new_gm: torch.fx.GraphModule,
     old_engine: trt.ICudaEngine,
@@ -192,7 +192,7 @@ def _refit_single_trt_engine_with_gm(
             raise AssertionError("Refitting failed.")
 
 
-@needs_refit
+@needs_refit  # type: ignore
 def refit_module_weights(
     compiled_module: torch.fx.GraphModule | ExportedProgram,
     new_weight_module: ExportedProgram,
