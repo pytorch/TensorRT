@@ -61,7 +61,6 @@ class TestCudagraphsPython(TestCase):
             min_block_size=1,
             pass_through_build_failures=True,
             use_python_runtime=True,
-            debug=True,
         )
 
         result_samples = []
