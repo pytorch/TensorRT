@@ -297,7 +297,6 @@ class TestBF16Support(TestCase):
                 ir="torch_compile",
                 inputs=inputs,
                 enabled_precisions={torch.bfloat16},
-                debug=True,
                 min_block_size=1,
                 device=device,
                 cache_built_engines=False,
