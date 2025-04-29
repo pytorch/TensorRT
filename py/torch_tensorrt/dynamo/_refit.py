@@ -9,6 +9,7 @@ import numpy as np
 import tensorrt as trt
 import torch
 from torch.export import ExportedProgram
+from torch.fx.experimental.proxy_tensor import unset_fake_temporarily
 from torch_tensorrt._enums import dtype
 from torch_tensorrt._features import needs_refit
 from torch_tensorrt._Input import Input
@@ -61,18 +62,6 @@ def construct_refit_mapping(
     Returns:
         Mapping from weight name in TensorRT to actual weight value in np.ndarray
     """
-    MODULE_MAP = {
-        "SCALE": (trt.IScaleLayer, [("scale", "SCALE"), ("shift", "SHIFT")]),
-        "CONVOLUTION": (
-            trt.IConvolutionLayer,
-            [("kernel", "KERNEL"), ("bias", "BIAS")],
-        ),
-        "DECONVOLUTION": (
-            trt.IDeconvolutionLayer,
-            [("kernel", "KERNEL"), ("bias", "BIAS")],
-        ),
-        "CONSTANT": (trt.IConstantLayer, [("weights", "CONSTANT")]),
-    }
 
     output_dtypes = infer_module_output_dtypes(
         module,
@@ -80,7 +69,6 @@ def construct_refit_mapping(
     )
 
     # Use Interpreter
-    weight_map = {}
     interpreter = TRTInterpreter(
         module,
         inputs,
@@ -89,24 +77,8 @@ def construct_refit_mapping(
         compilation_settings=settings,
     )
     interpreter._construct_trt_network_def()
-    net = interpreter.ctx.net
-    for i in range(net.num_layers):
-        layer = net[i]
-        layer_type: str = layer.type.name
-        if layer_type in MODULE_MAP:
-            # Cast the parent class to child class to access attributes
-            # For example: ILayer does not have ILayer.kernel/ILayer.bias
-            # So we cast it to IConvolutionLayer and access the attributes
-            layer.__class__ = MODULE_MAP[layer_type][0]
-            for weight_type, weight_name in MODULE_MAP[layer_type][1]:
-                weight = layer.__getattribute__(weight_type).copy()
-                weight_dtype = dtype.try_from(weight.dtype).to(trt.DataType)
-                weight_map[f"{layer.name} {weight_name}"] = (
-                    weight,
-                    weight_dtype,
-                )
 
-    return weight_map
+    return interpreter.ctx.mapping
 
 
 @needs_refit
@@ -117,13 +89,12 @@ def construct_refit_mapping_from_weight_name_map(
 ) -> dict[Any, Any]:
     engine_weight_map = {}
     for engine_weight_name, (sd_weight_name, np_weight_type) in weight_name_map.items():
-        trt_dtype = dtype.try_from(np_weight_type).to(trt.DataType)
-        torch_dtype = dtype.try_from(np_weight_type).to(torch.dtype)
-
         if sd_weight_name not in state_dict:
             # If weights is not in sd, we can leave it unchanged
             continue
         else:
+            trt_dtype = dtype._from(np_weight_type).to(trt.DataType)
+            torch_dtype = dtype._from(np_weight_type).to(torch.dtype)
             engine_weight_map[engine_weight_name] = state_dict[sd_weight_name].to(
                 to_torch_device(settings.device)
             )
@@ -152,71 +123,73 @@ def _refit_single_trt_engine_with_gm(
     Refit a TensorRT Engine in place
     """
 
-    refitted = set()
-    torch_device = get_model_device(new_gm)
-    refitter = trt.Refitter(old_engine, TRT_LOGGER)
-    weight_list = refitter.get_all_weights()
+    with unset_fake_temporarily():
+        refitted = set()
+        torch_device = get_model_device(new_gm)
+        refitter = trt.Refitter(old_engine, TRT_LOGGER)
+        weight_list = refitter.get_all_weights()
 
-    if weight_name_map:
-        # Get the refitting mapping
-        trt_wt_location = (
-            trt.TensorLocation.DEVICE
-            if torch_device.type == "cuda"
-            else trt.TensorLocation.HOST
-        )
-
-        constant_mapping: dict[str, Any] = weight_name_map.pop(
-            "constant_mapping", {}
-        )  # type: ignore
-        mapping = construct_refit_mapping_from_weight_name_map(
-            weight_name_map, new_gm.state_dict(), settings
-        )
-        constant_mapping_with_type = {}
-
-        for constant_name, val in constant_mapping.items():
-            np_weight_type = val.dtype
-            val_tensor = torch.from_numpy(val).cuda()
-            trt_dtype = dtype.try_from(np_weight_type).to(trt.DataType)
-            torch_dtype = dtype.try_from(np_weight_type).to(torch.dtype)
-            constant_mapping_with_type[constant_name] = (
-                val_tensor.clone().reshape(-1).contiguous().to(torch_dtype),
-                trt_dtype,
+        if weight_name_map:
+            # Get the refitting mapping
+            trt_wt_location = (
+                trt.TensorLocation.DEVICE
+                if torch_device.type == "cuda"
+                else trt.TensorLocation.HOST
             )
 
-        mapping.update(constant_mapping_with_type)
-
-        for layer_name in weight_list:
-            if layer_name not in mapping:
-                logger.warning(f"{layer_name} is not found in weight mapping.")
-                continue
-            # Use Numpy to create weights
-            weight, weight_dtype = mapping[layer_name]
-            trt_wt_tensor = trt.Weights(
-                weight_dtype, weight.data_ptr(), torch.numel(weight)
+            constant_mapping: dict[str, Any] = weight_name_map.pop(
+                "constant_mapping", {}
+            )  # type: ignore
+            mapping = construct_refit_mapping_from_weight_name_map(
+                weight_name_map, new_gm.state_dict(), settings
             )
-            refitter.set_named_weights(layer_name, trt_wt_tensor, trt_wt_location)
-        assert (
-            len(refitter.get_missing_weights()) == 0
-        ), "Fast refitting failed due to incomplete mapping"
+            constant_mapping_with_type = {}
 
-    else:
-        mapping = construct_refit_mapping(new_gm, input_list, settings)
-        trt_wt_location = trt.TensorLocation.HOST
-        for layer_name in weight_list:
-            if layer_name not in mapping:
-                raise AssertionError(f"{layer_name} is not found in weight mapping")
-            # Use Numpy to create weights
-            weight, datatype = mapping[layer_name]
-            trt_wt_tensor = trt.Weights(datatype, weight.ctypes.data, weight.size)
-            refitter.set_named_weights(layer_name, trt_wt_tensor, trt_wt_location)
-            refitted.add(layer_name)
+            for constant_name, val in constant_mapping.items():
+                np_weight_type = val.dtype
+                val_tensor = torch.from_numpy(val).cuda()
+                trt_dtype = dtype._from(np_weight_type).to(trt.DataType)
+                torch_dtype = dtype._from(np_weight_type).to(torch.dtype)
+                constant_mapping_with_type[constant_name] = (
+                    val_tensor.clone().reshape(-1).contiguous().to(torch_dtype),
+                    trt_dtype,
+                )
 
-        if len(refitted) != len(weight_list):
-            logger.warning("Not all weights have been refitted!!!")
+            mapping.update(constant_mapping_with_type)
 
-    if not refitter.refit_cuda_engine():
-        logger.error("Error: failed to refit new weights.")
-        raise AssertionError("Refitting failed.")
+            for layer_name in weight_list:
+                if layer_name not in mapping:
+                    logger.warning(f"{layer_name} is not found in weight mapping.")
+                    continue
+                # Use Numpy to create weights
+                weight, weight_dtype = mapping[layer_name]
+                trt_wt_tensor = trt.Weights(
+                    weight_dtype, weight.data_ptr(), torch.numel(weight)
+                )
+                refitter.set_named_weights(layer_name, trt_wt_tensor, trt_wt_location)
+            assert (
+                len(refitter.get_missing_weights()) == 0
+            ), "Fast refitting failed due to incomplete mapping"
+
+        else:
+            mapping = construct_refit_mapping(new_gm, input_list, settings)
+            trt_wt_location = trt.TensorLocation.HOST
+            for layer_name in weight_list:
+                if layer_name not in mapping:
+                    raise AssertionError(f"{layer_name} is not found in weight mapping")
+                # Use Numpy to create weights
+                weight = mapping[layer_name]
+                trt_dtype = dtype._from(weight.dtype).to(trt.DataType)
+                trt_wt_tensor = trt.Weights(trt_dtype, weight.ctypes.data, weight.size)
+                refitter.set_named_weights(layer_name, trt_wt_tensor, trt_wt_location)
+                refitted.add(layer_name)
+
+            if len(refitted) != len(weight_list):
+                logger.warning("Not all weights have been refitted!!!")
+
+        if not refitter.refit_cuda_engine():
+            logger.error("Error: failed to refit new weights.")
+            raise AssertionError("Refitting failed.")
 
 
 @needs_refit
