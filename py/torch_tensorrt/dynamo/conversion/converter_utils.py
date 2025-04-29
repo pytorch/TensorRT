@@ -342,8 +342,11 @@ def create_constant(
         A TensorRT ITensor that represents the given value.
     """
     with unset_fake_temporarily():
-
         torch_value = to_torch(value, dtype)
+        if torch_value is None:
+            raise ValueError(
+                f"Cannot convert tensor '{name}' to a TensorRT constant because its value is None."
+            )
         if torch_value.dtype == torch.float64:
             raise ValueError(
                 "TensorRT does not support float64 (double) precision. To resolve this, please set truncate_double=True in your compilation settings and re-run the model."
@@ -356,32 +359,26 @@ def create_constant(
         else:
             shape = list(torch_value.shape)
 
-        if torch_value is not None:
-            if torch_value.dtype == torch.bfloat16:
-                torch_value_fp32 = torch_value.to(torch.float32)
-                numpy_value = torch_value_fp32.numpy()
-            else:
-                numpy_value = torch_value.numpy()
-
-            constant = ctx.net.add_constant(
-                shape,
-                numpy_value,
-            )
-            constant.name = name
-
-            if torch_value.dtype == torch.bfloat16:
-                return cast_trt_tensor(
-                    ctx,
-                    constant.get_output(0),
-                    trt.DataType.BF16,
-                    name + "_bf16_cast",
-                )
-
-            return constant.get_output(0)
+        if torch_value.dtype == torch.bfloat16:
+            torch_value_fp32 = torch_value.to(torch.float32)
+            numpy_value = torch_value_fp32.numpy()
         else:
-            raise ValueError(
-                f"Cannot convert tensor '{name}' to a TensorRT constant because its value is None."
+            numpy_value = torch_value.numpy()
+
+        ctx.mapping[name + " CONSTANT"] = numpy_value.reshape(-1)
+        constant = ctx.net.add_constant(
+            shape,
+            numpy_value,
+        )
+        constant.name = name
+        if torch_value.dtype == torch.bfloat16:
+            return cast_trt_tensor(
+                ctx,
+                constant.get_output(0),
+                trt.DataType.BF16,
+                name + "_bf16_cast",
             )
+        return constant.get_output(0)
 
 
 def get_trt_tensor(

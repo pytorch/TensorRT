@@ -26,7 +26,6 @@ def quantize(
     Adds quantize and dequantize ops (QDQ) which quantize to INT8 or FP8 based
     on the output_type set and dequantizes them back.
     """
-
     with unset_fake_temporarily():
         if isinstance(input_tensor, TRTTensor) and input_tensor.dtype not in (
             trt.float32,
