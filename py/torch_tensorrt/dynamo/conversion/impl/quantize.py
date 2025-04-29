@@ -67,3 +67,55 @@ def quantize(
         dq_output = dequantize_layer.get_output(0)
 
         return dq_output
+
+def dynamic_block_quantize(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    input_tensor: TRTTensor,
+    block_size: int,
+    amax: Union[np.ndarray, torch.Tensor],
+    num_bits: int,
+    exponent_bits: int,
+    scale_num_bits: int,
+    scale_exponent_bits: int,
+) -> TRTTensor:
+    """
+    Adds quantize and dequantize ops (QDQ) which quantize to FP4 based
+    on the output_type set and dequantizes them back.
+    """
+
+    with unset_fake_temporarily():
+        if isinstance(input_tensor, TRTTensor) and input_tensor.dtype not in (
+            trt.float32,
+            trt.float16,
+            trt.bfloat16,
+        ):
+            raise ValueError(
+                f"dynamic_block_quantize converter received an input of {input_tensor.dtype} type. Supported types: float32 | float16 | bfloat16"
+            )
+        if len(input_tensor.shape) not in (2, 3):
+            raise ValueError(
+                f"dynamic_block_quantize converter received an input of {input_tensor.shape} shape. Supported shapes: 2D or 3D"
+            )
+        print(f"input_tensor.shape: {input_tensor.shape} {block_size=} {amax=} {num_bits=} {exponent_bits=} {scale_num_bits=} {scale_exponent_bits=}")
+        max_bound = 6
+        amax = to_torch(amax, None)
+        scale = torch.divide(amax, max_bound)
+        scale = get_trt_tensor(ctx, scale, name + "_scale")
+
+        output_type=trt.DataType.FP4
+        # Add Q node
+        dynamic_quantize_layer = ctx.net.add_dynamic_quantize(input_tensor, axis=-1, block_size=16, output_type=output_type)
+        quantize_layer.set_output_type(0, output_type)
+
+        set_layer_name(quantize_layer, target, name + "_quantize", source_ir)
+        q_output = quantize_layer.get_output(0)
+        # Add DQ node
+        dequantize_layer = ctx.net.add_dequantize(q_output, scale)
+        set_layer_name(dequantize_layer, target, name + "_dequantize", source_ir)
+        dequantize_layer.precision = output_type
+        dq_output = dequantize_layer.get_output(0)
+
+        return dq_output

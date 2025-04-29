@@ -617,6 +617,39 @@ else:
         )
 
 
+try:
+    import modelopt.torch.quantization as mtq  # noqa: F401
+
+    assert torch.ops.tensorrt.dynamic_block_quantize_op.default
+except Exception as e:
+    _LOGGER.warning(
+        "Unable to import dynamic block quantize op. Please install modelopt library (https://github.com/NVIDIA/TensorRT-Model-Optimizer?tab=readme-ov-file#installation) to add support for compiling dynamic blockquantized models"
+    )
+else:
+
+    @dynamo_tensorrt_converter(torch.ops.tensorrt.dynamic_block_quantize_op.default)
+    def aten_ops_dynamic_block_quantize_op(
+        ctx: ConversionContext,
+        target: Target,
+        args: Tuple[Argument, ...],
+        kwargs: Dict[str, Argument],
+        name: str,
+    ) -> Union[TRTTensor, Sequence[TRTTensor]]:
+        return impl.quantize.dynamic_block_quantize(
+            ctx,
+            target,
+            SourceIR.ATEN,
+            name,
+            args[0],
+            args[1],
+            args[2],
+            args[3],
+            args[4],
+            args[5],
+            args[6],
+        )
+
+
 @dynamo_tensorrt_converter(torch.ops.aten.squeeze.dim, supports_dynamic_shapes=True)
 @dynamo_tensorrt_converter(torch.ops.aten.squeeze.dims, supports_dynamic_shapes=True)
 def aten_ops_squeeze(
