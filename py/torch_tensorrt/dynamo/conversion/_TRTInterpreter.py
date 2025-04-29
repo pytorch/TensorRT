@@ -893,7 +893,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             else:
                 constant_tensor = frozen_attr
 
-        return to_torch(constant_tensor)
+            return to_torch(constant_tensor)
 
     def call_method(self, target: str, args: Any, kwargs: Any) -> Any:
         assert isinstance(target, str)
