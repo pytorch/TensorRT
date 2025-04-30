@@ -347,9 +347,10 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                 self.compilation_settings.tiling_optimization_level
             ]
 
-            builder_config.l2_limit_for_tiling = (
-                self.compilation_settings.l2_limit_for_tiling
-            )
+            if self.compilation_settings.l2_limit_for_tiling != -1:
+                builder_config.l2_limit_for_tiling = (
+                    self.compilation_settings.l2_limit_for_tiling
+                )
 
         return builder_config
 
@@ -498,19 +499,15 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             for k, v in self.module.state_dict().items()
         }
         weight_name_map: dict[str, Any] = {}
-        np_map = {}
-        constant_mapping = {}
+        np_map = self.ctx.mapping
+        constant_mapping = {k: v for k, v in np_map.items() if v.size == 1}
         net = self.ctx.net
         for i in range(net.num_layers):
             layer = net[i]
             layer_type: str = layer.type.name
             if layer_type in MODULE_MAP:
-                layer.__class__ = MODULE_MAP[layer_type][0]
                 # Name mapping
                 for weight_type, weight_name, torch_attr in MODULE_MAP[layer_type][1]:
-                    weight = layer.__getattribute__(weight_type).copy()
-                    if weight.size == 0:
-                        continue
                     engine_weight_name = f"{layer.name} {weight_name}"
                     # Infer the corresponding weight name(s) in state_dict
                     sd_weight_name_list = (
@@ -538,17 +535,15 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                         elif "bias" in suffix:
                             sd_weight_name = f"{sd_weight_name}.bias"
                         else:
-                            # Save the constant weights for future fast refit
                             sd_weight_name = f"{sd_weight_name}.unknown"
-                            constant_mapping[engine_weight_name] = weight
                     elif layer_type == "SCALE":
                         # Batch norm needs all weights to calculate scale and shift
                         sd_weight_name = [f"{sd_weight_name}.{n}" for n in torch_attr]
                     else:
                         sd_weight_name = f"{sd_weight_name}.{torch_attr}"
 
-                    weight_name_map[engine_weight_name] = sd_weight_name
-                    np_map[engine_weight_name] = weight
+                    if engine_weight_name in np_map:
+                        weight_name_map[engine_weight_name] = sd_weight_name
 
         # Stage 2: Value mapping
         for engine_weight_name, sd_weight_name in weight_name_map.items():
@@ -898,7 +893,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             else:
                 constant_tensor = frozen_attr
 
-        return to_torch(constant_tensor)
+            return to_torch(constant_tensor)
 
     def call_method(self, target: str, args: Any, kwargs: Any) -> Any:
         assert isinstance(target, str)
