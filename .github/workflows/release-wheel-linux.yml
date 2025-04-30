@@ -204,10 +204,6 @@ jobs:
               release/tarball/libtorchtrt-${BUILD_VERSION}-tensorrt${TRT_VERSION}-cuda${CU_VERSION:2}-libtorch${PYTORCH_VERSION}-x86_64-linux.tar.gz
           else
               ${CONDA_RUN} python setup.py bdist_wheel --release
-
-              cp bazel-bin/libtorchtrt.tar.gz \
-              release/tarball/libtorchtrt-${BUILD_VERSION}-tensorrt${TRT_VERSION}-cuda${CU_VERSION:2}-libtorch${PYTORCH_VERSION}-x86_64-linux.tar.gz
-
               ${CONDA_RUN} python -m pip install auditwheel
               ${CONDA_RUN} python -m auditwheel repair \
               $(cat py/ci/soname_excludes.params) \

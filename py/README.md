@@ -31,7 +31,7 @@ torch.jit.save(trt_ts_module, "trt_torchscript_module.ts") # save the TRT embedd
 
 | ABI / Platform                          | Installation command                                              |
 | --------------------------------------- | ----------------------------------------------------------------- |
-| CXX ABI  (Linux x86_64)                 | python3 setup.py install                                          |
+| CXX11 ABI  (Linux x86_64)                 | python3 setup.py install                                          |
 | CXX11 ABI (Jetson platform aarch64)     | python3 setup.py install --jetpack-version 4.6                    |
 
 

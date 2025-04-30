@@ -150,7 +150,7 @@ def initialize_globals(channel: str, build_python_only: bool) -> None:
         },
         CPU: "pytorch/manylinux2_28-builder:cpu",
         XPU: "pytorch/manylinux2_28-builder:xpu",
-        # TODO: Migrate CUDA_AARCH64 image to manylinux2_28_aarch64-builder:cuda12.4
+        # TODO: Migrate CUDA_AARCH64 image to manylinux2_28_aarch64-builder:cuda12.6
         CPU_AARCH64: "pytorch/manylinux2_28_aarch64-builder:cpu-aarch64",
         CUDA_AARCH64: "pytorch/manylinuxaarch64-builder:cuda12.6",
     }
