@@ -75,7 +75,6 @@ Environment variables supported by nox
 ```
 PYT_PATH          - To use different PYTHONPATH than system installed Python packages
 TOP_DIR           - To set the root directory of the noxfile
-USE_PRE_CXX11     - To use pre_cxx11_abi (Defaults to 0)
 USE_HOST_DEPS     - To use host dependencies for tests (Defaults to 0)
 ```
 
