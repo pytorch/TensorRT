@@ -199,10 +199,9 @@ def test_resnet18_half(ir):
     torch._dynamo.reset()
 
 
-
 @unittest.skipIf(
-    torch.cuda.get_device_capability() < (8, 9),
-    "FP4 quantization requires compute capability 8.9 or later",
+    torch.cuda.get_device_capability() < (10, 0),
+    "FP4 quantization requires compute capability 10.0 or later",
 )
 @unittest.skipIf(
     not importlib.util.find_spec("modelopt"),
@@ -216,8 +215,8 @@ def test_base_fp4(ir):
     class SimpleNetwork(torch.nn.Module):
         def __init__(self):
             super(SimpleNetwork, self).__init__()
-            self.linear1 = torch.nn.Linear(in_features=10, out_features=5)
-            self.linear2 = torch.nn.Linear(in_features=5, out_features=1)
+            self.linear1 = torch.nn.Linear(in_features=32, out_features=16)
+            self.linear2 = torch.nn.Linear(in_features=16, out_features=1)
 
         def forward(self, x):
             x = self.linear1(x)
@@ -229,12 +228,12 @@ def test_base_fp4(ir):
         """Simple calibration function for testing."""
         model(input_tensor)
 
-    input_tensor = torch.randn(1, 10).cuda()
+    input_tensor = torch.randn(1, 32).cuda()
     model = SimpleNetwork().eval().cuda()
 
     quant_cfg = mtq.NVFP4_DEFAULT_CFG
     mtq.quantize(model, quant_cfg, forward_loop=calibrate_loop)
-    # model has FP8 qdq nodes at this point
+    # model has FP4 qdq nodes at this point
     output_pyt = model(input_tensor)
 
     with torch.no_grad():

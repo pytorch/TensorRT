@@ -68,6 +68,7 @@ def quantize(
 
         return dq_output
 
+
 def dynamic_block_quantize(
     ctx: ConversionContext,
     target: Target,
@@ -99,23 +100,29 @@ def dynamic_block_quantize(
             raise ValueError(
                 f"dynamic_block_quantize converter received an input of {input_tensor.shape} shape. Supported shapes: 2D or 3D"
             )
-        print(f"input_tensor.shape: {input_tensor.shape} {block_size=} {amax=} {num_bits=} {exponent_bits=} {scale_num_bits=} {scale_exponent_bits=}")
         max_bound = 6
         amax = to_torch(amax, None)
         scale = torch.divide(amax, max_bound)
         scale = get_trt_tensor(ctx, scale, name + "_scale")
 
-        output_type=trt.DataType.FP4
         # Add Q node
-        dynamic_quantize_layer = ctx.net.add_dynamic_quantize(input_tensor, axis=-1, block_size=16, output_type=output_type)
-        quantize_layer.set_output_type(0, output_type)
+        dynamic_quantize_layer = ctx.net.add_dynamic_quantize(
+            input_tensor,
+            axis=-1,
+            block_size=16,
+            output_type=trt.DataType.FP4,
+            scale_type=trt.DataType.FP8,
+        )
+        dynamic_quantize_layer.set_output_type(0, trt.DataType.FP4)
 
-        set_layer_name(quantize_layer, target, name + "_quantize", source_ir)
-        q_output = quantize_layer.get_output(0)
+        set_layer_name(
+            dynamic_quantize_layer, target, name + "_dynamic_quantize", source_ir
+        )
+        q_output = dynamic_quantize_layer.get_output(0)
         # Add DQ node
         dequantize_layer = ctx.net.add_dequantize(q_output, scale)
         set_layer_name(dequantize_layer, target, name + "_dequantize", source_ir)
-        dequantize_layer.precision = output_type
+        dequantize_layer.precision = trt.DataType.FP4
         dq_output = dequantize_layer.get_output(0)
 
         return dq_output

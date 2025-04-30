@@ -76,10 +76,10 @@ class dtype(Enum):
 
     f8 = auto()
     """8 bit floating-point number, equivalent to ``dtype.fp8`` and ``dtype.float8``
-    
+
     :meta hide-value:
     """
-    
+
     f4 = auto()
     """4 bit floating-point number, equivalent to ``dtype.fp4`` and ``dtype.float4``
 
