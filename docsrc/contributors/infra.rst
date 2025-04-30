@@ -9,7 +9,7 @@ Our main CI provider is the PyTorch CI, backed by `pytorch/test-infra <https://g
 Debugging CI Failures
 ------------------------
 
-Sometimes, you may observe errors on CI tests but cannot repro on a local machines. There are a few possible reasons:
+Sometimes, you may observe errors on CI tests but cannot repro on a local machine. There are a few possible reasons:
 
 - Oversubscription of resources issue that means CI runs too many jobs at the same time. You have to reduce the num of parallel jobs by lowering -n like ``python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/dynamo_converters_test_results.xml -n 8 conversion/``
 - Your ENV may be different from CI.
@@ -81,7 +81,7 @@ Building Torch-TensorRT as Hermetically As Possible
 
 Torch-TensorRT uses a combination of `Bazel <https://bazel.build/>`_ and `UV <https://docs.astral.sh/uv>`_ to build the project in a (near) hermetic manner.
 
-C++ Dependencies are declared in ``MODULE.bzl`` using ``http_archive`` and `` git_repository`` rules. Using a combination of ``pyproject.toml`` and ``uv``
+C++ dependencies are declared in ``MODULE.bzl`` using ``http_archive`` and ``git_repository`` rules. Using a combination of ``pyproject.toml`` and ``uv``
 we lock python dependencies as well. This insures that the dependencies fetched will be identical on each build. Using the build command
 ``uv pip install -e . `` or ``uv run <script using torch_tensorrt>`` will use these dependencies to build the project. When providing a reproducer for a
 locally identified bug, providing the `MODULE.bzl` and `pyproject.toml` files will help us reproduce the issue.
