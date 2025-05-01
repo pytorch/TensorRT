@@ -9,8 +9,6 @@
 
 * This `Dockerfile` installs `cxx11-abi` versions of Pytorch and builds Torch-TRT using `cxx11-abi` libtorch as well. As of torch 2.7, torch requires `cxx11-abi` for all CUDA 11.8, 12.4, 12.6, and later versions.
 
-Note: By default the container uses the `cxx11-abi` version of Torch + Torch-TRT. If you are using a workflow that requires a build of PyTorch on the PRE CXX11 ABI, please add the Docker build argument: `--build-arg USE_PRE_CXX11_ABI=1`
-
 ### Dependencies
 
 * Install nvidia-docker by following https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html#docker
@@ -37,11 +35,10 @@ Test:
 
 You can run any converter test to verify if Torch-TRT built successfully inside the container. Once you launch the container, you can run
 ```
-bazel test //tests/core/conversion/converters:test_activation --compilation_mode=opt --test_output=summary --config use_precompiled_torchtrt --config pre_cxx11_abi
+bazel test //tests/core/conversion/converters:test_activation --compilation_mode=opt --test_output=summary --config use_precompiled_torchtrt
 ```
 
 * `--config use_precompiled_torchtrt` : Indicates bazel to use pre-installed Torch-TRT library to test an application.
-* `--config pre_cxx11_abi` : This flag ensures `bazel test` uses `pre_cxx11_abi` version of `libtorch`. Use this flag corresponding to the ABI format of your Torch-TensorRT installation.
 
 ### Pytorch NGC containers
 

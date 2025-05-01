@@ -347,9 +347,10 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                 self.compilation_settings.tiling_optimization_level
             ]
 
-            builder_config.l2_limit_for_tiling = (
-                self.compilation_settings.l2_limit_for_tiling
-            )
+            if self.compilation_settings.l2_limit_for_tiling != -1:
+                builder_config.l2_limit_for_tiling = (
+                    self.compilation_settings.l2_limit_for_tiling
+                )
 
         return builder_config
 
@@ -892,7 +893,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             else:
                 constant_tensor = frozen_attr
 
-        return to_torch(constant_tensor)
+            return to_torch(constant_tensor)
 
     def call_method(self, target: str, args: Any, kwargs: Any) -> Any:
         assert isinstance(target, str)
