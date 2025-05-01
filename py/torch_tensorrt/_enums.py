@@ -96,6 +96,8 @@ class dtype(Enum):
 
     float8 = f8
     fp8 = f8
+
+    float4 = f4
     fp4 = f4
 
     half = f16
