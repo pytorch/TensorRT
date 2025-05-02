@@ -7,18 +7,18 @@ python3 -m pip install pyyaml
 
 install -y ninja-build gettext
 
-PLATFORM="amd64"
-PLATFORM=x86_64
-BAZEL_PLATFORM=amd64
-if [[ $(uname -m) == "aarch64" ]]; then
-    PLATFORM=aarch64
-    BAZEL_PLATFORM=arm64
+# PLATFORM="amd64"
+# PLATFORM=x86_64
+# BAZEL_PLATFORM=amd64
+# if [[ $(uname -m) == "aarch64" ]]; then
+#     PLATFORM=aarch64
+#     BAZEL_PLATFORM=arm64
 
-    rm -rf /opt/openssl # Not sure whats up with the openssl mismatch
-fi
+#     rm -rf /opt/openssl # Not sure whats up with the openssl mismatch
+# fi
 
-wget https://github.com/bazelbuild/bazelisk/releases/download/v1.25.0/bazelisk-linux-${BAZEL_PLATFORM} \
-    && mv bazelisk-linux-${BAZEL_PLATFORM} /usr/bin/bazel \
+wget https://github.com/bazelbuild/bazelisk/releases/download/v1.25.0/bazelisk-`uname -s`-`uname -m` -o bazelisk \
+    && mv bazelisk /usr/bin/bazel \
     && chmod +x /usr/bin/bazel
 
 TORCH_TORCHVISION=$(grep "^torch" py/requirements.txt)
@@ -49,6 +49,8 @@ if [[ "${CU_VERSION::4}" < "cu12" ]]; then
          -e "s/tensorrt-cu12-libs/tensorrt-${CU_VERSION::4}-libs/g" \
          pyproject.toml
 fi
+
+
 curl -L  https://github.com/a8m/envsubst/releases/download/v1.4.2/envsubst-Linux-arm64 -o envsubst \
 && mv envsubst /usr/bin/envsubst && chmod +x /usr/bin/envsubst
 

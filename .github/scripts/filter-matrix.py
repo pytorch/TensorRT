@@ -28,7 +28,8 @@ def main(args: List[str]) -> None:
         if all(
             [
                 item["python_version"] not in disabled_python_versions,
-                item["desired_cuda"] != cpu_tag,
+                # only test cu128 for aarch64 for now for quick CI
+                item["desired_cuda"] == "cu128",
             ]
         ):
             filtered_includes.append(item)

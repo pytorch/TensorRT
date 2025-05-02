@@ -128,6 +128,7 @@ if (jetpack := os.environ.get("JETPACK_BUILD")) is None:
 
 if RELEASE:
     __version__ = os.environ.get("BUILD_VERSION")
+    print(f"lan added BUILD_VERSION: {__version__}")
 else:
     __version__ = f"{get_base_version()}.dev0+{get_git_revision_short_hash()}"
 
@@ -190,11 +191,11 @@ def build_libtorchtrt_cxx11_abi(
 
     if IS_SBSA:
         if CI_BUILD:
-            cmd.append("--//toolchains/dep_src:torch=whl")
-
-    if CI_BUILD:
-        cmd.append("--platforms=//toolchains:ci_rhel_x86_64_linux")
-        print("CI based build")
+            cmd.append("--platforms=//toolchains/dep_src:torch=whl")
+    else:
+        if CI_BUILD:
+            cmd.append("--platforms=//toolchains:ci_rhel_x86_64_linux")
+            print("CI based build")
 
     print(f"building libtorchtrt {cmd=}")
     status_code = subprocess.run(cmd).returncode
