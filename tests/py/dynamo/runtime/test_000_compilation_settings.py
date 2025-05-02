@@ -1,6 +1,10 @@
+import unittest
+
+import tensorrt as trt
 import torch
 import torch_tensorrt
 from torch.testing._internal.common_utils import TestCase, run_tests
+from torch_tensorrt.dynamo.utils import is_tegra_platform
 
 from ..testing_utilities import DECIMALS_OF_AGREEMENT
 
@@ -53,6 +57,10 @@ class TestEnableTRTFlags(TestCase):
         )
         torch._dynamo.reset()
 
+    @unittest.skipIf(
+        is_tegra_platform() and trt._version_ > "10.8",
+        "DLA is not supported on Jetson platform starting TRT 10.8",
+    )
     def test_dla_args(self):
         class AddSoftmax(torch.nn.Module):
             def forward(self, x):
