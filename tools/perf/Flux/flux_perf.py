@@ -8,10 +8,10 @@ for i in range(torch.cuda.device_count()):
     print(torch.cuda.get_device_properties(i).name)
 
 DEVICE = "cuda:0"
-pipe = FluxPipeline.from_pretrained(
-    "black-forest-labs/FLUX.1-dev",
-    torch_dtype=torch.float32,
-)
+# pipe = FluxPipeline.from_pretrained(
+#     "black-forest-labs/FLUX.1-dev",
+#     torch_dtype=torch.float32,
+# )
 pipe.to(DEVICE).to(torch.float32)
 backbone = pipe.transformer
 
@@ -60,7 +60,10 @@ def generate_image(prompt, inference_step, batch_size=2, benchmark=False, iterat
     end = time()
     if benchmark:
         print("Time Elapse for", iterations, "iterations:", end - start)
-        print("Average Latency Per Step:", (end - start) / inference_step / iterations)
+        print(
+            "Average Latency Per Step:",
+            (end - start) / inference_step / iterations / batchsize,
+        )
     return image
 
 

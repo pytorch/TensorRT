@@ -23,7 +23,7 @@ parser = argparse.ArgumentParser(
 parser.add_argument(
     "--dtype",
     choices=["fp8", "int8"],
-    default="int8",
+    default="fp8",
     help="Quantization data type to use (fp8 or int8)",
 )
 
@@ -75,7 +75,25 @@ def generate_image(pipe, prompt, image_name):
     print(f"Image generated using {image_name} model saved as {image_name}.png")
 
 
-generate_image(pipe, ["A golden retriever holding a sign to code"], "dog_code")
+def benchmark(prompt, inference_step, batch_size=2, iterations=1):
+    from time import time
+
+    start = time()
+    for i in range(iterations):
+        image = pipe(
+            prompt,
+            output_type="pil",
+            num_inference_steps=inference_step,
+            num_images_per_prompt=batch_size,
+        ).images
+    end = time()
+    print("Time Elapse for", iterations, "iterations:", end - start)
+    print(
+        "Average Latency Per Step:",
+        (end - start) / inference_step / iterations / batch_size,
+    )
+    return image
+
 
 # %%
 # Quantization
@@ -180,24 +198,8 @@ trt_gm.device = torch.device(DEVICE)
 generate_image(pipe, ["A golden retriever"], "dog_code2")
 
 
-def benchmark(prompt, inference_step, batch_size=2, iterations=1):
-    from time import time
-
-    start = time()
-    for i in range(iterations):
-        image = pipe(
-            prompt,
-            output_type="pil",
-            num_inference_steps=inference_step,
-            num_images_per_prompt=batch_size,
-        ).images
-    end = time()
-    print("Time Elapse for", iterations, "iterations:", end - start)
-    print("Average Latency Per Step:", (end - start) / inference_step / iterations)
-    return image
-
-
-print(f"Benchmark Original PyTorch Module Latency ({args.dtype})")
-benchmark(["Test"], 50, iterations=3)
+print(f"Benchmark TRT Module Latency at ({args.dtype})")
+benchmark(["Test"], 50, batch_size=2, iterations=3)
+print()
 
 # For this dummy model, the fp16 engine size is around 1GB, fp32 engine size is around 2GB
