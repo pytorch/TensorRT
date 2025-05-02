@@ -4,9 +4,6 @@ import ctypes
 import gc
 import logging
 import os
-import shutil
-import subprocess
-import sys
 import urllib.request
 import warnings
 from dataclasses import fields, replace
@@ -847,20 +844,22 @@ def download_plugin_lib_path(py_version: str, platform: str) -> str:
 
     # Proceeding with the unzip of the wheel file
     # This will exist if the filename was already downloaded
-    if os.path.exists("./tensorrt_llm/libs/libnvinfer_plugin_tensorrt_llm.so"):
-        plugin_lib_path = "./tensorrt_llm/libs/" + "libnvinfer_plugin_tensorrt_llm.so"
+    if "linux" in platform:
+        lib_filename = "libnvinfer_plugin_tensorrt_llm.so"
     else:
-        try:
-            import zipfile
-        except:
-            raise ImportError(
-                "zipfile module is required but not found. Please install zipfile"
-            )
-        with zipfile.ZipFile(file_name, "r") as zip_ref:
-            zip_ref.extractall(".")  # Extract to a folder named 'tensorrt_llm'
-            plugin_lib_path = (
-                "./tensorrt_llm/libs/" + "libnvinfer_plugin_tensorrt_llm.so"
-            )
+        lib_filename = "libnvinfer_plugin_tensorrt_llm.dll"
+    plugin_lib_path = os.path.join("./tensorrt_llm/libs", lib_filename)
+    if os.path.exists(plugin_lib_path):
+        return plugin_lib_path
+    try:
+        import zipfile
+    except:
+        raise ImportError(
+            "zipfile module is required but not found. Please install zipfile"
+        )
+    with zipfile.ZipFile(file_name, "r") as zip_ref:
+        zip_ref.extractall(".")  # Extract to a folder named 'tensorrt_llm'
+        plugin_lib_path = "./tensorrt_llm/libs/" + lib_filename
     return plugin_lib_path
 
 
