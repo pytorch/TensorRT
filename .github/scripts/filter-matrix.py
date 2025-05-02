@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
-from typing import List
-
 import argparse
 import json
 import sys
+from typing import List
 
 disabled_python_versions = "3.13"
 cpu_tag = "cpu"
@@ -29,7 +28,7 @@ def main(args: List[str]) -> None:
         if all(
             [
                 item["python_version"] not in disabled_python_versions,
-                item["desired_cuda"] != cpu_tag
+                item["desired_cuda"] != cpu_tag,
             ]
         ):
             filtered_includes.append(item)
