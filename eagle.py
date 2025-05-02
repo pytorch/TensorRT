@@ -2,8 +2,8 @@ from PIL import Image
 import requests
 from transformers import AutoProcessor, AutoModel
 import torch
-model = AutoModel.from_pretrained("nvidia/Eagle-2.5-8B",trust_remote_code=True, torch_dtype=torch.bfloat16)
-processor = AutoProcessor.from_pretrained("nvidia/Eagle-2.5-8B", trust_remote_code=True, use_fast=True)
+model = AutoModel.from_pretrained("nvidia/Eagle2-2B",trust_remote_code=True, torch_dtype=torch.bfloat16)
+processor = AutoProcessor.from_pretrained("nvidia/Eagle2-2B", trust_remote_code=True, use_fast=True)
 processor.tokenizer.padding_side = "left"
 
 messages = [
