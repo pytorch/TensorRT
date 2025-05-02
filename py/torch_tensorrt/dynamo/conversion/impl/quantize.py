@@ -28,6 +28,8 @@ def quantize(
     """
 
     with unset_fake_temporarily():
+        if not isinstance(input_tensor, TRTTensor):
+            input_tensor = get_trt_tensor(ctx, input_tensor, name + "_quantize_input")
         if isinstance(input_tensor, TRTTensor) and input_tensor.dtype not in (
             trt.float32,
             trt.float16,
@@ -88,6 +90,10 @@ def dynamic_block_quantize(
     """
 
     with unset_fake_temporarily():
+        if not isinstance(input_tensor, TRTTensor):
+            input_tensor = get_trt_tensor(
+                ctx, input_tensor, name + "_dynamic_quantize_input"
+            )
         if isinstance(input_tensor, TRTTensor) and input_tensor.dtype not in (
             trt.float32,
             trt.float16,
