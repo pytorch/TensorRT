@@ -190,8 +190,9 @@ def build_libtorchtrt_cxx11_abi(
         cmd.append("--config=jetpack")
 
     if IS_SBSA:
+        cmd.append("--config=use_torch_whl")
         if CI_BUILD:
-            cmd.append("--platforms=//toolchains/dep_src:torch=whl")
+            cmd.append("--platforms=//toolchains:aarch64_linux")
     else:
         if CI_BUILD:
             cmd.append("--platforms=//toolchains:ci_rhel_x86_64_linux")
