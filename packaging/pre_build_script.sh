@@ -49,7 +49,8 @@ if [[ "${CU_VERSION::4}" < "cu12" ]]; then
          -e "s/tensorrt-cu12-libs/tensorrt-${CU_VERSION::4}-libs/g" \
          pyproject.toml
 fi
-
+curl -L  https://github.com/a8m/envsubst/releases/download/v1.4.2/envsubst-Linux-arm64 -o envsubst
+chmod +x envsubst
 if [[ ${TENSORRT_VERSION} != "" ]]; then
   cat toolchains/ci_workspaces/MODULE_tensorrt.bazel.tmpl | envsubst > MODULE.bazel
 else
