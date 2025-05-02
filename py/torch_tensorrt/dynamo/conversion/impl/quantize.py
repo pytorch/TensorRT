@@ -108,12 +108,11 @@ def dynamic_block_quantize(
         # Add Q node
         dynamic_quantize_layer = ctx.net.add_dynamic_quantize(
             input_tensor,
-            axis=-1,
-            block_size=16,
-            output_type=trt.DataType.FP4,
-            scale_type=trt.DataType.FP8,
+            -1,
+            16,
+            trt.DataType.FP4,
+            trt.DataType.FP8,
         )
-        dynamic_quantize_layer.set_output_type(0, trt.DataType.FP4)
 
         set_layer_name(
             dynamic_quantize_layer, target, name + "_dynamic_quantize", source_ir
