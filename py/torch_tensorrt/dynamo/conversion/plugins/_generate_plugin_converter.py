@@ -31,6 +31,7 @@ def _generate_plugin_converter(
     priority: ConverterPriority = ConverterPriority.STANDARD,
     supports_dynamic_shapes: bool = False,
     requires_output_allocator: bool = False,
+    aot: bool = False,
 ) -> DynamoConverterImplSignature:
     torch_target = getattr(getattr(torch.ops, namespace), op_name)
     overload_str = overload if overload else ""
@@ -80,7 +81,7 @@ def _generate_plugin_converter(
             if isinstance(v, torch.fx.immutable_collections.immutable_list):
                 kwargs[k] = np.array(v)
 
-        layer = ctx.net.add_plugin(plugin(*itensor_args, **kwargs))
+        layer = ctx.net.add_plugin(plugin(*itensor_args, **kwargs), aot=aot)
         assert layer, f"{namespace}::{name} plugin layer was not able to be created"
         _LOGGER.debug(
             f"Adding generated plugin for {namespace}::{name} to tensorrt network"
@@ -107,6 +108,7 @@ def generate_plugin_converter(
     priority: ConverterPriority = ConverterPriority.STANDARD,
     supports_dynamic_shapes: bool = False,
     requires_output_allocator: bool = False,
+    aot: bool = False,
 ) -> DynamoConverterImplSignature:
     plugin_ns, plugin_name = plugin_id.split("::")
     return _generate_plugin_converter(
@@ -116,4 +118,5 @@ def generate_plugin_converter(
         priority=priority,
         supports_dynamic_shapes=supports_dynamic_shapes,
         requires_output_allocator=requires_output_allocator,
+        aot=aot,
     )
