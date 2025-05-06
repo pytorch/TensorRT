@@ -71,7 +71,7 @@ def quantize(
         return dq_output
 
 
-def dynamic_block_quantize(
+def nvfp4_quantize(
     ctx: ConversionContext,
     target: Target,
     source_ir: Optional[SourceIR],
@@ -88,50 +88,71 @@ def dynamic_block_quantize(
     Adds quantize and dequantize ops (QDQ) which quantize to FP4 based
     on the output_type set and dequantizes them back.
     """
-    print(
-        f"dynamic_block_quantize entered: {target=} {source_ir=} {name=} {input_tensor.shape=} {input_tensor.dtype=} {block_size=} {amax=} {num_bits=} {exponent_bits=} {scale_num_bits=} {scale_exponent_bits=}"
-    )
+
     with unset_fake_temporarily():
-        if not isinstance(input_tensor, TRTTensor):
-            input_tensor = get_trt_tensor(ctx, input_tensor, name + "_input")
-        if isinstance(input_tensor, TRTTensor) and input_tensor.dtype not in (
-            trt.float32,
-            trt.float16,
-            trt.bfloat16,
-        ):
-            raise ValueError(
-                f"dynamic_block_quantize converter received an input of {input_tensor.dtype} type. Supported types: float32 | float16 | bfloat16"
-            )
-
-        # calculate global scale (the global per-tensor scaling factor, should only contain 1 element)
-        max_bound = 6
-        amax = to_torch(amax, None)
-        global_scale = torch.divide(amax, max_bound)
-        global_scale = get_trt_tensor(ctx, global_scale, name + "_global_scale")
-
         if ".weight_quantizer" in name:
+            # calculate global scale (the global per-tensor scaling factor, should only contain 1 element)
+            amax = to_torch(
+                amax, None
+            )  # amax is calculated from input_tensor.abs().amax().float()
+            global_scale = torch.divide(amax, 6)
+
+            # calculate block scaling factor of weights
+            [n, k] = input_tensor.shape[-2:]
+            assert block_size != 0, "block_size must be non-zero"
+            assert k % block_size == 0, "k must be a multiple of block_size"
+            reshaped_input_tensor = input_tensor.reshape(
+                tuple(input_tensor.shape[:-2]) + (n, k // block_size, block_size)
+            )
+            per_block_amax = reshaped_input_tensor.abs().amax(dim=-1).float()
+            per_block_scale = torch.divide(per_block_amax, 6)
+
+            global_scale = get_trt_tensor(ctx, global_scale, name + "_global_scale")
+            per_block_scale = get_trt_tensor(
+                ctx, per_block_scale, name + "_per_block_scale"
+            )
+            input_tensor = get_trt_tensor(ctx, input_tensor, name + "_input")
             # static double quantization is used for weights
-            q_output, q_scale = _static_double_quantize(
-                ctx,
-                target,
-                source_ir,
-                name,
-                input_tensor,
-                global_scale,
+            quantized_data_in_fp4, quantized_block_scale_in_fp8 = (
+                _static_double_quantize(
+                    ctx,
+                    target,
+                    source_ir,
+                    name,
+                    input_tensor,
+                    per_block_scale,
+                    global_scale,
+                )
             )
             output = _block_double_dequantize(
                 ctx,
                 target,
                 source_ir,
                 name,
-                q_output,
-                q_scale,
+                quantized_data_in_fp4,
+                quantized_block_scale_in_fp8,
                 global_scale,
             )
         elif ".input_quantizer" in name:
+            if not isinstance(input_tensor, TRTTensor):
+                input_tensor = get_trt_tensor(ctx, input_tensor, name + "_input")
+            if isinstance(input_tensor, TRTTensor) and input_tensor.dtype not in (
+                trt.float32,
+                trt.float16,
+                trt.bfloat16,
+            ):
+                raise ValueError(
+                    f"dynamic_block_quantize converter received an input of {input_tensor.dtype} type. Supported types: float32 | float16 | bfloat16"
+                )
+
             # dynamic double quantization is used for inputs
-            # Add DYQ node
-            q_output, q_scale = _dynamic_quantize(
+            # calculate global scale (the global per-tensor scaling factor, should only contain 1 element)
+            amax = to_torch(amax, None)
+            global_scale = torch.divide(amax, 6)
+            global_scale = get_trt_tensor(ctx, global_scale, name + "_global_scale")
+
+            # quantize input tensor to fp4, output should be data tensor in fp4 and block scale tensor in fp8
+            quantized_data_in_fp4, quantized_scale_in_fp8 = _dynamic_quantize(
                 ctx,
                 target,
                 source_ir,
@@ -145,8 +166,8 @@ def dynamic_block_quantize(
                 target,
                 source_ir,
                 name,
-                q_output,
-                q_scale,
+                quantized_data_in_fp4,
+                quantized_scale_in_fp8,
                 global_scale,
             )
         else:
@@ -169,6 +190,7 @@ def _dynamic_quantize(
     scale_type: trt.DataType = trt.DataType.FP8,
 ) -> Tuple[TRTTensor, TRTTensor]:
     """
+    quantize input tensor to fp4, output should be data tensor in fp4 and block scale tensor in fp8
     Parameters:
         ctx: ConversionContext,
         target: Target,
@@ -187,7 +209,7 @@ def _dynamic_quantize(
         scale_qtype : trt.DataType
             The data type for block scale. Default is FP8.
     Returns:
-        A tuple of two tensors: quantized tensor in f4 and block scale tensor.
+        A tuple of two tensors: quantized data tensor in fp4 and quantized scale tensor in fp8.
     """
     if len(input_tensor.shape) not in (2, 3):
         raise ValueError(
@@ -207,9 +229,9 @@ def _dynamic_quantize(
     set_layer_name(
         dynamic_quantize_layer, target, name + "_dynamic_quantize", source_ir
     )
-    q_output = dynamic_quantize_layer.get_output(0)
-    q_scale = dynamic_quantize_layer.get_output(1)
-    return q_output, q_scale
+    quantized_data_in_fp4 = dynamic_quantize_layer.get_output(0)
+    quantized_scale_in_fp8 = dynamic_quantize_layer.get_output(1)
+    return quantized_data_in_fp4, quantized_scale_in_fp8
 
 
 def _block_double_dequantize(
@@ -223,9 +245,10 @@ def _block_double_dequantize(
     dtype: trt.DataType = trt.DataType.FLOAT,
 ) -> TRTTensor:
     """
-     Parameters:
-     ctx: ConversionContext,
-    target: Target,
+    dequantize input_tensor from fp4 to dtype(default is float32)
+    Parameters:
+        ctx: ConversionContext,
+        target: Target,
         source_ir: Optional[SourceIR]
         name: str
         input_tensor : Tensor (On GPU)
@@ -261,26 +284,50 @@ def _static_double_quantize(
     source_ir: Optional[SourceIR],
     name: str,
     input_tensor: TRTTensor,
+    per_block_scale: TRTTensor,
     global_scale: TRTTensor,
 ) -> Tuple[TRTTensor, TRTTensor]:
     """
     Parameters:
-    ctx: ConversionContext,
-    target: Target,
-    source_ir: Optional[SourceIR],
-    name: str,
+        ctx: ConversionContext,
+        target: Target,
+        source_ir: Optional[SourceIR],
+        name: str,
         input_tensor : Tensor (On GPU)
             The input tensor.
+        per_block_scale : Tensor (On GPU)
+            The per-block scaling factor.
         global_scale : Tensor (On GPU)
             The global per-tensor scaling factor. It should contain only 1 element.
     Returns:
-        A tuple of two tensors: quantized tensor and scaling factor tensor
+        A tuple of two tensors: quantized data tensor in fp4 and quantized block scaling factor tensor in fp8
     """
-    pass
-    return input_tensor, global_scale
-    # quantize_layer = ctx.net.add_quantize(input_tensor, global_scale)
-    # set_layer_name(quantize_layer, target, name + "_quantize", source_ir)
-    # q_output = quantize_layer.get_output(0)
-    # q_scale = quantize_layer.get_output(1)
 
-    # return q_output, q_scale
+    block_scale_quantize_layer = ctx.net.add_quantize(per_block_scale, global_scale)
+    set_layer_name(
+        block_scale_quantize_layer,
+        target,
+        name + "_per_block_scale_quantize",
+        source_ir,
+    )
+    block_scale_quantize_layer.set_output_type(0, trt.DataType.FP8)
+    quantized_block_scale_in_fp8 = block_scale_quantize_layer.get_output(0)
+
+    dequantize_block_scale_layer = ctx.net.add_dequantize(
+        quantized_block_scale_in_fp8, global_scale
+    )
+    set_layer_name(
+        dequantize_block_scale_layer,
+        target,
+        name + "_dequantize_block_scale",
+        source_ir,
+    )
+    dequantize_block_scale_layer.precision = trt.DataType.FP8
+    dequantized_block_scale = dequantize_block_scale_layer.get_output(0)
+
+    data_quantize_layer = ctx.net.add_quantize(input_tensor, dequantized_block_scale)
+    set_layer_name(data_quantize_layer, target, name + "_data_quantize", source_ir)
+    data_quantize_layer.set_output_type(0, trt.DataType.FP4)
+    quantized_data_in_fp4 = data_quantize_layer.get_output(0)
+
+    return quantized_data_in_fp4, quantized_block_scale_in_fp8

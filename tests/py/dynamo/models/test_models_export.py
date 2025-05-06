@@ -225,7 +225,8 @@ def test_base_fp4(ir):
         """Simple calibration function for testing."""
         model(input_tensor)
 
-    input_tensor = torch.randn(1, 16).cuda()
+    input_tensor = torch.randn(5, 16).cuda()
+    print(f"amax: {input_tensor.abs().amax()}")
     model = SimpleNetwork().eval().cuda()
 
     quant_cfg = mtq.NVFP4_DEFAULT_CFG
@@ -246,6 +247,8 @@ def test_base_fp4(ir):
                 reuse_cached_engines=False,
             )
             outputs_trt = trt_model(input_tensor)
+            print(f"lan added outputs_trt: {outputs_trt}")
+            print(f"lan added output_pyt: {output_pyt}")
             assert torch.allclose(output_pyt, outputs_trt, rtol=1e-3, atol=5e-1)
 
 
