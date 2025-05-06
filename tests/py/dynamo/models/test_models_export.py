@@ -230,7 +230,7 @@ def test_base_fp4(ir):
 
     quant_cfg = mtq.NVFP4_DEFAULT_CFG
     mtq.quantize(model, quant_cfg, forward_loop=calibrate_loop)
-    # model has FP4 qdq nodes at this point
+    # model has qdq nodes at this point
     output_pyt = model(input_tensor)
 
     with torch.no_grad():
