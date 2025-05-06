@@ -88,15 +88,30 @@ def nvfp4_quantize(
     Adds quantize and dequantize ops (QDQ) which quantize to FP4 based
     on the output_type set and dequantizes them back.
     """
-
+    print(
+        f"lan added nvfp4_quantize entered: {target=} {source_ir=} {name=} {input_tensor.shape=} {input_tensor.dtype=} {block_size=} {amax=} {num_bits=} {exponent_bits=} {scale_num_bits=} {scale_exponent_bits=}"
+    )
     with unset_fake_temporarily():
-        if ".weight_quantizer" in name:
-            # calculate global scale (the global per-tensor scaling factor, should only contain 1 element)
-            amax = to_torch(
-                amax, None
-            )  # amax is calculated from input_tensor.abs().amax().float()
-            global_scale = torch.divide(amax, 6)
+        if not isinstance(input_tensor, TRTTensor):
+            input_tensor = get_trt_tensor(ctx, input_tensor, name + "_input")
+        if input_tensor.dtype not in (
+            trt.float32,
+            trt.float16,
+            trt.bfloat16,
+        ):
+            raise ValueError(
+                f"dynamic_block_quantize converter received an input of {input_tensor.dtype} type. Supported types: float32 | float16 | bfloat16"
+            )
+        # TODO: ADD PADDING IF
 
+        # calculate global scale (the global per-tensor scaling factor, should only contain 1 element)
+        amax = to_torch(
+            amax, None
+        )  # amax is calculated from input_tensor.abs().amax().float()
+        global_scale = torch.divide(amax, 6)
+        global_scale = get_trt_tensor(ctx, global_scale, name + "_global_scale")
+
+        if ".weight_quantizer" in name:
             # calculate block scaling factor of weights
             [n, k] = input_tensor.shape[-2:]
             assert block_size != 0, "block_size must be non-zero"
@@ -107,11 +122,10 @@ def nvfp4_quantize(
             per_block_amax = reshaped_input_tensor.abs().amax(dim=-1).float()
             per_block_scale = torch.divide(per_block_amax, 6)
 
-            global_scale = get_trt_tensor(ctx, global_scale, name + "_global_scale")
             per_block_scale = get_trt_tensor(
                 ctx, per_block_scale, name + "_per_block_scale"
             )
-            input_tensor = get_trt_tensor(ctx, input_tensor, name + "_input")
+
             # static double quantization is used for weights
             quantized_data_in_fp4, quantized_block_scale_in_fp8 = (
                 _static_double_quantize(
@@ -134,23 +148,6 @@ def nvfp4_quantize(
                 global_scale,
             )
         elif ".input_quantizer" in name:
-            if not isinstance(input_tensor, TRTTensor):
-                input_tensor = get_trt_tensor(ctx, input_tensor, name + "_input")
-            if isinstance(input_tensor, TRTTensor) and input_tensor.dtype not in (
-                trt.float32,
-                trt.float16,
-                trt.bfloat16,
-            ):
-                raise ValueError(
-                    f"dynamic_block_quantize converter received an input of {input_tensor.dtype} type. Supported types: float32 | float16 | bfloat16"
-                )
-
-            # dynamic double quantization is used for inputs
-            # calculate global scale (the global per-tensor scaling factor, should only contain 1 element)
-            amax = to_torch(amax, None)
-            global_scale = torch.divide(amax, 6)
-            global_scale = get_trt_tensor(ctx, global_scale, name + "_global_scale")
-
             # quantize input tensor to fp4, output should be data tensor in fp4 and block scale tensor in fp8
             quantized_data_in_fp4, quantized_scale_in_fp8 = _dynamic_quantize(
                 ctx,
@@ -169,6 +166,7 @@ def nvfp4_quantize(
                 quantized_data_in_fp4,
                 quantized_scale_in_fp8,
                 global_scale,
+                input_tensor.dtype,
             )
         else:
             raise ValueError(
@@ -314,7 +312,9 @@ def _static_double_quantize(
     quantized_block_scale_in_fp8 = block_scale_quantize_layer.get_output(0)
 
     dequantize_block_scale_layer = ctx.net.add_dequantize(
-        quantized_block_scale_in_fp8, global_scale
+        quantized_block_scale_in_fp8,
+        global_scale,
+        per_block_scale.dtype,
     )
     set_layer_name(
         dequantize_block_scale_layer,
