@@ -215,7 +215,7 @@ def test_base_fp4(ir):
     class SimpleNetwork(torch.nn.Module):
         def __init__(self):
             super(SimpleNetwork, self).__init__()
-            self.linear1 = torch.nn.Linear(in_features=16, out_features=5)
+            self.linear1 = torch.nn.Linear(in_features=16, out_features=3)
 
         def forward(self, x):
             x = self.linear1(x)
@@ -249,7 +249,7 @@ def test_base_fp4(ir):
             outputs_trt = trt_model(input_tensor)
             print(f"lan added outputs_trt: {outputs_trt}")
             print(f"lan added output_pyt: {output_pyt}")
-            assert torch.allclose(output_pyt, outputs_trt, rtol=5e-1, atol=5e-1)
+            assert torch.allclose(output_pyt, outputs_trt, rtol=4e-1, atol=4e-1)
 
 
 @unittest.skipIf(
@@ -284,6 +284,7 @@ def test_base_fp8(ir):
     input_tensor = torch.randn(1, 10).cuda()
     model = SimpleNetwork().eval().cuda()
     quant_cfg = mtq.FP8_DEFAULT_CFG
+
     mtq.quantize(model, quant_cfg, forward_loop=calibrate_loop)
     # model has FP8 qdq nodes at this point
     output_pyt = model(input_tensor)
