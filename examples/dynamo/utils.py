@@ -39,31 +39,54 @@ def export_llm(model, inputs, min_seq_len=1, max_seq_len=16):
     return ep
 
 
-def generate(model, input_seq, max_tokens, eos_token_id):
+def generate(model, input_seq, max_output_seq_length, eos_token_id, benchmark=True):
     """
     Greedy decoding of the model. This generates up to max_tokens.
     """
-    # Max length of output seq = current input_seq length + max_tokens allowed to generate
-    max_output_seq_length = input_seq.shape[1] + max_tokens
     stopping_criteria = StoppingCriteriaList(
         [
             MaxLengthCriteria(max_length=max_output_seq_length),
             EosTokenCriteria(eos_token_id=eos_token_id),
         ]
     )
-
-    while True:
+    isl = input_seq.shape[1]
+    osl = max_output_seq_length - isl
+    num_tokens_generated = 0
+    while num_tokens_generated < osl:
         outputs = model(input_seq)
         logits = outputs.logits
         next_token_logits = logits[:, -1, :]
         next_tokens = torch.argmax(next_token_logits, dim=-1)
         input_seq = torch.cat([input_seq, next_tokens[:, None]], dim=-1)
-        # TODO: Handle batch in this check
-        if stopping_criteria(input_seq, logits).item():
+        num_tokens_generated += 1
+        # # TODO: Handle batch in this check
+        if not benchmark and stopping_criteria(input_seq, logits).item():
             break
-
+ 
     return input_seq
 
+def generate_with_kv_cache(model, input_signature, max_output_seq_length, eos_token_id):
+    """
+    Greedy decoding of the model with KV cache.
+    """
+    start_idx = 0
+    end_idx = input_signature[0].shape[1]
+    output_seq = input_signature[0].clone()
+
+    # TODO: Confirm this: When end_idx = max_output_seq_length-1, number of tokens generated = OSL
+    while end_idx < max_output_seq_length:
+        input_signature_with_start_end_idx = input_signature + (start_idx, end_idx)
+        logits_keys_values = model(*input_signature_with_start_end_idx)
+        logits = logits_keys_values[0]
+        kv_cache = logits_keys_values[1:]
+        next_token_logits = logits[:, -1, :]
+        next_tokens = torch.argmax(next_token_logits, dim=-1, keepdim=True)
+        input_signature = (next_tokens, *kv_cache)
+        output_seq = torch.cat([output_seq, next_tokens], dim=-1)
+        start_idx = end_idx
+        end_idx = start_idx + 1 
+    
+    return output_seq
 
 def time_generate(
     generate_fn, model, inputs, output_seq_length, eos_token_id, iterations=10
@@ -74,9 +97,8 @@ def time_generate(
     timings = []
     for _ in range(iterations):
         start_time = timeit.default_timer()
-        inputs_copy = copy.copy(inputs)
         _ = generate_fn(
-            model, inputs_copy, output_seq_length, eos_token_id
+            model, inputs, output_seq_length, eos_token_id
         )
         torch.cuda.synchronize()
         end_time = timeit.default_timer()
