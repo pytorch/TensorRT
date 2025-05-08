@@ -47,10 +47,8 @@ class TestCrossCompileSaveForWindows(TestCase):
         "Cross compile for windows can only be enabled on linux x86-64 platform",
     )
     @unittest.skipIf(
-        not (
-            check_cross_compile_trt_win_lib(),
-            "TRT windows lib for cross compile not found",
-        ),
+        not (check_cross_compile_trt_win_lib()),
+        "TRT windows lib for cross compile not found",
     )
     @pytest.mark.unit
     def test_dynamo_cross_compile_for_windows(self):
@@ -79,6 +77,10 @@ class TestCrossCompileSaveForWindows(TestCase):
     @unittest.skipIf(
         platform.system() != "Linux" or platform.architecture()[0] != "64bit",
         "Cross compile for windows can only be enabled on linux x86-64 platform",
+    )
+    @unittest.skipIf(
+        not (check_cross_compile_trt_win_lib()),
+        "TRT windows lib for cross compile not found",
     )
     @pytest.mark.unit
     def test_dynamo_cross_compile_for_windows_cpu_offload(self):
