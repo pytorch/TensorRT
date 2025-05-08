@@ -8,11 +8,11 @@ for i in range(torch.cuda.device_count()):
     print(torch.cuda.get_device_properties(i).name)
 
 DEVICE = "cuda:0"
-# pipe = FluxPipeline.from_pretrained(
-#     "black-forest-labs/FLUX.1-dev",
-#     torch_dtype=torch.float32,
-# )
-pipe.to(DEVICE).to(torch.float32)
+pipe = FluxPipeline.from_pretrained(
+    "black-forest-labs/FLUX.1-dev",
+    torch_dtype=torch.bfloat16,
+)
+pipe.to(DEVICE).to(torch.bfloat16)
 backbone = pipe.transformer
 
 
@@ -44,10 +44,11 @@ settings = {
     "debug": False,
     "use_python_runtime": True,
     "immutable_weights": False,
+    "offload_module_to_cpu": True,
 }
 
 
-def generate_image(prompt, inference_step, batch_size=2, benchmark=False, iterations=1):
+def generate_image(prompt, inference_step, batch_size=1, benchmark=False, iterations=1):
 
     start = time()
     for i in range(iterations):
@@ -59,38 +60,38 @@ def generate_image(prompt, inference_step, batch_size=2, benchmark=False, iterat
         ).images
     end = time()
     if benchmark:
+        print(f"Batch Size: {batch_size}")
         print("Time Elapse for", iterations, "iterations:", end - start)
         print(
             "Average Latency Per Step:",
-            (end - start) / inference_step / iterations / batchsize,
+            (end - start) / inference_step / iterations / batch_size,
         )
     return image
 
 
-generate_image(["Test"], 2)
-print("Benchmark Original PyTorch Module Latency (float32)")
-generate_image(["Test"], 50, benchmark=True, iterations=3)
+pipe.to(torch.bfloat16)
+torch.cuda.empty_cache()
+# Warmup
+generate_image(["Test"], 20)
+print("Benchmark Original PyTorch Module Latency (bfloat16)")
+for batch_size in range(1, 9):
+    generate_image(["Test"], 20, batch_size=batch_size, benchmark=True, iterations=3)
 
 pipe.to(torch.float16)
 print("Benchmark Original PyTorch Module Latency (float16)")
-generate_image(["Test"], 50, benchmark=True, iterations=3)
-
+for batch_size in range(1, 9):
+    generate_image(["Test"], 20, batch_size=batch_size, benchmark=True, iterations=3)
 
 trt_gm = torch_tensorrt.MutableTorchTensorRTModule(backbone, **settings)
 trt_gm.set_expected_dynamic_shape_range((), dynamic_shapes)
 pipe.transformer = trt_gm
 
 start = time()
-generate_image(["Test"], 2)
+generate_image(["Test"], 2, batch_size=2)
 end = time()
 print("Time Elapse compilation:", end - start)
 print()
 print("Benchmark TRT Accelerated Latency")
-generate_image(["Test"], 50, benchmark=True, iterations=3)
+for batch_size in range(1, 9):
+    generate_image(["Test"], 20, batch_size=batch_size, benchmark=True, iterations=3)
 torch.cuda.empty_cache()
-
-
-with torch_tensorrt.runtime.enable_cudagraphs(trt_gm):
-    generate_image(["Test"], 2)
-    print("Benchmark TRT Accelerated Latency with Cuda Graph")
-    generate_image(["Test"], 50, benchmark=True, iterations=3)

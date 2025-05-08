@@ -75,7 +75,7 @@ def generate_image(pipe, prompt, image_name):
     print(f"Image generated using {image_name} model saved as {image_name}.png")
 
 
-def benchmark(prompt, inference_step, batch_size=2, iterations=1):
+def benchmark(prompt, inference_step, batch_size=1, iterations=1):
     from time import time
 
     start = time()
@@ -87,6 +87,7 @@ def benchmark(prompt, inference_step, batch_size=2, iterations=1):
             num_images_per_prompt=batch_size,
         ).images
     end = time()
+    print(f"Batch Size: {batch_size}")
     print("Time Elapse for", iterations, "iterations:", end - start)
     print(
         "Average Latency Per Step:",
@@ -127,7 +128,7 @@ backbone = mtq.quantize(backbone, ptq_config, forward_loop)
 mtq.disable_quantizer(backbone, filter_func)
 
 batch_size = 2
-BATCH = torch.export.Dim("batch", min=1, max=2)
+BATCH = torch.export.Dim("batch", min=1, max=8)
 SEQ_LEN = torch.export.Dim("seq_len", min=1, max=512)
 # This particular min, max values for img_id input are recommended by torch dynamo during the export of the model.
 # To see this recommendation, you can try exporting using min=1, max=4096
@@ -199,7 +200,8 @@ generate_image(pipe, ["A golden retriever"], "dog_code2")
 
 
 print(f"Benchmark TRT Module Latency at ({args.dtype})")
-benchmark(["Test"], 50, batch_size=2, iterations=3)
+for batch_size in range(1, 9):
+    benchmark(["Test"], 20, batch_size=batch_size, iterations=3)
 print()
 
 # For this dummy model, the fp16 engine size is around 1GB, fp32 engine size is around 2GB
