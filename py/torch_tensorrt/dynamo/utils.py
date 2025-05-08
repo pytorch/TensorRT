@@ -9,7 +9,6 @@ import warnings
 from dataclasses import fields, replace
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
-from urllib.error import URLError
 
 import numpy as np
 import sympy
@@ -853,7 +852,7 @@ def download_plugin_lib_path(py_version: str, platform: str) -> str:
         return plugin_lib_path
     try:
         import zipfile
-    except:
+    except ImportError as e:
         raise ImportError(
             "zipfile module is required but not found. Please install zipfile"
         )
@@ -888,7 +887,7 @@ def load_tensorrt_llm() -> bool:
             return False
         else:
             # this is used as the default py version
-            py_version = f"cp312"
+            py_version = "cp312"
             platform = Platform.current_platform()
 
             platform = str(platform).lower()
