@@ -597,7 +597,7 @@ def save(
         output_format (str): Format to save the model. Options include exported_program | torchscript.
         retrace (bool): When the module type is a fx.GraphModule, this option re-exports the graph using torch.export.export(strict=False) to save it.
                 This flag is experimental for now.
-        pickle_protocol (int): The pickle protocol to use to save the model. Default is 2. Increase this to 4 or higher for large models (eg: SAM2)
+        pickle_protocol (int): The pickle protocol to use to save the model. Default is 2. Increase this to 4 or higher for large models
     """
     if isinstance(module, CudaGraphsTorchTensorRTModule):
         module = module.compiled_module
