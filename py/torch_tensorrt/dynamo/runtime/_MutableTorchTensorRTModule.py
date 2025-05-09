@@ -306,23 +306,42 @@ class MutableTorchTensorRTModule(object):
         torch.cuda.empty_cache()
 
     def get_exported_program(self) -> torch.export.ExportedProgram:
-        if self.allow_complex_guards_as_runtime_asserts:
-            return _export(
-                self.original_model,
-                self.arg_inputs,
-                kwargs=self.kwarg_inputs,
-                dynamic_shapes=self._get_total_dynamic_shapes(),
-                strict=self.strict,
-                allow_complex_guards_as_runtime_asserts=self.allow_complex_guards_as_runtime_asserts,
-            )
+
+        def export_fn() -> torch.export.ExportedProgram:
+            if self.allow_complex_guards_as_runtime_asserts:
+                return _export(
+                    self.original_model,
+                    self.arg_inputs,
+                    kwargs=self.kwarg_inputs,
+                    dynamic_shapes=self._get_total_dynamic_shapes(),
+                    strict=self.strict,
+                    allow_complex_guards_as_runtime_asserts=self.allow_complex_guards_as_runtime_asserts,
+                )
+            else:
+                return torch.export.export(
+                    self.original_model,
+                    self.arg_inputs,
+                    kwargs=self.kwarg_inputs,
+                    dynamic_shapes=self._get_total_dynamic_shapes(),
+                    strict=self.strict,
+                )
+
+        if (
+            torch.float8_e4m3fn in self.additional_settings["enabled_precisions"]
+            or torch.int8 in self.additional_settings["enabled_precisions"]
+        ):
+            try:
+                from modelopt.torch.quantization.utils import export_torch_mode
+
+                assert torch.ops.tensorrt.quantize_op.default
+            except Exception as e:
+                logger.warning(
+                    "Unable to import quantization op. Please install modelopt library (https://github.com/NVIDIA/TensorRT-Model-Optimizer?tab=readme-ov-file#installation) to add support for compiling quantized models"
+                )
+            with export_torch_mode():
+                return export_fn()
         else:
-            return torch.export.export(
-                self.original_model,
-                self.arg_inputs,
-                kwargs=self.kwarg_inputs,
-                dynamic_shapes=self._get_total_dynamic_shapes(),
-                strict=self.strict,
-            )
+            return export_fn()
 
     def compile(self) -> None:
         """

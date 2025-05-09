@@ -1,24 +1,88 @@
+import argparse
+import re
 import time
 
 import gradio as gr
+import modelopt.torch.quantization as mtq
 import torch
 import torch_tensorrt
 from diffusers import FluxPipeline
+
+parser = argparse.ArgumentParser(
+    description="Run Flux quantization with different dtypes"
+)
+
+parser.add_argument(
+    "--dtype",
+    choices=["fp8", "int8", "fp16"],
+    default="int8",
+    help="Select the data type to use (fp8 or int8 or fp16)",
+)
+args = parser.parse_args()
+# Update enabled precisions based on dtype argument
+
+if args.dtype == "fp8":
+    enabled_precisions = {torch.float8_e4m3fn, torch.float16}
+    ptq_config = mtq.FP8_DEFAULT_CFG
+elif args.dtype == "int8":
+    enabled_precisions = {torch.int8, torch.float16}
+    ptq_config = mtq.INT8_DEFAULT_CFG
+    ptq_config["quant_cfg"]["*weight_quantizer"]["axis"] = None
+elif args.dtype == "fp16":
+    enabled_precisions = {torch.float16}
+print(f"\nUsing {args.dtype} quantization")
+
 
 DEVICE = "cuda:0"
 pipe = FluxPipeline.from_pretrained(
     "black-forest-labs/FLUX.1-dev",
     torch_dtype=torch.float16,
 )
-pipe.to(torch.float16)
-backbone = pipe.transformer
 
+
+pipe.to(DEVICE).to(torch.float16)
+backbone = pipe.transformer
+backbone.eval()
+
+
+def filter_func(name):
+    pattern = re.compile(
+        r".*(time_emb_proj|time_embedding|conv_in|conv_out|conv_shortcut|add_embedding|pos_embed|time_text_embed|context_embedder|norm_out|x_embedder).*"
+    )
+    return pattern.match(name) is not None
+
+
+def do_calibrate(
+    pipe,
+    prompt: str,
+) -> None:
+    """
+    Run calibration steps on the pipeline using the given prompts.
+    """
+    image = pipe(
+        prompt,
+        output_type="pil",
+        num_inference_steps=20,
+        generator=torch.Generator("cuda").manual_seed(0),
+    ).images[0]
+
+
+def forward_loop(mod):
+    # Switch the pipeline's backbone, run calibration
+    pipe.transformer = mod
+    do_calibrate(
+        pipe=pipe,
+        prompt="test",
+    )
+
+
+if args.dtype != "fp16":
+    backbone = mtq.quantize(backbone, ptq_config, forward_loop)
+    mtq.disable_quantizer(backbone, filter_func)
 
 batch_size = 2
-BATCH = torch.export.Dim("batch", min=1, max=8)
 
-# This particular min, max values for img_id input are recommended by torch dynamo during the export of the model.
-# To see this recommendation, you can try exporting using min=1, max=4096
+BATCH = torch.export.Dim("batch", min=1, max=8)
 dynamic_shapes = {
     "hidden_states": {0: BATCH},
     "encoder_hidden_states": {0: BATCH},
@@ -34,21 +98,18 @@ dynamic_shapes = {
 settings = {
     "strict": False,
     "allow_complex_guards_as_runtime_asserts": True,
-    "enabled_precisions": {torch.float32},
+    "enabled_precisions": enabled_precisions,
     "truncate_double": True,
     "min_block_size": 1,
-    "use_fp32_acc": True,
-    "use_explicit_typing": True,
     "debug": False,
     "use_python_runtime": True,
     "immutable_weights": False,
-    "enable_cuda_graph": True,
+    "offload_module_to_cpu": True,
 }
-backbone.to(DEVICE)
+
 trt_gm = torch_tensorrt.MutableTorchTensorRTModule(backbone, **settings)
 trt_gm.set_expected_dynamic_shape_range((), dynamic_shapes)
 pipe.transformer = trt_gm
-pipe.to(DEVICE)
 
 
 def generate_image(prompt, inference_step, batch_size=2):
