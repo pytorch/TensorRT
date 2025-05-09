@@ -526,7 +526,6 @@ def convert_method_to_trt_engine(
         raise RuntimeError("Module is an unknown format or the ir requested is unknown")
 
 
-@needs_cross_compile
 def load_cross_compiled_exported_program(file_path: str = "") -> Any:
     """
     Load an ExportedProgram file in Windows which was previously cross compiled in Linux

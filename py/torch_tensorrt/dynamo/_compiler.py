@@ -1247,7 +1247,6 @@ def save_cross_compiled_exported_program(
     logger.debug(f"successfully saved the module for windows at {file_path}")
 
 
-@needs_cross_compile
 def load_cross_compiled_exported_program(file_path: str = "") -> Any:
     """
     Load an ExportedProgram file in Windows which was previously cross compiled in Linux
