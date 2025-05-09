@@ -1,6 +1,7 @@
 from typing import Any
 
 import torch
+from torch_tensorrt._enums import Platform
 
 
 def sanitized_torch_version() -> Any:
@@ -9,3 +10,18 @@ def sanitized_torch_version() -> Any:
         if ".nv" not in torch.__version__
         else torch.__version__.split(".nv")[0]
     )
+
+
+def check_cross_compile_trt_win_lib() -> bool:
+    # cross compile feature is only available on linux
+    # build engine on linux and run on windows
+    import dllist
+
+    platform = Platform.current_platform()
+    platform = str(platform).lower()
+    if platform.startswith("linux"):
+        loaded_libs = dllist.dllist()
+        target_lib = "libnvinfer_builder_resource_win.so.*"
+        if target_lib in loaded_libs:
+            return True
+    return False
