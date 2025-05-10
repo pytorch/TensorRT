@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
-from typing import List
-
 import argparse
 import json
 import sys
+from typing import List
 
 disabled_python_versions = "3.13"
 cpu_tag = "cpu"
@@ -29,10 +28,15 @@ def main(args: List[str]) -> None:
         if all(
             [
                 item["python_version"] not in disabled_python_versions,
-                item["desired_cuda"] != cpu_tag
             ]
         ):
-            filtered_includes.append(item)
+            if item["gpu_arch_type"] == "cuda-aarch64":
+                # for aarch64 only test cu128 for now for quick CI
+                if item["desired_cuda"] == "cu128":
+                    item["container_image"] = "sameli/manylinux_2_34_x86_64_cuda_12.8"
+                    filtered_includes.append(item)
+            else:
+                filtered_includes.append(item)
     filtered_matrix_dict = {}
     filtered_matrix_dict["include"] = filtered_includes
     print(json.dumps(filtered_matrix_dict))

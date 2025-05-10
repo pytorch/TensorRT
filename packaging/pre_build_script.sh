@@ -7,14 +7,16 @@ python3 -m pip install pyyaml
 
 install -y ninja-build gettext
 
-PLATFORM="amd64"
-PLATFORM=x86_64
 BAZEL_PLATFORM=amd64
-if [[ $(uname -m) == "aarch64" ]]; then
-    PLATFORM=aarch64
-    BAZEL_PLATFORM=arm64
 
+nvidia-smi
+
+if [[ $(uname -m) == "aarch64" ]]; then
+    BAZEL_PLATFORM=arm64
     rm -rf /opt/openssl # Not sure whats up with the openssl mismatch
+    # aarch64 does not have envsubst pre-installed in the image, install it here
+    curl -L  https://github.com/a8m/envsubst/releases/download/v1.4.2/envsubst-Linux-arm64 -o envsubst \
+    && mv envsubst /usr/bin/envsubst && chmod +x /usr/bin/envsubst
 fi
 
 wget https://github.com/bazelbuild/bazelisk/releases/download/v1.25.0/bazelisk-linux-${BAZEL_PLATFORM} \
@@ -49,6 +51,9 @@ if [[ "${CU_VERSION::4}" < "cu12" ]]; then
          -e "s/tensorrt-cu12-libs/tensorrt-${CU_VERSION::4}-libs/g" \
          pyproject.toml
 fi
+
+
+
 
 if [[ ${TENSORRT_VERSION} != "" ]]; then
   cat toolchains/ci_workspaces/MODULE_tensorrt.bazel.tmpl | envsubst > MODULE.bazel
