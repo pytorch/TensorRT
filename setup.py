@@ -192,7 +192,7 @@ def build_libtorchtrt_cxx11_abi(
     if IS_SBSA:
         if CI_BUILD:
             cmd.append("--platforms=//toolchains:aarch64_linux")
-            cmd.append("--//toolchains/dep_src:torch=whl")
+            # cmd.append("--//toolchains/dep_src:torch=whl")
     else:
         if CI_BUILD:
             cmd.append("--platforms=//toolchains:ci_rhel_x86_64_linux")

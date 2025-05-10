@@ -9,6 +9,8 @@ install -y ninja-build gettext
 
 BAZEL_PLATFORM=amd64
 
+nvidia-smi
+
 if [[ $(uname -m) == "aarch64" ]]; then
     BAZEL_PLATFORM=arm64
     rm -rf /opt/openssl # Not sure whats up with the openssl mismatch
