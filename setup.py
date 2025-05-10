@@ -147,14 +147,14 @@ if platform.uname().processor == "aarch64":
             JETPACK_VERSION = "4.6"
         elif version == "5.0":
             JETPACK_VERSION = "5.0"
-        elif version == "6.1":
-            JETPACK_VERSION = "6.1"
+        elif version == "6.2":
+            JETPACK_VERSION = "6.2"
 
     if not JETPACK_VERSION:
         warnings.warn(
-            "Assuming jetpack version to be 6.1, if not use the --jetpack-version option"
+            "Assuming jetpack version to be 6.2, if not use the --jetpack-version option"
         )
-        JETPACK_VERSION = "6.1"
+        JETPACK_VERSION = "6.2"
 
 
 BAZEL_EXE = None
@@ -203,9 +203,9 @@ def build_libtorchtrt_cxx11_abi(
     elif JETPACK_VERSION == "5.0":
         cmd.append("--platforms=//toolchains:jetpack_5.0")
         print("Jetpack version: 5.0")
-    elif JETPACK_VERSION == "6.1":
-        cmd.append("--platforms=//toolchains:jetpack_6.1")
-        print("Jetpack version: 6.1")
+    elif JETPACK_VERSION == "6.2":
+        cmd.append("--platforms=//toolchains:jetpack_6.2")
+        print("Jetpack version: 6.2")
 
     if CI_BUILD:
         cmd.append("--platforms=//toolchains:ci_rhel_x86_64_linux")

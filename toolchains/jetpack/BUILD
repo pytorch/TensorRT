@@ -13,6 +13,6 @@ constraint_value(
 )
 
 constraint_value(
-    name = "6.1",
+    name = "6.2",
     constraint_setting = ":jetpack",
 )
