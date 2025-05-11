@@ -9,7 +9,6 @@ install -y ninja-build gettext
 
 BAZEL_PLATFORM=amd64
 
-nvidia-smi
 
 if [[ $(uname -m) == "aarch64" ]]; then
     BAZEL_PLATFORM=arm64
@@ -19,7 +18,8 @@ if [[ $(uname -m) == "aarch64" ]]; then
     && mv envsubst /usr/bin/envsubst && chmod +x /usr/bin/envsubst
 fi
 
-wget https://github.com/bazelbuild/bazelisk/releases/download/v1.25.0/bazelisk-linux-${BAZEL_PLATFORM} \
+curl -L  https://github.com/bazelbuild/bazelisk/releases/download/v1.26.0/bazelisk-linux-${BAZEL_PLATFORM} \
+    -o bazelisk-linux-${BAZEL_PLATFORM}  \
     && mv bazelisk-linux-${BAZEL_PLATFORM} /usr/bin/bazel \
     && chmod +x /usr/bin/bazel
 
