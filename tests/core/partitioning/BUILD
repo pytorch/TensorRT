@@ -4,27 +4,7 @@ load("//tests/core/partitioning:partitioning_test.bzl", "partitioning_test")
 config_setting(
     name = "use_torch_whl",
     flag_values = {
-        "//toolchains/dep_src:torch": "whl",
-    },
-)
-
-config_setting(
-    name = "sbsa",
-    constraint_values = [
-        "@platforms//cpu:aarch64",
-    ],
-    flag_values = {
-        "//toolchains/dep_collection:compute_libs": "default",
-    },
-)
-
-config_setting(
-    name = "jetpack",
-    constraint_values = [
-        "@platforms//cpu:aarch64",
-    ],
-    flag_values = {
-        "//toolchains/dep_collection:compute_libs": "jetpack",
+        "//toolchains/dep_src:torch": "whl"
     },
 )
 
@@ -34,6 +14,7 @@ config_setting(
         "@platforms//os:windows",
     ],
 )
+
 
 filegroup(
     name = "jit_models",
@@ -82,6 +63,7 @@ cc_test(
         "@googletest//:gtest_main",
     ] + select({
         ":windows": ["@libtorch_win//:libtorch"],
+        ":use_torch_whl": ["@torch_whl//:libtorch"],
         "//conditions:default": ["@libtorch"],
     }),
 )
@@ -97,6 +79,7 @@ cc_test(
         "@googletest//:gtest_main",
     ] + select({
         ":windows": ["@libtorch_win//:libtorch"],
+        ":use_torch_whl": ["@torch_whl//:libtorch"],
         "//conditions:default": ["@libtorch"],
     }),
 )
@@ -112,6 +95,7 @@ cc_test(
         "@googletest//:gtest_main",
     ] + select({
         ":windows": ["@libtorch_win//:libtorch"],
+        ":use_torch_whl": ["@torch_whl//:libtorch"],
         "//conditions:default": ["@libtorch"],
     }),
 )
@@ -127,6 +111,7 @@ cc_test(
         "@googletest//:gtest_main",
     ] + select({
         ":windows": ["@libtorch_win//:libtorch"],
+        ":use_torch_whl": ["@torch_whl//:libtorch"],
         "//conditions:default": ["@libtorch"],
     }),
 )

@@ -6,7 +6,7 @@ package(default_visibility = ["//visibility:public"])
 config_setting(
     name = "use_torch_whl",
     flag_values = {
-        "//toolchains/dep_src:torch": "whl",
+        "//toolchains/dep_src:torch": "whl"
     },
 )
 
@@ -16,7 +16,7 @@ config_setting(
         "@platforms//cpu:aarch64",
     ],
     flag_values = {
-        "//toolchains/dep_collection:compute_libs": "default",
+        "//toolchains/dep_collection:compute_libs": "default"
     },
 )
 
@@ -26,7 +26,7 @@ config_setting(
         "@platforms//cpu:aarch64",
     ],
     flag_values = {
-        "//toolchains/dep_collection:compute_libs": "jetpack",
+        "//toolchains/dep_collection:compute_libs": "jetpack"
     },
 )
 
@@ -46,14 +46,14 @@ cc_library(
         "TorchTRTLogger.h",
     ],
     deps = select({
-        ":windows": [
-            "@libtorch_win//:libtorch",
-            "@tensorrt_win//:nvinfer",
-        ],
-        "//conditions:default": [
-            "@libtorch",
-            "@tensorrt//:nvinfer",
-        ],
+        ":windows": ["@tensorrt_win//:nvinfer"],
+        ":sbsa": ["@tensorrt_sbsa//:nvinfer"],
+        ":jetpack": ["@tensorrt_l4t//:nvinfer"],
+        "//conditions:default": ["@tensorrt//:nvinfer"],
+    }) + select({
+        ":windows": ["@libtorch_win//:libtorch"],
+        ":use_torch_whl": ["@torch_whl//:libtorch"],
+        "//conditions:default": ["@libtorch"],
     }),
     alwayslink = True,
 )

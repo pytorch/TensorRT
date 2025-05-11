@@ -5,7 +5,7 @@ package(default_visibility = ["//visibility:public"])
 config_setting(
     name = "use_torch_whl",
     flag_values = {
-        "//toolchains/dep_src:torch": "whl",
+        "//toolchains/dep_src:torch": "whl"
     },
 )
 
@@ -35,13 +35,13 @@ cc_binary(
         "//cpp:torch_tensorrt",
         "//third_party/args",
     ] + select({
-        ":use_torch_whl": [
-            "@torch_whl//:caffe2",
-            "@torch_whl//:libtorch",
-        ],
         ":windows": [
             "@libtorch_win//:caffe2",
-            "@libtorch_win//:libtorch",
+            "@libtorch_win//:libtorch"
+        ],
+        ":use_torch_whl": [
+            "@torch_whl//:caffe2",
+            "@torch_whl//:libtorch"
         ],
         "//conditions:default": [
             "@libtorch",

@@ -8,7 +8,7 @@ config_setting(
         "@platforms//cpu:aarch64",
     ],
     flag_values = {
-        "@//toolchains/dep_collection:compute_libs": "jetpack",
+        "@//toolchains/dep_collection:compute_libs": "jetpack"
     },
 )
 
@@ -59,14 +59,8 @@ cc_library(
         "nvinfer_headers",
         "nvinfer_lib",
     ] + select({
-        ":jetpack": [
-            "nvinfer_static_lib",
-            "@cuda_l4t//:cudart",
-        ],
-        ":windows": [
-            "nvinfer_static_lib",
-            "@cuda_win//:cudart",
-        ],
+        ":windows": ["@cuda_win//:cudart", "nvinfer_static_lib"],
+        ":jetpack": ["@cuda_l4t//:cudart", "nvinfer_static_lib"],
         "//conditions:default": ["@cuda//:cudart"],
     }),
 )
@@ -202,14 +196,14 @@ cc_library(
         "//conditions:default": ["lib/libnvinfer_plugin.so"],
     }),
     hdrs = glob(["include/NvInferPlugin*.h"]),
-    copts = ["-pthread"],
+    copts = ["-pthread",],
     includes = ["include/"],
     linkopts = ["-lpthread"],
     deps = [
         "nvinfer",
     ] + select({
-        ":jetpack": ["@cuda_l4t//:cudart"],
         ":windows": ["@cuda_win//:cudart"],
+        ":jetpack": ["@cuda_l4t//:cudart"],
         "//conditions:default": ["@cuda//:cudart"],
     }),
     alwayslink = True,
