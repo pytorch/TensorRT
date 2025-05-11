@@ -80,7 +80,7 @@ dir_path = os.path.join(str(get_root_dir()), "py")
 
 IS_AARCH64 = platform.uname().processor == "aarch64"
 IS_JETPACK = False
-IS_SABA = False
+IS_SBSA = False
 PY_ONLY = False
 NO_TS = False
 LEGACY = False
@@ -126,9 +126,9 @@ if (jetpack := os.environ.get("JETPACK_BUILD")) is not None:
     if jetpack == "1":
         IS_JETPACK = True
 
-if (sbsa := os.environ.get("SABA_BUILD")) is not None:
+if (sbsa := os.environ.get("SBSA_BUILD")) is not None:
     if sbsa == "1":
-        IS_SABA = True
+        IS_SBSA = True
 
 if RELEASE:
     __version__ = os.environ.get("BUILD_VERSION")
@@ -196,7 +196,7 @@ def build_libtorchtrt_cxx11_abi(
         cmd.append("--config=jetpack")
         print("Jetpack build")
 
-    if IS_SABA:
+    if IS_SBSA:
         cmd.append("--platforms=//toolchains:sbsa")
         print("SABA build")
 
@@ -459,7 +459,7 @@ package_dir = {
 package_data = {}
 
 if not (PY_ONLY or NO_TS):
-    tensorrt_linux_external_dir = (
+    tensorrt_x86_64_external_dir = (
         lambda: subprocess.check_output(
             [BAZEL_EXE, "query", "@tensorrt//:nvinfer", "--output", "location"]
         )
@@ -467,6 +467,32 @@ if not (PY_ONLY or NO_TS):
         .strip()
         .split("/BUILD.bazel")[0]
     )
+
+    tensorrt_sbsa_external_dir = (
+        lambda: subprocess.check_output(
+            [BAZEL_EXE, "query", "@tensorrt_sbsa//:nvinfer", "--output", "location"]
+        )
+        .decode("ascii")
+        .strip()
+        .split("/BUILD.bazel")[0]
+    )
+
+    tensorrt_jetpack_external_dir = (
+        lambda: subprocess.check_output(
+            [BAZEL_EXE, "query", "@tensorrt_l4t//:nvinfer", "--output", "location"]
+        )
+        .decode("ascii")
+        .strip()
+        .split("/BUILD.bazel")[0]
+    )
+
+    if IS_SBSA:
+        tensorrt_linux_external_dir = tensorrt_sbsa_external_dir
+    elif IS_JETPACK:
+        tensorrt_linux_external_dir = tensorrt_jetpack_external_dir
+    else:
+        tensorrt_linux_external_dir = tensorrt_x86_64_external_dir
+
     tensorrt_windows_external_dir = (
         lambda: subprocess.check_output(
             [BAZEL_EXE, "query", "@tensorrt_win//:nvinfer", "--output", "location"]
