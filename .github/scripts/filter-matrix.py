@@ -41,7 +41,7 @@ def main(args: list[str]) -> None:
         if options.limit_pr_builds == "true":
             # currently if it is the pr build, it build using py3.9 with all cuda versions, we want to change to py3.11 with singlecu12.8
             if item["desired_cuda"] == "cu128":
-                item["python_version"] = "py3.11"
+                item["python_version"] = "3.11"
                 build_names = item["build_name"].split("-")
                 build_names[1] = "py3_11"
                 item["build_name"] = "-".join(build_names)
