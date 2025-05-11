@@ -2,6 +2,33 @@ load("@rules_cc//cc:defs.bzl", "cc_test")
 load("//tests/core/partitioning:partitioning_test.bzl", "partitioning_test")
 
 config_setting(
+    name = "use_torch_whl",
+    flag_values = {
+        "//toolchains/dep_src:torch": "whl",
+    },
+)
+
+config_setting(
+    name = "sbsa",
+    constraint_values = [
+        "@platforms//cpu:aarch64",
+    ],
+    flag_values = {
+        "//toolchains/dep_collection:compute_libs": "default",
+    },
+)
+
+config_setting(
+    name = "jetpack",
+    constraint_values = [
+        "@platforms//cpu:aarch64",
+    ],
+    flag_values = {
+        "//toolchains/dep_collection:compute_libs": "jetpack",
+    },
+)
+
+config_setting(
     name = "windows",
     constraint_values = [
         "@platforms//os:windows",

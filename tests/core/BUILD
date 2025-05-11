@@ -1,6 +1,33 @@
 load("@rules_cc//cc:defs.bzl", "cc_test")
 
 config_setting(
+    name = "use_torch_whl",
+    flag_values = {
+        "//toolchains/dep_src:torch": "whl",
+    },
+)
+
+config_setting(
+    name = "sbsa",
+    constraint_values = [
+        "@platforms//cpu:aarch64",
+    ],
+    flag_values = {
+        "//toolchains/dep_collection:compute_libs": "default",
+    },
+)
+
+config_setting(
+    name = "jetpack",
+    constraint_values = [
+        "@platforms//cpu:aarch64",
+    ],
+    flag_values = {
+        "//toolchains/dep_collection:compute_libs": "jetpack",
+    },
+)
+
+config_setting(
     name = "windows",
     constraint_values = [
         "@platforms//os:windows",
@@ -22,6 +49,7 @@ cc_test(
         "//tests/util",
         "@googletest//:gtest_main",
     ] + select({
+        ":use_torch_whl": ["@torch_whl//:libtorch"],
         ":windows": ["@libtorch_win//:libtorch"],
         "//conditions:default": ["@libtorch"],
     }),

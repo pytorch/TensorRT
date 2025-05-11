@@ -78,7 +78,9 @@ load_dep_info()
 
 dir_path = os.path.join(str(get_root_dir()), "py")
 
-JETPACK_VERSION = None
+IS_AARCH64 = platform.uname().processor == "aarch64"
+IS_JETPACK = False
+IS_SABA = False
 PY_ONLY = False
 NO_TS = False
 LEGACY = False
@@ -120,6 +122,13 @@ if (release_env_var := os.environ.get("RELEASE")) is not None:
 if (gpu_arch_version := os.environ.get("CU_VERSION")) is None:
     gpu_arch_version = f"cu{__cuda_version__.replace('.','')}"
 
+if (jetpack := os.environ.get("JETPACK_BUILD")) is not None:
+    if jetpack == "1":
+        IS_JETPACK = True
+
+if (sbsa := os.environ.get("SABA_BUILD")) is not None:
+    if sbsa == "1":
+        IS_SABA = True
 
 if RELEASE:
     __version__ = os.environ.get("BUILD_VERSION")
@@ -135,26 +144,12 @@ if (ci_env_var := os.environ.get("CI_BUILD")) is not None:
     if ci_env_var == "1":
         CI_BUILD = True
 
-if platform.uname().processor == "aarch64":
-    if "--jetpack-version" in sys.argv:
-        version_idx = sys.argv.index("--jetpack-version") + 1
-        version = sys.argv[version_idx]
-        sys.argv.remove(version)
-        sys.argv.remove("--jetpack-version")
-        if version == "4.5":
-            JETPACK_VERSION = "4.5"
-        elif version == "4.6":
-            JETPACK_VERSION = "4.6"
-        elif version == "5.0":
-            JETPACK_VERSION = "5.0"
-        elif version == "6.1":
-            JETPACK_VERSION = "6.1"
-
-    if not JETPACK_VERSION:
-        warnings.warn(
-            "Assuming jetpack version to be 6.1, if not use the --jetpack-version option"
-        )
-        JETPACK_VERSION = "6.1"
+if IS_AARCH64:
+    if "--jetpack" in sys.argv:
+        sys.argv.remove("--jetpack")
+        IS_JETPACK = True
+    else:
+        IS_SBSA = True
 
 
 BAZEL_EXE = None
@@ -184,7 +179,10 @@ def build_libtorchtrt_cxx11_abi(
     else:
         cmd.append("--compilation_mode=opt")
     if use_dist_dir:
-        cmd.append("--distdir=third_party/dist_dir/x86_64-linux-gnu")
+        if IS_AARCH64:
+            cmd.append("--distdir=third_party/dist_dir/aarch64-linux-gnu")
+        else:
+            cmd.append("--distdir=third_party/dist_dir/x86_64-linux-gnu")
 
     if target_python:
         cmd.append("--config=python")
@@ -194,22 +192,20 @@ def build_libtorchtrt_cxx11_abi(
     else:
         cmd.append("--config=linux")
 
-    if JETPACK_VERSION == "4.5":
-        cmd.append("--platforms=//toolchains:jetpack_4.5")
-        print("Jetpack version: 4.5")
-    elif JETPACK_VERSION == "4.6":
-        cmd.append("--platforms=//toolchains:jetpack_4.6")
-        print("Jetpack version: 4.6")
-    elif JETPACK_VERSION == "5.0":
-        cmd.append("--platforms=//toolchains:jetpack_5.0")
-        print("Jetpack version: 5.0")
-    elif JETPACK_VERSION == "6.1":
-        cmd.append("--platforms=//toolchains:jetpack_6.1")
-        print("Jetpack version: 6.1")
+    if IS_JETPACK:
+        cmd.append("--config=jetpack")
+        print("Jetpack build")
+
+    if IS_SABA:
+        cmd.append("--platforms=//toolchains:sbsa")
+        print("SABA build")
 
     if CI_BUILD:
-        cmd.append("--platforms=//toolchains:ci_rhel_x86_64_linux")
         print("CI based build")
+        if IS_AARCH64:
+            cmd.append("--platforms=//toolchains:aarch64_linux")
+        else:
+            cmd.append("--platforms=//toolchains:ci_rhel_x86_64_linux")
 
     print(f"building libtorchtrt {cmd=}")
     status_code = subprocess.run(cmd).returncode

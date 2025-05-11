@@ -1,0 +1,350 @@
+name: Build and test Linux aarch64 wheels
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - nightly
+      - release/*
+    tags:
+      # NOTE: Binary build pipelines should only get triggered on release candidate builds
+      # Release candidate tags look like: v1.11.0-rc1
+      - v[0-9]+.[0-9]+.[0-9]+-rc[0-9]+
+  workflow_dispatch:
+
+jobs:
+  generate-matrix:
+    uses: ./.github/workflows/generate_binary_build_matrix.yml
+    with:
+      package-type: wheel
+      os: linux-aarch64
+      test-infra-repository: pytorch/test-infra
+      test-infra-ref: main
+      with-rocm: false
+      with-cpu: false
+      python-versions: '["3.11", "3.12", "3.10", "3.9"]'
+
+  filter-matrix:
+    needs: [generate-matrix]
+    outputs:
+      matrix: ${{ steps.generate.outputs.matrix }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: actions/checkout@v4
+        with:
+          repository: pytorch/tensorrt
+      - name: Generate release matrix
+        id: generate
+        run: |
+          set -eou pipefail
+          MATRIX_BLOB=${{ toJSON(needs.generate-matrix.outputs.matrix) }}
+          MATRIX_BLOB="$(python3 .github/scripts/filter-matrix.py --matrix "${MATRIX_BLOB}")"
+          echo "${MATRIX_BLOB}"
+          echo "matrix=${MATRIX_BLOB}" >> "${GITHUB_OUTPUT}"
+
+  build:
+    needs: filter-matrix
+    permissions:
+      id-token: write
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - repository: pytorch/tensorrt
+            pre-script: packaging/pre_build_script.sh
+            env-var-script: packaging/env_vars.txt
+            post-script: packaging/post_build_script.sh
+            smoke-test-script: packaging/smoke_test_script.sh
+            package-name: torch_tensorrt
+    name: Build torch-tensorrt whl package
+    uses: pytorch/test-infra/.github/workflows/build_wheels_linux.yml@main
+    with:
+      repository: ${{ matrix.repository }}
+      ref: ""
+      test-infra-repository: pytorch/test-infra
+      test-infra-ref: main
+      build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
+      pre-script: ${{ matrix.pre-script }}
+      env-var-script: ${{ matrix.env-var-script }}
+      post-script: ${{ matrix.post-script }}
+      package-name: ${{ matrix.package-name }}
+      smoke-test-script: ${{ matrix.smoke-test-script }}
+      trigger-event: ${{ github.event_name }}
+      architecture: "aarch64"
+
+  tests-py-torchscript-fe:
+    name: Test torchscript frontend [Python]
+    needs: [filter-matrix, build]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - repository: pytorch/tensorrt
+            package-name: torch_tensorrt
+            pre-script: packaging/pre_build_script.sh
+            post-script: packaging/post_build_script.sh
+            smoke-test-script: packaging/smoke_test_script.sh
+    uses: ./.github/workflows/linux-test.yml
+    with:
+      job-name: tests-py-torchscript-fe
+      repository: "pytorch/tensorrt"
+      ref: ""
+      test-infra-repository: pytorch/test-infra
+      test-infra-ref: main
+      build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
+      pre-script: ${{ matrix.pre-script }}
+      architecture: "aarch64"
+      script: |
+        export USE_HOST_DEPS=1
+        export CI_BUILD=1
+        export LD_LIBRARY_PATH=/usr/lib64:$LD_LIBRARY_PATH
+        pushd .
+        cd tests/modules
+        python hub.py
+        popd
+        pushd .
+        cd tests/py/ts
+        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/ts_api_test_results.xml api/
+        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/ts_models_test_results.xml models/
+        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/ts_integrations_test_results.xml integrations/
+        popd
+
+  tests-py-dynamo-converters:
+    name: Test dynamo converters [Python]
+    needs: [filter-matrix, build]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - repository: pytorch/tensorrt
+            package-name: torch_tensorrt
+            pre-script: packaging/pre_build_script.sh
+            post-script: packaging/post_build_script.sh
+            smoke-test-script: packaging/smoke_test_script.sh
+    uses: ./.github/workflows/linux-test.yml
+    with:
+      job-name: tests-py-dynamo-converters
+      repository: "pytorch/tensorrt"
+      ref: ""
+      test-infra-repository: pytorch/test-infra
+      test-infra-ref: main
+      build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
+      pre-script: ${{ matrix.pre-script }}
+      architecture: "aarch64"
+      script: |
+        export USE_HOST_DEPS=1
+        export CI_BUILD=1
+        pushd .
+        cd tests/py
+        python -m pip install -r requirements.txt
+        cd dynamo
+        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/dynamo_converters_test_results.xml -n 4 conversion/
+        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/dynamo_converters_test_results.xml automatic_plugin/test_automatic_plugin.py
+        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/dynamo_converters_test_results.xml automatic_plugin/test_automatic_plugin_with_attrs.py
+        popd
+
+  tests-py-dynamo-fe:
+    name: Test dynamo frontend [Python]
+    needs: [filter-matrix, build]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - repository: pytorch/tensorrt
+            package-name: torch_tensorrt
+            pre-script: packaging/pre_build_script.sh
+            post-script: packaging/post_build_script.sh
+            smoke-test-script: packaging/smoke_test_script.sh
+    uses: ./.github/workflows/linux-test.yml
+    with:
+      job-name: tests-py-dynamo-fe
+      repository: "pytorch/tensorrt"
+      ref: ""
+      test-infra-repository: pytorch/test-infra
+      test-infra-ref: main
+      build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
+      pre-script: ${{ matrix.pre-script }}
+      architecture: "aarch64"
+      script: |
+        export USE_HOST_DEPS=1
+        export CI_BUILD=1
+        pushd .
+        cd tests/py
+        python -m pip install -r requirements.txt
+        cd dynamo
+        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/dyn_models_export.xml --ir dynamo models/
+        popd
+
+  tests-py-dynamo-serde:
+    name: Test dynamo export serde [Python]
+    needs: [filter-matrix, build]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - repository: pytorch/tensorrt
+            package-name: torch_tensorrt
+            pre-script: packaging/pre_build_script.sh
+            post-script: packaging/post_build_script.sh
+            smoke-test-script: packaging/smoke_test_script.sh
+    uses: ./.github/workflows/linux-test.yml
+    with:
+      job-name: tests-py-dynamo-serde
+      repository: "pytorch/tensorrt"
+      ref: ""
+      test-infra-repository: pytorch/test-infra
+      test-infra-ref: main
+      build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
+      pre-script: ${{ matrix.pre-script }}
+      architecture: "aarch64"
+      script: |
+        export USE_HOST_DEPS=1
+        export CI_BUILD=1
+        pushd .
+        cd tests/py
+        python -m pip install -r requirements.txt
+        cd dynamo
+        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/export_serde_test_results.xml --ir dynamo models/test_export_serde.py
+        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/reexport_test_results.xml --ir dynamo models/test_reexport.py
+        popd
+
+  tests-py-torch-compile-be:
+    name: Test torch compile backend [Python]
+    needs: [filter-matrix, build]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - repository: pytorch/tensorrt
+            package-name: torch_tensorrt
+            pre-script: packaging/pre_build_script.sh
+            post-script: packaging/post_build_script.sh
+            smoke-test-script: packaging/smoke_test_script.sh
+    uses: ./.github/workflows/linux-test.yml
+    with:
+      job-name: tests-py-torch-compile-be
+      repository: "pytorch/tensorrt"
+      ref: ""
+      test-infra-repository: pytorch/test-infra
+      test-infra-ref: main
+      build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
+      pre-script: ${{ matrix.pre-script }}
+      architecture: "aarch64"
+      script: |
+        export USE_HOST_DEPS=1
+        export CI_BUILD=1
+        pushd .
+        cd tests/py
+        python -m pip install -r requirements.txt
+        cd dynamo
+        python -m pytest -ra -n 10 --junitxml=${RUNNER_TEST_RESULTS_DIR}/torch_compile_be_test_results.xml backend/
+        python -m pytest -ra -n 4 --junitxml=${RUNNER_TEST_RESULTS_DIR}/torch_complete_be_e2e_test_results.xml --ir torch_compile models/test_models.py
+        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/torch_compile_dyn_models_export.xml --ir torch_compile models/test_dyn_models.py
+        popd
+
+  tests-py-dynamo-core:
+    name: Test dynamo core [Python]
+    needs: [filter-matrix, build]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - repository: pytorch/tensorrt
+            package-name: torch_tensorrt
+            pre-script: packaging/pre_build_script.sh
+            post-script: packaging/post_build_script.sh
+            smoke-test-script: packaging/smoke_test_script.sh
+    uses: ./.github/workflows/linux-test.yml
+    with:
+      job-name: tests-py-dynamo-core
+      repository: "pytorch/tensorrt"
+      ref: ""
+      test-infra-repository: pytorch/test-infra
+      test-infra-ref: main
+      build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
+      pre-script: ${{ matrix.pre-script }}
+      architecture: "aarch64"
+      script: |
+        export USE_HOST_DEPS=1
+        export CI_BUILD=1
+        pushd .
+        cd tests/py
+        python -m pip install -r requirements.txt
+        cd dynamo
+        python -m pytest -ra -n 4 --junitxml=${RUNNER_TEST_RESULTS_DIR}/tests_py_dynamo_core_runtime_test_results.xml --ignore runtime/test_002_cudagraphs_py.py --ignore runtime/test_002_cudagraphs_cpp.py runtime/
+        python -m pytest -ra -n 4 --junitxml=${RUNNER_TEST_RESULTS_DIR}/tests_py_dynamo_core_partitioning_test_results.xml partitioning/
+        python -m pytest -ra -n 4 --junitxml=${RUNNER_TEST_RESULTS_DIR}/tests_py_dynamo_core_lowering_test_results.xml lowering/
+        popd
+
+  tests-py-dynamo-cudagraphs:
+    name: Test dynamo cudagraphs [Python]
+    needs: [filter-matrix, build]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - repository: pytorch/tensorrt
+            package-name: torch_tensorrt
+            pre-script: packaging/pre_build_script.sh
+            post-script: packaging/post_build_script.sh
+            smoke-test-script: packaging/smoke_test_script.sh
+    uses: ./.github/workflows/linux-test.yml
+    with:
+      job-name: tests-py-dynamo-cudagraphs
+      repository: "pytorch/tensorrt"
+      ref: ""
+      test-infra-repository: pytorch/test-infra
+      test-infra-ref: main
+      build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
+      pre-script: ${{ matrix.pre-script }}
+      architecture: "aarch64"
+      script: |
+        export USE_HOST_DEPS=1
+        export CI_BUILD=1
+        pushd .
+        cd tests/py
+        python -m pip install -r requirements.txt
+        cd dynamo
+        nvidia-smi
+        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/tests_py_dynamo_core_runtime_cudagraphs_cpp_test_results.xml runtime/test_002_cudagraphs_cpp.py || true
+        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/tests_py_dynamo_core_runtime_cudagraphs_py_test_results.xml runtime/test_002_cudagraphs_py.py || true
+        popd
+
+  tests-py-core:
+    name: Test core [Python]
+    needs: [filter-matrix, build]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - repository: pytorch/tensorrt
+            package-name: torch_tensorrt
+            pre-script: packaging/pre_build_script.sh
+            post-script: packaging/post_build_script.sh
+            smoke-test-script: packaging/smoke_test_script.sh
+    uses: ./.github/workflows/linux-test.yml
+    with:
+      job-name: tests-py-core
+      repository: "pytorch/tensorrt"
+      ref: ""
+      test-infra-repository: pytorch/test-infra
+      test-infra-ref: main
+      build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
+      pre-script: ${{ matrix.pre-script }}
+      architecture: "aarch64"
+      script: |
+        export USE_HOST_DEPS=1
+        export CI_BUILD=1
+        pushd .
+        cd tests/py/core
+        python -m pytest -ra -n 4 --junitxml=${RUNNER_TEST_RESULTS_DIR}/tests_py_core_test_results.xml .
+        popd
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref_name }}-${{ inputs.repository }}-${{ github.event_name == 'workflow_dispatch' }}-${{ inputs.job-name }}
+  cancel-in-progress: true
