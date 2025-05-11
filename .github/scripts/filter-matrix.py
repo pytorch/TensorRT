@@ -33,7 +33,7 @@ def main(args: List[str]) -> None:
             if item["gpu_arch_type"] == "cuda-aarch64":
                 # for aarch64 only test cu128 for now for quick CI
                 if item["desired_cuda"] == "cu128":
-                    item["container_image"] = "sameli/manylinux_2_34_x86_64_cuda_12.8"
+                    item["container_image"] = "sameli/manylinux_2_34_aarch64_cuda_12.8"
                     filtered_includes.append(item)
             else:
                 filtered_includes.append(item)
