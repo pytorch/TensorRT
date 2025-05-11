@@ -146,7 +146,7 @@ jobs:
 
           if [[ "${{ inputs.architecture }}" = "aarch64" ]]; then
             echo "RUNNER_TEMP: ${RUNNER_TEMP}"
-            rm -rf "${RUNNER_TEMP}/*"
+            # rm -rf "${RUNNER_TEMP}/*"
           fi
           echo "::endgroup::"
 
