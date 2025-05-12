@@ -15,6 +15,7 @@ FeatureSet = namedtuple(
         "dynamo_frontend",
         "fx_frontend",
         "refit",
+        "tensorrt_plugin",
     ],
 )
 
@@ -39,14 +40,27 @@ _DYNAMO_FE_AVAIL = version.parse(sanitized_torch_version()) >= version.parse("2.
 _FX_FE_AVAIL = True
 _REFIT_AVAIL = True
 
+try:
+    import tensorrt.plugin as trtp
+
+    assert trtp
+    _TENSORRT_PLUGIN_AVAIL = True
+except ImportError:
+    _TENSORRT_PLUGIN_AVAIL = False
+
 ENABLED_FEATURES = FeatureSet(
-    _TS_FE_AVAIL, _TORCHTRT_RT_AVAIL, _DYNAMO_FE_AVAIL, _FX_FE_AVAIL, _REFIT_AVAIL
+    _TS_FE_AVAIL,
+    _TORCHTRT_RT_AVAIL,
+    _DYNAMO_FE_AVAIL,
+    _FX_FE_AVAIL,
+    _REFIT_AVAIL,
+    _TENSORRT_PLUGIN_AVAIL,
 )
 
 
 def _enabled_features_str() -> str:
     enabled = lambda x: "ENABLED" if x else "DISABLED"
-    out_str: str = f"Enabled Features:\n  - Dynamo Frontend: {enabled(_DYNAMO_FE_AVAIL)}\n  - Torch-TensorRT Runtime: {enabled(_TORCHTRT_RT_AVAIL)}\n  - FX Frontend: {enabled(_FX_FE_AVAIL)}\n  - TorchScript Frontend: {enabled(_TS_FE_AVAIL)}\n"  # type: ignore[no-untyped-call]
+    out_str: str = f"Enabled Features:\n  - Dynamo Frontend: {enabled(_DYNAMO_FE_AVAIL)}\n  - Torch-TensorRT Runtime: {enabled(_TORCHTRT_RT_AVAIL)}\n  - FX Frontend: {enabled(_FX_FE_AVAIL)}\n  - TorchScript Frontend: {enabled(_TS_FE_AVAIL)}\n  - TensorRT Plugin: {enabled(_TENSORRT_PLUGIN_AVAIL)}\n"  # type: ignore[no-untyped-call]
     return out_str
 
 
