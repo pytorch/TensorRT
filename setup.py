@@ -198,7 +198,7 @@ def build_libtorchtrt_cxx11_abi(
 
     if IS_SBSA:
         cmd.append("--platforms=//toolchains:sbsa")
-        print("SABA build")
+        print("SBSA build")
 
     if CI_BUILD:
         print("CI based build")

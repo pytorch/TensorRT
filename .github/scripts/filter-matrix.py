@@ -16,8 +16,8 @@ def replace_aarch64_container_image(item: Dict[str, Any]) -> Dict[str, Any] | No
             # pytorch image:pytorch/manylinuxaarch64-builder:cuda12.8 comes with glibc2.28
             # however, TensorRT requires glibc2.31 on aarch64 platform
             # TODO: in future, if pytorch supports aarch64 with glibc2.31, we should switch to use the pytorch image
-            # item["container_image"] = "sameli/manylinux_2_34_aarch64_cuda_12.8"
-            item["container_image"] = "quay.io/pypa/manylinux_2_34_aarch64"
+            item["container_image"] = "sameli/manylinux_2_34_aarch64_cuda_12.8"
+            # item["container_image"] = "quay.io/pypa/manylinux_2_34_aarch64"
             return item
         else:
             # for aarch64 do not test on other cuda versions
