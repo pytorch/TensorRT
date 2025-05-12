@@ -195,7 +195,7 @@ def repair_double_inputs(
 
         # If the data type of the input is long/double, insert necessary
         # casts to replace the operation
-        if param.dtype == torch.float64:
+        if isinstance(param, torch.Tensor) and param.dtype == torch.float64:
             # Ensure outputs are only repaired once per submodule to avoid
             # unnecessary ops showing up in the graph
             if not repaired_outputs_once:

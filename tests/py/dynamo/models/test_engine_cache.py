@@ -250,6 +250,10 @@ class TestEngineCache(TestCase):
             msg=f"Engine caching didn't speed up the compilation. Time taken without engine caching: {times[0]} ms, time taken with engine caching: {times[2]} ms",
         )
 
+    @unittest.skipIf(
+        not torch_trt.ENABLED_FEATURES.refit,
+        "Engine caching requires refit feature that is not supported in Python 3.13 or higher",
+    )
     def test_dynamo_compile_with_custom_engine_cache(self):
         model = models.resnet18(pretrained=True).eval().to("cuda")
 
@@ -314,6 +318,10 @@ class TestEngineCache(TestCase):
             for h, count in custom_engine_cache.hashes.items()
         ]
 
+    @unittest.skipIf(
+        not torch_trt.ENABLED_FEATURES.refit,
+        "Engine caching requires refit feature that is not supported in Python 3.13 or higher",
+    )
     def test_dynamo_compile_change_input_shape(self):
         """Runs compilation 3 times, the cache should miss each time"""
         model = models.resnet18(pretrained=True).eval().to("cuda")
@@ -346,6 +354,10 @@ class TestEngineCache(TestCase):
             for h, count in custom_engine_cache.hashes.items()
         ]
 
+    @unittest.skipIf(
+        not torch_trt.ENABLED_FEATURES.refit,
+        "Engine caching requires refit feature that is not supported in Python 3.13 or higher",
+    )
     @pytest.mark.xfail
     def test_torch_compile_with_default_disk_engine_cache(self):
         # Custom Engine Cache
@@ -485,6 +497,10 @@ class TestEngineCache(TestCase):
             for h, count in custom_engine_cache.hashes.items()
         ]
 
+    @unittest.skipIf(
+        not torch_trt.ENABLED_FEATURES.refit,
+        "Engine caching requires refit feature that is not supported in Python 3.13 or higher",
+    )
     def test_torch_trt_compile_change_input_shape(self):
         # Custom Engine Cache
         model = models.resnet18(pretrained=True).eval().to("cuda")
@@ -611,6 +627,10 @@ class TestEngineCache(TestCase):
         assertions.assertEqual(hash1, hash2)
 
     # @unittest.skip("benchmark on small models")
+    @unittest.skipIf(
+        not torch_trt.ENABLED_FEATURES.refit,
+        "Engine caching requires refit feature that is not supported in Python 3.13 or higher",
+    )
     def test_caching_small_model(self):
         from torch_tensorrt.dynamo._refit import refit_module_weights
 

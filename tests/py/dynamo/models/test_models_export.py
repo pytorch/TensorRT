@@ -10,7 +10,6 @@ import torch
 import torch_tensorrt as torchtrt
 import torchvision.models as models
 from torch_tensorrt.dynamo.utils import COSINE_THRESHOLD, cosine_similarity
-from transformers import BertModel
 
 from packaging.version import Version
 
@@ -114,12 +113,18 @@ def test_efficientnet_b0(ir):
 
 
 @pytest.mark.unit
+@unittest.skipIf(
+    not importlib.util.find_spec("transformers"),
+    "transformers is required to run this test",
+)
 def test_bert_base_uncased(ir):
+    from transformers import BertModel
+
     model = (
         BertModel.from_pretrained("bert-base-uncased", return_dict=False).cuda().eval()
     )
-    input = torch.randint(0, 1, (1, 14), dtype=torch.int32).to("cuda")
-    input2 = torch.randint(0, 1, (1, 14), dtype=torch.int32).to("cuda")
+    input = torch.randint(0, 2, (1, 14), dtype=torch.int32).to("cuda")
+    input2 = torch.randint(0, 2, (1, 14), dtype=torch.int32).to("cuda")
 
     compile_spec = {
         "inputs": [
@@ -249,7 +254,6 @@ def test_base_fp8(ir):
 
 @unittest.skipIf(
     platform.system() != "Linux"
-    or torch.cuda.get_device_capability() < (8, 9)
     or not importlib.util.find_spec("modelopt")
     or Version(metadata.version("nvidia-modelopt")) < Version("0.17.0"),
     "modelopt 0.17.0 or later is required, Int8 quantization is supported in modelopt since 0.17.0 or later for linux",
@@ -285,7 +289,7 @@ def test_base_int8(ir):
 
     with torch.no_grad():
         with export_torch_mode():
-            exp_program = torch.export.export(model, (input_tensor,))
+            exp_program = torch.export.export(model, (input_tensor,), strict=False)
             trt_model = torchtrt.dynamo.compile(
                 exp_program,
                 inputs=[input_tensor],

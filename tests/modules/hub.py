@@ -4,10 +4,7 @@ import os
 import custom_models as cm
 import timm
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
 import torchvision.models as models
-from transformers import BertConfig, BertModel, BertTokenizer
 
 torch.hub._validate_not_a_forked_repo = lambda a, b, c: True
 

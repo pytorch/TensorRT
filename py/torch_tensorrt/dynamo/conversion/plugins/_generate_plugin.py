@@ -1,3 +1,4 @@
+import itertools
 import logging
 from types import FunctionType
 from typing import Any, Callable, Tuple
@@ -108,7 +109,6 @@ def _generate_plugin(plugin_name: str) -> None:
 
     def _generic_plugin_desc(*args: Any, **kwargs: Any) -> Tuple[trtp.TensorDesc]:
         shape_env = ShapeEnv()
-        fake_mode = FakeTensorMode(shape_env=shape_env)
         syms_args = []
         tensor_args = [elem for elem in args if isinstance(elem, trtp.TensorDesc)]
 
@@ -121,7 +121,7 @@ def _generate_plugin(plugin_name: str) -> None:
             ]
             syms_args.append(syms_arg)
 
-        with FakeTensorMode() as fake_mode:
+        with FakeTensorMode(shape_env=shape_env) as fake_mode:
             fake_args = []
             for syms_arg in syms_args:
                 fake_arg = torch.randn(syms_arg)
@@ -130,16 +130,25 @@ def _generate_plugin(plugin_name: str) -> None:
             output = torch_op(*fake_args, **kwargs)
 
         # We assume that number of dimensions are the same in torch op
-        shape_calc_fns = [None] * args[0].ndim
-        for i in range(args[0].ndim):
-            input_node_expr = [syms_arg[i].node.expr for syms_arg in syms_args]
+        shape_calc_fns = [None] * output.ndim
+
+        for i in range(output.ndim):
+            input_node_expr = list(
+                itertools.chain.from_iterable(
+                    [sym.node.expr for sym in syms_arg] for syms_arg in syms_args
+                )
+            )
+
             shape_calc_fns[i] = lambdify(
                 tuple(input_node_expr), output.shape[i].node.expr, "math"
             )
 
         out_desc = tensor_args[0].like()
         for i in range(out_desc.ndim):
-            input_shape_expr = [tensor_arg.shape_expr[i] for tensor_arg in tensor_args]
+            input_shape_expr = list(
+                itertools.chain.from_iterable(arg.shape_expr for arg in tensor_args)
+            )
+
             if output.shape[i].node.expr is None:
                 raise ValueError(f"output.shape[{i}].node.expr cannot be None")
             out_desc.shape_expr[i] = shape_calc_fns[i](*input_shape_expr)  # type: ignore[misc]

@@ -9,8 +9,8 @@ Torch-TensorRT
 [![cuda](https://img.shields.io/badge/CUDA-12.8-green)](https://developer.nvidia.com/cuda-downloads)
 [![trt](https://img.shields.io/badge/TensorRT-10.9.0-green)](https://github.com/nvidia/tensorrt-llm)
 [![license](https://img.shields.io/badge/license-BSD--3--Clause-blue)](./LICENSE)
-[![linux_tests](https://github.com/pytorch/TensorRT/actions/workflows/build-test-linux.yml/badge.svg)](https://github.com/pytorch/TensorRT/actions/workflows/build-test-linux.yml)
-[![windows_tests](https://github.com/pytorch/TensorRT/actions/workflows/build-test-windows.yml/badge.svg)](https://github.com/pytorch/TensorRT/actions/workflows/build-test-windows.yml)
+[![linux_nightly](https://github.com/pytorch/TensorRT/actions/workflows/build-test-linux.yml/badge.svg?branch=nightly)](https://github.com/pytorch/TensorRT/actions/workflows/build-test-linux.yml)
+[![windows_nightly](https://github.com/pytorch/TensorRT/actions/workflows/build-test-windows.yml/badge.svg?branch=nightly)](https://github.com/pytorch/TensorRT/actions/workflows/build-test-windows.yml)
 
 ---
 <div align="left">

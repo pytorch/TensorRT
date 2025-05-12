@@ -63,9 +63,8 @@ will result in a minor version bump and significant bug fixes will result in a p
     - Paste in Milestone information and Changelog information into release notes
     - Generate libtorchtrt.tar.gz for the following platforms:
         - x86_64 cxx11-abi
-        - x86_64 pre-cxx11-abi
         - TODO: Add cxx11-abi build for aarch64 when a manylinux container for aarch64 exists
-    - Generate Python packages for Python 3.6/3.7/3.8/3.9 for x86_64
+    - Generate Python packages for supported Python versions for x86_64
         - TODO: Build a manylinux container for aarch64
         - `docker run -it -v$(pwd)/..:/workspace/Torch-TensorRT build_torch_tensorrt_wheel /bin/bash /workspace/Torch-TensorRT/py/build_whl.sh` generates all wheels
             - To build container `docker build -t build_torch_tensorrt_wheel .`

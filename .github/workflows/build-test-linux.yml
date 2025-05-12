@@ -23,7 +23,6 @@ jobs:
       test-infra-ref: main
       with-rocm: false
       with-cpu: false
-      python-versions: '["3.11", "3.12", "3.10", "3.9"]'
 
   filter-matrix:
     needs: [generate-matrix]
@@ -139,10 +138,12 @@ jobs:
         pushd .
         cd tests/py
         python -m pip install -r requirements.txt
+        python -m pip install nvidia-modelopt[all] --extra-index-url https://pypi.nvidia.com
         cd dynamo
         python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/dynamo_converters_test_results.xml -n 4 conversion/
         python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/dynamo_converters_test_results.xml automatic_plugin/test_automatic_plugin.py
         python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/dynamo_converters_test_results.xml automatic_plugin/test_automatic_plugin_with_attrs.py
+        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/dynamo_converters_test_results.xml automatic_plugin/test_flashinfer_rmsnorm.py
         popd
 
   tests-py-dynamo-fe:
@@ -172,6 +173,7 @@ jobs:
         pushd .
         cd tests/py
         python -m pip install -r requirements.txt
+        python -m pip install nvidia-modelopt[all] --extra-index-url https://pypi.nvidia.com
         cd dynamo
         python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/dyn_models_export.xml --ir dynamo models/
         popd

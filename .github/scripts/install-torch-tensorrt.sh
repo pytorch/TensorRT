@@ -6,7 +6,7 @@ PLATFORM=$(python -c "import sys; print(sys.platform)")
 
 # Install all the dependencies required for Torch-TensorRT
 pip install --pre ${TORCH_TORCHVISION} --index-url ${INDEX_URL}
-pip install --pre -r ${PWD}/tests/py/requirements.txt --use-deprecated legacy-resolver
+pip install --pre -r ${PWD}/tests/py/requirements.txt
 
 # Install Torch-TensorRT
 if [[ ${PLATFORM} == win32 ]]; then

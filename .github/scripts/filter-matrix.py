@@ -3,8 +3,9 @@
 import argparse
 import json
 import sys
+from typing import List
 
-disabled_python_versions = "3.13"
+disabled_python_versions: List[str] = []
 
 
 def main(args: list[str]) -> None:

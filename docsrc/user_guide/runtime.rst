@@ -22,8 +22,6 @@ link ``libtorchtrt_runtime.so`` in your deployment programs or use ``DL_OPEN`` o
 you can load the runtime with ``torch.ops.load_library("libtorchtrt_runtime.so")``. You can then continue to use
 programs just as you would otherwise via PyTorch API.
 
-.. note:: If you are using the standard distribution of PyTorch in Python on x86, likely you will need the pre-cxx11-abi variant of ``libtorchtrt_runtime.so``, check :ref:`Installation` documentation for more details.
-
 .. note:: If you are linking ``libtorchtrt_runtime.so``, likely using the following flags will help ``-Wl,--no-as-needed -ltorchtrt -Wl,--as-needed`` as there's no direct symbol dependency to anything in the Torch-TensorRT runtime for most Torch-TensorRT runtime applications
 
 An example of how to use ``libtorchtrt_runtime.so`` can be found here: https://github.com/pytorch/TensorRT/tree/master/examples/torchtrt_runtime_example

@@ -1,6 +1,6 @@
 [build-system]
 requires = [
-    "setuptools>=68.0.0",
+    "setuptools>=77.0.0",
     "packaging>=23.1",
     "wheel>=0.40.0",
     "ninja>=1.11.0",
@@ -87,7 +87,7 @@ dev = [
 torchvision = [
     "torchvision",
 ] #Leaving torchvisions dependency unconstrained so uv can just install something that should work for the torch we have. TV's on PyT makes it hard to put version constrains in
-quantization = ["nvidia-modelopt[deploy,hf,torch]>=0.17.0"]
+quantization = ["nvidia-modelopt[all]>=0.27.1"]
 monitoring-tools = ["rich>=13.7.1"]
 jupyter = ["rich[jupyter]>=13.7.1"]
 distributed = ["tensorrt-llm>=0.16.0"]
@@ -103,6 +103,7 @@ package-dir = { "" = "py" }
 include-package-data = false
 
 [tool.uv]
+package = true
 environments = ["sys_platform == 'linux'", "sys_platform == 'windows'"]
 prerelease = "if-necessary-or-explicit"
 index-strategy = "unsafe-best-match"                                    # Needed for TRT-LLM

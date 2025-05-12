@@ -18,15 +18,16 @@ import os
 import sys
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
+PYTHON_VERSIONS_FOR_PR_BUILD = ["3.11"]
 PYTHON_ARCHES_DICT = {
-    "nightly": ["3.9", "3.10", "3.11", "3.12"],
-    "test": ["3.9", "3.10", "3.11", "3.12"],
-    "release": ["3.9", "3.10", "3.11", "3.12"],
+    "nightly": ["3.9", "3.10", "3.11", "3.12", "3.13"],
+    "test": ["3.9", "3.10", "3.11", "3.12", "3.13"],
+    "release": ["3.9", "3.10", "3.11", "3.12", "3.13"],
 }
 CUDA_ARCHES_DICT = {
     "nightly": ["11.8", "12.6", "12.8"],
     "test": ["11.8", "12.6", "12.8"],
-    "release": ["11.8", "12.6", "12.8"],
+    "release": ["11.8", "12.4", "12.6"],
 }
 ROCM_ARCHES_DICT = {
     "nightly": ["6.1", "6.2"],
@@ -35,7 +36,6 @@ ROCM_ARCHES_DICT = {
 }
 
 PACKAGE_TYPES = ["wheel", "conda", "libtorch"]
-PRE_CXX11_ABI = "pre-cxx11"
 CXX11_ABI = "cxx11-abi"
 RELEASE = "release"
 DEBUG = "debug"
@@ -140,39 +140,29 @@ def initialize_globals(channel: str, build_python_only: bool) -> None:
     else:
         PYTHON_ARCHES = PYTHON_ARCHES_DICT[channel]
     WHEEL_CONTAINER_IMAGES = {
-        "11.8": "pytorch/manylinux2_28-builder:cuda11.8",
-        "12.1": "pytorch/manylinux2_28-builder:cuda12.1",
-        "12.4": "pytorch/manylinux2_28-builder:cuda12.4",
-        "12.6": "pytorch/manylinux2_28-builder:cuda12.6",
-        "12.8": "pytorch/manylinux2_28-builder:cuda12.8",
+        **{
+            gpu_arch: f"pytorch/manylinux2_28-builder:cuda{gpu_arch}"
+            for gpu_arch in CUDA_ARCHES
+        },
         **{
             gpu_arch: f"pytorch/manylinux2_28-builder:rocm{gpu_arch}"
             for gpu_arch in ROCM_ARCHES
         },
         CPU: "pytorch/manylinux2_28-builder:cpu",
         XPU: "pytorch/manylinux2_28-builder:xpu",
-        # TODO: Migrate CUDA_AARCH64 image to manylinux2_28_aarch64-builder:cuda12.4
+        # TODO: Migrate CUDA_AARCH64 image to manylinux2_28_aarch64-builder:cuda12.6
         CPU_AARCH64: "pytorch/manylinux2_28_aarch64-builder:cpu-aarch64",
-        CUDA_AARCH64: "pytorch/manylinuxaarch64-builder:cuda12.4",
+        CUDA_AARCH64: "pytorch/manylinuxaarch64-builder:cuda12.6",
     }
     LIBTORCH_CONTAINER_IMAGES = {
-        **{
-            (gpu_arch, PRE_CXX11_ABI): f"pytorch/manylinux2_28-builder:cuda{gpu_arch}"
-            for gpu_arch in CUDA_ARCHES
-        },
         **{
             (gpu_arch, CXX11_ABI): f"pytorch/libtorch-cxx11-builder:cuda{gpu_arch}"
             for gpu_arch in CUDA_ARCHES
         },
         **{
-            (gpu_arch, PRE_CXX11_ABI): f"pytorch/manylinux2_28-builder:rocm{gpu_arch}"
-            for gpu_arch in ROCM_ARCHES
-        },
-        **{
             (gpu_arch, CXX11_ABI): f"pytorch/libtorch-cxx11-builder:rocm{gpu_arch}"
             for gpu_arch in ROCM_ARCHES
         },
-        (CPU, PRE_CXX11_ABI): "pytorch/manylinux2_28-builder:cpu",
         (CPU, CXX11_ABI): "pytorch/libtorch-cxx11-builder:cpu",
     }
 
@@ -343,7 +333,7 @@ def generate_libtorch_matrix(
         if os == WINDOWS:
             abi_versions = [RELEASE, DEBUG]
         elif os == LINUX:
-            abi_versions = [PRE_CXX11_ABI, CXX11_ABI]
+            abi_versions = [CXX11_ABI]
         elif os in [MACOS_ARM64]:
             abi_versions = [CXX11_ABI]
         else:
@@ -422,11 +412,6 @@ def generate_wheels_matrix(
         # Define default python version
         python_versions = list(PYTHON_ARCHES)
 
-        # If the list of python versions is set explicitly by the caller, stick with it instead
-        # of trying to add more versions behind the scene
-        if channel == NIGHTLY and (os in (LINUX, MACOS_ARM64, LINUX_AARCH64)):
-            python_versions += ["3.13"]
-
     if os == LINUX:
         # NOTE: We only build manywheel packages for linux
         package_type = "manywheel"
@@ -456,7 +441,7 @@ def generate_wheels_matrix(
             arches += [XPU]
 
     if limit_pr_builds:
-        python_versions = [python_versions[0]]
+        python_versions = PYTHON_VERSIONS_FOR_PR_BUILD
 
     global WHEEL_CONTAINER_IMAGES
 

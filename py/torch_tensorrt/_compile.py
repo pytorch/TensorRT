@@ -584,6 +584,7 @@ def save(
     arg_inputs: Optional[Sequence[torch.Tensor]] = None,
     kwarg_inputs: Optional[dict[str, Any]] = None,
     retrace: bool = False,
+    pickle_protocol: int = 2,
 ) -> None:
     """
     Save the model to disk in the specified output format.
@@ -596,6 +597,7 @@ def save(
         output_format (str): Format to save the model. Options include exported_program | torchscript.
         retrace (bool): When the module type is a fx.GraphModule, this option re-exports the graph using torch.export.export(strict=False) to save it.
                 This flag is experimental for now.
+        pickle_protocol (int): The pickle protocol to use to save the model. Default is 2. Increase this to 4 or higher for large models
     """
     if isinstance(module, CudaGraphsTorchTensorRTModule):
         module = module.compiled_module
@@ -668,7 +670,9 @@ def save(
                         "Provided model is a torch.fx.GraphModule and retrace is False, inputs or arg_inputs is not necessary during save."
                     )
                 exp_program = export(module)
-                torch.export.save(exp_program, file_path)
+                torch.export.save(
+                    exp_program, file_path, pickle_protocol=pickle_protocol
+                )
             else:
                 if arg_inputs is None:
                     raise ValueError(
@@ -680,4 +684,6 @@ def save(
                     kwargs=kwarg_inputs,
                     strict=False,
                 )
-                torch.export.save(exp_program, file_path)
+                torch.export.save(
+                    exp_program, file_path, pickle_protocol=pickle_protocol
+                )

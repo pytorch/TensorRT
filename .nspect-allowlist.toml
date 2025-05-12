@@ -1,0 +1,12 @@
+version = "1.0.0"
+
+
+[oss.excluded]
+# filter out all packages below as it is not shipped as part of wheel file
+[[oss.excluded.directories]]
+paths = ['docsrc/', 'docs/', 'third_party/']
+comment = 'docs packages'
+
+[[oss.excluded.directories]]
+paths = ['tools/', 'toolchains/', 'third_party/', 'packaging']
+comment = 'builds/tools packages'

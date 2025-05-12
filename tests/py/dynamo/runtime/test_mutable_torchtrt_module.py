@@ -74,6 +74,10 @@ def test_check_input_shape_dynamic():
     )
 
 
+@unittest.skipIf(
+    not torch_trt.ENABLED_FEATURES.refit,
+    "Refit feature is not supported in Python 3.13 or higher",
+)
 @pytest.mark.unit
 def test_model_complex_dynamic_shape_with_saving():
     device = "cuda:0"
@@ -201,6 +205,10 @@ def test_model_complex_dynamic_shape_with_saving():
     not torch_trt.ENABLED_FEATURES.torch_tensorrt_runtime,
     "TorchScript Frontend is not available",
 )
+@unittest.skipIf(
+    not torch_trt.ENABLED_FEATURES.refit,
+    "Refit feature is not supported in Python 3.13 or higher",
+)
 @pytest.mark.unit
 def test_resnet18():
     torch.manual_seed(0)
@@ -237,6 +245,10 @@ def test_resnet18():
     not torch_trt.ENABLED_FEATURES.torch_tensorrt_runtime,
     "TorchScript Frontend is not available",
 )
+@unittest.skipIf(
+    not torch_trt.ENABLED_FEATURES.refit,
+    "Refit feature is not supported in Python 3.13 or higher",
+)
 @pytest.mark.unit
 def test_save():
     torch.manual_seed(0)
@@ -272,6 +284,10 @@ def test_save():
 @unittest.skipIf(
     not torch_trt.ENABLED_FEATURES.torch_tensorrt_runtime,
     "TorchScript Frontend is not available",
+)
+@unittest.skipIf(
+    not torch_trt.ENABLED_FEATURES.refit,
+    "Refit feature is not supported in Python 3.13 or higher",
 )
 @pytest.mark.unit
 def test_resnet18_modify_attribute():
@@ -312,6 +328,10 @@ def test_resnet18_modify_attribute():
 @unittest.skipIf(
     not torch_trt.ENABLED_FEATURES.torch_tensorrt_runtime,
     "TorchScript Frontend is not available",
+)
+@unittest.skipIf(
+    not torch_trt.ENABLED_FEATURES.refit,
+    "Refit feature is not supported in Python 3.13 or higher",
 )
 @pytest.mark.unit
 def test_resnet18_modify_attribute_no_refit():
@@ -359,6 +379,10 @@ def test_resnet18_modify_attribute_no_refit():
 @unittest.skipIf(
     not torch_trt.ENABLED_FEATURES.torch_tensorrt_runtime,
     "TorchScript Frontend is not available",
+)
+@unittest.skipIf(
+    not torch_trt.ENABLED_FEATURES.refit,
+    "Refit feature is not supported in Python 3.13 or higher",
 )
 @pytest.mark.unit
 def test_custom_model_with_kwarg():
@@ -427,6 +451,10 @@ def test_custom_model_with_kwarg():
     not torch_trt.ENABLED_FEATURES.torch_tensorrt_runtime,
     "TorchScript Frontend is not available",
 )
+@unittest.skipIf(
+    not torch_trt.ENABLED_FEATURES.refit,
+    "Refit feature is not supported in Python 3.13 or higher",
+)
 @pytest.mark.unit
 def test_custom_model_with_inplace_init():
     class net(nn.Module):
@@ -490,6 +518,10 @@ def test_custom_model_with_inplace_init():
     not torch_trt.ENABLED_FEATURES.torch_tensorrt_runtime,
     "TorchScript Frontend is not available",
 )
+@unittest.skipIf(
+    not torch_trt.ENABLED_FEATURES.refit,
+    "Refit feature is not supported in Python 3.13 or higher",
+)
 @pytest.mark.unit
 def test_custom_model_with_init_recompile():
     class net(nn.Module):
@@ -552,6 +584,10 @@ def test_custom_model_with_init_recompile():
 @unittest.skipIf(
     not torch_trt.ENABLED_FEATURES.torch_tensorrt_runtime,
     "TorchScript Frontend is not available",
+)
+@unittest.skipIf(
+    not torch_trt.ENABLED_FEATURES.refit,
+    "Refit feature is not supported in Python 3.13 or higher",
 )
 @pytest.mark.unit
 def test_custom_model_with_kwarg_different_input():
