@@ -168,7 +168,7 @@ def build_libtorchtrt_cxx11_abi(
     rt_only=False,
     target_python=True,
 ):
-    cmd = [BAZEL_EXE, "build"]
+    cmd = [BAZEL_EXE, "build", "--verbose_failures"]
     if rt_only:
         cmd.append("//:libtorchtrt_runtime")
     else:
