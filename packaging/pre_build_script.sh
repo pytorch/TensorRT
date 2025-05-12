@@ -16,15 +16,8 @@ if [[ $(uname -m) == "aarch64" ]]; then
     curl -L  https://github.com/a8m/envsubst/releases/download/v1.4.2/envsubst-Linux-arm64 -o envsubst \
     && mv envsubst /usr/bin/envsubst && chmod +x /usr/bin/envsubst
     # install cuda for aarch64
-    # CU_VERSION: cu128 --> CU_VER: 12-8
-    CU_VER=${CU_VERSION:2:2}-${CU_VERSION:4:1}
-    dnf config-manager --add-repo https://developer.download.nvidia.com/compute/cuda/repos/rhel8/sbsa/cuda-rhel8.repo
-    dnf -y install cuda-compiler-${CU_VER}.aarch64 \
-                   cuda-libraries-${CU_VER}.aarch64 \
-                   cuda-libraries-devel-${CU_VERER}.aarch64
-    dnf clean all
-    export LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH
-    echo "cuda ${CU_VER} installed successfully"
+    source .github/scripts/install-cuda-aarch64.sh
+    install_cuda_aarch64
 fi
 
 curl -L https://github.com/bazelbuild/bazelisk/releases/download/v1.26.0/bazelisk-linux-${BAZEL_PLATFORM} \
