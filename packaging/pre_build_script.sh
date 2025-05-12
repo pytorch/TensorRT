@@ -7,7 +7,7 @@ python3 -m pip install pyyaml
 
 yum install -y ninja-build gettext
 
-PLATFORM="amd64"
+BAZEL_PLATFORM="amd64"
 
 if [[ $(uname -m) == "aarch64" ]]; then
     BAZEL_PLATFORM=arm64
