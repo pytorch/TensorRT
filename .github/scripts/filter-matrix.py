@@ -4,7 +4,7 @@ import argparse
 import json
 import os
 import sys
-from typing import Any, Dict, List
+from typing import List
 
 # this was introduced to avoid build for py3.13, currently we support py3.13, but keep this for future use with other python versions
 disabled_python_versions: List[str] = []
