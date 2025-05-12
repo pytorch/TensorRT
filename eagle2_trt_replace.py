@@ -26,7 +26,6 @@ def _patch_siglip_attention():
         scores = torch.matmul(q, k.transpose(-2, -1)) * self.scale
         if attention_mask is not None:
             scores = scores + attention_mask
-        
         probs = torch.softmax(scores, dim=-1, dtype=torch.float32).to(q.dtype)
         if self.training and self.dropout > 0:
             probs = torch.nn.functional.dropout(probs, p=self.dropout, training=True)
@@ -123,8 +122,6 @@ def _patch_qwen2_attention():
                 pass
             else:
                 raise ValueError(f"Unexpected attention_mask.dim={attention_mask.dim()}")
-
-            attention_mask = attention_mask.to(device=device).to(torch.bool)
 
             if attention_mask.dtype == torch.bool:
                 scores.masked_fill_(~attention_mask, float("-inf"))
@@ -316,8 +313,8 @@ def compile_submodules(base_model, device="cuda:0"):
     hidden_size = language_model.config.hidden_size
     dummy_seq = 13
     dummy_batch = 2
-    dummy_embeds = torch.randn(dummy_batch, dummy_seq, hidden_size, dtype=torch.float32, device=device) # torch.float16
-    dummy_mask = torch.ones(dummy_batch, dummy_seq, dtype=torch.float32, device=device) #torch.float16
+    dummy_embeds = torch.randn(dummy_batch, dummy_seq, hidden_size, dtype=torch.float16, device=device)
+    dummy_mask = torch.ones(dummy_batch, dummy_seq, dtype=torch.float16, device=device)
     dummy_position_ids = torch.arange(1, dummy_seq + 1, device=device).unsqueeze(0).expand(dummy_batch, -1)
     dummy_cache_position = torch.arange(dummy_seq, device=device)
     B3 = torch.export.Dim("batch3", min=1, max=4)
@@ -406,11 +403,9 @@ class TRTLanguageWrapper(nn.Module, GenerationMixin):
 
         # Prepare inputs
         if inputs_embeds is None and input_ids is not None:
-            # inputs_embeds = self._input_embeddings(input_ids).to(dtype=torch.float16, device=device)
-            inputs_embeds = self._input_embeddings(input_ids).to(dtype=torch.float32, device=device)
+            inputs_embeds = self._input_embeddings(input_ids).to(dtype=torch.float16, device=device)
         else:
-            # inputs_embeds = inputs_embeds.to(dtype=torch.float16, device=device)
-            inputs_embeds = inputs_embeds.to(dtype=torch.float32, device=device)
+            inputs_embeds = inputs_embeds.to(dtype=torch.float16, device=device)
 
         if position_ids is None and inputs_embeds is not None:
             batch_size, seq_length = inputs_embeds.shape[:2]
@@ -428,7 +423,7 @@ class TRTLanguageWrapper(nn.Module, GenerationMixin):
             position_ids = cache_position.unsqueeze(0).expand(batch_size, -1).to(device=device)
 
         if attention_mask is not None:
-            attention_mask = attention_mask.to(dtype=torch.float32, device=device) # torch.float16
+            attention_mask = attention_mask.to(dtype=torch.float16, device=device)
 
         # Execute TensorRT engine
         logits = self.trt_lm(
@@ -510,7 +505,7 @@ def build_trt_model(device="cuda:0"):
         else:
             input_embeds = self.language_model.get_input_embeddings()(input_ids)
         if attention_mask is not None and attention_mask.dtype != torch.float16:
-            attention_mask = attention_mask.to(torch.float32) # torch.float16
+            attention_mask = attention_mask.to(torch.float16)
         gen_kwargs = {
             'attention_mask': attention_mask,
             'position_ids': position_ids,
