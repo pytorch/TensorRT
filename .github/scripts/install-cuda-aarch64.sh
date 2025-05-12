@@ -1,6 +1,6 @@
 
 install_cuda_aarch64() {
-    echo "install cuda${CU_VERSION}"
+    echo "install cuda ${CU_VERSION}"
     # CU_VERSION: cu128 --> CU_VER: 12-8
     CU_VER=${CU_VERSION:2:2}-${CU_VERSION:4:1}
     dnf config-manager --add-repo https://developer.download.nvidia.com/compute/cuda/repos/rhel8/sbsa/cuda-rhel8.repo
