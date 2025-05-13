@@ -15,7 +15,7 @@ parser = argparse.ArgumentParser(
 parser.add_argument(
     "--dtype",
     choices=["fp8", "int8", "fp16"],
-    default="int8",
+    default="fp16",
     help="Select the data type to use (fp8 or int8 or fp16)",
 )
 args = parser.parse_args()
@@ -30,7 +30,7 @@ elif args.dtype == "int8":
     ptq_config["quant_cfg"]["*weight_quantizer"]["axis"] = None
 elif args.dtype == "fp16":
     enabled_precisions = {torch.float16}
-print(f"\nUsing {args.dtype} quantization")
+print(f"\nUsing {args.dtype}")
 
 
 DEVICE = "cuda:0"
@@ -150,6 +150,9 @@ def load_lora(path):
     print("LoRA loaded! Begin refitting")
     generate_image(["Test"], 2)
     print("Refitting Finished!")
+
+
+load_lora("/home/TensorRT/examples/apps/NGRVNG.safetensors")
 
 
 # Create Gradio interface
