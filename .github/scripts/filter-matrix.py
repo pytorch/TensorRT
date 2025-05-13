@@ -6,8 +6,8 @@ import os
 import sys
 from typing import List
 
-# this was introduced to avoid build for py3.13, currently we support py3.13, but keep this for future use with other python versions
-disabled_python_versions: List[str] = []
+# currently we don't support python 3.13t due to tensorrt does not support 3.13t
+disabled_python_versions: List[str] = ["3.13t"]
 
 
 def main(args: list[str]) -> None:
