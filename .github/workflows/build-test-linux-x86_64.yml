@@ -1,14 +1,17 @@
-name: Build and Test Torch-TensorRT on Linux with Future TensorRT Versions
+name: Build and test Linux wheels
 
 on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - nightly
+      - release/*
+    tags:
+      # NOTE: Binary build pipelines should only get triggered on release candidate builds
+      # Release candidate tags look like: v1.11.0-rc1
+      - v[0-9]+.[0-9]+.[0-9]+-rc[0-9]+
   workflow_dispatch:
-  schedule:
-    - cron: '0 0 * * 0'  # Runs at 00:00 UTC every Sunday (minute hour day-of-month month-of-year day-of-week)
-
-permissions:
-  id-token: write
-  contents: read
-  packages: write
 
 jobs:
   generate-matrix:
@@ -20,9 +23,8 @@ jobs:
       test-infra-ref: main
       with-rocm: false
       with-cpu: false
-      python-versions: '["3.11"]'
 
-  generate-tensorrt-matrix:
+  filter-matrix:
     needs: [generate-matrix]
     outputs:
       matrix: ${{ steps.generate.outputs.matrix }}
@@ -34,20 +36,20 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: pytorch/tensorrt
-      - name: Generate tensorrt matrix
+      - name: Generate matrix
         id: generate
         run: |
           set -eou pipefail
-          python -m pip install --upgrade pip
-          pip install requests
           MATRIX_BLOB=${{ toJSON(needs.generate-matrix.outputs.matrix) }}
-          MATRIX_BLOB="$(python3 .github/scripts/generate-tensorrt-test-matrix.py --matrix "${MATRIX_BLOB}")"
+          MATRIX_BLOB="$(python3 .github/scripts/filter-matrix.py --matrix "${MATRIX_BLOB}")"
           echo "${MATRIX_BLOB}"
           echo "matrix=${MATRIX_BLOB}" >> "${GITHUB_OUTPUT}"
 
   build:
-    needs: [generate-tensorrt-matrix]
-    name: Build torch-tensorrt whl package
+    needs: filter-matrix
+    permissions:
+      id-token: write
+      contents: read
     strategy:
       fail-fast: false
       matrix:
@@ -58,13 +60,14 @@ jobs:
             post-script: packaging/post_build_script.sh
             smoke-test-script: packaging/smoke_test_script.sh
             package-name: torch_tensorrt
-    uses: ./.github/workflows/build-tensorrt-linux.yml
+    name: Build torch-tensorrt whl package
+    uses: pytorch/test-infra/.github/workflows/build_wheels_linux.yml@main
     with:
       repository: ${{ matrix.repository }}
       ref: ""
       test-infra-repository: pytorch/test-infra
       test-infra-ref: main
-      build-matrix: ${{ needs.generate-tensorrt-matrix.outputs.matrix }}
+      build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
       pre-script: ${{ matrix.pre-script }}
       env-var-script: ${{ matrix.env-var-script }}
       post-script: ${{ matrix.post-script }}
@@ -74,7 +77,7 @@ jobs:
 
   tests-py-torchscript-fe:
     name: Test torchscript frontend [Python]
-    needs: [generate-tensorrt-matrix, build]
+    needs: [filter-matrix, build]
     strategy:
       fail-fast: false
       matrix:
@@ -91,7 +94,7 @@ jobs:
       ref: ""
       test-infra-repository: pytorch/test-infra
       test-infra-ref: main
-      build-matrix: ${{ needs.generate-tensorrt-matrix.outputs.matrix }}
+      build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
       pre-script: ${{ matrix.pre-script }}
       script: |
         export USE_HOST_DEPS=1
@@ -110,7 +113,7 @@ jobs:
 
   tests-py-dynamo-converters:
     name: Test dynamo converters [Python]
-    needs: [generate-tensorrt-matrix, build]
+    needs: [filter-matrix, build]
     strategy:
       fail-fast: false
       matrix:
@@ -127,7 +130,7 @@ jobs:
       ref: ""
       test-infra-repository: pytorch/test-infra
       test-infra-ref: main
-      build-matrix: ${{ needs.generate-tensorrt-matrix.outputs.matrix }}
+      build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
       pre-script: ${{ matrix.pre-script }}
       script: |
         export USE_HOST_DEPS=1
@@ -135,13 +138,17 @@ jobs:
         pushd .
         cd tests/py
         python -m pip install -r requirements.txt
+        python -m pip install nvidia-modelopt[all] --extra-index-url https://pypi.nvidia.com
         cd dynamo
         python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/dynamo_converters_test_results.xml -n 4 conversion/
+        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/dynamo_converters_test_results.xml automatic_plugin/test_automatic_plugin.py
+        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/dynamo_converters_test_results.xml automatic_plugin/test_automatic_plugin_with_attrs.py
+        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/dynamo_converters_test_results.xml automatic_plugin/test_flashinfer_rmsnorm.py
         popd
 
   tests-py-dynamo-fe:
     name: Test dynamo frontend [Python]
-    needs: [generate-tensorrt-matrix, build]
+    needs: [filter-matrix, build]
     strategy:
       fail-fast: false
       matrix:
@@ -158,7 +165,7 @@ jobs:
       ref: ""
       test-infra-repository: pytorch/test-infra
       test-infra-ref: main
-      build-matrix: ${{ needs.generate-tensorrt-matrix.outputs.matrix }}
+      build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
       pre-script: ${{ matrix.pre-script }}
       script: |
         export USE_HOST_DEPS=1
@@ -166,13 +173,14 @@ jobs:
         pushd .
         cd tests/py
         python -m pip install -r requirements.txt
+        python -m pip install nvidia-modelopt[all] --extra-index-url https://pypi.nvidia.com
         cd dynamo
         python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/dyn_models_export.xml --ir dynamo models/
         popd
 
   tests-py-dynamo-serde:
     name: Test dynamo export serde [Python]
-    needs: [generate-tensorrt-matrix, build]
+    needs: [filter-matrix, build]
     strategy:
       fail-fast: false
       matrix:
@@ -189,7 +197,7 @@ jobs:
       ref: ""
       test-infra-repository: pytorch/test-infra
       test-infra-ref: main
-      build-matrix: ${{ needs.generate-tensorrt-matrix.outputs.matrix }}
+      build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
       pre-script: ${{ matrix.pre-script }}
       script: |
         export USE_HOST_DEPS=1
@@ -199,11 +207,12 @@ jobs:
         python -m pip install -r requirements.txt
         cd dynamo
         python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/export_serde_test_results.xml --ir dynamo models/test_export_serde.py
+        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/reexport_test_results.xml --ir dynamo models/test_reexport.py
         popd
 
   tests-py-torch-compile-be:
     name: Test torch compile backend [Python]
-    needs: [generate-tensorrt-matrix, build]
+    needs: [filter-matrix, build]
     strategy:
       fail-fast: false
       matrix:
@@ -220,7 +229,7 @@ jobs:
       ref: ""
       test-infra-repository: pytorch/test-infra
       test-infra-ref: main
-      build-matrix: ${{ needs.generate-tensorrt-matrix.outputs.matrix }}
+      build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
       pre-script: ${{ matrix.pre-script }}
       script: |
         export USE_HOST_DEPS=1
@@ -236,7 +245,7 @@ jobs:
 
   tests-py-dynamo-core:
     name: Test dynamo core [Python]
-    needs: [generate-tensorrt-matrix, build]
+    needs: [filter-matrix, build]
     strategy:
       fail-fast: false
       matrix:
@@ -253,7 +262,7 @@ jobs:
       ref: ""
       test-infra-repository: pytorch/test-infra
       test-infra-ref: main
-      build-matrix: ${{ needs.generate-tensorrt-matrix.outputs.matrix }}
+      build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
       pre-script: ${{ matrix.pre-script }}
       script: |
         export USE_HOST_DEPS=1
@@ -262,14 +271,14 @@ jobs:
         cd tests/py
         python -m pip install -r requirements.txt
         cd dynamo
-        python -m pytest -ra -n 4 --junitxml=${RUNNER_TEST_RESULTS_DIR}/tests_py_dynamo_core_runtime_test_results.xml  --ignore runtime/test_002_cudagraphs_py.py --ignore runtime/test_002_cudagraphs_cpp.py runtime/
+        python -m pytest -ra -n 4 --junitxml=${RUNNER_TEST_RESULTS_DIR}/tests_py_dynamo_core_runtime_test_results.xml --ignore runtime/test_002_cudagraphs_py.py --ignore runtime/test_002_cudagraphs_cpp.py runtime/
         python -m pytest -ra -n 4 --junitxml=${RUNNER_TEST_RESULTS_DIR}/tests_py_dynamo_core_partitioning_test_results.xml partitioning/
         python -m pytest -ra -n 4 --junitxml=${RUNNER_TEST_RESULTS_DIR}/tests_py_dynamo_core_lowering_test_results.xml lowering/
         popd
 
   tests-py-dynamo-cudagraphs:
     name: Test dynamo cudagraphs [Python]
-    needs: [generate-tensorrt-matrix, build]
+    needs: [filter-matrix, build]
     strategy:
       fail-fast: false
       matrix:
@@ -286,7 +295,7 @@ jobs:
       ref: ""
       test-infra-repository: pytorch/test-infra
       test-infra-ref: main
-      build-matrix: ${{ needs.generate-tensorrt-matrix.outputs.matrix }}
+      build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
       pre-script: ${{ matrix.pre-script }}
       script: |
         export USE_HOST_DEPS=1
@@ -302,7 +311,7 @@ jobs:
 
   tests-py-core:
     name: Test core [Python]
-    needs: [generate-tensorrt-matrix, build]
+    needs: [filter-matrix, build]
     strategy:
       fail-fast: false
       matrix:
@@ -319,7 +328,7 @@ jobs:
       ref: ""
       test-infra-repository: pytorch/test-infra
       test-infra-ref: main
-      build-matrix: ${{ needs.generate-tensorrt-matrix.outputs.matrix }}
+      build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
       pre-script: ${{ matrix.pre-script }}
       script: |
         export USE_HOST_DEPS=1

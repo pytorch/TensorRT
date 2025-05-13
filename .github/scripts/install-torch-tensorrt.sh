@@ -1,8 +1,15 @@
-set -exou pipefail
+#set -exou pipefail
+set -x
 
 TORCH_TORCHVISION=$(grep "^torch" ${PWD}/py/requirements.txt)
 INDEX_URL=https://download.pytorch.org/whl/${CHANNEL}/${CU_VERSION}
 PLATFORM=$(python -c "import sys; print(sys.platform)")
+
+if [[ $(uname -m) == "aarch64" ]]; then
+    # install cuda for aarch64
+    source .github/scripts/install-cuda-aarch64.sh
+    install_cuda_aarch64
+fi
 
 # Install all the dependencies required for Torch-TensorRT
 pip install --pre ${TORCH_TORCHVISION} --index-url ${INDEX_URL}

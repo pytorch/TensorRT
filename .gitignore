@@ -75,3 +75,4 @@ tests/py/dynamo/models/*.ep
 *.deb
 *.tar.xz
 MODULE.bazel.lock
+*.whl

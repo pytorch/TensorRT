@@ -20,7 +20,8 @@ def partitioning_test(name, visibility = None):
             "@googletest//:gtest_main",
         ] + select({
             ":windows": ["@libtorch_win//:libtorch"],
-            "//conditions:default": ["@libtorch//:libtorch"],
+            ":use_torch_whl": ["@torch_whl//:libtorch"],
+            "//conditions:default": ["@libtorch"],
         }),
         #timeout = "short",
     )
