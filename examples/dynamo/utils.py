@@ -72,9 +72,10 @@ def generate_with_kv_cache(model, input_signature, max_output_seq_length, eos_to
     start_idx = 0
     end_idx = input_signature[0].shape[1]
     output_seq = input_signature[0].clone()
-
+    isl = input_signature[0].shape[1]
     # TODO: Confirm this: When end_idx = max_output_seq_length-1, number of tokens generated = OSL
-    while end_idx < max_output_seq_length:
+    num_tokens_generated = 0
+    while num_tokens_generated <= max_output_seq_length - isl: # end_idx < max_output_seq_length:
         input_signature_with_start_end_idx = input_signature + (start_idx, end_idx)
         logits_keys_values = model(*input_signature_with_start_end_idx)
         logits = logits_keys_values[0]
@@ -85,7 +86,7 @@ def generate_with_kv_cache(model, input_signature, max_output_seq_length, eos_to
         output_seq = torch.cat([output_seq, next_tokens], dim=-1)
         start_idx = end_idx
         end_idx = start_idx + 1 
-    
+        num_tokens_generated += 1
     return output_seq
 
 def time_generate(

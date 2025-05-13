@@ -21,7 +21,7 @@ from transformers import AutoModelForCausalLM, AutoTokenizer, StoppingCriteriaLi
 from contextlib import nullcontext
 from utils import export_llm, generate, recordStats, time_generate, generate_with_kv_cache
 
-MAX_TOKENS = 128
+
 DEVICE = torch.device("cuda:0")
 
 def get_model(args):
@@ -34,7 +34,6 @@ def get_model(args):
                     attn_implementation="sdpa",
                 )
                 .eval()
-                .half()
                 .cuda()
             )
             
@@ -47,7 +46,6 @@ def get_model(args):
                     # num_hidden_layers=2
                 )
                 .eval()
-                .half()
                 .cuda()
             )
         elif args.model == "meta-llama/Llama-3.1-8B-Instruct":
@@ -58,37 +56,58 @@ def get_model(args):
                     attn_implementation="sdpa",  # num_hidden_layers=1
                 )
                 .eval()
-                .half()
                 .cuda()
             )
         elif args.model == "google/gemma-3-1b-it":
             model = (
                 AutoModelForCausalLM.from_pretrained(
-                    "google/gemma-3-1b-it", use_cache=False, attn_implementation="sdpa"
+                    "google/gemma-3-1b-it", 
+                    use_cache=False, 
+                    attn_implementation="sdpa"
                 )
                 .eval()
-                .half()
                 .cuda()
             )
-    model = model.to(torch.float16)
+    if args.precision == "FP16":
+        model = model.to(torch.float16)
+    elif args.precision == "BF16":
+        model = model.to(torch.bfloat16)
+    else:
+        model = model.to(torch.float32)
+
     return model
 
 
-def compile_torchtrt(model, input_ids, min_block_size=1, debug=False):
-    max_seq_len = input_ids.shape[1] + MAX_TOKENS
+def compile_torchtrt(model, input_ids, args):
+    max_seq_len = input_ids.shape[1] + args.max_tokens
     ep = export_llm(model, input_ids, max_seq_len=max_seq_len)
-
-    with (torch_tensorrt.logging.debug() if debug else nullcontext()):
+    
+    # Set precision specific flags
+    use_fp32_acc = False 
+    use_explicit_typing = False
+    if args.precision == "FP16":
+        enabled_precisions = {torch.float32}
+        use_fp32_acc = True 
+        use_explicit_typing = True
+    elif args.precision == "BF16":
+        enabled_precisions = {torch.bfloat16}
+        use_fp32_acc = False
+    else:
+        enabled_precisions = {torch.float32}
+        
+    with (torch_tensorrt.logging.debug() if args.debug else nullcontext()):
         trt_model = torch_tensorrt.dynamo.compile(
             ep,
             inputs=[input_ids],
-            enabled_precisions={torch.float16},
+            enabled_precisions=enabled_precisions,
             # truncate_double=True,
+            use_explicit_typing=use_explicit_typing,
+            use_fp32_acc=use_fp32_acc,
             device=DEVICE,
             disable_tf32=True,
             use_python_runtime=True,
-            debug=debug,
-            min_block_size=min_block_size,
+            debug=args.debug,
+            min_block_size=args.min_block_size,
         )
 
     return trt_model
@@ -96,8 +115,6 @@ def compile_torchtrt(model, input_ids, min_block_size=1, debug=False):
 
 def print_outputs(backend_name, gen_tokens, tokenizer):
 
-
-    print(f"============================= {backend_name} ==============================")
     print(
         f"{backend_name} model generated text: ",
         tokenizer.decode(gen_tokens[0], skip_special_tokens=True),
@@ -127,6 +144,33 @@ def get_zeroed_kv_cache_inputs(model: torch.fx.GraphModule):
 
     return tuple(zeroed_kv_cache_inputs)
 
+def measure_perf(trt_model, input_signature, backend_name):
+    # Measure average time for 10 iterations
+    import timeit
+    import numpy as np
+    
+    total_time = 0
+    iterations = 10
+    
+    print("Running warmup iteration...")
+    # Warmup run
+    _ = trt_model(*input_signature)
+    torch.cuda.synchronize()
+    
+    print(f"Measuring performance over {iterations} iterations...")
+    for i in range(iterations):
+        start_time = timeit.default_timer()
+        _ = trt_model(*input_signature)
+        torch.cuda.synchronize()
+        end_time = timeit.default_timer()
+        iter_time = end_time - start_time
+        total_time += iter_time
+        # print(f"Iteration {i+1}: {iter_time:.4f} seconds")
+    
+    avg_time = total_time / iterations
+    print(f"Backend: {backend_name} Average time per iteration: {avg_time*1000:.4f} milliseconds")
+    print(f"Backend: {backend_name} Average throughput: {1.0/avg_time:.2f} iterations/second")
+
 if __name__ == "__main__":
     arg_parser = argparse.ArgumentParser(
         description="Run inference on a model with random input values"
@@ -151,14 +195,22 @@ if __name__ == "__main__":
         "--min_block_size", type=int, default=1, help="no. of iterations to run"
     )
     arg_parser.add_argument(
-        "--disable_pytorch_run", 
-        action="store_false", 
-        help="Disable pytorch run (default: True)"
+        "--max_tokens", type=int, default=128, help="no. of iterations to run"
+    )
+    arg_parser.add_argument(
+        "--enable_pytorch_run", 
+        action="store_true", 
+        help="Enable pytorch run (default: False)"
     )
     arg_parser.add_argument(
         "--kv_cache",
         action="store_true",
         help="Enable kv_cache (default: False)"
+    )
+    arg_parser.add_argument(
+        "--cudagraph",
+        action="store_true",
+        help="Enable cudagraphs (default: False)"
     )
     arg_parser.add_argument(
         "--debug",
@@ -180,20 +232,20 @@ if __name__ == "__main__":
         # word_ids = tokenizer(word, return_tensors="pt").input_ids[0]  # Get the first (and only) sequence
         # input_ids = word_ids.repeat(1024).unsqueeze(0).to(model.device)  # Add batch dimension and move to device
 
-        MAX_OUTPUT_SEQ_LENGTH = input_ids.shape[1] + MAX_TOKENS
+        MAX_OUTPUT_SEQ_LENGTH = input_ids.shape[1] + args.max_tokens
         # Pyt
-        pytorch_input_signature = (input_ids.clone(),)
-        if args.disable_pytorch_run:
-            pyt_gen_tokens = None
-        else:
+        pyt_gen_tokens = None
+        pyt_timings = None
+        pyt_stats = None
+        if args.enable_pytorch_run:
             pyt_gen_tokens = generate(
-                model, pytorch_input_signature, MAX_OUTPUT_SEQ_LENGTH, tokenizer.eos_token_id
+                model, input_ids.clone(), MAX_OUTPUT_SEQ_LENGTH, tokenizer.eos_token_id
             )
 
             pyt_timings = time_generate(
                 generate,
                 model,
-                pytorch_input_signature,
+                input_ids.clone(),
                 MAX_OUTPUT_SEQ_LENGTH,
                 tokenizer.eos_token_id,
                 iterations=args.iterations,
@@ -207,13 +259,21 @@ if __name__ == "__main__":
             # This import is required to register static/dynamic KV cache transformations as lowering passes
             import torch_tensorrt.extensions
 
-        trt_model = compile_torchtrt(model, input_ids, min_block_size=args.min_block_size, debug=args.debug)
-        
+        trt_model = compile_torchtrt(model, input_ids, args)
+
         if args.kv_cache:
+            trt_input_signature = (input_ids.clone(),) + get_zeroed_kv_cache_inputs(trt_model)
+            if args.cudagraph:
+                # Run a decoding loop with prefill and generate phases so that the CUDAGraph is recorded for both of these phases.
+                trt_input_signature = (input_ids.clone(),) + get_zeroed_kv_cache_inputs(trt_model)
+                torch_tensorrt.runtime.set_cudagraphs_mode(True)
+ 
             trt_input_signature = (input_ids.clone(),) + get_zeroed_kv_cache_inputs(trt_model)
             trt_gen_tokens = generate_with_kv_cache(
                 trt_model, trt_input_signature, MAX_OUTPUT_SEQ_LENGTH, tokenizer.eos_token_id,
-            )
+                )
+
+            trt_input_signature = (input_ids.clone(),) + get_zeroed_kv_cache_inputs(trt_model)
             trt_timings = time_generate(
                 generate_with_kv_cache,
                 trt_model,
@@ -239,10 +299,10 @@ if __name__ == "__main__":
             "TensorRT", trt_timings, args.precision, batch_size=1, compile_time_s=None
         )
 
-
+        if args.enable_pytorch_run: 
+            print_outputs("PyTorch", pyt_gen_tokens, tokenizer)
         print_outputs("TensorRT", trt_gen_tokens, tokenizer)
-        print("===================== \n")
-        if not args.disable_pytorch_run:
+        if  args.enable_pytorch_run:
             print("=========PyTorch PERFORMANCE============ \n")
             print(pyt_stats)
             print("===================== \n")

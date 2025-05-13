@@ -684,7 +684,11 @@ def compile(
     )
 
     gm = exported_program.module()
+
     exported_program.module().to("cpu")
+    torch.cuda.empty_cache()
+    import gc
+    gc.collect()
     logger.debug("Input graph: " + str(gm.graph))
 
     # Apply lowering on the graph module
