@@ -66,7 +66,7 @@ def quantize(
         if not isinstance(amax, trt.ITensor):
             amax = to_torch(amax, None)
             scale = torch.divide(amax, max_bound)
-            scale = get_trt_tensor(ctx, scale, name + "_scale")
+            scale = get_trt_tensor(ctx, scale, name + "_scale", dtype=torch.float32)
         else:
             scale = impl.elementwise.div(
                 ctx,
@@ -76,7 +76,7 @@ def quantize(
                 amax,
                 max_bound,
             )
-            scale = get_trt_tensor(ctx, scale, name + "_scale")
+            scale = get_trt_tensor(ctx, scale, name + "_scale", dtype=torch.float32)
 
         # Add Q node
         if num_bits == 8 and exponent_bits == 0:
@@ -96,7 +96,6 @@ def quantize(
             q_output, scale, output_type=input_tensor.dtype
         )
         set_layer_name(dequantize_layer, target, name + "_dequantize", source_ir)
-        dequantize_layer.precision = dtype
 
         dq_output = dequantize_layer.get_output(0)
 
