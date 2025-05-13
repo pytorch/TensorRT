@@ -20,6 +20,7 @@ from torch_tensorrt._Device import Device
 from torch_tensorrt._enums import Platform, dtype
 from torch_tensorrt._features import ENABLED_FEATURES
 from torch_tensorrt._Input import Input
+from torch_tensorrt._version import __tensorrt_llm_version__
 from torch_tensorrt.dynamo import _defaults
 from torch_tensorrt.dynamo._defaults import default_device
 from torch_tensorrt.dynamo._engine_cache import BaseEngineCache
@@ -821,9 +822,8 @@ def download_plugin_lib_path(py_version: str, platform: str) -> str:
     plugin_lib_path = None
 
     # Downloading TRT-LLM lib
-    # TODO: check how to fix the 0.18.0 hardcode below
     base_url = "https://pypi.nvidia.com/tensorrt-llm/"
-    file_name = f"tensorrt_llm-0.18.0-{py_version}-{py_version}-{platform}.whl"
+    file_name = f"tensorrt_llm-{__tensorrt_llm_version__}-{py_version}-{py_version}-{platform}.whl"
     download_url = base_url + file_name
     if not (os.path.exists(file_name)):
         try:
@@ -887,7 +887,7 @@ def load_tensorrt_llm() -> bool:
             return False
         else:
             # this is used as the default py version
-            py_version = "cp312"
+            py_version = "cp310"
             platform = Platform.current_platform()
 
             platform = str(platform).lower()
