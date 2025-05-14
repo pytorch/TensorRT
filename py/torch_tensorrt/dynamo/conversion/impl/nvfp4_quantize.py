@@ -35,6 +35,10 @@ def nvfp4_quantize(
     print(
         f"lan added nvfp4_quantize entered: {target=} {source_ir=} {name=} {input_tensor.shape=} {input_tensor.dtype=} {block_size=} {amax=} {num_bits=} {exponent_bits=} {scale_num_bits=} {scale_exponent_bits=}"
     )
+    if len(input_tensor.shape) not in (2, 3):
+        raise ValueError(
+            f"nvfp4_quantize converter received an input of {input_tensor.shape} shape. Supported shapes: 2D or 3D"
+        )
     with unset_fake_temporarily():
         axis = len(input_tensor.shape) - 1
         global_scale = _calculate_global_scale(ctx, name, amax)
