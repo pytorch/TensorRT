@@ -409,6 +409,8 @@ class dtype(Enum):
                 return trt.DataType.BOOL
             elif self == dtype.bf16:
                 return trt.DataType.BF16
+            elif self == dtype.f4:
+                return trt.DataType.FP4
             elif use_default:
                 return trt.DataType.FLOAT
             else:

@@ -199,10 +199,10 @@ def test_resnet18_half(ir):
     torch._dynamo.reset()
 
 
-@unittest.skipIf(
-    torch.cuda.get_device_capability() < (10, 0),
-    "FP4 quantization requires compute capability 10.0 or later",
-)
+# @unittest.skipIf(
+#     torch.cuda.get_device_capability() < (10, 0),
+#     "FP4 quantization requires compute capability 10.0 or later",
+# )
 @unittest.skipIf(
     not importlib.util.find_spec("modelopt"),
     "ModelOpt is required to run this test",
