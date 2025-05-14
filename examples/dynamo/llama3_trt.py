@@ -26,12 +26,24 @@ DEVICE = torch.device("cuda:0")
 
 def get_model(args):
     with torch.no_grad():
-        if args.model == "meta-llama/Llama-3.2-1B-Instruct":
+        if args.model == "meta-llama/Llama-2-7b-hf":
             model = (
                 AutoModelForCausalLM.from_pretrained(
                     args.model,
                     use_cache=False,
                     attn_implementation="sdpa",
+                    # num_hidden_layers=1
+                )
+                .eval()
+                .cuda()
+            )
+        elif args.model == "meta-llama/Llama-3.2-1B-Instruct":
+            model = (
+                AutoModelForCausalLM.from_pretrained(
+                    args.model,
+                    use_cache=False,
+                    attn_implementation="sdpa",
+                    num_hidden_layers=1
                 )
                 .eval()
                 .cuda()
@@ -94,7 +106,7 @@ def compile_torchtrt(model, input_ids, args):
         use_fp32_acc = False
     else:
         enabled_precisions = {torch.float32}
-        
+
     with (torch_tensorrt.logging.debug() if args.debug else nullcontext()):
         trt_model = torch_tensorrt.dynamo.compile(
             ep,
@@ -114,12 +126,12 @@ def compile_torchtrt(model, input_ids, args):
 
 
 def print_outputs(backend_name, gen_tokens, tokenizer):
-
+    print(f"========= {backend_name} =========")
     print(
         f"{backend_name} model generated text: ",
         tokenizer.decode(gen_tokens[0], skip_special_tokens=True),
     )
-    print("=============================")
+    print("===================================")
 
 def get_zeroed_kv_cache_inputs(model: torch.fx.GraphModule):
     """
@@ -260,7 +272,11 @@ if __name__ == "__main__":
             import torch_tensorrt.extensions
 
         trt_model = compile_torchtrt(model, input_ids, args)
-
+        pyt_logits = model.cuda()(input_ids.clone())
+        trt_logits = trt_model(input_ids.clone())
+        print(f"Diff between pyt and trt: {torch.mean(torch.abs(pyt_logits - trt_logits))}")
+        # print(f"Diff between pyt and trt logits: {torch.mean(torch.abs(pyt_logits.logits - trt_logits.logits))}")
+        # breakpoint()
         if args.kv_cache:
             trt_input_signature = (input_ids.clone(),) + get_zeroed_kv_cache_inputs(trt_model)
             if args.cudagraph:
@@ -269,6 +285,7 @@ if __name__ == "__main__":
                 torch_tensorrt.runtime.set_cudagraphs_mode(True)
  
             trt_input_signature = (input_ids.clone(),) + get_zeroed_kv_cache_inputs(trt_model)
+            
             trt_gen_tokens = generate_with_kv_cache(
                 trt_model, trt_input_signature, MAX_OUTPUT_SEQ_LENGTH, tokenizer.eos_token_id,
                 )
