@@ -2,6 +2,13 @@ load("@rules_cc//cc:defs.bzl", "cc_test")
 load("//tests/core/lowering:lowering_test.bzl", "lowering_test")
 
 config_setting(
+    name = "use_torch_whl",
+    flag_values = {
+        "//toolchains/dep_src:torch": "whl"
+    },
+)
+
+config_setting(
     name = "windows",
     constraint_values = [
         "@platforms//os:windows",
@@ -23,6 +30,7 @@ cc_test(
         "@googletest//:gtest_main",
     ] + select({
         ":windows": ["@libtorch_win//:libtorch"],
+        ":use_pre_cxx11_abi": ["@libtorch_pre_cxx11_abi//:libtorch"],
         "//conditions:default": ["@libtorch"],
     }),
 )

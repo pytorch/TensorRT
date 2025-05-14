@@ -1,0 +1,334 @@
+name: Build Linux Wheels For aarch64
+
+on:
+  workflow_call:
+    inputs:
+      repository:
+        description: 'Repository to checkout, defaults to ""'
+        default: ""
+        type: string
+      ref:
+        description: 'Reference to checkout, defaults to "nightly"'
+        default: "nightly"
+        type: string
+      test-infra-repository:
+        description: "Test infra repository to use"
+        default: "pytorch/test-infra"
+        type: string
+      test-infra-ref:
+        description: "Test infra reference to use"
+        default: ""
+        type: string
+      build-matrix:
+        description: "Build matrix to utilize"
+        default: ""
+        type: string
+      pre-script:
+        description: "Pre script to run prior to build"
+        default: ""
+        type: string
+      post-script:
+        description: "Post script to run prior to build"
+        default: ""
+        type: string
+      smoke-test-script:
+        description: "Script for Smoke Test for a specific domain"
+        default: ""
+        type: string
+      env-var-script:
+        description: "Script that sets Domain-Specific Environment Variables"
+        default: ""
+        type: string
+      package-name:
+        description: "Name of the actual python package that is imported in the smoke test"
+        default: ""
+        type: string
+      build-target:
+        description: "The target to build and publish (for repos that build multiple packages)"
+        default: ""
+        type: string
+      trigger-event:
+        description: "Trigger Event in caller that determines whether or not to upload"
+        default: ""
+        type: string
+      cache-path:
+        description: "The path(s) on the runner to cache or restore. The path is relative to repository."
+        default: ""
+        type: string
+      cache-key:
+        description: "The key created when saving a cache and the key used to search for a cache."
+        default: ""
+        type: string
+      architecture:
+        description: Architecture to build for x86_64 for default Linux, or aarch64 for Linux aarch64 builds
+        required: false
+        type: string
+        default: x86_64
+      submodules:
+        description: Works as stated in actions/checkout, but the default value is recursive
+        required: false
+        type: string
+        default: recursive
+      setup-miniconda:
+        description: Set to true if setup-miniconda is needed
+        required: false
+        type: boolean
+        default: true
+      build-platform:
+        description: Platform to build wheels, choose from 'python-build-package' or 'setup-py'
+        required: false
+        type: string
+        default: 'setup-py'
+      upload-to-pypi:
+        description: The comma-separated list of CUDA arch to be uploaded to pypi
+        default: ""
+        type: string
+      build-command:
+        description: The build command to use if build-platform is python-build-package
+        required: false
+        default: "python -m build --wheel"
+        type: string
+      pip-install-torch-extra-args:
+        # NOTE: Why does this exist?
+        # Well setuptools / python packaging doesn't actually allow you to specify dependencies
+        # that come from other index URLs when you are building a package for "security" purposes.
+        # Unfortunately for us our nightlies (torch, torchvision, etc.) only exist on download.pytorch.org
+        # which means that if our users depend on things like torchvision then they need to have
+        # an ability to install these dependencies from download.pytorch.org, as part of the build process
+        # which currently the do not have the ability to do through normal means, hence this parameter
+        # Reference: https://discuss.python.org/t/specifying-extra-index-url-in-setup-cfg-option-dependencies/19377
+        description: Extra arguments to pass to the command that install base torch dependency
+        required: false
+        default: ""
+        type: string
+      timeout:
+        description: 'Timeout for the job (in minutes)'
+        default: 120
+        type: number
+    secrets:
+      PYPI_API_TOKEN:
+        description: An optional token to upload to pypi
+        required: false
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(inputs.build-matrix) }}
+    env:
+      PYTHON_VERSION: ${{ matrix.python_version }}
+      PACKAGE_TYPE: wheel
+      REPOSITORY: ${{ inputs.repository }}
+      REF: ${{ inputs.ref }}
+      CU_VERSION: ${{ matrix.desired_cuda }}
+      UPLOAD_TO_BASE_BUCKET: ${{ matrix.upload_to_base_bucket }}
+      ARCH: ${{ inputs.architecture }}
+      BUILD_TARGET: ${{ inputs.build-target }}
+    name: build-${{ matrix.build_name }}
+    runs-on: ${{ matrix.validation_runner }}
+    environment: ${{(inputs.trigger-event == 'schedule' || (inputs.trigger-event == 'push' && (startsWith(github.event.ref, 'refs/heads/nightly') || startsWith(github.event.ref, 'refs/tags/v')))) && 'pytorchbot-env' || ''}}
+    container:
+      image: ${{ matrix.container_image }}
+      options: ${{ matrix.gpu_arch_type == 'cuda' && '--gpus all' || ' ' }}
+    timeout-minutes: ${{ inputs.timeout }}
+    steps:
+      - name: Clean workspace
+        shell: bash -l {0}
+        run: |
+          set -euxo pipefail
+          echo "::group::Cleanup debug output"
+          rm -rf "${GITHUB_WORKSPACE}"
+          mkdir -p "${GITHUB_WORKSPACE}"
+
+          if [[ "${{ inputs.architecture }}" = "aarch64" ]]; then
+            rm -rf "${RUNNER_TEMP}/*"
+          fi
+          echo "::endgroup::"
+
+      - uses: actions/checkout@v4
+        with:
+          # Support the use case where we need to checkout someone's fork
+          repository: ${{ inputs.test-infra-repository }}
+          ref: ${{ inputs.test-infra-ref }}
+          path: test-infra
+
+      - name: Install Miniforge
+        if: ${{ inputs.architecture == 'aarch64' }}
+        shell: bash -l {0}
+        env:
+          DESIRED_PYTHON: ${{ matrix.python_version }}
+        run: |
+          set -euxo pipefail
+          # TODO: Get rid of Conda, we already have all versions of PyThon one needs in the docker
+          ###############################################################################
+          # Install conda
+          # disable SSL_verify due to getting "Could not find a suitable TLS CA certificate bundle, invalid path"
+          # when using Python version, less than the conda latest
+          ###############################################################################
+          echo 'Installing conda-forge'
+          curl -L -o /mambaforge.sh https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-aarch64.sh
+          chmod +x /mambaforge.sh
+          /mambaforge.sh -b -p /opt/conda
+          rm /mambaforge.sh
+          source /opt/conda/etc/profile.d/conda.sh
+          conda config --set ssl_verify False
+          echo "/opt/conda/bin" >> $GITHUB_PATH
+      - uses: ./test-infra/.github/actions/set-channel
+      - name: Set PYTORCH_VERSION
+        if: ${{ env.CHANNEL == 'test' }}
+        run: |
+          # When building RC, set the version to be the current candidate version,
+          # otherwise, leave it alone so nightly will pick up the latest
+          echo "PYTORCH_VERSION=${{ matrix.stable_version }}" >> "${GITHUB_ENV}"
+      - uses: ./test-infra/.github/actions/setup-binary-builds
+        env:
+          PLATFORM: ${{ inputs.architecture == 'aarch64'  && 'linux-aarch64' || ''}}
+        with:
+          repository: ${{ inputs.repository }}
+          ref: ${{ inputs.ref }}
+          submodules: ${{ inputs.submodules }}
+          setup-miniconda: false
+          python-version: ${{ env.PYTHON_VERSION }}
+          cuda-version: ${{ env.CU_VERSION }}
+          arch: ${{ env.ARCH }}
+
+      - name: Combine Env Var and Build Env Files
+        if: ${{ inputs.env-var-script != '' }}
+        working-directory: ${{ inputs.repository }}
+        run: |
+          set -euxo pipefail
+          cat "${{ inputs.env-var-script }}" >> "${BUILD_ENV_FILE}"
+      - name: Add XPU Env Vars in Build Env File
+        if: ${{ matrix.gpu_arch_type == 'xpu' }}
+        run: |
+          {
+            echo "set +u"
+            echo "source /opt/intel/oneapi/compiler/latest/env/vars.sh"
+            echo "source /opt/intel/oneapi/pti/latest/env/vars.sh"
+          } >> "${BUILD_ENV_FILE}"
+      - name: Install torch dependency
+        run: |
+          set -euxo pipefail
+          # shellcheck disable=SC1090
+          source "${BUILD_ENV_FILE}"
+          # shellcheck disable=SC2086
+          ${CONDA_RUN} ${PIP_INSTALL_TORCH} ${{ inputs.pip-install-torch-extra-args }}
+      - name: Run Pre-Script with Caching
+        if: ${{ inputs.pre-script != '' }}
+        uses: ./test-infra/.github/actions/run-script-with-cache
+        with:
+          cache-path: ${{ inputs.cache-path }}
+          cache-key: ${{ inputs.cache-key }}
+          repository: ${{ inputs.repository  }}
+          script: ${{ inputs.pre-script }}
+      - name: Build the wheel (python-build-package)
+        if: ${{ inputs.build-platform == 'python-build-package' }}
+        working-directory: ${{ inputs.repository }}
+        shell: bash -l {0}
+        run: |
+          set -euxo pipefail
+          source "${BUILD_ENV_FILE}"
+          export PYTORCH_VERSION="$(${CONDA_RUN} pip show torch | grep ^Version: | sed 's/Version: *//' | sed 's/+.\+//')"
+          ${CONDA_RUN} python -m pip install build==1.2.2
+          echo "Successfully installed Python build package"
+          ${CONDA_RUN} ${{ inputs.build-command }}
+      - name: Build the wheel (setup-py)
+        if: ${{ inputs.build-platform == 'setup-py' }}
+        working-directory: ${{ inputs.repository }}
+        shell: bash -l {0}
+        run: |
+          set -euxo pipefail
+          source "${BUILD_ENV_FILE}"
+          export PYTORCH_VERSION="$(${CONDA_RUN} pip show torch | grep ^Version: | sed 's/Version: *//' | sed 's/+.\+//')"
+          ${CONDA_RUN} python setup.py clean
+          echo "Successfully ran `python setup.py clean`"
+          ${CONDA_RUN} python setup.py bdist_wheel
+      - name: Repair Manylinux_2_28 Wheel
+        shell: bash -l {0}
+        env:
+          PACKAGE_NAME: ${{ inputs.package-name }}
+          SMOKE_TEST_SCRIPT: ${{ inputs.smoke-test-script }}
+        run: |
+          set -euxo pipefail
+          source "${BUILD_ENV_FILE}"
+          # for pkg in ${{ inputs.repository }}/dist/*-linux_*.whl; do
+          #   # if the glob didn't match anything
+          #   if [[ ! -e $pkg ]]; then
+          #       continue
+          #   fi
+          #   abs_pkg=$(realpath $pkg)
+          #   ./test-infra/.github/scripts/repair_manylinux_2_28.sh $abs_pkg
+          # done
+          echo "Repair Manylinux_2_28 Wheel is not supported for aarch64"
+      - name: Run Post-Script
+        if: ${{ inputs.post-script != '' }}
+        uses: ./test-infra/.github/actions/run-script-with-cache
+        with:
+          repository: ${{ inputs.repository  }}
+          script: ${{ inputs.post-script }}
+      - name: Smoke Test
+        shell: bash -l {0}
+        env:
+          PACKAGE_NAME: ${{ inputs.package-name }}
+          SMOKE_TEST_SCRIPT: ${{ inputs.smoke-test-script }}
+        run: |
+          set -euxo pipefail
+          source "${BUILD_ENV_FILE}"
+          WHEEL_NAME=$(ls "${{ inputs.repository }}/dist/")
+          echo "$WHEEL_NAME"
+
+          ${CONDA_RUN} pip install "${{ inputs.repository }}/dist/$WHEEL_NAME"
+          # Checking that we have a pinned version of torch in our dependency tree
+          (
+            pushd "${RUNNER_TEMP}"
+            unzip -o "${GITHUB_WORKSPACE}/${{ inputs.repository }}/dist/$WHEEL_NAME"
+            # Ensure that pytorch version is pinned, should output file where it was found
+            grep "Requires-Dist: torch (==.*)" -r .
+          )
+
+          if [[ (! -f "${{ inputs.repository }}"/${SMOKE_TEST_SCRIPT}) ]]; then
+            echo "${{ inputs.repository }}/${SMOKE_TEST_SCRIPT} not found"
+            if [[ "${PACKAGE_NAME}" = "torchrec" ]]; then
+              # Special case for torchrec temporarily since __version__ does not
+              # work correctly on main in torchrec. This block will be
+              # removed once we fix it.
+              ${CONDA_RUN} python -c "import ${PACKAGE_NAME}"
+            else
+              ${CONDA_RUN} python -c "import ${PACKAGE_NAME}; print('package version is ', ${PACKAGE_NAME}.__version__)"
+            fi
+          else
+            echo "${{ inputs.repository }}/${SMOKE_TEST_SCRIPT} found"
+            ${CONDA_RUN} python "${{ inputs.repository }}/${SMOKE_TEST_SCRIPT}"
+          fi
+      # NB: Only upload to GitHub after passing smoke tests
+
+      - name: Upload wheel to GitHub
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.ARTIFACT_NAME }}
+          path: ${{ inputs.repository }}/dist/
+
+  upload:
+    needs: build
+    uses: pytorch/test-infra/.github/workflows/_binary_upload.yml@main
+    if: always()
+    with:
+      repository: ${{ inputs.repository }}
+      ref: ${{ inputs.ref }}
+      test-infra-repository: ${{ inputs.test-infra-repository }}
+      test-infra-ref: ${{ inputs.test-infra-ref }}
+      build-matrix: ${{ inputs.build-matrix }}
+      architecture: ${{ inputs.architecture }}
+      trigger-event: ${{ inputs.trigger-event }}
+      upload-to-pypi: ${{ inputs.upload-to-pypi }}
+    secrets:
+      PYPI_API_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}-${{ inputs.repository }}-${{ github.event_name == 'workflow_dispatch' }}
+  cancel-in-progress: true
