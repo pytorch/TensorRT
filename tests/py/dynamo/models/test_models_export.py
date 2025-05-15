@@ -233,19 +233,31 @@ def test_base_fp4(ir):
     mtq.quantize(model, quant_cfg, forward_loop=calibrate_loop)
     # model has qdq nodes at this point
     output_pyt = model(input_tensor)
+    torch.onnx.export(model, input_tensor, "mtq_model.onnx")
 
     with torch.no_grad():
         with export_torch_mode():
             exp_program = torch.export.export(model, (input_tensor,), strict=False)
+            from torch.fx import passes
+
+            g = passes.graph_drawer.FxGraphDrawer(exp_program, "torch_export_fp4")
+            with open("a.svg", "wb") as f:
+                f.write(g.get_dot_graph().create_svg())
+
             trt_model = torchtrt.dynamo.compile(
                 exp_program,
                 inputs=[input_tensor],
-                enabled_precisions={torch.float4_e2m1fn_x2},
+                enabled_precisions={
+                    torch.float4_e2m1fn_x2,
+                    torch.float32,
+                    torch.float16,
+                },
                 min_block_size=1,
                 debug=True,
                 cache_built_engines=False,
                 reuse_cached_engines=False,
             )
+
             outputs_trt = trt_model(input_tensor)
             print(f"lan added outputs_trt: {outputs_trt}")
             print(f"lan added output_pyt: {output_pyt}")
