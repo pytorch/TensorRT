@@ -362,32 +362,37 @@ def create_constant(
 
         if torch_value is not None:
             if torch_value.dtype == torch.float8_e4m3fn:
-                weights = trt.Weights(type=trt.DataType.FP8, ptr=torch_value.data_ptr(), count=torch_value.numel())
+                weights = trt.Weights(
+                    type=trt.DataType.FP8,
+                    ptr=torch_value.data_ptr(),
+                    count=torch_value.numel(),
+                )
                 constant = ctx.net.add_constant(
                     shape,
                     weights,
                 )
                 constant.name = name
                 return constant.get_output(0)
-
-            if torch_value.dtype in [torch.bfloat16]:
+            # Iconstant layer does not support Uint8, it only support that FP4 data packed in uint8
+            if torch_value.dtype == torch.uint8:
+                weights = trt.Weights(
+                    type=trt.DataType.FP4,
+                    ptr=torch_value.data_ptr(),
+                    count=torch_value.numel() * 2,
+                )
+                shape[-1] = shape[-1] * 2
+                constant = ctx.net.add_constant(
+                    shape,
+                    weights,
+                )
+                constant.name = name
+                return constant.get_output(0)
+            if torch_value.dtype == torch.bfloat16:
                 torch_value_fp32 = torch_value.to(torch.float32)
                 numpy_value = torch_value_fp32.numpy()
             else:
                 numpy_value = torch_value.numpy()
             ctx.mapping[name + " CONSTANT"] = numpy_value.reshape(-1)
-
-            if torch_value.dtype == torch.uint8:
-                weights = trt.Weights(type=trt.DataType.FP4, ptr=numpy_value.ctypes.data, count=numpy_value.size * 2)
-                shape[1] = shape[1] * 2
-                constant = ctx.net.add_constant(
-                    shape,
-                    weights,
-                )
-                constant.name = name
-                return constant.get_output(0)
-            
-            
             constant = ctx.net.add_constant(
                 shape,
                 numpy_value,
