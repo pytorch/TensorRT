@@ -1,7 +1,8 @@
 from typing import Any
+import sys
+import platform
 
 import torch
-from torch_tensorrt._enums import Platform
 
 
 def sanitized_torch_version() -> Any:
@@ -17,9 +18,7 @@ def check_cross_compile_trt_win_lib() -> bool:
     # build engine on linux and run on windows
     import dllist
 
-    platform = Platform.current_platform()
-    platform = str(platform).lower()
-    if platform.startswith("linux"):
+    if sys.platform.startswith("linux"):
         loaded_libs = dllist.dllist()
         target_lib = "libnvinfer_builder_resource_win.so.*"
         if target_lib in loaded_libs:
