@@ -215,7 +215,7 @@ def test_base_fp4(ir):
     class SimpleNetwork(torch.nn.Module):
         def __init__(self):
             super(SimpleNetwork, self).__init__()
-            self.linear1 = torch.nn.Linear(in_features=16, out_features=3)
+            self.linear1 = torch.nn.Linear(in_features=64, out_features=32)
 
         def forward(self, x):
             x = self.linear1(x)
@@ -225,7 +225,7 @@ def test_base_fp4(ir):
         """Simple calibration function for testing."""
         model(input_tensor)
 
-    input_tensor = torch.randn(5, 16).cuda()
+    input_tensor = torch.randn(128, 64).cuda()
     print(f"lan added amax: {input_tensor.abs().amax()}")
     model = SimpleNetwork().eval().cuda()
 
@@ -259,8 +259,10 @@ def test_base_fp4(ir):
             )
 
             outputs_trt = trt_model(input_tensor)
-            print(f"lan added outputs_trt: {outputs_trt}")
-            print(f"lan added output_pyt: {output_pyt}")
+            print(f"lan added torch_tensorrtoutputs_trt: {outputs_trt}")
+            print(f"lan added pytorchoutput_pyt: {output_pyt}")
+            abs_diff = torch.abs(output_pyt - outputs_trt)
+            print(f"lan added max abs_diff: {abs_diff.max().item()}")
             assert torch.allclose(output_pyt, outputs_trt, rtol=4e-1, atol=4e-1)
 
 
