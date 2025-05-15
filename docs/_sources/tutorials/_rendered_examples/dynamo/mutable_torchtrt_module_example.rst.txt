@@ -118,7 +118,7 @@ Saving Mutable Torch TensorRT Module
 Stable Diffusion with Huggingface
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. GENERATED FROM PYTHON SOURCE LINES 75-145
+.. GENERATED FROM PYTHON SOURCE LINES 75-146
 
 .. code-block:: python
 
@@ -156,6 +156,7 @@ Stable Diffusion with Huggingface
                 "text_embeds": {0: BATCH},
                 "time_ids": {0: BATCH},
             },
+            "return_dict": False,
         }
         pipe.unet.set_expected_dynamic_shape_range(
             args_dynamic_shapes, kwargs_dynamic_shapes
@@ -193,7 +194,7 @@ Stable Diffusion with Huggingface
 
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 146-152
+.. GENERATED FROM PYTHON SOURCE LINES 147-153
 
 Use Mutable Torch TensorRT module with dynamic shape
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -202,7 +203,7 @@ and should not omit any entries (except None in the kwarg_inputs). If there is a
 If the dynamic shape is not required for an input, an empty dictionary should be given as the shape hint for that input.
 Note that you should exclude keyword arguments with value None as those will be filtered out.
 
-.. GENERATED FROM PYTHON SOURCE LINES 152-195
+.. GENERATED FROM PYTHON SOURCE LINES 153-196
 
 .. code-block:: python
 
@@ -250,13 +251,13 @@ Note that you should exclude keyword arguments with value None as those will be 
     model(*inputs_2, **kwargs_2)
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 196-199
+.. GENERATED FROM PYTHON SOURCE LINES 197-200
 
 Use Mutable Torch TensorRT module with persistent cache
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Leveraging engine caching, we are able to shortcut the engine compilation and save much time.
 
-.. GENERATED FROM PYTHON SOURCE LINES 199-244
+.. GENERATED FROM PYTHON SOURCE LINES 200-245
 
 .. code-block:: python
 

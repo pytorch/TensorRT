@@ -203,37 +203,20 @@ To build with debug symbols use the following command
 
 A tarball with the include files and library can then be found in ``bazel-bin``
 
-Pre CXX11 ABI Build
-............................
-
-To build using the pre-CXX11 ABI use the ``pre_cxx11_abi`` config
-
-.. code-block:: shell
-
-    bazel build //:libtorchtrt --config pre_cxx11_abi -c [dbg/opt]
-
-A tarball with the include files and library can then be found in ``bazel-bin``
-
-
 .. _abis:
 
 Choosing the Right ABI
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
-Likely the most complicated thing about compiling Torch-TensorRT is selecting the correct ABI. There are two options
-which are incompatible with each other, pre-cxx11-abi and the cxx11-abi. The complexity comes from the fact that while
-the most popular distribution of PyTorch (wheels downloaded from pytorch.org/pypi directly) use the pre-cxx11-abi, most
-other distributions you might encounter (e.g. ones from NVIDIA - NGC containers, and builds for Jetson as well as certain
-libtorch builds and likely if you build PyTorch from source) use the cxx11-abi. It is important you compile Torch-TensorRT
-using the correct ABI to function properly. Below is a table with general pairings of PyTorch distribution sources and the
-recommended commands:
+For the old versions, there were two ABI options to compile Torch-TensorRT which were incompatible with each other, 
+pre-cxx11-abi and cxx11-abi. The complexity came from the different distributions of PyTorch. Fortunately, PyTorch 
+has switched to cxx11-abi for all distributions. Below is a table with general pairings of PyTorch distribution 
+sources and the recommended commands:
 
 +-------------------------------------------------------------+----------------------------------------------------------+--------------------------------------------------------------------+
 | PyTorch Source                                              | Recommended Python Compilation Command                   | Recommended C++ Compilation Command                                |
 +=============================================================+==========================================================+====================================================================+
-| PyTorch whl file from PyTorch.org                           | python -m pip install .                                  | bazel build //:libtorchtrt -c opt \-\-config pre_cxx11_abi         |
-+-------------------------------------------------------------+----------------------------------------------------------+--------------------------------------------------------------------+
-| libtorch-shared-with-deps-*.zip from PyTorch.org            | python -m pip install .                                  | bazel build //:libtorchtrt -c opt \-\-config pre_cxx11_abi         |
+| PyTorch whl file from PyTorch.org                           | python -m pip install .                                  | bazel build //:libtorchtrt -c opt                                  |
 +-------------------------------------------------------------+----------------------------------------------------------+--------------------------------------------------------------------+
 | libtorch-cxx11-abi-shared-with-deps-*.zip from PyTorch.org  | python setup.py bdist_wheel                              | bazel build //:libtorchtrt -c opt                                  |
 +-------------------------------------------------------------+----------------------------------------------------------+--------------------------------------------------------------------+
@@ -339,20 +322,10 @@ To build natively on aarch64-linux-gnu platform, configure the ``WORKSPACE`` wit
     In the case that you installed with ``sudo pip install`` this will be ``/usr/local/lib/python3.8/dist-packages/torch``.
     In the case you installed with ``pip install --user`` this will be ``$HOME/.local/lib/python3.8/site-packages/torch``.
 
-In the case you are using NVIDIA compiled pip packages, set the path for both libtorch sources to the same path. This is because unlike
-PyTorch on x86_64, NVIDIA aarch64 PyTorch uses the CXX11-ABI. If you compiled for source using the pre_cxx11_abi and only would like to
-use that library, set the paths to the same path but when you compile make sure to add the flag ``--config=pre_cxx11_abi``
-
 .. code-block:: shell
 
     new_local_repository(
         name = "libtorch",
-        path = "/usr/local/lib/python3.8/dist-packages/torch",
-        build_file = "third_party/libtorch/BUILD"
-    )
-
-    new_local_repository(
-        name = "libtorch_pre_cxx11_abi",
         path = "/usr/local/lib/python3.8/dist-packages/torch",
         build_file = "third_party/libtorch/BUILD"
     )
@@ -384,7 +357,5 @@ Compile the Python API using the following command from the ``//py`` directory:
 .. code-block:: shell
 
     python3 setup.py install
-
-If you have a build of PyTorch that uses Pre-CXX11 ABI drop the ``--use-pre-cxx11-abi`` flag
 
 If you are building for Jetpack 4.5 add the ``--jetpack-version 5.0`` flag
