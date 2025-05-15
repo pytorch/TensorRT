@@ -817,72 +817,33 @@ class TestLowering(TestCase):
             def __init__(self, *args, **kwargs) -> None:
                 super().__init__(*args, **kwargs)
 
-            def forward(self, x, src, dim, start=None, end=None, step=1):
-                y = torch.ops.aten.slice_scatter(x, src, dim, start, end, step)
+            def forward(self, x, src):
+                y = torch.ops.aten.slice_scatter(x, src, 1, 6, None, 1)
                 return y
 
-        # Operations expected to be removed in the traced graph after decompositions
-        expected_ops = {
-            torch.ops.aten.scatter.src,
-        }
-        unexpected_ops = {torch.ops.aten.select_scatter}
-
-        a = torch.zeros(8, 8).cuda()
-        b = torch.ones(8, 2).cuda()
-
-        # 0-D tensors for dynamic scalar values
-        start = torch.tensor(1, dtype=torch.int64).cuda()
-        end = torch.tensor(6, dtype=torch.int64).cuda()
-        step = torch.tensor(1, dtype=torch.int64).cuda()
-
-        # Mark scalar tensors as dynamic (note: shape = ())
-        torch._dynamo.mark_dynamic(start, (), min=1, max=3)
-        torch._dynamo.mark_dynamic(end, (), min=4, max=6)
-
-        inputs = (a, b, start, end, None, step)
         fx_graph = torch.fx.symbolic_trace(sliceScatter())
-        unexpected_ops_seen, expected_ops_unseen = lower_graph_testing(
-            fx_graph,
-            inputs,
-            expected_ops=expected_ops,
-            unexpected_ops=unexpected_ops,
-            min_block_size=1,
-        )
 
-        self.assertEqual(
-            len(unexpected_ops_seen),
-            0,
-            f"The following unexpected ops were encountered: {unexpected_ops_seen}",
+        dim1 = torch.export.Dim("dim1", min=8, max=10)
+        dynamic_shapes = {
+            "x": [torch.export.Dim.STATIC, dim1],
+            "src": [torch.export.Dim.STATIC, None],
+        }
+        inputs = (torch.zeros(8, 8).cuda(), torch.ones(8, 2).cuda())
+        exported_program = torch.export.export(
+            sliceScatter(), tuple(inputs), dynamic_shapes=dynamic_shapes
         )
-
-        self.assertEqual(
-            len(expected_ops_unseen),
-            0,
-            f"The following expected ops were not encountered: {expected_ops_unseen}",
-        )
-
+        fx_graph = exported_program.module()
+        inputs = [
+            torch_tensorrt.Input(
+                min_shape=[8, 8], opt_shape=[8, 10], max_shape=[8, 10]
+            ),
+            torch_tensorrt.Input(min_shape=[8, 2], opt_shape=[8, 2], max_shape=[8, 2]),
+        ]
         torch._dynamo.reset()
-
-        # Validate that the results between Torch and Torch-TRT are similar
-        optimized_model = torch_tensorrt.compile(
-            fx_graph,
-            "torch_compile",
-            inputs,
-            min_block_size=1,
-            truncate_double=True,
-            pass_through_build_failures=True,
-        )
-        optimized_model_results = optimized_model(*inputs).detach().cpu()
-        torch_model_results = fx_graph(*inputs).detach().cpu()
-
-        max_diff = float(
-            torch.max(torch.abs(optimized_model_results - torch_model_results))
-        )
-        self.assertAlmostEqual(
-            max_diff,
-            0,
-            DECIMALS_OF_AGREEMENT,
-            f"Slice_scatter TRT outputs don't match with the original model.",
+        trt_model = torch_tensorrt.dynamo.compile(exported_program, inputs)
+        inputs = (torch.zeros(8, 8).cuda(), torch.ones(8, 2).cuda())
+        torch.testing.assert_close(
+            trt_model(*inputs), fx_graph(*inputs), rtol=RTOL, atol=ATOL
         )
 
     def test_lowering_select_scatter_dimZero_module(self):

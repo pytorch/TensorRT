@@ -201,29 +201,20 @@ def slice_scatter_decomposition(
     start = get_positive_dim(start, input_tensor.shape[dim])
     if end is None:  # Ensure end is int
         end = dim_size
-    end = get_positive_dim(end, input_tensor.shape[dim])
+    end = (
+        get_positive_dim(end, input_tensor.shape[dim]) if isinstance(end, int) else end
+    )
     if step is None:
         step = 1
 
-    src_dim = src_tensor.shape
     # step == 0 is not a valid torch case
-    # also src_dim should be equal to slice dimension
-
     if start == 0 and end == dim_size and step == 1:
         return src_tensor
 
-    # Ensure start, end, and step are all integers
     # Ensure start, end, and step are all integers
     assert isinstance(start, (int, torch.SymInt)), "start must be an int or SymInt"
     assert isinstance(end, (int, torch.SymInt)), "end must be an int or SymInt"
     assert isinstance(step, (int, torch.SymInt)), "step must be an int or SymInt"
-
-    src_dim = src_tensor.shape
-    # step == 0 is not a valid torch case
-    # also src_dim should be equal to slice dimension
-
-    if start == 0 and end == dim_size and step == 1:
-        return src_tensor
 
     indices = torch.arange(
         start, end, step, device=device_input_tensor, dtype=torch.int64
