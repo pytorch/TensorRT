@@ -44,7 +44,7 @@ def nvfp4_quantize(
         global_scale = _calculate_global_scale(ctx, name, amax)
         if ".weight_quantizer" in name:
             _test_weights_scaling_factor(input_tensor, global_scale)
-            output = _static_double_quantize_solution_2(
+            output = _static_double_quantize(
                 ctx,
                 target,
                 source_ir,
@@ -141,7 +141,10 @@ def _dynamic_double_quantize(
 
 
 # TODO: to remove it this is to make sure our global scale and block scale calculation is correct during debugging
-def _test_weights_scaling_factor(weights_tensor, global_scale):
+def _test_weights_scaling_factor(
+    weights_tensor: torch.Tensor, 
+    global_scale: torch.Tensor
+) -> None:
 
     import modelopt.core.torch.quantization.qtensor.nvfp4_tensor as nvfp4_tensor
     import modelopt.onnx.quantization.quant_utils as quant_utils
@@ -162,14 +165,8 @@ def _test_weights_scaling_factor(weights_tensor, global_scale):
     torch.allclose(block_scale_f32, block_scale)
     block_scale_fp8 = block_scale.to(torch.float8_e4m3fn)
 
-# # solution1: got quantized weights tensor in fp32 torch tensor format(but it cannot be directly used by TensorRT, needs to be packed into uint8 format so that TensorRT can understand it)
-# # reference https://gitlab-master.nvidia.com/omniml/modelopt/-/blob/main/modelopt/onnx/quantization/qdq_utils.py#L952
-#  this is the fp4 quantized weight represented in fp32 format: w_f32 = quantize(w32, block_size, sw_f32_per_block, sw_f32_per_tensor)
-#  this is the cast to fp4 format in onnx: w_f4 = Cast.eval(w_f32, to=onnx.TensorProto.FLOAT4E2M1)
-#  issue: there is no equivalent op in TensorRT API to cast fp32 to fp4
-#  I don't know how to create a fp4 TRTTensor from fp32 torch tensor
-#  tried with ICastLayer but it does not support fp4 cast, 
-def _static_double_quantize_solution_1(
+
+def _static_double_quantize(
     ctx: ConversionContext,
     target: Target,
     source_ir: Optional[SourceIR],
@@ -196,58 +193,27 @@ def _static_double_quantize_solution_1(
 
     import modelopt.core.torch.quantization.qtensor.nvfp4_tensor as nvfp4_tensor
 
-    import modelopt.onnx.quantization.quant_utils as quant_utils
-
-    block_scale_fp32 = nvfp4_tensor.NVFP4QTensor.get_weights_scaling_factor(
-        weights_tensor, 16, global_scale, True
+    block_scale_fp8 = nvfp4_tensor.NVFP4QTensor.get_weights_scaling_factor(
+        weights_tensor, 16, global_scale,
     )[0]
-    block_scale_fp8 = block_scale_fp32.to(torch.float8_e4m3fn)
 
-    global_scale = to_torch(global_scale, None)
-
-
-    # error from 
-    weights_tensor_scaled = quant_utils.quantize(weights_tensor.numpy(), 16, block_scale_fp32.numpy(),global_scale.numpy())
-    weights_tensor_scaled = torch.from_numpy(weights_tensor_scaled)
-    weights_tensor_scaled = get_trt_tensor(ctx, weights_tensor_scaled, name + "_weights_tensor_scaled")
-    # tried with ICastLayer but it does not support it, 
-    weights_fp4 = cast_trt_tensor(ctx, weights_tensor_scaled, trt.DataType.FP4, name + "_cast_weights_tensor_scaled_to_fp4")
-
-    # # solution2: got quantized weights tensor in uint8 torch tensor format which TensorRT can directly understand it
-    # issue2: weights_tensor_scaled is in torch.uint8 format not sure how can this to be converted into float4_e2m1fn_x2
-    # reference: https://gitlab-master.nvidia.com/omniml/modelopt/-/blob/main/modelopt/core/torch/quantization/qtensor/nvfp4_tensor.py#L136
-    # 
     weights_tensor_scaled = nvfp4_tensor.NVFP4QTensor.quantize(
         weights_tensor,
         16,
-        block_scale_fp32,
+        block_scale_fp8,
         global_scale,
     )[0]._quantized_data
-    weights_fp4_represented_in_uint8 = get_trt_tensor(ctx, weights_tensor_scaled, name + "_weights_fp4_represented_in_uint8")
 
-    # # TODO: issue3: torch does not support convert to float4_e2m1fn_x2 directly got RuntimeError: "copy_kernel" not implemented for 'Float4_e2m1fn_x2'
-    # weights_fp4 = weights_tensor_scaled.to(torch.float4_e2m1fn_x2)
-    # weights_fp4 = get_trt_tensor(ctx, weights_fp4, name + "_weights_fp4")
-
-    global_scale = get_trt_tensor(ctx, global_scale, name + "_global_scale")
-    block_scale = get_trt_tensor(ctx, block_scale_fp32, name + "_block_scale")
     block_scale_fp8 = get_trt_tensor(ctx, block_scale_fp8, name + "_block_scale_fp8")
-    # # quantize block scale to fp8
-    # block_scale_quantize_layer = ctx.net.add_quantize(block_scale, global_scale)
-    # set_layer_name(
-    #     block_scale_quantize_layer,
-    #     target,
-    #     name + "_block_scale_quantize",
-    #     source_ir,
-    # )
-    # block_scale_quantize_layer.set_output_type(0, trt.DataType.FP8)
-    # quantized_block_scale_in_fp8 = block_scale_quantize_layer.get_output(0)
+    global_scale = to_torch(global_scale, None)
+    global_scale = get_trt_tensor(ctx, global_scale, name + "_global_scale")
+    weights_fp4_represented_in_uint8 = get_trt_tensor(ctx, weights_tensor_scaled, name + "_weights_fp4_represented_in_uint8")
 
     # dequantize block scale from fp8 to float32
     dequantize_block_scale_layer = ctx.net.add_dequantize(
         block_scale_fp8,
         global_scale,
-        block_scale.dtype,
+        trt.DataType.FLOAT,
     )
     set_layer_name(
         dequantize_block_scale_layer,
@@ -258,7 +224,6 @@ def _static_double_quantize_solution_1(
     dequantized_block_scale = dequantize_block_scale_layer.get_output(0)
 
     # dequantize weights tensor from fp4 to originaldtype(default is float32)
-    breakpoint()
     dequantize_data_layer = ctx.net.add_dequantize(
         weights_fp4_represented_in_uint8,
         dequantized_block_scale,
@@ -267,190 +232,6 @@ def _static_double_quantize_solution_1(
     dequantize_data_layer.precision = trt.DataType.FP4
     set_layer_name(dequantize_data_layer, target, name + "_dequantize_data", source_ir)
     dequantized_data = dequantize_data_layer.get_output(0)
-    return dequantized_data
-
-
-
-def _static_double_quantize_solution_2(
-    ctx: ConversionContext,
-    target: Target,
-    source_ir: Optional[SourceIR],
-    name: str,
-    weights_tensor: torch.Tensor,
-    global_scale: torch.Tensor,
-    axis: int,
-) -> TRTTensor:
-    """
-    Parameters:
-        ctx: ConversionContext,
-        target: Target,
-        source_ir: Optional[SourceIR],
-        name: str,
-        weights_tensor : Tensor (On GPU)
-            The input tensor for weights.
-        global_scale : Tensor (On GPU)
-            The global per-tensor scaling factor. It should contain only 1 element.
-        axis: int
-            The axis to quantize. Default is -1 (the last axis).
-    Returns:
-        quantized data tensor in fp4
-    """
-
-    import modelopt.core.torch.quantization.qtensor.nvfp4_tensor as nvfp4_tensor
-
-    block_scale_fp32 = nvfp4_tensor.NVFP4QTensor.get_weights_scaling_factor(
-        weights_tensor, 16, global_scale, True
-    )[0]
-    block_scale_fp8 = block_scale_fp32.to(torch.float8_e4m3fn)
-    global_scale = to_torch(global_scale, None)
-
-    # # solution2: got quantized weights tensor in uint8 torch tensor format which TensorRT can directly understand it
-    # reference: https://gitlab-master.nvidia.com/omniml/modelopt/-/blob/main/modelopt/core/torch/quantization/qtensor/nvfp4_tensor.py#L136
-    # issue2: fp4 quantized weights tensor represented in a uint8 torch tensor format not sure how can I create a TRTTensor out of it
-    # https://docs.nvidia.com/deeplearning/tensorrt/latest/_static/python-api/infer/Graph/Layers.html#tensorrt.IConstantLayer does not support uint8 input
-    weights_tensor_scaled = nvfp4_tensor.NVFP4QTensor.quantize(
-        weights_tensor,
-        16,
-        block_scale_fp32,
-        global_scale,
-    )[0]._quantized_data
-
-    weights_fp4_represented_in_uint8 = get_trt_tensor(ctx, weights_tensor_scaled, name + "_weights_fp4_represented_in_uint8")
-
-
-    global_scale = get_trt_tensor(ctx, global_scale, name + "_global_scale")
-    block_scale = get_trt_tensor(ctx, block_scale_fp32, name + "_block_scale")
-    block_scale_fp8 = get_trt_tensor(ctx, block_scale_fp8, name + "_block_scale_fp8")
-    # # quantize block scale to fp8
-    # block_scale_quantize_layer = ctx.net.add_quantize(block_scale, global_scale)
-    # set_layer_name(
-    #     block_scale_quantize_layer,
-    #     target,
-    #     name + "_block_scale_quantize",
-    #     source_ir,
-    # )
-    # block_scale_quantize_layer.set_output_type(0, trt.DataType.FP8)
-    # quantized_block_scale_in_fp8 = block_scale_quantize_layer.get_output(0)
-
-    # dequantize block scale from fp8 to float32
-    dequantize_block_scale_layer = ctx.net.add_dequantize(
-        block_scale_fp8,
-        global_scale,
-        block_scale.dtype,
-    )
-    set_layer_name(
-        dequantize_block_scale_layer,
-        target,
-        name + "_dequantize_block_scale",
-        source_ir,
-    )
-    dequantized_block_scale = dequantize_block_scale_layer.get_output(0)
-
-    # dequantize weights tensor from fp4 to originaldtype(default is float32)
-    breakpoint()
-    dequantize_data_layer = ctx.net.add_dequantize(
-        weights_fp4_represented_in_uint8,
-        dequantized_block_scale,
-        trt.DataType.FLOAT,
-    )
-    dequantize_data_layer.precision = trt.DataType.FP4
-    set_layer_name(dequantize_data_layer, target, name + "_dequantize_data", source_ir)
-    dequantized_data = dequantize_data_layer.get_output(0)
-    return dequantized_data
-
-
-def _static_double_quantize_without_constant_folding(
-    ctx: ConversionContext,
-    target: Target,
-    source_ir: Optional[SourceIR],
-    name: str,
-    weights_tensor: torch.Tensor,
-    global_scale: torch.Tensor,
-    axis: int,
-) -> TRTTensor:
-    """
-    Parameters:
-        ctx: ConversionContext,
-        target: Target,
-        source_ir: Optional[SourceIR],
-        name: str,
-        weights_tensor : Tensor (On GPU)
-            The input tensor for weights.
-        global_scale : Tensor (On GPU)
-            The global per-tensor scaling factor. It should contain only 1 element.
-        axis: int
-            The axis to quantize. Default is -1 (the last axis).
-    Returns:
-        quantized data tensor in fp4
-    """
-
-    import modelopt.core.torch.quantization.qtensor.nvfp4_tensor as nvfp4_tensor
-
-    # import modelopt.onnx.quantization.quant_utils as quant_utils
-
-    block_scale = nvfp4_tensor.NVFP4QTensor.get_weights_scaling_factor(
-        weights_tensor, 16, global_scale, True
-    )[0]
-    global_scale = to_torch(global_scale, None)
-
-    # block_scale_fp8 = block_scale.to(torch.float8_e4m3fn)
-    # block_scale_fp8 = get_trt_tensor(ctx, block_scale_fp8, name + "_block_scale_fp8")
-
-    global_scale = get_trt_tensor(ctx, global_scale, name + "_global_scale")
-    block_scale = get_trt_tensor(ctx, block_scale, name + "_block_scale")
-    weights_tensor = get_trt_tensor(ctx, weights_tensor, name + "_weights_tensor")
-
-    # quantize block scale to fp8
-    block_scale_quantize_layer = ctx.net.add_quantize(block_scale, global_scale)
-    set_layer_name(
-        block_scale_quantize_layer,
-        target,
-        name + "_block_scale_quantize_to_fp8",
-        source_ir,
-    )
-    block_scale_quantize_layer.set_output_type(0, trt.DataType.FP8)
-    block_scale_fp8 = block_scale_quantize_layer.get_output(0)
-
-    # dequantize block scale from fp8 to float32
-    dequantize_block_scale_layer = ctx.net.add_dequantize(
-        block_scale_fp8,
-        global_scale,
-        block_scale.dtype,
-    )
-    set_layer_name(
-        dequantize_block_scale_layer,
-        target,
-        name + "_dequantize_block_scale_from_fp8",
-        source_ir,
-    )
-    dequantized_block_scale = dequantize_block_scale_layer.get_output(0)
-
-    # quantize weights tensor to fp4
-    quantize_weights_layer = ctx.net.add_quantize(
-        weights_tensor, dequantized_block_scale
-    )
-    set_layer_name(
-        quantize_weights_layer,
-        target,
-        name + "_quantize_weights_to_fp4",
-        source_ir,
-    )
-    quantize_weights_layer.set_output_type(0, trt.DataType.FP4)
-    weights_fp4 = quantize_weights_layer.get_output(0)
-
-    # dequantize weights tensor from fp4 to originaldtype(default is float32)
-    dequantize_weights_layer = ctx.net.add_dequantize(
-        weights_fp4,
-        dequantized_block_scale,
-        trt.DataType.FLOAT,
-    )
-    set_layer_name(
-        dequantize_weights_layer,
-        target,
-        name + "_dequantize_weights_from_fp4",
-        source_ir,
-    )
-    dequantized_data = dequantize_weights_layer.get_output(0)
     return dequantized_data
 
 
@@ -470,30 +251,3 @@ def _calculate_global_scale(
         global_scale = 1.0
     return global_scale
 
-
-def _calculate_block_scale(
-    ctx: ConversionContext,
-    name: str,
-    weights_tensor: TRTTensor,
-    block_size: int,
-) -> TRTTensor:
-    amax = weights_tensor.abs().amax().float()
-    # reference: https://gitlab-master.nvidia.com/omniml/modelopt/-/blob/main/modelopt/onnx/quantization/quant_utils.py#L122
-    weights_scaling_factor_2 = amax / 6 / 448
-    if weights_scaling_factor_2 == 0:
-        weights_scaling_factor_2 = 1.0
-
-    # reference: https://gitlab-master.nvidia.com/omniml/modelopt/-/blob/main/modelopt/onnx/quantization/quant_utils.py#L131
-    [n, k] = weights_tensor.shape[-2:]
-    assert block_size != 0, "block_size must be non-zero"
-    assert k % block_size == 0, "k must be a multiple of block_size"
-    reshaped_input_tensor = weights_tensor.reshape(
-        tuple(weights_tensor.shape[:-2]) + (n, k // block_size, block_size)
-    )
-
-    per_block_amax = reshaped_input_tensor.abs().amax(dim=-1).float()
-    per_block_scale = torch.divide(per_block_amax, 6)
-    q_per_block_scale = torch.divide(per_block_scale, weights_scaling_factor_2)
-    # TODO:set all zero values in scale to 1.0
-    # block_scale = get_trt_tensor(ctx, q_per_block_scale, name + "_block_scale")
-    return q_per_block_scale
