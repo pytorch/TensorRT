@@ -223,7 +223,7 @@ def slice_scatter_decomposition(
         [-1 if i == dim else 1 for i in range(input_tensor.dim())]
     )
     index_tensor = index_tensor.expand_as(src_tensor)
-    return torch.scatter(input_tensor.clone(), dim, index_tensor, src_tensor)
+    return torch.scatter(input_tensor, dim, index_tensor, src_tensor)
 
 
 @register_torch_trt_decomposition(
