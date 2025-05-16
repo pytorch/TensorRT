@@ -259,8 +259,8 @@ def test_base_fp4(ir):
             )
 
             outputs_trt = trt_model(input_tensor)
-            print(f"lan added torch_tensorrtoutputs_trt: {outputs_trt}")
-            print(f"lan added pytorchoutput_pyt: {output_pyt}")
+            print(f"lan added torch_tensorrt outputs_trt: {outputs_trt}")
+            print(f"lan added pytorch output_pyt: {output_pyt}")
             abs_diff = torch.abs(output_pyt - outputs_trt)
             print(f"lan added max abs_diff: {abs_diff.max().item()}")
             assert torch.allclose(output_pyt, outputs_trt, rtol=4e-1, atol=4e-1)

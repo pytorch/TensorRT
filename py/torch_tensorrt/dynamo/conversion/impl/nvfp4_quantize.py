@@ -8,6 +8,7 @@ from torch.fx.node import Target
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
 from torch_tensorrt.dynamo.conversion.converter_utils import (
+    cast_trt_tensor,
     get_trt_tensor,
     to_torch,
 )
@@ -43,7 +44,8 @@ def nvfp4_quantize(
         axis = len(input_tensor.shape) - 1
         global_scale = _calculate_global_scale(ctx, name, amax)
         if ".weight_quantizer" in name:
-            _test_weights_scaling_factor(input_tensor, global_scale)
+            # _test_weights_scaling_factor(input_tensor, global_scale)
+            input_tensor = input_tensor.to(torch.float16)
             output = _static_double_quantize(
                 ctx,
                 target,
@@ -54,6 +56,9 @@ def nvfp4_quantize(
                 axis,
             )
         elif ".input_quantizer" in name:
+            input_tensor = cast_trt_tensor(
+                ctx, input_tensor, trt.float16, name + "_input_tensor_f16"
+            )
             # quantize input tensor to fp4, output should be data tensor in fp4 and block scale tensor in fp8
             output = _dynamic_double_quantize(
                 ctx,
@@ -85,7 +90,7 @@ def _dynamic_double_quantize(
     scale_type: trt.DataType = trt.DataType.FP8,
 ) -> TRTTensor:
     """
-    quantize input tensor to fp4, output should be data tensor in fp4 and block scale tensor in fp8
+    quantize input tensor to fp4
     Parameters:
         ctx: ConversionContext,
         target: Target,
@@ -125,6 +130,7 @@ def _dynamic_double_quantize(
     dequantize_scale_layer = ctx.net.add_dequantize(
         quantized_scale_in_fp8, global_scale, input_tensor.dtype
     )
+    dequantize_scale_layer.axis = axis
     set_layer_name(
         dequantize_scale_layer, target, name + "_dequantize_scale", source_ir
     )
@@ -142,8 +148,7 @@ def _dynamic_double_quantize(
 
 # TODO: to remove it this is to make sure our global scale and block scale calculation is correct during debugging
 def _test_weights_scaling_factor(
-    weights_tensor: torch.Tensor, 
-    global_scale: torch.Tensor
+    weights_tensor: torch.Tensor, global_scale: torch.Tensor
 ) -> None:
 
     import modelopt.core.torch.quantization.qtensor.nvfp4_tensor as nvfp4_tensor
@@ -194,10 +199,12 @@ def _static_double_quantize(
     import modelopt.core.torch.quantization.qtensor.nvfp4_tensor as nvfp4_tensor
 
     block_scale_fp8 = nvfp4_tensor.NVFP4QTensor.get_weights_scaling_factor(
-        weights_tensor, 16, global_scale,
+        weights_tensor,
+        16,
+        global_scale,
     )[0]
 
-    weights_tensor_scaled = nvfp4_tensor.NVFP4QTensor.quantize(
+    weights_tensor_fp4 = nvfp4_tensor.NVFP4QTensor.quantize(
         weights_tensor,
         16,
         block_scale_fp8,
@@ -207,7 +214,7 @@ def _static_double_quantize(
     block_scale_fp8 = get_trt_tensor(ctx, block_scale_fp8, name + "_block_scale_fp8")
     global_scale = to_torch(global_scale, None)
     global_scale = get_trt_tensor(ctx, global_scale, name + "_global_scale")
-    weights_fp4_represented_in_uint8 = get_trt_tensor(ctx, weights_tensor_scaled, name + "_weights_fp4_represented_in_uint8")
+    weights_tensor_fp4 = get_trt_tensor(ctx, weights_tensor_fp4, name + "_weights_fp4")
 
     # dequantize block scale from fp8 to float32
     dequantize_block_scale_layer = ctx.net.add_dequantize(
@@ -215,6 +222,8 @@ def _static_double_quantize(
         global_scale,
         trt.DataType.FLOAT,
     )
+    dequantize_block_scale_layer.axis = axis
+    dequantize_block_scale_layer.precision = trt.DataType.FP8
     set_layer_name(
         dequantize_block_scale_layer,
         target,
@@ -225,10 +234,11 @@ def _static_double_quantize(
 
     # dequantize weights tensor from fp4 to originaldtype(default is float32)
     dequantize_data_layer = ctx.net.add_dequantize(
-        weights_fp4_represented_in_uint8,
+        weights_tensor_fp4,
         dequantized_block_scale,
-        trt.DataType.FLOAT,
+        trt.DataType.HALF,
     )
+    dequantize_data_layer.axis = axis
     dequantize_data_layer.precision = trt.DataType.FP4
     set_layer_name(dequantize_data_layer, target, name + "_dequantize_data", source_ir)
     dequantized_data = dequantize_data_layer.get_output(0)
@@ -250,4 +260,3 @@ def _calculate_global_scale(
     if global_scale == 0:
         global_scale = 1.0
     return global_scale
-
