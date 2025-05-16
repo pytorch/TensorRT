@@ -45,7 +45,6 @@ def nvfp4_quantize(
         global_scale = _calculate_global_scale(ctx, name, amax)
         if ".weight_quantizer" in name:
             # _test_weights_scaling_factor(input_tensor, global_scale)
-            input_tensor = input_tensor.to(torch.float16)
             output = _static_double_quantize(
                 ctx,
                 target,
@@ -56,9 +55,6 @@ def nvfp4_quantize(
                 axis,
             )
         elif ".input_quantizer" in name:
-            input_tensor = cast_trt_tensor(
-                ctx, input_tensor, trt.float16, name + "_input_tensor_f16"
-            )
             # quantize input tensor to fp4, output should be data tensor in fp4 and block scale tensor in fp8
             output = _dynamic_double_quantize(
                 ctx,
@@ -111,6 +107,9 @@ def _dynamic_double_quantize(
 
     """
     global_scale = get_trt_tensor(ctx, global_scale, name + "_global_scale")
+
+    if input_tensor.dtype not in [trt.DataType.HALF, trt.DataType.FLOAT]:
+        raise ValueError(f"Currently try float16, float32 only on input tensor for now. Unsupported dtype: {input_tensor.dtype}")
     # dynamic quantize input tensor to fp4
     dynamic_quantize_layer = ctx.net.add_dynamic_quantize(
         input_tensor,
@@ -197,6 +196,13 @@ def _static_double_quantize(
     """
 
     import modelopt.core.torch.quantization.qtensor.nvfp4_tensor as nvfp4_tensor
+    
+    if weights_tensor.dtype == torch.float16:
+        original_dtype = trt.DataType.HALF
+    elif weights_tensor.dtype == torch.float32:
+        original_dtype = trt.DataType.FLOAT
+    else:
+        raise ValueError(f"Currently try float16, float32 only on weights tensor. Unsupported dtype: {weights_tensor.dtype}")
 
     block_scale_fp8 = nvfp4_tensor.NVFP4QTensor.get_weights_scaling_factor(
         weights_tensor,
@@ -220,7 +226,7 @@ def _static_double_quantize(
     dequantize_block_scale_layer = ctx.net.add_dequantize(
         block_scale_fp8,
         global_scale,
-        trt.DataType.FLOAT,
+        original_dtype,
     )
     dequantize_block_scale_layer.axis = axis
     dequantize_block_scale_layer.precision = trt.DataType.FP8
@@ -236,7 +242,7 @@ def _static_double_quantize(
     dequantize_data_layer = ctx.net.add_dequantize(
         weights_tensor_fp4,
         dequantized_block_scale,
-        trt.DataType.HALF,
+        original_dtype,
     )
     dequantize_data_layer.axis = axis
     dequantize_data_layer.precision = trt.DataType.FP4
