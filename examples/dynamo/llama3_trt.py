@@ -17,7 +17,7 @@ import timeit
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 import torch
 import torch_tensorrt
-from transformers import AutoModelForCausalLM, AutoTokenizer, StoppingCriteriaList
+from transformers import AutoModelForCausalLM, AutoTokenizer
 from contextlib import nullcontext
 from utils import export_llm, generate, recordStats, time_generate, generate_with_kv_cache
 
@@ -26,13 +26,13 @@ DEVICE = torch.device("cuda:0")
 
 def get_model(args):
     with torch.no_grad():
-        if args.model == "meta-llama/Llama-2-7b-hf":
+        if args.model == "meta-llama/Llama-2-7b-chat-hf":
             model = (
                 AutoModelForCausalLM.from_pretrained(
                     args.model,
                     use_cache=False,
                     attn_implementation="sdpa",
-                    # num_hidden_layers=1
+                    num_hidden_layers=1
                 )
                 .eval()
                 .cuda()
@@ -271,12 +271,12 @@ if __name__ == "__main__":
             # This import is required to register static/dynamic KV cache transformations as lowering passes
             import torch_tensorrt.extensions
 
-        trt_model = compile_torchtrt(model, input_ids, args)
         pyt_logits = model.cuda()(input_ids.clone())
+        trt_model = compile_torchtrt(model, input_ids, args) 
         trt_logits = trt_model(input_ids.clone())
         print(f"Diff between pyt and trt: {torch.mean(torch.abs(pyt_logits - trt_logits))}")
         # print(f"Diff between pyt and trt logits: {torch.mean(torch.abs(pyt_logits.logits - trt_logits.logits))}")
-        # breakpoint()
+        breakpoint()
         if args.kv_cache:
             trt_input_signature = (input_ids.clone(),) + get_zeroed_kv_cache_inputs(trt_model)
             if args.cudagraph:
