@@ -152,69 +152,6 @@ compare_outputs()
 # ----------------------------------------------------------------------------
 # 7) Generation-capable wrappers & comparison
 # ----------------------------------------------------------------------------
-
-class EagleGenWrapper(nn.Module, GenerationMixin):
-    """Wraps the original HF language model to expose GenerationMixin while keeping the
-    interface identical to the base model. This is essentially a thin pass-through
-    that only adds a few attributes that GenerationMixin expects (config,
-    generation_config, etc.)."""
-
-    def __init__(self, lm_module: nn.Module):
-        super().__init__()
-        self.lm = lm_module
-        # Attributes expected by GenerationMixin
-        self.config = lm_module.config
-        self.main_input_name = lm_module.main_input_name
-        self.generation_config = getattr(lm_module, "generation_config", None)
-        # Expose device attribute expected by GenerationMixin
-        self.device = next(lm_module.parameters()).device
-        # Keep embedding layers so that GenerationMixin utility methods work.
-        self._input_embeddings = lm_module.get_input_embeddings()
-        self._output_embeddings = lm_module.get_output_embeddings()
-        # Some helper functions that GenerationMixin tries to call if they exist.
-        if hasattr(lm_module, "_apply_logits_warper"):
-            self._apply_logits_warper = lm_module._apply_logits_warper
-        if hasattr(lm_module, "_prepare_attention_mask_for_generation"):
-            self._prepare_attention_mask_for_generation = (
-                lm_module._prepare_attention_mask_for_generation
-            )
-
-    # ----- Interfaces required by GenerationMixin -----
-    def get_input_embeddings(self):
-        return self._input_embeddings
-
-    def get_output_embeddings(self):
-        return self._output_embeddings
-
-    def prepare_inputs_for_generation(self, *args, **kwargs):
-        # Defer to underlying model implementation so we keep identical behaviour.
-        return self.lm.prepare_inputs_for_generation(*args, **kwargs)
-
-    def forward(
-        self,
-        input_ids=None,
-        inputs_embeds=None,
-        attention_mask=None,
-        position_ids=None,
-        past_key_values=None,
-        use_cache=False,
-        **kwargs,
-    ):
-        # Convert mask dtype if necessary (HF generation often produces int64 masks)
-        if attention_mask is not None: #  and attention_mask.dtype not in (torch.bool, torch.float16, torch.float32):
-            attention_mask = attention_mask.to(torch.bool)
-
-        return self.lm(
-            input_ids=input_ids,
-            inputs_embeds=inputs_embeds,
-            attention_mask=attention_mask,
-            position_ids=position_ids,
-            past_key_values=past_key_values,
-            use_cache=use_cache,
-            **kwargs,
-        )
-
-
 class EagleTRTGenWrapper(nn.Module, GenerationMixin):
     """Wraps the TensorRT-compiled module so it can be used with .generate(). The
     compiled module (``trt_wrapper``) only understands (inputs_embeds,
@@ -328,16 +265,4 @@ def compare_generation_outputs(prompt: str = "Hello", max_new_tokens: int = 32):
 
 # Execute comparison when running as script
 if __name__ == "__main__":
-
-    # from transformers import AutoTokenizer
-
-    # prompt = "Hey, are you conscious? Can you talk to me?"
-    # inputs = tokenizer(prompt, return_tensors="pt").to(device)
-
-    # # Generate
-    # generate_ids = model.language_model.generate(inputs.input_ids, max_length=30)
-    # tokenizer.batch_decode(generate_ids, skip_special_tokens=True, clean_up_tokenization_spaces=False)[0]
-    
-    # "Hey, are you conscious? Can you talk to me?\nI'm not conscious, but I can talk to you."
-
     compare_generation_outputs(prompt="What is your name?", max_new_tokens=32)
