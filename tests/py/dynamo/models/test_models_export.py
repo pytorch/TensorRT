@@ -260,6 +260,7 @@ def test_base_fp4(ir):
                 debug=True,
                 cache_built_engines=False,
                 reuse_cached_engines=False,
+                use_explicit_typing=True,
             )
 
             outputs_trt = trt_model(input_tensor)

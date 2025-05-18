@@ -133,7 +133,8 @@ def _dynamic_double_quantize(
         quantized_scale_in_fp8, global_scale, input_tensor.dtype
     )
     dequantize_scale_layer.axis = axis
-    dequantize_scale_layer.set_output_type(0, input_tensor.dtype)
+    dequantize_scale_layer.to_type = input_tensor.dtype
+    # dequantize_scale_layer.set_output_type(0, input_tensor.dtype)
     set_layer_name(
         dequantize_scale_layer, target, name + "_dequantize_scale", source_ir
     )
@@ -144,7 +145,7 @@ def _dynamic_double_quantize(
         quantized_data_in_fp4, dequantized_scale, input_tensor.dtype
     )
     dequantize_data_layer.axis = axis
-    dequantize_scale_layer.set_output_type(0, input_tensor.dtype)
+    dequantize_data_layer.to_type = input_tensor.dtype
     set_layer_name(dequantize_data_layer, target, name + "_dequantize_data", source_ir)
     dequantized_data = dequantize_data_layer.get_output(0)
     return dequantized_data
@@ -235,8 +236,8 @@ def _static_double_quantize(
         original_dtype,
     )
     dequantize_block_scale_layer.axis = axis
-    dequantize_block_scale_layer.precision = trt.DataType.FP8
-    dequantize_block_scale_layer.set_output_type(0, original_dtype)
+    # dequantize_block_scale_layer.precision = trt.DataType.FP8
+    dequantize_block_scale_layer.to_type = original_dtype
     set_layer_name(
         dequantize_block_scale_layer,
         target,
@@ -244,7 +245,7 @@ def _static_double_quantize(
         source_ir,
     )
     print(
-        f"lan added dequantize_block_scale_layer: {dequantize_block_scale_layer.axis=} {dequantize_block_scale_layer.precision=} {dequantize_block_scale_layer.get_output_type(0)=}"
+        f"lan added dequantize_block_scale_layer: {dequantize_block_scale_layer.to_type=} {dequantize_block_scale_layer.axis=} {dequantize_block_scale_layer.precision=} {dequantize_block_scale_layer.get_output_type(0)=}"
     )
     dequantized_block_scale = dequantize_block_scale_layer.get_output(0)
 
@@ -255,11 +256,11 @@ def _static_double_quantize(
         original_dtype,
     )
     dequantize_data_layer.axis = axis
-    dequantize_data_layer.precision = trt.DataType.FP4
-    dequantize_data_layer.set_output_type(0, original_dtype)
+    # dequantize_data_layer.precision = trt.DataType.FP4
+    dequantize_data_layer.to_type = original_dtype
     set_layer_name(dequantize_data_layer, target, name + "_dequantize_data", source_ir)
     print(
-        f"lan added dequantize_data_layer: {dequantize_data_layer.axis=} {dequantize_data_layer.precision=} {dequantize_data_layer.get_output_type(0)=}"
+        f"lan added dequantize_data_layer: {dequantize_data_layer.to_type=} {dequantize_data_layer.axis=} {dequantize_data_layer.precision=} {dequantize_data_layer.get_output_type(0)=}"
     )
     dequantized_data = dequantize_data_layer.get_output(0)
     return dequantized_data
