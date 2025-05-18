@@ -231,11 +231,13 @@ def test_base_fp4(ir):
 
     print(f"lan added amax: {input_tensor.abs().amax()}")
     model = SimpleNetwork().eval().cuda()
+    output_pyt = model(input_tensor)
+    print(f"lan added pytorch output_pyt: {output_pyt}")
 
     quant_cfg = mtq.NVFP4_DEFAULT_CFG
     mtq.quantize(model, quant_cfg, forward_loop=calibrate_loop)
     # model has qdq nodes at this point
-    output_pyt = model(input_tensor)
+    
     torch.onnx.export(model, input_tensor, "mtq_model.onnx")
 
     with torch.no_grad():
@@ -265,7 +267,6 @@ def test_base_fp4(ir):
 
             outputs_trt = trt_model(input_tensor)
             print(f"lan added torch_tensorrt outputs_trt: {outputs_trt}")
-            print(f"lan added pytorch output_pyt: {output_pyt}")
             abs_diff = torch.abs(output_pyt - outputs_trt)
             print(f"lan added max abs_diff: {abs_diff.max().item()}")
             assert torch.allclose(output_pyt, outputs_trt, rtol=4e-1, atol=4e-1)
