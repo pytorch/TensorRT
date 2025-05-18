@@ -72,9 +72,9 @@ http_archive(
 http_archive(
     name = "tensorrt",
     build_file = "@//third_party/tensorrt/archive:BUILD",
-    strip_prefix = "TensorRT-10.9.0.34",
+    strip_prefix = "TensorRT-10.10.0.31",
     urls = [
-        "https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.9.0/tars/TensorRT-10.9.0.34.Linux.x86_64-gnu.cuda-12.8.tar.gz",
+        "https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.10.0/tars/TensorRT-10.10.0.31.Linux.x86_64-gnu.cuda-12.9.tar.gz",
     ],
 )
 

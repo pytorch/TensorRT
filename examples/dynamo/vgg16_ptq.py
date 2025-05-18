@@ -169,7 +169,6 @@ training_dataloader = torch.utils.data.DataLoader(
 
 data = iter(training_dataloader)
 images, _ = next(data)
-
 crit = nn.CrossEntropyLoss()
 
 # %%
@@ -244,7 +243,12 @@ with torch.no_grad():
         elif args.quantize_type == "fp8":
             enabled_precisions = {torch.float8_e4m3fn}
         elif args.quantize_type == "fp4":
-            enabled_precisions = {torch.float4_e2m1fn_x2}
+            enabled_precisions = {
+                torch.float4_e2m1fn_x2,
+                torch.float8_e4m3fn,
+                torch.float16,
+                torch.float32,
+            }
         trt_model = torchtrt.dynamo.compile(
             exp_program,
             inputs=[input_tensor],

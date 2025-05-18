@@ -215,7 +215,9 @@ def test_base_fp4(ir):
     class SimpleNetwork(torch.nn.Module):
         def __init__(self):
             super(SimpleNetwork, self).__init__()
-            self.linear1 = torch.nn.Linear(in_features=64, out_features=32, bias=False, dtype=torch.float16)
+            self.linear1 = torch.nn.Linear(
+                in_features=64, out_features=32, bias=True, dtype=torch.float16
+            )
 
         def forward(self, x):
             x = self.linear1(x)
@@ -226,7 +228,7 @@ def test_base_fp4(ir):
         model(input_tensor)
 
     input_tensor = torch.randn(128, 64, dtype=torch.float16).cuda()
-    breakpoint()
+
     print(f"lan added amax: {input_tensor.abs().amax()}")
     model = SimpleNetwork().eval().cuda()
 
