@@ -227,12 +227,17 @@ def test_base_fp4(ir):
         """Simple calibration function for testing."""
         model(input_tensor)
 
-    input_tensor = torch.randn(128, 64, dtype=torch.float16).cuda()
+    input_tensor = torch.ones(128, 64, dtype=torch.float16).cuda()
 
     print(f"lan added amax: {input_tensor.abs().amax()}")
     model = SimpleNetwork().eval().cuda()
+    model.linear1.weight = torch.nn.Parameter(torch.ones(32, 64, dtype=torch.float16).cuda())
+    model.linear1.bias = torch.nn.Parameter(torch.zeros(128, 32, dtype=torch.float16).cuda())
     output_pyt = model(input_tensor)
-    print(f"lan added pytorch output_pyt: {output_pyt}")
+    print(f"lan added model input: {input_tensor=}")    
+    print(f"lan added model weight: {model.linear1.weight=}")
+    print(f"lan added model bias: {model.linear1.bias=}")
+    print(f"lan added pytorch output_pyt: {output_pyt} {output_pyt.dtype=} {output_pyt.shape=}")
 
     quant_cfg = mtq.NVFP4_DEFAULT_CFG
     mtq.quantize(model, quant_cfg, forward_loop=calibrate_loop)

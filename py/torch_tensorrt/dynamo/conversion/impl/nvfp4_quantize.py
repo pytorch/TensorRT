@@ -211,20 +211,20 @@ def _static_double_quantize(
         raise ValueError(
             f"Currently try float16, float32 only on weights tensor. Unsupported dtype: {weights_tensor.dtype}"
         )
-
     block_scale_fp8 = nvfp4_tensor.NVFP4QTensor.get_weights_scaling_factor(
         weights_tensor,
         16,
         global_scale,
     )[0]
-
+    print(f"lan added global_scale: {global_scale.shape=} {global_scale.dtype=} {global_scale=}")
+    print(f"lan added block_scale_fp8: {block_scale_fp8.shape=} {block_scale_fp8.dtype=} {block_scale_fp8=}")
     weights_tensor_fp4 = nvfp4_tensor.NVFP4QTensor.quantize(
         weights_tensor,
         16,
         block_scale_fp8,
         global_scale,
     )[0]._quantized_data
-
+    print(f"lan added weights_tensor_fp4: {weights_tensor_fp4.shape=} {weights_tensor_fp4.dtype=} {weights_tensor_fp4=}")
     block_scale_fp8 = get_trt_tensor(ctx, block_scale_fp8, name + "_block_scale_fp8")
     global_scale = to_torch(global_scale, None)
     global_scale = get_trt_tensor(ctx, global_scale, name + "_global_scale")
