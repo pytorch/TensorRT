@@ -12,7 +12,6 @@ if [[ $(uname -m) == "aarch64" ]]; then
   if [[ ${os_name} == "ubuntu" ]]; then
       IS_JETPACK=true
       apt-get update
-      # curl libopenblas-dev is not by default in the
       apt-get install -y ninja-build gettext curl libopenblas-dev
   else
       IS_SBSA=true
@@ -66,6 +65,11 @@ if [[ ${IS_JETPACK} == true ]]; then
     export TENSORRT_URLS=https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.3.0/tars/TensorRT-10.3.0.26.l4t.aarch64-gnu.cuda-12.6.tar.gz
     # change the torch dependency for jp6.2
     sed -i -e "s/torch>=2.8.0.dev,<2.9.0/torch>=2.7.0,<2.8.0/g" pyproject.toml
+    # change the tensorrt dependency for jp6.2
+    sed -i -e "s/tensorrt>=10.9.0,<10.10.0/tensorrt>=10.3.0,<10.4.0/g" pyproject.toml
+    sed -i -e "s/\"tensorrt-cu12>=10.9.0,<10.10.0\",//g" pyproject.toml
+    sed -i -e "s/\"tensorrt-cu12-bindings>=10.9.0,<10.10.0\",//g" pyproject.toml
+    sed -i -e "s/\"tensorrt-cu12-libs>=10.9.0,<10.10.0\",//g" pyproject.toml
 elif [[ ${IS_SBSA} == true ]]; then
     export TENSORRT_NAME=tensorrt_sbsa
     export TENSORRT_STRIP_PREFIX=TensorRT-10.9.0.34
@@ -74,17 +78,16 @@ else
     export TENSORRT_NAME=tensorrt
     export TENSORRT_STRIP_PREFIX=TensorRT-10.9.0.34
     export TENSORRT_URLS=https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.9.0/tars/TensorRT-10.9.0.34.Linux.x86_64-gnu.cuda-12.8.tar.gz
-fi
-
-if [[ ${TENSORRT_VERSION} != "" ]]; then
-    # Replace dependencies in the original pyproject.toml with the current TensorRT version. It is used for CI tests of different TensorRT versions.
-    # For example, if the current testing TensorRT version is 10.7.0, but the pyproject.toml tensorrt>=10.8.0,<10.9.0, then the following sed command
-    # will replace tensorrt>=10.8.0,<10.9.0 with tensorrt==10.7.0
-    sed -i -e "s/tensorrt>=.*,<.*\"/tensorrt>=${TENSORRT_VERSION},<$(echo "${TENSORRT_VERSION}" | awk -F. '{print $1"."$2+1".0"}')\"/g" \
-          -e "s/tensorrt-cu12>=.*,<.*\"/tensorrt-cu12>=${TENSORRT_VERSION},<$(echo "${TENSORRT_VERSION}" | awk -F. '{print $1"."$2+1".0"}')\"/g" \
-          -e "s/tensorrt-cu12-bindings>=.*,<.*\"/tensorrt-cu12-bindings>=${TENSORRT_VERSION},<$(echo "${TENSORRT_VERSION}" | awk -F. '{print $1"."$2+1".0"}')\"/g" \
-          -e "s/tensorrt-cu12-libs>=.*,<.*\"/tensorrt-cu12-libs>=${TENSORRT_VERSION},<$(echo "${TENSORRT_VERSION}" | awk -F. '{print $1"."$2+1".0"}')\"/g" \
-          pyproject.toml
+    if [[ ${TENSORRT_VERSION} != "" ]]; then
+        # Replace dependencies in the original pyproject.toml with the current TensorRT version. It is used for CI tests of different TensorRT versions.
+        # For example, if the current testing TensorRT version is 10.7.0, but the pyproject.toml tensorrt>=10.8.0,<10.9.0, then the following sed command
+        # will replace tensorrt>=10.8.0,<10.9.0 with tensorrt==10.7.0
+        sed -i -e "s/tensorrt>=.*,<.*\"/tensorrt>=${TENSORRT_VERSION},<$(echo "${TENSORRT_VERSION}" | awk -F. '{print $1"."$2+1".0"}')\"/g" \
+            -e "s/tensorrt-cu12>=.*,<.*\"/tensorrt-cu12>=${TENSORRT_VERSION},<$(echo "${TENSORRT_VERSION}" | awk -F. '{print $1"."$2+1".0"}')\"/g" \
+            -e "s/tensorrt-cu12-bindings>=.*,<.*\"/tensorrt-cu12-bindings>=${TENSORRT_VERSION},<$(echo "${TENSORRT_VERSION}" | awk -F. '{print $1"."$2+1".0"}')\"/g" \
+            -e "s/tensorrt-cu12-libs>=.*,<.*\"/tensorrt-cu12-libs>=${TENSORRT_VERSION},<$(echo "${TENSORRT_VERSION}" | awk -F. '{print $1"."$2+1".0"}')\"/g" \
+            pyproject.toml
+    fi
 fi
 
 if [[ "${CU_VERSION::4}" < "cu12" ]]; then
