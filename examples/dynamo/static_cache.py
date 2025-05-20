@@ -53,7 +53,7 @@ def add_kv_as_outputs(gm, kv_cache_for_graph: List[Tuple[torch.Tensor, torch.Ten
 
 def add_kv_cache_inputs(gm, fixed_kv: bool = True):
     """
-    Add key-value tensors, index parameters and is_causal as inputs to the graph.
+    Add key-value tensors, index parameters as inputs to the graph.
     
     Args:
         gm: The GraphModule to modify
@@ -64,7 +64,6 @@ def add_kv_cache_inputs(gm, fixed_kv: bool = True):
         - List of (k_input, v_input) node pairs for each SDPA operation
         - start_idx input node for slicing operations
         - end_idx input node for slicing operations
-        - is_causal input node
     """
 
     def get_static_tensor(tensor: torch.Tensor):
@@ -98,21 +97,23 @@ def add_kv_cache_inputs(gm, fixed_kv: bool = True):
     start_idx_input = add_graph_input(gm, "start_idx", torch.tensor(0))
     end_idx_input = add_graph_input(gm, "end_idx", torch.tensor(1))
 
-    # Get input_ids metadata from the graph. The first placeholder node in the graph is the input_ids node
-    # find the first placeholder node, then pull out meta["val"]
-    placeholder_node = next(node for node in gm.graph.nodes if node.op == "placeholder")
-    input_ids_meta = placeholder_node.meta["val"]
-    seq_len = input_ids_meta.shape[1]
+    # Get the max sequence length from the first key_cache node. The order of nodes is: input_ids, is_causal, key_cache, value_cache, ..
+    input_nodes = [node for node in gm.graph.nodes if node.op == "placeholder"]
+    input_ids_meta = input_nodes[0].meta["val"]
+    seq_len = input_ids_meta.shape[2]
+    min_max_opt = extract_var_range_info(seq_len)
+    max_seq_len = min_max_opt["max"]
 
+    from torch.fx.experimental.symbolic_shapes import ShapeEnv
+    shape_env = ShapeEnv()
     # Create symbolic ints for start_idx and end_idx with range [0, seq_len] inclusive
-    shape_env = seq_len.node.shape_env 
     start_idx_unbacked_symint = shape_env.create_unbacked_symint()
     torch._check(start_idx_unbacked_symint >= 0)
-    torch._check(start_idx_unbacked_symint <= seq_len)
+    torch._check(start_idx_unbacked_symint <= max_seq_len)
 
     end_idx_unbacked_symint = shape_env.create_unbacked_symint()
     torch._check(end_idx_unbacked_symint >= 0)
-    torch._check(end_idx_unbacked_symint <= seq_len)
+    torch._check(end_idx_unbacked_symint <= max_seq_len)
     # Set the symbolic ints as the metadata for start_idx and end_idx inputs
     start_idx_input.meta["val"] = start_idx_unbacked_symint
     end_idx_input.meta["val"] = end_idx_unbacked_symint
@@ -123,7 +124,6 @@ def insert_kv_slicing_before_sdpa(gm, incoming_keys_values: List[Tuple[torch.Ten
     """
     Insert slicing operations before each scaled_dot_product_attention operation.
     """
-    pass
     # Find all nodes with scaled_dot_product_attention
     sdpa_nodes = []
     for node in gm.graph.nodes:
@@ -251,6 +251,7 @@ def insert_kv_cache(
     logits_keys_values = add_kv_as_outputs(gm, kv_cache_for_graph)
 
     gm = clean_up_graph_after_modifications(gm)
+
     new_output_tensors = create_random_output_tensors(logits_keys_values)
     
     new_out_spec = pytree.tree_flatten(new_output_tensors)[1]

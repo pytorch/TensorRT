@@ -56,7 +56,7 @@ def scaled_dot_product_attention(
     name: str,
 ) -> TRTTensor:
     # TODO: Handle attn_mask and is_causal arguments in the future
-    query, key, value, is_causal = args
+    query, key, value, attn_mask, dropout_p, is_causal = args
     logger.info("Ignoring attn_mask and is_causal arguments provided by the original graph. "
                 "This converter expects is_causal to be an input to the graph. For prefill phase, is_causal=True "
                 "and for generate phase, is_causal=False since we pass only 1 input token at a time")
@@ -160,14 +160,14 @@ def scaled_dot_product_attention(
     )
 
     # Create a if condition to check if is_causal is True
-    if_layer = ctx.net.add_if_conditional()
-    condition, true_branch, false_branch = is_causal, scaled_add_attn_bias, scaled
-    if_layer.set_condition(condition)
-    output_layer = if_layer.add_output(true_branch, false_branch)
-    attn_weights = output_layer.get_output(0)
+    # if_layer = ctx.net.add_if_conditional()
+    # condition, true_branch, false_branch = is_causal, scaled_add_attn_bias, scaled
+    # if_layer.set_condition(condition)
+    # output_layer = if_layer.add_output(true_branch, false_branch)
+    # attn_weights = output_layer.get_output(0)
 
     softmax = impl.normalization.softmax(
-        ctx, target, source_ir, name + "_softmax", attn_weights, -1, False
+        ctx, target, source_ir, name + "_softmax", scaled_add_attn_bias, -1, False
     )
     out = impl.matmul.matrix_multiply(
         ctx,

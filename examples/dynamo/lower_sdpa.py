@@ -32,18 +32,29 @@ def replace_variants_of_sdpa(
     is_causal_input = None
     for node in gm.graph.nodes:
         if node.op == "call_function" and node.target in REPLACEABLE_ATEN_OPS:
-
             # is_causal_input is None if this is the first sdpa node in the graph, otherwise it is reused across all sdpa nodes
             if is_causal_input is None:
                 # Add a new input to the graph for is_causal
-                is_causal_input = add_graph_input(gm, "is_causal", torch.tensor(True))
+                is_causal_input = add_graph_input(gm, "is_causal", True)
+                is_causal_input.meta["val"] = torch.tensor(True)
+
+            if node.target == torch.ops.aten._scaled_dot_product_efficient_attention.default:
+                if len(node.args) == 7:
+                    query, key, value, attn_bias, compute_log_sumexp, dropout_p, is_causal = node.args
+                elif len(node.args) == 5:
+                    query, key, value, attn_mask, is_causal = node.args
+                    dropout_p = 0.0
+            elif node.target == torch.ops.aten._scaled_dot_product_flash_attention.default:
+                query, key, value, dropout_p, is_causal, return_debug_mask = node.args
+            
+            modified_input_args = (query, key, value, None, dropout_p, is_causal_input)
 
             # Create a new node with torch.nn.functional.scaled_dot_product_attention
             # The input args is (query, key, value, is_causal). kwargs has scale
             with gm.graph.inserting_after(node):
                 new_node = gm.graph.call_function(
                     torch.nn.functional.scaled_dot_product_attention,
-                    args=node.args[:3] + (is_causal_input,),
+                    args=modified_input_args,
                     kwargs={"scale": node.kwargs.get("scale", None)}
                 )
 
@@ -56,6 +67,7 @@ def replace_variants_of_sdpa(
                         if user.args[1] == 0:
                             # Replace all uses of the getitem with the new attention node
                             user.replace_all_uses_with(new_node)
+                            new_node.meta['val'] = new_node.meta['val'][0]
                 # Replace all uses of the original node with the new node
                 node.replace_all_uses_with(new_node)
 
@@ -63,5 +75,6 @@ def replace_variants_of_sdpa(
     
     # Clean up the graph
     clean_up_graph_after_modifications(gm)
+
     logger.info("Replaced variants of scaled_dot_product_attention with torch.nn.functional.scaled_dot_product_attention")
     return gm

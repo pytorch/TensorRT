@@ -86,7 +86,6 @@ def generate(model, input_seq, max_output_seq_length, eos_token_id, benchmark=Tr
         # TODO: Handle batch in this check
         if not benchmark and stopping_criteria(input_seq, logits).item():
             break
-
     return input_seq
 
 def generate_with_kv_cache(model, input_seq, max_output_seq_length, eos_token_id):
@@ -99,10 +98,10 @@ def generate_with_kv_cache(model, input_seq, max_output_seq_length, eos_token_id
     # TODO: Confirm this: When end_idx = max_output_seq_length-1, number of tokens generated = OSL
     logits_concat = []
     num_tokens_generated = 0
-    
     kv_cache = get_zeroed_kv_cache_inputs(model)
     while end_idx < max_output_seq_length:
         is_causal = True if input_seq.shape[1] > 1 else False
+        # breakpoint()
         input_signature = (input_seq, is_causal, *kv_cache, start_idx, end_idx)
         logits_keys_values = model(*input_signature)
         num_tokens_generated += 1
@@ -115,6 +114,7 @@ def generate_with_kv_cache(model, input_seq, max_output_seq_length, eos_token_id
         input_seq = next_tokens
         start_idx = end_idx
         end_idx = start_idx + 1 
+    lkv = torch.cat(logits_concat, dim=1)
 
     return output_seq
 
