@@ -209,7 +209,7 @@ jobs:
         if: ${{ inputs.env-var-script != '' }}
         working-directory: ${{ inputs.repository }}
         run: |
-          set -euxo pipefail
+          set -x
           cat "${{ inputs.env-var-script }}" >> "${BUILD_ENV_FILE}"
       - name: Add XPU Env Vars in Build Env File
         if: ${{ matrix.gpu_arch_type == 'xpu' }}

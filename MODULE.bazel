@@ -94,36 +94,36 @@ http_archive(
 http_archive(
     name = "tensorrt",
     build_file = "@//third_party/tensorrt/archive:BUILD",
-    strip_prefix = "TensorRT-",
+    strip_prefix = "TensorRT-10.9.0.34",
     urls = [
-        "TENSORRT_URLS=https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.9.0/tars/TensorRT-10.9.0.34.Linux.aarch64-gnu.cuda-12.8.tar.gz",
+        "https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.9.0/tars/TensorRT-10.9.0.34.Linux.x86_64-gnu.cuda-12.8.tar.gz",
     ],
 )
 
 http_archive(
     name = "tensorrt_sbsa",
     build_file = "@//third_party/tensorrt/archive:BUILD",
-    strip_prefix = "TensorRT-",
+    strip_prefix = "TensorRT-10.9.0.34",
     urls = [
-        "TENSORRT_URLS=https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.9.0/tars/TensorRT-10.9.0.34.Linux.aarch64-gnu.cuda-12.8.tar.gz",
+        "https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.9.0/tars/TensorRT-10.9.0.34.Linux.aarch64-gnu.cuda-12.8.tar.gz",
     ],
 )
 
 http_archive(
     name = "tensorrt_l4t",
     build_file = "@//third_party/tensorrt/archive:BUILD",
-    strip_prefix = "TensorRT-",
+    strip_prefix = "TensorRT-10.3.0.26",
     urls = [
-        "TENSORRT_URLS=https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.9.0/tars/TensorRT-10.9.0.34.Linux.aarch64-gnu.cuda-12.8.tar.gz",
+        "https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.3.0/tars/TensorRT-10.3.0.26.l4t.aarch64-gnu.cuda-12.6.tar.gz",
     ],
 )
 
 http_archive(
     name = "tensorrt_win",
     build_file = "@//third_party/tensorrt/archive:BUILD",
-    strip_prefix = "TensorRT-",
+    strip_prefix = "TensorRT-10.9.0.34",
     urls = [
-        "TENSORRT_URLS=https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.9.0/tars/TensorRT-10.9.0.34.Linux.aarch64-gnu.cuda-12.8.tar.gz",
+        "https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.9.0/zip/TensorRT-10.9.0.34.Windows.win10.cuda-12.8.zip",
     ],
 )
 
