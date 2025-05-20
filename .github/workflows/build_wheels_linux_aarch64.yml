@@ -175,8 +175,11 @@ jobs:
           # when using Python version, less than the conda latest
           ###############################################################################
           echo 'Installing conda-forge'
-          apt-get update
-          apt-get install -y curl
+          if [[ ${{ inputs.is-jetpack }} == true ]]; then
+            # jetpack base image is ubuntu 22.04, does not have curl installed
+            apt-get update
+            apt-get install -y curl
+          fi
           curl -L -o /mambaforge.sh https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-aarch64.sh
           chmod +x /mambaforge.sh
           /mambaforge.sh -b -p /opt/conda
