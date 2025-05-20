@@ -35,14 +35,12 @@ pip install --force-reinstall --pre ${TORCH_TORCHVISION} --index-url ${INDEX_URL
 export CUDA_HOME="$(echo ${CUDA_PATH} | sed -e 's#\\#\/#g')"
 export TORCH_INSTALL_PATH="$(python -c "import torch, os; print(os.path.dirname(torch.__file__))" | sed -e 's#\\#\/#g')"
 
-
-export TENSORRT_NAME=tensorrt_win
-export CUDA_NAME=cuda_win
-export TENSORRT_STRIP_PREFIX=TensorRT-10.9.0.34
-export TENSORRT_URLS=https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.9.0/zip/TensorRT-10.9.0.34.Windows.win10.cuda-12.8.zip
-
 cat toolchains/ci_workspaces/MODULE.bazel.tmpl | envsubst > MODULE.bazel
 
+if [[ ${TENSORRT_VERSION} != "" ]]; then
+  sed -i -e "s/strip_prefix = \"TensorRT-.*\"/strip_prefix = \"TensorRT-${TENSORRT_VERSION}\"/g" MODULE.bazel
+  sed -i -e "s/https://developer.nvidia.com/downloads/compute\/machine-learning\/tensorrt\/.*\"/${TENSORRT_URLS}\"/g" MODULE.bazel
+fi
 
 cat MODULE.bazel
 echo "RELEASE=1" >> ${GITHUB_ENV}

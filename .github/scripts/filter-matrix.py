@@ -9,7 +9,8 @@ from typing import List
 # currently we don't support python 3.13t due to tensorrt does not support 3.13t
 disabled_python_versions: List[str] = ["3.13t"]
 
-jetpack_python_versions: List[str] = ["3.9", "3.10", "3.11", "3.12"]
+# jetpack 6.2 only officially supports python 3.10 and cu126
+jetpack_python_versions: List[str] = ["3.10"]
 jetpack_cuda_versions: List[str] = ["cu126"]
 
 jetpack_container_image: str = "nvcr.io/nvidia/l4t-jetpack:r36.4.0"
@@ -56,6 +57,7 @@ def main(args: list[str]) -> None:
                 # in the PR Branch, we only have cu128 passed in as matrix from test-infra, change to cu126
                 if options.limit_pr_builds == "true":
                     item["desired_cuda"] = "cu126"
+                    item["python_version"] = "3.10"
                     item["container_image"] = jetpack_container_image
                     filtered_includes.append(item)
                 else:
