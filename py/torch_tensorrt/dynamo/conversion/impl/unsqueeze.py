@@ -19,6 +19,10 @@ def unsqueeze(
     input: TRTTensor,
     dim: int,
 ) -> TRTTensor:
+    from importlib.metadata import version
+
+    if version("tensorrt") < "10.7.0":
+        return unsqueeze_old(ctx, target, source_ir, name, input, dim)
     axes = get_trt_tensor(ctx, dim, f"{name}_axes")
     layer = ctx.net.add_unsqueeze(input, axes)
     set_layer_name(layer, target, name, source_ir)
