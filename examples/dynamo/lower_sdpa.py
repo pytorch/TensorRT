@@ -1,0 +1,67 @@
+import copy
+import logging
+import operator
+from typing import Callable, Sequence, Tuple
+
+import torch
+from torch_tensorrt.dynamo._settings import CompilationSettings
+from torch_tensorrt.dynamo.conversion.aten_ops_converters import args_bounds_check
+from torch_tensorrt.dynamo.lowering.passes.pass_utils import (
+    clean_up_graph_after_modifications,
+)
+from torch_tensorrt.dynamo.lowering.passes._aten_lowering_pass import (
+    _aten_lowering_pass,
+)
+from cache_utils import add_graph_input
+
+from sdpa_converter import *
+logger = logging.getLogger(__name__)
+REPLACEABLE_ATEN_OPS = {
+    torch.ops.aten._scaled_dot_product_efficient_attention.default,
+    torch.ops.aten._scaled_dot_product_flash_attention.default,
+}
+
+@_aten_lowering_pass
+def replace_variants_of_sdpa(
+    gm: torch.fx.GraphModule, settings: CompilationSettings
+) -> torch.fx.GraphModule:
+    """Replace scaled_dot_product_attention with an equivalent
+    implementation which can be accurately converted to TRT
+    """
+    # If sdpa replacement is found, add is_causal_input only once in the graph
+    is_causal_input = None
+    for node in gm.graph.nodes:
+        if node.op == "call_function" and node.target in REPLACEABLE_ATEN_OPS:
+
+            # is_causal_input is None if this is the first sdpa node in the graph, otherwise it is reused across all sdpa nodes
+            if is_causal_input is None:
+                # Add a new input to the graph for is_causal
+                is_causal_input = add_graph_input(gm, "is_causal", torch.tensor(True))
+
+            # Create a new node with torch.nn.functional.scaled_dot_product_attention
+            # The input args is (query, key, value, is_causal). kwargs has scale
+            with gm.graph.inserting_after(node):
+                new_node = gm.graph.call_function(
+                    torch.nn.functional.scaled_dot_product_attention,
+                    args=node.args[:3] + (is_causal_input,),
+                    kwargs={"scale": node.kwargs.get("scale", None)}
+                )
+
+                # Deep copy encounters RuntimeError: Cannot access data pointer of Tensor (e.g. FakeTensor, FunctionalTensor). So we use copy instead.
+                new_node.meta = copy.copy(node.meta)
+                # Check if there's a getitem node following this attention node
+                for user in list(node.users):
+                    if user.op == "call_function" and user.target == operator.getitem:
+                        # If the getitem is extracting the first element (the output tensor)
+                        if user.args[1] == 0:
+                            # Replace all uses of the getitem with the new attention node
+                            user.replace_all_uses_with(new_node)
+                # Replace all uses of the original node with the new node
+                node.replace_all_uses_with(new_node)
+
+            gm.graph.erase_node(node)
+    
+    # Clean up the graph
+    clean_up_graph_after_modifications(gm)
+    logger.info("Replaced variants of scaled_dot_product_attention with torch.nn.functional.scaled_dot_product_attention")
+    return gm
