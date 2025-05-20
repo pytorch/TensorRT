@@ -33,6 +33,7 @@ cc_library(
             [
                 "include/aarch64-linux-gnu/NvInfer*.h",
             ],
+            allow_empty = True,
             exclude = [
                 "include/aarch64-linux-gnu/NvInferPlugin.h",
                 "include/aarch64-linux-gnu/NvInferPluginUtils.h",
@@ -42,6 +43,7 @@ cc_library(
             [
                 "include/NvInfer*.h",
             ],
+            allow_empty = True,
             exclude = [
                 "include/NvInferPlugin.h",
                 "include/NvInferPluginUtils.h",
@@ -51,6 +53,7 @@ cc_library(
             [
                 "include/NvInfer*.h",
             ],
+            allow_empty = True,
             exclude = [
                 "include/NvInferPlugin.h",
                 "include/NvInferPluginUtils.h",
@@ -104,7 +107,10 @@ cc_library(
         "nvinfer_headers",
         "nvinfer_lib",
     ] + select({
-        ":windows": ["@cuda_win//:cudart", "nvinfer_static_lib"],
+        ":windows": [
+            "nvinfer_static_lib",
+            "@cuda_win//:cudart",
+        ],
         "//conditions:default": ["@cuda//:cudart"],
     }),
 )
@@ -336,10 +342,22 @@ cc_library(
         "//conditions:default": ["lib/x86_64-linux-gnu/libnvinfer_plugin.so"],
     }),
     hdrs = select({
-        ":aarch64_linux": glob(["include/aarch64-linux-gnu/NvInferPlugin*.h"]),
-        ":ci_rhel_x86_64_linux": glob(["include/NvInferPlugin*.h"]),
-        ":windows": glob(["include/NvInferPlugin*.h"]),
-        "//conditions:default": glob(["include/x86_64-linux-gnu/NvInferPlugin*.h"]),
+        ":aarch64_linux": glob(
+            ["include/aarch64-linux-gnu/NvInferPlugin*.h"],
+            allow_empty = True,
+        ),
+        ":ci_rhel_x86_64_linux": glob(
+            ["include/NvInferPlugin*.h"],
+            allow_empty = True,
+        ),
+        ":windows": glob(
+            ["include/NvInferPlugin*.h"],
+            allow_empty = True,
+        ),
+        "//conditions:default": glob(
+            ["include/x86_64-linux-gnu/NvInferPlugin*.h"],
+            allow_empty = True,
+        ),
     }),
     copts = [
         "-pthread",
