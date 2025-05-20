@@ -55,8 +55,6 @@ else
     pip install --force-reinstall --pre ${TORCH_TORCHVISION} --index-url ${INDEX_URL}
 fi
 
-export TORCH_BUILD_NUMBER=$(python -c "import torch, urllib.parse as ul; print(ul.quote_plus(torch.__version__))")
-export TORCH_INSTALL_PATH=$(python -c "import torch, os; print(os.path.dirname(torch.__file__))")
 
 if [[ ${IS_JETPACK} == true ]]; then
     # change the torch dependency for jp6.2
@@ -66,8 +64,10 @@ if [[ ${IS_JETPACK} == true ]]; then
     sed -i -e "s/\"tensorrt-cu12>=10.9.0,<10.10.0\",//g" pyproject.toml
     sed -i -e "s/\"tensorrt-cu12-bindings>=10.9.0,<10.10.0\",//g" pyproject.toml
     sed -i -e "s/\"tensorrt-cu12-libs>=10.9.0,<10.10.0\",//g" pyproject.toml
-    # downgrade the numpy dependency for jp6.2
+    # downgrade the numpy for jp6.2
     sed -i -e "s/\"numpy\"/\"numpy==1.26.3\"/g" pyproject.toml
+    pip uninstall -y numpy
+    pip install numpy==1.26.3
 else
     # for non-jetpack, we need to support on cuda 118
     if [[ "${CU_VERSION::4}" < "cu12" ]]; then
@@ -90,6 +90,11 @@ else
     fi
 fi
 
+export TORCH_BUILD_NUMBER=$(python -c "import torch, urllib.parse as ul; print(ul.quote_plus(torch.__version__))")
+export TORCH_INSTALL_PATH=$(python -c "import torch, os; print(os.path.dirname(torch.__file__))")
+
+echo "TORCH_BUILD_NUMBER=$TORCH_BUILD_NUMBER"
+echo "TORCH_INSTALL_PATH=$TORCH_INSTALL_PATH"
 cat toolchains/ci_workspaces/MODULE.bazel.tmpl | envsubst > MODULE.bazel
 
 if [[ ${TENSORRT_VERSION} != "" ]]; then
