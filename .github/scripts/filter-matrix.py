@@ -26,11 +26,13 @@ def main(args: list[str]) -> None:
         type=str,
         default="",
     )
+
     parser.add_argument(
         "--jetpack",
         help="is jetpack",
-        type=bool,
-        default=False,
+        type=str,
+        choices=["true", "false"],
+        default="false",
     )
 
     parser.add_argument(
@@ -45,14 +47,13 @@ def main(args: list[str]) -> None:
     if options.matrix == "":
         raise Exception("--matrix needs to be provided")
 
-    print(f"args: {options.matrix=} {options.jetpack=} {options.limit_pr_builds=}")
     matrix_dict = json.loads(options.matrix)
     includes = matrix_dict["include"]
     filtered_includes = []
     for item in includes:
         if item["python_version"] in disabled_python_versions:
             continue
-        if options.jetpack:
+        if options.jetpack == "true":
             if item["python_version"] in jetpack_python_versions:
                 # in the PR Branch, we only have cu128 passed in as matrix from test-infra, change to cu126
                 if options.limit_pr_builds == "true":
