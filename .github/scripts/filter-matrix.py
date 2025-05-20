@@ -43,7 +43,7 @@ def main(args: list[str]) -> None:
     for item in includes:
         if item["python_version"] in disabled_python_versions:
             continue
-        if options.is_jetpack:
+        if options.jetpack:
             if (
                 item["python_version"] in jetpack_python_versions
                 and item["desired_cuda"] in jetpack_cuda_versions
