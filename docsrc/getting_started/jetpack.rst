@@ -1,18 +1,18 @@
-.. _Torch_TensorRT_in_JetPack_6.1
+.. _Torch_TensorRT_in_JetPack_6.2
 
 Overview
 ##################
 
-JetPack 6.1
+JetPack 6.2
 ---------------------
-Nvida JetPack 6.1 is the latest production release ofJetPack 6.
+Nvida JetPack 6.2 is the latest production release of JetPack 6.
 With this release it incorporates:
 CUDA 12.6
 TensorRT 10.3
 cuDNN 9.3
-DLFW 24.09
+DLFW 25.04
 
-You can find more details for the JetPack 6.1:
+You can find more details for the JetPack 6.2:
 
     * https://docs.nvidia.com/jetson/jetpack/release-notes/index.html
     * https://docs.nvidia.com/deeplearning/frameworks/install-pytorch-jetson-platform/index.html
@@ -63,17 +63,30 @@ Ensure libcusparseLt.so exists at /usr/local/cuda/lib64/:
     sudo cp -a libcusparse_lt-linux-sbsa-0.5.2.1-archive/lib/* /usr/local/cuda/lib64/
 
 
-Build torch_tensorrt
-~~~~~~~~~~~~~~
+Build torch_tensorrt wheel file
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+you can build torch_tensorrt wheel file with or without docker.
+
+if you want to build torch_tensorrt wheel file with docker, you can get the docker image from:
+* https://catalog.ngc.nvidia.com/orgs/nvidia/containers/l4t-pytorch
+
+.. code-block:: sh
+# with this image you should have all the jetpack 6.2 environment ready 
+# with cuda 12.6 and tensorrt 10.3 pre-installed
+sudo docker run  -it  --gpus all --user root --shm-size=10.24g \
+-ulimit stack=67108864 --ulimit memlock=-1 --cap-add SYS_ADMIN \
+-v $(pwd):/workspace \
+-net host nvcr.io/nvidia/l4t-jetpack:r36.4.0 bash
 
 
 Install bazel
 
 .. code-block:: sh
 
-    wget -v https://github.com/bazelbuild/bazelisk/releases/download/v1.20.0/bazelisk-linux-arm64
+    wget -v https://github.com/bazelbuild/bazelisk/releases/download/v1.26.0/bazelisk-linux-arm64
     sudo mv bazelisk-linux-arm64 /usr/bin/bazel
-    chmod +x /usr/bin/bazel
+    sudo chmod +x /usr/bin/bazel
 
 Install pip and required python packages:
     * https://pip.pypa.io/en/stable/installation/
@@ -84,36 +97,16 @@ Install pip and required python packages:
     wget https://bootstrap.pypa.io/get-pip.py
     python get-pip.py
 
-.. code-block:: sh
-
-   # install pytorch from nvidia jetson distribution: https://developer.download.nvidia.com/compute/redist/jp/v61/pytorch
-   python -m pip install torch https://developer.download.nvidia.com/compute/redist/jp/v61/pytorch/torch-2.5.0a0+872d972e41.nv24.08.17622132-cp310-cp310-linux_aarch64.whl
 
 .. code-block:: sh
-
-    # install required python packages
-    python -m pip install -r toolchains/jp_workspaces/requirements.txt
-
-    # if you want to run the test cases, then install the test required python packages
-    python -m pip install -r toolchains/jp_workspaces/test_requirements.txt
-
-
-Build and Install torch_tensorrt wheel file
-
-
-Since torch_tensorrt version has dependencies on torch version. torch version supported by JetPack6.1 is from DLFW 24.08/24.09(torch 2.5.0).
-
-Please make sure to build torch_tensorrt wheel file from source release/2.5 branch
-(TODO: lanl to update the branch name once release/ngc branch is available)
-
-.. code-block:: sh
-
-    cuda_version=$(nvcc --version | grep Cuda | grep release | cut -d ',' -f 2 | sed -e 's/ release //g')
-    export TORCH_INSTALL_PATH=$(python -c "import torch, os; print(os.path.dirname(torch.__file__))")
-    export SITE_PACKAGE_PATH=${TORCH_INSTALL_PATH::-6}
+    # build torch_tensorrt wheel file
+    export cuda_version=$(nvcc --version | grep Cuda | grep release | cut -d ',' -f 2 | sed -e 's/ release //g')
     export CUDA_HOME=/usr/local/cuda-${cuda_version}/
-    # replace the MODULE.bazel with the jetpack one
-    cat toolchains/jp_workspaces/MODULE.bazel.tmpl | envsubst > MODULE.bazel
-    # build and install torch_tensorrt wheel file
-    python setup.py install --user
+    export BUILD_VERSION= && ./packaging/pre_build_script.sh
+    python setup.py bdist_wheel --jetpack
 
+
+.. code-block:: sh
+    # install torch_tensorrt wheel file built above
+    cd dist
+    python install torch-tensorrt-2.8.0.dev0+4da152843
