@@ -195,6 +195,7 @@ jobs:
           # otherwise, leave it alone so nightly will pick up the latest
           echo "PYTORCH_VERSION=${{ matrix.stable_version }}" >> "${GITHUB_ENV}"
       - uses: ./test-infra/.github/actions/setup-binary-builds
+        if: ${{ inputs.is-jetpack == false }}
         env:
           PLATFORM: ${{ inputs.architecture == 'aarch64'  && 'linux-aarch64' || ''}}
         with:
@@ -248,7 +249,7 @@ jobs:
           echo "Successfully installed Python build package"
           ${CONDA_RUN} ${{ inputs.build-command }}
       - name: Build the wheel (setup-py)
-        if: ${{ inputs.build-platform == 'setup-py' && inputs.is-jetpack == false }}
+        if: ${{ inputs.build-platform == 'setup-py' }}
         working-directory: ${{ inputs.repository }}
         shell: bash -l {0}
         run: |
@@ -257,18 +258,11 @@ jobs:
           export PYTORCH_VERSION="$(${CONDA_RUN} pip show torch | grep ^Version: | sed 's/Version: *//' | sed 's/+.\+//')"
           ${CONDA_RUN} python setup.py clean
           echo "Successfully ran `python setup.py clean`"
-          ${CONDA_RUN} python setup.py bdist_wheel
-      - name: Build the wheel for jetpack (setup-py)
-        if: ${{ inputs.build-platform == 'setup-py' && inputs.is-jetpack == true }}
-        working-directory: ${{ inputs.repository }}
-        shell: bash -l {0}
-        run: |
-          set -euxo pipefail
-          source "${BUILD_ENV_FILE}"
-          export PYTORCH_VERSION="$(${CONDA_RUN} pip show torch | grep ^Version: | sed 's/Version: *//' | sed 's/+.\+//')"
-          ${CONDA_RUN} python setup.py clean
-          echo "Successfully ran `python setup.py clean`"
-          ${CONDA_RUN} python setup.py bdist_wheel --jetpack
+          if [[ ${{ inputs.is-jetpack }} == false ]]; then
+            ${CONDA_RUN} python setup.py bdist_wheel
+          else
+            ${CONDA_RUN} python setup.py bdist_wheel --jetpack
+          fi
       - name: Repair Manylinux_2_28 Wheel
         shell: bash -l {0}
         env:
