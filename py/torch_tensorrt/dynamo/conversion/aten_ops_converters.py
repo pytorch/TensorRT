@@ -661,7 +661,16 @@ def aten_ops_unsqueeze(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    return impl.unsqueeze.unsqueeze(ctx, target, SourceIR.ATEN, name, args[0], args[1])
+    from importlib.metadata import version
+
+    if version("tensorrt") >= "10.7.0":
+        return impl.unsqueeze.unsqueeze(
+            ctx, target, SourceIR.ATEN, name, args[0], args[1]
+        )
+    else:
+        return impl.unsqueeze.unsqueeze_old(
+            ctx, target, SourceIR.ATEN, name, args[0], args[1]
+        )
 
 
 @dynamo_tensorrt_converter(
