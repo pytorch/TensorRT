@@ -1,3 +1,4 @@
+import logging
 from typing import List, Optional, Sequence, cast
 
 from torch.fx.node import Target
@@ -9,6 +10,8 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     set_layer_name,
 )
 from torch_tensorrt.dynamo.types import TRTTensor
+
+logger = logging.getLogger(__name__)
 
 
 def unsqueeze(
@@ -22,6 +25,9 @@ def unsqueeze(
     from importlib.metadata import version
 
     if version("tensorrt") < "10.7.0":
+        logger.warning(
+            f"IUnsqueezeLayer is supported starting from TensorRT 10.7.0, using the old unsqueeze implementation in the current TensorRT version: {version('tensorrt')}"
+        )
         return unsqueeze_old(ctx, target, source_ir, name, input, dim)
     axes = get_trt_tensor(ctx, dim, f"{name}_axes")
     layer = ctx.net.add_unsqueeze(input, axes)
