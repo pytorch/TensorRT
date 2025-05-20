@@ -5,7 +5,6 @@ from typing import Callable, Dict, Optional, Sequence, Tuple, Union
 import numpy as np
 import tensorrt as trt
 import torch
-
 from torch.fx.node import Argument, Node, Target
 from torch_tensorrt._features import needs_qdp_plugin
 from torch_tensorrt.dynamo._settings import CompilationSettings
@@ -38,6 +37,7 @@ def _generate_plugin_converter(
             "Unable to import TensorRT plugin. Please install TensorRT plugin library (https://github.com/NVIDIA/TensorRT-plugin-library?tab=readme-ov-file#installation) to add support for compiling quantized models"
         )
     from tensorrt.plugin._lib import QDP_REGISTRY
+
     torch_target = getattr(getattr(torch.ops, namespace), op_name)
     overload_str = overload if overload else ""
     overload_name = overload_str if overload else "default"
