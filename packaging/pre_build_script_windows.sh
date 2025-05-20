@@ -39,7 +39,7 @@ export TORCH_INSTALL_PATH="$(python -c "import torch, os; print(os.path.dirname(
 export TENSORRT_NAME=tensorrt_win
 export CUDA_NAME=cuda_win
 export TENSORRT_STRIP_PREFIX=TensorRT-10.9.0.34
-exppor TENSORRT_URLS=https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.9.0/zip/TensorRT-10.9.0.34.Windows.win10.cuda-12.8.zip
+export TENSORRT_URLS=https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.9.0/zip/TensorRT-10.9.0.34.Windows.win10.cuda-12.8.zip
 
 cat toolchains/ci_workspaces/MODULE.bazel.tmpl | envsubst > MODULE.bazel
 
