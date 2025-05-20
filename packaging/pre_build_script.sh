@@ -70,14 +70,16 @@ if [[ ${IS_JETPACK} == true ]]; then
     sed -i -e "s/\"tensorrt-cu12>=10.9.0,<10.10.0\",//g" pyproject.toml
     sed -i -e "s/\"tensorrt-cu12-bindings>=10.9.0,<10.10.0\",//g" pyproject.toml
     sed -i -e "s/\"tensorrt-cu12-libs>=10.9.0,<10.10.0\",//g" pyproject.toml
-elif [[ ${IS_SBSA} == true ]]; then
-    export TENSORRT_NAME=tensorrt_sbsa
-    export TENSORRT_STRIP_PREFIX=TensorRT-10.9.0.34
-    export TENSORRT_URLS=https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.9.0/tars/TensorRT-10.9.0.34.Linux.aarch64-gnu.cuda-12.8.tar.gz
 else
-    export TENSORRT_NAME=tensorrt
-    export TENSORRT_STRIP_PREFIX=TensorRT-10.9.0.34
-    export TENSORRT_URLS=https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.9.0/tars/TensorRT-10.9.0.34.Linux.x86_64-gnu.cuda-12.8.tar.gz
+    # for non-jetpack, we need to support on cuda 118
+    if [[ "${CU_VERSION::4}" < "cu12" ]]; then
+        # replace dependencies from tensorrt-cu12-bindings/libs to tensorrt-cu11-bindings/libs
+        sed -i -e "s/tensorrt-cu12/tensorrt-${CU_VERSION::4}/g" \
+            -e "s/tensorrt-cu12-bindings/tensorrt-${CU_VERSION::4}-bindings/g" \
+            -e "s/tensorrt-cu12-libs/tensorrt-${CU_VERSION::4}-libs/g" \
+            pyproject.toml
+    fi
+    # for non-jetpack, we need to support build with different tensorrt version
     if [[ ${TENSORRT_VERSION} != "" ]]; then
         # Replace dependencies in the original pyproject.toml with the current TensorRT version. It is used for CI tests of different TensorRT versions.
         # For example, if the current testing TensorRT version is 10.7.0, but the pyproject.toml tensorrt>=10.8.0,<10.9.0, then the following sed command
@@ -88,14 +90,16 @@ else
             -e "s/tensorrt-cu12-libs>=.*,<.*\"/tensorrt-cu12-libs>=${TENSORRT_VERSION},<$(echo "${TENSORRT_VERSION}" | awk -F. '{print $1"."$2+1".0"}')\"/g" \
             pyproject.toml
     fi
-fi
+    if [[ ${IS_SBSA} == true ]]; then
+        export TENSORRT_NAME=tensorrt_sbsa
+        export TENSORRT_STRIP_PREFIX=TensorRT-10.9.0.34
+        export TENSORRT_URLS=https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.9.0/tars/TensorRT-10.9.0.34.Linux.aarch64-gnu.cuda-12.8.tar.gz
+    else
+        export TENSORRT_NAME=tensorrt
+        export TENSORRT_STRIP_PREFIX=TensorRT-10.9.0.34
+        export TENSORRT_URLS=https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.9.0/tars/TensorRT-10.9.0.34.Linux.x86_64-gnu.cuda-12.8.tar.gz
 
-if [[ "${CU_VERSION::4}" < "cu12" ]]; then
-    # replace dependencies from tensorrt-cu12-bindings/libs to tensorrt-cu11-bindings/libs
-    sed -i -e "s/tensorrt-cu12/tensorrt-${CU_VERSION::4}/g" \
-          -e "s/tensorrt-cu12-bindings/tensorrt-${CU_VERSION::4}-bindings/g" \
-          -e "s/tensorrt-cu12-libs/tensorrt-${CU_VERSION::4}-libs/g" \
-          pyproject.toml
+    fi
 fi
 
 cat toolchains/ci_workspaces/MODULE.bazel.tmpl | envsubst > MODULE.bazel

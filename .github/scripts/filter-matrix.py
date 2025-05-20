@@ -10,7 +10,7 @@ from typing import List
 disabled_python_versions: List[str] = ["3.13t"]
 
 # jetpack 6.2 supports python 3.10 and cuda 12.6
-jetpack_python_versions: List[str] = ["3.10"]
+jetpack_python_versions: List[str] = ["3.9", "3.10", "3.11", "3.12"]
 jetpack_cuda_versions: List[str] = ["cu126"]
 
 jetpack_container_image: str = "nvcr.io/nvidia/l4t-jetpack:r36.4.0"
@@ -26,7 +26,7 @@ def main(args: list[str]) -> None:
         default="",
     )
     parser.add_argument(
-        "--is-jetpack",
+        "--jetpack",
         help="is jetpack",
         type=bool,
         default=False,
