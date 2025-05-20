@@ -27,10 +27,8 @@ jobs:
   filter-matrix:
     needs: [generate-matrix]
     outputs:
-      matrix: ${{ steps.generate.outputs.matrix }}
+      matrix: ${{ steps.filter.outputs.matrix }}
     runs-on: ubuntu-latest
-    env:
-      LIMIT_PR_BUILDS: ${{ github.event_name == 'pull_request' && !contains( github.event.pull_request.labels.*.name, 'ciflow/binaries/all') }}
     steps:
       - uses: actions/setup-python@v5
         with:
@@ -38,12 +36,14 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: pytorch/tensorrt
-      - name: Generate matrix
-        id: generate
+      - name: Filter matrix
+        id: filter
+        env:
+           LIMIT_PR_BUILDS: ${{ github.event_name == 'pull_request' && !contains( github.event.pull_request.labels.*.name, 'ciflow/binaries/all') }}
         run: |
           set -eou pipefail
           MATRIX_BLOB=${{ toJSON(needs.generate-matrix.outputs.matrix) }}
-          MATRIX_BLOB="$(python3 .github/scripts/filter-matrix.py --matrix "${MATRIX_BLOB}")" --jetpack true
+          MATRIX_BLOB="$(python3 .github/scripts/filter-matrix.py --matrix "${MATRIX_BLOB}" --jetpack true)"
           echo "${MATRIX_BLOB}"
           echo "matrix=${MATRIX_BLOB}" >> "${GITHUB_OUTPUT}"
 

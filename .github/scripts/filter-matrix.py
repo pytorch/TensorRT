@@ -33,12 +33,19 @@ def main(args: list[str]) -> None:
         default=False,
     )
 
+    parser.add_argument(
+        "--limit-pr-builds",
+        help="If it is a PR build",
+        type=str,
+        choices=["true", "false"],
+        default=os.getenv("LIMIT_PR_BUILDS", "false"),
+    )
+
     options = parser.parse_args(args)
     if options.matrix == "":
         raise Exception("--matrix needs to be provided")
 
-    limit_pr_builds = os.getenv("LIMIT_PR_BUILDS", "false")
-    print(f"limit_pr_builds: {limit_pr_builds}")
+    print(f"args: {options.matrix=} {options.jetpack=} {options.limit_pr_builds=}")
     matrix_dict = json.loads(options.matrix)
     includes = matrix_dict["include"]
     filtered_includes = []
@@ -48,7 +55,7 @@ def main(args: list[str]) -> None:
         if options.jetpack:
             if item["python_version"] in jetpack_python_versions:
                 # in the PR Branch, we only have cu128 passed in as matrix from test-infra, change to cu126
-                if limit_pr_builds == "true":
+                if options.limit_pr_builds == "true":
                     item["desired_cuda"] = "cu126"
                     item["container_image"] = jetpack_container_image
                     filtered_includes.append(item)
