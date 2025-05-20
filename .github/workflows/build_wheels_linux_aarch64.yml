@@ -178,7 +178,7 @@ jobs:
           if [[ ${{ inputs.is-jetpack }} == true ]]; then
             # jetpack base image is ubuntu 22.04, does not have curl installed
             apt-get update
-            apt-get install -y curl
+            apt-get install -y curl git
           fi
           curl -L -o /mambaforge.sh https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-aarch64.sh
           chmod +x /mambaforge.sh
@@ -195,7 +195,6 @@ jobs:
           # otherwise, leave it alone so nightly will pick up the latest
           echo "PYTORCH_VERSION=${{ matrix.stable_version }}" >> "${GITHUB_ENV}"
       - uses: ./test-infra/.github/actions/setup-binary-builds
-        if: ${{ inputs.is-jetpack == false }}
         env:
           PLATFORM: ${{ inputs.architecture == 'aarch64'  && 'linux-aarch64' || ''}}
         with:
@@ -206,7 +205,6 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
           cuda-version: ${{ env.CU_VERSION }}
           arch: ${{ env.ARCH }}
-
       - name: Combine Env Var and Build Env Files
         if: ${{ inputs.env-var-script != '' }}
         working-directory: ${{ inputs.repository }}
