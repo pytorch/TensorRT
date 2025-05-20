@@ -9,9 +9,7 @@ from typing import List
 # currently we don't support python 3.13t due to tensorrt does not support 3.13t
 disabled_python_versions: List[str] = ["3.13t"]
 
-# jetpack 6.2 supports python 3.10 and cuda 12.6
 jetpack_python_versions: List[str] = ["3.9", "3.10", "3.11", "3.12"]
-
 jetpack_cuda_versions: List[str] = ["cu126"]
 
 jetpack_container_image: str = "nvcr.io/nvidia/l4t-jetpack:r36.4.0"
