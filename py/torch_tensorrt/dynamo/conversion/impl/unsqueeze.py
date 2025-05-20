@@ -1,4 +1,4 @@
-from typing import List, Optional, Sequence
+from typing import List, Optional, Sequence, cast
 
 from torch.fx.node import Target
 from torch_tensorrt.dynamo._SourceIR import SourceIR
@@ -40,6 +40,8 @@ def unsqueeze_old(
             f"unsqueeze received input {input_val} that is not part "
             "of the TensorRT region!"
         )
+
+    dim = cast(int, dim)
 
     input_shape_size = len(input_val.shape)
     dim = get_positive_dim(dim, input_shape_size + 1)
