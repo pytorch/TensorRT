@@ -93,7 +93,7 @@ fi
 cat toolchains/ci_workspaces/MODULE.bazel.tmpl | envsubst > MODULE.bazel
 
 if [[ ${TENSORRT_VERSION} != "" ]]; then
-    sed -i -e "s/strip_prefix = \"TensorRT-.*\"/strip_prefix = \"TensorRT-${TENSORRT_VERSION}\"/g" MODULE.bazel
+    sed -i -e "s/strip_prefix = \"TensorRT-.*\"/strip_prefix = \"${TENSORRT_STRIP_PREFIX}\"/g" MODULE.bazel
     sed -i -e "s#\"https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/.*\"#\"${TENSORRT_URLS}\"#g" MODULE.bazel
 fi
 cat MODULE.bazel
