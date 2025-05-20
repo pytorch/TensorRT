@@ -58,12 +58,7 @@ fi
 export TORCH_BUILD_NUMBER=$(python -c "import torch, urllib.parse as ul; print(ul.quote_plus(torch.__version__))")
 export TORCH_INSTALL_PATH=$(python -c "import torch, os; print(os.path.dirname(torch.__file__))")
 
-export CUDA_NAME=cuda
 if [[ ${IS_JETPACK} == true ]]; then
-    export CUDA_NAME=cuda_l4t
-    export TENSORRT_NAME=tensorrt_l4t
-    export TENSORRT_STRIP_PREFIX=TensorRT-10.3.0.26
-    export TENSORRT_URLS=https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.3.0/tars/TensorRT-10.3.0.26.l4t.aarch64-gnu.cuda-12.6.tar.gz
     # change the torch dependency for jp6.2
     sed -i -e "s/torch>=2.8.0.dev,<2.9.0/torch>=2.7.0,<2.8.0/g" pyproject.toml
     # change the tensorrt dependency for jp6.2
@@ -71,6 +66,8 @@ if [[ ${IS_JETPACK} == true ]]; then
     sed -i -e "s/\"tensorrt-cu12>=10.9.0,<10.10.0\",//g" pyproject.toml
     sed -i -e "s/\"tensorrt-cu12-bindings>=10.9.0,<10.10.0\",//g" pyproject.toml
     sed -i -e "s/\"tensorrt-cu12-libs>=10.9.0,<10.10.0\",//g" pyproject.toml
+    # downgrade the numpy dependency for jp6.2
+    sed -i -e "s/\"numpy\"/\"numpy==1.26.3\"/g" pyproject.toml
 else
     # for non-jetpack, we need to support on cuda 118
     if [[ "${CU_VERSION::4}" < "cu12" ]]; then
@@ -91,19 +88,13 @@ else
             -e "s/tensorrt-cu12-libs>=.*,<.*\"/tensorrt-cu12-libs>=${TENSORRT_VERSION},<$(echo "${TENSORRT_VERSION}" | awk -F. '{print $1"."$2+1".0"}')\"/g" \
             pyproject.toml
     fi
-    if [[ ${IS_SBSA} == true ]]; then
-        export TENSORRT_NAME=tensorrt_sbsa
-        export TENSORRT_STRIP_PREFIX=TensorRT-10.9.0.34
-        export TENSORRT_URLS=https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.9.0/tars/TensorRT-10.9.0.34.Linux.aarch64-gnu.cuda-12.8.tar.gz
-    else
-        export TENSORRT_NAME=tensorrt
-        export TENSORRT_STRIP_PREFIX=TensorRT-10.9.0.34
-        export TENSORRT_URLS=https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.9.0/tars/TensorRT-10.9.0.34.Linux.x86_64-gnu.cuda-12.8.tar.gz
-
-    fi
 fi
 
 cat toolchains/ci_workspaces/MODULE.bazel.tmpl | envsubst > MODULE.bazel
 
+if [[ ${TENSORRT_VERSION} != "" ]]; then
+    sed -i -e "s/strip_prefix = \"TensorRT-.*\"/strip_prefix = \"TensorRT-${TENSORRT_VERSION}\"/g" MODULE.bazel
+    sed -i -e "s#\"https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/.*\"#\"${TENSORRT_URLS}\"#g" MODULE.bazel
+fi
 cat MODULE.bazel
 export CI_BUILD=1

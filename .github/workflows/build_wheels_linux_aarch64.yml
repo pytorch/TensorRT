@@ -209,9 +209,8 @@ jobs:
         if: ${{ inputs.env-var-script != '' }}
         working-directory: ${{ inputs.repository }}
         run: |
-          set -x
+          set -euxo pipefail
           cat "${{ inputs.env-var-script }}" >> "${BUILD_ENV_FILE}"
-          cat "${BUILD_ENV_FILE}"
       - name: Add XPU Env Vars in Build Env File
         if: ${{ matrix.gpu_arch_type == 'xpu' }}
         run: |
@@ -260,7 +259,7 @@ jobs:
           if [[ ${{ inputs.is-jetpack }} == false ]]; then
             ${CONDA_RUN} python setup.py bdist_wheel
           else
-            export CI_BUILD="1" && ${CONDA_RUN} python setup.py bdist_wheel --jetpack
+            ${CONDA_RUN} python setup.py bdist_wheel --jetpack
           fi
       - name: Repair Manylinux_2_28 Wheel
         shell: bash -l {0}
