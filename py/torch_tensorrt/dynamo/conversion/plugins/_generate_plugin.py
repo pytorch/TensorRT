@@ -32,7 +32,7 @@ def _generate_plugin(plugin_name: str) -> None:
         import tensorrt.plugin as trtp
     except ImportError as e:
         raise RuntimeError(
-            "Unable to import TensorRT plugin. Please install TensorRT plugin library (https://github.com/NVIDIA/TensorRT-plugin-library?tab=readme-ov-file#installation) to add support for compiling quantized models"
+            "Unable to import TensorRT plugin. TensorRT version must be 10.7.0 or higher to support for Triton based TensorRT plugins"
         )
 
     namespace, name = plugin_name.split("::")

@@ -83,7 +83,9 @@ def needs_qdp_plugin(f: Callable[..., Any]) -> Callable[..., Any]:
         else:
 
             def not_implemented(*args: List[Any], **kwargs: Dict[str, Any]) -> Any:
-                raise NotImplementedError("QDP Plugin is not available")
+                raise NotImplementedError(
+                    "TensorRT QDP(Quick Deploy Plugins) not available, requires TensorRT 10.7.0 or higher"
+                )
 
             return not_implemented(*args, **kwargs)
 
