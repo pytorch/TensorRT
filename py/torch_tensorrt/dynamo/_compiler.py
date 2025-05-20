@@ -37,7 +37,7 @@ from torch_tensorrt.dynamo.lowering import (
     pre_export_lowering,
 )
 from torch_tensorrt.dynamo.utils import (
-    CPU_DEVICE,
+    deallocate_module,
     get_flat_args_with_check,
     get_output_metadata,
     parse_graph_io,
@@ -99,6 +99,7 @@ def cross_compile_for_windows(
     enable_weight_streaming: bool = _defaults.ENABLE_WEIGHT_STREAMING,
     tiling_optimization_level: str = _defaults.TILING_OPTIMIZATION_LEVEL,
     l2_limit_for_tiling: int = _defaults.L2_LIMIT_FOR_TILING,
+    offload_module_to_cpu: bool = _defaults.OFFLOAD_MODULE_TO_CPU,
     **kwargs: Any,
 ) -> torch.fx.GraphModule:
     """Compile an ExportedProgram module using TensorRT in Linux for Inference in Windows
@@ -363,7 +364,18 @@ def cross_compile_for_windows(
     # Apply lowering on the graph module
     gm = post_lowering(gm, settings)
     logger.debug("Lowered Input graph: " + str(gm.graph))
-
+    # Move the weights in the state_dict to CPU
+    if offload_module_to_cpu:
+        deallocate_module(exported_program.module(), delete_module=False)
+        logger.info(
+            "The PyTorch model was moved to the CPU to allocate all GPU memory to TensorRT. To retain the model on the GPU, set offload_module_to_cpu=False"
+        )
+    else:
+        remaining_memory, total_memory = torch.cuda.mem_get_info()
+        if remaining_memory < total_memory // 2:
+            logger.warning(
+                "Remaining GPU memory may not be enough to compile the TensorRT engine for this model resulting in an OOM error, Consider setting offload_module_to_cpu=True"
+            )
     trt_gm = compile_module(
         gm,
         trt_arg_inputs,
@@ -687,7 +699,7 @@ def compile(
 
     # Move the weights in the state_dict to CPU
     if offload_module_to_cpu:
-        exported_program.module().to(CPU_DEVICE)
+        deallocate_module(exported_program.module(), delete_module=False)
         logger.info(
             "The PyTorch model was moved to the CPU to allocate all GPU memory to TensorRT. To retain the model on the GPU, set offload_module_to_cpu=False"
         )
@@ -973,6 +985,7 @@ def convert_exported_program_to_serialized_trt_engine(
     enable_weight_streaming: bool = _defaults.ENABLE_WEIGHT_STREAMING,
     tiling_optimization_level: str = _defaults.TILING_OPTIMIZATION_LEVEL,
     l2_limit_for_tiling: int = _defaults.L2_LIMIT_FOR_TILING,
+    offload_module_to_cpu: bool = _defaults.OFFLOAD_MODULE_TO_CPU,
     **kwargs: Any,
 ) -> bytes:
     """Convert an ExportedProgram to a serialized TensorRT engine
@@ -1156,6 +1169,7 @@ def convert_exported_program_to_serialized_trt_engine(
         "enable_weight_streaming": enable_weight_streaming,
         "tiling_optimization_level": tiling_optimization_level,
         "l2_limit_for_tiling": l2_limit_for_tiling,
+        "offload_module_to_cpu": offload_module_to_cpu,
     }
 
     settings = CompilationSettings(**compilation_options)
@@ -1175,7 +1189,17 @@ def convert_exported_program_to_serialized_trt_engine(
 
     # Configure user compilation settings to converters.
     CONVERTERS.set_compilation_settings(settings)
-
+    if offload_module_to_cpu:
+        deallocate_module(exported_program.module(), delete_module=False)
+        logger.info(
+            "The PyTorch model was moved to the CPU to allocate all GPU memory to TensorRT. To retain the model on the GPU, set offload_module_to_cpu=False"
+        )
+    else:
+        remaining_memory, total_memory = torch.cuda.mem_get_info()
+        if remaining_memory < total_memory // 2:
+            logger.warning(
+                "Remaining GPU memory may not be enough to compile the TensorRT engine for this model resulting in an OOM error, Consider setting offload_module_to_cpu=True"
+            )
     try:
         interpreter_result = interpret_module_to_result(
             gm,

@@ -45,7 +45,7 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     get_trt_tensor,
     to_torch,
 )
-from torch_tensorrt.dynamo.utils import DYNAMIC_DIM, delete_module, to_torch_device
+from torch_tensorrt.dynamo.utils import DYNAMIC_DIM, deallocate_module, to_torch_device
 from torch_tensorrt.fx.observer import Observer
 from torch_tensorrt.logging import TRT_LOGGER
 
@@ -737,7 +737,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             builder_config, self.compilation_settings.timing_cache_path
         )
         if self.compilation_settings.offload_module_to_cpu:
-            delete_module(self.module)
+            deallocate_module(self.module)
         serialized_engine = self.builder.build_serialized_network(
             self.ctx.net, builder_config
         )

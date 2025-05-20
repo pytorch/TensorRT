@@ -88,6 +88,50 @@ class TestCudagraphsCPP(TestCase):
 
         torch._dynamo.reset()
 
+    def test_cudagraphs_enabled_inference_cpp_cpu_offload(self):
+        class SampleModel(torch.nn.Module):
+            def forward(self, x):
+                return torch.softmax((x + 2) * 7, dim=0)
+
+        inputs = [torch.randn(*INPUT_SIZE).cuda() for _ in range(TRIALS)]
+        fx_graph = torch.fx.symbolic_trace(SampleModel())
+
+        # Validate that the results between Torch and Torch-TRT are similar
+        optimized_model = torch_tensorrt.compile(
+            fx_graph,
+            "torch_compile",
+            inputs[0],
+            min_block_size=1,
+            pass_through_build_failures=True,
+            use_python_runtime=False,
+            offload_module_to_cpu=True,
+        )
+        optimized_model.cuda()
+
+        result_samples = []
+        torch_results_samples = []
+        with torch_tensorrt.runtime.enable_cudagraphs(
+            optimized_model
+        ) as cudagraphs_module:
+            for i in inputs:
+                result_samples.append(cudagraphs_module(i).detach().cpu())
+                torch_results_samples.append(fx_graph(i).detach().cpu())
+
+        for i, (optimized_model_results, torch_model_results) in enumerate(
+            zip(result_samples, torch_results_samples)
+        ):
+            max_diff = float(
+                torch.max(torch.abs(optimized_model_results - torch_model_results))
+            )
+            self.assertAlmostEqual(
+                max_diff,
+                0,
+                DECIMALS_OF_AGREEMENT,
+                msg=f"CUDA Graph C++ TRT outputs don't match with the original model. (trial: {i})",
+            )
+
+        torch._dynamo.reset()
+
     def test_cudagraphs_enabled_fallback_inference_cpp(self):
         class SampleModel(torch.nn.Module):
             def forward(self, x):
@@ -106,6 +150,51 @@ class TestCudagraphsCPP(TestCase):
             torch_executed_ops={"torch.ops.aten.mul.Tensor"},
             use_python_runtime=False,
         )
+
+        result_samples = []
+        torch_results_samples = []
+        with torch_tensorrt.runtime.enable_cudagraphs(
+            optimized_model
+        ) as cudagraphs_module:
+            for i in inputs:
+                result_samples.append(cudagraphs_module(i).detach().cpu())
+                torch_results_samples.append(fx_graph(i).detach().cpu())
+
+        for i, (optimized_model_results, torch_model_results) in enumerate(
+            zip(result_samples, torch_results_samples)
+        ):
+            max_diff = float(
+                torch.max(torch.abs(optimized_model_results - torch_model_results))
+            )
+            self.assertAlmostEqual(
+                max_diff,
+                0,
+                DECIMALS_OF_AGREEMENT,
+                msg=f"CUDA Graph Python TRT outputs don't match with the original model. (trial: {i})",
+            )
+
+        torch._dynamo.reset()
+
+    def test_cudagraphs_enabled_fallback_inference_cpp_cpu_offload(self):
+        class SampleModel(torch.nn.Module):
+            def forward(self, x):
+                return torch.relu((x + 2) * 0.5)
+
+        inputs = [torch.randn(*INPUT_SIZE).cuda() for _ in range(TRIALS)]
+        fx_graph = torch.fx.symbolic_trace(SampleModel())
+
+        # Validate that the results between Torch and Torch-TRT are similar
+        optimized_model = torch_tensorrt.compile(
+            fx_graph,
+            "torch_compile",
+            inputs[0],
+            min_block_size=1,
+            pass_through_build_failures=True,
+            torch_executed_ops={"torch.ops.aten.mul.Tensor"},
+            use_python_runtime=False,
+            offload_module_to_cpu=True,
+        )
+        optimized_model.cuda()
 
         result_samples = []
         torch_results_samples = []
