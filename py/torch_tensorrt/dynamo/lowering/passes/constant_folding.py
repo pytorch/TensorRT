@@ -55,7 +55,6 @@ def constant_fold(
     del cf
 
     logger.debug(f"Graph after constant folding:\n{gm.graph}")
-
     return gm
 
 

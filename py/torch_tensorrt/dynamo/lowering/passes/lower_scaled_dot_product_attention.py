@@ -25,6 +25,8 @@ def lower_scaled_dot_product_attention(
     """
     original_fns, replacement = scaled_dot_product_attention_replacement()
     replaced_nodes = []
+    sdpa_nodes = [node for node in gm.graph.nodes if node.target == torch.ops.aten._scaled_dot_product_efficient_attention.default]
+    breakpoint()
     # For each original function, search for it in the graph and replace
     for original in original_fns:
         replaced_nodes += torch.fx.subgraph_rewriter.replace_pattern_with_filters(
@@ -33,7 +35,7 @@ def lower_scaled_dot_product_attention(
             replacement,
             ignore_literals=True,
         )
-
+    breakpoint()
     if replaced_nodes:
         # Repair instances which use the kwargs field (specifically the "scale" kwarg)
         # Also repair instances which specified the is_causal or attn_bias fields
@@ -69,8 +71,9 @@ def lower_scaled_dot_product_attention(
 
             # Set default args in new node:
             # Tensor? attn_mask=None, float dropout_p=0.0, bool is_causal=False
+            breakpoint()
             new_attention_node.args = new_attention_node.args + (None, 0.0, False)
-
+            breakpoint()
             # The `is_causal` argument was specified
             if (
                 (

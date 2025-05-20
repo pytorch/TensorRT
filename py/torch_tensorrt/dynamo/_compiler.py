@@ -684,7 +684,6 @@ def compile(
     )
 
     gm = exported_program.module()
-
     exported_program.module().to("cpu")
     torch.cuda.empty_cache()
     import gc
@@ -797,7 +796,6 @@ def compile_module(
             
         return target_module
 
-    
     # Partition module into components that can be TRT-accelerated
     fast_partitioner_failed = False
     # If specified, try using the fast partitioner and fall back to the global one on failure
@@ -1178,7 +1176,7 @@ def convert_exported_program_to_serialized_trt_engine(
         "tiling_optimization_level": tiling_optimization_level,
         "l2_limit_for_tiling": l2_limit_for_tiling,
     }
-
+    
     settings = CompilationSettings(**compilation_options)
     logger.info("Compilation Settings: %s\n", settings)
 

@@ -43,7 +43,7 @@ def get_model(args):
                     args.model,
                     use_cache=False,
                     attn_implementation="sdpa",
-                    num_hidden_layers=1
+                    # num_hidden_layers=1
                 )
                 .eval()
                 .cuda()
@@ -133,28 +133,7 @@ def print_outputs(backend_name, gen_tokens, tokenizer):
     )
     print("===================================")
 
-def get_zeroed_kv_cache_inputs(model: torch.fx.GraphModule):
-    """
-    Extracts and returns zeroed KV cache tensors from a torch.fx.GraphModule.
-    
-    This function identifies placeholder nodes in the graph that represent KV cache tensors,
-    and creates zeroed tensors with the same shape, dtype, and device as the original placeholders.
-    
-    Args:
-        model (torch.fx.GraphModule): The exported model graph containing KV cache placeholders
-        
-    Returns:
-        tuple: A tuple of zeroed tensors corresponding to the KV cache placeholders in the graph
-    """
-    # placeholder nodes are expected to be in the following order:
-    # input_ids, kv_cache_key, kv_cache_value, start_idx, end_idx
-    placeholder_nodes = [node for node in model.graph.nodes if node.op == "placeholder"]
-    kv_cache_inputs = placeholder_nodes[1:-2]
-    zeroed_kv_cache_inputs = []
-    for input in kv_cache_inputs:
-        zeroed_kv_cache_inputs.append(torch.zeros(input.meta["val"].shape, dtype=input.meta["val"].dtype, device=DEVICE))
 
-    return tuple(zeroed_kv_cache_inputs)
 
 def measure_perf(trt_model, input_signature, backend_name):
     # Measure average time for 10 iterations
@@ -207,7 +186,7 @@ if __name__ == "__main__":
         "--min_block_size", type=int, default=1, help="no. of iterations to run"
     )
     arg_parser.add_argument(
-        "--max_tokens", type=int, default=128, help="no. of iterations to run"
+        "--max_tokens", type=int, default=128, help="no. of max tokens to be generated"
     )
     arg_parser.add_argument(
         "--enable_pytorch_run", 
@@ -228,6 +207,11 @@ if __name__ == "__main__":
         "--debug",
         action="store_true",
         help="Enable debug (default: False)"
+    )
+    arg_parser.add_argument(
+        "--benchmark",
+        action="store_true",
+        help="Enable benchmark (default: False)"
     )
     args = arg_parser.parse_args()
     with torch.inference_mode():
@@ -253,75 +237,79 @@ if __name__ == "__main__":
             pyt_gen_tokens = generate(
                 model, input_ids.clone(), MAX_OUTPUT_SEQ_LENGTH, tokenizer.eos_token_id
             )
-
-            pyt_timings = time_generate(
-                generate,
-                model,
-                input_ids.clone(),
-                MAX_OUTPUT_SEQ_LENGTH,
-                tokenizer.eos_token_id,
-                iterations=args.iterations,
-            )
-            pyt_stats = recordStats(
-                "PyTorch", pyt_timings, args.precision, batch_size=1, compile_time_s=None
-            )
-
-        # TRT
-        if args.kv_cache:
-            # This import is required to register static/dynamic KV cache transformations as lowering passes
-            import torch_tensorrt.extensions
-
-        pyt_logits = model.cuda()(input_ids.clone())
-        trt_model = compile_torchtrt(model, input_ids, args) 
-        trt_logits = trt_model(input_ids.clone())
-        print(f"Diff between pyt and trt: {torch.mean(torch.abs(pyt_logits - trt_logits))}")
-        # print(f"Diff between pyt and trt logits: {torch.mean(torch.abs(pyt_logits.logits - trt_logits.logits))}")
-        breakpoint()
-        if args.kv_cache:
-            trt_input_signature = (input_ids.clone(),) + get_zeroed_kv_cache_inputs(trt_model)
-            if args.cudagraph:
-                # Run a decoding loop with prefill and generate phases so that the CUDAGraph is recorded for both of these phases.
-                trt_input_signature = (input_ids.clone(),) + get_zeroed_kv_cache_inputs(trt_model)
-                torch_tensorrt.runtime.set_cudagraphs_mode(True)
- 
-            trt_input_signature = (input_ids.clone(),) + get_zeroed_kv_cache_inputs(trt_model)
             
-            trt_gen_tokens = generate_with_kv_cache(
-                trt_model, trt_input_signature, MAX_OUTPUT_SEQ_LENGTH, tokenizer.eos_token_id,
+            if args.benchmark:
+                pyt_timings = time_generate(
+                    generate,
+                    model,
+                    input_ids.clone(),
+                    MAX_OUTPUT_SEQ_LENGTH,
+                    tokenizer.eos_token_id,
+                    iterations=args.iterations,
+                )
+                pyt_stats = recordStats(
+                    "PyTorch", pyt_timings, args.precision, batch_size=1, compile_time_s=None
                 )
 
-            trt_input_signature = (input_ids.clone(),) + get_zeroed_kv_cache_inputs(trt_model)
-            trt_timings = time_generate(
-                generate_with_kv_cache,
-                trt_model,
-                trt_input_signature,
-                MAX_OUTPUT_SEQ_LENGTH,
-                tokenizer.eos_token_id,
-                iterations=args.iterations,
-            )
+        # TRT
+        from lower_sdpa import *
+        if args.kv_cache:
+            # This import is required to register static/dynamic KV cache transformations as lowering passes
+            from static_cache import *
+            trt_model = compile_torchtrt(model, input_ids, args) 
+        else:
+            # pyt_logits = model.cuda()(input_ids.clone())
+            trt_model = compile_torchtrt(model, input_ids, args) 
+            # trt_logits = trt_model(input_ids.clone(), True)
+            # print(f"Diff between pyt and trt: {torch.mean(torch.abs(pyt_logits - trt_logits))}")
+            # print(f"Diff between pyt and trt logits: {torch.mean(torch.abs(pyt_logits.logits - trt_logits.logits))}")
+        if args.kv_cache:
+            if args.cudagraph:
+                # Run a decoding loop with prefill and generate phases so that the CUDAGraph is recorded for both of these phases.
+                # trt_input_signature = (input_ids.clone(),) + get_zeroed_kv_cache_inputs(trt_model)
+                torch_tensorrt.runtime.set_cudagraphs_mode(True)
+             
+            trt_gen_tokens = generate_with_kv_cache(
+                trt_model, input_ids.clone(), MAX_OUTPUT_SEQ_LENGTH, tokenizer.eos_token_id,
+                )
+
+            if args.benchmark:
+                trt_timings = time_generate(
+                    generate_with_kv_cache,
+                    trt_model,
+                    input_ids.clone(),
+                    MAX_OUTPUT_SEQ_LENGTH,
+                    tokenizer.eos_token_id,
+                    iterations=args.iterations,
+                )
 
         else:
             trt_gen_tokens = generate(
                 trt_model, input_ids.clone(), MAX_OUTPUT_SEQ_LENGTH, tokenizer.eos_token_id,
             )
-            trt_timings = time_generate(
-                generate,
-                trt_model,
-                input_ids.clone(),
-                MAX_OUTPUT_SEQ_LENGTH,
-                tokenizer.eos_token_id,
-                iterations=args.iterations,
+            if args.benchmark:
+                trt_timings = time_generate(
+                    generate,
+                    trt_model,
+                    input_ids.clone(),
+                    MAX_OUTPUT_SEQ_LENGTH,
+                    tokenizer.eos_token_id,
+                    iterations=args.iterations,
+                )
+        
+        if args.benchmark:
+            trt_stats = recordStats(
+                "TensorRT", trt_timings, args.precision, batch_size=1, compile_time_s=None
             )
-        trt_stats = recordStats(
-            "TensorRT", trt_timings, args.precision, batch_size=1, compile_time_s=None
-        )
 
         if args.enable_pytorch_run: 
             print_outputs("PyTorch", pyt_gen_tokens, tokenizer)
         print_outputs("TensorRT", trt_gen_tokens, tokenizer)
-        if  args.enable_pytorch_run:
-            print("=========PyTorch PERFORMANCE============ \n")
-            print(pyt_stats)
+
+        if  args.benchmark:
+            if args.enable_pytorch_run:
+                print("=========PyTorch PERFORMANCE============ \n")
+                print(pyt_stats)
             print("===================== \n")
-        print("=========TensorRT PERFORMANCE============ \n")
-        print(trt_stats)
+            print("=========TensorRT PERFORMANCE============ \n")
+            print(trt_stats)

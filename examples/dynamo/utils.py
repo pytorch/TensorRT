@@ -38,6 +38,30 @@ def export_llm(model, inputs, min_seq_len=1, max_seq_len=16):
 
     return ep
 
+def get_zeroed_kv_cache_inputs(model: torch.fx.GraphModule):
+    """
+    Extracts and returns zeroed KV cache tensors from a torch.fx.GraphModule.
+    
+    This function identifies placeholder nodes in the graph that represent KV cache tensors,
+    and creates zeroed tensors with the same shape, dtype, and device as the original placeholders.
+    
+    Args:
+        model (torch.fx.GraphModule): The exported model graph containing KV cache placeholders
+        
+    Returns:
+        tuple: A tuple of zeroed tensors corresponding to the KV cache placeholders in the graph
+    """
+    # placeholder nodes are expected to be in the following order:
+    # input_ids, kv_cache_key, kv_cache_value, start_idx, end_idx
+    placeholder_nodes = [node for node in model.graph.nodes if node.op == "placeholder"]
+    # The first two inputs are input_ids and is_causal. The last two inputs are start_idx and end_idx. In between are the KV cache tensors.
+    kv_cache_inputs = placeholder_nodes[2:-2]
+    zeroed_kv_cache_inputs = []
+    for input in kv_cache_inputs:
+        zeroed_kv_cache_inputs.append(torch.zeros(input.meta["val"].shape, dtype=input.meta["val"].dtype, device=torch.device("cuda:0")))
+
+    return tuple(zeroed_kv_cache_inputs)
+
 
 def generate(model, input_seq, max_output_seq_length, eos_token_id, benchmark=True):
     """
@@ -62,36 +86,36 @@ def generate(model, input_seq, max_output_seq_length, eos_token_id, benchmark=Tr
         # TODO: Handle batch in this check
         if not benchmark and stopping_criteria(input_seq, logits).item():
             break
-    # breakpoint()
+
     return input_seq
 
-def generate_with_kv_cache(model, input_signature, max_output_seq_length, eos_token_id):
+def generate_with_kv_cache(model, input_seq, max_output_seq_length, eos_token_id):
     """
     Greedy decoding of the model with KV cache.
     """
     start_idx = 0
-    end_idx = input_signature[0].shape[1]
-    output_seq = input_signature[0].clone()
-    isl = input_signature[0].shape[1]
+    end_idx = input_seq.shape[1]
+    output_seq = input_seq.clone()
     # TODO: Confirm this: When end_idx = max_output_seq_length-1, number of tokens generated = OSL
     logits_concat = []
     num_tokens_generated = 0
-    while num_tokens_generated < max_output_seq_length - isl: # end_idx < max_output_seq_length:
-        input_signature_with_start_end_idx = input_signature + (start_idx, end_idx)
-        logits_keys_values = model(*input_signature_with_start_end_idx)
+    
+    kv_cache = get_zeroed_kv_cache_inputs(model)
+    while end_idx < max_output_seq_length:
+        is_causal = True if input_seq.shape[1] > 1 else False
+        input_signature = (input_seq, is_causal, *kv_cache, start_idx, end_idx)
+        logits_keys_values = model(*input_signature)
         num_tokens_generated += 1
         logits = logits_keys_values[0]
         logits_concat.append(logits)
         kv_cache = logits_keys_values[1:]
         next_token_logits = logits[:, -1, :]
         next_tokens = torch.argmax(next_token_logits, dim=-1, keepdim=True)
-        input_signature = (next_tokens, *kv_cache)
-
         output_seq = torch.cat([output_seq, next_tokens], dim=-1)
+        input_seq = next_tokens
         start_idx = end_idx
         end_idx = start_idx + 1 
-    lkv = torch.cat(logits_concat, dim=1)
-    # breakpoint()
+
     return output_seq
 
 def time_generate(

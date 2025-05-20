@@ -16,7 +16,7 @@ llama_model = AutoModelForCausalLM.from_pretrained(
                 use_cache=False,
                 attn_implementation="sdpa",
                 num_hidden_layers=1,
-            ).eval() 
+            ).eval().cuda()
 LLAMA_CONFIG = llama_model.config
 
 def test_llama_attention(args):
@@ -33,24 +33,33 @@ def test_llama_attention(args):
             return attn_output
     
     DTYPE = torch.float32
-    model = LlamaAttentionBlock().eval().cuda().to(DTYPE)
+    # model = LlamaAttentionBlock().eval().cuda().to(DTYPE)
+    model = llama_model.model.layers[0].self_attn.to(DTYPE)
     # llama3 
-    hidden_states = torch.randn((1, 6, 2048), dtype=DTYPE).cuda()
-    position_embeddings = (torch.randn((1, 6, 64), dtype=DTYPE).cuda(), torch.randn((1, 6, 64), dtype=DTYPE).cuda())
-
-    pyt_output = model(hidden_states, position_embeddings)
+    # hidden_states = torch.randn((1, 6, 2048), dtype=DTYPE).cuda()
+    # position_embeddings = (torch.randn((1, 6, 64), dtype=DTYPE).cuda(), torch.randn((1, 6, 64), dtype=DTYPE).cuda())
+    hidden_states = torch.load("hidden_states.pt")
+    position_embeddings = torch.load("position_embeddings.pt")
+    # breakpoint()
+    pyt_output = model(hidden_states, position_embeddings, None)
+    
     seq_len = torch.export.Dim("seq_len", min=2, max=2176)
-    dynamic_shapes = ({1: seq_len}, ({1: seq_len}, {1: seq_len}))
-    ep = torch.export.export(model, (hidden_states, position_embeddings), dynamic_shapes=dynamic_shapes)
+    dynamic_shapes = ({1: seq_len}, ({1: seq_len}, {1: seq_len}), None)
+    ep = torch.export.export(model, (hidden_states, position_embeddings, None), dynamic_shapes=dynamic_shapes)
     
     with torch_tensorrt.logging.debug():
         trt_model = torch_tensorrt.dynamo.compile(ep, 
-                                                inputs=[hidden_states, position_embeddings], 
+                                                inputs=[hidden_states, position_embeddings, None], 
                                                 enabled_precisions={torch.float32},
+                                                disable_tf32=True,
                                                 debug=True)
-    trt_output = trt_model(hidden_states, position_embeddings)
+    trt_output = trt_model(hidden_states, position_embeddings, None)
+    breakpoint()
+    if isinstance(pyt_output, tuple):
+        print(f"Diff b/w pyt and trt: {torch.mean(torch.abs(pyt_output[0] - trt_output[0]))}")
+    else:
+        print(f"Diff b/w pyt and trt: {torch.mean(torch.abs(pyt_output - trt_output))}")
     
-    print(f"Diff b/w pyt and trt: {torch.mean(torch.abs(pyt_output - trt_output))}")
 
 def test_llama_decoder(args):
     class LlamaDecoder(nn.Module):

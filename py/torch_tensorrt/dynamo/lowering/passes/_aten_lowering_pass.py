@@ -26,8 +26,7 @@ pass_list = [
     replace_max_pool_with_indices,
     remove_assert_nodes,
     accumulate_fp32_matmul,
-    lower_scaled_dot_product_attention,
-    remove_num_users_is_0_nodes,
+    # remove_num_users_is_0_nodes,
 ]
 
 if not is_tegra_platform():
