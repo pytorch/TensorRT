@@ -43,4 +43,5 @@ if [[ ${TENSORRT_VERSION} != "" ]]; then
 fi
 
 cat MODULE.bazel
+cat pyproject.toml
 echo "RELEASE=1" >> ${GITHUB_ENV}

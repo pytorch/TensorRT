@@ -97,4 +97,5 @@ if [[ ${TENSORRT_VERSION} != "" ]]; then
     sed -i -e "s#\"https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/.*\"#\"${TENSORRT_URLS}\"#g" MODULE.bazel
 fi
 cat MODULE.bazel
+cat pyproject.toml
 export CI_BUILD=1
