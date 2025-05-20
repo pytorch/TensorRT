@@ -199,6 +199,84 @@ def test_resnet18_half(ir):
     torch._dynamo.reset()
 
 
+# @unittest.skipIf(
+#     torch.cuda.get_device_capability() < (10, 0),
+#     "FP4 quantization requires compute capability 10.0 or later",
+# )
+@unittest.skipIf(
+    not importlib.util.find_spec("modelopt"),
+    "ModelOpt is required to run this test",
+)
+@pytest.mark.unit
+def test_base_fp4(ir):
+    import modelopt.torch.quantization as mtq
+    from modelopt.torch.quantization.utils import export_torch_mode
+
+    class SimpleNetwork(torch.nn.Module):
+        def __init__(self):
+            super(SimpleNetwork, self).__init__()
+            self.linear1 = torch.nn.Linear(
+                in_features=64, out_features=32, bias=True, dtype=torch.float16
+            )
+
+        def forward(self, x):
+            x = self.linear1(x)
+            return x
+
+    def calibrate_loop(model):
+        """Simple calibration function for testing."""
+        model(input_tensor)
+
+    input_tensor = torch.ones(128, 64, dtype=torch.float16).cuda()
+
+    print(f"lan added amax: {input_tensor.abs().amax()}")
+    model = SimpleNetwork().eval().cuda()
+    model.linear1.weight = torch.nn.Parameter(torch.ones(32, 64, dtype=torch.float16).cuda())
+    model.linear1.bias = torch.nn.Parameter(torch.zeros(128, 32, dtype=torch.float16).cuda())
+    output_pyt = model(input_tensor)
+    print(f"lan added model input: {input_tensor=}")    
+    print(f"lan added model weight: {model.linear1.weight=}")
+    print(f"lan added model bias: {model.linear1.bias=}")
+    print(f"lan added pytorch output_pyt: {output_pyt} {output_pyt.dtype=} {output_pyt.shape=}")
+
+    quant_cfg = mtq.NVFP4_DEFAULT_CFG
+    mtq.quantize(model, quant_cfg, forward_loop=calibrate_loop)
+    # model has qdq nodes at this point
+    
+    torch.onnx.export(model, input_tensor, "mtq_model.onnx")
+
+    with torch.no_grad():
+        with export_torch_mode():
+            exp_program = torch.export.export(model, (input_tensor,), strict=False)
+            from torch.fx import passes
+
+            g = passes.graph_drawer.FxGraphDrawer(exp_program, "torch_export_fp4")
+            with open("a.svg", "wb") as f:
+                f.write(g.get_dot_graph().create_svg())
+
+            trt_model = torchtrt.dynamo.compile(
+                exp_program,
+                inputs=[input_tensor],
+                enabled_precisions={
+                    torch.float4_e2m1fn_x2,
+                    torch.float8_e4m3fn,
+                    torch.float32,
+                    torch.float16,
+                },
+                min_block_size=1,
+                debug=True,
+                cache_built_engines=False,
+                reuse_cached_engines=False,
+                use_explicit_typing=True,
+            )
+
+            outputs_trt = trt_model(input_tensor)
+            print(f"lan added torch_tensorrt outputs_trt: {outputs_trt}")
+            abs_diff = torch.abs(output_pyt - outputs_trt)
+            print(f"lan added max abs_diff: {abs_diff.max().item()}")
+            assert torch.allclose(output_pyt, outputs_trt, rtol=4e-1, atol=4e-1)
+
+
 @unittest.skipIf(
     torch.cuda.get_device_capability() < (8, 9),
     "FP8 quantization requires compute capability 8.9 or later",
@@ -230,8 +308,8 @@ def test_base_fp8(ir):
 
     input_tensor = torch.randn(1, 10).cuda()
     model = SimpleNetwork().eval().cuda()
-
     quant_cfg = mtq.FP8_DEFAULT_CFG
+
     mtq.quantize(model, quant_cfg, forward_loop=calibrate_loop)
     # model has FP8 qdq nodes at this point
     output_pyt = model(input_tensor)
