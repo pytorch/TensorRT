@@ -4,10 +4,10 @@ module(
     version = "${BUILD_VERSION}"
 )
 
-bazel_dep(name = "googletest", version = "1.14.0")
-bazel_dep(name = "platforms", version = "0.0.10")
-bazel_dep(name = "rules_cc", version = "0.0.9")
-bazel_dep(name = "rules_python", version = "0.34.0")
+bazel_dep(name = "googletest", version = "1.16.0")
+bazel_dep(name = "platforms", version = "0.0.11")
+bazel_dep(name = "rules_cc", version = "0.1.1")
+bazel_dep(name = "rules_python", version = "1.3.0")
 
 python = use_extension("@rules_python//python/extensions:python.bzl", "python")
 python.toolchain(
@@ -27,17 +27,25 @@ local_repository = use_repo_rule("@bazel_tools//tools/build_defs/repo:local.bzl"
 # External dependency for torch_tensorrt if you already have precompiled binaries.
 local_repository(
     name = "torch_tensorrt",
-    path = "/opt/conda/lib/python3.8/site-packages/torch_tensorrt",
+    path = "/opt/conda/lib/python3.11/site-packages/torch_tensorrt",
 )
 
 
 new_local_repository = use_repo_rule("@bazel_tools//tools/build_defs/repo:local.bzl", "new_local_repository")
 
 # CUDA should be installed on the system locally
+
 new_local_repository(
     name = "cuda",
     build_file = "@//third_party/cuda:BUILD",
     path = "${CUDA_HOME}",
+)
+
+# These versions can be selected using the flag `--//toolchains/dep_collection:compute_libs="jetpack"`
+new_local_repository(
+    name = "cuda_l4t",
+    build_file = "@//third_party/cuda:BUILD",
+    path = "/usr/local/cuda-12.6",
 )
 
 new_local_repository(
@@ -53,12 +61,12 @@ http_archive = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "ht
 # Tarballs and fetched dependencies (default - use in cases when building from precompiled bin and tarballs)
 #############################################################################################################
 
-http_archive(
-    name = "libtorch",
-    build_file = "@//third_party/libtorch:BUILD",
-    strip_prefix = "libtorch",
-    urls = ["https://download.pytorch.org/libtorch/${CHANNEL}/${CU_VERSION}/libtorch-cxx11-abi-shared-with-deps-latest.zip"],
-)
+#http_archive(
+#    name = "libtorch",
+#    build_file = "@//third_party/libtorch:BUILD",
+#    strip_prefix = "libtorch",
+#    urls = ["https://download.pytorch.org/libtorch/${CHANNEL}/${CU_VERSION}/libtorch-cxx11-abi-shared-with-deps-latest.zip"],
+#)
 
 # Download these tarballs manually from the NVIDIA website
 # Either place them in the distdir directory in third_party and use the --distdir flag
@@ -70,6 +78,24 @@ http_archive(
     strip_prefix = "TensorRT-10.9.0.34",
     urls = [
         "https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.9.0/tars/TensorRT-10.9.0.34.Linux.x86_64-gnu.cuda-12.8.tar.gz",
+    ],
+)
+
+http_archive(
+    name = "tensorrt_sbsa",
+    build_file = "@//third_party/tensorrt/archive:BUILD",
+    strip_prefix = "TensorRT-10.9.0.34",
+    urls = [
+        "https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.9.0/tars/TensorRT-10.9.0.34.Linux.aarch64-gnu.cuda-12.8.tar.gz",
+    ],
+)
+
+http_archive(
+    name = "tensorrt_l4t",
+    build_file = "@//third_party/tensorrt/archive:BUILD",
+    strip_prefix = "TensorRT-10.3.0.26",
+    urls = [
+        "https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.3.0/tars/TensorRT-10.3.0.26.l4t.aarch64-gnu.cuda-12.6.tar.gz",
     ],
 )
 
@@ -88,6 +114,12 @@ http_archive(
 ####################################################################################
 
 # NOTE: If you are using a local build of torch, just point the Libtorch dep to that path.
+
+new_local_repository(
+    name = "libtorch",
+    path = "${TORCH_INSTALL_PATH}",
+    build_file = "third_party/libtorch/BUILD"
+)
 
 new_local_repository(
     name = "libtorch_win",

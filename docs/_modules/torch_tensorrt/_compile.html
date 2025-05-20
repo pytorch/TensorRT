@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt._compile &mdash; Torch-TensorRT v2.8.0.dev0+3b30409 documentation</title>
+  <title>torch_tensorrt._compile &mdash; Torch-TensorRT v2.8.0.dev0+bb990fd documentation</title>
   
 
   
@@ -290,7 +290,7 @@
               
               
                 <div class="version">
-                  v2.8.0.dev0+3b30409
+                  v2.8.0.dev0+bb990fd
                 </div>
               
             
@@ -1073,6 +1073,7 @@
     <span class="n">arg_inputs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Sequence</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">kwarg_inputs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">retrace</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">pickle_protocol</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">2</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Save the model to disk in the specified output format.</span>
@@ -1085,6 +1086,7 @@
 <span class="sd">        output_format (str): Format to save the model. Options include exported_program | torchscript.</span>
 <span class="sd">        retrace (bool): When the module type is a fx.GraphModule, this option re-exports the graph using torch.export.export(strict=False) to save it.</span>
 <span class="sd">                This flag is experimental for now.</span>
+<span class="sd">        pickle_protocol (int): The pickle protocol to use to save the model. Default is 2. Increase this to 4 or higher for large models</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">module</span><span class="p">,</span> <span class="n">CudaGraphsTorchTensorRTModule</span><span class="p">):</span>
         <span class="n">module</span> <span class="o">=</span> <span class="n">module</span><span class="o">.</span><span class="n">compiled_module</span>
@@ -1157,7 +1159,9 @@
                         <span class="s2">&quot;Provided model is a torch.fx.GraphModule and retrace is False, inputs or arg_inputs is not necessary during save.&quot;</span>
                     <span class="p">)</span>
                 <span class="n">exp_program</span> <span class="o">=</span> <span class="n">export</span><span class="p">(</span><span class="n">module</span><span class="p">)</span>
-                <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">exp_program</span><span class="p">,</span> <span class="n">file_path</span><span class="p">)</span>
+                <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">save</span><span class="p">(</span>
+                    <span class="n">exp_program</span><span class="p">,</span> <span class="n">file_path</span><span class="p">,</span> <span class="n">pickle_protocol</span><span class="o">=</span><span class="n">pickle_protocol</span>
+                <span class="p">)</span>
             <span class="k">else</span><span class="p">:</span>
                 <span class="k">if</span> <span class="n">arg_inputs</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
                     <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
@@ -1169,7 +1173,9 @@
                     <span class="n">kwargs</span><span class="o">=</span><span class="n">kwarg_inputs</span><span class="p">,</span>
                     <span class="n">strict</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
                 <span class="p">)</span>
-                <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">exp_program</span><span class="p">,</span> <span class="n">file_path</span><span class="p">)</span></div>
+                <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">save</span><span class="p">(</span>
+                    <span class="n">exp_program</span><span class="p">,</span> <span class="n">file_path</span><span class="p">,</span> <span class="n">pickle_protocol</span><span class="o">=</span><span class="n">pickle_protocol</span>
+                <span class="p">)</span></div>
 </pre></div>
 
              </article>

@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Deploying Torch-TensorRT Programs &mdash; Torch-TensorRT v2.8.0.dev0+3b30409 documentation</title>
+  <title>Deploying Torch-TensorRT Programs &mdash; Torch-TensorRT v2.8.0.dev0+bb990fd documentation</title>
   
 
   
@@ -293,7 +293,7 @@
               
               
                 <div class="version">
-                  v2.8.0.dev0+3b30409
+                  v2.8.0.dev0+bb990fd
                 </div>
               
             
@@ -508,10 +508,6 @@ necessary to run Torch-TensorRT programs. Instead of linking <code class="docuti
 link <code class="docutils literal notranslate"><span class="pre">libtorchtrt_runtime.so</span></code> in your deployment programs or use <code class="docutils literal notranslate"><span class="pre">DL_OPEN</span></code> or <code class="docutils literal notranslate"><span class="pre">LD_PRELOAD</span></code>. For python
 you can load the runtime with <code class="docutils literal notranslate"><span class="pre">torch.ops.load_library(&quot;libtorchtrt_runtime.so&quot;)</span></code>. You can then continue to use
 programs just as you would otherwise via PyTorch API.</p>
-<div class="admonition note">
-<p class="admonition-title">Note</p>
-<p>If you are using the standard distribution of PyTorch in Python on x86, likely you will need the pre-cxx11-abi variant of <code class="docutils literal notranslate"><span class="pre">libtorchtrt_runtime.so</span></code>, check <a class="reference internal" href="../getting_started/installation.html#installation"><span class="std std-ref">Installation</span></a> documentation for more details.</p>
-</div>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
 <p>If you are linking <code class="docutils literal notranslate"><span class="pre">libtorchtrt_runtime.so</span></code>, likely using the following flags will help <code class="docutils literal notranslate"><span class="pre">-Wl,--no-as-needed</span> <span class="pre">-ltorchtrt</span> <span class="pre">-Wl,--as-needed</span></code> as there’s no direct symbol dependency to anything in the Torch-TensorRT runtime for most Torch-TensorRT runtime applications</p>
