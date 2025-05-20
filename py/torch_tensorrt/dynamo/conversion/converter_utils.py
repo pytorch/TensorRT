@@ -1156,4 +1156,3 @@ def promote_trt_tensors_to_same_dtype(
     rhs_cast = cast_trt_tensor(ctx, rhs, promoted_dtype, f"{name_prefix}rhs_cast")
 
     return lhs_cast, rhs_cast
-    
