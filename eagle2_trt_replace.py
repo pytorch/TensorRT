@@ -15,7 +15,7 @@ mq.ALL_ATTENTION_FUNCTIONS["flash_attention_2"] = mq.ALL_ATTENTION_FUNCTIONS["sd
 from transformers.modeling_outputs import CausalLMOutputWithPast
 
 # 1) Load base model & processor
-def load_base(device="cuda:0"):
+def load_base(device="cuda:1"):
     model_id = "nvidia/Eagle2-2B"
     model = (
         AutoModel.from_pretrained(model_id, trust_remote_code=True, torch_dtype=torch.float16)
@@ -46,13 +46,6 @@ class LMNoCache(nn.Module):
 
     def forward(self, inputs_embeds, position_ids=None, cache_position=None): #, position_ids=None, cache_position=None):
         # Ensure inputs are in float16 and on the correct device
-        # inputs_embeds = inputs_embeds.to(dtype=torch.float32, device=self.lm.device) 
-
-        # if position_ids is not None:
-        #     position_ids = position_ids.to(device=self.lm.device)
-        # if cache_position is not None:
-        #     cache_position = cache_position.to(device=self.lm.device)
-
         if position_ids is not None:
             position_ids = position_ids.to(device=self.lm.device)
         if cache_position is not None:
@@ -60,8 +53,6 @@ class LMNoCache(nn.Module):
 
         outputs = self.lm(
             inputs_embeds=inputs_embeds,
-            # position_ids=position_ids,
-            # cache_position=cache_position,
             position_ids=position_ids,
             cache_position=cache_position,
             use_cache=False
@@ -79,7 +70,7 @@ class LMNoCache(nn.Module):
 
 # 3) Compile sub-modules with TRT
 
-def compile_submodules(base_model, device="cuda:0"):
+def compile_submodules(base_model, device="cuda:1"):
     vision_model = base_model.vision_model
     mlp1 = base_model.mlp1
     language_model = base_model.language_model
@@ -138,9 +129,9 @@ def compile_submodules(base_model, device="cuda:0"):
     dummy_position_ids = torch.arange(1, dummy_seq + 1, device=device).unsqueeze(0).expand(dummy_batch, -1)
     dummy_cache_position = torch.arange(dummy_seq, device=device)
     B3 = torch.export.Dim("batch3", min=1, max=4)
-    # Use a single symbolic dimension for sequence length rather than a complicated expression that can
-    # confuse shape unification during tracing.
-    S3 = torch.export.Dim("seq_lm", min=1, max=2048)
+
+
+    S3 = torch.export.Dim("seq_lm", min=1, max=2560)
     dyn_shapes_lm = {
         "inputs_embeds": {0: B3, 1: S3},
         "position_ids": {0: B3, 1: S3},
@@ -194,7 +185,7 @@ class TRTExtractFeature(nn.Module):
 
 class TRTLanguageWrapper(nn.Module, GenerationMixin):
     """Language model wrapper for Eagle2 compiled with TensorRT"""
-    def __init__(self, trt_lm, original_lm, device="cuda:0"):
+    def __init__(self, trt_lm, original_lm, device="cuda:1"):
         super().__init__()
         self.trt_lm = trt_lm
         self._original_lm = original_lm
@@ -278,118 +269,9 @@ class TRTLanguageWrapper(nn.Module, GenerationMixin):
     def prepare_inputs_for_generation(self, *args, **kwargs):
         return self._original_lm.prepare_inputs_for_generation(*args, **kwargs)
 
-
-    # def prepare_inputs_for_generation(
-    #     self,
-    #     input_ids=None,
-    #     past_key_values=None,
-    #     attention_mask=None,
-    #     inputs_embeds=None,   # <-- 반드시 명시
-    #     **kwargs,
-    # ):
-    #     """
-    #     GenerationMixin 이 첫 스텝과 이후 스텝을 구분할 때 호출됩니다.
-    #     - 첫 스텝: inputs_embeds 없으면 input_ids 로부터 토큰 임베딩 생성
-    #     - 이후 스텝: past_key_values 로 캐시를 활용
-    #     이 래퍼는 대부분의 로직을 원본 LM 에 위임합니다.
-    #     """
-    #     kwargs["use_cache"] = False   
-    #     if inputs_embeds is not None:
-    #         # 이미 임베딩을 넘겨받은 경우 그대로 사용
-    #         return {
-    #             "inputs_embeds": inputs_embeds,
-    #             "use_cache": False,
-    #             # "past_key_values": past_key_values,
-    #             "attention_mask": attention_mask,
-    #             **kwargs,
-                
-    #         }
-        
-    #     # 임베딩이 없으면 원본 모델의 헬퍼를 활용
-    #     return self._orig_lm.prepare_inputs_for_generation(
-    #         input_ids=input_ids,
-    #         use_cache= False,
-    #         # past_key_values=past_key_values,
-    #         attention_mask=attention_mask,
-    #         **kwargs,
-    #     )
-        
-    # def prepare_inputs_for_generation(
-    #     self, 
-    #     input_ids=None, 
-    #     past_key_values=None, 
-    #     inputs_embeds=None, 
-    #     attention_mask=None, 
-    #     **kwargs
-    # ):
-    #     return self._original_lm.prepare_inputs_for_generation(
-    #         input_ids=input_ids,
-    #         past_key_values=past_key_values,
-    #         inputs_embeds=inputs_embeds,
-    #         attention_mask=attention_mask,
-    #         **kwargs
-    #     )
-    
-    # def prepare_inputs_for_generation(self, *args, **kwargs):
-    #     # Re-use the helper from the original HF model.
-    #     return self._orig_lm.prepare_inputs_for_generation(*args, **kwargs)
-
-    # def prepare_inputs_for_generation(self, input_ids, past_key_values=None, inputs_embeds=None, **kwargs):
-    #     token_type_ids = kwargs.get("token_type_ids", None)
-    #     # only last token for inputs_ids if past is defined in kwargs
-    #     if past_key_values:
-    #         input_ids = input_ids[:, -1].unsqueeze(-1)
-    #         if token_type_ids is not None:
-    #             token_type_ids = token_type_ids[:, -1].unsqueeze(-1)
-    #     attention_mask = kwargs.get("attention_mask", None)
-    #     position_ids = kwargs.get("position_ids", None)
-    #     if attention_mask is not None and position_ids is None:
-    #         # create position_ids on the fly for batch generation
-    #         position_ids = attention_mask.long().cumsum(-1) - 1
-    #         position_ids.masked_fill_(attention_mask == 0, 1)
-    #         if past_key_values:
-    #             position_ids = position_ids[:, -1].unsqueeze(-1)
-    #     else:
-    #         position_ids = None
-
-    #     # if `inputs_embeds` are passed, we only want to use them in the 1st generation step
-    #     if inputs_embeds is not None and past_key_values is None:
-    #         model_inputs = {"inputs_embeds": inputs_embeds}
-    #     else:
-    #         model_inputs = {"input_ids": input_ids}
-
-    #     model_inputs.update(
-    #         {
-    #             "past_key_values": past_key_values,
-    #             "use_cache": kwargs.get("use_cache"),
-    #             "position_ids": position_ids,
-    #             "attention_mask": attention_mask,
-    #             "token_type_ids": token_type_ids,
-    #         }
-    #     )
-    #     return model_inputs
-
-    # def prepare_inputs_for_generation(
-    #     self,
-    #     input_ids=None,
-    #     inputs_embeds=None,
-    #     attention_mask=None,
-    #     position_ids=None,
-    #     past_key_values=None,
-    #     **kwargs,
-    # ):
-    #     return self._original_lm.prepare_inputs_for_generation(
-    #         input_ids=input_ids,
-    #         inputs_embeds=inputs_embeds,
-    #         attention_mask=attention_mask,
-    #         position_ids=position_ids,
-    #         past_key_values=past_key_values,
-    #         **kwargs,
-    #     )
-
 # 5) End-to-end integration & test
 
-def build_trt_model(device="cuda:0"):
+def build_trt_model(device="cuda:1"):
     base_model, processor = load_base(device)
     trt_vis, trt_mlp1, trt_lm = compile_submodules(base_model, device)
     base_model.config.use_cache = False
@@ -418,6 +300,7 @@ def build_trt_model(device="cuda:0"):
         # 1) Visual features (ViT) – run once then cache
         vit_embeds = None
         if pixel_values is not None:
+            print("extracting features from image")
             vit_embeds = self.extract_feature(pixel_values)
             self._cached_visual_features = vit_embeds
         else:
@@ -478,36 +361,95 @@ def build_trt_model(device="cuda:0"):
     print("TensorRT-integrated model built")
     return base_model, trt_model, processor
 
-# 6) CLI test – image caption
+# 6) CLI benchmark – Torch vs TensorRT (128 ISL tokens → 128 OSL tokens)
 if __name__ == "__main__":
-    device = "cuda:0"
-    torch.cuda.set_device(0)
+    device = "cuda:1"
+    torch.cuda.set_device(device)
+
+    # Build models (Torch reference & TensorRT-optimised)
     base_model, trt_model, processor = build_trt_model(device)
+
     url = "https://cdn.pixabay.com/photo/2019/08/08/23/33/car-4393990_1280.jpg"
     image = Image.open(requests.get(url, stream=True).raw)
-    prompt = "Describe this image."
+
+    prompt_tokens = ["token"] * 230 # when 230 tokens, ISL = 2048  (image 1792 + text 256). There are 26 additional overhead tokens
+    prompt_text = " ".join(prompt_tokens)
+
     messages = [{
         "role": "user",
-        "content": [{"type": "image", "image": image}, {"type": "text", "text": prompt}],
+        "content": [
+            {"type": "image", "image": image},
+            {"type": "text", "text": prompt_text},
+        ],
     }]
+
+    # Apply chat template & process vision info
     text_list = [processor.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)]
     image_inputs, video_inputs = processor.process_vision_info(messages)
-    model_inputs = processor(text=text_list, images=image_inputs, videos=video_inputs, return_tensors="pt", padding=True).to(device)
-    if "pixel_values" in model_inputs and model_inputs["pixel_values"].dtype != torch.float16:
-        model_inputs["pixel_values"] = model_inputs["pixel_values"].to(torch.float16) # torch.float16
-    if "image_sizes" in model_inputs:
-        print("Removing 'image_sizes' parameter as it's not used by generation")
-        model_inputs.pop("image_sizes")
-    if "image_flags" in model_inputs:
-        model_inputs.pop("image_flags")
 
-    print("\nStarting generation ...")
-    with torch.inference_mode():
-        outputs = trt_model.generate(
-            **model_inputs,
-            max_new_tokens=64,  # Test one token first
-            do_sample=False,
-            use_cache=False,
-        )
-    print("Generated token ID:", outputs[:, -1].item())
-    print("Generated text:", processor.batch_decode(outputs, skip_special_tokens=True)[0])
+    # Tokenise → dict of tensors
+    model_inputs = processor(
+        text=text_list,
+        images=image_inputs,
+        videos=video_inputs,
+        return_tensors="pt",
+        padding=True,
+    ).to(device)
+
+    input_ids = model_inputs["input_ids"]
+    img_tok_id = base_model.image_token_index      # [IMG] token id
+
+    n_total = input_ids.shape[1]                  # ISL
+    n_img   = (input_ids == img_tok_id).sum()     # image token count
+    n_txt   = n_total - n_img                     # text token count
+    print(f"ISL = {n_total}  (image {n_img} + text {n_txt})")
+
+    # Ensure pixel_values are fp16 and drop unused keys
+    if "pixel_values" in model_inputs and model_inputs["pixel_values"].dtype != torch.float16:
+        model_inputs["pixel_values"] = model_inputs["pixel_values"].to(torch.float16)
+    for _drop_key in ("image_sizes", "image_flags"):
+        model_inputs.pop(_drop_key, None)
+
+    # Shared generation kwargs (KV-cache disabled)
+    gen_kwargs = dict(max_new_tokens=128, do_sample=False, use_cache=False, eos_token_id=None, early_stopping=False )
+
+    def _benchmark(model, label):
+        torch.cuda.empty_cache()
+        torch.cuda.synchronize()
+        start = torch.cuda.Event(enable_timing=True)
+        end = torch.cuda.Event(enable_timing=True)
+
+        start.record()
+        with torch.inference_mode():
+            out = model.generate(**model_inputs, **gen_kwargs)
+        end.record()
+        torch.cuda.synchronize()
+
+        runtime_s = start.elapsed_time(end) / 1000.0  # milliseconds → seconds
+        text_out = processor.batch_decode(out, skip_special_tokens=True)[0]
+        print(f"[{label}] runtime: {runtime_s:.3f} s | last token id: {out[:, -1].item()}")
+        return out, text_out, runtime_s
+
+    print("\nRunning baseline (pure Torch) …")
+    torch_outputs, torch_text, torch_time = 0, 0, 0
+    # torch_outputs, torch_text, torch_time = _benchmark(base_model, "Torch")
+
+    print("\nRunning TensorRT-optimised model …")
+    trt_model.generation_config.eos_token_id = None
+    trt_outputs, trt_text, trt_time = _benchmark(trt_model, "TensorRT")
+
+    # ------------------------------------------------------------------
+    # Verify correctness and report speed-up
+    # ------------------------------------------------------------------
+    tokens_equal = False # torch.equal(torch_outputs, trt_outputs)
+    text_equal = False # (torch_text == trt_text)
+
+    print("\n=== Verification ===")
+    print(f"Token IDs identical: {tokens_equal}")
+    print(f"Decoded text identical: {text_equal}")
+
+    speedup = 0 # torch_time / trt_time if trt_time > 0 else float('inf')
+    print("\n=== Timing ===")
+    print(f"Torch time      : {torch_time:.3f} s")
+    print(f"TensorRT time   : {trt_time:.3f} s")
+    print(f"Speed-up (×)    : {speedup:.2f}")
