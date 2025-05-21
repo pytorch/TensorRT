@@ -3,6 +3,10 @@ from typing import Any, Callable, List, Optional, Sequence
 import torch
 from torch.fx.passes.pass_manager import PassManager
 from torch_tensorrt.dynamo._settings import CompilationSettings
+from torch_tensorrt.dynamo.lowering.passes.draw_fx_graph import (
+    get_draw_fx_graph_pass_post_lowering,
+    get_draw_fx_graph_pass_pre_lowering,
+)
 
 
 class DynamoPassManager(PassManager):  # type: ignore[misc]
@@ -48,6 +52,21 @@ class DynamoPassManager(PassManager):  # type: ignore[misc]
 
     def remove_pass_with_index(self, index: int) -> None:
         del self.passes[index]
+
+    def insert_debug_pass(
+        self, index: List[int], filename_prefix: str, post: bool = True
+    ) -> None:
+
+        for i in range(len(index)):
+            if post:
+                debug_pass = get_draw_fx_graph_pass_post_lowering(
+                    index[i], filename_prefix
+                )
+            else:
+                debug_pass = get_draw_fx_graph_pass_pre_lowering(
+                    index[i], filename_prefix
+                )
+            self.add_pass_with_index(debug_pass, index[i] + i)
 
     def __call__(self, gm: Any, settings: CompilationSettings) -> Any:
         self.validate()
