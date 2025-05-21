@@ -100,9 +100,10 @@ Install pip and required python packages:
 
 .. code-block:: sh
     # build torch_tensorrt wheel file
-    export cuda_version=$(nvcc --version | grep Cuda | grep release | cut -d ',' -f 2 | sed -e 's/ release //g')
-    export CUDA_HOME=/usr/local/cuda-${cuda_version}/
-    export BUILD_VERSION= && ./packaging/pre_build_script.sh
+    # make sure you have the latest Torch_tensorrt source code and git configured
+    # apt-get install git
+    # git config --global --add safe.directory /workspace/TensorRT (your tensorrt source code path)
+    export BUILD_VERSION="2.8.0.dev20250511" && ./packaging/pre_build_script.sh
     python setup.py bdist_wheel --jetpack
 
 
