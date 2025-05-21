@@ -87,6 +87,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
 
         flag = 0
         if compilation_settings.use_explicit_typing:
+            _LOGGER.info("Using strongly typed network definition")
             STRONGLY_TYPED = 1 << (int)(
                 trt.NetworkDefinitionCreationFlag.STRONGLY_TYPED
             )
@@ -277,8 +278,8 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         # if dtype.float16 in self.compilation_settings.enabled_precisions:
         #     builder_config.set_flag(trt.BuilderFlag.FP16)
 
-        # if dtype.int8 in self.compilation_settings.enabled_precisions:
-        #     builder_config.set_flag(trt.BuilderFlag.INT8)
+        if dtype.int8 in self.compilation_settings.enabled_precisions:
+            builder_config.set_flag(trt.BuilderFlag.INT8)
 
         # if dtype.fp8 in self.compilation_settings.enabled_precisions:
         #     builder_config.set_flag(trt.BuilderFlag.FP8)
@@ -288,11 +289,11 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         # if dtype.bfloat16 in self.compilation_settings.enabled_precisions:
         #     builder_config.set_flag(trt.BuilderFlag.BF16)
 
-        # if self.compilation_settings.sparse_weights:
-        #     builder_config.set_flag(trt.BuilderFlag.SPARSE_WEIGHTS)
+        if self.compilation_settings.sparse_weights:
+            builder_config.set_flag(trt.BuilderFlag.SPARSE_WEIGHTS)
 
-        # if self.compilation_settings.disable_tf32:
-        #     builder_config.clear_flag(trt.BuilderFlag.TF32)
+        if self.compilation_settings.disable_tf32:
+            builder_config.clear_flag(trt.BuilderFlag.TF32)
 
         if self.compilation_settings.immutable_weights:
             # non-refittable engine

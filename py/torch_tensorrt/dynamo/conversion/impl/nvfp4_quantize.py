@@ -13,7 +13,7 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
 )
 from torch_tensorrt.fx.converters.converter_utils import set_layer_name
 from torch_tensorrt.fx.types import TRTTensor
-
+import os
 
 def nvfp4_quantize(
     ctx: ConversionContext,
@@ -42,7 +42,7 @@ def nvfp4_quantize(
     with unset_fake_temporarily():
         axis = len(input_tensor.shape) - 1
         global_scale = _calculate_global_scale(ctx, name, amax)
-        print(f"lan added global_scale: {input_tensor.shape=} {input_tensor.dtype=}")
+        print(f"lan added input_tensor: {input_tensor.shape=} {input_tensor.dtype=}")
         print(f"lan added global_scale: {global_scale.shape=} {global_scale.dtype=}")
         if ".weight_quantizer" in name:
             # _test_weights_scaling_factor(input_tensor, global_scale)
@@ -107,6 +107,9 @@ def _dynamic_double_quantize(
             The data type for block scale. Default is FP8.
 
     """
+    if os.getenv("DISABLE_DYNAMIC_QUANTIZE", "false").lower() == "true":
+        print("lan added disable_dynamic_quantize is set, skipping dynamic quantize")
+        return input_tensor
     global_scale = get_trt_tensor(ctx, global_scale, name + "_global_scale")
 
     if input_tensor.dtype not in [trt.DataType.HALF, trt.DataType.FLOAT]:
@@ -200,7 +203,9 @@ def _static_double_quantize(
     Returns:
         quantized data tensor in fp4
     """
-
+    if os.getenv("DISABLE_STATIC_QUANTIZE", "false").lower() == "true":
+        print("lan added disable_static_quantize is set, skipping static quantize")
+        return get_trt_tensor(ctx, weights_tensor, name + "_weights")
     import modelopt.core.torch.quantization.qtensor.nvfp4_tensor as nvfp4_tensor
 
     if weights_tensor.dtype == torch.float16:

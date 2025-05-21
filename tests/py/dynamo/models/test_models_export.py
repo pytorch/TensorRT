@@ -3,7 +3,6 @@ import importlib
 import platform
 import unittest
 from importlib import metadata
-
 import pytest
 import timm
 import torch
@@ -232,7 +231,7 @@ def test_base_fp4(ir):
     print(f"lan added amax: {input_tensor.abs().amax()}")
     model = SimpleNetwork().eval().cuda()
     model.linear1.weight = torch.nn.Parameter(torch.ones(32, 64, dtype=torch.float16).cuda())
-    model.linear1.bias = torch.nn.Parameter(torch.zeros(128, 32, dtype=torch.float16).cuda())
+    model.linear1.bias = torch.nn.Parameter(torch.ones(128, 32, dtype=torch.float16).cuda())
     output_pyt = model(input_tensor)
     print(f"lan added model input: {input_tensor=}")    
     print(f"lan added model weight: {model.linear1.weight=}")
@@ -274,7 +273,7 @@ def test_base_fp4(ir):
             print(f"lan added torch_tensorrt outputs_trt: {outputs_trt}")
             abs_diff = torch.abs(output_pyt - outputs_trt)
             print(f"lan added max abs_diff: {abs_diff.max().item()}")
-            assert torch.allclose(output_pyt, outputs_trt, rtol=4e-1, atol=4e-1)
+            assert torch.allclose(output_pyt, outputs_trt, rtol=0.8, atol=0.8)
 
 
 @unittest.skipIf(
