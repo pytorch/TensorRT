@@ -44,9 +44,14 @@ class LMNoCache(nn.Module):
         super().__init__()
         self.lm = lm
 
-    def forward(self, inputs_embeds, position_ids=None, cache_position=None):
+    def forward(self, inputs_embeds, position_ids=None, cache_position=None): #, position_ids=None, cache_position=None):
         # Ensure inputs are in float16 and on the correct device
         # inputs_embeds = inputs_embeds.to(dtype=torch.float32, device=self.lm.device) 
+
+        # if position_ids is not None:
+        #     position_ids = position_ids.to(device=self.lm.device)
+        # if cache_position is not None:
+        #     cache_position = cache_position.to(device=self.lm.device)
 
         if position_ids is not None:
             position_ids = position_ids.to(device=self.lm.device)
@@ -55,6 +60,8 @@ class LMNoCache(nn.Module):
 
         outputs = self.lm(
             inputs_embeds=inputs_embeds,
+            # position_ids=position_ids,
+            # cache_position=cache_position,
             position_ids=position_ids,
             cache_position=cache_position,
             use_cache=False
@@ -88,6 +95,10 @@ def compile_submodules(base_model, device="cuda:0"):
         inputs=[dummy_pixels],
         enabled_precisions={torch.float32},
         device=device,
+        # truncate_double=True,
+        # disable_tf32=True,
+        # use_explicit_typing=True,
+        # use_fp32_acc=True,
     )
 
     with torch.inference_mode():
@@ -114,6 +125,10 @@ def compile_submodules(base_model, device="cuda:0"):
         inputs=[embeds],
         enabled_precisions={torch.float32},
         device=device,
+        # truncate_double=True,
+        # disable_tf32=True,
+        # use_explicit_typing=True,
+        # use_fp32_acc=True,
     )
 
     hidden_size = language_model.config.hidden_size
@@ -144,6 +159,10 @@ def compile_submodules(base_model, device="cuda:0"):
         inputs=[dummy_embeds, dummy_position_ids, dummy_cache_position],
         enabled_precisions={torch.float32},
         device=device,
+        # truncate_double=True,
+        # disable_tf32=True,
+        # use_explicit_typing=True,
+        # use_fp32_acc=True,
     )
     return trt_vis, trt_mlp1, trt_lm
 
@@ -175,16 +194,26 @@ class TRTExtractFeature(nn.Module):
 
 class TRTLanguageWrapper(nn.Module, GenerationMixin):
     """Language model wrapper for Eagle2 compiled with TensorRT"""
-    def __init__(self, trt_lm, original_lm):
+    def __init__(self, trt_lm, original_lm, device="cuda:0"):
         super().__init__()
         self.trt_lm = trt_lm
         self._original_lm = original_lm
+        # Attributes GenerationMixin expects
+        self.config = original_lm.config
+        self.main_input_name = original_lm.main_input_name
+        self.generation_config = getattr(original_lm, "generation_config", None)
+
+        self.device = torch.device(device)
+
         self._input_embeddings = original_lm.get_input_embeddings()
         self._output_embeddings = original_lm.get_output_embeddings()
         if hasattr(original_lm, "_apply_logits_warper"):
             self._apply_logits_warper = original_lm._apply_logits_warper
         if hasattr(original_lm, "_prepare_attention_mask_for_generation"):
             self._prepare_attention_mask_for_generation = original_lm._prepare_attention_mask_for_generation
+
+        # Some GenerationMixin helpers inspect this attribute directly.
+        self._supports_cache_class = getattr(original_lm, "_supports_cache_class", False)
 
     def forward(self,
                 input_ids=None,
@@ -200,11 +229,11 @@ class TRTLanguageWrapper(nn.Module, GenerationMixin):
 
         # Prepare inputs
         if inputs_embeds is None and input_ids is not None:
+            # inputs_embeds = self._input_embeddings(input_ids).to(dtype=torch.float16, device=self.device)
             inputs_embeds = self._input_embeddings(input_ids).to(dtype=torch.float16, device=device)
-            # inputs_embeds = self._input_embeddings(input_ids).to(dtype=torch.float32, device=device)
         else:
+            # inputs_embeds = inputs_embeds.to(dtype=torch.float16, device=self.device)
             inputs_embeds = inputs_embeds.to(dtype=torch.float16, device=device)
-            # inputs_embeds = inputs_embeds.to(dtype=torch.float32, device=device)
 
         if position_ids is None and inputs_embeds is not None:
             batch_size, seq_length = inputs_embeds.shape[:2]
@@ -217,9 +246,9 @@ class TRTLanguageWrapper(nn.Module, GenerationMixin):
                         past_length = past_key_values.get_seq_length()
                 cache_position = torch.arange(
                     past_length, past_length + seq_length,
-                    device=device
+                    device=self.device
                 )
-            position_ids = cache_position.unsqueeze(0).expand(batch_size, -1).to(device=device)
+            position_ids = cache_position.unsqueeze(0).expand(batch_size, -1).to(device=self.device)
 
         # Execute TensorRT engine
         logits = self.trt_lm(
@@ -248,6 +277,116 @@ class TRTLanguageWrapper(nn.Module, GenerationMixin):
 
     def prepare_inputs_for_generation(self, *args, **kwargs):
         return self._original_lm.prepare_inputs_for_generation(*args, **kwargs)
+
+
+    # def prepare_inputs_for_generation(
+    #     self,
+    #     input_ids=None,
+    #     past_key_values=None,
+    #     attention_mask=None,
+    #     inputs_embeds=None,   # <-- 반드시 명시
+    #     **kwargs,
+    # ):
+    #     """
+    #     GenerationMixin 이 첫 스텝과 이후 스텝을 구분할 때 호출됩니다.
+    #     - 첫 스텝: inputs_embeds 없으면 input_ids 로부터 토큰 임베딩 생성
+    #     - 이후 스텝: past_key_values 로 캐시를 활용
+    #     이 래퍼는 대부분의 로직을 원본 LM 에 위임합니다.
+    #     """
+    #     kwargs["use_cache"] = False   
+    #     if inputs_embeds is not None:
+    #         # 이미 임베딩을 넘겨받은 경우 그대로 사용
+    #         return {
+    #             "inputs_embeds": inputs_embeds,
+    #             "use_cache": False,
+    #             # "past_key_values": past_key_values,
+    #             "attention_mask": attention_mask,
+    #             **kwargs,
+                
+    #         }
+        
+    #     # 임베딩이 없으면 원본 모델의 헬퍼를 활용
+    #     return self._orig_lm.prepare_inputs_for_generation(
+    #         input_ids=input_ids,
+    #         use_cache= False,
+    #         # past_key_values=past_key_values,
+    #         attention_mask=attention_mask,
+    #         **kwargs,
+    #     )
+        
+    # def prepare_inputs_for_generation(
+    #     self, 
+    #     input_ids=None, 
+    #     past_key_values=None, 
+    #     inputs_embeds=None, 
+    #     attention_mask=None, 
+    #     **kwargs
+    # ):
+    #     return self._original_lm.prepare_inputs_for_generation(
+    #         input_ids=input_ids,
+    #         past_key_values=past_key_values,
+    #         inputs_embeds=inputs_embeds,
+    #         attention_mask=attention_mask,
+    #         **kwargs
+    #     )
+    
+    # def prepare_inputs_for_generation(self, *args, **kwargs):
+    #     # Re-use the helper from the original HF model.
+    #     return self._orig_lm.prepare_inputs_for_generation(*args, **kwargs)
+
+    # def prepare_inputs_for_generation(self, input_ids, past_key_values=None, inputs_embeds=None, **kwargs):
+    #     token_type_ids = kwargs.get("token_type_ids", None)
+    #     # only last token for inputs_ids if past is defined in kwargs
+    #     if past_key_values:
+    #         input_ids = input_ids[:, -1].unsqueeze(-1)
+    #         if token_type_ids is not None:
+    #             token_type_ids = token_type_ids[:, -1].unsqueeze(-1)
+    #     attention_mask = kwargs.get("attention_mask", None)
+    #     position_ids = kwargs.get("position_ids", None)
+    #     if attention_mask is not None and position_ids is None:
+    #         # create position_ids on the fly for batch generation
+    #         position_ids = attention_mask.long().cumsum(-1) - 1
+    #         position_ids.masked_fill_(attention_mask == 0, 1)
+    #         if past_key_values:
+    #             position_ids = position_ids[:, -1].unsqueeze(-1)
+    #     else:
+    #         position_ids = None
+
+    #     # if `inputs_embeds` are passed, we only want to use them in the 1st generation step
+    #     if inputs_embeds is not None and past_key_values is None:
+    #         model_inputs = {"inputs_embeds": inputs_embeds}
+    #     else:
+    #         model_inputs = {"input_ids": input_ids}
+
+    #     model_inputs.update(
+    #         {
+    #             "past_key_values": past_key_values,
+    #             "use_cache": kwargs.get("use_cache"),
+    #             "position_ids": position_ids,
+    #             "attention_mask": attention_mask,
+    #             "token_type_ids": token_type_ids,
+    #         }
+    #     )
+    #     return model_inputs
+
+    # def prepare_inputs_for_generation(
+    #     self,
+    #     input_ids=None,
+    #     inputs_embeds=None,
+    #     attention_mask=None,
+    #     position_ids=None,
+    #     past_key_values=None,
+    #     **kwargs,
+    # ):
+    #     return self._original_lm.prepare_inputs_for_generation(
+    #         input_ids=input_ids,
+    #         inputs_embeds=inputs_embeds,
+    #         attention_mask=attention_mask,
+    #         position_ids=position_ids,
+    #         past_key_values=past_key_values,
+    #         **kwargs,
+    #     )
+
 # 5) End-to-end integration & test
 
 def build_trt_model(device="cuda:0"):
@@ -257,53 +396,85 @@ def build_trt_model(device="cuda:0"):
     trt_model = copy.deepcopy(base_model)
     trt_extract = TRTExtractFeature(trt_vis, trt_mlp1, base_model)
     trt_model.extract_feature = trt_extract
-    trt_model.language_model = TRTLanguageWrapper(trt_lm, base_model.language_model)
+    trt_model.language_model = TRTLanguageWrapper(trt_lm, base_model.language_model, device)
 
-    def paligemma_style_forward(self, pixel_values=None, input_ids=None, attention_mask=None,
-                                position_ids=None, image_flags=None, past_key_values=None,
-                                labels=None, use_cache=None, output_attentions=None,
-                                output_hidden_states=None, return_dict=None, num_tiles_list=None, **kwargs):
+    def paligemma_style_forward(
+        self,
+        pixel_values=None,
+        input_ids=None,
+        attention_mask=None,
+        position_ids=None,
+        past_key_values=None,
+        use_cache=None,
+        output_attentions=None,
+        output_hidden_states=None,
+        return_dict=None,
+        **kwargs,
+    ):
+        """Forward pass that extracts visual features once and re-uses them on later decoding steps."""
+
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
-        print("attention_mask dtype:", attention_mask.dtype, "attention_mask.shape:", attention_mask.shape) # , "attention_mask.mean:", attention_mask.mean().item(), "attention_mask.std:", attention_mask.std().item())
+
+        # 1) Visual features (ViT) – run once then cache
+        vit_embeds = None
         if pixel_values is not None:
             vit_embeds = self.extract_feature(pixel_values)
-
-            input_embeds = self.language_model.get_input_embeddings()(input_ids)
-            
-            B, N, C = input_embeds.shape
-            input_embeds = input_embeds.reshape(B * N, C)
-            input_ids_flat = input_ids.reshape(B * N)
-            selected = (input_ids_flat == self.image_token_index)
-            print("selected.sum():", selected.sum().item())
-            try:
-                input_embeds[selected] = 0.0 * input_embeds[selected] + vit_embeds.reshape(-1, C).to(input_embeds.dtype)
-                print("input_embeds[selected].mean:", input_embeds[selected].mean().item())
-            except Exception as e:
-                vit_flat = vit_embeds.reshape(-1, C).to(input_embeds.dtype)
-                n_token = selected.sum()
-                print("Embedding replacement failed:", e)
-                input_embeds[selected] = 0.0 * input_embeds[selected] + vit_flat[:n_token]
-            input_embeds = input_embeds.reshape(B, N, C)
+            self._cached_visual_features = vit_embeds
         else:
-            input_embeds = self.language_model.get_input_embeddings()(input_ids)
+            vit_embeds = getattr(self, "_cached_visual_features", None)
 
-        gen_kwargs = {
-            'attention_mask': attention_mask,
-            'position_ids': position_ids,
-            'past_key_values': past_key_values,
-            'use_cache': use_cache if use_cache is not None else False,
-            'output_attentions': output_attentions,
-            'output_hidden_states': output_hidden_states,
-            'return_dict': return_dict,
+        # 2) Text token embeddings
+        input_embeds = self.language_model.get_input_embeddings()(input_ids)
+
+        # 3) Replace [IMG] token positions with image embeddings (if any)
+        if vit_embeds is not None:
+            B, N, C = input_embeds.shape
+            flat_emb = input_embeds.view(B * N, C)
+            mask = (input_ids.view(B * N) == self.image_token_index)
+            try:
+                flat_emb[mask] = vit_embeds.reshape(-1, C).to(flat_emb.dtype)[: mask.sum()]
+            except Exception:
+                # Fallback in unlikely size-mismatch cases
+                flat_emb[mask] = vit_embeds.reshape(-1, C)[: mask.sum()].to(flat_emb.dtype)
+            input_embeds = flat_emb.view(B, N, C)
+
+        # 4) Delegate to language model
+        lm_kwargs = {
+            "attention_mask": attention_mask,
+            "position_ids": position_ids,
+            "past_key_values": past_key_values,
+            "use_cache": use_cache if use_cache is not None else False,
+            "output_attentions": output_attentions,
+            "output_hidden_states": output_hidden_states,
+            "return_dict": return_dict,
         }
-        gen_kwargs.update({k: v for k, v in kwargs.items() if k != 'inputs_embeds'})
+        # forward additional kwargs transparently
+        lm_kwargs.update({k: v for k, v in kwargs.items() if k != "inputs_embeds"})
 
-        outputs = self.language_model(inputs_embeds=input_embeds, **gen_kwargs)
-        
-        return outputs
+        return self.language_model(inputs_embeds=input_embeds, **lm_kwargs)
 
     import types
     trt_model.forward = types.MethodType(paligemma_style_forward, trt_model)
+
+    # ------------------------------------------------------------------
+    # NEW: ensure `pixel_values` is only used at the very first decoding
+    #       step by stripping it from `model_kwargs` after step-0. This
+    #       prevents the ViT path from running on every autoregressive
+    #       iteration.
+    # ------------------------------------------------------------------
+    def _update_model_kwargs_for_generation(self, outputs, model_kwargs, is_encoder_decoder=False, num_new_tokens=1):
+        """Wrap the default GenerationMixin helper but drop `pixel_values`."""
+        # Call the vanilla helper from GenerationMixin to handle cache & masks
+        model_kwargs = GenerationMixin._update_model_kwargs_for_generation(
+            self, outputs, model_kwargs, is_encoder_decoder=is_encoder_decoder, num_new_tokens=num_new_tokens
+        )
+        # After the first step, `pixel_values` is no longer needed.
+        model_kwargs.pop("pixel_values", None)
+        return model_kwargs
+
+    # Bind the method to the TRTT-wrapped model instance.
+    trt_model._update_model_kwargs_for_generation = types.MethodType(_update_model_kwargs_for_generation, trt_model)
+
     print("TensorRT-integrated model built")
     return base_model, trt_model, processor
 
