@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt.dynamo._compiler &mdash; Torch-TensorRT v2.8.0.dev0+b100fdd documentation</title>
+  <title>torch_tensorrt.dynamo._compiler &mdash; Torch-TensorRT v2.8.0.dev0+bb990fd documentation</title>
   
 
   
@@ -290,7 +290,7 @@
               
               
                 <div class="version">
-                  v2.8.0.dev0+b100fdd
+                  v2.8.0.dev0+bb990fd
                 </div>
               
             
@@ -526,6 +526,7 @@
     <span class="n">pre_export_lowering</span><span class="p">,</span>
 <span class="p">)</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.utils</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">deallocate_module</span><span class="p">,</span>
     <span class="n">get_flat_args_with_check</span><span class="p">,</span>
     <span class="n">get_output_metadata</span><span class="p">,</span>
     <span class="n">parse_graph_io</span><span class="p">,</span>
@@ -587,6 +588,7 @@
     <span class="n">enable_weight_streaming</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">ENABLE_WEIGHT_STREAMING</span><span class="p">,</span>
     <span class="n">tiling_optimization_level</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">TILING_OPTIMIZATION_LEVEL</span><span class="p">,</span>
     <span class="n">l2_limit_for_tiling</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">L2_LIMIT_FOR_TILING</span><span class="p">,</span>
+    <span class="n">offload_module_to_cpu</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">OFFLOAD_MODULE_TO_CPU</span><span class="p">,</span>
     <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Compile an ExportedProgram module using TensorRT in Linux for Inference in Windows</span>
@@ -851,7 +853,18 @@
     <span class="c1"># Apply lowering on the graph module</span>
     <span class="n">gm</span> <span class="o">=</span> <span class="n">post_lowering</span><span class="p">(</span><span class="n">gm</span><span class="p">,</span> <span class="n">settings</span><span class="p">)</span>
     <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Lowered Input graph: &quot;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="p">))</span>
-
+    <span class="c1"># Move the weights in the state_dict to CPU</span>
+    <span class="k">if</span> <span class="n">offload_module_to_cpu</span><span class="p">:</span>
+        <span class="n">deallocate_module</span><span class="p">(</span><span class="n">exported_program</span><span class="o">.</span><span class="n">module</span><span class="p">(),</span> <span class="n">delete_module</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+            <span class="s2">&quot;The PyTorch model was moved to the CPU to allocate all GPU memory to TensorRT. To retain the model on the GPU, set offload_module_to_cpu=False&quot;</span>
+        <span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">remaining_memory</span><span class="p">,</span> <span class="n">total_memory</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">mem_get_info</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">remaining_memory</span> <span class="o">&lt;</span> <span class="n">total_memory</span> <span class="o">//</span> <span class="mi">2</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                <span class="s2">&quot;Remaining GPU memory may not be enough to compile the TensorRT engine for this model resulting in an OOM error, Consider setting offload_module_to_cpu=True&quot;</span>
+            <span class="p">)</span>
     <span class="n">trt_gm</span> <span class="o">=</span> <span class="n">compile_module</span><span class="p">(</span>
         <span class="n">gm</span><span class="p">,</span>
         <span class="n">trt_arg_inputs</span><span class="p">,</span>
@@ -910,6 +923,7 @@
     <span class="n">enable_weight_streaming</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">ENABLE_WEIGHT_STREAMING</span><span class="p">,</span>
     <span class="n">tiling_optimization_level</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">TILING_OPTIMIZATION_LEVEL</span><span class="p">,</span>
     <span class="n">l2_limit_for_tiling</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">L2_LIMIT_FOR_TILING</span><span class="p">,</span>
+    <span class="n">offload_module_to_cpu</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">OFFLOAD_MODULE_TO_CPU</span><span class="p">,</span>
     <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Compile an ExportedProgram module for NVIDIA GPUs using TensorRT</span>
@@ -987,6 +1001,7 @@
 <span class="sd">        enable_weight_streaming (bool): Enable weight streaming.</span>
 <span class="sd">        tiling_optimization_level (str): The optimization level of tiling strategies. A higher level allows TensorRT to spend more time searching for better tiling strategy. We currently support [&quot;none&quot;, &quot;fast&quot;, &quot;moderate&quot;, &quot;full&quot;].</span>
 <span class="sd">        l2_limit_for_tiling (int): The target L2 cache usage limit (in bytes) for tiling optimization (default is -1 which means no limit).</span>
+<span class="sd">        offload_module_to_cpu (bool): Offload the module to CPU. This is useful when we need to minimize GPU memory usage.</span>
 <span class="sd">        **kwargs: Any,</span>
 <span class="sd">    Returns:</span>
 <span class="sd">        torch.fx.GraphModule: Compiled FX Module, when run it will execute via TensorRT</span>
@@ -1038,15 +1053,6 @@
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
                 <span class="s2">&quot;`immutable_weights` must be False when `refit_identical_engine_weights` is True.&quot;</span>
             <span class="p">)</span>
-
-    <span class="k">if</span> <span class="p">(</span>
-        <span class="ow">not</span> <span class="n">immutable_weights</span>
-        <span class="ow">and</span> <span class="ow">not</span> <span class="n">refit_identical_engine_weights</span>
-        <span class="ow">and</span> <span class="n">enable_weight_streaming</span>
-    <span class="p">):</span>
-        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-            <span class="s2">&quot;TensorRT&#39;s `REFIT` flag is not compatible with `enable_weight_streaming=True` for now. This issue was reported on https://github.com/pytorch/TensorRT/issues/3305&quot;</span>
-        <span class="p">)</span>
 
     <span class="k">if</span> <span class="p">(</span>
         <span class="s2">&quot;enable_cross_compile_for_windows&quot;</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">keys</span><span class="p">()</span>
@@ -1163,6 +1169,7 @@
         <span class="s2">&quot;enable_weight_streaming&quot;</span><span class="p">:</span> <span class="n">enable_weight_streaming</span><span class="p">,</span>
         <span class="s2">&quot;tiling_optimization_level&quot;</span><span class="p">:</span> <span class="n">tiling_optimization_level</span><span class="p">,</span>
         <span class="s2">&quot;l2_limit_for_tiling&quot;</span><span class="p">:</span> <span class="n">l2_limit_for_tiling</span><span class="p">,</span>
+        <span class="s2">&quot;offload_module_to_cpu&quot;</span><span class="p">:</span> <span class="n">offload_module_to_cpu</span><span class="p">,</span>
     <span class="p">}</span>
 
     <span class="n">settings</span> <span class="o">=</span> <span class="n">CompilationSettings</span><span class="p">(</span><span class="o">**</span><span class="n">compilation_options</span><span class="p">)</span>
@@ -1179,6 +1186,18 @@
     <span class="n">gm</span> <span class="o">=</span> <span class="n">post_lowering</span><span class="p">(</span><span class="n">gm</span><span class="p">,</span> <span class="n">settings</span><span class="p">)</span>
     <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Lowered Input graph: &quot;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="p">))</span>
 
+    <span class="c1"># Move the weights in the state_dict to CPU</span>
+    <span class="k">if</span> <span class="n">offload_module_to_cpu</span><span class="p">:</span>
+        <span class="n">deallocate_module</span><span class="p">(</span><span class="n">exported_program</span><span class="o">.</span><span class="n">module</span><span class="p">(),</span> <span class="n">delete_module</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+            <span class="s2">&quot;The PyTorch model was moved to the CPU to allocate all GPU memory to TensorRT. To retain the model on the GPU, set offload_module_to_cpu=False&quot;</span>
+        <span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">remaining_memory</span><span class="p">,</span> <span class="n">total_memory</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">mem_get_info</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">remaining_memory</span> <span class="o">&lt;</span> <span class="n">total_memory</span> <span class="o">//</span> <span class="mi">2</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                <span class="s2">&quot;Remaining GPU memory may not be enough to compile the TensorRT engine for this model resulting in an OOM error, Consider setting offload_module_to_cpu=True&quot;</span>
+            <span class="p">)</span>
     <span class="n">trt_gm</span> <span class="o">=</span> <span class="n">compile_module</span><span class="p">(</span>
         <span class="n">gm</span><span class="p">,</span> <span class="n">trt_arg_inputs</span><span class="p">,</span> <span class="n">trt_kwarg_inputs</span><span class="p">,</span> <span class="n">settings</span><span class="p">,</span> <span class="n">engine_cache</span>
     <span class="p">)</span>
@@ -1309,6 +1328,7 @@
     <span class="n">trt_modules</span> <span class="o">=</span> <span class="p">{}</span>
     <span class="c1"># Iterate over all components that can be accelerated</span>
     <span class="c1"># Generate the corresponding TRT Module for those</span>
+
     <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">_</span> <span class="ow">in</span> <span class="n">partitioned_module</span><span class="o">.</span><span class="n">named_children</span><span class="p">():</span>
         <span class="n">submodule</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">partitioned_module</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span>
         <span class="c1"># filter on the GraphModule</span>
@@ -1322,6 +1342,7 @@
                 <span class="nb">str</span><span class="p">(</span><span class="n">name</span><span class="p">),</span>
                 <span class="nb">str</span><span class="p">(</span><span class="n">submodule</span><span class="o">.</span><span class="n">graph</span><span class="p">),</span>
             <span class="p">)</span>
+            <span class="n">submodule</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">to_torch_device</span><span class="p">(</span><span class="n">settings</span><span class="o">.</span><span class="n">device</span><span class="p">))</span>
             <span class="k">continue</span>
 
         <span class="k">if</span> <span class="n">name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">submodule_node_dict</span><span class="p">:</span>
@@ -1453,6 +1474,7 @@
     <span class="n">enable_weight_streaming</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">ENABLE_WEIGHT_STREAMING</span><span class="p">,</span>
     <span class="n">tiling_optimization_level</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">TILING_OPTIMIZATION_LEVEL</span><span class="p">,</span>
     <span class="n">l2_limit_for_tiling</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">L2_LIMIT_FOR_TILING</span><span class="p">,</span>
+    <span class="n">offload_module_to_cpu</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">OFFLOAD_MODULE_TO_CPU</span><span class="p">,</span>
     <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bytes</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Convert an ExportedProgram to a serialized TensorRT engine</span>
@@ -1636,6 +1658,7 @@
         <span class="s2">&quot;enable_weight_streaming&quot;</span><span class="p">:</span> <span class="n">enable_weight_streaming</span><span class="p">,</span>
         <span class="s2">&quot;tiling_optimization_level&quot;</span><span class="p">:</span> <span class="n">tiling_optimization_level</span><span class="p">,</span>
         <span class="s2">&quot;l2_limit_for_tiling&quot;</span><span class="p">:</span> <span class="n">l2_limit_for_tiling</span><span class="p">,</span>
+        <span class="s2">&quot;offload_module_to_cpu&quot;</span><span class="p">:</span> <span class="n">offload_module_to_cpu</span><span class="p">,</span>
     <span class="p">}</span>
 
     <span class="n">settings</span> <span class="o">=</span> <span class="n">CompilationSettings</span><span class="p">(</span><span class="o">**</span><span class="n">compilation_options</span><span class="p">)</span>
@@ -1655,7 +1678,17 @@
 
     <span class="c1"># Configure user compilation settings to converters.</span>
     <span class="n">CONVERTERS</span><span class="o">.</span><span class="n">set_compilation_settings</span><span class="p">(</span><span class="n">settings</span><span class="p">)</span>
-
+    <span class="k">if</span> <span class="n">offload_module_to_cpu</span><span class="p">:</span>
+        <span class="n">deallocate_module</span><span class="p">(</span><span class="n">exported_program</span><span class="o">.</span><span class="n">module</span><span class="p">(),</span> <span class="n">delete_module</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+            <span class="s2">&quot;The PyTorch model was moved to the CPU to allocate all GPU memory to TensorRT. To retain the model on the GPU, set offload_module_to_cpu=False&quot;</span>
+        <span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">remaining_memory</span><span class="p">,</span> <span class="n">total_memory</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">mem_get_info</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">remaining_memory</span> <span class="o">&lt;</span> <span class="n">total_memory</span> <span class="o">//</span> <span class="mi">2</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                <span class="s2">&quot;Remaining GPU memory may not be enough to compile the TensorRT engine for this model resulting in an OOM error, Consider setting offload_module_to_cpu=True&quot;</span>
+            <span class="p">)</span>
     <span class="k">try</span><span class="p">:</span>
         <span class="n">interpreter_result</span> <span class="o">=</span> <span class="n">interpret_module_to_result</span><span class="p">(</span>
             <span class="n">gm</span><span class="p">,</span>

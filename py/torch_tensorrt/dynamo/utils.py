@@ -84,13 +84,14 @@ if trt.__version__ >= "7.0":
     }
 
 
-def delete_module(module: torch.fx.GraphModule) -> None:
+def deallocate_module(module: torch.fx.GraphModule, delete_module: bool = True) -> None:
     """
     This is a helper function to delete the instance of module. We first move it to CPU and then
     delete the object. This function ensures the GPU memory occupied by the module is released effectively after this call
     """
     module.to(CPU_DEVICE)
-    del module
+    if delete_module:
+        del module
     torch.cuda.empty_cache()
     gc.collect()
 
