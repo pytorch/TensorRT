@@ -286,6 +286,7 @@ jobs:
           script: ${{ inputs.post-script }}
       - name: Smoke Test
         shell: bash -l {0}
+        if: ${{ inputs.is-jetpack == false }}
         env:
           PACKAGE_NAME: ${{ inputs.package-name }}
           SMOKE_TEST_SCRIPT: ${{ inputs.smoke-test-script }}
