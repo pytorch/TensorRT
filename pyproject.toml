@@ -83,6 +83,12 @@ dev = [
     "pyyaml",
 ]
 
+debug = [
+    "pydot >= 4.0.0",
+    "tabulate >= 0.8.10",
+    "graphviz >= 0.20.3"
+]
+
 [project.optional-dependencies]
 torchvision = [
     "torchvision",
