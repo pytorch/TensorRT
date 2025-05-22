@@ -1,14 +1,12 @@
 import argparse
 from typing import Tuple, Union
 
-
 import tensorrt as trt
 import tensorrt.plugin as trtp
 import torch
 import torch_tensorrt
 import triton
 import triton.language as tl
-
 
 trt_logger = trt.Logger(trt.Logger.VERBOSE)
 
@@ -25,9 +23,7 @@ def add_one_kernel(x_ptr, n_elements, y_ptr, BLOCK_SIZE: tl.constexpr):
 
 
 @torch.library.custom_op("my::add_one", mutates_args=())  # type: ignore[misc]
-def add_one(
-    X: torch.Tensor
-) -> torch.Tensor:
+def add_one(X: torch.Tensor) -> torch.Tensor:
     # Ensure the tensors are on the GPU
     assert X.is_cuda
 
@@ -51,63 +47,58 @@ def _(X: torch.Tensor) -> torch.Tensor:
     return X
 
 
-# torch_tensorrt.dynamo.conversion.plugins.generate_plugin(
-#     "my::add_one"
-# )
-
 @trtp.register("my::add_one")
 def add_plugin_desc(X: trtp.TensorDesc) -> Tuple[trtp.TensorDesc]:
     return X.like()
 
-@trtp.aot_impl("my::add_one")
-def add_plugin_aot_impl(
-    X: trtp.TensorDesc, outputs: Tuple[trtp.TensorDesc], tactic: int
-) -> Tuple[Union[str, bytes], Union[str, bytes], trtp.KernelLaunchParams, trtp.SymExprs]:
 
+# @trtp.aot_impl("my::add_one")
+# def add_plugin_aot_impl(
+#     X: trtp.TensorDesc, outputs: Tuple[trtp.TensorDesc], tactic: int
+# ) -> Tuple[Union[str, bytes], Union[str, bytes], trtp.KernelLaunchParams, trtp.SymExprs]:
+#     type_str = "fp32" if X.dtype == trt.float32 else "fp16"
 
-    type_str = "fp32" if X.dtype == trt.float32 else "fp16"
+#     block_size = 256
+#     src = triton.compiler.ASTSource(
+#         fn=add_one_kernel,
+#         signature={
+#             "x_ptr": f"*{type_str}",
+#             "n_elements": "i32",
+#             "y_ptr": f"*{type_str}",
+#             "BLOCK_SIZE": "constexpr",
+#         },
+#         constants={
+#             "BLOCK_SIZE": block_size,
+#         },
+#     )
 
-    block_size = 256
-    src = triton.compiler.ASTSource(
-        fn=add_one_kernel,
-        signature={
-            "x_ptr": f"*{type_str}",
-            "n_elements": "i32",
-            "y_ptr": f"*{type_str}",
-            "BLOCK_SIZE": "constexpr",
-        },
-        constants={
-            "BLOCK_SIZE": block_size,
-        },
-    )
+#     compiled_kernel = triton.compile(src)
 
-    compiled_kernel = triton.compile(src)
+#     N = X.shape_expr.numel()
+#     launch_params = trtp.KernelLaunchParams()
 
-    N = X.shape_expr.numel()
-    launch_params = trtp.KernelLaunchParams()
+#     # grid dims
+#     launch_params.grid_x = trtp.cdiv(N, block_size)
+#     # block dims
+#     launch_params.block_x = compiled_kernel.metadata.num_warps * 32
+#     # shared memory
+#     launch_params.shared_mem = compiled_kernel.metadata.shared
 
-    # grid dims
-    launch_params.grid_x = trtp.cdiv(N, block_size)
-    # block dims
-    launch_params.block_x = compiled_kernel.metadata.num_warps * 32
-    # shared memory
-    launch_params.shared_mem = compiled_kernel.metadata.shared
+#     extra_args = trtp.SymIntExprs(1)
+#     extra_args[0] = trtp.SymInt32(N)
 
-    extra_args = trtp.SymIntExprs(1)
-    extra_args[0] = trtp.SymInt32(N)
-
-    return (
-        compiled_kernel.metadata.name,
-        compiled_kernel.asm["ptx"],
-        launch_params,
-        extra_args,
-    )
+#     return (
+#         compiled_kernel.metadata.name,
+#         compiled_kernel.asm["ptx"],
+#         launch_params,
+#         extra_args,
+#     )
 
 torch_tensorrt.dynamo.conversion.plugins.generate_plugin_converter(
     "my::add_one",
     supports_dynamic_shapes=False,
     requires_output_allocator=False,
-    aot=True,
+    use_aot_if_available=True,
 )
 
 
@@ -129,14 +120,11 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-
-    
     my_model = MyModel().to("cuda")
     m = torch.full((64, 64), 2, device="cuda", dtype=torch.float)
 
     # This works!
     assert my_model(X=m)[0][0] == 3.0
-
 
     with torch_tensorrt.logging.debug():
         trt_inputs = [m]
