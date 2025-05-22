@@ -1,24 +1,21 @@
 import torch
 from torch.fx import passes
 from torch_tensorrt.dynamo._settings import CompilationSettings
-from torch_tensorrt.dynamo.lowering.passes import LoweringPassSignature
+from torch_tensorrt.dynamo.lowering.passes import (
+    LoweringPassSignature,
+    post_lowering_pass_list,
+    pre_lowering_pass_list,
+)
 
 PRE_DEBUG_NAME = {
-    0: "exported_program",
-    1: "after_remove_detach,",
+    i + 1: f"after_{p.__name__}" for i, p in enumerate(pre_lowering_pass_list)
 }
+PRE_DEBUG_NAME[0] = "exported_program"
 
 POST_DEBUG_NAME = {
-    0: "after_decomposition",
-    1: "after_remove_input_alias_fixing_clones",
-    2: "after_constant_fold",
-    3: "after_repair_input_as_output",
-    4: "after_fuse_prims_broadcast",
-    5: "after_replace_max_pool_with_indices",
-    6: "after_remove_assert_nodes",
-    7: "after_accumulate_fp32_matmul",
-    8: "after_remove_num_users_is_0_nodes",
+    i + 1: f"after_{p.__name__}" for i, p in enumerate(post_lowering_pass_list)
 }
+POST_DEBUG_NAME[0] = "after_decomposition"
 
 
 def get_draw_fx_graph_pass_post_lowering(
