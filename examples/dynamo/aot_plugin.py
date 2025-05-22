@@ -52,47 +52,50 @@ def add_plugin_desc(X: trtp.TensorDesc) -> Tuple[trtp.TensorDesc]:
     return X.like()
 
 
-# @trtp.aot_impl("my::add_one")
-# def add_plugin_aot_impl(
-#     X: trtp.TensorDesc, outputs: Tuple[trtp.TensorDesc], tactic: int
-# ) -> Tuple[Union[str, bytes], Union[str, bytes], trtp.KernelLaunchParams, trtp.SymExprs]:
-#     type_str = "fp32" if X.dtype == trt.float32 else "fp16"
+@trtp.aot_impl("my::add_one")
+def add_plugin_aot_impl(
+    X: trtp.TensorDesc, outputs: Tuple[trtp.TensorDesc], tactic: int
+) -> Tuple[
+    Union[str, bytes], Union[str, bytes], trtp.KernelLaunchParams, trtp.SymExprs
+]:
+    type_str = "fp32" if X.dtype == trt.float32 else "fp16"
 
-#     block_size = 256
-#     src = triton.compiler.ASTSource(
-#         fn=add_one_kernel,
-#         signature={
-#             "x_ptr": f"*{type_str}",
-#             "n_elements": "i32",
-#             "y_ptr": f"*{type_str}",
-#             "BLOCK_SIZE": "constexpr",
-#         },
-#         constants={
-#             "BLOCK_SIZE": block_size,
-#         },
-#     )
+    block_size = 256
+    src = triton.compiler.ASTSource(
+        fn=add_one_kernel,
+        signature={
+            "x_ptr": f"*{type_str}",
+            "n_elements": "i32",
+            "y_ptr": f"*{type_str}",
+            "BLOCK_SIZE": "constexpr",
+        },
+        constants={
+            "BLOCK_SIZE": block_size,
+        },
+    )
 
-#     compiled_kernel = triton.compile(src)
+    compiled_kernel = triton.compile(src)
 
-#     N = X.shape_expr.numel()
-#     launch_params = trtp.KernelLaunchParams()
+    N = X.shape_expr.numel()
+    launch_params = trtp.KernelLaunchParams()
 
-#     # grid dims
-#     launch_params.grid_x = trtp.cdiv(N, block_size)
-#     # block dims
-#     launch_params.block_x = compiled_kernel.metadata.num_warps * 32
-#     # shared memory
-#     launch_params.shared_mem = compiled_kernel.metadata.shared
+    # grid dims
+    launch_params.grid_x = trtp.cdiv(N, block_size)
+    # block dims
+    launch_params.block_x = compiled_kernel.metadata.num_warps * 32
+    # shared memory
+    launch_params.shared_mem = compiled_kernel.metadata.shared
 
-#     extra_args = trtp.SymIntExprs(1)
-#     extra_args[0] = trtp.SymInt32(N)
+    extra_args = trtp.SymIntExprs(1)
+    extra_args[0] = trtp.SymInt32(N)
 
-#     return (
-#         compiled_kernel.metadata.name,
-#         compiled_kernel.asm["ptx"],
-#         launch_params,
-#         extra_args,
-#     )
+    return (
+        compiled_kernel.metadata.name,
+        compiled_kernel.asm["ptx"],
+        launch_params,
+        extra_args,
+    )
+
 
 torch_tensorrt.dynamo.conversion.plugins.generate_plugin_converter(
     "my::add_one",
@@ -113,7 +116,6 @@ class MyModel(torch.nn.Module):
 
 
 if __name__ == "__main__":
-
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--aot", action="store_true", help="Try to use AOT compilation", default=False
@@ -123,7 +125,6 @@ if __name__ == "__main__":
     my_model = MyModel().to("cuda")
     m = torch.full((64, 64), 2, device="cuda", dtype=torch.float)
 
-    # This works!
     assert my_model(X=m)[0][0] == 3.0
 
     with torch_tensorrt.logging.debug():
@@ -141,4 +142,3 @@ if __name__ == "__main__":
             assert torch.allclose(res, my_model(m)), "Results do not match!"
 
     print("Inference successful!")
-    print(res)
