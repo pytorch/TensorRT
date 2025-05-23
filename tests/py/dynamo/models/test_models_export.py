@@ -210,12 +210,13 @@ def test_resnet18_half(ir):
 def test_base_fp4(ir):
     import modelopt.torch.quantization as mtq
     from modelopt.torch.quantization.utils import export_torch_mode
+    dtype = torch.float16
 
     class SimpleNetwork(torch.nn.Module):
         def __init__(self):
             super(SimpleNetwork, self).__init__()
             self.linear1 = torch.nn.Linear(
-                in_features=64, out_features=32, bias=True, dtype=torch.float16
+                in_features=64, out_features=32, bias=True, dtype=dtype
             )
 
         def forward(self, x):
@@ -226,12 +227,12 @@ def test_base_fp4(ir):
         """Simple calibration function for testing."""
         model(input_tensor)
 
-    input_tensor = torch.ones(128, 64, dtype=torch.float16).cuda()
+    input_tensor = torch.ones(128, 64, dtype=dtype).cuda()
 
     
     model = SimpleNetwork().eval().cuda()
-    model.linear1.weight = torch.nn.Parameter(torch.ones(32, 64, dtype=torch.float16).cuda())
-    #model.linear1.bias = torch.nn.Parameter(torch.ones(128, 32, dtype=torch.float16).cuda())
+    model.linear1.weight = torch.nn.Parameter(torch.ones(32, 64, dtype=dtype).cuda())
+    model.linear1.bias = torch.nn.Parameter(torch.zeros(128, 32, dtype=dtype).cuda())
     print(f"lan added amax: {input_tensor.abs().amax()=}")
     print(f"lan added amax: {model.linear1.weight.abs().amax()=}")
     expected_output = model(input_tensor)
@@ -260,7 +261,7 @@ def test_base_fp4(ir):
                 debug=True,
                 cache_built_engines=False,
                 reuse_cached_engines=False,
-                use_explicit_typing=True,
+                use_explicit_typing=dtype == torch.float16,
             )
 
             outputs_trt = trt_model(input_tensor)
@@ -270,8 +271,8 @@ def test_base_fp4(ir):
             else:
                 print("lan added disable_gemm is not set, compring result with pytorch")
 
-            print(f"lan added torch_tensorrt outputs_trt: {outputs_trt=} {outputs_trt.dtype=} {outputs_trt.shape=}")
-            print(f"lan added expected output_pyt: {expected_output=} {expected_output.dtype=} {expected_output.shape=}")
+            print(f"lan added torch_tensorrt outputs_trt: {outputs_trt=} {outputs_trt.dtype=} {outputs_trt.shape=} {outputs_trt.abs().amax()=}")
+            print(f"lan added expected output_pyt: {expected_output=} {expected_output.dtype=} {expected_output.shape=} {expected_output.abs().amax()=}")
 
             abs_diff = torch.abs(expected_output - outputs_trt)
             print(f"lan added max /mean abs_diff: {abs_diff.max().item()=} {abs_diff.mean()=}")

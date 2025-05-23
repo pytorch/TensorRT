@@ -24,8 +24,8 @@ def permute(
     permutation: Sequence[int],
 ) -> TRTTensor:
     if os.getenv("DISABLE_GEMM", "false").lower() == "true":
-        print("lan added disable_gemm is set, skip permute and returning mat2")
-        return mat2
+        print("lan added disable_gemm is set, skip permute")
+        return input
     print("lan added disable_gemm is not set, doing permute")
     if not isinstance(input, TRTTensor):
         raise RuntimeError(
