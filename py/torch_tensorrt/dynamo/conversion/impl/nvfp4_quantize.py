@@ -41,7 +41,7 @@ def nvfp4_quantize(
             f"nvfp4_quantize converter received an input of {input_tensor.shape} shape. Supported shapes: 2D or 3D"
         )
     with unset_fake_temporarily():
-        axis = len(input_tensor.shape) - 1
+        axis = -1
         global_scale = _calculate_global_scale(ctx, name, amax)
         print(f"lan added input_tensor: {input_tensor.shape=} {input_tensor.dtype=}")
         print(f"lan added global_scale: {global_scale.shape=} {global_scale.dtype=}")
@@ -209,6 +209,7 @@ def _static_double_quantize(
         return get_trt_tensor(ctx, weights_tensor, name + "_weights")
     if os.getenv("ENABLE_TRANSPOSE", "false").lower() == "true":
         enable_transpose = True
+        axis = -2
     else:
         enable_transpose = False
     import modelopt.core.torch.quantization.qtensor.nvfp4_tensor as nvfp4_tensor
@@ -256,7 +257,6 @@ def _static_double_quantize(
         original_dtype,
     )
     dequantize_block_scale_layer.axis = axis
-    # dequantize_block_scale_layer.precision = trt.DataType.FP8
     dequantize_block_scale_layer.to_type = original_dtype
     set_layer_name(
         dequantize_block_scale_layer,
@@ -276,7 +276,6 @@ def _static_double_quantize(
         original_dtype,
     )
     dequantize_data_layer.axis = axis
-    # dequantize_data_layer.precision = trt.DataType.FP4
     dequantize_data_layer.to_type = original_dtype
     set_layer_name(dequantize_data_layer, target, name + "_dequantize_data", source_ir)
     print(
