@@ -271,7 +271,7 @@ def test_base_fp4(ir):
                 print("lan added disable_gemm is not set, compring result with pytorch")
 
             print(f"lan added torch_tensorrt outputs_trt: {outputs_trt=} {outputs_trt.dtype=} {outputs_trt.shape=}")
-            print(f"lan added pytorch output_pyt: {expected_output=} {outexpected_outputput_pyt.dtype=} {expected_output.shape=}")
+            print(f"lan added expected output_pyt: {expected_output=} {expected_output.dtype=} {expected_output.shape=}")
 
             abs_diff = torch.abs(expected_output - outputs_trt)
             print(f"lan added max /mean abs_diff: {abs_diff.max().item()=} {abs_diff.mean()=}")
