@@ -13,7 +13,7 @@ from torch_tensorrt.dynamo.utils import COSINE_THRESHOLD, cosine_similarity
 from packaging.version import Version
 
 assertions = unittest.TestCase()
-
+import os
 
 @pytest.mark.unit
 def test_resnet18(ir):
@@ -228,16 +228,17 @@ def test_base_fp4(ir):
 
     input_tensor = torch.ones(128, 64, dtype=torch.float16).cuda()
 
-    print(f"lan added amax: {input_tensor.abs().amax()}")
+    
     model = SimpleNetwork().eval().cuda()
-    #model.linear1.weight = torch.nn.Parameter(torch.ones(32, 64, dtype=torch.float16).cuda())
+    model.linear1.weight = torch.nn.Parameter(torch.ones(32, 64, dtype=torch.float16).cuda())
     #model.linear1.bias = torch.nn.Parameter(torch.ones(128, 32, dtype=torch.float16).cuda())
-    output_pyt = model(input_tensor)
+    print(f"lan added amax: {input_tensor.abs().amax()=}")
+    print(f"lan added amax: {model.linear1.weight.abs().amax()=}")
+    expected_output = model(input_tensor)
     print(f"lan added model input: {input_tensor=}")    
     print(f"lan added model weight: {model.linear1.weight=}")
     print(f"lan added model bias: {model.linear1.bias=}")
-    print(f"lan added pytorch output_pyt: {output_pyt} {output_pyt.dtype=} {output_pyt.shape=}")
-
+    
     quant_cfg = mtq.NVFP4_DEFAULT_CFG
     mtq.quantize(model, quant_cfg, forward_loop=calibrate_loop)
     # model has qdq nodes at this point
@@ -263,10 +264,19 @@ def test_base_fp4(ir):
             )
 
             outputs_trt = trt_model(input_tensor)
-            print(f"lan added torch_tensorrt outputs_trt: {outputs_trt}")
-            abs_diff = torch.abs(output_pyt - outputs_trt)
-            print(f"lan added max abs_diff: {abs_diff.max().item()}")
-            assert torch.allclose(output_pyt, outputs_trt, rtol=0.8, atol=0.8)
+            if os.getenv("DISABLE_GEMM", "false").lower() == "true":
+                print("lan added disable_gemm is set, compring result with weights")
+                expected_output = model.linear1.weight
+            else:
+                print("lan added disable_gemm is not set, compring result with pytorch")
+
+            print(f"lan added torch_tensorrt outputs_trt: {outputs_trt=} {outputs_trt.dtype=} {outputs_trt.shape=}")
+            print(f"lan added pytorch output_pyt: {expected_output=} {outexpected_outputput_pyt.dtype=} {expected_output.shape=}")
+
+            abs_diff = torch.abs(expected_output - outputs_trt)
+            print(f"lan added max /mean abs_diff: {abs_diff.max().item()=} {abs_diff.mean()=}")
+            print(f"lan added abs_diff: {abs_diff=}")
+            assert torch.allclose(expected_output, outputs_trt, rtol=0.8, atol=0.8)
 
 
 @unittest.skipIf(

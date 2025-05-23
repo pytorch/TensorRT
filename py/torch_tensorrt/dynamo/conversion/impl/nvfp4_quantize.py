@@ -111,6 +111,7 @@ def _dynamic_double_quantize(
     if os.getenv("DISABLE_DYNAMIC_QUANTIZE", "false").lower() == "true":
         print("lan added disable_dynamic_quantize is set, skipping dynamic quantize")
         return input_tensor
+    print("lan added disable_dynamic_quantize is not set, doing dynamic quantize")
     global_scale = get_trt_tensor(ctx, global_scale, name + "_global_scale")
 
     if input_tensor.dtype not in [trt.DataType.HALF, trt.DataType.FLOAT]:
@@ -207,7 +208,9 @@ def _static_double_quantize(
     if os.getenv("DISABLE_STATIC_QUANTIZE", "false").lower() == "true":
         print("lan added disable_static_quantize is set, skipping static quantize")
         return get_trt_tensor(ctx, weights_tensor, name + "_weights")
+    print("lan added static disable_static_quantize is not set, do disable_static_quantize ")
     if os.getenv("ENABLE_TRANSPOSE", "false").lower() == "true":
+        print("lan added enable_transpose is set, transposing weights tensor")
         enable_transpose = True
         axis = -2
     else:
@@ -265,7 +268,7 @@ def _static_double_quantize(
         source_ir,
     )
     print(
-        f"lan added dequantize_block_scale_layer: {dequantize_block_scale_layer.to_type=} {dequantize_block_scale_layer.axis=} {dequantize_block_scale_layer.precision=} {dequantize_block_scale_layer.get_output_type(0)=}"
+        f"lan added dequantize_block_scale_layer: {dequantize_block_scale_layer.to_type=} {dequantize_block_scale_layer.axis=} {dequantize_block_scale_layer.get_input(0).shape=} {dequantize_block_scale_layer.get_input(1).shape=}"
     )
     dequantized_block_scale = dequantize_block_scale_layer.get_output(0)
 
@@ -279,7 +282,7 @@ def _static_double_quantize(
     dequantize_data_layer.to_type = original_dtype
     set_layer_name(dequantize_data_layer, target, name + "_dequantize_data", source_ir)
     print(
-        f"lan added dequantize_data_layer: {dequantize_data_layer.to_type=} {dequantize_data_layer.axis=} {dequantize_data_layer.precision=} {dequantize_data_layer.get_output_type(0)=}"
+        f"lan added dequantize_data_layer: {dequantize_data_layer.to_type=} {dequantize_data_layer.axis=} {dequantize_data_layer.get_input(0).shape=} {dequantize_data_layer.get_input(1).shape=}"
     )
     dequantized_data = dequantize_data_layer.get_output(0)
     if enable_transpose:
@@ -318,35 +321,3 @@ def _get_weights_scaling_factor_transposed(
     if not keep_high_precision:
         q_per_block_scale = q_per_block_scale.to(torch.float8_e4m3fn)
     return q_per_block_scale
-
-def _quantized_weights_transposed(
-    input: torch.Tensor,
-    weights_scaling_factor: torch.Tensor,
-    weights_scaling_factor_2: torch.Tensor,
-    keep_high_precision: bool = False,
-) -> torch.Tensor:
-    
-    # Reshape the weight and scale factors
-    input = input.view((*tuple(input.shape[:-1]), -1, block_size))
-
-    # Scale weights
-    scaled_weight = input / (
-        (weights_scaling_factor.to(torch.float32) * weights_scaling_factor_2).unsqueeze(-1)
-    )
-
-    # Reshape weights to original
-    scaled_weight = scaled_weight.view((*tuple(scaled_weight.shape[:-2]), -1))
-
-    if keep_high_precision:
-        return scaled_weight
-    # Cast weights to fp4
-    q_weight = cls._cast_fp4(scaled_weight)
-    # Pack weights
-    packed_weight = (q_weight[..., 1::2] << 4) | q_weight[..., 0::2]
-    return (
-        cls(input_shape, input_dtype, packed_weight),
-        weights_scaling_factor,
-        weights_scaling_factor_2,
-    )
-
-    

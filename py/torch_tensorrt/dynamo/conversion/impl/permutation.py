@@ -13,7 +13,7 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
 )
 from torch_tensorrt.dynamo.conversion.impl.shape import get_shape_with_dynamic_shape
 from torch_tensorrt.fx.types import TRTTensor
-
+import os
 
 def permute(
     ctx: ConversionContext,
@@ -23,6 +23,10 @@ def permute(
     input: TRTTensor,
     permutation: Sequence[int],
 ) -> TRTTensor:
+    if os.getenv("DISABLE_GEMM", "false").lower() == "true":
+        print("lan added disable_gemm is set, skip permute and returning mat2")
+        return mat2
+    print("lan added disable_gemm is not set, doing permute")
     if not isinstance(input, TRTTensor):
         raise RuntimeError(
             f"permute received input {input} that is not a TensorRT ITensor"
