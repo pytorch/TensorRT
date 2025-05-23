@@ -230,8 +230,8 @@ def test_base_fp4(ir):
 
     print(f"lan added amax: {input_tensor.abs().amax()}")
     model = SimpleNetwork().eval().cuda()
-    model.linear1.weight = torch.nn.Parameter(torch.ones(32, 64, dtype=torch.float16).cuda())
-    model.linear1.bias = torch.nn.Parameter(torch.ones(128, 32, dtype=torch.float16).cuda())
+    #model.linear1.weight = torch.nn.Parameter(torch.ones(32, 64, dtype=torch.float16).cuda())
+    #model.linear1.bias = torch.nn.Parameter(torch.ones(128, 32, dtype=torch.float16).cuda())
     output_pyt = model(input_tensor)
     print(f"lan added model input: {input_tensor=}")    
     print(f"lan added model weight: {model.linear1.weight=}")
@@ -241,17 +241,10 @@ def test_base_fp4(ir):
     quant_cfg = mtq.NVFP4_DEFAULT_CFG
     mtq.quantize(model, quant_cfg, forward_loop=calibrate_loop)
     # model has qdq nodes at this point
-    
-    torch.onnx.export(model, input_tensor, "mtq_model.onnx")
-
     with torch.no_grad():
         with export_torch_mode():
             exp_program = torch.export.export(model, (input_tensor,), strict=False)
             from torch.fx import passes
-
-            g = passes.graph_drawer.FxGraphDrawer(exp_program, "torch_export_fp4")
-            with open("a.svg", "wb") as f:
-                f.write(g.get_dot_graph().create_svg())
 
             trt_model = torchtrt.dynamo.compile(
                 exp_program,
