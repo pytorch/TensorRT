@@ -25,7 +25,6 @@ class ComplexSubGraphInfo:
 
 class ComplexOpDetector:
     def __init__(self):
-        # any initialization, thresholds, filters
         pass
 
     def is_complex_dtype(self, node: Node) -> bool:
@@ -48,7 +47,6 @@ class ComplexOpDetector:
     def subgraph_from_anchor(self, anchor_node: Node) -> ComplexSubGraphInfo:
         subgraph_nodes: Set[Node] = set()
         input_nodes: Set[Node] = set()
-        # backward DFS
         stack = [anchor_node]
         while stack:
             n = stack.pop()
@@ -70,16 +68,31 @@ class ComplexOpDetector:
         self, gm: GraphModule, anchor_target: str
     ) -> List[ComplexSubGraphInfo]:
         complex_op_subgraphs: List[ComplexSubGraphInfo] = []
-        seen: Set[Node] = set()
         for node in gm.graph.nodes:
-            if node in seen:
-                continue
             if node.target == anchor_target:
-                sub = self.subgraph_from_anchor(node)
-                new_nodes = set(sub.subgraph_nodes) - seen
-                if new_nodes:
-                    complex_op_subgraphs.append(sub)
-                    seen.update(sub.subgraph_nodes)
+                print("node.target:===", node.target, "node.name:", node.name)
+                new_sub = self.subgraph_from_anchor(node)
+                # new_nodes = set(sub.subgraph_nodes) - seen
+                # if any intersecting nodes between seen and sub.subgraph_nodes they should be merged
+                merged = False
+                for existing_sub in complex_op_subgraphs:
+                    if set(existing_sub.subgraph_nodes) & set(new_sub.subgraph_nodes):
+                        print("merging subgraphs:=======", existing_sub, new_sub)
+                        # merge the two subgraphs
+                        existing_sub.subgraph_nodes = list(
+                            set(existing_sub.subgraph_nodes)
+                            | set(new_sub.subgraph_nodes)
+                        )
+                        existing_sub.input_nodes = list(
+                            set(existing_sub.input_nodes) | set(new_sub.input_nodes)
+                        )
+                        existing_sub.anchor_nodes = list(
+                            set(existing_sub.anchor_nodes) | set(new_sub.anchor_nodes)
+                        )
+                        merged = True
+                        break
+                if not merged:
+                    complex_op_subgraphs.append(new_sub)
         return complex_op_subgraphs
 
 

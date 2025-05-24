@@ -223,7 +223,7 @@ def main():
     )
     x_out = compiled_parallel_model_backendTwo(x)
 
-    print("parallel modelx_out.shape:", x_out.shape)
+    print("parallel model x_out.shape:", x_out.shape)
 
     compiled_parallel_model_backendThree = torch.compile(
         model,
@@ -231,7 +231,7 @@ def main():
     )
     x_out = compiled_parallel_model_backendThree(x)
 
-    print("parallel modelx_out.shape:", x_out.shape)
+    print("parallel model x_out.shape:", x_out.shape)
 
     compiled_parallel_model_backendFour = torch.compile(
         model,
@@ -239,7 +239,7 @@ def main():
     )
     x_out = compiled_parallel_model_backendFour(x)
 
-    print("parallel modelx_out.shape:", x_out.shape)
+    print("parallel model x_out.shape:", x_out.shape)
 
 
 if __name__ == "__main__":
