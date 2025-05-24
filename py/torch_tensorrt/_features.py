@@ -1,3 +1,4 @@
+import importlib
 import os
 import sys
 from collections import namedtuple
@@ -15,6 +16,7 @@ FeatureSet = namedtuple(
         "dynamo_frontend",
         "fx_frontend",
         "refit",
+        "qdp_plugin",
     ],
 )
 
@@ -39,14 +41,24 @@ _DYNAMO_FE_AVAIL = version.parse(sanitized_torch_version()) >= version.parse("2.
 _FX_FE_AVAIL = True
 _REFIT_AVAIL = True
 
+if importlib.util.find_spec("tensorrt.plugin"):
+    _QDP_PLUGIN_AVAIL = True
+else:
+    _QDP_PLUGIN_AVAIL = False
+
 ENABLED_FEATURES = FeatureSet(
-    _TS_FE_AVAIL, _TORCHTRT_RT_AVAIL, _DYNAMO_FE_AVAIL, _FX_FE_AVAIL, _REFIT_AVAIL
+    _TS_FE_AVAIL,
+    _TORCHTRT_RT_AVAIL,
+    _DYNAMO_FE_AVAIL,
+    _FX_FE_AVAIL,
+    _REFIT_AVAIL,
+    _QDP_PLUGIN_AVAIL,
 )
 
 
 def _enabled_features_str() -> str:
     enabled = lambda x: "ENABLED" if x else "DISABLED"
-    out_str: str = f"Enabled Features:\n  - Dynamo Frontend: {enabled(_DYNAMO_FE_AVAIL)}\n  - Torch-TensorRT Runtime: {enabled(_TORCHTRT_RT_AVAIL)}\n  - FX Frontend: {enabled(_FX_FE_AVAIL)}\n  - TorchScript Frontend: {enabled(_TS_FE_AVAIL)}\n"  # type: ignore[no-untyped-call]
+    out_str: str = f"Enabled Features:\n - Dynamo Frontend: {enabled(_DYNAMO_FE_AVAIL)}\n - Torch-TensorRT Runtime: {enabled(_TORCHTRT_RT_AVAIL)}\n - FX Frontend: {enabled(_FX_FE_AVAIL)}\n - TorchScript Frontend: {enabled(_TS_FE_AVAIL)}\n - Refit: {enabled(_REFIT_AVAIL)}\n - QDP Plugin: {enabled(_QDP_PLUGIN_AVAIL)}\n"  # type: ignore[no-untyped-call]
     return out_str
 
 
@@ -58,6 +70,22 @@ def needs_torch_tensorrt_runtime(f: Callable[..., Any]) -> Callable[..., Any]:
 
             def not_implemented(*args: List[Any], **kwargs: Dict[str, Any]) -> Any:
                 raise NotImplementedError("Torch-TensorRT Runtime is not available")
+
+            return not_implemented(*args, **kwargs)
+
+    return wrapper
+
+
+def needs_qdp_plugin(f: Callable[..., Any]) -> Callable[..., Any]:
+    def wrapper(*args: List[Any], **kwargs: Dict[str, Any]) -> Any:
+        if ENABLED_FEATURES.qdp_plugin:
+            return f(*args, **kwargs)
+        else:
+
+            def not_implemented(*args: List[Any], **kwargs: Dict[str, Any]) -> Any:
+                raise NotImplementedError(
+                    "TensorRT QDP(Quick Deploy Plugins) not available, requires TensorRT 10.7.0 or higher"
+                )
 
             return not_implemented(*args, **kwargs)
 
