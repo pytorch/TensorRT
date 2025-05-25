@@ -47,7 +47,6 @@ def nvfp4_quantize(
         print(f"lan added input_tensor: {input_tensor.shape=} {input_tensor.dtype=}")
         print(f"lan added global_scale: {global_scale.shape=} {global_scale.dtype=}")
         if ".weight_quantizer" in name:
-            # _test_weights_scaling_factor(input_tensor, global_scale)
             output = _static_double_quantize(
                 ctx,
                 target,
@@ -204,7 +203,12 @@ def _static_double_quantize(
     Returns:
         quantized data tensor in fp4
     """
-    breakpoint()
+    if os.getenv("DISABLE_STATIC_QUANTIZE", "false").lower() == "true":
+        print("lan added disable_static_quantize is set, skipping static quantize")
+        return get_trt_tensor(ctx, weights_tensor, name + "_weights")
+    print(
+        "lan added static disable_static_quantize is not set, doing static double quantize "
+    )
     import modelopt.core.torch.quantization.qtensor.nvfp4_tensor as nvfp4_tensor
 
     if weights_tensor.dtype == torch.float16:
@@ -248,7 +252,7 @@ def _static_double_quantize(
     return dequantized_data
 
 
-def _static_double_quantize_debug(
+def _static_double_quantize_transpose(
     ctx: ConversionContext,
     target: Target,
     source_ir: Optional[SourceIR],
@@ -272,18 +276,7 @@ def _static_double_quantize_debug(
     Returns:
         quantized data tensor in fp4
     """
-    if os.getenv("DISABLE_STATIC_QUANTIZE", "false").lower() == "true":
-        print("lan added disable_static_quantize is set, skipping static quantize")
-        return get_trt_tensor(ctx, weights_tensor, name + "_weights")
-    print(
-        "lan added static disable_static_quantize is not set, doing static double quantize "
-    )
-    if os.getenv("ENABLE_TRANSPOSE", "false").lower() == "true":
-        print("lan added enable_transpose is set, transposing weights tensor")
-        enable_transpose = True
-        axis = -2
-    else:
-        enable_transpose = False
+    axis = -2
     import modelopt.core.torch.quantization.qtensor.nvfp4_tensor as nvfp4_tensor
 
     if weights_tensor.dtype == torch.float16:
@@ -307,9 +300,9 @@ def _static_double_quantize_debug(
         global_scale,
         keep_high_precision=True,
     )
-    if enable_transpose:
-        block_scale = block_scale.transpose(0, 1)
-        weights_tensor_scaled = weights_tensor_scaled.transpose(0, 1)
+
+    block_scale = block_scale.transpose(0, 1)
+    weights_tensor_scaled = weights_tensor_scaled.transpose(0, 1)
 
     block_scale_fp8 = block_scale.to(torch.float8_e4m3fn)
     weights_tensor_uint4 = nvfp4_tensor.NVFP4QTensor._cast_fp4(weights_tensor_scaled)
@@ -347,15 +340,14 @@ def _static_double_quantize_debug(
         axis,
         original_dtype,
     )
-    if enable_transpose:
-        dequantized_data = impl.permutation.permute(
-            ctx,
-            target,
-            source_ir,
-            name + "_dequantized_data_transposed",
-            dequantized_data,
-            (-1, -2),
-        )
+    dequantized_data = impl.permutation.permute(
+        ctx,
+        target,
+        source_ir,
+        name + "_dequantized_data_transposed",
+        dequantized_data,
+        (-1, -2),
+    )
     return dequantized_data
 
 
