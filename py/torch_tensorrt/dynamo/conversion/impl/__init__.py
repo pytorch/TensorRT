@@ -14,6 +14,7 @@ from torch_tensorrt.dynamo.conversion.impl import (
     matmul,
     nccl_ops,
     normalization,
+    nvfp4_quantize,
     pad,
     permutation,
     pool,

@@ -361,12 +361,37 @@ def create_constant(
             shape = list(torch_value.shape)
 
         if torch_value is not None:
+            if torch_value.dtype == torch.float8_e4m3fn:
+                weights = trt.Weights(
+                    type=trt.DataType.FP8,
+                    ptr=torch_value.data_ptr(),
+                    count=torch_value.numel(),
+                )
+                constant = ctx.net.add_constant(
+                    shape,
+                    weights,
+                )
+                constant.name = name
+                return constant.get_output(0)
+            # Iconstant layer does not support Uint8, it only support that FP4 data packed in uint8
+            if torch_value.dtype == torch.uint8:
+                weights = trt.Weights(
+                    type=trt.DataType.FP4,
+                    ptr=torch_value.data_ptr(),
+                    count=torch_value.numel() * 2,
+                )
+                shape[-1] = shape[-1] * 2
+                constant = ctx.net.add_constant(
+                    shape,
+                    weights,
+                )
+                constant.name = name
+                return constant.get_output(0)
             if torch_value.dtype == torch.bfloat16:
                 torch_value_fp32 = torch_value.to(torch.float32)
                 numpy_value = torch_value_fp32.numpy()
             else:
                 numpy_value = torch_value.numpy()
-
             ctx.mapping[name + " CONSTANT"] = numpy_value.reshape(-1)
             constant = ctx.net.add_constant(
                 shape,
@@ -381,7 +406,6 @@ def create_constant(
                     trt.DataType.BF16,
                     name + "_bf16_cast",
                 )
-
             return constant.get_output(0)
         else:
             raise ValueError(
