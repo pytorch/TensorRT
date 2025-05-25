@@ -9,8 +9,9 @@ Torch-TensorRT
 [![cuda](https://img.shields.io/badge/CUDA-12.8-green)](https://developer.nvidia.com/cuda-downloads)
 [![trt](https://img.shields.io/badge/TensorRT-10.9.0-green)](https://github.com/nvidia/tensorrt-llm)
 [![license](https://img.shields.io/badge/license-BSD--3--Clause-blue)](./LICENSE)
-[![linux_nightly](https://github.com/pytorch/TensorRT/actions/workflows/build-test-linux.yml/badge.svg?branch=nightly)](https://github.com/pytorch/TensorRT/actions/workflows/build-test-linux.yml)
-[![windows_nightly](https://github.com/pytorch/TensorRT/actions/workflows/build-test-windows.yml/badge.svg?branch=nightly)](https://github.com/pytorch/TensorRT/actions/workflows/build-test-windows.yml)
+[![Linux x86-64 Nightly Wheels](https://github.com/pytorch/TensorRT/actions/workflows/build-test-linux-x86_64.yml/badge.svg?branch=nightly)](https://github.com/pytorch/TensorRT/actions/workflows/build-test-linux-x86_64.yml)
+[![Linux SBSA Nightly Wheels](https://github.com/pytorch/TensorRT/actions/workflows/build-test-linux-aarch64.yml/badge.svg?branch=nightly)](https://github.com/pytorch/TensorRT/actions/workflows/build-test-linux-aarch64.yml)
+[![Windows Nightly Wheels](https://github.com/pytorch/TensorRT/actions/workflows/build-test-windows.yml/badge.svg?branch=nightly)](https://github.com/pytorch/TensorRT/actions/workflows/build-test-windows.yml)
 
 ---
 <div align="left">
@@ -105,9 +106,10 @@ auto results = trt_mod.forward({input_tensor});
 | Platform            | Support                                          |
 | ------------------- | ------------------------------------------------ |
 | Linux AMD64 / GPU   | **Supported**                                    |
+| Linux SBSA / GPU    | **Supported**                                    |
 | Windows / GPU       | **Supported (Dynamo only)**                      |
-| Linux aarch64 / GPU | **Native Compilation Supported on JetPack-4.4+ (use v1.0.0 for the time being)** |
-| Linux aarch64 / DLA | **Native Compilation Supported on JetPack-4.4+ (use v1.0.0 for the time being)** |
+| Linux Jetson / GPU | **Source Compilation Supported on JetPack-4.4+**  |
+| Linux Jetson / DLA | **Source Compilation Supported on JetPack-4.4+**  |
 | Linux ppc64le / GPU | Not supported                                    |
 
 > Note: Refer [NVIDIA L4T PyTorch NGC container](https://ngc.nvidia.com/catalog/containers/nvidia:l4t-pytorch) for PyTorch libraries on JetPack.
@@ -116,10 +118,10 @@ auto results = trt_mod.forward({input_tensor});
 
 These are the following dependencies used to verify the testcases. Torch-TensorRT can work with other versions, but the tests are not guaranteed to pass.
 
-- Bazel 6.3.2
-- Libtorch 2.8.0.dev (latest nightly) (built with CUDA 12.8)
-- CUDA 12.8
-- TensorRT 10.9.0.43
+- Bazel 8.1.1
+- Libtorch 2.8.0.dev (latest nightly)
+- CUDA 12.8 (CUDA 12.6 on Jetson) 
+- TensorRT 10.9 (TensorRT 10.3 on Jetson)
 
 ## Deprecation Policy
 
