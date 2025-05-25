@@ -1,8 +1,10 @@
+import os
 from typing import Optional, Union
 
 import numpy as np
 import tensorrt as trt
 import torch
+import torch_tensorrt.dynamo.conversion.impl as impl
 from torch.fx.experimental.proxy_tensor import unset_fake_temporarily
 from torch.fx.node import Target
 from torch_tensorrt.dynamo._SourceIR import SourceIR
@@ -13,8 +15,7 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
 )
 from torch_tensorrt.fx.converters.converter_utils import set_layer_name
 from torch_tensorrt.fx.types import TRTTensor
-import os
-import torch_tensorrt.dynamo.conversion.impl as impl
+
 
 def nvfp4_quantize(
     ctx: ConversionContext,
@@ -133,13 +134,36 @@ def _dynamic_double_quantize(
     quantized_data_in_fp4 = dynamic_quantize_layer.get_output(0)
     quantized_scale_in_fp8 = dynamic_quantize_layer.get_output(1)
 
+    return _double_dequantize(
+        ctx,
+        target,
+        source_ir,
+        name,
+        quantized_data_in_fp4,
+        quantized_scale_in_fp8,
+        global_scale,
+        axis,
+        input_tensor.dtype,
+    )
+
+
+def _double_dequantize(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    quantized_data_in_fp4: TRTTensor,
+    quantized_scale_in_fp8: TRTTensor,
+    global_scale: torch.Tensor,
+    axis: int = -1,
+    output_type: trt.DataType = trt.DataType.FLOAT,
+) -> TRTTensor:
     # dequantize scale from fp8 to orignal dtype(default is float32)
     dequantize_scale_layer = ctx.net.add_dequantize(
-        quantized_scale_in_fp8, global_scale, input_tensor.dtype
+        quantized_scale_in_fp8, global_scale, output_type
     )
     dequantize_scale_layer.axis = axis
-    dequantize_scale_layer.to_type = input_tensor.dtype
-    # dequantize_scale_layer.set_output_type(0, input_tensor.dtype)
+    dequantize_scale_layer.to_type = output_type
     set_layer_name(
         dequantize_scale_layer, target, name + "_dequantize_scale", source_ir
     )
@@ -147,38 +171,13 @@ def _dynamic_double_quantize(
 
     # dequantize quantized_data_in_fp4 from fp4 to orignal dtype(default is float32)
     dequantize_data_layer = ctx.net.add_dequantize(
-        quantized_data_in_fp4, dequantized_scale, input_tensor.dtype
+        quantized_data_in_fp4, dequantized_scale, output_type
     )
     dequantize_data_layer.axis = axis
-    dequantize_data_layer.to_type = input_tensor.dtype
+    dequantize_data_layer.to_type = output_type
     set_layer_name(dequantize_data_layer, target, name + "_dequantize_data", source_ir)
     dequantized_data = dequantize_data_layer.get_output(0)
     return dequantized_data
-
-
-# TODO: to remove it this is to make sure our global scale and block scale calculation is correct during debugging
-def _test_weights_scaling_factor(
-    weights_tensor: torch.Tensor, global_scale: torch.Tensor
-) -> None:
-
-    import modelopt.core.torch.quantization.qtensor.nvfp4_tensor as nvfp4_tensor
-    import modelopt.onnx.quantization.quant_utils as quant_utils
-
-    weights_scaling_factor_2 = nvfp4_tensor.NVFP4QTensor.get_weights_scaling_factor_2(
-        weights_tensor
-    )
-    torch.allclose(weights_scaling_factor_2, global_scale)
-
-    block_scale_f32 = quant_utils.get_weights_scaling_factor(
-        weights_tensor.numpy(), 16, np.float32(global_scale)
-    )
-    block_scale_f32 = torch.from_numpy(block_scale_f32)
-
-    block_scale = nvfp4_tensor.NVFP4QTensor.get_weights_scaling_factor(
-        weights_tensor, 16, global_scale, True
-    )[0]
-    torch.allclose(block_scale_f32, block_scale)
-    block_scale_fp8 = block_scale.to(torch.float8_e4m3fn)
 
 
 def _static_double_quantize(
@@ -205,10 +204,80 @@ def _static_double_quantize(
     Returns:
         quantized data tensor in fp4
     """
+    breakpoint()
+    import modelopt.core.torch.quantization.qtensor.nvfp4_tensor as nvfp4_tensor
+
+    if weights_tensor.dtype == torch.float16:
+        original_dtype = trt.DataType.HALF
+    elif weights_tensor.dtype == torch.float32:
+        original_dtype = trt.DataType.FLOAT
+    else:
+        raise ValueError(
+            f"Currently try float16, float32 only on weights tensor. Unsupported dtype: {weights_tensor.dtype}"
+        )
+    block_scale_fp8 = nvfp4_tensor.NVFP4QTensor.get_weights_scaling_factor(
+        weights_tensor,
+        16,
+        global_scale,
+    )[0]
+    weights_tensor_fp4 = nvfp4_tensor.NVFP4QTensor.quantize(
+        weights_tensor,
+        16,
+        block_scale_fp8,
+        global_scale,
+    )[0]._quantized_data
+
+    block_scale_fp8 = get_trt_tensor(ctx, block_scale_fp8, name + "_block_scale_fp8")
+    global_scale = to_torch(global_scale, None)
+    global_scale = get_trt_tensor(ctx, global_scale, name + "_global_scale")
+    weights_tensor_fp4 = get_trt_tensor(ctx, weights_tensor_fp4, name + "_weights_fp4")
+    print(
+        f"lan added weights_tensor_fp4: {weights_tensor_fp4.shape=} {weights_tensor_fp4.dtype=}"
+    )
+    dequantized_data = _double_dequantize(
+        ctx,
+        target,
+        source_ir,
+        name,
+        weights_tensor_fp4,
+        block_scale_fp8,
+        global_scale,
+        axis,
+        original_dtype,
+    )
+    return dequantized_data
+
+
+def _static_double_quantize_debug(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    weights_tensor: torch.Tensor,
+    global_scale: torch.Tensor,
+    axis: int,
+) -> TRTTensor:
+    """
+    Parameters:
+        ctx: ConversionContext,
+        target: Target,
+        source_ir: Optional[SourceIR],
+        name: str,
+        weights_tensor : Tensor (On GPU)
+            The input tensor for weights.
+        global_scale : Tensor (On GPU)
+            The global per-tensor scaling factor. It should contain only 1 element.
+        axis: int
+            The axis to quantize. Default is -1 (the last axis).
+    Returns:
+        quantized data tensor in fp4
+    """
     if os.getenv("DISABLE_STATIC_QUANTIZE", "false").lower() == "true":
         print("lan added disable_static_quantize is set, skipping static quantize")
         return get_trt_tensor(ctx, weights_tensor, name + "_weights")
-    print("lan added static disable_static_quantize is not set, do disable_static_quantize ")
+    print(
+        "lan added static disable_static_quantize is not set, doing static double quantize "
+    )
     if os.getenv("ENABLE_TRANSPOSE", "false").lower() == "true":
         print("lan added enable_transpose is set, transposing weights tensor")
         enable_transpose = True
@@ -241,52 +310,52 @@ def _static_double_quantize(
     if enable_transpose:
         block_scale = block_scale.transpose(0, 1)
         weights_tensor_scaled = weights_tensor_scaled.transpose(0, 1)
-    
+
     block_scale_fp8 = block_scale.to(torch.float8_e4m3fn)
     weights_tensor_uint4 = nvfp4_tensor.NVFP4QTensor._cast_fp4(weights_tensor_scaled)
-    weights_tensor_uint8 = (weights_tensor_uint4[..., 1::2] << 4) | weights_tensor_uint4[..., 0::2]
-    
-    print(f"lan added block_scale_fp8: {block_scale_fp8.shape=} {block_scale_fp8.dtype=} {block_scale_fp8=}")
-    print(f"lan added weights_tensor_uint8: {weights_tensor_uint8.shape=} {weights_tensor_uint8.dtype=}")
-    
+    weights_tensor_uint8 = (
+        weights_tensor_uint4[..., 1::2] << 4
+    ) | weights_tensor_uint4[..., 0::2]
+
+    print(
+        f"lan added block_scale_fp8: {block_scale_fp8.shape=} {block_scale_fp8.dtype=} {block_scale_fp8=}"
+    )
+    print(
+        f"lan added weights_tensor_uint4: {weights_tensor_uint4.shape=} {weights_tensor_uint4.dtype=} {weights_tensor_uint4=}"
+    )
+    print(
+        f"lan added weights_tensor_uint8: {weights_tensor_uint8.shape=} {weights_tensor_uint8.dtype=} {weights_tensor_uint8=}"
+    )
+
     block_scale_fp8 = get_trt_tensor(ctx, block_scale_fp8, name + "_block_scale_fp8")
     global_scale = to_torch(global_scale, None)
     global_scale = get_trt_tensor(ctx, global_scale, name + "_global_scale")
-    weights_tensor_fp4 = get_trt_tensor(ctx, weights_tensor_uint8, name + "_weights_fp4")
-    # dequantize block scale from fp8 to original dtype (default is float32)
-    dequantize_block_scale_layer = ctx.net.add_dequantize(
+    weights_tensor_fp4 = get_trt_tensor(
+        ctx, weights_tensor_uint8, name + "_weights_fp4"
+    )
+    print(
+        f"lan added weights_tensor_fp4: {weights_tensor_fp4.shape=} {weights_tensor_fp4.dtype=}"
+    )
+    dequantized_data = _double_dequantize(
+        ctx,
+        target,
+        source_ir,
+        name,
+        weights_tensor_fp4,
         block_scale_fp8,
         global_scale,
+        axis,
         original_dtype,
     )
-    dequantize_block_scale_layer.axis = axis
-    dequantize_block_scale_layer.to_type = original_dtype
-    set_layer_name(
-        dequantize_block_scale_layer,
-        target,
-        name + "_dequantize_block_scale",
-        source_ir,
-    )
-    print(
-        f"lan added dequantize_block_scale_layer: {dequantize_block_scale_layer.to_type=} {dequantize_block_scale_layer.axis=} {dequantize_block_scale_layer.get_input(0).shape=} {dequantize_block_scale_layer.get_input(1).shape=}"
-    )
-    dequantized_block_scale = dequantize_block_scale_layer.get_output(0)
-
-    # dequantize weights tensor from fp4 to original dtype(default is float32)
-    dequantize_data_layer = ctx.net.add_dequantize(
-        weights_tensor_fp4,
-        dequantized_block_scale,
-        original_dtype,
-    )
-    dequantize_data_layer.axis = axis
-    dequantize_data_layer.to_type = original_dtype
-    set_layer_name(dequantize_data_layer, target, name + "_dequantize_data", source_ir)
-    print(
-        f"lan added dequantize_data_layer: {dequantize_data_layer.to_type=} {dequantize_data_layer.axis=} {dequantize_data_layer.get_input(0).shape=} {dequantize_data_layer.get_input(1).shape=}"
-    )
-    dequantized_data = dequantize_data_layer.get_output(0)
     if enable_transpose:
-        dequantized_data = impl.permutation.permute(ctx, target, source_ir, name + "_dequantized_data_transposed", dequantized_data, (-1, -2))
+        dequantized_data = impl.permutation.permute(
+            ctx,
+            target,
+            source_ir,
+            name + "_dequantized_data_transposed",
+            dequantized_data,
+            (-1, -2),
+        )
     return dequantized_data
 
 
@@ -305,19 +374,3 @@ def _calculate_global_scale(
     if global_scale == 0:
         global_scale = 1.0
     return global_scale
-
-def _get_weights_scaling_factor_transposed(
-    weights_tensor: torch.Tensor,
-    global_scale: torch.Tensor,
-    keep_high_precision: bool = False,
-) -> torch.Tensor:
-    [k, n] = weights_tensor.shape[-2:]
-    assert k % 16 == 0, "Weight shape is not divisible for block size for block quantiation."
-    weights_tensor = weights_tensor.reshape(tuple(weights_tensor.shape[:-2]) + (k // 16, n, 16))
-    per_block_amax = weights_tensor.abs().amax(dim=-1).float()
-    per_block_scale = per_block_amax / 6.0
-    q_per_block_scale = per_block_scale / global_scale
-    q_per_block_scale[per_block_scale == 0] = 1.0
-    if not keep_high_precision:
-        q_per_block_scale = q_per_block_scale.to(torch.float8_e4m3fn)
-    return q_per_block_scale
