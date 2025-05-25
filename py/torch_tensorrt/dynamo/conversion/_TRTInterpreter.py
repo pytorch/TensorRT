@@ -274,13 +274,13 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                 self.compilation_settings.dla_global_dram_size,
             )
 
-        if dtype.float16 in self.compilation_settings.enabled_precisions:
+        if not self.compilation_settings.use_explicit_typing and dtype.float16 in self.compilation_settings.enabled_precisions:
             builder_config.set_flag(trt.BuilderFlag.FP16)
 
         if dtype.int8 in self.compilation_settings.enabled_precisions:
             builder_config.set_flag(trt.BuilderFlag.INT8)
 
-        if dtype.fp8 in self.compilation_settings.enabled_precisions:
+        if not self.compilation_settings.use_explicit_typing and dtype.fp8 in self.compilation_settings.enabled_precisions:
             builder_config.set_flag(trt.BuilderFlag.FP8)
 
         if dtype.bfloat16 in self.compilation_settings.enabled_precisions:
