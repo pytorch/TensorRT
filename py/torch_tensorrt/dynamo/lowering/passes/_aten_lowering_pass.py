@@ -17,7 +17,7 @@ from .remove_num_users_is_0_nodes import remove_num_users_is_0_nodes
 from .repair_input_as_output import repair_input_as_output
 from .replace_max_pool_with_indices import replace_max_pool_with_indices
 
-pass_list = [
+post_lowering_pass_list = [
     remove_input_alias_fixing_clones,
     constant_fold,
     repair_input_as_output,
@@ -28,16 +28,18 @@ pass_list = [
     remove_num_users_is_0_nodes,
 ]
 
+pre_lowering_pass_list = [
+    remove_detach,
+]
+
 if not is_tegra_platform():
-    pass_list.append(fuse_distributed_ops)
+    post_lowering_pass_list.append(fuse_distributed_ops)
 
-ATEN_POST_LOWERING_PASSES = DynamoPassManager.build_from_passlist(pass_list)
-
-ATEN_PRE_LOWERING_PASSES = DynamoPassManager.build_from_passlist(
-    [
-        remove_detach,
-    ]
+ATEN_POST_LOWERING_PASSES = DynamoPassManager.build_from_passlist(
+    post_lowering_pass_list
 )
+
+ATEN_PRE_LOWERING_PASSES = DynamoPassManager.build_from_passlist(pre_lowering_pass_list)
 
 logger = logging.getLogger(__name__)
 
