@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt.dynamo._settings &mdash; Torch-TensorRT v2.8.0.dev0+b100fdd documentation</title>
+  <title>torch_tensorrt.dynamo._settings &mdash; Torch-TensorRT v2.8.0.dev0+5dbf2b9 documentation</title>
   
 
   
@@ -290,7 +290,7 @@
               
               
                 <div class="version">
-                  v2.8.0.dev0+b100fdd
+                  v2.8.0.dev0+5dbf2b9
                 </div>
               
             
@@ -514,6 +514,7 @@
     <span class="n">MAX_AUX_STREAMS</span><span class="p">,</span>
     <span class="n">MIN_BLOCK_SIZE</span><span class="p">,</span>
     <span class="n">NUM_AVG_TIMING_ITERS</span><span class="p">,</span>
+    <span class="n">OFFLOAD_MODULE_TO_CPU</span><span class="p">,</span>
     <span class="n">OPTIMIZATION_LEVEL</span><span class="p">,</span>
     <span class="n">PASS_THROUGH_BUILD_FAILURES</span><span class="p">,</span>
     <span class="n">REFIT_IDENTICAL_ENGINE_WEIGHTS</span><span class="p">,</span>
@@ -628,7 +629,8 @@
     <span class="n">enable_cross_compile_for_windows</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">ENABLE_CROSS_COMPILE_FOR_WINDOWS</span>
     <span class="n">tiling_optimization_level</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">TILING_OPTIMIZATION_LEVEL</span>
     <span class="n">l2_limit_for_tiling</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">L2_LIMIT_FOR_TILING</span>
-    <span class="n">use_distributed_mode_trace</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">USE_DISTRIBUTED_MODE_TRACE</span></div>
+    <span class="n">use_distributed_mode_trace</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">USE_DISTRIBUTED_MODE_TRACE</span>
+    <span class="n">offload_module_to_cpu</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">OFFLOAD_MODULE_TO_CPU</span></div>
 
 
 <span class="n">_SETTINGS_TO_BE_ENGINE_INVARIANT</span> <span class="o">=</span> <span class="p">(</span>

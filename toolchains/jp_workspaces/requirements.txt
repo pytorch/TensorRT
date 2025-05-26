@@ -1,4 +1,4 @@
-setuptools==70.2.0
+setuptools==78.1.1
 numpy<2.0.0
 packaging
 pyyaml
