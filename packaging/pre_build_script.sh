@@ -55,39 +55,24 @@ else
     pip install --force-reinstall --pre ${TORCH_TORCHVISION} --index-url ${INDEX_URL}
 fi
 
+if [[ "${CU_VERSION::4}" < "cu12" ]]; then
+    # replace dependencies from tensorrt-cu12-bindings/libs to tensorrt-cu11-bindings/libs
+    sed -i -e "s/tensorrt-cu12/tensorrt-${CU_VERSION::4}/g" \
+        -e "s/tensorrt-cu12-bindings/tensorrt-${CU_VERSION::4}-bindings/g" \
+        -e "s/tensorrt-cu12-libs/tensorrt-${CU_VERSION::4}-libs/g" \
+        pyproject.toml
+fi
 
-if [[ ${IS_JETPACK} == true ]]; then
-    # change the torch dependency for jp6.2
-    sed -i -e "s/torch>=2.8.0.dev,<2.9.0/torch>=2.7.0,<2.8.0/g" pyproject.toml
-    # change the tensorrt dependency for jp6.2
-    sed -i -e "s/tensorrt>=10.9.0,<10.10.0/tensorrt>=10.3.0,<10.4.0/g" pyproject.toml
-    sed -i -e "s/\"tensorrt-cu12>=10.9.0,<10.10.0\",//g" pyproject.toml
-    sed -i -e "s/\"tensorrt-cu12-bindings>=10.9.0,<10.10.0\",//g" pyproject.toml
-    sed -i -e "s/\"tensorrt-cu12-libs>=10.9.0,<10.10.0\",//g" pyproject.toml
-    # downgrade the numpy for jp6.2
-    sed -i -e "s/\"numpy\"/\"numpy==1.26.3\"/g" pyproject.toml
-    pip uninstall -y numpy
-    pip install numpy==1.26.3
-else
-    # for non-jetpack, we need to support on cuda 118
-    if [[ "${CU_VERSION::4}" < "cu12" ]]; then
-        # replace dependencies from tensorrt-cu12-bindings/libs to tensorrt-cu11-bindings/libs
-        sed -i -e "s/tensorrt-cu12/tensorrt-${CU_VERSION::4}/g" \
-            -e "s/tensorrt-cu12-bindings/tensorrt-${CU_VERSION::4}-bindings/g" \
-            -e "s/tensorrt-cu12-libs/tensorrt-${CU_VERSION::4}-libs/g" \
-            pyproject.toml
-    fi
-    # for non-jetpack, we need to support build with different tensorrt version
-    if [[ ${TENSORRT_VERSION} != "" ]]; then
-        # Replace dependencies in the original pyproject.toml with the current TensorRT version. It is used for CI tests of different TensorRT versions.
-        # For example, if the current testing TensorRT version is 10.7.0, but the pyproject.toml tensorrt>=10.8.0,<10.9.0, then the following sed command
-        # will replace tensorrt>=10.8.0,<10.9.0 with tensorrt==10.7.0
-        sed -i -e "s/tensorrt>=.*,<.*\"/tensorrt>=${TENSORRT_VERSION},<$(echo "${TENSORRT_VERSION}" | awk -F. '{print $1"."$2+1".0"}')\"/g" \
-            -e "s/tensorrt-cu12>=.*,<.*\"/tensorrt-cu12>=${TENSORRT_VERSION},<$(echo "${TENSORRT_VERSION}" | awk -F. '{print $1"."$2+1".0"}')\"/g" \
-            -e "s/tensorrt-cu12-bindings>=.*,<.*\"/tensorrt-cu12-bindings>=${TENSORRT_VERSION},<$(echo "${TENSORRT_VERSION}" | awk -F. '{print $1"."$2+1".0"}')\"/g" \
-            -e "s/tensorrt-cu12-libs>=.*,<.*\"/tensorrt-cu12-libs>=${TENSORRT_VERSION},<$(echo "${TENSORRT_VERSION}" | awk -F. '{print $1"."$2+1".0"}')\"/g" \
-            pyproject.toml
-    fi
+# for build torch_tensorrt with different tensorrt version workflow, we need to replace the tensorrt version in the pyproject.toml
+if [[ ${TENSORRT_VERSION} != "" ]]; then
+    # Replace dependencies in the original pyproject.toml with the current TensorRT version. It is used for CI tests of different TensorRT versions.
+    # For example, if the current testing TensorRT version is 10.7.0, but the pyproject.toml tensorrt>=10.8.0,<10.9.0, then the following sed command
+    # will replace tensorrt>=10.8.0,<10.9.0 with tensorrt==10.7.0
+    sed -i -e "s/tensorrt>=.*,<.*\"/tensorrt>=${TENSORRT_VERSION},<$(echo "${TENSORRT_VERSION}" | awk -F. '{print $1"."$2+1".0"}')\"/g" \
+        -e "s/tensorrt-cu12>=.*,<.*\"/tensorrt-cu12>=${TENSORRT_VERSION},<$(echo "${TENSORRT_VERSION}" | awk -F. '{print $1"."$2+1".0"}')\"/g" \
+        -e "s/tensorrt-cu12-bindings>=.*,<.*\"/tensorrt-cu12-bindings>=${TENSORRT_VERSION},<$(echo "${TENSORRT_VERSION}" | awk -F. '{print $1"."$2+1".0"}')\"/g" \
+        -e "s/tensorrt-cu12-libs>=.*,<.*\"/tensorrt-cu12-libs>=${TENSORRT_VERSION},<$(echo "${TENSORRT_VERSION}" | awk -F. '{print $1"."$2+1".0"}')\"/g" \
+        pyproject.toml
 fi
 
 export TORCH_BUILD_NUMBER=$(python -c "import torch, urllib.parse as ul; print(ul.quote_plus(torch.__version__))")
@@ -102,5 +87,4 @@ if [[ ${TENSORRT_VERSION} != "" ]]; then
     sed -i -e "s#\"https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/.*\"#\"${TENSORRT_URLS}\"#g" MODULE.bazel
 fi
 cat MODULE.bazel
-cat pyproject.toml
 export CI_BUILD=1

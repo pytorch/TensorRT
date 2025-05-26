@@ -60,18 +60,36 @@ Building Torch-TensorRT
 
 Build Environment Setup
 =======================
-1. **Install Bazel**:
+1. **Install Build Dependencies**:
+
    .. code-block:: sh
    
       wget https://github.com/bazelbuild/bazelisk/releases/download/v1.26.0/bazelisk-linux-arm64
       sudo mv bazelisk-linux-arm64 /usr/bin/bazel
       sudo chmod +x /usr/bin/bazel
 
-2. **Install Python dependencies**:
    .. code-block:: sh
-   
+      
+      apt-get install ninja-build gettext curl libopenblas-dev git
+
+2. **Install Python dependencies**:
+
+   .. code-block:: sh
+      
       wget https://bootstrap.pypa.io/get-pip.py
       python get-pip.py
+      python -m pip install pyyaml
+
+3. **Install PyTorch**:
+
+   .. code-block:: sh
+      
+      # Can only install the torch and torchvision wheel from the JPL repo which is built specifically for JetPack 6.2
+      TORCH_URL=https://pypi.jetson-ai-lab.dev/jp6/cu126/+f/6ef/f643c0a7acda9/torch-2.7.0-cp310-cp310-linux_aarch64.whl#sha256=6eff643c0a7acda92734cc798338f733ff35c7df1a4434576f5ff7c66fc97319
+      TORCHVISION_URL=https://pypi.jetson-ai-lab.dev/jp6/cu126/+f/daa/bff3a07259968/torchvision-0.22.0-cp310-cp310-linux_aarch64.whl#sha256=daabff3a0725996886b92e4b5dd143f5750ef4b181b5c7d01371a9185e8f0402
+      python -m pip install ${TORCH_URL}
+      python -m pip install ${TORCHVISION_URL}
+
 
 Building the Wheel
 ==================
@@ -79,7 +97,6 @@ Building the Wheel
 
    # Configure build environment
    export BUILD_VERSION="2.8.0.dev20250511"
-   ./packaging/pre_build_script.sh
 
    # Execute build with JetPack support
    python setup.py bdist_wheel --jetpack
@@ -89,7 +106,7 @@ Installation
 .. code-block:: sh
 
    cd dist
-   pip install torch-tensorrt-2.8.0.dev0+4da152843-cp310-none-linux_aarch64.whl
+   python -m pip install torch-tensorrt-2.8.0.dev0+4da152843-cp310-none-linux_aarch64.whl
 
 Post-Installation Verification
 ==============================
