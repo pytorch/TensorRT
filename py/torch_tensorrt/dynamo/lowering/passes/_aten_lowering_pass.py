@@ -9,6 +9,7 @@ from .accumulate_fp32_matmul import accumulate_fp32_matmul
 from .constant_folding import constant_fold
 from .fuse_distributed_ops import fuse_distributed_ops
 from .fuse_prims_broadcast import fuse_prims_broadcast
+from .lower_scaled_dot_product_attention import lower_scaled_dot_product_attention
 from .pass_manager import DynamoPassManager
 from .remove_assert_nodes import remove_assert_nodes
 from .remove_detach import remove_detach
@@ -23,6 +24,7 @@ pass_list = [
     repair_input_as_output,
     fuse_prims_broadcast,
     replace_max_pool_with_indices,
+    lower_scaled_dot_product_attention,
     remove_assert_nodes,
     accumulate_fp32_matmul,
     remove_num_users_is_0_nodes,

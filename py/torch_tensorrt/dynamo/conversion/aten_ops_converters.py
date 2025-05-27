@@ -597,7 +597,9 @@ except Exception as e:
     )
 else:
 
-    @dynamo_tensorrt_converter(torch.ops.tensorrt.quantize_op.default)
+    @dynamo_tensorrt_converter(
+        torch.ops.tensorrt.quantize_op.default, supports_dynamic_shapes=True
+    )
     def aten_ops_quantize_op(
         ctx: ConversionContext,
         target: Target,
@@ -648,6 +650,38 @@ else:
             args[5],
             args[6],
         )
+
+
+def attention_validator(
+    node: Node, settings: Optional[CompilationSettings] = None
+) -> bool:
+    # Currently, `attn_mask` is not supported
+    return args_bounds_check(node.args, 3) is None
+
+
+@dynamo_tensorrt_converter(
+    torch.nn.functional.scaled_dot_product_attention,
+    capability_validator=attention_validator,
+    supports_dynamic_shapes=True,
+)
+def tensorrt_scaled_dot_product_attention(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.attention.scaled_dot_product_attention(
+        ctx,
+        target,
+        SourceIR.TORCHTRT_LOWERED,
+        name,
+        args[0],
+        args[1],
+        args[2],
+        args_bounds_check(args, 5, False),
+        kwargs.get("scale", None),
+    )
 
 
 @dynamo_tensorrt_converter(torch.ops.aten.squeeze.dim, supports_dynamic_shapes=True)

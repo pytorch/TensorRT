@@ -1,4 +1,3 @@
-
 # %%
 # Import the following libraries
 # -----------------------------
@@ -56,11 +55,13 @@ config = pipe.transformer.config
 backbone = pipe.transformer
 backbone.eval()
 
+
 def filter_func(name):
     pattern = re.compile(
         r".*(time_emb_proj|time_embedding|conv_in|conv_out|conv_shortcut|add_embedding|pos_embed|time_text_embed|context_embedder|norm_out|x_embedder).*"
     )
     return pattern.match(name) is not None
+
 
 def generate_image(pipe, prompt, image_name):
     seed = 42
@@ -72,6 +73,28 @@ def generate_image(pipe, prompt, image_name):
     ).images[0]
     image.save(f"{image_name}.png")
     print(f"Image generated using {image_name} model saved as {image_name}.png")
+
+
+def benchmark(prompt, inference_step, batch_size=1, iterations=1):
+    from time import time
+
+    start = time()
+    for i in range(iterations):
+        image = pipe(
+            prompt,
+            output_type="pil",
+            num_inference_steps=inference_step,
+            num_images_per_prompt=batch_size,
+        ).images
+    end = time()
+    print(f"Batch Size: {batch_size}")
+    print("Time Elapse for", iterations, "iterations:", end - start)
+    print(
+        "Average Latency Per Step:",
+        (end - start) / inference_step / iterations / batch_size,
+    )
+    return image
+
 
 # %%
 # Quantization
@@ -99,6 +122,7 @@ def forward_loop(mod):
         pipe=pipe,
         prompt="test",
     )
+
 
 backbone = mtq.quantize(backbone, ptq_config, forward_loop)
 mtq.disable_quantizer(backbone, filter_func)
@@ -155,10 +179,11 @@ trt_gm = torch_tensorrt.dynamo.compile(
     ep,
     inputs=dummy_inputs,
     enabled_precisions=enabled_precisions,
+    use_explicit_typing=True,
     truncate_double=True,
     min_block_size=1,
     debug=False,
-    use_python_runtime=True,
+    # use_python_runtime=True,
     immutable_weights=True,
     offload_module_to_cpu=True,
 )
@@ -173,3 +198,6 @@ pipe.transformer.config = config
 trt_gm.device = torch.device(DEVICE)
 # Function which generates images from the flux pipeline
 generate_image(pipe, ["A golden retriever"], "dog_code2")
+
+
+# For this dummy model, the fp16 engine size is around 1GB, fp32 engine size is around 2GB
