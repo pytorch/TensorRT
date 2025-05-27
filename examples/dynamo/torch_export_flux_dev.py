@@ -26,6 +26,7 @@ import torch
 import torch_tensorrt
 from diffusers import FluxPipeline
 from torch.export._trace import _export
+import register_sdpa # Register SDPA as a standalone operator
 
 # %%
 # Define the FLUX-1.dev model
@@ -112,7 +113,6 @@ trt_gm = torch_tensorrt.dynamo.compile(
     min_block_size=1,
     use_fp32_acc=True,
     use_explicit_typing=True,
-)
 
 # %%
 # Post Processing
@@ -147,7 +147,7 @@ def generate_image(pipe, prompt, image_name):
     print(f"Image generated using {image_name} model saved as {image_name}.png")
 
 
-generate_image(pipe, ["A golden retriever holding a sign to code"], "dog_code")
+generate_image(pipe, ["A golden retriever holding a sign to debug"], "dog_code")
 
 # %%
 # The generated image is as shown below
