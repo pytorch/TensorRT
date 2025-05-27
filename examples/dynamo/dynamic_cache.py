@@ -14,7 +14,7 @@ from torch_tensorrt.dynamo.lowering.passes.pass_utils import (
     clean_up_graph_after_modifications,
 )
 
-from .cache_utils import add_graph_input, create_random_output_tensors, get_kv_nodes
+from cache_utils import add_graph_input, create_random_output_tensors, get_kv_nodes, is_op
 import tensorrt
 import torch.utils._pytree as pytree
 logger = logging.getLogger(__name__)
@@ -146,23 +146,7 @@ def add_kv_and_indices_as_inputs(gm, fixed_kv: bool = True):
             v_input = add_graph_input(gm, key_value[1].name+"_v_input", v_val)
             kv_inputs.append((k_input, v_input))
 
-        # Add start_idx and end_idx as inputs
-        start_idx_input = add_graph_input(gm, "start_idx")
-        end_idx_input = add_graph_input(gm, "end_idx")
-        return kv_inputs, start_idx_input, end_idx_input
-
-def insert_kv_slicing_before_sdpa(gm, incoming_keys_values: List[Tuple[torch.Tensor, torch.Tensor]]):
-    """
-    Insert slicing operations before each scaled_dot_product_attention operation.
-    """
-    pass
-    # Find all nodes with scaled_dot_product_attention
-    sdpa_nodes = []
-    for node in gm.graph.nodes:
-        if node.op == "call_function" and node.target == torch._C._nn.scaled_dot_product_attention:
-            sdpa_nodes.append(node)
-
-    for idx, sdpa_node in enumerate(sdpa_nodes):
+        return kv_inputs
 
 
 def insert_torch_cond_before_sdpa(gm, incoming_keys_values: List[Tuple[torch.Tensor, torch.Tensor]]):
@@ -181,24 +165,27 @@ def insert_torch_cond_before_sdpa(gm, incoming_keys_values: List[Tuple[torch.Ten
         if node.op == "call_function" and node.target == torch._C._nn.scaled_dot_product_attention:
             sdpa_nodes.append(node)
     
+    # Get the is_causal input node 
+    is_causal_node = next((node for node in gm.graph.nodes if node.op == "placeholder" and node.name == "is_causal"), None)
+
     # For each SDPA node, insert a torch.cond operation before it
     for idx, sdpa_node in enumerate(sdpa_nodes):
  
         with gm.graph.inserting_before(sdpa_node):
-            pred_node = add_graph_input(gm, "is_generate", torch.tensor(False, dtype=torch.bool))
+            # pred_node = add_graph_input(gm, "is_generate", torch.tensor(False, dtype=torch.bool))
             q_node, k_node, v_node = sdpa_node.args[:3]
             incoming_key, incoming_value = incoming_keys_values[idx]
             # Create nodes for concatenating k with incoming_key and v with incoming_value
             concatenated_k_node = gm.graph.create_node(
                 "call_function",
                 torch.ops.aten.cat.default,
-                args=([k_node, incoming_key], 2),  # Concatenate along sequence length dimension
+                args=([incoming_key, k_node], 2),  # Concatenate along sequence length dimension
                 kwargs={}
             )
             concatenated_v_node = gm.graph.create_node(
                 "call_function",
                 torch.ops.aten.cat.default,
-                args=([v_node, incoming_value], 2),  #  Concatenate along sequence length dimension
+                args=([incoming_value, v_node], 2),  #  Concatenate along sequence length dimension
                 kwargs={}
             )
             
@@ -206,16 +193,16 @@ def insert_torch_cond_before_sdpa(gm, incoming_keys_values: List[Tuple[torch.Ten
             cond_k_node = gm.graph.create_node(
                 "call_function",
                 torch.ops.higher_order.cond,
-                args=(pred_node, concatenated_k_node, k_node),
+                args=(is_causal_node, concatenated_k_node, k_node),
             )
  
             cond_v_node = gm.graph.create_node(
                 "call_function",
                 torch.ops.higher_order.cond,
-                args=(pred_node, concatenated_v_node, v_node),
+                args=(is_causal_node, concatenated_v_node, v_node),
             )
 
-            sdpa_node.args = (q_node, cond_k_node, cond_v_node)
+            sdpa_node.args = (q_node, cond_k_node, cond_v_node) + sdpa_node.args[3:]
     
     return gm
 
@@ -229,13 +216,13 @@ def insert_dynamic_kv_cache(
     """Perform insertion of kv-caches and attention kernel."""
 
     # Add static key and value as inputs to the graph
-    kv_inputs, start_idx_input, end_idx_input = add_kv_and_indices_as_inputs(gm, fixed_kv=True)
+    kv_inputs  = add_kv_and_indices_as_inputs(gm, fixed_kv=True)
 
-    # Call the function to add QKV as outputs
-    logits_keys_values = add_kv_as_outputs(gm, start_idx_input, end_idx_input)
+    # Call the function to add KV as outputs
+    logits_keys_values = add_kv_as_outputs(gm)
 
-    gm = insert_kv_slicing_before_sdpa(gm, kv_inputs, start_idx_input, end_idx_input)
-    # gm = insert_torch_cond_before_sdpa(gm, kv_inputs)
+    # Insert torch.cond before each SDPA node which acts toggles between prefill and generate phases
+    gm = insert_torch_cond_before_sdpa(gm, kv_inputs)
 
     gm = clean_up_graph_after_modifications(gm)
     

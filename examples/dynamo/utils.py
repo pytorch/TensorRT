@@ -86,6 +86,7 @@ def generate(model, input_seq, max_output_seq_length, eos_token_id, benchmark=Tr
         # TODO: Handle batch in this check
         if not benchmark and stopping_criteria(input_seq, logits).item():
             break
+    # breakpoint()
     return input_seq
 
 def generate_with_kv_cache(model, input_seq, max_output_seq_length, eos_token_id):
@@ -115,7 +116,7 @@ def generate_with_kv_cache(model, input_seq, max_output_seq_length, eos_token_id
         start_idx = end_idx
         end_idx = start_idx + 1 
     lkv = torch.cat(logits_concat, dim=1)
-
+    # breakpoint()
     return output_seq
 
 def time_generate(

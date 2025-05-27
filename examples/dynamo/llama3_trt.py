@@ -19,7 +19,7 @@ import torch
 import torch_tensorrt
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from contextlib import nullcontext
-from utils import export_llm, generate, recordStats, time_generate, generate_with_kv_cache
+from utils import export_llm, generate, recordStats, time_generate, generate_with_kv_cache, get_zeroed_kv_cache_inputs
 
 
 DEVICE = torch.device("cuda:0")
@@ -43,7 +43,7 @@ def get_model(args):
                     args.model,
                     use_cache=False,
                     attn_implementation="sdpa",
-                    # num_hidden_layers=1
+                    num_hidden_layers=1
                 )
                 .eval()
                 .cuda()
@@ -194,9 +194,10 @@ if __name__ == "__main__":
         help="Enable pytorch run (default: False)"
     )
     arg_parser.add_argument(
-        "--kv_cache",
-        action="store_true",
-        help="Enable kv_cache (default: False)"
+        "--cache",
+        type=str,
+        default="static",
+        help="Type of KV cache to use",
     )
     arg_parser.add_argument(
         "--cudagraph",
@@ -220,9 +221,9 @@ if __name__ == "__main__":
         tokenizer = AutoTokenizer.from_pretrained(args.tokenizer_path)
 
         prompt = "What is parallel programming ?"
+        # prompt = "What is the capital of France ?"
         model_inputs = tokenizer(prompt, return_tensors="pt")
         input_ids = model_inputs["input_ids"].to(DEVICE)
-
         # Prepare input prompt
         # word = "What"
         # word_ids = tokenizer(word, return_tensors="pt").input_ids[0]  # Get the first (and only) sequence
@@ -252,18 +253,67 @@ if __name__ == "__main__":
                 )
 
         # TRT
+        pyt_logits_tok1 = model.cuda()(input_ids)
+        next_tokens = torch.argmax(pyt_logits_tok1.logits[:, -1, :], dim=-1)
+        input_seq = torch.cat([input_ids, next_tokens[:, None]], dim=-1)
+        pyt_logits_tok2 = model.cuda()(input_seq)
         from lower_sdpa import *
-        if args.kv_cache:
-            # This import is required to register static/dynamic KV cache transformations as lowering passes
-            from static_cache import *
+        if args.cache == "static":
+            # This import is required to register static KV cache transformations as lowering passes
+            from static_cache2 import *
             trt_model = compile_torchtrt(model, input_ids, args) 
+            kv_cache = get_zeroed_kv_cache_inputs(trt_model)
+
+            # First token generation
+            pyt_keys = torch.load("key.pt"); pyt_values = torch.load("value.pt")
+            trt_logits, key_cache, value_cache, trt_keys_1, trt_values_1 = trt_model(input_ids.clone(), True, *kv_cache, 0, input_ids.shape[1])
+            print(f"Diff between pyt and trt logits: {torch.mean(torch.abs(pyt_logits_tok1.logits - trt_logits))}")
+            print(f"Diff between pyt and trt keys: {torch.mean(torch.abs(pyt_keys - trt_keys_1))}")
+            print(f"Diff between pyt and trt keys in cache: {torch.mean(torch.abs(pyt_keys - key_cache[:, :, :-2, :]))}")
+            print(f"Diff between pyt and trt values: {torch.mean(torch.abs(pyt_values - trt_values_1))}")
+            print(f"Diff between pyt and trt values in cache: {torch.mean(torch.abs(pyt_values - value_cache[:, :, :-2, :]))}")
+            next_tokens = torch.argmax(trt_logits[:, -1, :], dim=-1)
+
+            # Second token generation
+            trt_logits_2, key_cache2, value_cache2, trt_keys_2, trt_values_2 = trt_model(next_tokens[:, None], False, key_cache.clone(), value_cache.clone(), input_ids.shape[1], input_ids.shape[1]+1)
+            pyt_keys2 = torch.load("key2.pt"); pyt_values2 = torch.load("value2.pt")
+            print(f"Diff between pyt and trt logits: {torch.mean(torch.abs(pyt_logits_tok2.logits[:, -1:, :] - trt_logits_2))}")
+            print(f"Diff between pyt and trt keys: {torch.mean(torch.abs(pyt_keys2[:, :, -2:-1, :] - trt_keys_2))}")
+            print(f"Diff between pyt and trt keys in cache: {torch.mean(torch.abs(pyt_keys2 - key_cache2[:, :, :-1, :]))}")
+            print(f"Diff between pyt and trt values: {torch.mean(torch.abs(pyt_values2[:, :, -2:-1, :] - trt_values_2))}")
+            print(f"Diff between pyt and trt values in cache: {torch.mean(torch.abs(pyt_values2 - value_cache2[:, :, :-1, :]))}")
+            breakpoint()
+        elif args.cache == "dynamic":
+            from dynamic_cache import *
+            trt_model = compile_torchtrt(model, input_ids, args) 
+            breakpoint()
+            kv_cache = get_zeroed_kv_cache_inputs(trt_model)
         else:
             # pyt_logits = model.cuda()(input_ids.clone())
             trt_model = compile_torchtrt(model, input_ids, args) 
             # trt_logits = trt_model(input_ids.clone(), True)
             # print(f"Diff between pyt and trt: {torch.mean(torch.abs(pyt_logits - trt_logits))}")
             # print(f"Diff between pyt and trt logits: {torch.mean(torch.abs(pyt_logits.logits - trt_logits.logits))}")
-        if args.kv_cache:
+        if args.cache == "static":
+            if args.cudagraph:
+                # Run a decoding loop with prefill and generate phases so that the CUDAGraph is recorded for both of these phases.
+                # trt_input_signature = (input_ids.clone(),) + get_zeroed_kv_cache_inputs(trt_model)
+                torch_tensorrt.runtime.set_cudagraphs_mode(True)
+             
+            trt_gen_tokens = generate_with_kv_cache(
+                trt_model, input_ids.clone(), MAX_OUTPUT_SEQ_LENGTH, tokenizer.eos_token_id,
+                )
+
+            if args.benchmark:
+                trt_timings = time_generate(
+                    generate_with_kv_cache,
+                    trt_model,
+                    input_ids.clone(),
+                    MAX_OUTPUT_SEQ_LENGTH,
+                    tokenizer.eos_token_id,
+                    iterations=args.iterations,
+                )
+        elif args.cache == "dynamic":
             if args.cudagraph:
                 # Run a decoding loop with prefill and generate phases so that the CUDAGraph is recorded for both of these phases.
                 # trt_input_signature = (input_ids.clone(),) + get_zeroed_kv_cache_inputs(trt_model)

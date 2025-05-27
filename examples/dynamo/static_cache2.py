@@ -99,10 +99,15 @@ def add_kv_cache_inputs(gm, fixed_kv: bool = True):
 
     # Get the max sequence length from the first key_cache node. The order of nodes is: input_ids, is_causal, key_cache1, value_cache1, key_cache2, value_cache2, ..
     input_nodes = [node for node in gm.graph.nodes if node.op == "placeholder"]
-    input_ids_meta = input_nodes[0].meta["val"]
-    seq_len = input_ids_meta.shape[1]
-    min_max_opt = extract_var_range_info(seq_len)
-    max_seq_len = min_max_opt["max"]
+    # Get the third last input which should be the last value cache node and store the max_seq_len
+    input_ids_meta = input_nodes[-3].meta["val"]
+    seq_len = input_ids_meta.shape[2]
+ 
+    if isinstance(seq_len, torch.SymInt):
+        min_max_opt = extract_var_range_info(seq_len)
+        max_seq_len = min_max_opt["max"]
+    else:
+        max_seq_len = seq_len
 
     from torch.fx.experimental.symbolic_shapes import ShapeEnv
     shape_env = ShapeEnv()
@@ -120,11 +125,101 @@ def add_kv_cache_inputs(gm, fixed_kv: bool = True):
 
     return kv_inputs, start_idx_input, end_idx_input
 
+def create_kv_cache_update_nodes(gm, sdpa_node, current_kv_node, incoming_kv_node, start_idx_input, end_idx_input):
+    """
+    Create slicing and concatenation nodes for KV cache update.
+    
+    This function creates the necessary slicing and concatenation nodes to update the KV cache
+    during the generation process. It takes the SDPA node, the current KV cache node, and the
+    incoming KV cache node as input.
+    Returns:
+        for a particular SDPA node, a tuple containing:
+        - List of new current KV  nodes
+        - List of updated incoming KV cache nodes
 
+    """
+
+    # Create a slice node for key_cache[:,:,:start_idx,:]. The shape of key_cache is batch_size x num_heads x seq_len x head_dim
+    with gm.graph.inserting_before(sdpa_node):
+        slice_1 = gm.graph.create_node(
+            "call_function",
+            torch.ops.aten.slice.Tensor,
+            args=(incoming_kv_node,),
+            kwargs={}
+        )
+        slice_2 = gm.graph.create_node(
+            "call_function",
+            torch.ops.aten.slice.Tensor,
+            args=(slice_1, 1),
+            kwargs={}
+        )
+        slice_3 = gm.graph.create_node(
+            "call_function",
+            torch.ops.aten.slice.Tensor,
+            args=(slice_2, 2, None, start_idx_input),  
+            kwargs={}
+        )
+        slice_4 = gm.graph.create_node(
+            "call_function",
+            torch.ops.aten.slice.Tensor,
+            args=(slice_3, 3), 
+            kwargs={}
+        )
+        # Concat key_cache[:,:,:start_idx,:] with current key (k)
+        concat_keys_or_values = gm.graph.create_node(
+            "call_function",
+            torch.ops.aten.cat.default,
+            args=([slice_4, current_kv_node], 2), 
+            kwargs={}
+        )
+
+        # =============================================== # 
+        # Create nodes for key_cache[:,:, end_idx:,:]. The shape of key_cache is batch_size x num_heads x seq_len x head_dim
+        slice_5 = gm.graph.create_node(
+            "call_function",
+            torch.ops.aten.slice.Tensor,
+            args=(incoming_kv_node,),
+            kwargs={}
+        )
+        slice_6 = gm.graph.create_node(
+            "call_function",
+            torch.ops.aten.slice.Tensor,
+            args=(slice_5, 1),
+            kwargs={}
+        )
+        slice_7 = gm.graph.create_node(
+            "call_function",
+            torch.ops.aten.slice.Tensor,
+            args=(slice_6, 2, end_idx_input),  
+            kwargs={}
+        )
+        slice_8 = gm.graph.create_node(
+            "call_function",
+            torch.ops.aten.slice.Tensor,
+            args=(slice_7, 3), 
+            kwargs={}
+        )
+        # =============================================== # 
+        # Concatenate the sliced tensors to build KV cache
+        new_incoming_keys_or_values = gm.graph.create_node(
+            "call_function",
+            torch.ops.aten.cat.default,
+            args=([concat_keys_or_values, slice_8], 2), 
+            kwargs={}
+        )
+        # Update the metadata of the newly built KV cache node with the metadata of the input KV cache node to the graph
+        new_incoming_keys_or_values.meta.update(incoming_kv_node.meta)
+
+    return concat_keys_or_values, new_incoming_keys_or_values
 
 def insert_kv_slicing_before_sdpa(gm, incoming_keys_values: List[Tuple[torch.Tensor, torch.Tensor]], start_idx_input: Node, end_idx_input: Node):
     """
-    Insert slicing operations before each scaled_dot_product_attention operation.
+    Insert slicing and concatenation operations before each scaled_dot_product_attention operation as per the following KV cache update logic:
+    concat_keys = torch.cat((key_cache[:, :, :start_idx, :], k), dim=2)
+    concat_values = torch.cat((value_cache[:, :, :start_idx, :], v), dim=2)
+    new_key_cache = torch.cat((concat_keys, key_cache[:, :, end_idx:, :]), dim=2)
+    new_value_cache = torch.cat((concat_values, value_cache[:, :, end_idx:, :]), dim=2)
+    out = torch._C._nn.scaled_dot_product_attention(q, concat_keys, concat_values, dropout_p=0.0, is_causal=is_causal)
     """
     # Find all nodes with scaled_dot_product_attention
     sdpa_nodes = []
@@ -135,104 +230,18 @@ def insert_kv_slicing_before_sdpa(gm, incoming_keys_values: List[Tuple[torch.Ten
     for idx, sdpa_node in enumerate(sdpa_nodes):
         q_node, k_node, v_node = sdpa_node.args[:3]
         incoming_key, incoming_value = incoming_keys_values[idx]
-        kv_cache_for_sdpa_node = []
-        new_keys_values = []
-        for key_or_value, current_key_or_value_node in zip([incoming_key, incoming_value], [k_node, v_node]):
-            # Create a slice node for key_cache[:,:,:start_idx,:]. The shape of key_cache is batch_size x num_heads x seq_len x head_dim
-            with gm.graph.inserting_before(sdpa_node):
-                slice_1 = gm.graph.create_node(
-                    "call_function",
-                    torch.ops.aten.slice.Tensor,
-                    args=(key_or_value,),
-                    kwargs={}
-                )
-                slice_2 = gm.graph.create_node(
-                    "call_function",
-                    torch.ops.aten.slice.Tensor,
-                    args=(slice_1, 1),
-                    kwargs={}
-                )
-                slice_3 = gm.graph.create_node(
-                    "call_function",
-                    torch.ops.aten.slice.Tensor,
-                    args=(slice_2, 2, None, start_idx_input),  
-                    kwargs={}
-                )
-                slice_4 = gm.graph.create_node(
-                    "call_function",
-                    torch.ops.aten.slice.Tensor,
-                    args=(slice_3, 3), 
-                    kwargs={}
-                )
-                # =============================================== # 
-                # Create a slice node for key_cache[:,:, end_idx:,:]. The shape of key_cache is batch_size x num_heads x seq_len x head_dim
-                slice_5 = gm.graph.create_node(
-                    "call_function",
-                    torch.ops.aten.slice.Tensor,
-                    args=(key_or_value,),
-                    kwargs={}
-                )
-                slice_6 = gm.graph.create_node(
-                    "call_function",
-                    torch.ops.aten.slice.Tensor,
-                    args=(slice_5, 1),
-                    kwargs={}
-                )
-                slice_7 = gm.graph.create_node(
-                    "call_function",
-                    torch.ops.aten.slice.Tensor,
-                    args=(slice_6, 2, end_idx_input),  
-                    kwargs={}
-                )
-                slice_8 = gm.graph.create_node(
-                    "call_function",
-                    torch.ops.aten.slice.Tensor,
-                    args=(slice_7, 3), 
-                    kwargs={}
-                )
-                # =============================================== # 
-                # Concatenate the sliced tensors to build KV cache
-                cat = gm.graph.create_node(
-                    "call_function",
-                    torch.ops.aten.cat.default,
-                    args=([slice_4, current_key_or_value_node, slice_8], 2), 
-                    kwargs={}
-                )
-                # Update the metadata of the newly built KV cache node with the metadata of the input KV cache node to the graph
-                cat.meta.update(key_or_value.meta)
-                kv_cache_for_sdpa_node.append(cat)
-                # =============================================== # 
-                # Get the current key and value by indexing the KV cache
-                slice_9 = gm.graph.create_node(
-                    "call_function",
-                    torch.ops.aten.slice.Tensor,
-                    args=(cat,),
-                    kwargs={}
-                )
-                slice_10 = gm.graph.create_node(
-                    "call_function",
-                    torch.ops.aten.slice.Tensor,
-                    args=(slice_9, 1),
-                    kwargs={}
-                )
-                slice_11 = gm.graph.create_node(
-                    "call_function",
-                    torch.ops.aten.slice.Tensor,
-                    args=(slice_10, 2, None, end_idx_input),  
-                    kwargs={}
-                )
-                slice_12 = gm.graph.create_node(
-                    "call_function",
-                    torch.ops.aten.slice.Tensor,
-                    args=(slice_11, 3), 
-                    kwargs={}
-                )
-                new_keys_values.append(slice_12)
-        
-        kv_cache_for_graph.extend(kv_cache_for_sdpa_node)
+        # For keys  
+        new_current_key_node, new_incoming_key_cache_node = create_kv_cache_update_nodes(gm, sdpa_node, k_node, incoming_key, start_idx_input, end_idx_input)
+        # For values
+        new_current_value_node, new_incoming_value_cache_node = create_kv_cache_update_nodes(gm, sdpa_node, v_node, incoming_value, start_idx_input, end_idx_input)
 
-        sdpa_node.args = (q_node, new_keys_values[0], new_keys_values[1]) + sdpa_node.args[3:]
+        # Store the KV cache nodes for the current SDPA node
+        kv_cache_for_graph.extend([new_incoming_key_cache_node, new_incoming_value_cache_node])
+
+        # Update the SDPA node arguments with current key and value nodes
+        sdpa_node.args = (q_node, new_current_key_node, new_current_value_node) + sdpa_node.args[3:]
     
+    kv_cache_for_graph.extend([k_node, v_node])
     return gm, kv_cache_for_graph
 
 

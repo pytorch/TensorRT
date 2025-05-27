@@ -54,7 +54,6 @@ def test_llama_attention(args):
                                                 disable_tf32=True,
                                                 debug=True)
     trt_output = trt_model(hidden_states, position_embeddings, None)
-    breakpoint()
     if isinstance(pyt_output, tuple):
         print(f"Diff b/w pyt and trt: {torch.mean(torch.abs(pyt_output[0] - trt_output[0]))}")
     else:

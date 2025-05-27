@@ -28,26 +28,24 @@ def replace_variants_of_sdpa(
     """Replace scaled_dot_product_attention with an equivalent
     implementation which can be accurately converted to TRT
     """
-    # If sdpa replacement is found, add is_causal_input only once in the graph
-    is_causal_input = None
+
     for node in gm.graph.nodes:
         if node.op == "call_function" and node.target in REPLACEABLE_ATEN_OPS:
-            # is_causal_input is None if this is the first sdpa node in the graph, otherwise it is reused across all sdpa nodes
-            if is_causal_input is None:
-                # Add a new input to the graph for is_causal
-                is_causal_input = add_graph_input(gm, "is_causal", True)
-                is_causal_input.meta["val"] = torch.tensor(True)
-
             if node.target == torch.ops.aten._scaled_dot_product_efficient_attention.default:
                 if len(node.args) == 7:
                     query, key, value, attn_bias, compute_log_sumexp, dropout_p, is_causal = node.args
                 elif len(node.args) == 5:
                     query, key, value, attn_mask, is_causal = node.args
                     dropout_p = 0.0
+                else:
+                    raise ValueError(f"Unexpected number of arguments for {node.target} in the graph")
             elif node.target == torch.ops.aten._scaled_dot_product_flash_attention.default:
                 query, key, value, dropout_p, is_causal, return_debug_mask = node.args
-            
-            modified_input_args = (query, key, value, None, dropout_p, is_causal_input)
+
+            if attn_mask is not None:
+                logger.warning(f"We do not support attn_mask for {node.target} in the graph. Ignoring it and using is_causal=True configuration.")
+            breakpoint()
+            modified_input_args = (query, key, value, None, dropout_p, is_causal)
 
             # Create a new node with torch.nn.functional.scaled_dot_product_attention
             # The input args is (query, key, value, is_causal). kwargs has scale
@@ -75,6 +73,6 @@ def replace_variants_of_sdpa(
     
     # Clean up the graph
     clean_up_graph_after_modifications(gm)
-
+    
     logger.info("Replaced variants of scaled_dot_product_attention with torch.nn.functional.scaled_dot_product_attention")
     return gm
