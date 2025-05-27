@@ -21,8 +21,8 @@ CUDA_VERSIONS_DICT = {
 # channel: test if the future tensorRT version test workflow is triggered from the release branch(release/2.5 etc....)
 PYTHON_VERSIONS_DICT = {
     "nightly": ["3.11"],
-    "test": ["3.9", "3.10", "3.11", "3.12"],
-    "release": ["3.9", "3.10", "3.11", "3.12"],
+    "test": ["3.9", "3.10", "3.11", "3.12", "3.13"],
+    "release": ["3.9", "3.10", "3.11", "3.12", "3.13"],
 }
 
 # please update the future tensorRT version you want to test here

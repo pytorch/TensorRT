@@ -3,6 +3,13 @@ load("@rules_cc//cc:defs.bzl", "cc_binary")
 package(default_visibility = ["//visibility:public"])
 
 config_setting(
+    name = "use_torch_whl",
+    flag_values = {
+        "//toolchains/dep_src:torch": "whl"
+    },
+)
+
+config_setting(
     name = "windows",
     constraint_values = [
         "@platforms//os:windows",
@@ -30,7 +37,11 @@ cc_binary(
     ] + select({
         ":windows": [
             "@libtorch_win//:caffe2",
-            "@libtorch_win//:libtorch",
+            "@libtorch_win//:libtorch"
+        ],
+        ":use_torch_whl": [
+            "@torch_whl//:caffe2",
+            "@torch_whl//:libtorch"
         ],
         "//conditions:default": [
             "@libtorch",

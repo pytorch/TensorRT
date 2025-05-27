@@ -1,6 +1,13 @@
 load("//tests/core/conversion/converters:converter_test.bzl", "converter_test")
 
 config_setting(
+    name = "use_torch_whl",
+    values = {
+        "define": "torch_src=whl",
+    },
+)
+
+config_setting(
     name = "windows",
     constraint_values = [
         "@platforms//os:windows",

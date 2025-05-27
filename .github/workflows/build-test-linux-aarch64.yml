@@ -1,4 +1,4 @@
-name: Build and test Linux wheels
+name: Build and test Linux aarch64 wheels
 
 on:
   pull_request:
@@ -15,10 +15,10 @@ on:
 
 jobs:
   generate-matrix:
-    uses: ./.github/workflows/generate_binary_build_matrix.yml
+    uses: pytorch/test-infra/.github/workflows/generate_binary_build_matrix.yml@main
     with:
       package-type: wheel
-      os: linux
+      os: linux-aarch64
       test-infra-repository: pytorch/test-infra
       test-infra-ref: main
       with-rocm: false
@@ -32,11 +32,11 @@ jobs:
     steps:
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: "3.11"
       - uses: actions/checkout@v4
         with:
           repository: pytorch/tensorrt
-      - name: Generate release matrix
+      - name: Generate matrix
         id: generate
         run: |
           set -eou pipefail
@@ -61,7 +61,7 @@ jobs:
             smoke-test-script: packaging/smoke_test_script.sh
             package-name: torch_tensorrt
     name: Build torch-tensorrt whl package
-    uses: pytorch/test-infra/.github/workflows/build_wheels_linux.yml@main
+    uses: ./.github/workflows/build_wheels_linux_aarch64.yml
     with:
       repository: ${{ matrix.repository }}
       ref: ""
@@ -74,6 +74,7 @@ jobs:
       package-name: ${{ matrix.package-name }}
       smoke-test-script: ${{ matrix.smoke-test-script }}
       trigger-event: ${{ github.event_name }}
+      architecture: "aarch64"
 
   tests-py-torchscript-fe:
     name: Test torchscript frontend [Python]
@@ -96,6 +97,7 @@ jobs:
       test-infra-ref: main
       build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
       pre-script: ${{ matrix.pre-script }}
+      architecture: "aarch64"
       script: |
         export USE_HOST_DEPS=1
         export CI_BUILD=1
@@ -132,18 +134,17 @@ jobs:
       test-infra-ref: main
       build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
       pre-script: ${{ matrix.pre-script }}
+      architecture: "aarch64"
       script: |
         export USE_HOST_DEPS=1
         export CI_BUILD=1
         pushd .
         cd tests/py
         python -m pip install -r requirements.txt
-        python -m pip install nvidia-modelopt[all] --extra-index-url https://pypi.nvidia.com
         cd dynamo
         python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/dynamo_converters_test_results.xml -n 4 conversion/
         python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/dynamo_converters_test_results.xml automatic_plugin/test_automatic_plugin.py
         python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/dynamo_converters_test_results.xml automatic_plugin/test_automatic_plugin_with_attrs.py
-        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/dynamo_converters_test_results.xml automatic_plugin/test_flashinfer_rmsnorm.py
         popd
 
   tests-py-dynamo-fe:
@@ -167,13 +168,13 @@ jobs:
       test-infra-ref: main
       build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
       pre-script: ${{ matrix.pre-script }}
+      architecture: "aarch64"
       script: |
         export USE_HOST_DEPS=1
         export CI_BUILD=1
         pushd .
         cd tests/py
         python -m pip install -r requirements.txt
-        python -m pip install nvidia-modelopt[all] --extra-index-url https://pypi.nvidia.com
         cd dynamo
         python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/dyn_models_export.xml --ir dynamo models/
         popd
@@ -199,6 +200,7 @@ jobs:
       test-infra-ref: main
       build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
       pre-script: ${{ matrix.pre-script }}
+      architecture: "aarch64"
       script: |
         export USE_HOST_DEPS=1
         export CI_BUILD=1
@@ -231,6 +233,7 @@ jobs:
       test-infra-ref: main
       build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
       pre-script: ${{ matrix.pre-script }}
+      architecture: "aarch64"
       script: |
         export USE_HOST_DEPS=1
         export CI_BUILD=1
@@ -264,6 +267,7 @@ jobs:
       test-infra-ref: main
       build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
       pre-script: ${{ matrix.pre-script }}
+      architecture: "aarch64"
       script: |
         export USE_HOST_DEPS=1
         export CI_BUILD=1
@@ -297,6 +301,7 @@ jobs:
       test-infra-ref: main
       build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
       pre-script: ${{ matrix.pre-script }}
+      architecture: "aarch64"
       script: |
         export USE_HOST_DEPS=1
         export CI_BUILD=1
@@ -330,6 +335,7 @@ jobs:
       test-infra-ref: main
       build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
       pre-script: ${{ matrix.pre-script }}
+      architecture: "aarch64"
       script: |
         export USE_HOST_DEPS=1
         export CI_BUILD=1

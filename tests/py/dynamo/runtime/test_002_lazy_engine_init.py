@@ -9,7 +9,11 @@ import torch_tensorrt as torchtrt
 import torchvision.models as models
 from torch.testing._internal.common_utils import TestCase
 from torch_tensorrt.dynamo import CompilationSettings
-from torch_tensorrt.dynamo.utils import COSINE_THRESHOLD, cosine_similarity
+from torch_tensorrt.dynamo.utils import (
+    COSINE_THRESHOLD,
+    cosine_similarity,
+    get_model_device,
+)
 from torch_tensorrt.runtime import PythonTorchTensorRTModule, TorchTensorRTModule
 
 assertions = unittest.TestCase()
@@ -87,6 +91,63 @@ class TestLazyEngineInit(TestCase):
 
         # Inference on PyTorch model
         model_output = model(input_data_0, input_data_1)
+
+        assert_close(trt_output, model_output)
+
+    @unittest.skipIf(
+        not torch_tensorrt.ENABLED_FEATURES.torch_tensorrt_runtime,
+        "Torch-TensorRT Runtime is not available",
+    )
+    def test_lazy_engine_init_py_cpu_offload(self):
+        class Test(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.w = torch.nn.Parameter(torch.randn((2, 4)))
+
+            def forward(self, x):
+                return torch.add(self.w, x)
+
+        # Prepare the input data
+        input_data = torch.randn((2, 4)).cuda()
+
+        # Create a model
+        model = Test().cuda()
+        exp_program = torch.export.export(model, (input_data,))
+
+        # Convert to TensorRT engine
+        trt_engine_str = (
+            torch_tensorrt.dynamo.convert_exported_program_to_serialized_trt_engine(
+                exp_program,
+                inputs=(input_data,),
+                offload_module_to_cpu=True,
+            )
+        )
+        assert get_model_device(model).type == "cpu"
+        model.cuda()
+        # Inference on TRT Engine
+        trt_module = PythonTorchTensorRTModule(
+            trt_engine_str,
+            ["x"],
+            ["output0"],
+            settings=CompilationSettings(lazy_engine_init=True),
+        )
+
+        assertions.assertTrue(
+            trt_module.engine is None,
+            msg="Engine was proactively instantiated even though lazy engine loading was enabled",
+        )
+
+        with assertions.assertRaises(Exception):
+            trt_output = trt_module(input_data).cpu()
+
+        trt_module.setup_engine()
+        assertions.assertTrue(trt_module.engine, msg="Engine was not setup")
+
+        trt_output = trt_module(input_data).cpu()
+
+        # Inference on PyTorch model
+
+        model_output = model(input_data)
 
         assert_close(trt_output, model_output)
 

@@ -4,12 +4,9 @@ from typing import Callable, Dict, Optional, Sequence, Tuple, Union
 
 import numpy as np
 import tensorrt as trt
-
-# Seems like a bug in TensorRT
-import tensorrt.plugin as trtp
 import torch
-from tensorrt.plugin._lib import QDP_REGISTRY
 from torch.fx.node import Argument, Node, Target
+from torch_tensorrt._features import needs_qdp_plugin
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
 from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
@@ -32,6 +29,15 @@ def _generate_plugin_converter(
     supports_dynamic_shapes: bool = False,
     requires_output_allocator: bool = False,
 ) -> DynamoConverterImplSignature:
+    try:
+        import tensorrt.plugin as trtp
+
+    except ImportError as e:
+        raise RuntimeError(
+            "Unable to import TensorRT plugin. TensorRT version must be 10.7.0 or higher to support for Triton based TensorRT plugins"
+        )
+    from tensorrt.plugin._lib import QDP_REGISTRY
+
     torch_target = getattr(getattr(torch.ops, namespace), op_name)
     overload_str = overload if overload else ""
     overload_name = overload_str if overload else "default"
@@ -101,6 +107,7 @@ def _generate_plugin_converter(
     return custom_kernel_converter
 
 
+@needs_qdp_plugin
 def generate_plugin_converter(
     plugin_id: str,
     capability_validator: Optional[Callable[[Node, CompilationSettings], bool]] = None,

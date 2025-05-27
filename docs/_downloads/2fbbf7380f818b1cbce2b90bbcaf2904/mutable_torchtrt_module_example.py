@@ -106,6 +106,7 @@ with torch.no_grad():
             "text_embeds": {0: BATCH},
             "time_ids": {0: BATCH},
         },
+        "return_dict": False,
     }
     pipe.unet.set_expected_dynamic_shape_range(
         args_dynamic_shapes, kwargs_dynamic_shapes

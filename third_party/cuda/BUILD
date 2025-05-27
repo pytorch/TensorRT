@@ -46,9 +46,12 @@ cc_library(
         ":windows": [
             "bin/*.dll",
         ],
-        "//conditions:default": glob([
-            "lib64/**/lib*.so",
-        ]),
+        "//conditions:default": glob(
+            [
+                "lib64/**/lib*.so",
+            ],
+            allow_empty = True,
+        ),
     }),
     hdrs = glob([
         "include/**/*.h",
@@ -66,9 +69,12 @@ cc_library(
         ":windows": [
             "lib/x64/cublas.lib",
         ],
-        "//conditions:default": glob([
-            "lib64/**/*libcublas.so",
-        ]),
+        "//conditions:default": glob(
+            [
+                "lib64/**/*libcublas.so",
+            ],
+            allow_empty = True,
+        ),
     }),
     hdrs = glob([
         "include/**/*cublas*.h",

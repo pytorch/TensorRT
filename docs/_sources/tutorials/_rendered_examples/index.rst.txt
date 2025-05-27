@@ -405,6 +405,23 @@ Model Zoo
 
 .. raw:: html
 
+    <div class="sphx-glr-thumbcontainer" tooltip="Automatically generate a TensorRT Plugin for RMSNorm module and apply it in Llama2 ============...">
+
+.. only:: html
+
+  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_llama2_flashinfer_rmsnorm_thumb.png
+    :alt:
+
+  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_llama2_flashinfer_rmsnorm.py`
+
+.. raw:: html
+
+      <div class="sphx-glr-thumbnail-title">.._llama2_flashinfer_rmsnorm:</div>
+    </div>
+
+
+.. raw:: html
+
     <div class="sphx-glr-thumbcontainer" tooltip="We are going to demonstrate how a developer could include a custom kernel in a TensorRT engine ...">
 
 .. only:: html
