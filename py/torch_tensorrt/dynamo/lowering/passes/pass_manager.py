@@ -1,6 +1,6 @@
+import os
 import tempfile
-from types import new_class
-from typing import Any, Callable, List, Optional, Union
+from typing import Any, Callable, List, Optional
 
 import torch
 from torch.fx import passes
@@ -14,6 +14,8 @@ def _generate_draw_fx_graph_pass(
     def draw_fx_graph_pass(
         gm: torch.fx.GraphModule, settings: CompilationSettings
     ) -> torch.fx.GraphModule:
+        if not os.path.exists(f"{output_path_prefix}/"):
+            os.makedirs(f"{output_path_prefix}/")
         path = f"{output_path_prefix}/{name}.svg"
         g = passes.graph_drawer.FxGraphDrawer(gm, name)
         with open(path, "wb") as f:
@@ -33,7 +35,7 @@ class DynamoPassManager(PassManager):  # type: ignore[misc]
                 ]
             ]
         ] = None,
-        constraints: Optional[List[Callable]] = None
+        constraints: Optional[List[Callable]] = None,
     ):
         super().__init__(passes, constraints)
 
@@ -68,7 +70,7 @@ class DynamoPassManager(PassManager):  # type: ignore[misc]
         del self.passes[index]
 
     def insert_debug_pass_before(
-        self, passes: List[str], output_path_prefix: str=tempfile.gettempdir()
+        self, passes: List[str], output_path_prefix: str = tempfile.gettempdir()
     ) -> None:
         """Insert debug passes in the PassManager pass sequence prior to the execution of a particular pass.
 
@@ -79,17 +81,22 @@ class DynamoPassManager(PassManager):  # type: ignore[misc]
         Debug passes generate SVG visualizations of the FX graph at specified points
         in the pass sequence.
         """
+        self.check_pass_names_valid(passes)
         new_pass_list = []
         for ps in self.passes:
             if ps.__name__ in passes:
-                new_pass_list.append(_generate_draw_fx_graph_pass(output_path_prefix, f"before_{ps.__name__}"))
+                new_pass_list.append(
+                    _generate_draw_fx_graph_pass(
+                        output_path_prefix, f"before_{ps.__name__}"
+                    )
+                )
             new_pass_list.append(ps)
 
         self.passes = new_pass_list
         self._validated = False
 
     def insert_debug_pass_after(
-        self, passes: List[str], output_path_prefix: str=tempfile.gettempdir()
+        self, passes: List[str], output_path_prefix: str = tempfile.gettempdir()
     ) -> None:
         """Insert debug passes in the PassManager pass sequence after the execution of a particular pass.
 
@@ -100,15 +107,26 @@ class DynamoPassManager(PassManager):  # type: ignore[misc]
         Debug passes generate SVG visualizations of the FX graph at specified points
         in the pass sequence.
         """
+        self.check_pass_names_valid(passes)
         new_pass_list = []
         for ps in self.passes:
             new_pass_list.append(ps)
             if ps.__name__ in passes:
-                new_pass_list.append(_generate_draw_fx_graph_pass(output_path_prefix, f"after_{ps.__name__}"))
-
+                new_pass_list.append(
+                    _generate_draw_fx_graph_pass(
+                        output_path_prefix, f"after_{ps.__name__}"
+                    )
+                )
 
         self.passes = new_pass_list
         self._validated = False
+
+    def check_pass_names_valid(self, debug_pass_names: List[str]) -> None:
+        pass_names_str = [p.__name__ for p in self.passes]
+        for name in debug_pass_names:
+            assert (
+                name in pass_names_str
+            ), f"{name} is not a valid pass! Passes: {pass_names_str}"
 
     def __call__(self, gm: Any, settings: CompilationSettings) -> Any:
         self.validate()
