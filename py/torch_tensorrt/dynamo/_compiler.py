@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import collections.abc
 import logging
+import os
 import platform
 import warnings
 from typing import Any, Collection, List, Optional, Sequence, Set, Tuple, Union
@@ -421,6 +422,7 @@ def compile(
     enable_weight_streaming: bool = _defaults.ENABLE_WEIGHT_STREAMING,
     tiling_optimization_level: str = _defaults.TILING_OPTIMIZATION_LEVEL,
     l2_limit_for_tiling: int = _defaults.L2_LIMIT_FOR_TILING,
+    engine_vis_dir: Optional[str] = _defaults.ENGINE_VIS_DIR,
     **kwargs: Any,
 ) -> torch.fx.GraphModule:
     """Compile an ExportedProgram module for NVIDIA GPUs using TensorRT
@@ -674,6 +676,7 @@ def compile(
         "enable_weight_streaming": enable_weight_streaming,
         "tiling_optimization_level": tiling_optimization_level,
         "l2_limit_for_tiling": l2_limit_for_tiling,
+        "engine_vis_dir": engine_vis_dir,
     }
 
     settings = CompilationSettings(**compilation_options)
@@ -903,6 +906,19 @@ def compile_module(
             )
 
             trt_modules[name] = trt_module
+
+            if settings.debug and settings.engine_vis_dir:
+                if settings.use_python_runtime:
+                    logger.warning(
+                        "Profiling can only be enabled when using the C++ runtime"
+                    )
+                else:
+                    if not os.path.exists(settings.engine_vis_dir):
+                        os.makedirs(settings.engine_vis_dir)
+                    trt_module.enable_profiling(
+                        profiling_results_dir=settings.engine_vis_dir,
+                        profile_format="trex",
+                    )
 
     # Parse the graph I/O and store it in dryrun tracker
     parse_graph_io(gm, dryrun_tracker)

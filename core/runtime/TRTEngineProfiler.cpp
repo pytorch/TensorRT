@@ -32,25 +32,36 @@ TRTEngineProfiler::TRTEngineProfiler(const std::string& name, const std::vector<
   }
 }
 
-void dump_trace(const std::string& path, const TRTEngineProfiler& value) {
+void dump_trace(const std::string& path, const TRTEngineProfiler& value, TraceFormat format) {
   std::stringstream out;
   out << "[" << std::endl;
   double ts = 0.0;
+  double running_time = 0.0;
+  for (size_t i = 0; i < value.layer_names.size(); i++) {
+    auto layer_name = value.layer_names[i];
+    auto elem = value.profile.at(layer_name);
+    ts += elem.time;
+  }
   for (size_t i = 0; i < value.layer_names.size(); i++) {
     auto layer_name = value.layer_names[i];
     auto elem = value.profile.at(layer_name);
 
     out << "  {" << std::endl;
     out << "    \"name\": \"" << layer_name << "\"," << std::endl;
-    out << "    \"ph\": \"X\"," << std::endl;
-    out << "    \"ts\": " << ts * 1000 << "," << std::endl;
-    out << "    \"dur\": " << elem.time * 1000 << "," << std::endl;
-    out << "    \"tid\": 1," << std::endl;
-    out << "    \"pid\": \"" << value.name << " Engine Execution\"," << std::endl;
-    out << "    \"args\": {}" << std::endl;
+    if (format == kPERFETTO) {
+      out << "    \"ph\": \"X\"," << std::endl;
+      out << "    \"ts\": " << running_time * 1000 << "," << std::endl;
+      out << "    \"dur\": " << elem.time * 1000 << "," << std::endl;
+      out << "    \"tid\": 1," << std::endl;
+      out << "    \"pid\": \"" << value.name << " Engine Execution\"," << std::endl;
+    } else { // kTREX
+      out << "    \"timeMs\": " << elem.time << "," << std::endl;
+      out << "    \"averageMs\": " << elem.time / elem.count << "," << std::endl;
+      out << "    \"percentage\": " << (elem.time * 100.0 / ts) << "," << std::endl;
+      out << "    \"args\": {}" << std::endl;
+    }
     out << "  }," << std::endl;
-
-    ts += elem.time;
+    running_time += elem.time;
   }
   out.seekp(-2, out.cur);
   out << "\n]" << std::endl;
