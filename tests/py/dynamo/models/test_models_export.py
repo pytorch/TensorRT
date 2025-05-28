@@ -3,6 +3,7 @@ import importlib
 import platform
 import unittest
 from importlib import metadata
+
 import pytest
 import timm
 import torch
@@ -14,6 +15,7 @@ from packaging.version import Version
 
 assertions = unittest.TestCase()
 import os
+
 
 @pytest.mark.unit
 def test_resnet18(ir):
@@ -207,9 +209,100 @@ def test_resnet18_half(ir):
     "ModelOpt is required to run this test",
 )
 @pytest.mark.unit
+def test_base_fp4_dynamic_shapes(ir):
+    import modelopt.torch.quantization as mtq
+    from modelopt.torch.quantization.utils import export_torch_mode
+
+    dtype = torch.float16
+
+    class SimpleNetwork(torch.nn.Module):
+        def __init__(self):
+            super(SimpleNetwork, self).__init__()
+            self.linear1 = torch.nn.Linear(
+                in_features=64, out_features=32, bias=True, dtype=dtype
+            )
+
+        def forward(self, x):
+            x = self.linear1(x)
+            return x
+
+    def calibrate_loop(model):
+        """Simple calibration function for testing."""
+        model(dummy_inputs)
+
+    BATCH_SIZE = torch.export.Dim("BATCH_SIZE", min=16, max=128)
+    batch_size = 64
+    dummy_inputs = torch.ones(batch_size, 64, dtype=dtype).cuda()
+
+    model = SimpleNetwork().eval().cuda()
+    # model.linear1.weight = torch.nn.Parameter(torch.ones(32, 64, dtype=dtype).cuda())
+    # model.linear1.bias = torch.nn.Parameter(torch.zeros(128, 32, dtype=dtype).cuda())
+
+    print(f"lan added model weight: {model.linear1.weight=}")
+    print(f"lan added model bias: {model.linear1.bias=}")
+
+    quant_cfg = mtq.NVFP4_DEFAULT_CFG
+    mtq.quantize(model, quant_cfg, forward_loop=calibrate_loop)
+    # model has qdq nodes at this point
+    with torch.no_grad():
+        with export_torch_mode():
+            exp_program = torch.export.export(
+                model, (dummy_inputs,), strict=False, dynamic_shapes=({0: BATCH_SIZE},)
+            )
+
+            trt_model = torchtrt.dynamo.compile(
+                exp_program,
+                inputs=[dummy_inputs],
+                enabled_precisions={
+                    torch.float4_e2m1fn_x2,
+                    torch.float8_e4m3fn,
+                    torch.float32,
+                    torch.float16,
+                },
+                min_block_size=1,
+                debug=True,
+                cache_built_engines=False,
+                reuse_cached_engines=False,
+                use_explicit_typing=dtype == torch.float16,
+            )
+            batch_size = 128
+            input_tensor = torch.ones(batch_size, 64, dtype=dtype).cuda()
+            expected_output = model(input_tensor)
+            outputs_trt = trt_model(input_tensor)
+            if os.getenv("DISABLE_GEMM", "false").lower() == "true":
+                print("lan added disable_gemm is set, compring result with weights")
+                expected_output = model.linear1.weight
+            else:
+                print("lan added disable_gemm is not set, compring result with pytorch")
+
+            print(
+                f"lan added torch_tensorrt outputs_trt: {outputs_trt=} {outputs_trt.dtype=} {outputs_trt.shape=} {outputs_trt.abs().amax()=}"
+            )
+            print(
+                f"lan added expected output_pyt: {expected_output=} {expected_output.dtype=} {expected_output.shape=} {expected_output.abs().amax()=}"
+            )
+
+            abs_diff = torch.abs(expected_output - outputs_trt)
+            print(
+                f"lan added max /mean abs_diff: {abs_diff.max().item()=} {abs_diff.mean()=}"
+            )
+            print(f"lan added abs_diff: {abs_diff=}")
+            assert torch.allclose(expected_output, outputs_trt, rtol=0.8, atol=0.8)
+
+
+# @unittest.skipIf(
+#     torch.cuda.get_device_capability() < (10, 0),
+#     "FP4 quantization requires compute capability 10.0 or later",
+# )
+@unittest.skipIf(
+    not importlib.util.find_spec("modelopt"),
+    "ModelOpt is required to run this test",
+)
+@pytest.mark.unit
 def test_base_fp4(ir):
     import modelopt.torch.quantization as mtq
     from modelopt.torch.quantization.utils import export_torch_mode
+
     dtype = torch.float16
 
     class SimpleNetwork(torch.nn.Module):
@@ -229,17 +322,16 @@ def test_base_fp4(ir):
 
     input_tensor = torch.ones(128, 64, dtype=dtype).cuda()
 
-    
     model = SimpleNetwork().eval().cuda()
     model.linear1.weight = torch.nn.Parameter(torch.ones(32, 64, dtype=dtype).cuda())
     model.linear1.bias = torch.nn.Parameter(torch.zeros(128, 32, dtype=dtype).cuda())
     print(f"lan added amax: {input_tensor.abs().amax()=}")
     print(f"lan added amax: {model.linear1.weight.abs().amax()=}")
     expected_output = model(input_tensor)
-    print(f"lan added model input: {input_tensor=}")    
+    print(f"lan added model input: {input_tensor=}")
     print(f"lan added model weight: {model.linear1.weight=}")
     print(f"lan added model bias: {model.linear1.bias=}")
-    
+
     quant_cfg = mtq.NVFP4_DEFAULT_CFG
     mtq.quantize(model, quant_cfg, forward_loop=calibrate_loop)
     # model has qdq nodes at this point
@@ -271,11 +363,17 @@ def test_base_fp4(ir):
             else:
                 print("lan added disable_gemm is not set, compring result with pytorch")
 
-            print(f"lan added torch_tensorrt outputs_trt: {outputs_trt=} {outputs_trt.dtype=} {outputs_trt.shape=} {outputs_trt.abs().amax()=}")
-            print(f"lan added expected output_pyt: {expected_output=} {expected_output.dtype=} {expected_output.shape=} {expected_output.abs().amax()=}")
+            print(
+                f"lan added torch_tensorrt outputs_trt: {outputs_trt=} {outputs_trt.dtype=} {outputs_trt.shape=} {outputs_trt.abs().amax()=}"
+            )
+            print(
+                f"lan added expected output_pyt: {expected_output=} {expected_output.dtype=} {expected_output.shape=} {expected_output.abs().amax()=}"
+            )
 
             abs_diff = torch.abs(expected_output - outputs_trt)
-            print(f"lan added max /mean abs_diff: {abs_diff.max().item()=} {abs_diff.mean()=}")
+            print(
+                f"lan added max /mean abs_diff: {abs_diff.max().item()=} {abs_diff.mean()=}"
+            )
             print(f"lan added abs_diff: {abs_diff=}")
             assert torch.allclose(expected_output, outputs_trt, rtol=0.8, atol=0.8)
 
