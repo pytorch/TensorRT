@@ -283,14 +283,12 @@ void TRTEngine::enable_profiling() {
 
 void TRTEngine::set_profile_format(std::string format) {
   if (format == "trex") {
-    profile_format = TraceFormat::kTREX;
+    this->trt_engine_profiler->set_profile_format(TraceFormat::kTREX);
   } else if (format == "perfetto") {
-    profile_format = TraceFormat::kPERFETTO;
+    this->trt_engine_profiler->set_profile_format(TraceFormat::kPERFETTO);
   } else {
     TORCHTRT_THROW_ERROR("Invalid profile format: " + format);
   }
-
-  profile_format = profile_format;
 }
 
 std::string TRTEngine::get_engine_layer_info() {

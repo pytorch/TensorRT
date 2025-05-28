@@ -192,7 +192,6 @@ struct TRTEngine : torch::CustomClassHolder {
 #else
   bool profile_execution = false;
 #endif
-  TraceFormat profile_format = TraceFormat::kPERFETTO;
   std::string device_profile_path;
   std::string input_profile_path;
   std::string output_profile_path;
