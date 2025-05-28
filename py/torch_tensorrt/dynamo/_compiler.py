@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import collections.abc
 import logging
+import os
 import platform
 import warnings
 from typing import Any, Collection, List, Optional, Sequence, Set, Tuple, Union
@@ -927,6 +928,19 @@ def compile_module(
             )
 
             trt_modules[name] = trt_module
+
+            if settings.debug and settings.engine_vis_dir:
+                if settings.use_python_runtime:
+                    logger.warning(
+                        "Profiling can only be enabled when using the C++ runtime"
+                    )
+                else:
+                    if not os.path.exists(settings.engine_vis_dir):
+                        os.makedirs(settings.engine_vis_dir)
+                    trt_module.enable_profiling(
+                        profiling_results_dir=settings.engine_vis_dir,
+                        profile_format="trex",
+                    )
 
     # Parse the graph I/O and store it in dryrun tracker
     parse_graph_io(gm, dryrun_tracker)
