@@ -335,7 +335,9 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         return tuple(outputs)
 
     def enable_profiling(
-        self, profiling_results_dir: Optional[str] = None, profile_format: str = "trex"
+        self,
+        profiling_results_dir: Optional[str] = None,
+        profile_format: str = "perfetto",
     ) -> None:
         """Enable the profiler to collect latency information about the execution of the engine
 

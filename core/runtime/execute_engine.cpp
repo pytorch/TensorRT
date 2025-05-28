@@ -339,10 +339,7 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
 
     if (compiled_engine->profile_execution) {
       LOG_INFO(std::endl << *compiled_engine->trt_engine_profiler);
-      dump_trace(
-          compiled_engine->trt_engine_profile_path,
-          *compiled_engine->trt_engine_profiler,
-          compiled_engine->profile_format);
+      dump_trace(compiled_engine->trt_engine_profile_path, *compiled_engine->trt_engine_profiler);
       compiled_engine->dump_engine_layer_info();
     }
 
@@ -443,10 +440,7 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
 
     if (compiled_engine->profile_execution) {
       LOG_INFO(std::endl << *compiled_engine->trt_engine_profiler);
-      dump_trace(
-          compiled_engine->trt_engine_profile_path,
-          *compiled_engine->trt_engine_profiler,
-          compiled_engine->profile_format);
+      dump_trace(compiled_engine->trt_engine_profile_path, *compiled_engine->trt_engine_profiler);
       compiled_engine->dump_engine_layer_info();
     }
 
