@@ -46,7 +46,6 @@ def replace_variants_of_sdpa(
                 node.target
                 == torch.ops.aten._scaled_dot_product_efficient_attention.default
             ):
-                breakpoint()
                 if len(node.args) == 7:
                     (
                         query,
