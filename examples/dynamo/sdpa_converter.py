@@ -1,9 +1,11 @@
+import logging
 import math
-from typing import Optional, Union, Tuple, Any, Dict
-import torch
-import torch_tensorrt
+from typing import Any, Dict, Optional, Tuple, Union
+
 import numpy as np
 import tensorrt as trt
+import torch
+import torch_tensorrt
 from torch.fx.node import Target
 from torch_tensorrt._enums import dtype
 from torch_tensorrt.dynamo.conversion import impl
@@ -14,8 +16,9 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     get_trt_tensor,
 )
 from torch_tensorrt.fx.types import TRTTensor
-import logging
+
 logger = logging.getLogger(__name__)
+
 
 def tril(
     ctx: ConversionContext,
@@ -25,17 +28,31 @@ def tril(
     row: TRTTensor,
     col: TRTTensor,
 ) -> TRTTensor:
-    row_arange_tensor = impl.arange.arange(ctx, target, source_ir, name + "_arange_row", start=0, end=row, step=1)
-    row_reshape_tensor = impl.shuffle.reshape(ctx, target, source_ir, name + "_reshape_row", row_arange_tensor, [row, 1])
+    row_arange_tensor = impl.arange.arange(
+        ctx, target, source_ir, name + "_arange_row", start=0, end=row, step=1
+    )
+    row_reshape_tensor = impl.shuffle.reshape(
+        ctx, target, source_ir, name + "_reshape_row", row_arange_tensor, [row, 1]
+    )
 
-    col_arange_tensor = impl.arange.arange(ctx, target, source_ir, name + "_arange_col", start=0, end=col, step=1)
-    col_reshape_tensor = impl.shuffle.reshape(ctx, target, source_ir, name + "_reshape_col", col_arange_tensor, [1, col])
-    
-    mask = impl.elementwise.ge(ctx, target, source_ir, name + "_ge", row_reshape_tensor, col_reshape_tensor)
+    col_arange_tensor = impl.arange.arange(
+        ctx, target, source_ir, name + "_arange_col", start=0, end=col, step=1
+    )
+    col_reshape_tensor = impl.shuffle.reshape(
+        ctx, target, source_ir, name + "_reshape_col", col_arange_tensor, [1, col]
+    )
+
+    mask = impl.elementwise.ge(
+        ctx, target, source_ir, name + "_ge", row_reshape_tensor, col_reshape_tensor
+    )
     return mask
 
 
-@torch_tensorrt.dynamo.conversion.dynamo_tensorrt_converter(torch.nn.functional.scaled_dot_product_attention, enabled=True, supports_dynamic_shapes=True)
+@torch_tensorrt.dynamo.conversion.dynamo_tensorrt_converter(
+    torch.nn.functional.scaled_dot_product_attention,
+    enabled=True,
+    supports_dynamic_shapes=True,
+)
 def scaled_dot_product_attention(
     ctx: torch_tensorrt.dynamo.conversion.ConversionContext,
     target: Target,
@@ -45,11 +62,12 @@ def scaled_dot_product_attention(
 ) -> TRTTensor:
     # TODO: Handle attn_mask and is_causal arguments in the future
     query, key, value, attn_mask, dropout_p, is_causal = args
-    logger.info("Ignoring attn_mask and is_causal arguments provided by the original graph. "
-                "This converter expects is_causal to be an input to the graph. For prefill phase, is_causal=True "
-                "and for generate phase, is_causal=False since we pass only 1 input token at a time")
+    logger.info(
+        "Ignoring attn_mask and is_causal arguments provided by the original graph. "
+        "This converter expects is_causal to be an input to the graph. For prefill phase, is_causal=True "
+        "and for generate phase, is_causal=False since we pass only 1 input token at a time"
+    )
 
-    
     # TODO: remove this once we have a better way to handle the causal mask
     scale = kwargs.get("scale", None)
     source_ir = SourceIR.ATEN
@@ -114,12 +132,21 @@ def scaled_dot_product_attention(
             temp_mask = impl.unary.logical_not(
                 ctx, target, source_ir, name + "_logical_not", tril_tensor
             )
-            temp_mask_casted = cast_trt_tensor(ctx, temp_mask, trt.float32, name + "_casted_bool", target, source_ir)
-            one_minus_temp_mask = impl.elementwise.sub(
-                ctx, target, source_ir, name + "_one_minus_temp_mask", 1.0, temp_mask_casted
+            temp_mask_casted = cast_trt_tensor(
+                ctx, temp_mask, trt.float32, name + "_casted_bool", target, source_ir
             )
-            attn_bias = impl.unary.log(ctx, target, source_ir, name + "_log", one_minus_temp_mask)
-           
+            one_minus_temp_mask = impl.elementwise.sub(
+                ctx,
+                target,
+                source_ir,
+                name + "_one_minus_temp_mask",
+                1.0,
+                temp_mask_casted,
+            )
+            attn_bias = impl.unary.log(
+                ctx, target, source_ir, name + "_log", one_minus_temp_mask
+            )
+
         scaled_add_attn_bias = impl.elementwise.add(
             ctx, target, source_ir, name + "_attn_bias_add", scaled, attn_bias
         )
