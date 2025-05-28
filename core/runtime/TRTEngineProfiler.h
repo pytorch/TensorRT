@@ -10,6 +10,10 @@ namespace torch_tensorrt {
 namespace core {
 namespace runtime {
 
+enum TraceFormat { kPERFETTO, kTREX };
+
+// Forward declare the function
+
 struct TRTEngineProfiler : public nvinfer1::IProfiler {
   struct Record {
     float time{0};
@@ -21,7 +25,7 @@ struct TRTEngineProfiler : public nvinfer1::IProfiler {
       const std::string& name,
       const std::vector<TRTEngineProfiler>& srcProfilers = std::vector<TRTEngineProfiler>());
   friend std::ostream& operator<<(std::ostream& out, const TRTEngineProfiler& value);
-  friend void dump_trace(const std::string& path, const TRTEngineProfiler& value);
+  friend void dump_trace(const std::string& path, const TRTEngineProfiler& value, TraceFormat format);
 
  private:
   std::string name;

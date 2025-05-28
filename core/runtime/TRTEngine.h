@@ -147,6 +147,7 @@ struct TRTEngine : torch::CustomClassHolder {
   std::string to_str() const;
   static void verify_serialization_fmt(const std::vector<std::string>& serialized_info);
   void enable_profiling();
+  void set_profile_format(std::string profile_format);
   void disable_profiling();
   std::string get_engine_layer_info();
 
@@ -191,6 +192,7 @@ struct TRTEngine : torch::CustomClassHolder {
 #else
   bool profile_execution = false;
 #endif
+  TraceFormat profile_format = TraceFormat::kPERFETTO;
   std::string device_profile_path;
   std::string input_profile_path;
   std::string output_profile_path;

@@ -334,7 +334,9 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
 
         return tuple(outputs)
 
-    def enable_profiling(self, profiling_results_dir: Optional[str] = None) -> None:
+    def enable_profiling(
+        self, profiling_results_dir: Optional[str] = None, profile_format: str = "trex"
+    ) -> None:
         """Enable the profiler to collect latency information about the execution of the engine
 
         Traces can be visualized using https://ui.perfetto.dev/ or compatible alternatives
@@ -347,7 +349,9 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
 
         if profiling_results_dir is not None:
             self.engine.profile_path_prefix = profiling_results_dir
+        assert profile_format in ["trex", "perfetto"]
         self.engine.enable_profiling()
+        self.engine.set_profile_format(profile_format)
 
     def disable_profiling(self) -> None:
         """Disable the profiler"""
