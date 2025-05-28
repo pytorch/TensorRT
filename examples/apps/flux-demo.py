@@ -4,6 +4,7 @@ import time
 
 import gradio as gr
 import modelopt.torch.quantization as mtq
+import register_sdpa
 import torch
 import torch_tensorrt
 from diffusers import FluxPipeline
@@ -150,9 +151,6 @@ def load_lora(path):
     print("LoRA loaded! Begin refitting")
     generate_image(["Test"], 2)
     print("Refitting Finished!")
-
-
-load_lora("/home/TensorRT/examples/apps/NGRVNG.safetensors")
 
 
 # Create Gradio interface
