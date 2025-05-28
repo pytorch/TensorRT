@@ -19,6 +19,8 @@ There are different components of the ``FLUX.1-dev`` pipeline such as ``transfor
 we demonstrate optimizing the ``transformer`` component of the model (which typically consumes >95% of the e2e diffusion latency)
 """
 
+import register_sdpa  # Register SDPA as a standalone operator
+
 # %%
 # Import the following libraries
 # -----------------------------
