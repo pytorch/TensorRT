@@ -7,7 +7,11 @@ import timm
 import torch
 import torch_tensorrt as torchtrt
 import torchvision.models as models
-from torch_tensorrt.dynamo.utils import COSINE_THRESHOLD, cosine_similarity
+from torch_tensorrt.dynamo.utils import (
+    COSINE_THRESHOLD,
+    cosine_similarity,
+    get_model_device,
+)
 
 assertions = unittest.TestCase()
 
@@ -33,6 +37,43 @@ def test_resnet18(ir):
     }
 
     trt_mod = torchtrt.compile(model, **compile_spec)
+    cos_sim = cosine_similarity(model(input), trt_mod(input))
+    assertions.assertTrue(
+        cos_sim > COSINE_THRESHOLD,
+        msg=f"Resnet18 TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
+    )
+
+    # Clean up model env
+    torch._dynamo.reset()
+
+
+@pytest.mark.unit
+def test_resnet18_cpu_offload(ir):
+    model = models.resnet18(pretrained=True).eval().to("cuda")
+    input = torch.randn((1, 3, 224, 224)).to("cuda")
+
+    compile_spec = {
+        "inputs": [
+            torchtrt.Input(
+                input.shape, dtype=torch.float, format=torch.contiguous_format
+            )
+        ],
+        "device": torchtrt.Device("cuda:0"),
+        "enabled_precisions": {torch.float},
+        "ir": ir,
+        "pass_through_build_failures": True,
+        "optimization_level": 1,
+        "cache_built_engines": False,
+        "reuse_cached_engines": False,
+        "offload_module_to_cpu": True,
+    }
+
+    trt_mod = torchtrt.compile(model, **compile_spec)
+    assertions.assertTrue(
+        get_model_device(model).type == "cpu",
+        msg="Model should be offloaded to CPU",
+    )
+    model.cuda()
     cos_sim = cosine_similarity(model(input), trt_mod(input))
     assertions.assertTrue(
         cos_sim > COSINE_THRESHOLD,
@@ -143,6 +184,59 @@ def test_bert_base_uncased(ir):
         "reuse_cached_engines": False,
     }
     trt_mod = torchtrt.compile(model, **compile_spec)
+
+    model_outputs = model(input, input2)
+    trt_model_outputs = trt_mod(input, input2)
+    for key in model_outputs.keys():
+        out, trt_out = model_outputs[key], trt_model_outputs[key]
+        cos_sim = cosine_similarity(out, trt_out)
+        assertions.assertTrue(
+            cos_sim > COSINE_THRESHOLD,
+            msg=f"HF BERT base-uncased TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
+        )
+
+    # Clean up model env
+    torch._dynamo.reset()
+
+
+@pytest.mark.unit
+def test_bert_base_uncased_cpu_offload(ir):
+    from transformers import BertModel
+
+    model = BertModel.from_pretrained("bert-base-uncased").cuda().eval()
+    input = torch.randint(0, 2, (1, 14), dtype=torch.int32).to("cuda")
+    input2 = torch.randint(0, 2, (1, 14), dtype=torch.int32).to("cuda")
+
+    compile_spec = {
+        "inputs": [
+            torchtrt.Input(
+                input.shape,
+                dtype=input.dtype,
+                format=torch.contiguous_format,
+            ),
+            torchtrt.Input(
+                input.shape,
+                dtype=input.dtype,
+                format=torch.contiguous_format,
+            ),
+        ],
+        "device": torchtrt.Device("cuda:0"),
+        "enabled_precisions": {torch.float},
+        "truncate_double": True,
+        "ir": ir,
+        "pass_through_build_failures": True,
+        "optimization_level": 1,
+        "min_block_size": 15,
+        "cache_built_engines": False,
+        "reuse_cached_engines": False,
+        "offload_module_to_cpu": True,
+    }
+    trt_mod = torchtrt.compile(model, **compile_spec)
+    assertions.assertTrue(
+        get_model_device(model).type == "cpu",
+        msg="Model should be offloaded to CPU",
+    )
+    model.cuda()
 
     model_outputs = model(input, input2)
     trt_model_outputs = trt_mod(input, input2)

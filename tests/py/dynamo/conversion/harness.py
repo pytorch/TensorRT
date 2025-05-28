@@ -415,7 +415,6 @@ class DispatchTestCase(TRTTestCase):
         compilation_settings = CompilationSettings(
             enabled_precisions={dtype._from(precision)},
             truncate_double=True,
-            debug=True,
             immutable_weights=immutable_weights,
         )
 
@@ -507,7 +506,6 @@ class DispatchTestCase(TRTTestCase):
         compilation_settings = CompilationSettings(
             enabled_precisions={dtype._from(precision)},
             truncate_double=True,
-            debug=True,
             immutable_weights=immutable_weights,
         )
 

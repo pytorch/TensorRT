@@ -3,9 +3,9 @@ load("@rules_cc//cc:defs.bzl", "cc_library", "cc_test")
 package(default_visibility = ["//visibility:public"])
 
 config_setting(
-    name = "use_pre_cxx11_abi",
-    values = {
-        "define": "abi=pre_cxx11_abi",
+    name = "use_torch_whl",
+    flag_values = {
+        "//toolchains/dep_src:torch": "whl"
     },
 )
 
@@ -94,7 +94,7 @@ cc_test(
         "@googletest//:gtest_main",
     ] + select({
         ":windows": ["@libtorch_win//:libtorch"],
-        ":use_pre_cxx11_abi": ["@libtorch_pre_cxx11_abi//:libtorch"],
+        ":use_torch_whl": ["@torch_whl//:libtorch"],
         "//conditions:default": ["@libtorch"],
     }),
 )
@@ -133,7 +133,7 @@ cc_test(
         "@googletest//:gtest_main",
     ] + select({
         ":windows": ["@libtorch_win//:libtorch"],
-        ":use_pre_cxx11_abi": ["@libtorch_pre_cxx11_abi//:libtorch"],
+        ":use_torch_whl": ["@torch_whl//:libtorch"],
         "//conditions:default": ["@libtorch"],
     }),
 )
@@ -149,7 +149,7 @@ cc_test(
         "@googletest//:gtest_main",
     ] + select({
         ":windows": ["@libtorch_win//:libtorch"],
-        ":use_pre_cxx11_abi": ["@libtorch_pre_cxx11_abi//:libtorch"],
+        ":use_torch_whl": ["@torch_whl//:libtorch"],
         "//conditions:default": ["@libtorch"],
     }),
 )
@@ -162,7 +162,7 @@ cc_test(
         "@googletest//:gtest_main",
     ] + select({
         ":windows": ["@libtorch_win//:libtorch"],
-        ":use_pre_cxx11_abi": ["@libtorch_pre_cxx11_abi//:libtorch"],
+        ":use_torch_whl": ["@torch_whl//:libtorch"],
         "//conditions:default": ["@libtorch"],
     }),
 )
@@ -178,7 +178,7 @@ cc_test(
         "@googletest//:gtest_main",
     ] + select({
         ":windows": ["@libtorch_win//:libtorch"],
-        ":use_pre_cxx11_abi": ["@libtorch_pre_cxx11_abi//:libtorch"],
+        ":use_torch_whl": ["@torch_whl//:libtorch"],
         "//conditions:default": ["@libtorch"],
     }),
 )
@@ -214,7 +214,7 @@ cc_library(
         "@googletest//:gtest_main",
     ] + select({
         ":windows": ["@libtorch_win//:libtorch"],
-        ":use_pre_cxx11_abi": ["@libtorch_pre_cxx11_abi//:libtorch"],
+        ":use_torch_whl": ["@torch_whl//:libtorch"],
         "//conditions:default": ["@libtorch"],
     }),
 )

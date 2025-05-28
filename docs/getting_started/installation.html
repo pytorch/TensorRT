@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Installation &mdash; Torch-TensorRT v2.8.0.dev0+3b30409 documentation</title>
+  <title>Installation &mdash; Torch-TensorRT v2.8.0.dev0+ee32da0 documentation</title>
   
 
   
@@ -293,7 +293,7 @@
               
               
                 <div class="version">
-                  v2.8.0.dev0+3b30409
+                  v2.8.0.dev0+ee32da0
                 </div>
               
             
@@ -658,24 +658,13 @@ of C++ code that is no longer necessary for most users. Therefore you can exclud
 </div>
 <p>A tarball with the include files and library can then be found in <code class="docutils literal notranslate"><span class="pre">bazel-bin</span></code></p>
 </section>
-<section id="pre-cxx11-abi-build">
-<h5>Pre CXX11 ABI Build<a class="headerlink" href="#pre-cxx11-abi-build" title="Permalink to this heading">¶</a></h5>
-<p>To build using the pre-CXX11 ABI use the <code class="docutils literal notranslate"><span class="pre">pre_cxx11_abi</span></code> config</p>
-<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>bazel<span class="w"> </span>build<span class="w"> </span>//:libtorchtrt<span class="w"> </span>--config<span class="w"> </span>pre_cxx11_abi<span class="w"> </span>-c<span class="w"> </span><span class="o">[</span>dbg/opt<span class="o">]</span>
-</pre></div>
-</div>
-<p>A tarball with the include files and library can then be found in <code class="docutils literal notranslate"><span class="pre">bazel-bin</span></code></p>
-</section>
 </section>
 <section id="choosing-the-right-abi">
 <span id="abis"></span><h4>Choosing the Right ABI<a class="headerlink" href="#choosing-the-right-abi" title="Permalink to this heading">¶</a></h4>
-<p>Likely the most complicated thing about compiling Torch-TensorRT is selecting the correct ABI. There are two options
-which are incompatible with each other, pre-cxx11-abi and the cxx11-abi. The complexity comes from the fact that while
-the most popular distribution of PyTorch (wheels downloaded from pytorch.org/pypi directly) use the pre-cxx11-abi, most
-other distributions you might encounter (e.g. ones from NVIDIA - NGC containers, and builds for Jetson as well as certain
-libtorch builds and likely if you build PyTorch from source) use the cxx11-abi. It is important you compile Torch-TensorRT
-using the correct ABI to function properly. Below is a table with general pairings of PyTorch distribution sources and the
-recommended commands:</p>
+<p>For the old versions, there were two ABI options to compile Torch-TensorRT which were incompatible with each other,
+pre-cxx11-abi and cxx11-abi. The complexity came from the different distributions of PyTorch. Fortunately, PyTorch
+has switched to cxx11-abi for all distributions. Below is a table with general pairings of PyTorch distribution
+sources and the recommended commands:</p>
 <table class="docutils align-default">
 <colgroup>
 <col style="width: 33%" />
@@ -691,25 +680,21 @@ recommended commands:</p>
 <tbody>
 <tr class="row-even"><td><p>PyTorch whl file from PyTorch.org</p></td>
 <td><p>python -m pip install .</p></td>
-<td><p>bazel build //:libtorchtrt -c opt --config pre_cxx11_abi</p></td>
+<td><p>bazel build //:libtorchtrt -c opt</p></td>
 </tr>
-<tr class="row-odd"><td><p>libtorch-shared-with-deps-<a href="#id3"><span class="problematic" id="id4">*</span></a>.zip from PyTorch.org</p></td>
-<td><p>python -m pip install .</p></td>
-<td><p>bazel build //:libtorchtrt -c opt --config pre_cxx11_abi</p></td>
-</tr>
-<tr class="row-even"><td><p>libtorch-cxx11-abi-shared-with-deps-<a href="#id5"><span class="problematic" id="id6">*</span></a>.zip from PyTorch.org</p></td>
+<tr class="row-odd"><td><p>libtorch-cxx11-abi-shared-with-deps-<a href="#id3"><span class="problematic" id="id4">*</span></a>.zip from PyTorch.org</p></td>
 <td><p>python setup.py bdist_wheel</p></td>
 <td><p>bazel build //:libtorchtrt -c opt</p></td>
 </tr>
-<tr class="row-odd"><td><p>PyTorch preinstalled in an NGC container</p></td>
+<tr class="row-even"><td><p>PyTorch preinstalled in an NGC container</p></td>
 <td><p>python setup.py bdist_wheel</p></td>
 <td><p>bazel build //:libtorchtrt -c opt</p></td>
 </tr>
-<tr class="row-even"><td><p>PyTorch from the NVIDIA Forums for Jetson</p></td>
+<tr class="row-odd"><td><p>PyTorch from the NVIDIA Forums for Jetson</p></td>
 <td><p>python setup.py bdist_wheel</p></td>
 <td><p>bazel build //:libtorchtrt -c opt</p></td>
 </tr>
-<tr class="row-odd"><td><p>PyTorch built from Source</p></td>
+<tr class="row-even"><td><p>PyTorch built from Source</p></td>
 <td><p>python setup.py bdist_wheel</p></td>
 <td><p>bazel build //:libtorchtrt -c opt</p></td>
 </tr>
@@ -805,17 +790,8 @@ In the case you installed with <code class="docutils literal notranslate"><span 
 </div></blockquote>
 </li>
 </ol>
-<p>In the case you are using NVIDIA compiled pip packages, set the path for both libtorch sources to the same path. This is because unlike
-PyTorch on x86_64, NVIDIA aarch64 PyTorch uses the CXX11-ABI. If you compiled for source using the pre_cxx11_abi and only would like to
-use that library, set the paths to the same path but when you compile make sure to add the flag <code class="docutils literal notranslate"><span class="pre">--config=pre_cxx11_abi</span></code></p>
 <div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>new_local_repository<span class="o">(</span>
 <span class="w">    </span><span class="nv">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;libtorch&quot;</span>,
-<span class="w">    </span><span class="nv">path</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;/usr/local/lib/python3.8/dist-packages/torch&quot;</span>,
-<span class="w">    </span><span class="nv">build_file</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;third_party/libtorch/BUILD&quot;</span>
-<span class="o">)</span>
-
-new_local_repository<span class="o">(</span>
-<span class="w">    </span><span class="nv">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;libtorch_pre_cxx11_abi&quot;</span>,
 <span class="w">    </span><span class="nv">path</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;/usr/local/lib/python3.8/dist-packages/torch&quot;</span>,
 <span class="w">    </span><span class="nv">build_file</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;third_party/libtorch/BUILD&quot;</span>
 <span class="o">)</span>
@@ -844,7 +820,6 @@ new_local_repository<span class="o">(</span>
 <div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>python3<span class="w"> </span>setup.py<span class="w"> </span>install
 </pre></div>
 </div>
-<p>If you have a build of PyTorch that uses Pre-CXX11 ABI drop the <code class="docutils literal notranslate"><span class="pre">--use-pre-cxx11-abi</span></code> flag</p>
 <p>If you are building for Jetpack 4.5 add the <code class="docutils literal notranslate"><span class="pre">--jetpack-version</span> <span class="pre">5.0</span></code> flag</p>
 </section>
 </section>
@@ -916,7 +891,6 @@ new_local_repository<span class="o">(</span>
 <li><a class="reference internal" href="#building-the-c-library-standalone-torchscript-only">Building the C++ Library Standalone (TorchScript Only)</a><ul>
 <li><a class="reference internal" href="#release-build">Release Build</a></li>
 <li><a class="reference internal" href="#debug-build">Debug Build</a></li>
-<li><a class="reference internal" href="#pre-cxx11-abi-build">Pre CXX11 ABI Build</a></li>
 </ul>
 </li>
 <li><a class="reference internal" href="#choosing-the-right-abi">Choosing the Right ABI</a></li>

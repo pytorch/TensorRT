@@ -84,13 +84,14 @@ if trt.__version__ >= "7.0":
     }
 
 
-def delete_module(module: torch.fx.GraphModule) -> None:
+def deallocate_module(module: torch.fx.GraphModule, delete_module: bool = True) -> None:
     """
     This is a helper function to delete the instance of module. We first move it to CPU and then
     delete the object. This function ensures the GPU memory occupied by the module is released effectively after this call
     """
     module.to(CPU_DEVICE)
-    del module
+    if delete_module:
+        del module
     torch.cuda.empty_cache()
     gc.collect()
 
@@ -419,7 +420,7 @@ def unwrap_tensor_dtype(tensor: Union[torch.Tensor, FakeTensor, torch.SymInt]) -
     """
     Returns the dtype of torch.tensor or FakeTensor. For symbolic integers, we return int64
     """
-    if isinstance(tensor, (torch.Tensor, FakeTensor)): 
+    if isinstance(tensor, (torch.Tensor, FakeTensor)):
         return tensor.dtype
     elif isinstance(tensor, (int, float, bool)):
         return torch.tensor(tensor).dtype
@@ -793,6 +794,8 @@ def get_output_dtypes(output: Any, truncate_doulbe: bool = False) -> List[dtype]
                     output_dtypes.append(dtype.float32)
                 else:
                     output_dtypes.append(dtype._from(output_meta.dtype))
+            elif isinstance(output_meta, torch.SymInt):
+                output_dtypes.append(dtype.int64)
         elif "tensor_meta" in output.meta:
             output_meta = output.meta["tensor_meta"]
             output_dtypes.append(dtype._from(output_meta.dtype))

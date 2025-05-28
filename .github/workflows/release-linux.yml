@@ -15,7 +15,7 @@ permissions:
 
 jobs:
   generate-matrix:
-    uses: ./.github/workflows/generate_binary_build_matrix.yml
+    uses: pytorch/test-infra/.github/workflows/generate_binary_build_matrix.yml@main
     if: ${{ contains(github.event.pull_request.labels.*.name, 'build-release-artifacts') || startsWith(github.event.ref, 'refs/tags/v') }}
     with:
       package-type: wheel
@@ -96,8 +96,8 @@ jobs:
           echo "${MATRIX_BLOB}"
           echo "matrix=${MATRIX_BLOB}" >> "${GITHUB_OUTPUT}"
 
-  release-other-artifacts:
-    name: Release torch-tensorrt wheel and pre-cxx11 tarball artifacts
+  release-wheel-artifacts:
+    name: Release torch-tensorrt wheel artifacts
     needs: [generate-release-wheel-matrix]
     strategy:
       fail-fast: false

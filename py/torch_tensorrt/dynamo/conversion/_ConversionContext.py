@@ -1,7 +1,8 @@
 from dataclasses import dataclass, field
 
+import numpy as np
 from torch_tensorrt.dynamo._settings import CompilationSettings
-from torch_tensorrt.fx.types import TRTNetwork
+from torch_tensorrt.dynamo.types import TRTNetwork
 
 
 @dataclass
@@ -19,3 +20,4 @@ class ConversionContext:
         default_factory=CompilationSettings
     )
     requires_output_allocator: bool = False
+    mapping: dict[str, np.array] = field(default_factory=dict)

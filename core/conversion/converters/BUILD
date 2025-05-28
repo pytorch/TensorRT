@@ -4,9 +4,29 @@ load("@rules_pkg//:pkg.bzl", "pkg_tar")
 package(default_visibility = ["//visibility:public"])
 
 config_setting(
-    name = "use_pre_cxx11_abi",
-    values = {
-        "define": "abi=pre_cxx11_abi",
+    name = "use_torch_whl",
+    flag_values = {
+        "//toolchains/dep_src:torch": "whl"
+    },
+)
+
+config_setting(
+    name = "sbsa",
+    constraint_values = [
+        "@platforms//cpu:aarch64",
+    ],
+    flag_values = {
+        "//toolchains/dep_collection:compute_libs": "default"
+    },
+)
+
+config_setting(
+    name = "jetpack",
+    constraint_values = [
+        "@platforms//cpu:aarch64",
+    ],
+    flag_values = {
+        "//toolchains/dep_collection:compute_libs": "jetpack"
     },
 )
 
@@ -29,9 +49,14 @@ cc_library(
         "//core/conversion/conversionctx",
         "//core/util:prelude",
     ] + select({
-        ":windows": ["@tensorrt_win//:nvinfer", "@libtorch_win//:libtorch"],
-        ":use_pre_cxx11_abi": ["@tensorrt//:nvinfer", "@libtorch_pre_cxx11_abi//:libtorch"],
-        "//conditions:default": ["@tensorrt//:nvinfer", "@libtorch"],
+        ":windows": ["@tensorrt_win//:nvinfer"],
+        ":sbsa": ["@tensorrt_sbsa//:nvinfer"],
+        ":jetpack": ["@tensorrt_l4t//:nvinfer"],
+        "//conditions:default": ["@tensorrt//:nvinfer"],
+    }) + select({
+        ":windows": ["@libtorch_win//:libtorch"],
+        ":use_torch_whl": ["@torch_whl//:libtorch"],
+        "//conditions:default": ["@libtorch"],
     }),
     alwayslink = True,
 )
@@ -49,9 +74,14 @@ cc_library(
         "//core/conversion/conversionctx",
         "//core/util:prelude",
     ] + select({
-        ":windows": ["@tensorrt_win//:nvinfer", "@libtorch_win//:libtorch"],
-        ":use_pre_cxx11_abi": ["@tensorrt//:nvinfer", "@libtorch_pre_cxx11_abi//:libtorch"],
-        "//conditions:default": ["@tensorrt//:nvinfer", "@libtorch"],
+        ":windows": ["@tensorrt_win//:nvinfer"],
+        ":sbsa": ["@tensorrt_sbsa//:nvinfer"],
+        ":jetpack": ["@tensorrt_l4t//:nvinfer"],
+        "//conditions:default": ["@tensorrt//:nvinfer"],
+    }) + select({
+        ":windows": ["@libtorch_win//:libtorch"],
+        ":use_torch_whl": ["@torch_whl//:libtorch"],
+        "//conditions:default": ["@libtorch"],
     }),
     alwayslink = True,
 )
@@ -106,9 +136,14 @@ cc_library(
         "//core/plugins:torch_tensorrt_plugins",
         "//core/util:prelude",
     ] + select({
-        ":windows": ["@tensorrt_win//:nvinfer", "@libtorch_win//:libtorch"],
-        ":use_pre_cxx11_abi": ["@tensorrt//:nvinfer", "@libtorch_pre_cxx11_abi//:libtorch"],
-        "//conditions:default": ["@tensorrt//:nvinfer", "@libtorch"],
+        ":windows": ["@tensorrt_win//:nvinfer"],
+        ":sbsa": ["@tensorrt_sbsa//:nvinfer"],
+        ":jetpack": ["@tensorrt_l4t//:nvinfer"],
+        "//conditions:default": ["@tensorrt//:nvinfer"],
+    }) + select({
+        ":windows": ["@libtorch_win//:libtorch"],
+        ":use_torch_whl": ["@torch_whl//:libtorch"],
+        "//conditions:default": ["@libtorch"],
     }),
     alwayslink = True,
 )

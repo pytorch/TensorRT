@@ -9,7 +9,7 @@ RELEASE_CUDA_VERSION = {
     "tarball": ["cu128"],
 }
 RELEASE_PYTHON_VERSION = {
-    "wheel": ["3.9", "3.10", "3.11", "3.12"],
+    "wheel": ["3.9", "3.10", "3.11", "3.12", "3.13"],
     "tarball": ["3.11"],
 }
 

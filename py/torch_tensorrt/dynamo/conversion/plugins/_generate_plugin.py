@@ -3,12 +3,12 @@ import logging
 from types import FunctionType
 from typing import Any, Callable, Tuple
 
-import tensorrt.plugin as trtp
 import torch
 from sympy import lambdify
 from torch._dynamo.source import LocalSource
 from torch._subclasses.fake_tensor import FakeTensorMode
 from torch.fx.experimental.symbolic_shapes import DimDynamic, ShapeEnv
+from torch_tensorrt._features import needs_qdp_plugin
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -28,6 +28,13 @@ def mksym(
 
 
 def _generate_plugin(plugin_name: str) -> None:
+    try:
+        import tensorrt.plugin as trtp
+    except ImportError as e:
+        raise RuntimeError(
+            "Unable to import TensorRT plugin. TensorRT version must be 10.7.0 or higher to support for Triton based TensorRT plugins"
+        )
+
     namespace, name = plugin_name.split("::")
 
     # retrieve the corresponding torch operation using the passed in string
@@ -211,6 +218,7 @@ def _generate_plugin(plugin_name: str) -> None:
     trtp.impl(plugin_name)(plugin_impl)
 
 
+@needs_qdp_plugin
 def generate_plugin(plugin_name: str) -> None:
     """
     Generate the Plugin using external kernels and TensorRT Quick Deployable Plugin APIs.
