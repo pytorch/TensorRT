@@ -36,11 +36,9 @@ dynamic_shapes = {
 settings = {
     "strict": False,
     "allow_complex_guards_as_runtime_asserts": True,
-    "enabled_precisions": {torch.float32},
+    "enabled_precisions": {torch.float16},
     "truncate_double": True,
     "min_block_size": 1,
-    "use_fp32_acc": True,
-    "use_explicit_typing": True,
     "debug": False,
     "use_python_runtime": True,
     "immutable_weights": False,
@@ -74,12 +72,12 @@ torch.cuda.empty_cache()
 # Warmup
 generate_image(["Test"], 20)
 print("Benchmark Original PyTorch Module Latency (bfloat16)")
-for batch_size in range(1, 9):
+for batch_size in range(1, 3):
     generate_image(["Test"], 20, batch_size=batch_size, benchmark=True, iterations=3)
 
 pipe.to(torch.float16)
 print("Benchmark Original PyTorch Module Latency (float16)")
-for batch_size in range(1, 9):
+for batch_size in range(1, 3):
     generate_image(["Test"], 20, batch_size=batch_size, benchmark=True, iterations=3)
 
 trt_gm = torch_tensorrt.MutableTorchTensorRTModule(backbone, **settings)
@@ -92,6 +90,6 @@ end = time()
 print("Time Elapse compilation:", end - start)
 print()
 print("Benchmark TRT Accelerated Latency")
-for batch_size in range(1, 9):
+for batch_size in range(1, 3):
     generate_image(["Test"], 20, batch_size=batch_size, benchmark=True, iterations=3)
 torch.cuda.empty_cache()
