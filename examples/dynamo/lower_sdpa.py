@@ -44,7 +44,7 @@ def replace_variants_of_sdpa(
 
             if attn_mask is not None:
                 logger.warning(f"We do not support attn_mask for {node.target} in the graph. Ignoring it and using is_causal=True configuration.")
-            breakpoint()
+
             modified_input_args = (query, key, value, None, dropout_p, is_causal)
 
             # Create a new node with torch.nn.functional.scaled_dot_product_attention

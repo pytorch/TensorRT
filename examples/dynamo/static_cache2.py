@@ -123,7 +123,11 @@ def add_kv_cache_inputs(gm, fixed_kv: bool = True):
     start_idx_input.meta["val"] = start_idx_unbacked_symint
     end_idx_input.meta["val"] = end_idx_unbacked_symint
 
-    return kv_inputs, start_idx_input, end_idx_input
+    # Add is_causal as input
+    is_causal_input = add_graph_input(gm, "is_causal", True)
+    is_causal_input.meta["val"] = torch.tensor(True)
+
+    return kv_inputs, start_idx_input, end_idx_input, is_causal_input
 
 def create_kv_cache_update_nodes(gm, sdpa_node, current_kv_node, incoming_kv_node, start_idx_input, end_idx_input):
     """
@@ -212,7 +216,7 @@ def create_kv_cache_update_nodes(gm, sdpa_node, current_kv_node, incoming_kv_nod
 
     return concat_keys_or_values, new_incoming_keys_or_values
 
-def insert_kv_slicing_before_sdpa(gm, incoming_keys_values: List[Tuple[torch.Tensor, torch.Tensor]], start_idx_input: Node, end_idx_input: Node):
+def insert_kv_slicing_before_sdpa(gm, incoming_keys_values: List[Tuple[torch.Tensor, torch.Tensor]], start_idx_input: Node, end_idx_input: Node, is_causal_input: Node):
     """
     Insert slicing and concatenation operations before each scaled_dot_product_attention operation as per the following KV cache update logic:
     concat_keys = torch.cat((key_cache[:, :, :start_idx, :], k), dim=2)
@@ -239,7 +243,7 @@ def insert_kv_slicing_before_sdpa(gm, incoming_keys_values: List[Tuple[torch.Ten
         kv_cache_for_graph.extend([new_incoming_key_cache_node, new_incoming_value_cache_node])
 
         # Update the SDPA node arguments with current key and value nodes
-        sdpa_node.args = (q_node, new_current_key_node, new_current_value_node) + sdpa_node.args[3:]
+        sdpa_node.args = (q_node, new_current_key_node, new_current_value_node) + (None, is_causal_input) # + sdpa_node.args[3:]
     
     kv_cache_for_graph.extend([k_node, v_node])
     return gm, kv_cache_for_graph
@@ -252,11 +256,11 @@ def insert_kv_cache(
     """Insert KV cache ops in the graph"""
     """Perform insertion of kv-caches and attention kernel."""
     # Add static key and value as inputs to the graph
-    kv_inputs, start_idx_input, end_idx_input = add_kv_cache_inputs(gm, fixed_kv=True)
+    kv_inputs, start_idx_input, end_idx_input, is_causal_input = add_kv_cache_inputs(gm, fixed_kv=True)
 
     # Build and update the KV cache using computed KV inputs for current token and 
     # incoming keys and values from previous tokens (which were added as inputs)
-    gm, kv_cache_for_graph = insert_kv_slicing_before_sdpa(gm, kv_inputs, start_idx_input, end_idx_input)
+    gm, kv_cache_for_graph = insert_kv_slicing_before_sdpa(gm, kv_inputs, start_idx_input, end_idx_input, is_causal_input)
 
     # Call the function to add KV as outputs
     logits_keys_values = add_kv_as_outputs(gm, kv_cache_for_graph)
