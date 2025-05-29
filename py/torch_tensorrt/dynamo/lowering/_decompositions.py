@@ -434,7 +434,7 @@ def full_like_decomposition(*args, **kwargs) -> torch.Tensor:
     shape = args[0].shape
     fill_value = args[1]
     kwargs["dtype"] = kwargs.get("dtype", None) or input.dtype
-    kwargs["device"] = input.device
+    kwargs["device"] = kwargs.get("device", None) or input.device
     return torch.full(shape, fill_value, dtype=kwargs["dtype"], device=kwargs["device"])
 
 
