@@ -3,7 +3,6 @@ from __future__ import annotations
 import logging
 from typing import Any, List, Optional, Sequence
 
-import tensorrt as trt
 import torch
 from torch_tensorrt._enums import dtype
 from torch_tensorrt._features import ENABLED_FEATURES
@@ -60,7 +59,6 @@ def interpret_module_to_result(
     interpreter = TRTInterpreter(
         module,
         inputs,
-        logger_level=(trt.Logger.VERBOSE if settings.debug else trt.Logger.WARNING),
         output_dtypes=output_dtypes,
         compilation_settings=settings,
         engine_cache=engine_cache,

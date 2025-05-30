@@ -3,9 +3,7 @@ We use the TRT Engine Explorer (TREX) to visualize the engien graph structure. T
 
 ## Installation
 ```bash
-git clone https://github.com/NVIDIA/TensorRT.git
-cd TensorRT/tools/experimental/trt-engine-explorer
-python3 -m pip install -e .[notebook]
+pip install git+https://github.com/NVIDIA/TensorRT.git#subdirectory=tools/experimental/trt-engine-explorer
 sudo apt --yes install graphviz
 ```
 

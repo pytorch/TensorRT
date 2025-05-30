@@ -75,7 +75,6 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         self,
         module: torch.fx.GraphModule,
         input_specs: Sequence[Input],
-        logger_level: trt.ILogger.Severity = trt.ILogger.Severity.WARNING,
         output_dtypes: Optional[Sequence[dtype]] = None,
         compilation_settings: CompilationSettings = CompilationSettings(),
         engine_cache: Optional[BaseEngineCache] = None,

@@ -13,14 +13,15 @@ from torch.fx.passes.splitter_base import (
 )
 from torch.fx.passes.tools_common import CALLABLE_NODE_OPS, NodeSet
 from torch_tensorrt.dynamo._defaults import (
-    DEBUG,
     MIN_BLOCK_SIZE,
     REQUIRE_FULL_COMPILATION,
 )
 from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
     DYNAMO_CONVERTERS as CONVERTERS,
 )
-from torch_tensorrt.dynamo.conversion._ConverterRegistry import ConverterRegistry
+from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
+    ConverterRegistry,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -250,7 +251,6 @@ class TRTPartitioner(_SplitterBase):  # type: ignore
 
 def partition(
     gm: torch.fx.GraphModule,
-    verbose: bool = DEBUG,
     min_block_size: int = MIN_BLOCK_SIZE,
     torch_executed_ops: Collection[Target] = set(),
     require_full_compilation: bool = REQUIRE_FULL_COMPILATION,
@@ -286,7 +286,6 @@ def partition(
 
     partitioned_graph = partitioner.partition_graph()
 
-    if verbose:
-        supported_ops.print_support_overview(partitioner.num_trt_accelerated_subgraphs)
+    supported_ops.print_support_overview(partitioner.num_trt_accelerated_subgraphs)
 
     return partitioned_graph, supported_ops
