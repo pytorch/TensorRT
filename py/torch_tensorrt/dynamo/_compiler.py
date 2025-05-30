@@ -522,7 +522,13 @@ def compile(
     """
 
     if debug:
-        set_log_level(logger.parent, logging.DEBUG)
+        warnings.warn(
+            "The 'debug' argument is deprecated and will be removed in a future release. "
+            "Please use the torch_tensorrt.dynamo.Debugger context manager for debugging and graph capture.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+
     if "truncate_long_and_double" in kwargs.keys():
         if truncate_double is not _defaults.TRUNCATE_DOUBLE:
             raise ValueError(
@@ -644,7 +650,6 @@ def compile(
         "enabled_precisions": (
             enabled_precisions if enabled_precisions else _defaults.ENABLED_PRECISIONS
         ),
-        "debug": debug,
         "device": device,
         "assume_dynamic_shape_support": assume_dynamic_shape_support,
         "workspace_size": workspace_size,
@@ -748,7 +753,7 @@ def compile_module(
 
     # Check the number of supported operations in the graph
     num_supported_ops, total_ops = partitioning.get_graph_converter_support(
-        gm, settings.debug, settings.torch_executed_ops
+        gm, settings.torch_executed_ops
     )
 
     dryrun_tracker.total_ops_in_graph = total_ops
@@ -800,7 +805,6 @@ def compile_module(
             logger.info("Partitioning the graph via the fast partitioner")
             partitioned_module, supported_ops = partitioning.fast_partition(
                 gm,
-                verbose=settings.debug,
                 min_block_size=settings.min_block_size,
                 torch_executed_ops=settings.torch_executed_ops,
                 require_full_compilation=settings.require_full_compilation,
@@ -821,7 +825,6 @@ def compile_module(
         logger.info("Partitioning the graph via the global partitioner")
         partitioned_module, supported_ops = partitioning.global_partition(
             gm,
-            verbose=settings.debug,
             min_block_size=settings.min_block_size,
             torch_executed_ops=settings.torch_executed_ops,
             require_full_compilation=settings.require_full_compilation,
@@ -928,17 +931,21 @@ def compile_module(
             )
 
             trt_modules[name] = trt_module
+            from torch_tensorrt.dynamo._debugger import (
+                DEBUG_FILE_DIR,
+                SAVE_ENGINE_PROFILE,
+            )
 
-            if settings.debug and settings.engine_vis_dir:
+            if SAVE_ENGINE_PROFILE:
                 if settings.use_python_runtime:
                     logger.warning(
                         "Profiling can only be enabled when using the C++ runtime"
                     )
                 else:
-                    if not os.path.exists(settings.engine_vis_dir):
-                        os.makedirs(settings.engine_vis_dir)
+                    path = os.path.join(DEBUG_FILE_DIR, "engine_visualization")
+                    os.makedirs(path, exist_ok=True)
                     trt_module.enable_profiling(
-                        profiling_results_dir=settings.engine_vis_dir,
+                        profiling_results_dir=path,
                         profile_format="trex",
                     )
 

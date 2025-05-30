@@ -42,7 +42,6 @@ from torch_tensorrt.dynamo.utils import (
     deallocate_module,
     get_model_device,
     get_torch_inputs,
-    set_log_level,
     to_torch_device,
     to_torch_tensorrt_device,
 )
@@ -75,7 +74,6 @@ def construct_refit_mapping(
     interpreter = TRTInterpreter(
         module,
         inputs,
-        logger_level=(trt.Logger.VERBOSE if settings.debug else trt.Logger.WARNING),
         output_dtypes=output_dtypes,
         compilation_settings=settings,
     )
@@ -269,9 +267,6 @@ def refit_module_weights(
         not settings.immutable_weights
     ), "Refitting is not enabled. Please recompile the engine with immutable_weights=False."
 
-    if settings.debug:
-        set_log_level(logger.parent, logging.DEBUG)
-
     device = to_torch_tensorrt_device(settings.device)
     if arg_inputs:
         if not isinstance(arg_inputs, collections.abc.Sequence):
@@ -327,7 +322,6 @@ def refit_module_weights(
             logger.info("Partitioning the graph via the fast partitioner")
             new_partitioned_module, supported_ops = partitioning.fast_partition(
                 new_gm,
-                verbose=settings.debug,
                 min_block_size=settings.min_block_size,
                 torch_executed_ops=settings.torch_executed_ops,
                 require_full_compilation=settings.require_full_compilation,
@@ -347,7 +341,6 @@ def refit_module_weights(
         logger.info("Partitioning the graph via the global partitioner")
         new_partitioned_module, supported_ops = partitioning.global_partition(
             new_gm,
-            verbose=settings.debug,
             min_block_size=settings.min_block_size,
             torch_executed_ops=settings.torch_executed_ops,
             require_full_compilation=settings.require_full_compilation,
