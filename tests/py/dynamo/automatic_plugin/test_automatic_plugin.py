@@ -1,5 +1,6 @@
 from typing import Tuple
 
+import pytest
 import torch
 import torch.nn as nn
 import torch_tensorrt
@@ -66,6 +67,7 @@ class TestAutomaticPlugin(DispatchTestCase):
             ((256, 256), torch.int),
         ]
     )
+    @pytest.mark.critical
     def test_mul_plugin_float(self, input_shape, dtype):
         class elementwise_mul(nn.Module):
             def forward(self, lhs, rhs):

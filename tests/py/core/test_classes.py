@@ -2,16 +2,17 @@ import copy
 import unittest
 from typing import Dict
 
+import pytest
+import tensorrt as trt
 import torch
 import torch_tensorrt
 import torch_tensorrt as torchtrt
 import torchvision.models as models
 from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import TorchTensorRTModule
 
-import tensorrt as trt
-
 
 class TestDevice(unittest.TestCase):
+    @pytest.mark.critical
     def test_from_string_constructor(self):
         device = torchtrt.Device("cuda:0")
         self.assertEqual(device.device_type, torchtrt.DeviceType.GPU)

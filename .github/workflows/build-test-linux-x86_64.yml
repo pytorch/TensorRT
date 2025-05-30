@@ -75,9 +75,50 @@ jobs:
       smoke-test-script: ${{ matrix.smoke-test-script }}
       trigger-event: ${{ github.event_name }}
 
+  tests-py-fail-fast:
+    name: Test fail fast [Python]
+    needs: [filter-matrix, build]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - repository: pytorch/tensorrt
+            package-name: torch_tensorrt
+            pre-script: packaging/pre_build_script.sh
+            post-script: packaging/post_build_script.sh
+            smoke-test-script: packaging/smoke_test_script.sh
+    uses: ./.github/workflows/linux-test.yml
+    with:
+      job-name: tests-py-critical-fail-fast
+      repository: "pytorch/tensorrt"
+      ref: ""
+      test-infra-repository: pytorch/test-infra
+      test-infra-ref: main
+      build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
+      pre-script: ${{ matrix.pre-script }}
+      script: |
+        export USE_HOST_DEPS=1
+        export CI_BUILD=1
+        export LD_LIBRARY_PATH=/usr/lib64:$LD_LIBRARY_PATH
+        pushd .
+        cd tests/py
+        python -m pip install -r requirements.txt
+
+        # test dynamo
+        python -m pytest -m critical --junitxml=${RUNNER_TEST_RESULTS_DIR}/dynamo_backend_test_results.xml -n 4 dynamo/backend/
+        python -m pytest -m critical -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/dynamo_models_result.xml --ir dynamo dynamo/models/
+        python -m pytest -m critical --junitxml=${RUNNER_TEST_RESULTS_DIR}/dynamo_automatic_plugin_results.xml dynamo/automatic_plugin/
+        python -m pytest -m critical --junitxml=${RUNNER_TEST_RESULTS_DIR}/dynamo_partitioning_results.xml dynamo/partitioning/
+        python -m pytest -m critical --junitxml=${RUNNER_TEST_RESULTS_DIR}/dynamo_lowering_results.xml dynamo/lowering/
+        python -m pytest -m critical --junitxml=${RUNNER_TEST_RESULTS_DIR}/dynamo_runtime_results.xml dynamo/runtime/
+
+        # test core
+        python -m pytest -m critical --junitxml=${RUNNER_TEST_RESULTS_DIR}/core_test_results.xml core/
+        popd
+
   tests-py-torchscript-fe:
     name: Test torchscript frontend [Python]
-    needs: [filter-matrix, build]
+    needs: [filter-matrix, build, tests-py-fail-fast]
     strategy:
       fail-fast: false
       matrix:
@@ -113,7 +154,7 @@ jobs:
 
   tests-py-dynamo-converters:
     name: Test dynamo converters [Python]
-    needs: [filter-matrix, build]
+    needs: [filter-matrix, build, tests-py-fail-fast]
     strategy:
       fail-fast: false
       matrix:
@@ -148,7 +189,7 @@ jobs:
 
   tests-py-dynamo-fe:
     name: Test dynamo frontend [Python]
-    needs: [filter-matrix, build]
+    needs: [filter-matrix, build, tests-py-fail-fast]
     strategy:
       fail-fast: false
       matrix:
@@ -180,7 +221,7 @@ jobs:
 
   tests-py-dynamo-serde:
     name: Test dynamo export serde [Python]
-    needs: [filter-matrix, build]
+    needs: [filter-matrix, build, tests-py-fail-fast]
     strategy:
       fail-fast: false
       matrix:
@@ -245,7 +286,7 @@ jobs:
 
   tests-py-dynamo-core:
     name: Test dynamo core [Python]
-    needs: [filter-matrix, build]
+    needs: [filter-matrix, build, tests-py-fail-fast]
     strategy:
       fail-fast: false
       matrix:
@@ -278,7 +319,7 @@ jobs:
 
   tests-py-dynamo-cudagraphs:
     name: Test dynamo cudagraphs [Python]
-    needs: [filter-matrix, build]
+    needs: [filter-matrix, build, tests-py-fail-fast]
     strategy:
       fail-fast: false
       matrix:
@@ -311,7 +352,7 @@ jobs:
 
   tests-py-core:
     name: Test core [Python]
-    needs: [filter-matrix, build]
+    needs: [filter-matrix, build, tests-py-fail-fast]
     strategy:
       fail-fast: false
       matrix:

@@ -85,6 +85,7 @@ def test_resnet18_cpu_offload(ir):
 
 
 @pytest.mark.unit
+@pytest.mark.critical
 def test_mobilenet_v2(ir):
     model = models.mobilenet_v2(pretrained=True).eval().to("cuda")
     input = torch.randn((1, 3, 224, 224)).to("cuda")

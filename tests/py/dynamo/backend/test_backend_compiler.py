@@ -1,6 +1,7 @@
 # type: ignore
 from copy import deepcopy
 
+import pytest
 import torch
 import torch_tensorrt
 from torch.testing._internal.common_utils import TestCase, run_tests
@@ -10,6 +11,7 @@ from ..testing_utilities import DECIMALS_OF_AGREEMENT, lower_graph_testing
 
 
 class TestTRTModuleNextCompilation(TestCase):
+    @pytest.mark.critical
     def test_trt_module_next_full_support(self):
         class FullySupportedMultiOp(torch.nn.Module):
             def forward(self, x, y):

@@ -1,3 +1,4 @@
+import pytest
 import torch
 import torch_tensorrt
 from torch.testing._internal.common_utils import TestCase, run_tests
@@ -6,6 +7,7 @@ from ..testing_utilities import DECIMALS_OF_AGREEMENT, lower_graph_testing
 
 
 class TestInputAsOutput(TestCase):
+    @pytest.mark.critical
     def test_input_as_output(self):
         class InputAsOutput(torch.nn.Module):
             def forward(self, x, y):
@@ -56,6 +58,7 @@ class TestInputAsOutput(TestCase):
 
 
 class TestLoweringPassMembership(TestCase):
+    @pytest.mark.critical
     def insert_at_end(self):
         from torch_tensorrt.dynamo.lowering.passes import (
             ATEN_LOWERING_PASSES,

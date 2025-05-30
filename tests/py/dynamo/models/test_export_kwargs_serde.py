@@ -23,6 +23,7 @@ assertions = unittest.TestCase()
 
 
 @pytest.mark.unit
+@pytest.mark.critical
 def test_custom_model():
     class net(nn.Module):
         def __init__(self):
@@ -83,6 +84,7 @@ def test_custom_model():
 
 
 @pytest.mark.unit
+@pytest.mark.critical
 def test_custom_model_with_dynamo_trace():
     class net(nn.Module):
         def __init__(self):

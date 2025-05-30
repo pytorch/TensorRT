@@ -81,6 +81,7 @@ def test_mobilenet_v2(ir):
 
 
 @pytest.mark.unit
+@pytest.mark.critical
 def test_efficientnet_b0(ir):
     model = timm.create_model("efficientnet_b0", pretrained=True).eval().to("cuda")
     input = torch.randn((1, 3, 224, 224)).to("cuda")
