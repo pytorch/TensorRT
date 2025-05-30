@@ -253,7 +253,7 @@ jobs:
 
   tests-py-torch-compile-be:
     name: Test torch compile backend [Python]
-    needs: [filter-matrix, build]
+    needs: [filter-matrix, build, tests-py-fail-fast]
     strategy:
       fail-fast: false
       matrix:
