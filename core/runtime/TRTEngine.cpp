@@ -281,6 +281,16 @@ void TRTEngine::enable_profiling() {
   exec_ctx->setProfiler(trt_engine_profiler.get());
 }
 
+void TRTEngine::set_profile_format(std::string format) {
+  if (format == "trex") {
+    this->trt_engine_profiler->set_profile_format(TraceFormat::kTREX);
+  } else if (format == "perfetto") {
+    this->trt_engine_profiler->set_profile_format(TraceFormat::kPERFETTO);
+  } else {
+    TORCHTRT_THROW_ERROR("Invalid profile format: " + format);
+  }
+}
+
 std::string TRTEngine::get_engine_layer_info() {
   auto inspector = cuda_engine->createEngineInspector();
   return inspector->getEngineInformation(nvinfer1::LayerInformationFormat::kJSON);

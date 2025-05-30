@@ -5,7 +5,6 @@ import torch
 from torch._subclasses.fake_tensor import FakeTensor
 from torch.fx.experimental.proxy_tensor import unset_fake_temporarily
 from torch_tensorrt._Input import Input
-from torch_tensorrt.dynamo._defaults import DEBUG
 from torch_tensorrt.dynamo.utils import contains_sym_int, extract_var_range_info
 
 logger = logging.getLogger(__name__)
@@ -169,7 +168,6 @@ def run_shape_analysis(
 
 def get_graph_converter_support(
     graph_module: torch.fx.GraphModule,
-    verbose: bool = DEBUG,
     torch_executed_ops: Optional[Set[str]] = None,
 ) -> Tuple[int, int]:
     """Helper function to get converter support overview pre-partitioning
@@ -199,7 +197,6 @@ def get_graph_converter_support(
                 number_of_supported_nodes += 1
 
     # Print node support overview prior to partitioning
-    if verbose:
-        op_support.print_support_overview(print_node_support=True)
+    op_support.print_support_overview(print_node_support=True)
 
     return number_of_supported_nodes, total_functional_nodes
