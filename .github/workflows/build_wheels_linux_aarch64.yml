@@ -251,7 +251,8 @@ jobs:
         working-directory: ${{ inputs.repository }}
         shell: bash -l {0}
         run: |
-          set -euxo pipefail
+          #set -euxo pipefail
+          set -x
           source "${BUILD_ENV_FILE}"
           export PYTORCH_VERSION="$(${CONDA_RUN} pip show torch | grep ^Version: | sed 's/Version: *//' | sed 's/+.\+//')"
           ${CONDA_RUN} python setup.py clean
@@ -259,7 +260,12 @@ jobs:
           if [[ ${{ inputs.is-jetpack }} == false ]]; then
             ${CONDA_RUN} python setup.py bdist_wheel
           else
+           # BUILD_VERSION example: '2.8.0.dev20250530+cu128'
+            BUILD_VERSION=${BUILD_VERSION}+jp62
+            echo "BUILD_VERSION: $BUILD_VERSION"
             ${CONDA_RUN} python setup.py bdist_wheel --jetpack
+            cd dist
+            ls -lart
           fi
       - name: Repair Manylinux_2_28 Wheel
         shell: bash -l {0}
@@ -331,6 +337,8 @@ jobs:
   upload:
     needs: build
     uses: pytorch/test-infra/.github/workflows/_binary_upload.yml@main
+    # only upload to pytorch nightly index for jetpack builds
+    # if: ${{ inputs.is-jetpack == false ||  env.CHANNEL == 'nightly' }}
     if: ${{ inputs.is-jetpack == false }}
     with:
       repository: ${{ inputs.repository }}
