@@ -260,12 +260,10 @@ jobs:
           if [[ ${{ inputs.is-jetpack }} == false ]]; then
             ${CONDA_RUN} python setup.py bdist_wheel
           else
-           # BUILD_VERSION example: '2.8.0.dev20250530+cu128'
+            # BUILD_VERSION example: '2.8.0.dev20250530'
             BUILD_VERSION=${BUILD_VERSION}+jp62
             echo "BUILD_VERSION: $BUILD_VERSION"
             ${CONDA_RUN} python setup.py bdist_wheel --jetpack
-            cd dist
-            ls -lart
           fi
       - name: Repair Manylinux_2_28 Wheel
         shell: bash -l {0}
@@ -338,8 +336,7 @@ jobs:
     needs: build
     uses: pytorch/test-infra/.github/workflows/_binary_upload.yml@main
     # only upload to pytorch nightly index for jetpack builds
-    # if: ${{ inputs.is-jetpack == false ||  env.CHANNEL == 'nightly' }}
-    if: ${{ inputs.is-jetpack == false }}
+    if: ${{ inputs.is-jetpack == false ||  env.CHANNEL == 'nightly' }}
     with:
       repository: ${{ inputs.repository }}
       ref: ${{ inputs.ref }}
