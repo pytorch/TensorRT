@@ -54,7 +54,6 @@ if load_tensorrt_llm():
             [args[0]],
         )
 
-    breakpoint()
 else:
     _LOGGER.debug(
         "Did not load torch.distributed converters since TensorRT-LLM is not available"
