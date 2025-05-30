@@ -1,5 +1,6 @@
 import os
 
+import pytest
 import torch
 import torch.distributed as dist
 import torch.nn as nn
@@ -17,6 +18,7 @@ from conversion.harness import DispatchTestCase
 
 
 class TestGatherNcclOpsConverter(DispatchTestCase):
+    @pytest.mark.critical
     @parameterized.expand([8])
     def test_nccl_ops(self, linear_layer_dim):
         class DistributedGatherModel(nn.Module):

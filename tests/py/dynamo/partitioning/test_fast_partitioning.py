@@ -1,6 +1,7 @@
 from copy import deepcopy
 
 import numpy as np
+import pytest
 import torch
 from torch.testing._internal.common_utils import TestCase, run_tests
 from torch_tensorrt.dynamo import partitioning
@@ -55,6 +56,7 @@ class TestFastPartitioning(TestCase):
             "Single operators can be segmented if full compilation is required",
         )
 
+    @pytest.mark.critical
     def test_partition_fully_supported_multi_op(self):
         class FullySupportedMultiOp(torch.nn.Module):
             def __init__(self, *args, **kwargs) -> None:

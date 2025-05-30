@@ -14,6 +14,7 @@ from ..testing_utilities import DECIMALS_OF_AGREEMENT, lower_graph_testing
 
 
 class TestLowering(TestCase):
+    @pytest.mark.critical
     def test_lowering_inplace_op(self):
         class InPlace(torch.nn.Module):
             def __init__(self, *args, **kwargs) -> None:

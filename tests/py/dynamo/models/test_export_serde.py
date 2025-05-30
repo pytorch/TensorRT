@@ -17,6 +17,7 @@ assertions = unittest.TestCase()
 trt_ep_path = os.path.join(tempfile.gettempdir(), "trt.ep")
 
 
+@pytest.mark.critical
 @pytest.mark.unit
 def test_base_full_compile(ir):
     """
