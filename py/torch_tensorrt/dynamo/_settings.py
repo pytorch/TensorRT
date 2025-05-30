@@ -1,3 +1,4 @@
+import logging
 from dataclasses import dataclass, field
 from typing import Collection, Optional, Set, Tuple, Union
 
@@ -7,7 +8,6 @@ from torch_tensorrt._enums import EngineCapability, dtype
 from torch_tensorrt.dynamo._defaults import (
     ASSUME_DYNAMIC_SHAPE_SUPPORT,
     CACHE_BUILT_ENGINES,
-    DEBUG,
     DISABLE_TF32,
     DLA_GLOBAL_DRAM_SIZE,
     DLA_LOCAL_DRAM_SIZE,
@@ -18,7 +18,6 @@ from torch_tensorrt.dynamo._defaults import (
     ENABLE_WEIGHT_STREAMING,
     ENABLED_PRECISIONS,
     ENGINE_CAPABILITY,
-    ENGINE_VIS_DIR,
     HARDWARE_COMPATIBLE,
     IMMUTABLE_WEIGHTS,
     L2_LIMIT_FOR_TILING,
@@ -101,7 +100,7 @@ class CompilationSettings:
     """
 
     enabled_precisions: Set[dtype] = field(default_factory=lambda: ENABLED_PRECISIONS)
-    debug: bool = DEBUG
+    debug: bool = logging.root.manager.root.level <= logging.DEBUG
     workspace_size: int = WORKSPACE_SIZE
     min_block_size: int = MIN_BLOCK_SIZE
     torch_executed_ops: Collection[Target] = field(default_factory=set)
@@ -141,7 +140,6 @@ class CompilationSettings:
     tiling_optimization_level: str = TILING_OPTIMIZATION_LEVEL
     l2_limit_for_tiling: int = L2_LIMIT_FOR_TILING
     use_distributed_mode_trace: bool = USE_DISTRIBUTED_MODE_TRACE
-    engine_vis_dir: Optional[str] = ENGINE_VIS_DIR
 
 
 _SETTINGS_TO_BE_ENGINE_INVARIANT = (
