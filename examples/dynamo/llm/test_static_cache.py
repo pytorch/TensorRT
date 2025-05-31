@@ -4,7 +4,7 @@ from torch.export import export
 import torch_tensorrt
 from contextlib import nullcontext
 import argparse
-from lower_sdpa import *
+import register_sdpa
 from transformers.models.llama.modeling_llama import LlamaAttention, LlamaDecoderLayer
 from transformers.models.llama.configuration_llama import LlamaConfig
 from transformers import AutoModelForCausalLM
@@ -198,7 +198,7 @@ def test_static_cache_lowering(args):
     is_causal = True
     q = torch.randn(1, 32, 2048, 64).cuda()
     out_no_cache = model_no_cache(q, k, v)
-    out_pyt_cache, key_cache, value_cache = gm(q, k, v, is_causal, key_cache, value_cache, start_idx, end_idx)
+    out_pyt_cache, key_cache, value_cache = gm(q, k, v, key_cache, value_cache, start_idx, end_idx, is_causal)
     assert torch.allclose(out_no_cache, out_pyt_cache, atol=ATOL, rtol=RTOL)
 
     # Test Generate
@@ -214,7 +214,7 @@ def test_static_cache_lowering(args):
         v_full = torch.cat((v, v_curr), dim=2)   
         
         out_no_cache = model_no_cache(q_full, k_full, v_full)
-        out_pyt_static_cache, key_cache, value_cache = gm(q_curr, k_curr, v_curr, is_causal, key_cache, value_cache, start_idx, end_idx)
+        out_pyt_static_cache, key_cache, value_cache = gm(q_curr, k_curr, v_curr, key_cache, value_cache, start_idx, end_idx, is_causal)
         assert torch.allclose(out_no_cache[:, :, -1:, :], out_pyt_static_cache, atol=ATOL, rtol=RTOL)
         q = q_full 
         k = k_full
@@ -286,8 +286,8 @@ def test_static_cache_with_torch_tensorrt(args):
     q = torch.randn(1, 32, 2048, 64).cuda()
     # out_eager = eager_sdpa(q, k, v, is_causal=is_causal)
     out_no_cache = model_no_cache(q, k, v)
-    out_trt, trt_key_cache, trt_value_cache = trt_model(q, k, v, is_causal, key_cache, value_cache, start_idx, end_idx)
-    # breakpoint()
+    out_trt, trt_key_cache, trt_value_cache = trt_model(q, k, v, key_cache, value_cache, start_idx, end_idx, is_causal)
+
     assert torch.allclose(out_no_cache, out_trt, atol=ATOL, rtol=RTOL), "Prefill TRT logits don't match"
     assert torch.allclose(trt_key_cache[:, :, :end_idx, :], k, atol=ATOL, rtol=RTOL), "Prefill TRT key cache don't match"
     assert torch.allclose(trt_value_cache[:, :, :end_idx, :], v, atol=ATOL, rtol=RTOL), "Prefill TRT value cache don't match"
@@ -304,7 +304,7 @@ def test_static_cache_with_torch_tensorrt(args):
         v_full = torch.cat((v, v_curr), dim=2)   
         is_causal = False
         out_no_cache = model_no_cache(q_full, k_full, v_full)
-        out_trt, trt_key_cache, trt_value_cache = trt_model(q_curr, k_curr, v_curr, is_causal, trt_key_cache, trt_value_cache, start_idx, end_idx)
+        out_trt, trt_key_cache, trt_value_cache = trt_model(q_curr, k_curr, v_curr, trt_key_cache, trt_value_cache, start_idx, end_idx, is_causal)
         # breakpoint()
         # print_diff(out_no_cache[:, :, -1:, :], out_trt, f"out_no_cache[:, :, -1:, :] vs out_trt for idx {start_idx}")
         # print_diff(trt_key_cache[:, :, :end_idx, :], k_full, f"trt_key_cache[:, :, :end_idx, :] vs k_full for idx {start_idx}")
@@ -330,8 +330,8 @@ def main():
     )
     args = arg_parser.parse_args()
     with torch.inference_mode():
-        # test_static_cache_model(args)
-        # test_static_cache_lowering(args)
+        test_static_cache_model(args)
+        test_static_cache_lowering(args)
         test_static_cache_with_torch_tensorrt(args)
     
 
