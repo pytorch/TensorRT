@@ -62,25 +62,22 @@ def scaled_dot_product_attention(
 ) -> TRTTensor:
     # TODO: Handle attn_mask and is_causal arguments in the future
     query, key, value, attn_mask, dropout_p, is_causal = args
-    logger.info(
-        "Ignoring attn_mask and is_causal arguments provided by the original graph. "
-        "This converter expects is_causal to be an input to the graph. For prefill phase, is_causal=True "
-        "and for generate phase, is_causal=False since we pass only 1 input token at a time"
-    )
 
     # TODO: remove this once we have a better way to handle the causal mask
     scale = kwargs.get("scale", None)
     source_ir = SourceIR.ATEN
+
     # implementation as described here: https://pytorch.org/docs/stable/generated/torch.nn.functional.scaled_dot_product_attention.html
-    mm = impl.matmul.matrix_multiply(
-        ctx,
-        target,
-        source_ir,
-        name + "_mm",
-        query,
-        key,
-        other_matrix_op=trt.MatrixOperation.TRANSPOSE,
-    )
+    use_fp32_acc = kwargs.get("use_fp32_acc", False)
+    query_dtype = query.dtype
+    # if use_fp32_acc and query_dtype == trt.float16:
+    #     query = cast_trt_tensor(
+    #             ctx, query, trt.float32, name + "_query_cast_to_fp32", target, source_ir
+    #         )
+    #     key = cast_trt_tensor(
+    #             ctx, key, trt.float32, name + "_key_cast_to_fp32", target, source_ir
+            # )
+    
     if scale is None:
         scale = query.shape[-1]
         if scale < 0:
@@ -90,30 +87,45 @@ def scaled_dot_product_attention(
         else:
             # static shape
             sqrt_scaled = math.sqrt(scale)
-        scaled = impl.elementwise.div(
+        key = impl.elementwise.div(
             ctx,
             target,
             source_ir,
             name + "_scale",
-            mm,
+            key,
             sqrt_scaled,
         )
     else:
-        scaled = impl.elementwise.mul(
+        key = impl.elementwise.mul(
             ctx,
             target,
             source_ir,
             name + "_scale",
-            mm,
+            key,
             scale,
         )
+
+    mm = impl.matmul.matrix_multiply(
+        ctx,
+        target,
+        source_ir,
+        name + "_mm",
+        query,
+        key,
+        other_matrix_op=trt.MatrixOperation.TRANSPOSE,
+    )
+    
+    # if use_fp32_acc:
+    #     mm = cast_trt_tensor(
+    #             ctx, mm, query_dtype, name + "_mm_cast_to_fp16", target, source_ir
+    #         )
 
     # If is_causal is True, we need to generate a causal mask
     if is_causal:
         L, S = query.shape[-2], key.shape[-2]
         if L >= 0 and S >= 0:
             # static shape
-            attn_bias = np.zeros((L, S), dtype=dtype._from(query.dtype).to(np.dtype))
+            attn_bias = np.zeros((L, S), dtype=dtype._from(query_dtype).to(np.dtype))
             temp_mask = np.logical_not(np.tril(np.ones((L, S), dtype=np.bool_), k=0))
             attn_bias = np.ma.array(attn_bias, mask=temp_mask).filled(float("-inf"))
             attn_bias = get_trt_tensor(ctx, attn_bias, name + "_attn_bias")
@@ -133,7 +145,7 @@ def scaled_dot_product_attention(
                 ctx, target, source_ir, name + "_logical_not", tril_tensor
             )
             temp_mask_casted = cast_trt_tensor(
-                ctx, temp_mask, trt.float32, name + "_casted_bool", target, source_ir
+                ctx, temp_mask, query_dtype, name + "_casted_bool", target, source_ir
             )
             one_minus_temp_mask = impl.elementwise.sub(
                 ctx,
@@ -148,15 +160,15 @@ def scaled_dot_product_attention(
             )
 
         scaled_add_attn_bias = impl.elementwise.add(
-            ctx, target, source_ir, name + "_attn_bias_add", scaled, attn_bias
+            ctx, target, source_ir, name + "_attn_bias_add", mm, attn_bias
         )
     else:
-        scaled_add_attn_bias = scaled
-
+        scaled_add_attn_bias = mm
+    
     # Create a if condition to check if is_causal is True
     if isinstance(is_causal, TRTTensor):
         if_layer = ctx.net.add_if_conditional()
-        condition, true_branch, false_branch = is_causal, scaled_add_attn_bias, scaled
+        condition, true_branch, false_branch = is_causal, scaled_add_attn_bias, mm
         if_layer.set_condition(condition)
         output_layer = if_layer.add_output(true_branch, false_branch)
         scaled_add_attn_bias = output_layer.get_output(0)
@@ -164,6 +176,13 @@ def scaled_dot_product_attention(
     softmax = impl.normalization.softmax(
         ctx, target, source_ir, name + "_softmax", scaled_add_attn_bias, -1, False
     )
+    # if use_fp32_acc:
+    #     softmax = cast_trt_tensor(
+    #             ctx, softmax, trt.float32, name + "_softmax_cast_to_fp32", target, source_ir
+    #         )
+    #     value = cast_trt_tensor(
+    #             ctx, value, trt.float32, name + "_value_cast_to_fp32", target, source_ir
+    #         )
     out = impl.matmul.matrix_multiply(
         ctx,
         target,
@@ -172,5 +191,9 @@ def scaled_dot_product_attention(
         softmax,
         value,
     )
+    # if use_fp32_acc:
+    #     out = cast_trt_tensor(
+    #             ctx, out, query_dtype, name + "_out_cast_to_fp16", target, source_ir
+    #         )
 
     return out

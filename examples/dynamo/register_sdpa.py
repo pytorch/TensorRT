@@ -19,11 +19,13 @@ logger = logging.getLogger(__name__)
 
 # Remove decompositions for aten.scaled_dot_product_attention, aten._scaled_dot_product_efficient_attention, aten._scaled_dot_product_flash_attention
 # This is because we want to have SDPA as a standalone operator in the graph and invoke the custom converter for it.
-TORCH_TRT_DECOMPOSITIONS.pop(torch.ops.aten.scaled_dot_product_attention.default)
+TORCH_TRT_DECOMPOSITIONS.pop(torch.ops.aten.scaled_dot_product_attention.default, None)
 TORCH_TRT_DECOMPOSITIONS.pop(
-    torch.ops.aten._scaled_dot_product_efficient_attention.default
+    torch.ops.aten._scaled_dot_product_efficient_attention.default, None
 )
-TORCH_TRT_DECOMPOSITIONS.pop(torch.ops.aten._scaled_dot_product_flash_attention.default)
+TORCH_TRT_DECOMPOSITIONS.pop(
+    torch.ops.aten._scaled_dot_product_flash_attention.default, None
+)
 
 REPLACEABLE_ATEN_OPS = {
     torch.ops.aten._scaled_dot_product_efficient_attention.default,
@@ -71,6 +73,10 @@ def replace_variants_of_sdpa(
                     query, key, value, dropout_p, is_causal, return_debug_mask = (
                         node.args
                     )
+                if len(node.args) == 5:
+                    query, key, value, dropout_p, is_causal = (
+                        node.args
+                    )
                 elif len(node.args) == 3:
                     query, key, value = node.args
                     dropout_p = 0.0
@@ -85,14 +91,13 @@ def replace_variants_of_sdpa(
                 )
 
             modified_input_args = (query, key, value, None, dropout_p, is_causal)
-
             # Create a new node with torch.nn.functional.scaled_dot_product_attention
             # The input args is (query, key, value, is_causal). kwargs has scale
             with gm.graph.inserting_after(node):
                 new_node = gm.graph.call_function(
                     torch.nn.functional.scaled_dot_product_attention,
                     args=modified_input_args,
-                    kwargs={"scale": node.kwargs.get("scale", None)},
+                    kwargs={"scale": node.kwargs.get("scale", None), "use_fp32_acc": settings.use_fp32_acc},
                 )
 
                 # Deep copy encounters RuntimeError: Cannot access data pointer of Tensor (e.g. FakeTensor, FunctionalTensor). So we use copy instead.
@@ -113,7 +118,7 @@ def replace_variants_of_sdpa(
     # Clean up the graph
     clean_up_graph_after_modifications(gm)
 
-    logger.info(
+    logger.debug(
         "Replaced variants of scaled_dot_product_attention with torch.nn.functional.scaled_dot_product_attention"
     )
     return gm
