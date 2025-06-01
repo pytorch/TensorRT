@@ -75,7 +75,7 @@ Build Environment Setup
 
    .. code-block:: sh
       
-      apt-get install ninja-build gettext curl libopenblas-dev git
+      apt-get install ninja-build vim libopenblas-dev git
 
 2. **Install Python dependencies**:
 
@@ -99,16 +99,42 @@ Build Environment Setup
 Building the Wheel
 ==================
 
-.. code-block:: sh
+1. **Configure `MODULE.bazel` for JetPack 6.2**:
 
-   # Configure build environment
-   export BUILD_VERSION="2.8.0.dev20250511"
-   export CUDA_HOME=/usr/local/cuda-12.6
-   export TORCH_INSTALL_PATH=$(python -c "import torch, os; print(os.path.dirname(torch.__file__))")
-   cat toolchains/ci_workspaces/MODULE.bazel.tmpl | envsubst > MODULE.bazel
-   
-   # Execute build with JetPack support
-   python setup.py bdist_wheel --jetpack
+   Replace the `http_archive` dependency for libtorch with a `new_local_repository`.
+
+   Comment out:
+
+   .. code-block:: python
+
+      http_archive(
+         name = "libtorch",
+         build_file = "@//third_party/libtorch:BUILD",
+         strip_prefix = "libtorch",
+         urls = ["https://download.pytorch.org/libtorch/nightly/cu128/libtorch-cxx11-abi-shared-with-deps-latest.zip"],
+      )
+
+   Uncomment or add:
+
+   .. code-block:: python
+
+      new_local_repository(
+         name = "libtorch",
+         path = "/usr/local/lib/python3.10/dist-packages/torch",
+         build_file = "third_party/libtorch/BUILD"
+      )
+
+   Confirm the path using:
+
+   .. code-block:: sh
+
+      python -c "import torch, os; print(os.path.dirname(torch.__file__))"
+
+2. **Build the wheel**:
+
+   .. code-block:: sh
+
+      python setup.py bdist_wheel --jetpack
 
 Installation
 ============
