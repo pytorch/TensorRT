@@ -1,11 +1,23 @@
 import logging
+from dataclasses import dataclass
 from typing import Collection, Dict, List, Optional, Set, Tuple
 
 import torch
 import torch.fx.passes.operator_support as ops
 from torch._ops import OpOverload
+from torch.fx._compatibility import compatibility
 from torch.fx.node import Target, _get_qualified_name
-from torch.fx.passes.tools_common import CALLABLE_NODE_OPS, NodeList, NodeSet
+from torch.fx.passes.splitter_base import (
+    _SplitterBase,
+    _SplitterSettingBase,
+)
+from torch.fx.passes.tools_common import (
+    CALLABLE_NODE_OPS,
+    FxNetAccFusionsFinder,
+    NodeList,
+    NodeSet,
+    is_node_output_tensor,
+)
 from torch_tensorrt.dynamo._defaults import (
     DEBUG,
     MIN_BLOCK_SIZE,
@@ -15,15 +27,17 @@ from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
     DYNAMO_ATEN_CONVERTERS,
     ConverterRegistry,
 )
-from torch_tensorrt.dynamo.partitioning.splitter_base import (
-    FxNetAccFusionsFinder,
-    FxNetAccNodesFinder,
-    Subgraph,
-    _SplitterBase,
-    _SplitterSettingBase,
-)
 
 logger = logging.getLogger(__name__)
+
+
+@compatibility(is_backward_compatible=False)
+@dataclass
+class Subgraph:
+    is_acc: bool
+    backend: str
+    nodes: NodeList
+    device_ordinal: Optional[int] = None
 
 
 class BackendOpSupportTester(ops.OperatorSupportBase):  # type: ignore
@@ -100,8 +114,8 @@ class BackendOpSupportTester(ops.OperatorSupportBase):  # type: ignore
             logger.debug("\nAll Nodes Supported\n")
 
 
-class HierarchicalTRTPartitioner(_SplitterBase):
-    """Hierarchical partitioner to split an FX graph into subgraphs based on backend priority
+class HierarchicalAdjacencyPartitioner(_SplitterBase):  # type: ignore
+    """Hierarchical Adjacency Partitioner to split an FX graph into subgraphs based on backend priority
 
     This partitioner extends the TRTPartitioner of adjacency_partitioner with backend priority awareness,
     allowing different parts of the model to be executed on different backends based on
@@ -370,12 +384,133 @@ class HierarchicalTRTPartitioner(_SplitterBase):
 
         return subgraphs
 
+    def tag(self, subgraphs: list[Subgraph]):
+        self.tags = []
+        for subgraph in subgraphs:
+            tag = (
+                f"_run_on_acc_{subgraph.backend}_{len(self.tags)}"
+                if subgraph.is_acc
+                else f"{self.non_acc_submodule_name}{len(self.tags)}"
+            )
+            self.tags.append(tag)
+            for node in subgraph.nodes:
+                if hasattr(node, "tag"):
+                    raise FxNetSplitterInternalError(f"Node {node} was already tagged")
 
+                node.tag = tag  # type: ignore[attr-defined]
+                self._node_submodule_map[node.name] = tag
+
+
+@compatibility(is_backward_compatible=False)
+class FxNetAccNodesFinder:
+    """
+    Finds a set of nodes that can be supported on ACC, excluding nodes that have non-tensor
+    input/output to cpu nodes to prevent non-tensor data flow between backends and cpu.
+
+    I.e. if we have a chain:
+
+    ACC_NODE_1 -> ACC_NODE_2 -> ACC_NODE_3 -> CPU_NODE_1
+
+    where every ACC node produces non-tensor output, then they all should be treated as CPU nodes.
+
+    This behavior can be turned off by passing allow_non_tensor=True.
+    """
+
+    def __init__(
+        self,
+        module: torch.fx.GraphModule,
+        operator_support: ops.OperatorSupportBase,
+        allow_non_tensor: bool,
+    ):
+        self.module = module
+        self.operator_support = operator_support
+        self.allow_non_tensor = allow_non_tensor
+        self.acc_nodes: NodeSet = set()
+
+    def reduce_acc_nodes_non_tensor_input_helper(self, cpu_worklist: NodeList):
+        """
+        Transitively excludes nodes from ACC supported set.
+        For every node in the worklist:
+        - removes its downstream ACC nodes from ACC supported set,
+        - if any downstream ACC node produces non-tensor output,
+          then it gets added into the worklist.
+        """
+        while cpu_worklist:
+            node = cpu_worklist.pop(0)
+
+            for user in node.users:
+                if user in self.acc_nodes:
+                    self.acc_nodes.remove(user)
+                    if not is_node_output_tensor(user):
+                        cpu_worklist.append(user)
+
+    def reduce_acc_nodes_non_tensor_input(self):
+        """
+        Excludes nodes from ACC supported set that have direct
+        upstream CPU nodes that produce non-tensor outputs.
+        """
+        non_tensor_cpu_nodes: NodeList = []
+
+        for node in self.module.graph.nodes:
+            if node.op not in CALLABLE_NODE_OPS:
+                continue
+            if node in self.acc_nodes:
+                continue
+            if is_node_output_tensor(node):
+                continue
+            non_tensor_cpu_nodes.append(node)
+
+        self.reduce_acc_nodes_non_tensor_input_helper(non_tensor_cpu_nodes)
+
+    def reduce_acc_nodes_non_tensor_output(self):
+        """
+        Excludes nodes from ACC supported set that produce non-tensor
+        outputs and have downstream CPU nodes.
+        """
+        while True:
+            new_cpu_nodes: NodeList = []
+
+            for acc_node in self.acc_nodes:
+                if is_node_output_tensor(acc_node):
+                    continue
+                for user in acc_node.users:
+                    if user not in self.acc_nodes:
+                        new_cpu_nodes.append(acc_node)
+                        break
+
+            if not new_cpu_nodes:
+                break
+
+            for new_cpu_node in new_cpu_nodes:
+                self.acc_nodes.remove(new_cpu_node)
+
+            self.reduce_acc_nodes_non_tensor_input_helper(new_cpu_nodes)
+
+    def __call__(self) -> NodeSet:
+        submodules = dict(self.module.named_modules())
+        for n in self.module.graph.nodes:
+            n.backend = "None"
+            if n.op in CALLABLE_NODE_OPS:
+                is_supported, backend = self.operator_support.is_node_supported(
+                    submodules, n
+                )
+                if is_supported:
+                    n.backend = backend
+                    self.acc_nodes.add(n)
+
+        if not self.allow_non_tensor:
+            self.reduce_acc_nodes_non_tensor_input()
+            self.reduce_acc_nodes_non_tensor_output()
+
+        return self.acc_nodes
+
+
+@compatibility(is_backward_compatible=False)
 class FxNetSplitterInternalError(Exception):
     pass
 
 
-def hierarchical_partition(
+def hierarchical_adjacency_partition(
     gm: torch.fx.GraphModule,
     verbose: bool = DEBUG,
     min_block_size: int = MIN_BLOCK_SIZE,
@@ -421,7 +556,7 @@ def hierarchical_partition(
         backend_priority=backend_priority,
         torch_executed_ops=torch_executed_ops,
     )
-    partitioner = HierarchicalTRTPartitioner(
+    partitioner = HierarchicalAdjacencyPartitioner(
         gm,
         supported_ops,
         backend_support_map=backend_support_map,
