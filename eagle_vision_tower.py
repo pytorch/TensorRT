@@ -8,24 +8,49 @@ from transformers.models.siglip import modeling_siglip as ms
 
 
 def patched_attention_forward(self, hidden_states, attention_mask=None, output_attentions=False):
+    """Scaled-dot-product attention (export-friendly).
+
+    • Matches the computation path of `flash_attention_forward` but avoids any custom
+      CUDA kernels so that torch.export can symbolically trace the graph.
+    • Softmax is executed in fp32 for numerical stability, then cast back to the
+      original dtype – identical to HuggingFaceʼs implementation.
+    """
+
     B, S, _ = hidden_states.shape
-    q = self.q_proj(hidden_states).view(B, S, self.num_heads, self.head_dim).transpose(1, 2)
-    k = self.k_proj(hidden_states).view(B, S, self.num_heads, self.head_dim).transpose(1, 2)
-    v = self.v_proj(hidden_states).view(B, S, self.num_heads, self.head_dim).transpose(1, 2)
 
-    attn_weights = torch.matmul(q, k.transpose(-1, -2)) * self.scale
+    # 1. Linear projections
+    q = self.q_proj(hidden_states)
+    k = self.k_proj(hidden_states)
+    v = self.v_proj(hidden_states)
+
+    # 2. Shape to (B, nH, S, dH)
+    q = q.view(B, S, self.num_heads, self.head_dim).transpose(1, 2)
+    k = k.view(B, S, self.num_heads, self.head_dim).transpose(1, 2)
+    v = v.view(B, S, self.num_heads, self.head_dim).transpose(1, 2)
+
+    # 3. Scaled dot-product attention
+    attn_scores = torch.matmul(q, k.transpose(-2, -1)) * self.scale  # (B, nH, S, S)
     if attention_mask is not None:
-        attn_weights = attn_weights + attention_mask
-    attn_weights = torch.softmax(attn_weights, dim=-1, dtype=torch.float32).to(q.dtype)
-    attn_weights = torch.dropout(attn_weights,
-                                 p=0.0 if not self.training else self.dropout,
-                                 train=self.training)
+        attn_scores = attn_scores + attention_mask  # additive mask
 
-    attn_output = torch.matmul(attn_weights, v).transpose(1, 2).contiguous()
-    attn_output = attn_output.reshape(B, S, self.embed_dim)
-    attn_output = self.out_proj(attn_output)
+    # 4. Softmax in fp32 then cast back
+    attn_probs = torch.softmax(attn_scores, dim=-1, dtype=torch.float32).to(q.dtype)
 
-    return (attn_output, attn_weights) if output_attentions else (attn_output, None)
+    # 5. Dropout (train-time only, mirrors HF behaviour)
+    if self.training and self.dropout > 0:
+        attn_probs = torch.nn.functional.dropout(attn_probs, p=self.dropout, training=True)
+
+    # 6. Weighted sum over values
+    context = torch.matmul(attn_probs, v)  # (B, nH, S, dH)
+
+    # 7. Restore original shape and project out
+    context = context.transpose(1, 2).contiguous().view(B, S, self.embed_dim)
+    context = self.out_proj(context)
+
+    if not output_attentions:
+        attn_probs = None
+
+    return context, attn_probs
 
 # 원래 forward 교체
 ms.SiglipAttention.forward = patched_attention_forward
@@ -63,30 +88,17 @@ dummy_pixel_values = torch.randn(
     device=DEVICE
 )
 
-# # Vision Tower 래퍼 클래스 생성
-# class VisionModelWrapper(torch.nn.Module):
+# # 모델 래핑
+# class VisionTowerWrapper(torch.nn.Module):
 #     def __init__(self, vision_model):
 #         super().__init__()
-#         self.vision_model = vision_model
-        
+#         self.vision_model = vision_model            # SiglipVisionModel
+
+#     @torch.no_grad()
 #     def forward(self, pixel_values):
-#         return self.vision_model(
-#             pixel_values=pixel_values,
-#             output_hidden_states=False,
-#             return_dict=True
-#         )
+#         return self.vision_model(pixel_values).last_hidden_state   # <-- Tensor 1개만 반환
 
-# 모델 래핑
-class VisionTowerWrapper(torch.nn.Module):
-    def __init__(self, vision_model):
-        super().__init__()
-        self.vision_model = vision_model            # SiglipVisionModel
-
-    @torch.no_grad()
-    def forward(self, pixel_values):
-        return self.vision_model(pixel_values).last_hidden_state   # <-- Tensor 1개만 반환
-
-vision_wrapper = VisionTowerWrapper(vision_tower)  # (수정)
+vision_wrapper = vision_tower  #VisionTowerWrapper(vision_tower)  # (수정) wrapper 없이 적용
 
 # torch.export.Dim을 이용해 pixel_values의 차원을 동적으로 정의
 BATCH = torch.export.Dim("batch_dim", min=1, max=8)
@@ -216,31 +228,3 @@ def compute_cosine_similarity(tensor1, tensor2):
 
 cosine_sim = compute_cosine_similarity(baseline_hidden.float(), trt_hidden.float())
 print(f"[Vision Tower] cosine similarity: {cosine_sim:.6f}")
-
-# ############################################################
-# # 6) 추가 테스트: 다른 배치 크기로 검증
-# ############################################################
-# # 다른 배치 크기로 테스트
-# test_batch_size = 2
-# test_pixel_values = torch.randn(
-#     test_batch_size,
-#     channels,
-#     height,
-#     width,
-#     dtype=torch.float16,
-#     device=DEVICE
-# )
-
-# with torch.inference_mode():
-#     baseline_test = vision_wrapper(test_pixel_values)
-#     trt_test = trt_vision_tower(test_pixel_values)
-
-# if hasattr(baseline_test, 'last_hidden_state'):
-#     baseline_test_hidden = baseline_test.last_hidden_state
-#     trt_test_hidden = trt_test.last_hidden_state
-# else:
-#     baseline_test_hidden = baseline_test
-#     trt_test_hidden = trt_test
-
-# test_max_diff = (baseline_test_hidden - trt_test_hidden).abs().max().item()
-# print(f"[Test with batch size {test_batch_size}] max difference: {test_max_diff:.6f}")
