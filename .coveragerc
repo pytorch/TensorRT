@@ -1,0 +1,27 @@
+[run]
+source =
+    py/torch_tensorrt/
+    .
+omit =
+    tests/*
+relative_files = true
+branch = true
+
+[paths]
+source =
+    py/torch_tensorrt/
+    */site-packages/torch_tensorrt/
+
+[report]
+# Configure minimum coverage threshold
+fail_under = 20
+exclude_lines =
+    # Don't count debug-only code
+    pragma: no cover
+    # Don't count empty functions
+    def __repr__
+    # Don't count error handling
+    raise NotImplementedError
+
+[html]
+directory = coverage_html
