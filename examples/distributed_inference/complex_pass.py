@@ -24,7 +24,8 @@ class ComplexSubGraphInfo:
 
 
 class ComplexOpDetector:
-    def __init__(self):
+    def __init__(self, logger):
+        self.logger = logger
         pass
 
     def is_complex_dtype(self, node: Node) -> bool:
@@ -42,6 +43,10 @@ class ComplexOpDetector:
         # Include only call_function ops on complex tensors
         print("node.op:", node.op, "node name:", node.name)
         print("is_complex_dtype:", self.is_complex_dtype(node))
+        self.logger.info(f"node.op: {node.op}, node name: {node.name}")
+        self.logger.info(f"is_complex_dtype: {self.is_complex_dtype(node)}")
+        if node.op == "call_function" and self.is_complex_dtype(node):
+            self.logger.info(f"node.op is added to subgraph: {node.op}, node name: {node.name} is complex")
         return node.op == "call_function" and self.is_complex_dtype(node)
 
     def subgraph_from_anchor(self, anchor_node: Node) -> ComplexSubGraphInfo:
@@ -53,6 +58,7 @@ class ComplexOpDetector:
             if n in subgraph_nodes:
                 continue
             subgraph_nodes.add(n)
+            self.logger.info(f"node {n.name} is added to subgraph")
             for inp in n.all_input_nodes:
                 if self.node_include_in_subgraph(inp):
                     print("node inp is added to stack:", inp.name)
