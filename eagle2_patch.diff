@@ -1,0 +1,91 @@
+--- /root/.cache/huggingface/modules/transformers_modules/nvidia/Eagle2-2B/3ab0a536b1778c885624ae920cd73d06228ae441/modeling_eagle2_5_vl.py	2025-05-02 15:31:15.236750391 +0000
++++ /develop/TensorRT/patches/eagle2/modeling_eagle2_5_vl.py	2025-05-02 15:24:39.865264423 +0000
+@@ -288,48 +288,47 @@
+ 
+         return vit_embeds
+ 
+-    @torch.no_grad()
+-    def generate(
+-            self,
+-            pixel_values: Optional[torch.FloatTensor] = None,
+-            input_ids: Optional[torch.FloatTensor] = None,
+-            attention_mask: Optional[torch.LongTensor] = None,
+-            visual_features: Optional[torch.FloatTensor] = None,
+-            generation_config: Optional[GenerationConfig] = None,
+-            output_hidden_states: Optional[bool] = None,
+-            image_sizes: Optional[List[Tuple[int, int]]] = None,
+-            **generate_kwargs,
+-    ) -> torch.LongTensor:
+-
+-        if pixel_values is not None:
+-            if visual_features is not None:
+-                vit_embeds = visual_features
+-            else:
+-                vit_embeds = self.extract_feature(pixel_values)
+-
+-            input_embeds = self.language_model.get_input_embeddings()(input_ids)
+-            B, N, C = input_embeds.shape
+-            input_embeds = input_embeds.reshape(B * N, C)
+-
+-            input_ids = input_ids.reshape(B * N)
+-            selected = (input_ids == self.config.image_token_index)
+-            assert selected.sum() != 0
+-            input_embeds[selected] = vit_embeds.reshape(-1, C).to(input_embeds.device)
+-
+-            input_embeds = input_embeds.reshape(B, N, C)
+-        else:
+-            input_embeds = self.language_model.get_input_embeddings()(input_ids)
+-
+-        outputs = self.language_model.generate(
+-            inputs_embeds=input_embeds,
+-            attention_mask=attention_mask,
+-            generation_config=generation_config,
+-            output_hidden_states=output_hidden_states,
+-            use_cache=True,
+-            **generate_kwargs,
+-        )
++    # @torch.no_grad()
++    # def generate(
++    #         self,
++    #         pixel_values: Optional[torch.FloatTensor] = None,
++    #         input_ids: Optional[torch.FloatTensor] = None,
++    #         attention_mask: Optional[torch.LongTensor] = None,
++    #         visual_features: Optional[torch.FloatTensor] = None,
++    #         generation_config: Optional[GenerationConfig] = None,
++    #         output_hidden_states: Optional[bool] = None,
++    #         image_sizes: Optional[List[Tuple[int, int]]] = None,
++    #         **generate_kwargs,
++    # ) -> torch.LongTensor:
++
++    #     if pixel_values is not None:
++    #         if visual_features is not None:
++    #             vit_embeds = visual_features
++    #         else:
++    #             vit_embeds = self.extract_feature(pixel_values)
++
++    #         input_embeds = self.language_model.get_input_embeddings()(input_ids)
++    #         B, N, C = input_embeds.shape
++    #         input_embeds = input_embeds.reshape(B * N, C)
++
++    #         input_ids = input_ids.reshape(B * N)
++    #         selected = (input_ids == self.config.image_token_index)
++    #         assert selected.sum() != 0
++    #         input_embeds[selected] = vit_embeds.reshape(-1, C).to(input_embeds.device)
++
++    #         input_embeds = input_embeds.reshape(B, N, C)
++    #     else:
++    #         input_embeds = self.language_model.get_input_embeddings()(input_ids)
++
++    #     outputs = self.language_model.generate(
++    #         inputs_embeds=input_embeds,
++    #         attention_mask=attention_mask,
++    #         generation_config=generation_config,
++    #         output_hidden_states=output_hidden_states,
++    #         **generate_kwargs,
++    #     )
+ 
+-        return outputs
++    #     return outputs
+ 
+     # Copied from transformers.models.llava_next.modeling_llava_next.LlavaNextForConditionalGeneration.get_input_embeddings
+     def get_input_embeddings(self):
