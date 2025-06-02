@@ -94,12 +94,12 @@ def compile_submodules(base_model, device="cuda:1"):
     trt_vis = torch_tensorrt.dynamo.compile(
         exported_vis,
         inputs=[dummy_pixels],
-        enabled_precisions={torch.float16},
+        enabled_precisions={torch.float32},
         device=device,
-        # truncate_double=True,
-        # disable_tf32=True,
-        # use_explicit_typing=True,
-        # use_fp32_acc=True,
+        truncate_double=True,
+        disable_tf32=True,
+        use_explicit_typing=True,
+        use_fp32_acc=True,
     )
 
     with torch.inference_mode():
@@ -124,12 +124,12 @@ def compile_submodules(base_model, device="cuda:1"):
     trt_mlp1 = torch_tensorrt.dynamo.compile(
         exported_mlp,
         inputs=[embeds],
-        enabled_precisions={torch.float16},
+        enabled_precisions={torch.float32},
         device=device,
-        # truncate_double=True,
-        # disable_tf32=True,
-        # use_explicit_typing=True,
-        # use_fp32_acc=True,
+        truncate_double=True,
+        disable_tf32=True,
+        use_explicit_typing=True,
+        use_fp32_acc=True,
     )
 
     hidden_size = language_model.config.hidden_size
@@ -158,12 +158,12 @@ def compile_submodules(base_model, device="cuda:1"):
     trt_lm = torch_tensorrt.dynamo.compile(
         exported_lm,
         inputs=[dummy_embeds, dummy_position_ids, dummy_cache_position],
-        enabled_precisions={torch.float16},
+        enabled_precisions={torch.float32},
         device=device,
-        # truncate_double=True,
-        # disable_tf32=True,
-        # use_explicit_typing=True,
-        # use_fp32_acc=True,
+        truncate_double=True,
+        disable_tf32=True,
+        use_explicit_typing=True,
+        use_fp32_acc=True,
     )
     return trt_vis, trt_mlp1, trt_lm
 
@@ -257,6 +257,7 @@ class TRTLanguageWrapper(nn.Module, GenerationMixin):
 
 def build_trt_model(device="cuda:1"):
     base_model, processor = load_base(device)
+    base_model = base_model.half()
     
     trt_vis, trt_mlp1, trt_lm = compile_submodules(base_model, device)
     # trt_vis, trt_mlp1, trt_lm = None, None, None
@@ -287,7 +288,9 @@ def build_trt_model(device="cuda:1"):
 
         # 1) Visual features (ViT) – run once then cache
         vit_embeds = None
+        
         if pixel_values is not None:
+            print(f"Pixel values shape: {pixel_values.shape}, dtype: {pixel_values.dtype}")
             # --- Vision encoder timing ---
             vis_s = torch.cuda.Event(enable_timing=True); vis_e = torch.cuda.Event(enable_timing=True)
             vis_s.record()
@@ -316,11 +319,15 @@ def build_trt_model(device="cuda:1"):
 
         # 2) Text token embeddings
         input_embeds = self.language_model.get_input_embeddings()(input_ids)
-
+        print(f"Input ids shape: {input_ids.shape}, values: {input_ids}, dtype: {input_ids.dtype}")
+        print(f"Input embeds shape: {input_embeds.shape}, dtype: {input_embeds.dtype}")
         # 3) Replace [IMG] token positions with image embeddings (if any)
+        print(f"Before insertion: input_embeds min={input_embeds.min()}, max={input_embeds.max()}")
+
         if vit_embeds is not None:
             B, N, C = input_embeds.shape
             flat_emb = input_embeds.view(B * N, C)
+            
             mask = (input_ids.view(B * N) == self.image_token_index)
             try:
                 flat_emb[mask] = vit_embeds.reshape(-1, C).to(flat_emb.dtype)[: mask.sum()]
@@ -328,8 +335,13 @@ def build_trt_model(device="cuda:1"):
                 # Fallback in unlikely size-mismatch cases
                 flat_emb[mask] = vit_embeds.reshape(-1, C)[: mask.sum()].to(flat_emb.dtype)
             input_embeds = flat_emb.view(B, N, C)
-
+            print(f"After insertion: input_embeds min={input_embeds.min()}, max={input_embeds.max()}")
+            
         # 4) Delegate to language model (time this call separately)
+        if position_ids is None:
+            position_ids = torch.arange(input_ids.shape[1], device=input_ids.device).unsqueeze(0).expand(B, -1)
+        # lm_out = self.language_model(inputs_embeds=input_embeds, position_ids=position_ids, **lm_kwargs)
+
         lm_kwargs = {
             "attention_mask": attention_mask,
             "position_ids": position_ids,
@@ -339,7 +351,11 @@ def build_trt_model(device="cuda:1"):
             "output_hidden_states": output_hidden_states,
             "return_dict": return_dict,
         }
+
+        
         lm_kwargs.update({k: v for k, v in kwargs.items() if k != "inputs_embeds"})
+
+        # print(f"Attention mask shape: {attention_mask.shape}, values: {attention_mask}")
 
         # --- Language model timing ---
         start_lm = torch.cuda.Event(enable_timing=True); end_lm = torch.cuda.Event(enable_timing=True)
@@ -351,6 +367,19 @@ def build_trt_model(device="cuda:1"):
         STEP_TIMINGS["lm"].append(step_s)
 
         return lm_out
+
+    def prepare_inputs_for_generation(self, input_ids, attention_mask=None, **model_kwargs):
+        model_inputs = {
+            "input_ids": input_ids,
+            # "attention_mask": attention_mask,
+        }
+        if "pixel_values" in model_kwargs and "pixel_values" not in model_inputs:
+            model_inputs["pixel_values"] = model_kwargs["pixel_values"]
+        # print("Inputs prepared:", {k: v.shape for k, v in model_inputs.items()})
+        return model_inputs
+    
+    import types
+    base_model.prepare_inputs_for_generation = types.MethodType(prepare_inputs_for_generation, base_model)
 
     import types
     trt_model.forward = types.MethodType(paligemma_style_forward, trt_model)
@@ -400,6 +429,7 @@ if __name__ == "__main__":
     # Build a 230-word placeholder prompt ("token token …") so that ISL totals 256 tokens after template overhead.
     prompt_tokens = ["token"] * 230
     prompt_text = " ".join(prompt_tokens)
+    # prompt_text = "Describe the image."
 
     messages = [{
         "role": "user",
@@ -433,6 +463,7 @@ if __name__ == "__main__":
     # Ensure dtypes are what PyTorch-SDPA expects
     if "attention_mask" in model_inputs and model_inputs["attention_mask"].dtype != torch.bool:
         model_inputs["attention_mask"] = model_inputs["attention_mask"].bool()
+    model_inputs["attention_mask"] = None
 
     # Ensure pixel_values are fp16 and drop unused keys
     if "pixel_values" in model_inputs and model_inputs["pixel_values"].dtype != torch.float16:
@@ -441,7 +472,8 @@ if __name__ == "__main__":
         model_inputs.pop(_drop_key, None)
 
     # Shared generation kwargs (KV-cache disabled)
-    gen_kwargs = dict(max_new_tokens=64, do_sample=False, use_cache=False, eos_token_id=None, early_stopping=False )
+    gen_kwargs = dict(max_new_tokens=64, do_sample=False, use_cache=False, eos_token_id=processor.tokenizer.eos_token_id, early_stopping=True )
+    # gen_kwargs = dict(max_new_tokens=64, do_sample=False, use_cache=False, eos_token_id=None, early_stopping=False )
 
     def _benchmark(model, label):
         global PROF_TIMINGS, STEP_TIMINGS
