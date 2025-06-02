@@ -1,6 +1,5 @@
-from typing import Optional, Union
+from typing import Optional
 
-import numpy as np
 import tensorrt as trt
 import torch
 import torch_tensorrt.dynamo.conversion.impl as impl
@@ -19,7 +18,7 @@ def quantize(
     source_ir: Optional[SourceIR],
     name: str,
     input_tensor: TRTTensor,
-    amax: Union[np.ndarray, torch.Tensor],
+    amax: torch.Tensor,
     num_bits: int,
     exponent_bits: int,
 ) -> TRTTensor:
