@@ -1,4 +1,3 @@
-# from torch_tensorrt.dynamo.partitioning._global_partitioner import partition
 import torch
 import torch.nn as nn
 import torch_tensorrt
@@ -10,12 +9,11 @@ from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
 )
 from torch_tensorrt.dynamo.lowering import (
     get_decompositions,
-    post_lowering,
     pre_export_lowering,
 )
 from torch_tensorrt.dynamo.partitioning._adjacency_partitioner import partition
 from torch_tensorrt.dynamo.partitioning._hierarchical_partitioner import (
-    hierarchical_partition,
+    hierarchical_adjacency_partition,
 )
 
 
@@ -54,6 +52,8 @@ def main():
 
     print(gm.graph)
 
+    original_output = model(example_input)
+
     # Partition the model using the adjacency partitioner
     # partitioned_model, op_support = partition(
     #     gm,
@@ -64,21 +64,18 @@ def main():
     #     ],
     # )
 
-    partitioned_model, op_support = hierarchical_partition(
+    partitioned_model, op_support = hierarchical_adjacency_partition(
         gm,
         verbose=True,
         min_block_size=1,
-        backend_priority=["mlir", "tensorrt"],  # , "inductor"],
+        backend_priority=["inductor", "tensorrt"],
         backend_support_map={
-            "mlir": {
+            "inductor": {
                 # operator.getitem,
                 torch.ops.aten.conv2d.default,
                 torch.ops.aten.convolution.default,
             },
             "tensorrt": set(DYNAMO_ATEN_CONVERTERS.keys()),
-            # "inductor": {
-            #     torch.ops.aten.relu.default,
-            # },
         },
         torch_executed_ops=[
             torch.ops.aten._native_batch_norm_legit_no_training.default
@@ -90,12 +87,26 @@ def main():
     print("\nPartitioned Model Structure:")
     print(partitioned_model)
 
+    print("0. Original_output:", original_output)
+
     with torch.no_grad():
-        output = partitioned_model(example_input)
-        print("Partitioned output:", output)
+        partitioned_output = partitioned_model(example_input)
+        print("1. Partitioned output:", partitioned_output)
         print(
-            "Partitioned output == original output:",
-            torch.allclose(model(example_input), output, 1e-2, 1e-2),
+            "Partitioned output == Original output:",
+            torch.allclose(original_output, partitioned_output, 1e-2, 1e-2),
+        )
+
+    compiled_model = torch_tensorrt.compile(
+        model, inputs=[example_input], min_block_size=1
+    )
+    with torch.no_grad():
+        compiled_output = compiled_model(example_input)
+        print("2. Compiled_output:", compiled_output)
+
+        print(
+            "Compiled output == Original output:",
+            torch.allclose(original_output, compiled_output, 1e-2, 1e-2),
         )
 
 

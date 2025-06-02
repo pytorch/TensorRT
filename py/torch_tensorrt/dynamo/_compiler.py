@@ -31,6 +31,9 @@ from torch_tensorrt.dynamo.conversion import (
     repair_double_inputs,
 )
 from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
+    DYNAMO_ATEN_CONVERTERS,
+)
+from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
     DYNAMO_CONVERTERS as CONVERTERS,
 )
 from torch_tensorrt.dynamo.debug._DebuggerConfig import DebuggerConfig
@@ -799,6 +802,18 @@ def compile_module(
             "Some nodes do not have metadata (shape and dtype information). This could lead to problems sometimes if the graph has PyTorch and TensorRT segments."
         )
 
+    ############ TODO: testing only ############
+    use_hierarchical_partitioner = False
+    backend_priority = ["inductor", "tensorrt"]
+    backend_support_map = {
+        "inductor": {
+            # operator.getitem,
+            torch.ops.aten.conv2d.default,
+            torch.ops.aten.convolution.default,
+        },
+        "tensorrt": set(DYNAMO_ATEN_CONVERTERS.keys()),
+    }
+    #############################################
     # Partition module into components that can be TRT-accelerated
     fast_partitioner_failed = False
     # If specified, try using the fast partitioner and fall back to the global one on failure
@@ -845,7 +860,7 @@ def compile_module(
         submodule_node_dict[node.name] = node
 
     # Store TRT replicas of Torch subgraphs
-    trt_modules = {}
+    compiled_modules = {}
     # Iterate over all components that can be accelerated
     # Generate the corresponding TRT Module for those
 
@@ -924,15 +939,45 @@ def compile_module(
         torch.cuda.empty_cache()
         # Create TRT engines from submodule
         if not settings.dryrun:
-            trt_module = convert_module(
-                submodule,
-                submodule_inputs,
-                settings=settings,
-                name=name,
-                engine_cache=engine_cache,
-            )
+            if use_hierarchical_partitioner:
+                # compile submodule with pytorch inductor
+                if "_run_on_acc_inductor" in name:
+                    sub_inputs = []
+                    for input in submodule_inputs:
+                        sub_input = (
+                            torch.randn(input.shape)
+                            .to(dtype.to(input.dtype, t=torch.dtype))
+                            .cuda()
+                        )
+                        sub_inputs.append(sub_input)
 
-            trt_modules[name] = trt_module
+                    compiled_func = torch._inductor.compile(
+                        submodule,
+                        sub_inputs,
+                    )
+                    # Wrap the compiled function to be a torch.nn.Module
+                    compiled_submodule = FunctionWrapper(compiled_func)
+
+                elif "_run_on_acc_tensorrt" in name:
+                    compiled_submodule = convert_module(
+                        submodule,
+                        submodule_inputs,
+                        settings=settings,
+                        name=name,
+                        engine_cache=engine_cache,
+                    )
+                else:
+                    raise ValueError(f"Unknown backend for submodule: {name}")
+            else:
+                compiled_submodule = convert_module(
+                    submodule,
+                    submodule_inputs,
+                    settings=settings,
+                    name=name,
+                    engine_cache=engine_cache,
+                )
+
+            compiled_modules[name] = compiled_submodule
 
             if _debugger_config:
 
@@ -973,10 +1018,14 @@ def compile_module(
     parse_graph_io(gm, dryrun_tracker)
 
     # Replace all FX Modules with TRT Modules
-    for name, trt_module in trt_modules.items():
-        setattr(partitioned_module, name, trt_module)
+    for name, compiled_module in compiled_modules.items():
+        setattr(partitioned_module, name, compiled_module)
         if settings.lazy_engine_init and not settings.enable_cross_compile_for_windows:
-            getattr(partitioned_module, name).setup_engine()
+            if use_hierarchical_partitioner:
+                if "_run_on_acc_tensorrt" in name:
+                    getattr(partitioned_module, name).setup_engine()
+            else:
+                getattr(partitioned_module, name).setup_engine()
 
     # Reset settings object to user specification after fallback to global partitioning mode
     if fast_partitioner_failed:
@@ -1322,3 +1371,12 @@ def load_cross_compiled_exported_program(file_path: str = "") -> Any:
         )
 
     return replace_execute_engine_no_op_node(exp_program)
+
+
+class FunctionWrapper(torch.nn.Module):
+    def __init__(self, func):
+        super().__init__()
+        self.func = func
+
+    def forward(self, *args, **kwargs):
+        return self.func(*args, **kwargs)
