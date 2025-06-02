@@ -263,7 +263,7 @@ jobs:
             # BUILD_VERSION example: '2.8.0.dev20250530'
             BUILD_VERSION=${BUILD_VERSION}+jp62
             echo "BUILD_VERSION: $BUILD_VERSION"
-            ${CONDA_RUN} python setup.py bdist_wheel --jetpack
+            ${CONDA_RUN} python setup.py bdist_wheel --jetpack --plat-name=linux_tegra_aarch64
           fi
       - name: Repair Manylinux_2_28 Wheel
         shell: bash -l {0}
@@ -334,7 +334,8 @@ jobs:
 
   upload:
     needs: build
-    uses: pytorch/test-infra/.github/workflows/_binary_upload.yml@main
+    uses: ./.github/workflows/_binary_upload.yml
+    #uses: pytorch/test-infra/.github/workflows/_binary_upload.yml@main
     # only upload to pytorch nightly index for jetpack builds
     # if: ${{ inputs.is-jetpack == false || (inputs.trigger-event == 'push' && startsWith(github.event.ref, 'refs/heads/nightly')) }}
     with:
@@ -346,6 +347,7 @@ jobs:
       architecture: ${{ inputs.architecture }}
       trigger-event: ${{ inputs.trigger-event }}
       upload-to-pypi: ${{ inputs.upload-to-pypi }}
+      is-jetpack: ${{ inputs.is-jetpack }}
     secrets:
       PYPI_API_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
 

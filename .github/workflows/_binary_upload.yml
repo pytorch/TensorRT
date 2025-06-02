@@ -1,0 +1,128 @@
+name: upload
+
+on:
+  workflow_call:
+    inputs:
+      repository:
+        description: 'Repository to checkout, defaults to ""'
+        default: ''
+        type: string
+      ref:
+        description: 'Reference to checkout, defaults to "nightly"'
+        default: 'nightly'
+        type: string
+      test-infra-repository:
+        description: "Test infra repository to use"
+        default: "pytorch/test-infra"
+        type: string
+      test-infra-ref:
+        description: "Test infra reference to use"
+        default: ""
+        type: string
+      build-matrix:
+        description: "Build matrix to utilize"
+        default: ''
+        type: string
+      architecture:
+        description: Architecture to build for x86_64 for default Linux, or aarch64 for Linux aarch64 builds
+        required: false
+        type: string
+        default: ''
+      trigger-event:
+        description: "Trigger Event in caller that determines whether or not to upload"
+        type: string
+        default: ''
+      upload-to-pypi:
+        description: The comma-separated list of CUDA arch to be uploaded to pypi
+        default: ''
+        type: string
+      is-jetpack:
+        description: Set to true if the build is for jetpack
+        required: false
+        default: false
+        type: boolean
+    secrets:
+      PYPI_API_TOKEN:
+        description: An optional token to upload to pypi
+        required: false
+
+jobs:
+  upload:
+    runs-on: ubuntu-22.04
+    environment: ${{(inputs.trigger-event == 'schedule' || (inputs.trigger-event == 'push' && (startsWith(github.event.ref, 'refs/heads/nightly') || startsWith(github.event.ref, 'refs/tags/v')))) && 'pytorchbot-env' || ''}}
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(inputs.build-matrix) }}
+    timeout-minutes: 30
+    name: upload-${{ matrix.build_name }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.test-infra-repository }}
+          ref: ${{ inputs.test-infra-ref }}
+          path: test-infra
+
+      - uses: ./test-infra/.github/actions/set-channel
+
+      # For pytorch_pkg_helpers which we need to run to generate the artifact name and target S3 buckets
+      - uses: ./test-infra/.github/actions/setup-binary-upload
+        with:
+          repository: ${{ inputs.repository }}
+          ref: ${{ inputs.ref }}
+          python-version: ${{ matrix.python_version }}
+          cuda-version: ${{ matrix.desired_cuda }}
+          arch: ${{ inputs.architecture }}
+          upload-to-base-bucket: ${{ matrix.upload_to_base_bucket }}
+
+      - name: Download the artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ env.ARTIFACT_NAME }}
+          path: ${{ inputs.repository }}/dist/
+
+      - name: Configure aws credentials (pytorch account)
+        if: ${{ inputs.trigger-event == 'schedule' || (inputs.trigger-event == 'push' && startsWith(github.event.ref, 'refs/heads/nightly')) }}
+        uses: aws-actions/configure-aws-credentials@v3
+        with:
+          role-to-assume: arn:aws:iam::749337293305:role/gha_workflow_nightly_build_wheels
+          aws-region: us-east-1
+
+      - name: Configure aws credentials (pytorch account)
+        if: ${{ env.CHANNEL == 'test' && startsWith(github.event.ref, 'refs/tags/v') }}
+        uses: aws-actions/configure-aws-credentials@v3
+        with:
+          role-to-assume: arn:aws:iam::749337293305:role/gha_workflow_test_build_wheels
+          aws-region: us-east-1
+
+      - name: Nightly or release RC
+        if: ${{ inputs.trigger-event == 'schedule' || (inputs.trigger-event == 'push' && startsWith(github.event.ref, 'refs/heads/nightly')) || (env.CHANNEL == 'test' && startsWith(github.event.ref, 'refs/tags/')) }}
+        shell: bash
+        run: |
+          set -ex
+          echo "NIGHTLY_OR_TEST=1" >> "${GITHUB_ENV}"
+
+      - name: Upload package to pytorch.org
+        shell: bash
+        working-directory: ${{ inputs.repository }}
+        run: |
+          set -ex
+
+          # shellcheck disable=SC1090
+          source "${BUILD_ENV_FILE}"
+
+          pip install awscli==1.32.18
+
+          AWS_CMD="aws s3 cp --dryrun"
+          if ${{ inputs.is-jetpack == true }}; then
+            AWS_CMD="aws s3 cp"
+          fi
+          if [[ "${NIGHTLY_OR_TEST:-0}" == "1" ]]; then
+            AWS_CMD="aws s3 cp"
+          fi
+
+          for pkg in dist/*; do
+            shm_id=$(sha256sum "${pkg}" | awk '{print $1}')
+            ${AWS_CMD} "$pkg" "${PYTORCH_S3_BUCKET_PATH}" --acl public-read \
+              --metadata "checksum-sha256=${shm_id}"
+          done
+
