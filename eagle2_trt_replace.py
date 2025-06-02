@@ -9,9 +9,7 @@ from transformers.models.siglip import modeling_siglip as ms
 from transformers.models.qwen2 import modeling_qwen2 as mq
 from transformers.modeling_outputs import CausalLMOutputWithPast
 
-# -----------------------------------------------------------------------------
 # 0) Export-friendly attention patches
-# -----------------------------------------------------------------------------
 
 def _patch_siglip_attention():
     """Swap SiglipAttention.forward with an sdpa-only version no Flash-Attn kernels."""
@@ -23,10 +21,19 @@ def _patch_siglip_attention():
         q = q.view(B, S, self.num_heads, self.head_dim).transpose(1, 2)
         k = k.view(B, S, self.num_heads, self.head_dim).transpose(1, 2)
         v = v.view(B, S, self.num_heads, self.head_dim).transpose(1, 2)
+        # Compute scores in fp32 to avoid half-precision overflow/underflow
         scores = torch.matmul(q, k.transpose(-2, -1)) * self.scale
+        # scores = torch.matmul(q.float(), k.transpose(-2, -1).float()) * self.scale
+        print("scores.mean siglip:", scores.mean().item(), "scores.std siglip:", scores.std().item())
         if attention_mask is not None:
+            # cast mask to fp32 so dtype matches scores before the addition
             scores = scores + attention_mask
+            print("masked_scores.mean siglip:", scores.mean().item())
+        print("masked scores.mean siglip:", scores.mean().item(), "masked scores.std siglip:", scores.std().item())
+        # scores = scores - scores.max(dim=-1, keepdim=True).values # numerically stable softmax float16
+        print("stable masked scores.mean siglip:", scores.mean().item(), "stable masked scores.std siglip:", scores.std().item())
         probs = torch.softmax(scores, dim=-1, dtype=torch.float32).to(q.dtype)
+        print("probs.max siglip:", probs.max().item(), "probs.sum siglip:", probs.sum().item())
         if self.training and self.dropout > 0:
             probs = torch.nn.functional.dropout(probs, p=self.dropout, training=True)
         ctx = torch.matmul(probs, v)
@@ -35,168 +42,14 @@ def _patch_siglip_attention():
         return (ctx, None) if output_attentions else (ctx, None)
     ms.SiglipAttention.forward = patched_attention_forward
 
-def _patch_qwen2_attention():
-    """Numerically‑stable, export‑friendly Qwen‑2 attention"""
-
-    def patched_qwen2_attention_forward(
-        self,
-        hidden_states: torch.Tensor,
-        position_embeddings: tuple[torch.Tensor, torch.Tensor],
-        attention_mask: Optional[torch.Tensor] = None,
-        past_key_value=None,
-        cache_position=None,
-        **kwargs,
-    ):
-        # ------------------------------------------------------------------
-        # shapes / constants
-        # ------------------------------------------------------------------
-        B, S, _ = hidden_states.shape
-        Hq      = self.config.num_attention_heads
-        Hkv     = self.config.num_key_value_heads
-        Hd      = self.head_dim
-        dtype   = hidden_states.dtype
-        device  = hidden_states.device
-
-        # ------------------------------------------------------------------
-        # Q‑K‑V (B, S, H, Hd) → (B, H, S, Hd)
-        # ------------------------------------------------------------------
-        q = self.q_proj(hidden_states).view(B, S, Hq, Hd).transpose(1, 2)
-        k = self.k_proj(hidden_states).view(B, S, Hkv, Hd).transpose(1, 2)
-        v = self.v_proj(hidden_states).view(B, S, Hkv, Hd).transpose(1, 2)
-
-        # ------------------------------------------------------------------
-        # rotary pos‑emb
-        # ------------------------------------------------------------------
-        cos, sin = position_embeddings
-        q, k = mq.apply_rotary_pos_emb(q, k, cos, sin)
-
-        # ------------------------------------------------------------------
-        # KV‑cache
-        # ------------------------------------------------------------------
-        if past_key_value is not None:
-            k, v = past_key_value.update(
-                k, v, self.layer_idx,
-                {"sin": sin, "cos": cos, "cache_position": cache_position},
-            )
-
-        # ------------------------------------------------------------------
-        # group‑QK attention (GQA) : repeat kv‑heads
-        # ------------------------------------------------------------------
-        if self.num_key_value_groups != 1:
-            k = k.repeat_interleave(self.num_key_value_groups, dim=1)
-            v = v.repeat_interleave(self.num_key_value_groups, dim=1)
-
-        # ------------------------------------------------------------------
-        # raw scores (fp32)
-        # ------------------------------------------------------------------
-        scores = torch.matmul(q.float(), k.transpose(-2, -1).float()) * self.scaling  # (B,H,S,S)
-
-        # if torch.isinf(hidden_states).any() or torch.isnan(hidden_states).any():
-        #     print("!!! NaN/Inf detected at layer", self.layer_idx)
-
-        # ------------------------------------------------------------------
-        # optional sliding‑window causal mask
-        # ------------------------------------------------------------------
-        if (
-            self.config.use_sliding_window
-            and getattr(self.config, "sliding_window", None) is not None
-            and self.layer_idx >= self.config.max_window_layers
-        ):
-            win   = self.config.sliding_window
-            idx   = torch.arange(S, device=device)
-            bad   = (idx.view(-1,1) - idx.view(1,-1)).lt(0) | \
-                    (idx.view(-1,1) - idx.view(1,-1)).ge(win)
-            scores.masked_fill_(bad.unsqueeze(0).unsqueeze(0), float("-inf"))
-
-        # ------------------------------------------------------------------
-        # caller‑provided mask  (padding / causal / kv‑cache)
-        # make sure shape == (B,1,1,S) so broadcasting with (B,H,S,S) works
-        # ------------------------------------------------------------------
-        if attention_mask is not None:
-            # squeeze/unsqueeze until 4‑D
-            if attention_mask.dim() == 2:                 # (B, S)
-                attention_mask = attention_mask[:, None, None, :]
-            elif attention_mask.dim() == 3:               # (B, 1, S)
-                attention_mask = attention_mask[:, :, None, :]
-            elif attention_mask.dim() == 4:
-                pass
-            else:
-                raise ValueError(f"Unexpected attention_mask.dim={attention_mask.dim()}")
-
-            if attention_mask.dtype == torch.bool:
-                scores.masked_fill_(~attention_mask, float("-inf"))
-            else:
-                # additive mask: assume already −inf or 0 in last dim
-                scores = scores + attention_mask.float()
-
-        # ------------------------------------------------------------------
-        # softmax (fp32) → cast back
-        # ------------------------------------------------------------------
-        probs = torch.softmax(scores, dim=-1, dtype=torch.float32).to(dtype)
-        if self.training and self.attention_dropout > 0.0:
-            probs = torch.nn.functional.dropout(probs, p=self.attention_dropout, training=True)
-
-        # ------------------------------------------------------------------
-        # context & output
-        # ------------------------------------------------------------------
-        ctx = torch.matmul(probs, v)                      # (B,H,S,Hd)
-        ctx = ctx.transpose(1, 2).reshape(B, S, Hq * Hd)
-        attn_output = self.o_proj(ctx)
-
-        attn_weights = probs if kwargs.get("output_attentions", False) else None
-        return attn_output, attn_weights
-
-    # monkey‑patch
-    mq.Qwen2Attention.forward = patched_qwen2_attention_forward
-
-
-
-
-
-
-    # def patched_qwen2_attention_forward(
-    #     self,
-    #     hidden_states: torch.Tensor,
-    #     position_embeddings: tuple[torch.Tensor, torch.Tensor],
-    #     attention_mask: Optional[torch.Tensor] = None,
-    #     past_key_value=None,
-    #     cache_position=None,
-    #     **kwargs,
-    # ):
-    #     B, S, _ = hidden_states.shape
-    #     q = self.q_proj(hidden_states)
-    #     k = self.k_proj(hidden_states)
-    #     v = self.v_proj(hidden_states)
-    #     q = q.reshape(B, S, self.config.num_attention_heads, self.head_dim).transpose(1, 2)
-    #     k = k.reshape(B, S, self.config.num_key_value_heads, self.head_dim)
-    #     k = k.repeat_interleave(self.num_key_value_groups, dim=2).transpose(1, 2)
-    #     v = v.reshape(B, S, self.config.num_key_value_heads, self.head_dim)
-    #     v = v.repeat_interleave(self.num_key_value_groups, dim=2).transpose(1, 2)
-    #     cos, sin = position_embeddings
-    #     q, k = mq.apply_rotary_pos_emb(q, k, cos, sin)
-    #     attn = (q @ k.transpose(-2, -1)) * self.scaling
-    #     if attention_mask is not None:
-    #         mask = (1.0 - attention_mask[:, None, None, :]).to(q.dtype) * (-10.0)
-    #         attn = attn + mask
-    #     attn = torch.softmax(attn, dim=-1, dtype=torch.float32).to(q.dtype)
-    #     if self.training and self.attention_dropout > 0:
-    #         attn = torch.nn.functional.dropout(attn, p=self.attention_dropout, training=True)
-    #     ctx = attn @ v
-    #     ctx = ctx.transpose(1, 2).contiguous().reshape(B, S, self.config.hidden_size)
-    #     ctx = self.o_proj(ctx)
-    #     return ctx, None
-    # mq.Qwen2Attention.forward = patched_qwen2_attention_forward
-
-# -----------------------------------------------------------------------------
 # 1) Load base model & processor
-# -----------------------------------------------------------------------------
 
 def load_base(device="cuda:0"):
     _patch_siglip_attention()
-    _patch_qwen2_attention()
+    # _patch_qwen2_attention()
     model_id = "nvidia/Eagle2-2B"
     model = (
-        AutoModel.from_pretrained(model_id, trust_remote_code=True, torch_dtype=torch.float16)
+        AutoModel.from_pretrained(model_id, trust_remote_code=True, torch_dtype=torch.float16) # torch.float16
         .to(device)
         .eval()
     )
@@ -205,9 +58,7 @@ def load_base(device="cuda:0"):
         processor.tokenizer.padding_side = "left"
     return model, processor
 
-# -----------------------------------------------------------------------------
 # 2) Torch-TensorRT compile helpers
-# -----------------------------------------------------------------------------
 
 class VisionWrapper(nn.Module):
     """Return only last_hidden_state tensor for simpler TRT signature."""
@@ -223,14 +74,9 @@ class LMNoCache(nn.Module):
         super().__init__()
         self.lm = lm
 
-    def forward(self, inputs_embeds, attention_mask, position_ids=None, cache_position=None):
+    def forward(self, inputs_embeds, position_ids=None, cache_position=None):
         # Ensure inputs are in float16 and on the correct device
-        # inputs_embeds = inputs_embeds.to(dtype=torch.float16, device=self.lm.device)
-        inputs_embeds = inputs_embeds.to(dtype=torch.float32, device=self.lm.device)
-
-        if attention_mask is not None:
-            # attention_mask = attention_mask.to(dtype=torch.float16, device=self.lm.device)
-            attention_mask = attention_mask.to(dtype=torch.float32, device=self.lm.device)
+        inputs_embeds = inputs_embeds.to(dtype=torch.float32, device=self.lm.device) 
 
         if position_ids is not None:
             position_ids = position_ids.to(device=self.lm.device)
@@ -239,7 +85,6 @@ class LMNoCache(nn.Module):
 
         outputs = self.lm(
             inputs_embeds=inputs_embeds,
-            attention_mask=attention_mask,
             position_ids=position_ids,
             cache_position=cache_position,
             use_cache=False
@@ -255,9 +100,7 @@ class LMNoCache(nn.Module):
             raise TypeError(f"Unexpected output type from language model: {type(outputs)}")
         return logits
 
-# -----------------------------------------------------------------------------
 # 3) Compile sub-modules with TRT
-# -----------------------------------------------------------------------------
 
 def compile_submodules(base_model, device="cuda:0"):
     vision_model = base_model.vision_model
@@ -314,29 +157,28 @@ def compile_submodules(base_model, device="cuda:0"):
     dummy_seq = 13
     dummy_batch = 2
     dummy_embeds = torch.randn(dummy_batch, dummy_seq, hidden_size, dtype=torch.float16, device=device)
-    dummy_mask = torch.ones(dummy_batch, dummy_seq, dtype=torch.float16, device=device)
     dummy_position_ids = torch.arange(1, dummy_seq + 1, device=device).unsqueeze(0).expand(dummy_batch, -1)
     dummy_cache_position = torch.arange(dummy_seq, device=device)
     B3 = torch.export.Dim("batch3", min=1, max=4)
-    K = torch.export.Dim("_k", min=1, max=512)
-    seq_sym = 8 * K - 3
+    # Use a single symbolic dimension for sequence length rather than a complicated expression that can
+    # confuse shape unification during tracing.
+    S3 = torch.export.Dim("seq_lm", min=1, max=2048)
     dyn_shapes_lm = {
-        "inputs_embeds": {0: B3, 1: seq_sym},
-        "attention_mask": {0: B3, 1: seq_sym},
-        "position_ids": {0: B3, 1: seq_sym},
-        "cache_position": {0: seq_sym},
+        "inputs_embeds": {0: B3, 1: S3},
+        "position_ids": {0: B3, 1: S3},
+        "cache_position": {0: S3},
     }
     lm_wrap = LMNoCache(language_model).to(device).eval()
     with torch.inference_mode():
         exported_lm = torch.export.export(
             lm_wrap,
-            (dummy_embeds, dummy_mask, dummy_position_ids, dummy_cache_position),
+            (dummy_embeds, dummy_position_ids, dummy_cache_position),
             dynamic_shapes=dyn_shapes_lm,
             strict=False
         )
     trt_lm = torch_tensorrt.dynamo.compile(
         exported_lm,
-        inputs=[dummy_embeds, dummy_mask, dummy_position_ids, dummy_cache_position],
+        inputs=[dummy_embeds, dummy_position_ids, dummy_cache_position],
         enabled_precisions={torch.float32},
         device=device,
         # truncate_double=True,
@@ -346,9 +188,7 @@ def compile_submodules(base_model, device="cuda:0"):
     )
     return trt_vis, trt_mlp1, trt_lm
 
-# -----------------------------------------------------------------------------
 # 4) Glue: wrap TRT modules back into full model
-# -----------------------------------------------------------------------------
 
 class TRTExtractFeature(nn.Module):
     def __init__(self, trt_vis, trt_mlp, original_model):
@@ -362,6 +202,7 @@ class TRTExtractFeature(nn.Module):
             if pixel_values.dtype != torch.float16:
                 pixel_values = pixel_values.to(torch.float16)
             vit = self.trt_vis(pixel_values)
+            # vit = self.trt_vis(pixel_values.to(torch.float16))   ######
             print("vit.shape:", vit.shape, "vit.mean:", vit.mean().item(), "vit.std:", vit.std().item())
 
             h = w = int(vit.shape[1] ** 0.5)
@@ -404,8 +245,10 @@ class TRTLanguageWrapper(nn.Module, GenerationMixin):
         # Prepare inputs
         if inputs_embeds is None and input_ids is not None:
             inputs_embeds = self._input_embeddings(input_ids).to(dtype=torch.float16, device=device)
+            # inputs_embeds = self._input_embeddings(input_ids).to(dtype=torch.float32, device=device)
         else:
             inputs_embeds = inputs_embeds.to(dtype=torch.float16, device=device)
+            # inputs_embeds = inputs_embeds.to(dtype=torch.float32, device=device)
 
         if position_ids is None and inputs_embeds is not None:
             batch_size, seq_length = inputs_embeds.shape[:2]
@@ -422,13 +265,9 @@ class TRTLanguageWrapper(nn.Module, GenerationMixin):
                 )
             position_ids = cache_position.unsqueeze(0).expand(batch_size, -1).to(device=device)
 
-        if attention_mask is not None:
-            attention_mask = attention_mask.to(dtype=torch.float16, device=device)
-
         # Execute TensorRT engine
         logits = self.trt_lm(
             inputs_embeds,
-            attention_mask,
             position_ids,
             cache_position,
         )
@@ -453,9 +292,7 @@ class TRTLanguageWrapper(nn.Module, GenerationMixin):
 
     def prepare_inputs_for_generation(self, *args, **kwargs):
         return self._original_lm.prepare_inputs_for_generation(*args, **kwargs)
-# -----------------------------------------------------------------------------
 # 5) End-to-end integration & test
-# -----------------------------------------------------------------------------
 
 def build_trt_model(device="cuda:0"):
     base_model, processor = load_base(device)
@@ -471,10 +308,13 @@ def build_trt_model(device="cuda:0"):
                                 labels=None, use_cache=None, output_attentions=None,
                                 output_hidden_states=None, return_dict=None, num_tiles_list=None, **kwargs):
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+        print("attention_mask dtype:", attention_mask.dtype, "attention_mask.shape:", attention_mask.shape) # , "attention_mask.mean:", attention_mask.mean().item(), "attention_mask.std:", attention_mask.std().item())
         if pixel_values is not None:
             print("pixel_values.shape:", pixel_values.shape, "mean:", pixel_values.mean().item(), "std:", pixel_values.std().item())
             vit_embeds = self.extract_feature(pixel_values)
-
+            # vit_embeds = nn.LayerNorm(vit_embeds.shape[-1],
+            #                           eps=1e-5, elementwise_affine=False
+            #                           ).to(vit_embeds.dtype)(vit_embeds)
             if torch.isnan(vit_embeds).any():
                 print("2 Warning: NaN detected in vit_embeds!")
             else:
@@ -488,6 +328,9 @@ def build_trt_model(device="cuda:0"):
             else:
                 print("1 Input embeds are valid.")
 
+            print("vit σ:", vit_embeds.std().item(),
+                  "txt σ:", input_embeds.std().item())
+            
             B, N, C = input_embeds.shape
             input_embeds = input_embeds.reshape(B * N, C)
             input_ids_flat = input_ids.reshape(B * N)
@@ -504,8 +347,11 @@ def build_trt_model(device="cuda:0"):
             input_embeds = input_embeds.reshape(B, N, C)
         else:
             input_embeds = self.language_model.get_input_embeddings()(input_ids)
-        if attention_mask is not None and attention_mask.dtype != torch.float16:
-            attention_mask = attention_mask.to(torch.float16)
+        # if attention_mask is not None and attention_mask.dtype != torch.float16:
+        #     attention_mask = attention_mask.to(torch.float16) # torch.float16
+        # if attention_mask is not None:
+        #     attention_mask = attention_mask.to(torch.bool)
+
         gen_kwargs = {
             'attention_mask': attention_mask,
             'position_ids': position_ids,
@@ -517,6 +363,8 @@ def build_trt_model(device="cuda:0"):
         }
         gen_kwargs.update({k: v for k, v in kwargs.items() if k != 'inputs_embeds'})
 
+        print("position_ids:", position_ids)
+
         if torch.isnan(input_embeds).any():
             print("2 Warning: NaN detected in input embeds!")
         else:
@@ -525,20 +373,22 @@ def build_trt_model(device="cuda:0"):
         outputs = self.language_model(inputs_embeds=input_embeds, **gen_kwargs)
         
         print("logits.shape:", outputs.logits.shape, "predicted_token:", outputs.logits[:, -1, :].argmax(-1).item())
+
+        print("logits max:", outputs.logits.max().item(), "logits min:", outputs.logits.min().item())
+        print("top 5 token probs:", torch.softmax(outputs.logits[:, -1, :], dim=-1).topk(5))
+
         return outputs
 
     import types
     trt_model.forward = types.MethodType(paligemma_style_forward, trt_model)
     print("TensorRT-integrated model built")
-    return trt_model, processor
+    return base_model, trt_model, processor
 
-# -----------------------------------------------------------------------------
 # 6) CLI test – image caption
-# -----------------------------------------------------------------------------
 if __name__ == "__main__":
     device = "cuda:0"
     torch.cuda.set_device(0)
-    trt_model, processor = build_trt_model(device)
+    base_model, trt_model, processor = build_trt_model(device)
     url = "https://cdn.pixabay.com/photo/2019/08/08/23/33/car-4393990_1280.jpg"
     image = Image.open(requests.get(url, stream=True).raw)
     prompt = "Describe this image."
@@ -550,12 +400,16 @@ if __name__ == "__main__":
     image_inputs, video_inputs = processor.process_vision_info(messages)
     model_inputs = processor(text=text_list, images=image_inputs, videos=video_inputs, return_tensors="pt", padding=True).to(device)
     if "pixel_values" in model_inputs and model_inputs["pixel_values"].dtype != torch.float16:
-        model_inputs["pixel_values"] = model_inputs["pixel_values"].to(torch.float16)
+        model_inputs["pixel_values"] = model_inputs["pixel_values"].to(torch.float16) # torch.float16
     if "image_sizes" in model_inputs:
         print("Removing 'image_sizes' parameter as it's not used by generation")
         model_inputs.pop("image_sizes")
     if "image_flags" in model_inputs:
         model_inputs.pop("image_flags")
+
+    # with torch.inference_mode():
+    #     outputs = base_model.generate(**model_inputs, max_new_tokens=64, use_cache=False)
+    # print("Generated text (torch):", processor.batch_decode(outputs, skip_special_tokens=True)[0])
     # Debug input
     print("input_ids:", model_inputs['input_ids'])
     print("image_token_index:", trt_model.config.image_token_index)
