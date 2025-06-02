@@ -43,10 +43,7 @@ pip uninstall -y torch torchvision
 
 if [[ ${IS_JETPACK} == true ]]; then
     # install torch 2.7 torchvision 0.22.0 for jp6.2
-    TORCH_URL=https://pypi.jetson-ai-lab.dev/jp6/cu126/+f/6ef/f643c0a7acda9/torch-2.7.0-cp310-cp310-linux_aarch64.whl#sha256=6eff643c0a7acda92734cc798338f733ff35c7df1a4434576f5ff7c66fc97319
-    TORCHVISION_URL=https://pypi.jetson-ai-lab.dev/jp6/cu126/+f/daa/bff3a07259968/torchvision-0.22.0-cp310-cp310-linux_aarch64.whl#sha256=daabff3a0725996886b92e4b5dd143f5750ef4b181b5c7d01371a9185e8f0402
-    pip install ${TORCH_URL}
-    pip install ${TORCHVISION_URL}
+    pip install torch==2.7.0 torchvision==0.22.0  --index-url=https://pypi.jetson-ai-lab.dev/jp6/cu126/
 else
     TORCH_TORCHVISION=$(grep "^torch" py/requirements.txt)
     INDEX_URL=https://download.pytorch.org/whl/${CHANNEL}/${CU_VERSION}
