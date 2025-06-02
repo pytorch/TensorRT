@@ -1,5 +1,6 @@
-from typing import Optional
+from typing import Optional, Union
 
+import numpy as np
 import tensorrt as trt
 import torch
 import torch_tensorrt.dynamo.conversion.impl as impl
@@ -18,7 +19,7 @@ def quantize(
     source_ir: Optional[SourceIR],
     name: str,
     input_tensor: TRTTensor,
-    amax: torch.Tensor,
+    amax: Union[np.ndarray, torch.Tensor],
     num_bits: int,
     exponent_bits: int,
 ) -> TRTTensor:
@@ -52,15 +53,15 @@ def quantize(
             max_bound = 448
 
         if not isinstance(amax, trt.ITensor):
+            amax = to_torch(amax, None)
             # for the int8/fp8 quantization, it is per tensor quantization, so amax should be a singlular element
             # TODO: to confirm with ModelOpt team, why I am getting a amax with shape > 1
             if len(amax.shape) >= 1:
                 amax = amax.abs().amax()
                 if amax == 0.0:
                     amax = 1.0
-            amax = to_torch(amax, None)
             scale = torch.divide(amax, max_bound)
-            scale = get_trt_tensor(ctx, amax, name + "_scale")
+            scale = get_trt_tensor(ctx, scale, name + "_scale")
         else:
             scale = impl.elementwise_div(
                 ctx, target, source_ir, name + "_scale", amax, max_bound
