@@ -77,4 +77,5 @@ tests/py/dynamo/models/*.ep
 MODULE.bazel.lock
 *.whl
 .coverage
+coverage.xml
 *.log

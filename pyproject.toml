@@ -104,10 +104,47 @@ include-package-data = false
 
 [tool.pytest.ini_options]
 testpaths = ["tests/py"]
-addopts = "--cov=py/torch_tensorrt --cov-report=html"
+addopts = "-ra --cov=py/torch_tensorrt --cov-report=html --cov-report=xml:coverage.xml --cov-config=pyproject.toml"
+
+[tool.coverage.paths]
+source = [
+    "py/torch_tensorrt/",
+    "*/site-packages/torch_tensorrt/"
+]
+omit = [
+    "tests/*"
+]
 
 [tool.coverage.run]
+relative_files=true
 branch = true
+
+[tool.coverage.report]
+fail_under = 20
+skip_covered = true
+ignore_errors = true
+exclude_lines = [
+    "pragma: no cover",
+    # Don't complain about missing debug or verbose code
+    "def __repr__",
+    "if verbose",
+    # Don't complain if tests don't hit defensive exception handling code
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "raise RuntimeError",
+    "raise ValueError",
+    "raise KeyError",
+    "raise AttributeError",
+    "except ImportError",
+    # Don't complain if non-runnable code isn't run
+    "if __name__ == \"__main__\":",
+    "if TYPE_CHECKING:",
+    # Don't complain about abstract methods, they aren't run
+    "@(abc\\.)?abstractmethod",
+]
+
+[tool.coverage.html]
+directory = "coverage_html"
 
 [tool.uv]
 package = true
