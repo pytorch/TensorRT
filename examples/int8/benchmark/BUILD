@@ -29,6 +29,10 @@ cc_library(
             "@torch_whl//:libtorch",
             "@torch_whl//:caffe2",
         ],
+        ":jetpack": [
+            "@torch_l4t//:libtorch",
+            "@torch_l4t//:caffe2",
+        ],
         "//conditions:default": [
             "@libtorch//:libtorch",
             "@libtorch//:caffe2",
