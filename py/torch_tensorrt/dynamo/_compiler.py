@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import collections.abc
 import logging
-import os
 import platform
 import warnings
 from typing import Any, Collection, List, Optional, Sequence, Set, Tuple, Union
@@ -521,14 +520,6 @@ def compile(
         torch.fx.GraphModule: Compiled FX Module, when run it will execute via TensorRT
     """
 
-    if debug:
-        warnings.warn(
-            "The 'debug' argument is deprecated and will be removed in a future release. "
-            "Please use the torch_tensorrt.dynamo.Debugger context manager for debugging and graph capture.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-
     if "truncate_long_and_double" in kwargs.keys():
         if truncate_double is not _defaults.TRUNCATE_DOUBLE:
             raise ValueError(
@@ -650,6 +641,7 @@ def compile(
         "enabled_precisions": (
             enabled_precisions if enabled_precisions else _defaults.ENABLED_PRECISIONS
         ),
+        "debug": debug,
         "device": device,
         "assume_dynamic_shape_support": assume_dynamic_shape_support,
         "workspace_size": workspace_size,
@@ -931,23 +923,6 @@ def compile_module(
             )
 
             trt_modules[name] = trt_module
-            from torch_tensorrt.dynamo._debugger import (
-                DEBUG_FILE_DIR,
-                SAVE_ENGINE_PROFILE,
-            )
-
-            if SAVE_ENGINE_PROFILE:
-                if settings.use_python_runtime:
-                    logger.warning(
-                        "Profiling can only be enabled when using the C++ runtime"
-                    )
-                else:
-                    path = os.path.join(DEBUG_FILE_DIR, "engine_visualization")
-                    os.makedirs(path, exist_ok=True)
-                    trt_module.enable_profiling(
-                        profiling_results_dir=path,
-                        profile_format="trex",
-                    )
 
     # Parse the graph I/O and store it in dryrun tracker
     parse_graph_io(gm, dryrun_tracker)
