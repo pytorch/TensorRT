@@ -78,6 +78,7 @@ cc_library(
     ] + select({
         ":use_torch_whl": ["@torch_whl//:libtorch"],
         ":windows": ["@libtorch_win//:libtorch"],
+        ":jetpack": ["@torch_l4t//:libtorch"],
         "//conditions:default": ["@libtorch"],
     }),
     alwayslink = True,
