@@ -35,11 +35,11 @@ pip install --force-reinstall --pre ${TORCH_TORCHVISION} --index-url ${INDEX_URL
 export CUDA_HOME="$(echo ${CUDA_PATH} | sed -e 's#\\#\/#g')"
 export TORCH_INSTALL_PATH="$(python -c "import torch, os; print(os.path.dirname(torch.__file__))" | sed -e 's#\\#\/#g')"
 
+cat toolchains/ci_workspaces/MODULE.bazel.tmpl | envsubst > MODULE.bazel
 
 if [[ ${TENSORRT_VERSION} != "" ]]; then
-  cat toolchains/ci_workspaces/MODULE_tensorrt.bazel.tmpl | envsubst > MODULE.bazel
-else
-  cat toolchains/ci_workspaces/MODULE.bazel.tmpl | envsubst > MODULE.bazel
+    sed -i -e "s/strip_prefix = \"TensorRT-.*\"/strip_prefix = \"${TENSORRT_STRIP_PREFIX}\"/g" MODULE.bazel
+    sed -i -e "s#\"https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/.*\"#\"${TENSORRT_URLS}\"#g" MODULE.bazel
 fi
 
 cat MODULE.bazel

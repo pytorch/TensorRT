@@ -127,6 +127,12 @@ new_local_repository(
     build_file = "third_party/libtorch/BUILD"
 )
 
+new_local_repository(
+    name = "torch_l4t",
+    path = "${TORCH_INSTALL_PATH}",
+    build_file = "third_party/libtorch/BUILD"
+)
+
 #new_local_repository(
 #   name = "tensorrt",
 #   path = "/usr/",
