@@ -99,8 +99,8 @@ Building the Wheel
 1. **Build the wheel**:
 
    .. code-block:: sh
-
-      python setup.py bdist_wheel --jetpack
+   
+       python setup.py bdist_wheel
 
 Installation
 ============
