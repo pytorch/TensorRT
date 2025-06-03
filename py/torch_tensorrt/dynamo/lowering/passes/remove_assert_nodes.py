@@ -1,5 +1,8 @@
+from typing import Optional
 import logging
 
+from torch_tensorrt.dynamo._DebuggerConfig import DebuggerConfig
+from torch_tensorrt.dynamo._supports_debugger import fn_supports_debugger
 import torch
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.lowering.passes.pass_utils import (
@@ -8,11 +11,13 @@ from torch_tensorrt.dynamo.lowering.passes.pass_utils import (
 
 logger = logging.getLogger(__name__)
 
-
+@fn_supports_debugger
 def remove_assert_nodes(
-    gm: torch.fx.GraphModule, settings: CompilationSettings
+    gm: torch.fx.GraphModule, settings: CompilationSettings, *, _debugger_settings: Optional[DebuggerConfig]=None
 ) -> torch.fx.GraphModule:
     """Remove assert_scalar ops in the graph"""
+    if _debugger_settings is not None and _debugger_settings.break_in_remove_assert_nodes:
+        breakpoint()
     count = 0
     for node in gm.graph.nodes:
         if (

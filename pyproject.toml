@@ -83,11 +83,7 @@ dev = [
     "pyyaml",
 ]
 
-debug = [
-    "pydot >= 4.0.0",
-    "tabulate >= 0.8.10",
-    "graphviz >= 0.20.3"
-]
+debug = ["pydot >= 4.0.0", "tabulate >= 0.8.10", "graphviz >= 0.20.3"]
 
 [project.optional-dependencies]
 torchvision = [
@@ -96,7 +92,6 @@ torchvision = [
 quantization = ["nvidia-modelopt[all]>=0.27.1"]
 monitoring-tools = ["rich>=13.7.1"]
 jupyter = ["rich[jupyter]>=13.7.1"]
-distributed = ["tensorrt-llm>=0.16.0"]
 
 [project.urls]
 Homepage = "https://pytorch.org/tensorrt"

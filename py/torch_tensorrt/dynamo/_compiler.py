@@ -907,23 +907,23 @@ def compile_module(
             )
 
             trt_modules[name] = trt_module
-            from torch_tensorrt.dynamo._debugger import (
-                DEBUG_FILE_DIR,
-                SAVE_ENGINE_PROFILE,
-            )
+            # from torch_tensorrt.dynamo._debugger import (
+            #     DEBUG_FILE_DIR,
+            #     SAVE_ENGINE_PROFILE,
+            # )
 
-            if SAVE_ENGINE_PROFILE:
-                if settings.use_python_runtime:
-                    logger.warning(
-                        "Profiling can only be enabled when using the C++ runtime"
-                    )
-                else:
-                    path = os.path.join(DEBUG_FILE_DIR, "engine_visualization")
-                    os.makedirs(path, exist_ok=True)
-                    trt_module.enable_profiling(
-                        profiling_results_dir=path,
-                        profile_format="trex",
-                    )
+            # if SAVE_ENGINE_PROFILE:
+            #     if settings.use_python_runtime:
+            #         logger.warning(
+            #             "Profiling can only be enabled when using the C++ runtime"
+            #         )
+            #     else:
+            #         path = os.path.join(DEBUG_FILE_DIR, "engine_visualization")
+            #         os.makedirs(path, exist_ok=True)
+            #         trt_module.enable_profiling(
+            #             profiling_results_dir=path,
+            #             profile_format="trex",
+            #         )
 
     # Parse the graph I/O and store it in dryrun tracker
     parse_graph_io(gm, dryrun_tracker)

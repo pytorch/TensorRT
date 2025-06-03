@@ -18,6 +18,8 @@ from typing import (
 )
 
 import numpy as np
+from torch_tensorrt.dynamo._DebuggerConfig import DebuggerConfig
+from torch_tensorrt.dynamo._supports_debugger import cls_supports_debugger
 import tensorrt as trt
 import torch
 import torch.fx
@@ -69,7 +71,7 @@ class TRTInterpreterResult(NamedTuple):
     weight_name_map: Optional[dict[Any, Any]]
     requires_output_allocator: bool
 
-
+@cls_supports_debugger
 class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
     def __init__(
         self,
@@ -78,11 +80,14 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         output_dtypes: Optional[Sequence[dtype]] = None,
         compilation_settings: CompilationSettings = CompilationSettings(),
         engine_cache: Optional[BaseEngineCache] = None,
+        *,
+        _debugger_settings: Optional[DebuggerConfig] = None,
     ):
         super().__init__(module)
 
         self.logger = TRT_LOGGER
         self.builder = trt.Builder(self.logger)
+        self._debugger_settings = _debugger_settings
 
         flag = 0
         if compilation_settings.use_explicit_typing:
@@ -204,7 +209,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
     ) -> trt.IBuilderConfig:
         builder_config = self.builder.create_builder_config()
 
-        if self.compilation_settings.debug:
+        if self._debugger_settings is not None and self._debugger_settings.engine_builder_monitor:
             builder_config.progress_monitor = TRTBulderMonitor()
 
         if self.compilation_settings.workspace_size != 0:

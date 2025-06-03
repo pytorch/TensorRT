@@ -16,6 +16,8 @@ class _ASCIIMonitor(trt.IProgressMonitor):  # type: ignore
             if ci_env_var == "1":
                 self._render = False
 
+        breakpoint()
+
     def phase_start(
         self, phase_name: str, parent_phase: Optional[str], num_steps: int
     ) -> None:
@@ -90,70 +92,69 @@ class _ASCIIMonitor(trt.IProgressMonitor):  # type: ignore
             move_cursor_up(len(self._active_phases) + blank_lines)
             sys.stdout.flush()
 
+# try:
+#     from rich.progress import BarColumn, Progress, TaskID, TextColumn, TimeElapsedColumn
 
-try:
-    from rich.progress import BarColumn, Progress, TaskID, TextColumn, TimeElapsedColumn
+#     class _RichMonitor(trt.IProgressMonitor):  # type: ignore
+#         def __init__(self, engine_name: str = "") -> None:
+#             trt.IProgressMonitor.__init__(self)
+#             self._active_phases: Dict[str, TaskID] = {}
+#             self._step_result = True
 
-    class _RichMonitor(trt.IProgressMonitor):  # type: ignore
-        def __init__(self, engine_name: str = "") -> None:
-            trt.IProgressMonitor.__init__(self)
-            self._active_phases: Dict[str, TaskID] = {}
-            self._step_result = True
+#             self._progress_monitors = Progress(
+#                 TextColumn("  "),
+#                 TimeElapsedColumn(),
+#                 TextColumn("{task.description}: "),
+#                 BarColumn(),
+#                 TextColumn(" {task.percentage:.0f}% ({task.completed}/{task.total})"),
+#             )
 
-            self._progress_monitors = Progress(
-                TextColumn("  "),
-                TimeElapsedColumn(),
-                TextColumn("{task.description}: "),
-                BarColumn(),
-                TextColumn(" {task.percentage:.0f}% ({task.completed}/{task.total})"),
-            )
+#             self._render = True
+#             if (ci_env_var := os.environ.get("CI_BUILD")) is not None:
+#                 if ci_env_var == "1":
+#                     self._render = False
 
-            self._render = True
-            if (ci_env_var := os.environ.get("CI_BUILD")) is not None:
-                if ci_env_var == "1":
-                    self._render = False
+#             if self._render:
+#                 self._progress_monitors.start()
 
-            if self._render:
-                self._progress_monitors.start()
+#         def phase_start(
+#             self, phase_name: str, parent_phase: Optional[str], num_steps: int
+#         ) -> None:
+#             try:
+#                 self._active_phases[phase_name] = self._progress_monitors.add_task(
+#                     phase_name, total=num_steps
+#                 )
+#                 self._progress_monitors.refresh()
+#             except KeyboardInterrupt:
+#                 # The phase_start callback cannot directly cancel the build, so request the cancellation from within step_complete.
+#                 _step_result = False
 
-        def phase_start(
-            self, phase_name: str, parent_phase: Optional[str], num_steps: int
-        ) -> None:
-            try:
-                self._active_phases[phase_name] = self._progress_monitors.add_task(
-                    phase_name, total=num_steps
-                )
-                self._progress_monitors.refresh()
-            except KeyboardInterrupt:
-                # The phase_start callback cannot directly cancel the build, so request the cancellation from within step_complete.
-                _step_result = False
+#         def phase_finish(self, phase_name: str) -> None:
+#             try:
+#                 self._progress_monitors.update(
+#                     self._active_phases[phase_name], visible=False
+#                 )
+#                 self._progress_monitors.stop_task(self._active_phases[phase_name])
+#                 self._progress_monitors.remove_task(self._active_phases[phase_name])
+#                 self._progress_monitors.refresh()
+#             except KeyboardInterrupt:
+#                 _step_result = False
 
-        def phase_finish(self, phase_name: str) -> None:
-            try:
-                self._progress_monitors.update(
-                    self._active_phases[phase_name], visible=False
-                )
-                self._progress_monitors.stop_task(self._active_phases[phase_name])
-                self._progress_monitors.remove_task(self._active_phases[phase_name])
-                self._progress_monitors.refresh()
-            except KeyboardInterrupt:
-                _step_result = False
+#         def step_complete(self, phase_name: str, step: int) -> bool:
+#             try:
+#                 self._progress_monitors.update(
+#                     self._active_phases[phase_name], completed=step
+#                 )
+#                 self._progress_monitors.refresh()
+#                 return self._step_result
+#             except KeyboardInterrupt:
+#                 # There is no need to propagate this exception to TensorRT. We can simply cancel the build.
+#                 return False
 
-        def step_complete(self, phase_name: str, step: int) -> bool:
-            try:
-                self._progress_monitors.update(
-                    self._active_phases[phase_name], completed=step
-                )
-                self._progress_monitors.refresh()
-                return self._step_result
-            except KeyboardInterrupt:
-                # There is no need to propagate this exception to TensorRT. We can simply cancel the build.
-                return False
+#         def __del__(self) -> None:
+#             if self._progress_monitors:
+#                 self._progress_monitors.stop()
 
-        def __del__(self) -> None:
-            if self._progress_monitors:
-                self._progress_monitors.stop()
-
-    TRTBulderMonitor: trt.IProgressMonitor = _RichMonitor
-except ImportError:
-    TRTBulderMonitor: trt.IProgressMonitor = _ASCIIMonitor  # type: ignore[no-redef]
+#     TRTBulderMonitor: trt.IProgressMonitor = _RichMonitor
+# except ImportError:
+TRTBulderMonitor: trt.IProgressMonitor = _ASCIIMonitor  # type: ignore[no-redef]
