@@ -73,7 +73,6 @@ def load_dep_info():
             __cuda_version__ = versions["__cuda_version__"]
         __tensorrt_version__ = versions["__tensorrt_version__"]
 
-
 load_dep_info()
 
 dir_path = os.path.join(str(get_root_dir()), "py")
@@ -153,6 +152,18 @@ if IS_AARCH64:
         IS_SBSA = True
 
 IS_SBSA = True if IS_AARCH64 and not IS_JETPACK else False
+
+if IS_JETPACK and "bdist_wheel" in sys.argv:
+    needs_append_plat_name = True
+    for i, arg in enumerate(sys.argv):
+        if arg == "--plat-name" and i+1 < len(sys.argv) and sys.argv[i+1] == "linux_tegra_aarch64":
+            needs_append_plat_name = False
+            break
+        if arg == "--plat-name=linux_tegra_aarch64":
+            needs_append_plat_name = False
+            break
+    if needs_append_plat_name:
+        sys.argv.append("--plat-name=linux_tegra_aarch64")
 
 BAZEL_EXE = None
 if not PY_ONLY:

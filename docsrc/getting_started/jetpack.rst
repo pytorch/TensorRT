@@ -103,9 +103,9 @@ Installation
 ============
 
 .. code-block:: sh
-
+   # you will be able to find the wheel in the dist directory, has platform name linux_tegra_aarch64
    cd dist
-   python -m pip install torch-tensorrt-2.8.0.dev0+4da152843-cp310-none-linux_aarch64.whl
+   python -m pip install torch_tensorrt-2.8.0.dev0+d8318d8fc-cp310-cp310-linux_tegra_aarch64.whl
 
 Post-Installation Verification
 ==============================
