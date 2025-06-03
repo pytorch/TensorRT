@@ -25,10 +25,6 @@ class Debugger:
         logging_dir: Optional[str] = None,
     ):
         self.debug_file_dir = tempfile.TemporaryDirectory().name
-        if log_level != "graphs" and (capture_fx_graph_after or save_engine_profile):
-            _LOGGER.warning(
-                "Capture FX Graph or Draw Engine Graph is only supported when level is 'graphs'"
-            )
 
         if log_level == "debug":
             self.log_level = logging.DEBUG
@@ -60,7 +56,7 @@ class Debugger:
         self.rt_level = torch.ops.tensorrt.get_logging_level()
         dictConfig(self.get_config())
 
-        if self.log_level == GRAPH_LEVEL:
+        if self.capture_fx_graph_before or self.capture_fx_graph_after:
             self.old_pre_passes, self.old_post_passes = (
                 ATEN_PRE_LOWERING_PASSES.passes,
                 ATEN_POST_LOWERING_PASSES.passes,
@@ -93,14 +89,14 @@ class Debugger:
 
         dictConfig(self.get_default_config())
         torch.ops.tensorrt.set_logging_level(self.rt_level)
-        if self.log_level == GRAPH_LEVEL and self.capture_fx_graph_after:
+        if self.capture_fx_graph_before or self.capture_fx_graph_after:
             ATEN_PRE_LOWERING_PASSES.passes, ATEN_POST_LOWERING_PASSES.passes = (
                 self.old_pre_passes,
                 self.old_post_passes,
             )
         self.debug_file_dir = tempfile.TemporaryDirectory().name
 
-    def get_config(self) -> dict[str, Any]:
+    def get_customized_logging_config(self) -> dict[str, Any]:
         config = {
             "version": 1,
             "disable_existing_loggers": False,
@@ -138,7 +134,7 @@ class Debugger:
         }
         return config
 
-    def get_default_config(self) -> dict[str, Any]:
+    def get_default_logging_config(self) -> dict[str, Any]:
         config = {
             "version": 1,
             "disable_existing_loggers": False,
