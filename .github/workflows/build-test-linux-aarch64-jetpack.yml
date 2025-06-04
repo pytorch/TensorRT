@@ -40,11 +40,13 @@ jobs:
         id: filter
         env:
            LIMIT_PR_BUILDS: ${{ github.event_name == 'pull_request' && !contains( github.event.pull_request.labels.*.name, 'ciflow/binaries/all') }}
+           NIGHTLY_BUILDS: ${{ inputs.trigger-event == 'push' && startsWith(github.event.ref, 'refs/heads/nightly') }}
         run: |
           set -eou pipefail
           echo "LIMIT_PR_BUILDS=${LIMIT_PR_BUILDS}"
+          echo "NIGHTLY_BUILDS=${NIGHTLY_BUILDS}"
           MATRIX_BLOB=${{ toJSON(needs.generate-matrix.outputs.matrix) }}
-          MATRIX_BLOB="$(python3 .github/scripts/filter-matrix.py --matrix "${MATRIX_BLOB}" --jetpack true)"
+          MATRIX_BLOB="$(python3 .github/scripts/filter-matrix.py --matrix "${MATRIX_BLOB}" --jetpack true --limit-pr-builds "${LIMIT_PR_BUILDS}" --is-nightly "${NIGHTLY_BUILDS}")"
           echo "${MATRIX_BLOB}"
           echo "matrix=${MATRIX_BLOB}" >> "${GITHUB_OUTPUT}"
 
