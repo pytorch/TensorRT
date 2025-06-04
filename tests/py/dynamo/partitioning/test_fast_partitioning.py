@@ -84,6 +84,7 @@ class TestFastPartitioning(TestCase):
             1,
             "All operators are supported, there should be one segment",
         )
+
     @pytest.mark.critical
     def test_partition_partially_supported_multi_op(self):
         class PartiallySupportedMultiOp(torch.nn.Module):
