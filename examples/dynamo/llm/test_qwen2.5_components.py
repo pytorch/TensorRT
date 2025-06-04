@@ -6,7 +6,6 @@ torch.backends.cudnn.allow_tf32 = False
 import torch.nn as nn
 from torch.testing._internal.common_utils import run_tests
 from torch.testing._internal.common_utils import TestCase
-from transformers.models.llama.modeling_llama import LlamaAttention, LlamaDecoderLayer
 from transformers.models.llama.configuration_llama import LlamaConfig
 from transformers import AutoModelForCausalLM
 import torch_tensorrt

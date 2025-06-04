@@ -41,7 +41,7 @@ def get_model(args):
                     args.model,
                     use_cache=False,
                     attn_implementation="sdpa",
-                    # num_hidden_layers=1
+                    num_hidden_layers=2
                 )
                 .eval()
                 .cuda()
@@ -59,7 +59,7 @@ def get_model(args):
 def compile_torchtrt(model, input_ids, args):
     max_seq_len = input_ids.shape[1] + args.num_tokens
     ep = export_llm(model, input_ids, max_seq_len=max_seq_len)
-
+    position_ids = torch.arange(input_ids.shape[1]).unsqueeze(0).to(DEVICE)
     # Set precision specific flags
     use_fp32_acc = False 
     use_explicit_typing = False
@@ -76,7 +76,7 @@ def compile_torchtrt(model, input_ids, args):
     with (torch_tensorrt.logging.debug() if args.debug else nullcontext()):
         trt_model = torch_tensorrt.dynamo.compile(
             ep,
-            inputs=[input_ids],
+            inputs=[input_ids, position_ids],
             enabled_precisions=enabled_precisions,
             # truncate_double=True,
             use_explicit_typing=use_explicit_typing,
