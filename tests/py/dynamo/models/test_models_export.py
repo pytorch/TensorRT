@@ -279,7 +279,7 @@ def test_base_int8(ir):
         """Simple calibration function for testing."""
         model(input_tensor)
 
-    input_tensor = torch.randn(1, 10).cuda()
+    input_tensor = torch.randn(3, 10).cuda()
     model = SimpleNetwork().eval().cuda()
 
     quant_cfg = mtq.INT8_DEFAULT_CFG
