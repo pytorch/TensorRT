@@ -40,7 +40,7 @@ jobs:
         id: filter
         env:
            LIMIT_PR_BUILDS: ${{ github.event_name == 'pull_request' && !contains( github.event.pull_request.labels.*.name, 'ciflow/binaries/all') }}
-           NIGHTLY_BUILDS: ${{ inputs.trigger-event == 'push' && startsWith(github.event.ref, 'refs/heads/nightly' }}
+           NIGHTLY_BUILDS: ${{ inputs.trigger-event == 'push' && startsWith(github.event.ref, 'refs/heads/nightly') }}
         run: |
           set -eou pipefail
           echo "LIMIT_PR_BUILDS=${LIMIT_PR_BUILDS}"
