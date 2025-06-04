@@ -92,6 +92,14 @@ def main(args: list[str]) -> None:
         default=os.getenv("LIMIT_PR_BUILDS", "false"),
     )
 
+    parser.add_argument(
+        "--is-nightly",
+        help="If it is a nightly build",
+        type=str,
+        choices=["true", "false"],
+        default=os.getenv("LIMIT_PR_BUILDS", "false"),
+    )
+
     options = parser.parse_args(args)
     if options.matrix == "":
         raise ValueError("--matrix needs to be provided")
@@ -104,8 +112,6 @@ def main(args: list[str]) -> None:
     except ValueError as e:
         raise ValueError(f"Invalid matrix structure: {e}")
 
-    nightly_builds = os.getenv("NIGHTLY_BUILDS", "false")
-
     includes = matrix_dict["include"]
     filtered_includes = []
 
@@ -114,7 +120,7 @@ def main(args: list[str]) -> None:
             item,
             options.jetpack == "true",
             options.limit_pr_builds == "true",
-            nightly_builds == "true",
+            options.is_nightly == "true",
         ):
             filtered_includes.append(item)
 
