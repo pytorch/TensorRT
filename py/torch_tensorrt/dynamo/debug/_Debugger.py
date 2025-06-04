@@ -30,9 +30,33 @@ class Debugger:
         capture_fx_graph_before: Optional[List[str]] = None,
         capture_fx_graph_after: Optional[List[str]] = None,
         save_engine_profile: bool = False,
+        profile_format: str = "perfetto",
         engine_builder_monitor: bool = True,
         logging_dir: str = tempfile.gettempdir(),
+        save_layer_info: bool = False,
     ):
+        """Initialize a debugger for TensorRT conversion.
+
+        Args:
+            log_level (str): Logging level to use. Valid options are:
+                'debug', 'info', 'warning', 'error', 'internal_errors', 'graphs'.
+                Defaults to 'debug'.
+            capture_fx_graph_before (List[str], optional): List of pass names to visualize FX graph
+                before execution of a lowering pass. Defaults to None.
+            capture_fx_graph_after (List[str], optional): List of pass names to visualize FX graph
+                after execution of a lowering pass. Defaults to None.
+            save_engine_profile (bool): Whether to save TensorRT engine profiling information.
+                Defaults to False.
+            profile_format (str): Format for profiling data. Can be either 'perfetto' or 'trex'.
+                If you need to generate engine graph using the profiling files, set it to 'trex' .
+                Defaults to 'perfetto'.
+            engine_builder_monitor (bool): Whether to monitor TensorRT engine building process.
+                Defaults to True.
+            logging_dir (str): Directory to save debug logs and profiles.
+                Defaults to system temp directory.
+            save_layer_info (bool): Whether to save layer info.
+                Defaults to False.
+        """
 
         os.makedirs(logging_dir, exist_ok=True)
         self.cfg = DebuggerConfig(
@@ -40,6 +64,8 @@ class Debugger:
             save_engine_profile=save_engine_profile,
             engine_builder_monitor=engine_builder_monitor,
             logging_dir=logging_dir,
+            profile_format=profile_format,
+            save_layer_info=save_layer_info,
         )
 
         if log_level == "debug":

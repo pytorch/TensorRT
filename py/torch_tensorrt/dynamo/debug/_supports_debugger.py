@@ -1,12 +1,10 @@
 from typing import Any, Callable, Type, TypeVar
 
 T = TypeVar("T")
-
+F = TypeVar("F", bound=Callable[..., Any])
 
 _DEBUG_ENABLED_FUNCS = []
 _DEBUG_ENABLED_CLS = []
-
-F = TypeVar("F", bound=Callable[..., Any])
 
 
 def fn_supports_debugger(func: F) -> F:

@@ -719,7 +719,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                 if self.compilation_settings.reuse_cached_engines:
                     interpreter_result = self._pull_cached_engine(hash_val)
                     if interpreter_result is not None:  # hit the cache
-                        return interpreter_result
+                        return interpreter_result  # type: ignore[no-any-return]
 
         self._construct_trt_network_def()
 

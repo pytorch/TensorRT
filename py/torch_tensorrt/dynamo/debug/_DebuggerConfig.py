@@ -8,3 +8,5 @@ class DebuggerConfig:
     save_engine_profile: bool = False
     engine_builder_monitor: bool = True
     logging_dir: str = tempfile.gettempdir()
+    profile_format: str = "perfetto"
+    save_layer_info: bool = False
