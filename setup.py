@@ -79,8 +79,8 @@ load_dep_info()
 dir_path = os.path.join(str(get_root_dir()), "py")
 
 IS_AARCH64 = platform.uname().processor == "aarch64"
-IS_JETPACK = False
-IS_SBSA = False
+IS_JETPACK = True if "tegra" in platform.uname().release else False
+
 PY_ONLY = False
 NO_TS = False
 LEGACY = False
@@ -122,11 +122,11 @@ if (release_env_var := os.environ.get("RELEASE")) is not None:
 if (gpu_arch_version := os.environ.get("CU_VERSION")) is None:
     gpu_arch_version = f"cu{__cuda_version__.replace('.','')}"
 
-if (jetpack := os.environ.get("JETPACK_BUILD")) is not None:
+if IS_AARCH64 and (jetpack := os.environ.get("JETPACK_BUILD")) is not None:
     if jetpack == "1":
         IS_JETPACK = True
 
-if (sbsa := os.environ.get("SBSA_BUILD")) is not None:
+if IS_AARCH64 and (sbsa := os.environ.get("SBSA_BUILD")) is not None:
     if sbsa == "1":
         IS_SBSA = True
 
@@ -147,10 +147,28 @@ if (ci_env_var := os.environ.get("CI_BUILD")) is not None:
 if IS_AARCH64:
     if "--jetpack" in sys.argv:
         sys.argv.remove("--jetpack")
+        # this is used to simulate the jetpack build on aarch64 machines(non-tegra platforms)
         IS_JETPACK = True
     else:
         IS_SBSA = True
 
+IS_SBSA = True if IS_AARCH64 and not IS_JETPACK else False
+
+if IS_JETPACK and "bdist_wheel" in sys.argv:
+    needs_append_plat_name = True
+    for i, arg in enumerate(sys.argv):
+        if (
+            arg == "--plat-name"
+            and i + 1 < len(sys.argv)
+            and sys.argv[i + 1] == "linux_tegra_aarch64"
+        ):
+            needs_append_plat_name = False
+            break
+        if arg == "--plat-name=linux_tegra_aarch64":
+            needs_append_plat_name = False
+            break
+    if needs_append_plat_name:
+        sys.argv.append("--plat-name=linux_tegra_aarch64")
 
 BAZEL_EXE = None
 if not PY_ONLY:

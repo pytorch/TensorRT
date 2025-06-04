@@ -21,6 +21,7 @@ def runtime_test(name, visibility = None):
         ] + select({
             ":windows": ["@libtorch_win//:libtorch"],
             ":use_torch_whl": ["@torch_whl//:libtorch"],
+            ":jetpack": ["@torch_l4t//:libtorch"],
             "//conditions:default": ["@libtorch"],
         }),
     )
