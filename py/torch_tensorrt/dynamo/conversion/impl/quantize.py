@@ -38,7 +38,7 @@ def quantize(
                 torch.float32,
             ):
                 raise ValueError(
-                    f"quantize converter received an input of {input_tensor.dtype} type. Supported types: float32 | float16"
+                    f"quantize converter received an input of {input_tensor.dtype} type. Supported types: float32 | float16 | bfloat16"
                 )
             if num_bits != 8 or exponent_bits not in (0, 4):
                 raise ValueError(
