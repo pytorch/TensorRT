@@ -9,7 +9,7 @@ from torch.testing._internal.common_cuda import (
 )
 from torch.testing._internal.common_utils import TestCase, run_tests
 from torch_tensorrt.dynamo.utils import ATOL, RTOL
-
+import pytest
 from ..testing_utilities import DECIMALS_OF_AGREEMENT, lower_graph_testing
 
 

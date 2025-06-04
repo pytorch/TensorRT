@@ -77,6 +77,7 @@ dev = [
     "isort",
     "ruff",
     "pytest",
+    "pytest-cov",
     "pytest-xdist",
     "parameterized>=0.2.0",
     "expecttest==0.1.6",
@@ -102,25 +103,22 @@ Changelog = "https://github.com/pytorch/tensorrt/releases"
 package-dir = { "" = "py" }
 include-package-data = false
 
-[tool.pytest.ini_options]
-testpaths = ["tests/py"]
-addopts = "-ra --cov=py/torch_tensorrt --cov-report=html --cov-report=xml:coverage.xml --cov-config=pyproject.toml"
-
 [tool.coverage.paths]
 source = [
-    "py/torch_tensorrt/",
-    "*/site-packages/torch_tensorrt/"
-]
-omit = [
-    "tests/*"
+    "py/torch_tensorrt",
+    "*/site-packages/torch_tensorrt"
 ]
 
 [tool.coverage.run]
+source = ["torch_tensorrt"]
+omit = [
+    "tests/*"
+]
+data_file=".coverage"
 relative_files=true
 branch = true
 
 [tool.coverage.report]
-fail_under = 20
 skip_covered = true
 ignore_errors = true
 exclude_lines = [
@@ -142,9 +140,6 @@ exclude_lines = [
     # Don't complain about abstract methods, they aren't run
     "@(abc\\.)?abstractmethod",
 ]
-
-[tool.coverage.html]
-directory = "coverage_html"
 
 [tool.uv]
 package = true

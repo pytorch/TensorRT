@@ -84,7 +84,7 @@ class TestFastPartitioning(TestCase):
             1,
             "All operators are supported, there should be one segment",
         )
-
+    @pytest.mark.critical
     def test_partition_partially_supported_multi_op(self):
         class PartiallySupportedMultiOp(torch.nn.Module):
             def __init__(self, *args, **kwargs) -> None:
@@ -114,6 +114,7 @@ class TestFastPartitioning(TestCase):
             "Unsupported operators interleave supported ones, expected 2 segments",
         )
 
+    @pytest.mark.critical
     def test_partition_partially_supported_with_torch_executed_ops(self):
         class PartiallySupportedMultiOp(torch.nn.Module):
             def __init__(self, *args, **kwargs) -> None:

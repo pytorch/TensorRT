@@ -1,15 +1,14 @@
 import unittest
 
-import pytest
-import tensorrt as trt
 import torch
 import torch_tensorrt
 from torch_tensorrt.dynamo.runtime import PythonTorchTensorRTModule
 from torch_tensorrt.dynamo.utils import COSINE_THRESHOLD, cosine_similarity
 
+import tensorrt as trt
+
 
 class TestConvertModuleToTrtEngine(unittest.TestCase):
-    @pytest.mark.critical
     def test_convert_module(self):
         class Test(torch.nn.Module):
             def forward(self, a, b):

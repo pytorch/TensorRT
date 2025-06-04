@@ -6,6 +6,7 @@ numpy
 parameterized>=0.2.0
 pytest>=8.2.1
 pytest-xdist>=3.6.1
+pytest-cov
 pyyaml
 timm>=1.0.3
 flashinfer-python;  python_version < "3.13"
