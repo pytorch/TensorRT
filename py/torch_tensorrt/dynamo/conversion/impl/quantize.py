@@ -29,10 +29,11 @@ def quantize(
 
     with unset_fake_temporarily():
         if isinstance(input_tensor, (torch.Tensor, TRTTensor)):
-
             if input_tensor.dtype not in (
                 trt.float32,
                 trt.float16,
+                trt.bfloat16,
+                torch.bfloat16,
                 torch.float16,
                 torch.float32,
             ):
