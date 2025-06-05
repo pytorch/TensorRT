@@ -8,6 +8,7 @@ import re
 
 import modelopt.torch.opt as mto
 import modelopt.torch.quantization as mtq
+import register_sdpa
 import torch
 import torch_tensorrt
 from diffusers import FluxPipeline

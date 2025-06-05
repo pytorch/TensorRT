@@ -1,5 +1,6 @@
 from time import time
 
+import register_sdpa
 import torch
 import torch_tensorrt
 from diffusers import FluxPipeline

@@ -4,19 +4,34 @@ import operator
 from typing import Callable, Sequence, Tuple
 
 import torch
+from sdpa_converter import *
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.conversion.aten_ops_converters import args_bounds_check
+from torch_tensorrt.dynamo.lowering import TORCH_TRT_DECOMPOSITIONS
+from torch_tensorrt.dynamo.lowering.passes._aten_lowering_pass import (
+    _aten_lowering_pass,
+)
 from torch_tensorrt.dynamo.lowering.passes.pass_utils import (
     clean_up_graph_after_modifications,
 )
 
 logger = logging.getLogger(__name__)
+
+# Remove decompositions for aten.scaled_dot_product_attention, aten._scaled_dot_product_efficient_attention, aten._scaled_dot_product_flash_attention
+# This is because we want to have SDPA as a standalone operator in the graph and invoke the custom converter for it.
+TORCH_TRT_DECOMPOSITIONS.pop(torch.ops.aten.scaled_dot_product_attention.default)
+TORCH_TRT_DECOMPOSITIONS.pop(
+    torch.ops.aten._scaled_dot_product_efficient_attention.default
+)
+TORCH_TRT_DECOMPOSITIONS.pop(torch.ops.aten._scaled_dot_product_flash_attention.default)
+
 REPLACEABLE_ATEN_OPS = {
     torch.ops.aten._scaled_dot_product_efficient_attention.default,
     torch.ops.aten._scaled_dot_product_flash_attention.default,
 }
 
 
+@_aten_lowering_pass
 def lower_scaled_dot_product_attention(
     gm: torch.fx.GraphModule, settings: CompilationSettings
 ) -> torch.fx.GraphModule:
