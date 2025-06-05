@@ -97,7 +97,7 @@ def main(args: list[str]) -> None:
         help="If it is a nightly build",
         type=str,
         choices=["true", "false"],
-        default=os.getenv("LIMIT_PR_BUILDS", "false"),
+        default=os.getenv("NIGHTLY_BUILDS", "false"),
     )
 
     options = parser.parse_args(args)
