@@ -68,15 +68,16 @@ def scaled_dot_product_attention(
     source_ir = SourceIR.ATEN
 
     # implementation as described here: https://pytorch.org/docs/stable/generated/torch.nn.functional.scaled_dot_product_attention.html
-    use_fp32_acc = kwargs.get("use_fp32_acc", False)
+    use_fp32_acc = False # kwargs.get("use_fp32_acc", False)
     query_dtype = query.dtype
-    # if use_fp32_acc and query_dtype == trt.float16:
-    #     query = cast_trt_tensor(
-    #             ctx, query, trt.float32, name + "_query_cast_to_fp32", target, source_ir
-    #         )
-    #     key = cast_trt_tensor(
-    #             ctx, key, trt.float32, name + "_key_cast_to_fp32", target, source_ir
-    #         )
+
+    if use_fp32_acc and query_dtype == trt.float16:
+        query = cast_trt_tensor(
+                ctx, query, trt.float32, name + "_query_cast_to_fp32", target, source_ir
+            )
+        key = cast_trt_tensor(
+                ctx, key, trt.float32, name + "_key_cast_to_fp32", target, source_ir
+            )
 
     if scale is None:
         scale = query.shape[-1]
@@ -115,10 +116,10 @@ def scaled_dot_product_attention(
         other_matrix_op=trt.MatrixOperation.TRANSPOSE,
     )
     
-    # if use_fp32_acc:
-    #     mm = cast_trt_tensor(
-    #             ctx, mm, query_dtype, name + "_mm_cast_to_fp16", target, source_ir
-    #         )
+    if use_fp32_acc:
+        mm = cast_trt_tensor(
+                ctx, mm, query_dtype, name + "_mm_cast_to_fp16", target, source_ir
+            )
 
     # If is_causal is True, we need to generate a causal mask
     if is_causal:
@@ -176,13 +177,13 @@ def scaled_dot_product_attention(
     softmax = impl.normalization.softmax(
         ctx, target, source_ir, name + "_softmax", scaled_add_attn_bias, -1, False
     )
-    # if use_fp32_acc:
-    #     softmax = cast_trt_tensor(
-    #             ctx, softmax, trt.float32, name + "_softmax_cast_to_fp32", target, source_ir
-    #         )
-    #     value = cast_trt_tensor(
-    #             ctx, value, trt.float32, name + "_value_cast_to_fp32", target, source_ir
-    #         )
+    if use_fp32_acc:
+        softmax = cast_trt_tensor(
+                ctx, softmax, trt.float32, name + "_softmax_cast_to_fp32", target, source_ir
+            )
+        value = cast_trt_tensor(
+                ctx, value, trt.float32, name + "_value_cast_to_fp32", target, source_ir
+            )
     out = impl.matmul.matrix_multiply(
         ctx,
         target,
@@ -191,9 +192,9 @@ def scaled_dot_product_attention(
         softmax,
         value,
     )
-    # if use_fp32_acc:
-    #     out = cast_trt_tensor(
-    #             ctx, out, query_dtype, name + "_out_cast_to_fp16", target, source_ir
-    #         )
+    if use_fp32_acc:
+        out = cast_trt_tensor(
+                ctx, out, query_dtype, name + "_out_cast_to_fp16", target, source_ir
+            )
 
     return out
