@@ -59,18 +59,17 @@ def quantize(
         amax = to_torch(amax, None)
         axis = None
         # int8 weight quantization is per-channel quantization(it can have one or multiple amax values)
-        if dtype == trt.DataType.INT8 and ".weight_quantizer" in name:
+        if dtype == trt.DataType.INT8 and amax.numel() > 1:
             # if the amax has more than one element, calculate the axis, otherwise axis value will be ignored
-            if amax.numel() > 1:
-                amax_init_shape = amax.shape
-                amax = amax.squeeze().data
-                assert (
-                    len(amax.shape) == 1
-                ), f"TensorRT does not support multi-axis quantization. {name=} {amax_init_shape=} {amax.shape=} "
-                axis = list(amax_init_shape).index(list(amax.shape)[0])
-                assert (
-                    axis == 0
-                ), f"{name=} {amax=} is per-channel quantization, expected axis to be 0, but got {axis=}"
+            amax_init_shape = amax.shape
+            amax = amax.squeeze().data
+            assert (
+                len(amax.shape) == 1
+            ), f"TensorRT does not support multi-axis quantization. {name=} {amax_init_shape=} {amax.shape=} "
+            axis = list(amax_init_shape).index(list(amax.shape)[0])
+            assert (
+                axis == 0
+            ), f"{name=} {amax=} is per-channel quantization, expected axis to be 0, but got {axis=}"
         else:
             # int8 activation and fp8 weight/activation quantization is per-tensor quantization, it can only have single amax value
             assert (
