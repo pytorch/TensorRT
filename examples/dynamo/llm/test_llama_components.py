@@ -103,7 +103,7 @@ def test_llama_attention_with_static_cache(args):
     class LlamaAttentionBlock(nn.Module):
         def __init__(self):
             super().__init__()
-            self.config = LLAMA_CONFIG
+                self.config = LLAMA_CONFIG
             self.attn = LlamaAttention(
                 config=self.config,
                 layer_idx=0

@@ -40,9 +40,9 @@ def export_llm(model, inputs, min_seq_len=1, max_seq_len=16):
 
     return ep
 
-def get_zeroed_kv_cache_inputs(model: torch.fx.GraphModule):
+def get_zeroed_static_cache_inputs(model: torch.fx.GraphModule):
     """
-    Extracts and returns zeroed KV cache tensors from a torch.fx.GraphModule.
+    Extracts and returns zeroed static KV cache tensors from a torch.fx.GraphModule. This should only be used for static cache_v1 and static cache_v2.
     
     This function identifies placeholder nodes in the graph that represent KV cache tensors,
     and creates zeroed tensors with the same shape, dtype, and device as the original placeholders.
@@ -58,6 +58,30 @@ def get_zeroed_kv_cache_inputs(model: torch.fx.GraphModule):
     placeholder_nodes = [node for node in model.graph.nodes if node.op == "placeholder"]
     # The first two inputs are input_ids, position_ids. The last three inputs are start_idx, end_idx and is_causal. In between are the KV cache tensors.
     kv_cache_inputs = placeholder_nodes[2:-3]
+    zeroed_kv_cache_inputs = []
+    for input in kv_cache_inputs:
+        zeroed_kv_cache_inputs.append(torch.zeros(input.meta["val"].shape, dtype=input.meta["val"].dtype, device=torch.device("cuda:0")))
+
+    return tuple(zeroed_kv_cache_inputs)
+
+def get_zeroed_dynamic_cache_inputs(model: torch.fx.GraphModule):
+    """
+    Extracts and returns zeroed KV cache tensors from a torch.fx.GraphModule. This should only be used for dynamic cache.
+    
+    This function identifies placeholder nodes in the graph that represent KV cache tensors,
+    and creates zeroed tensors with the same shape, dtype, and device as the original placeholders.
+    
+    Args:
+        model (torch.fx.GraphModule): The exported model graph containing KV cache placeholders
+        
+    Returns:
+        tuple: A tuple of zeroed tensors corresponding to the KV cache placeholders in the graph
+    """
+    # placeholder nodes are expected to be in the following order:
+    # input_ids, kv_cache_key, kv_cache_value, start_idx, end_idx
+    placeholder_nodes = [node for node in model.graph.nodes if node.op == "placeholder"]
+    # The first two inputs are input_ids, position_ids. The last input is is_generate. In between are the KV cache tensors.
+    kv_cache_inputs = placeholder_nodes[2:-1]
     zeroed_kv_cache_inputs = []
     for input in kv_cache_inputs:
         zeroed_kv_cache_inputs.append(torch.zeros(input.meta["val"].shape, dtype=input.meta["val"].dtype, device=torch.device("cuda:0")))
@@ -93,9 +117,9 @@ def generate(model, input_seq, max_output_seq_length, eos_token_id, benchmark=Tr
 
     return input_seq
 
-def generate_with_kv_cache(model, input_seq, max_output_seq_length, eos_token_id):
+def generate_with_static_cache(model, input_seq, max_output_seq_length, eos_token_id):
     """
-    Greedy decoding of the model with KV cache.
+    Greedy decoding of the model with static KV cache.
     """
     start_idx = 0
     end_idx = input_seq.shape[1]
@@ -104,7 +128,7 @@ def generate_with_kv_cache(model, input_seq, max_output_seq_length, eos_token_id
     # TODO: Confirm this: When end_idx = max_output_seq_length-1, number of tokens generated = OSL
     logits_concat = []
     num_tokens_generated = 0
-    kv_cache = get_zeroed_kv_cache_inputs(model)
+    kv_cache = get_zeroed_static_cache_inputs(model)
     while end_idx < max_output_seq_length:
         is_causal = True if input_seq.shape[1] > 1 else False
         position_ids = torch.tensor([[start_idx]], dtype=torch.int64).cuda() if input_seq.shape[1] == 1 else position_ids
@@ -120,8 +144,34 @@ def generate_with_kv_cache(model, input_seq, max_output_seq_length, eos_token_id
         input_seq = next_tokens
         start_idx = end_idx
         end_idx = start_idx + 1 
-    lkv = torch.cat(logits_concat, dim=1)
     return output_seq
+
+def generate_with_dynamic_cache(model, input_seq, max_output_seq_length, eos_token_id):
+    """
+    Greedy decoding of the model with dynamic KV cache.
+    """
+    position_ids = torch.arange(input_seq.shape[1]).unsqueeze(0).cuda()
+    output_seq = input_seq.clone()
+    num_output_tokens = max_output_seq_length - input_seq.shape[1]
+    num_tokens_generated = 0
+    kv_cache = get_zeroed_dynamic_cache_inputs(model)
+    last_position_id = position_ids[-1, -1].item()
+    breakpoint()
+    while num_tokens_generated < num_output_tokens:
+        is_generate = False if input_seq.shape[1] > 1 else True
+        position_ids = torch.tensor([[last_position_id+1]], dtype=torch.int64).cuda() if input_seq.shape[1] == 1 else position_ids
+        input_signature = (input_seq, position_ids, *kv_cache, is_generate)
+        logits_keys_values = model(*input_signature)
+        num_tokens_generated += 1
+        logits = logits_keys_values[0]
+        kv_cache = logits_keys_values[1:]
+        next_token_logits = logits[:, -1, :]
+        next_tokens = torch.argmax(next_token_logits, dim=-1, keepdim=True)
+        output_seq = torch.cat([output_seq, next_tokens], dim=-1)
+        input_seq = next_tokens
+        last_position_id += 1
+    return output_seq
+
 
 def time_generate(
     generate_fn, model, inputs, output_seq_length, eos_token_id, iterations=10

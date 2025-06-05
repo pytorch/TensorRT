@@ -19,7 +19,7 @@ import torch
 import torch_tensorrt
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from contextlib import nullcontext
-from utils import export_llm, generate, recordStats, time_generate, generate_with_kv_cache
+from utils import export_llm, generate, recordStats, time_generate, generate_with_static_cache, generate_with_dynamic_cache
 import sys
 import os
 
@@ -41,7 +41,7 @@ def get_model(args):
                     args.model,
                     use_cache=False,
                     attn_implementation="sdpa",
-                    num_hidden_layers=2
+                    # num_hidden_layers=2
                 )
                 .eval()
                 .cuda()
@@ -238,19 +238,32 @@ if __name__ == "__main__":
 
         trt_model = compile_torchtrt(model, input_ids, args) 
             
-        if args.cache == "static_v1" or args.cache == "static_v2" or args.cache == "dynamic":
+        if args.cache == "static_v1" or args.cache == "static_v2":
             if args.cudagraph:
                 # Run a decoding loop with prefill and generate phases so that the CUDAGraph is recorded for both of these phases.
                 # trt_input_signature = (input_ids.clone(),) + get_zeroed_kv_cache_inputs(trt_model)
                 torch_tensorrt.runtime.set_cudagraphs_mode(True)
              
-            trt_gen_tokens = generate_with_kv_cache(
+            trt_gen_tokens = generate_with_static_cache(
                 trt_model, input_ids.clone(), MAX_OUTPUT_SEQ_LENGTH, tokenizer.eos_token_id,
                 )
 
             if args.benchmark:
                 trt_timings = time_generate(
-                    generate_with_kv_cache,
+                    generate_with_static_cache,
+                    trt_model,
+                    input_ids.clone(),
+                    MAX_OUTPUT_SEQ_LENGTH,
+                    tokenizer.eos_token_id,
+                    iterations=args.iterations,
+                )
+        elif args.cache == "dynamic":
+            trt_gen_tokens = generate_with_dynamic_cache(
+                trt_model, input_ids.clone(), MAX_OUTPUT_SEQ_LENGTH, tokenizer.eos_token_id,
+            )
+            if args.benchmark:
+                trt_timings = time_generate(
+                    generate_with_dynamic_cache,
                     trt_model,
                     input_ids.clone(),
                     MAX_OUTPUT_SEQ_LENGTH,

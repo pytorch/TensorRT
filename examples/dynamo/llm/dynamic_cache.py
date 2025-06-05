@@ -146,10 +146,15 @@ def add_kv_and_indices_as_inputs(gm, fixed_kv: bool = True):
             v_input = add_graph_input(gm, key_value[1].name+"_v_input", v_val)
             kv_inputs.append((k_input, v_input))
 
-        return kv_inputs
+
+        # Add is_generate as input
+        is_generate_input = add_graph_input(gm, "is_generate", True)
+        is_generate_input.meta["val"] = torch.tensor(True)
+
+        return kv_inputs, is_generate_input
 
 
-def insert_torch_cond_before_sdpa(gm, incoming_keys_values: List[Tuple[torch.Tensor, torch.Tensor]]):
+def insert_torch_cond_before_sdpa(gm, incoming_keys_values: List[Tuple[torch.Tensor, torch.Tensor]], is_generate_input: torch.Tensor):
     """
     Insert a torch.cond operation before each scaled_dot_product_attention operation.
     
@@ -164,9 +169,6 @@ def insert_torch_cond_before_sdpa(gm, incoming_keys_values: List[Tuple[torch.Ten
     for node in gm.graph.nodes:
         if node.op == "call_function" and node.target == torch._C._nn.scaled_dot_product_attention:
             sdpa_nodes.append(node)
-    
-    # Get the is_causal input node 
-    is_causal_node = next((node for node in gm.graph.nodes if node.op == "placeholder" and node.name == "is_causal"), None)
 
     # For each SDPA node, insert a torch.cond operation before it
     for idx, sdpa_node in enumerate(sdpa_nodes):
@@ -193,13 +195,13 @@ def insert_torch_cond_before_sdpa(gm, incoming_keys_values: List[Tuple[torch.Ten
             cond_k_node = gm.graph.create_node(
                 "call_function",
                 torch.ops.higher_order.cond,
-                args=(is_causal_node, concatenated_k_node, k_node),
+                args=(is_generate_input, concatenated_k_node, k_node),
             )
  
             cond_v_node = gm.graph.create_node(
                 "call_function",
                 torch.ops.higher_order.cond,
-                args=(is_causal_node, concatenated_v_node, v_node),
+                args=(is_generate_input, concatenated_v_node, v_node),
             )
 
             sdpa_node.args = (q_node, cond_k_node, cond_v_node) + sdpa_node.args[3:]
@@ -216,13 +218,13 @@ def insert_dynamic_kv_cache(
     """Perform insertion of kv-caches and attention kernel."""
 
     # Add static key and value as inputs to the graph
-    kv_inputs  = add_kv_and_indices_as_inputs(gm, fixed_kv=True)
+    kv_inputs, is_generate_input = add_kv_and_indices_as_inputs(gm, fixed_kv=True)
 
     # Call the function to add KV as outputs
     logits_keys_values = add_kv_as_outputs(gm)
 
     # Insert torch.cond before each SDPA node which acts toggles between prefill and generate phases
-    gm = insert_torch_cond_before_sdpa(gm, kv_inputs)
+    gm = insert_torch_cond_before_sdpa(gm, kv_inputs, is_generate_input)
 
     gm = clean_up_graph_after_modifications(gm)
     
