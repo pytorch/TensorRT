@@ -45,7 +45,7 @@ jobs:
           set -eou pipefail
           echo "LIMIT_PR_BUILDS=${LIMIT_PR_BUILDS}"
           echo "NIGHTLY_BUILDS=${NIGHTLY_BUILDS}"
-          echo
+          echo '${{ toJson(github)}}'
           MATRIX_BLOB=${{ toJSON(needs.generate-matrix.outputs.matrix) }}
           MATRIX_BLOB="$(python3 .github/scripts/filter-matrix.py --matrix "${MATRIX_BLOB}" --jetpack true --limit-pr-builds "${LIMIT_PR_BUILDS}" --is-nightly "${NIGHTLY_BUILDS}")"
           echo "${MATRIX_BLOB}"
