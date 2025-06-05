@@ -365,7 +365,7 @@ def create_constant(
 
         if torch_value is not None:
             if torch_value.dtype in (torch.float8_e4m3fn, torch.uint8):
-                # global_reference_holder.append(torch_value)
+
                 # Iconstant layer does not support Uint8, it only support that FP4 data packed in uint8
                 if torch_value.dtype == torch.uint8:
                     count = torch_value.numel() * 2
@@ -384,8 +384,10 @@ def create_constant(
                     weights,
                 )
                 constant.name = name
-                # TODO: confirm with @dheeraj whether it is ok to put the torch tensor here, since the fp8 torch tensor cannot have the equivalent of numpy array
+                # TODO: confirm with @dheeraj @naren whether i can use ctx.mapping as the reference holder to prevent the torch tensor being garbage collected.
                 ctx.mapping[name + " CONSTANT"] = torch_value.reshape(-1)
+                # if yes, then the following global_reference_holder is no longer needed
+                # global_reference_holder.append(torch_value)
                 return constant.get_output(0)
 
             if torch_value.dtype == torch.bfloat16:
