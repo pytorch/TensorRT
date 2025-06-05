@@ -76,3 +76,6 @@ tests/py/dynamo/models/*.ep
 *.tar.xz
 MODULE.bazel.lock
 *.whl
+.coverage
+coverage.xml
+*.log
