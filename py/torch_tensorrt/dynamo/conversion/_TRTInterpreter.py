@@ -39,7 +39,7 @@ from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
     CallingConvention,
 )
 from torch_tensorrt.dynamo.conversion._TRTBuilderMonitor import TRTBulderMonitor
-from torch_tensorrt.dynamo.conversion.converter_utils import (  # global_reference_holder,
+from torch_tensorrt.dynamo.conversion.converter_utils import (
     get_node_io,
     get_node_name,
     get_trt_tensor,
@@ -425,14 +425,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         state_dict: state of the graph module
         """
         with unset_fake_temporarily():
-            if isinstance(np_map[weight_name], np.ndarray):
-                network_weight = torch.from_numpy(np_map[weight_name]).to(device)
-            elif isinstance(np_map[weight_name], torch.Tensor):
-                network_weight = np_map[weight_name].to(device)
-            else:
-                raise ValueError(
-                    f"Unsupported weight type: {type(np_map[weight_name])}, currently only support numpy.ndarray | torch.Tensor"
-                )
+            network_weight = torch.from_numpy(np_map[weight_name]).to(device)
             for sd_w_name, sd_weight in state_dict.items():
                 if TRTInterpreter.check_weight_equal(sd_weight, network_weight, device):
                     del state_dict[sd_w_name]
@@ -756,8 +749,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             self.ctx.net, builder_config
         )
         assert serialized_engine
-        # clear the global reference holder after engin is built
-        # global_reference_holder.clear()
+
         _LOGGER.info(
             f"Build TRT engine elapsed time: {datetime.now() - build_engine_start_time}"
         )

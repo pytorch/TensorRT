@@ -33,7 +33,7 @@ def quantize(
     """
     if len(input_tensor.shape) not in (2, 3):
         raise ValueError(
-            f"nvfp4_quantize converter received an input of {input_tensor.shape} shape. Supported shapes: 2D or 3D"
+            f"dynamic_block_quantize converter received an input of {input_tensor.shape} shape. Supported shapes: 2D or 3D"
         )
     with unset_fake_temporarily():
         axis = -1

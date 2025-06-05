@@ -25,9 +25,6 @@ from ..types import Shape, TRTDataType, TRTLayer, TRTTensor
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
-# global reference holder for the objects that should not be garbage collected before the engine is built
-global_reference_holder: List[torch.Tensor] = []
-
 
 def get_node_name(node: torch.fx.Node) -> str:
     # nn_module_stack preserves the call stack of pytorch nn.modules
@@ -364,30 +361,34 @@ def create_constant(
             shape = list(torch_value.shape)
 
         if torch_value is not None:
-            if torch_value.dtype in (torch.float8_e4m3fn, torch.uint8):
-
-                # Iconstant layer does not support Uint8, it only support that FP4 data packed in uint8
-                if torch_value.dtype == torch.uint8:
-                    count = torch_value.numel() * 2
-                    shape[-1] = shape[-1] * 2
-                    dtype = trt.DataType.FP4
-                else:
-                    count = torch_value.numel()
-                    dtype = trt.DataType.FP8
+            if torch_value.dtype == torch.float8_e4m3fn:
                 weights = trt.Weights(
-                    type=dtype,
+                    type=trt.DataType.FP8,
                     ptr=torch_value.data_ptr(),
-                    count=count,
+                    count=torch_value.numel(),
                 )
                 constant = ctx.net.add_constant(
                     shape,
                     weights,
                 )
                 constant.name = name
-                # TODO: confirm with @dheeraj @naren whether i can use ctx.mapping as the reference holder to prevent the torch tensor being garbage collected.
-                ctx.mapping[name + " CONSTANT"] = torch_value.reshape(-1)
-                # if yes, then the following global_reference_holder is no longer needed
-                # global_reference_holder.append(torch_value)
+                ctx.weights_reference_holder[name + " FP8_CONSTANT"] = torch_value
+                return constant.get_output(0)
+
+            if torch_value.dtype == torch.uint8:
+                # Iconstant layer does not support Uint8, it only support that FP4 data packed in uint8
+                shape[-1] = shape[-1] * 2
+                weights = trt.Weights(
+                    type=trt.DataType.FP4,
+                    ptr=torch_value.data_ptr(),
+                    count=torch_value.numel() * 2,
+                )
+                constant = ctx.net.add_constant(
+                    shape,
+                    weights,
+                )
+                constant.name = name
+                ctx.weights_reference_holder[name + " FP4_CONSTANT"] = torch_value
                 return constant.get_output(0)
 
             if torch_value.dtype == torch.bfloat16:
