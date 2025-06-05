@@ -11,6 +11,8 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
 )
 from torch_tensorrt.dynamo.types import TRTTensor
 
+from packaging import version as pkg_version
+
 logger = logging.getLogger(__name__)
 
 
@@ -24,7 +26,7 @@ def unsqueeze(
 ) -> TRTTensor:
     from importlib.metadata import version
 
-    if version("tensorrt") < "10.7.0":
+    if pkg_version.parse(version("tensorrt")) < pkg_version.parse("10.7.0"):
         logger.warning(
             f"IUnsqueezeLayer is supported starting from TensorRT 10.7.0, using the old unsqueeze implementation in the current TensorRT version: {version('tensorrt')}"
         )
