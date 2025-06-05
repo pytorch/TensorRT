@@ -43,6 +43,7 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     get_node_io,
     get_node_name,
     get_trt_tensor,
+    global_reference_holder,
     to_torch,
 )
 from torch_tensorrt.dynamo.utils import DYNAMIC_DIM, deallocate_module, to_torch_device
@@ -274,16 +275,28 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                 self.compilation_settings.dla_global_dram_size,
             )
 
-        if not self.compilation_settings.use_explicit_typing and dtype.float16 in self.compilation_settings.enabled_precisions:
+        if (
+            not self.compilation_settings.use_explicit_typing
+            and dtype.float16 in self.compilation_settings.enabled_precisions
+        ):
             builder_config.set_flag(trt.BuilderFlag.FP16)
 
-        if dtype.int8 in self.compilation_settings.enabled_precisions:
+        if (
+            not self.compilation_settings.use_explicit_typing
+            and dtype.int8 in self.compilation_settings.enabled_precisions
+        ):
             builder_config.set_flag(trt.BuilderFlag.INT8)
 
-        if not self.compilation_settings.use_explicit_typing and dtype.fp8 in self.compilation_settings.enabled_precisions:
+        if (
+            not self.compilation_settings.use_explicit_typing
+            and dtype.fp8 in self.compilation_settings.enabled_precisions
+        ):
             builder_config.set_flag(trt.BuilderFlag.FP8)
 
-        if dtype.bfloat16 in self.compilation_settings.enabled_precisions:
+        if (
+            not self.compilation_settings.use_explicit_typing
+            and dtype.bfloat16 in self.compilation_settings.enabled_precisions
+        ):
             builder_config.set_flag(trt.BuilderFlag.BF16)
 
         if self.compilation_settings.sparse_weights:
@@ -737,7 +750,8 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             self.ctx.net, builder_config
         )
         assert serialized_engine
-
+        # clear the global reference holder after engin is built
+        global_reference_holder.clear()
         _LOGGER.info(
             f"Build TRT engine elapsed time: {datetime.now() - build_engine_start_time}"
         )

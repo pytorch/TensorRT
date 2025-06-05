@@ -25,6 +25,9 @@ from ..types import Shape, TRTDataType, TRTLayer, TRTTensor
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
+# global reference holder for the objects that should not be garbage collected before the engine is built
+global_reference_holder: List[torch.Tensor] = []
+
 
 def get_node_name(node: torch.fx.Node) -> str:
     # nn_module_stack preserves the call stack of pytorch nn.modules
@@ -361,32 +364,30 @@ def create_constant(
             shape = list(torch_value.shape)
 
         if torch_value is not None:
-            if torch_value.dtype == torch.float8_e4m3fn:
+            if torch_value.dtype in (torch.float8_e4m3fn, torch.uint8):
+                # global_reference_holder.append(torch_value)
+                # Iconstant layer does not support Uint8, it only support that FP4 data packed in uint8
+                if torch_value.dtype == torch.uint8:
+                    count = torch_value.numel() * 2
+                    shape[-1] = shape[-1] * 2
+                    dtype = trt.DataType.FP4
+                else:
+                    count = torch_value.numel()
+                    dtype = trt.DataType.FP8
                 weights = trt.Weights(
-                    type=trt.DataType.FP8,
+                    type=dtype,
                     ptr=torch_value.data_ptr(),
-                    count=torch_value.numel(),
+                    count=count,
                 )
                 constant = ctx.net.add_constant(
                     shape,
                     weights,
                 )
                 constant.name = name
+                # TODO: confirm with @dheeraj whether it is ok to put the torch tensor here, since the fp8 torch tensor cannot have the equivalent of numpy array
+                ctx.mapping[name + " CONSTANT"] = torch_value.reshape(-1)
                 return constant.get_output(0)
-            # Iconstant layer does not support Uint8, it only support that FP4 data packed in uint8
-            if torch_value.dtype == torch.uint8:
-                weights = trt.Weights(
-                    type=trt.DataType.FP4,
-                    ptr=torch_value.data_ptr(),
-                    count=torch_value.numel() * 2,
-                )
-                shape[-1] = shape[-1] * 2
-                constant = ctx.net.add_constant(
-                    shape,
-                    weights,
-                )
-                constant.name = name
-                return constant.get_output(0)
+
             if torch_value.dtype == torch.bfloat16:
                 torch_value_fp32 = torch_value.to(torch.float32)
                 numpy_value = torch_value_fp32.numpy()

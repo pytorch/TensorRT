@@ -638,7 +638,7 @@ else:
         kwargs: Dict[str, Argument],
         name: str,
     ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-        return impl.nvfp4_quantize.nvfp4_quantize(
+        return impl.nvfp4_quantize.quantize(
             ctx,
             target,
             SourceIR.ATEN,
