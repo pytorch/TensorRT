@@ -102,7 +102,7 @@ jobs:
         export LD_LIBRARY_PATH=/usr/lib64:$LD_LIBRARY_PATH
         pushd .
         python -m pip install -r tests/py/requirements.txt
-        cov_param="--cov=torch_tensorrt --cov-report=xml:${RUNNER_TEST_RESULTS_DIR}/coverage.xml --cov-config=pyproject.toml"
+        cov_param="--cov=torch_tensorrt --cov-report= --cov-config=pyproject.toml"
 
         # test dynamo backend
         python -m pytest -m critical ${cov_param} -n 4 tests/py/dynamo/backend/
