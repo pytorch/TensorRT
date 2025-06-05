@@ -3,7 +3,6 @@ import torch.nn as nn
 import torch_tensorrt
 import copy, requests
 from PIL import Image
-from typing import Optional
 from transformers import AutoModel, AutoProcessor, GenerationMixin
 
 from transformers.models.siglip import modeling_siglip as ms
@@ -21,7 +20,6 @@ from collections import defaultdict
 
 # key → cumulative seconds (GPU clock) — reset inside _benchmark()
 PROF_TIMINGS = defaultdict(float)
-# per-step timings (seconds)
 STEP_TIMINGS = defaultdict(list)
 
 # 1) Load base model & processor
@@ -38,33 +36,14 @@ def load_base(device="cuda:1"):
         processor.tokenizer.padding_side = "left"
     return model, processor
 
-# 2) Torch-TensorRT compile helpers
-
-class VisionWrapper(nn.Module):
-    """Return only last_hidden_state tensor for simpler TRT signature."""
-    def __init__(self, vision_model):
-        super().__init__()
-        self.vision_model = vision_model
-    def forward(self, pixel_values):
-        out = self.vision_model(pixel_values=pixel_values, output_hidden_states=False, return_dict=True)
-        return out.last_hidden_state if hasattr(out, "last_hidden_state") else out
-
 class LMNoCache(nn.Module):
     def __init__(self, lm):
         super().__init__()
         self.lm = lm
 
-    def forward(self, inputs_embeds, position_ids=None, cache_position=None): #, position_ids=None, cache_position=None):
-        # Ensure inputs are in float16 and on the correct device
-        if position_ids is not None:
-            position_ids = position_ids.to(device=self.lm.device)
-        if cache_position is not None:
-            cache_position = cache_position.to(device=self.lm.device)
-
+    def forward(self, inputs_embeds): 
         outputs = self.lm(
             inputs_embeds=inputs_embeds,
-            position_ids=position_ids,
-            cache_position=cache_position,
             use_cache=False
         )
         # Robustly extract logits
@@ -85,87 +64,85 @@ def compile_submodules(base_model, device="cuda:1"):
     mlp1 = base_model.mlp1
     language_model = base_model.language_model
 
-    B = torch.export.Dim("batch", min=1, max=8)
-    dummy_pixels = torch.randn(4, 3, 448, 448, dtype=torch.float16, device=device)
-    dyn_shapes_vis = {"pixel_values": {0: B}}
-    vis_wrapper = VisionWrapper(vision_model).to(device)
-    with torch.inference_mode():
-        exported_vis = torch.export.export(vis_wrapper, (dummy_pixels,), dynamic_shapes=dyn_shapes_vis, strict=False)
-    trt_vis = torch_tensorrt.dynamo.compile(
-        exported_vis,
-        inputs=[dummy_pixels],
-        enabled_precisions={torch.float32},
-        device=device,
-        truncate_double=True,
-        disable_tf32=True,
-        use_explicit_typing=True,
-        use_fp32_acc=True,
-    )
+    # B = torch.export.Dim("batch", min=1, max=8)
+    # dummy_pixels = torch.randn(4, 3, 448, 448, dtype=torch.float16, device=device)
+    # dyn_shapes_vis = {"pixel_values": {0: B}}
+    # # vis_wrapper = VisionWrapper(vision_model).to(device)
+    # with torch.inference_mode():
+    #     exported_vis = torch.export.export(vision_model, (dummy_pixels,), dynamic_shapes=dyn_shapes_vis, strict=False)
+    # trt_vis = torch_tensorrt.dynamo.compile(
+    #     exported_vis,
+    #     inputs=[dummy_pixels],
+    #     enabled_precisions={torch.float32},
+    #     device=device,
+    #     # truncate_double=True,
+    #     # disable_tf32=True,
+    #     # use_explicit_typing=True,
+    #     # use_fp32_acc=True,
+    # )
 
-    with torch.inference_mode():
-        vit_out = vis_wrapper(dummy_pixels)
-    h = w = int(vit_out.shape[1] ** 0.5)
-    embeds = vit_out.reshape(vit_out.shape[0], h, w, -1)
-    embeds = base_model.pixel_shuffle(embeds, scale_factor=base_model.downsample_ratio)
-    embeds = embeds.reshape(embeds.shape[0], -1, embeds.shape[-1])
+    # with torch.inference_mode():
+    #     vit_out = vision_model(dummy_pixels).last_hidden_state
+    # h = w = int(vit_out.shape[1] ** 0.5)
+    # embeds = vit_out.reshape(vit_out.shape[0], h, w, -1)
+    # embeds = base_model.pixel_shuffle(embeds, scale_factor=base_model.downsample_ratio)
+    # embeds = embeds.reshape(embeds.shape[0], -1, embeds.shape[-1])
 
-    B2 = torch.export.Dim("batch2", min=1, max=8)
-    S2 = torch.export.Dim("seq2", min=1, max=2048)
-    dyn_shapes_mlp = {"x": {0: B2, 1: S2}}
-    class _MLPWrap(nn.Module):
-        def __init__(self, mlp):
-            super().__init__()
-            self.mlp = mlp
-        def forward(self, x):
-            return self.mlp(x)
-    mlp_wrap = _MLPWrap(mlp1).to(device)
-    with torch.inference_mode():
-        exported_mlp = torch.export.export(mlp_wrap, (embeds,), dynamic_shapes=dyn_shapes_mlp, strict=False)
-    trt_mlp1 = torch_tensorrt.dynamo.compile(
-        exported_mlp,
-        inputs=[embeds],
-        enabled_precisions={torch.float32},
-        device=device,
-        truncate_double=True,
-        disable_tf32=True,
-        use_explicit_typing=True,
-        use_fp32_acc=True,
-    )
+    # B2 = torch.export.Dim("batch2", min=1, max=8)
+    # S2 = torch.export.Dim("seq2", min=1, max=2048)
+    # dyn_shapes_mlp = {"x": {0: B2, 1: S2}}
+    # class _MLPWrap(nn.Module):
+    #     def __init__(self, mlp):
+    #         super().__init__()
+    #         self.mlp = mlp
+    #     def forward(self, x):
+    #         return self.mlp(x)
+    # mlp_wrap = _MLPWrap(mlp1).to(device)
+    # with torch.inference_mode():
+    #     exported_mlp = torch.export.export(mlp_wrap, (embeds,), dynamic_shapes=dyn_shapes_mlp, strict=False)
+    # trt_mlp1 = torch_tensorrt.dynamo.compile(
+    #     exported_mlp,
+    #     inputs=[embeds],
+    #     enabled_precisions={torch.float32},
+    #     device=device,
+    #     # truncate_double=True,
+    #     # disable_tf32=True,
+    #     # use_explicit_typing=True,
+    #     # use_fp32_acc=True,
+    # )
 
     hidden_size = language_model.config.hidden_size
     dummy_seq = 13
     dummy_batch = 2
     dummy_embeds = torch.randn(dummy_batch, dummy_seq, hidden_size, dtype=torch.float16, device=device)
-    dummy_position_ids = torch.arange(1, dummy_seq + 1, device=device).unsqueeze(0).expand(dummy_batch, -1)
-    dummy_cache_position = torch.arange(dummy_seq, device=device)
+
     B3 = torch.export.Dim("batch3", min=1, max=4)
-
-
     S3 = torch.export.Dim("seq_lm", min=1, max=2560)
     dyn_shapes_lm = {
         "inputs_embeds": {0: B3, 1: S3},
-        "position_ids": {0: B3, 1: S3},
-        "cache_position": {0: S3},
     }
     lm_wrap = LMNoCache(language_model).to(device).eval()
     with torch.inference_mode():
         exported_lm = torch.export.export(
             lm_wrap,
-            (dummy_embeds, dummy_position_ids, dummy_cache_position),
+            (dummy_embeds,), 
             dynamic_shapes=dyn_shapes_lm,
             strict=False
         )
     trt_lm = torch_tensorrt.dynamo.compile(
         exported_lm,
-        inputs=[dummy_embeds, dummy_position_ids, dummy_cache_position],
+        inputs=[dummy_embeds], 
         enabled_precisions={torch.float32},
         device=device,
-        truncate_double=True,
-        disable_tf32=True,
-        use_explicit_typing=True,
-        use_fp32_acc=True,
+        # truncate_double=True,
+        # disable_tf32=True,
+        # use_explicit_typing=True,
+        # use_fp32_acc=True,
     )
-    return trt_vis, trt_mlp1, trt_lm
+
+    trt_lm_wrapper = TRTLanguageWrapper(trt_lm, base_model.language_model, device)
+
+    return vision_model, mlp1, trt_lm_wrapper # trt_vis, trt_mlp1, trt_lm_wrapper
 
 
 class TRTLanguageWrapper(nn.Module, GenerationMixin):
@@ -176,20 +153,20 @@ class TRTLanguageWrapper(nn.Module, GenerationMixin):
         self._original_lm = original_lm
         # Attributes GenerationMixin expects
         self.config = original_lm.config
-        self.main_input_name = original_lm.main_input_name
+        # self.main_input_name = original_lm.main_input_name
         self.generation_config = getattr(original_lm, "generation_config", None)
 
         self.device = torch.device(device)
 
         self._input_embeddings = original_lm.get_input_embeddings()
-        self._output_embeddings = original_lm.get_output_embeddings()
+        # self._output_embeddings = original_lm.get_output_embeddings()
         if hasattr(original_lm, "_apply_logits_warper"):
             self._apply_logits_warper = original_lm._apply_logits_warper
         if hasattr(original_lm, "_prepare_attention_mask_for_generation"):
             self._prepare_attention_mask_for_generation = original_lm._prepare_attention_mask_for_generation
 
         # Some GenerationMixin helpers inspect this attribute directly.
-        self._supports_cache_class = getattr(original_lm, "_supports_cache_class", False)
+        # self._supports_cache_class = getattr(original_lm, "_supports_cache_class", False)
 
     def forward(self,
                 input_ids=None,
@@ -201,43 +178,14 @@ class TRTLanguageWrapper(nn.Module, GenerationMixin):
                 use_cache=False,
                 **kwargs):
         """Forward pass using TensorRT engine, returning CausalLMOutputWithPast for compatibility"""
-        # device = next(self.trt_lm.parameters()).device if hasattr(self.trt_lm, "parameters") else "cuda:0"
-
-        # Prepare inputs
-        if inputs_embeds is None and input_ids is not None:
-            inputs_embeds = self._input_embeddings(input_ids).to(dtype=torch.float16, device=self.device)
-        else:
-            inputs_embeds = inputs_embeds.to(dtype=torch.float16, device=self.device)
-
-        if position_ids is None and inputs_embeds is not None:
-            batch_size, seq_length = inputs_embeds.shape[:2]
-            if cache_position is None:
-                past_length = 0
-                if past_key_values is not None:
-                    if isinstance(past_key_values, tuple) and len(past_key_values) > 0:
-                        past_length = past_key_values[0][0].shape[2]
-                    elif hasattr(past_key_values, "get_seq_length"):
-                        past_length = past_key_values.get_seq_length()
-                cache_position = torch.arange(
-                    past_length, past_length + seq_length,
-                    device=self.device
-                )
-            position_ids = cache_position.unsqueeze(0).expand(batch_size, -1).to(device=self.device)
 
         # Execute TensorRT engine
         logits = self.trt_lm(
             inputs_embeds,
-            position_ids,
-            cache_position,
         )
-
         # Ensure logits is a tensor
         if not isinstance(logits, torch.Tensor):
             raise TypeError(f"Expected logits to be a tensor, but got {type(logits)}")
-
-        # Ensure logits are in float16
-        # logits = logits.to(dtype=torch.float16)
-
         # Return standard CausalLMOutputWithPast for compatibility
         return CausalLMOutputWithPast(
             logits=logits,
@@ -247,9 +195,6 @@ class TRTLanguageWrapper(nn.Module, GenerationMixin):
     def get_input_embeddings(self):
         return self._input_embeddings
 
-    def get_output_embeddings(self):
-        return self._output_embeddings
-
     def prepare_inputs_for_generation(self, *args, **kwargs):
         return self._original_lm.prepare_inputs_for_generation(*args, **kwargs)
 
@@ -257,17 +202,14 @@ class TRTLanguageWrapper(nn.Module, GenerationMixin):
 
 def build_trt_model(device="cuda:1"):
     base_model, processor = load_base(device)
-    base_model = base_model.half()
-    
-    trt_vis, trt_mlp1, trt_lm = compile_submodules(base_model, device)
-    # trt_vis, trt_mlp1, trt_lm = None, None, None
-    
     base_model.config.use_cache = False
     
+    trt_vis, trt_mlp1, trt_lm = compile_submodules(base_model, device)
+
     trt_model = copy.deepcopy(base_model)
     trt_model.vision_model = trt_vis
     trt_model.mlp1 = trt_mlp1
-    trt_model.language_model = TRTLanguageWrapper(trt_lm, base_model.language_model, device)
+    trt_model.language_model = trt_lm
 
     def paligemma_style_forward(
         self,
@@ -290,7 +232,6 @@ def build_trt_model(device="cuda:1"):
         vit_embeds = None
         
         if pixel_values is not None:
-            print(f"Pixel values shape: {pixel_values.shape}, dtype: {pixel_values.dtype}")
             # --- Vision encoder timing ---
             vis_s = torch.cuda.Event(enable_timing=True); vis_e = torch.cuda.Event(enable_timing=True)
             vis_s.record()
@@ -319,10 +260,6 @@ def build_trt_model(device="cuda:1"):
 
         # 2) Text token embeddings
         input_embeds = self.language_model.get_input_embeddings()(input_ids)
-        print(f"Input ids shape: {input_ids.shape}, values: {input_ids}, dtype: {input_ids.dtype}")
-        print(f"Input embeds shape: {input_embeds.shape}, dtype: {input_embeds.dtype}")
-        # 3) Replace [IMG] token positions with image embeddings (if any)
-        print(f"Before insertion: input_embeds min={input_embeds.min()}, max={input_embeds.max()}")
 
         if vit_embeds is not None:
             B, N, C = input_embeds.shape
@@ -338,8 +275,8 @@ def build_trt_model(device="cuda:1"):
             print(f"After insertion: input_embeds min={input_embeds.min()}, max={input_embeds.max()}")
             
         # 4) Delegate to language model (time this call separately)
-        if position_ids is None:
-            position_ids = torch.arange(input_ids.shape[1], device=input_ids.device).unsqueeze(0).expand(B, -1)
+        # if position_ids is None:
+        #     position_ids = torch.arange(input_ids.shape[1], device=input_ids.device).unsqueeze(0).expand(B, -1)
         # lm_out = self.language_model(inputs_embeds=input_embeds, position_ids=position_ids, **lm_kwargs)
 
         lm_kwargs = {
@@ -355,8 +292,6 @@ def build_trt_model(device="cuda:1"):
         
         lm_kwargs.update({k: v for k, v in kwargs.items() if k != "inputs_embeds"})
 
-        # print(f"Attention mask shape: {attention_mask.shape}, values: {attention_mask}")
-
         # --- Language model timing ---
         start_lm = torch.cuda.Event(enable_timing=True); end_lm = torch.cuda.Event(enable_timing=True)
         start_lm.record()
@@ -371,7 +306,6 @@ def build_trt_model(device="cuda:1"):
     def prepare_inputs_for_generation(self, input_ids, attention_mask=None, **model_kwargs):
         model_inputs = {
             "input_ids": input_ids,
-            # "attention_mask": attention_mask,
         }
         if "pixel_values" in model_kwargs and "pixel_values" not in model_inputs:
             model_inputs["pixel_values"] = model_kwargs["pixel_values"]
@@ -383,7 +317,6 @@ def build_trt_model(device="cuda:1"):
 
     import types
     trt_model.forward = types.MethodType(paligemma_style_forward, trt_model)
-    # trt_model.forward = None
 
     # ------------------------------------------------------------------
     # NEW: ensure `pixel_values` is only used at the very first decoding
@@ -411,7 +344,7 @@ def build_trt_model(device="cuda:1"):
     base_model._update_model_kwargs_for_generation = types.MethodType(
         _update_model_kwargs_for_generation, base_model
     )
-    base_model.config.use_cache = False      # TRTT 모델과 조건 맞추기
+    base_model.config.use_cache = False
 
     return base_model, trt_model, processor
 
@@ -429,7 +362,6 @@ if __name__ == "__main__":
     # Build a 230-word placeholder prompt ("token token …") so that ISL totals 256 tokens after template overhead.
     prompt_tokens = ["token"] * 230
     prompt_text = " ".join(prompt_tokens)
-    # prompt_text = "Describe the image."
 
     messages = [{
         "role": "user",
