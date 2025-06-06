@@ -44,6 +44,14 @@ TENSORRT_VERSIONS_DICT = {
             "urls": "https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.9.0/zip/TensorRT-10.9.0.34.Windows.win10.cuda-12.8.zip",
             "strip_prefix": "TensorRT-10.9.0.34",
         },
+        "10.10.0": {
+            "urls": "https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.10.0/zip/TensorRT-10.10.0.31.Windows.win10.cuda-12.9.zip",
+            "strip_prefix": "TensorRT-10.10.0.31",
+        },
+        "10.11.0": {
+            "urls": "https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.11.0/zip/TensorRT-10.11.0.33.Windows.win10.cuda-12.9.zip",
+            "strip_prefix": "TensorRT-10.11.0.33",
+        },
     },
     "linux": {
         "10.3.0": {
@@ -62,6 +70,14 @@ TENSORRT_VERSIONS_DICT = {
             "urls": "https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.9.0/tars/TensorRT-10.9.0.34.Linux.x86_64-gnu.cuda-12.8.tar.gz",
             "strip_prefix": "TensorRT-10.9.0.34",
         },
+        "10.10.0": {
+            "urls": "https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.10.0/tars/TensorRT-10.10.0.31.Linux.x86_64-gnu.cuda-12.9.tar.gz",
+            "strip_prefix": "TensorRT-10.10.0.31",
+        },
+        "10.11.0": {
+            "urls": "https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.11.0/tars/TensorRT-10.11.0.33.Linux.x86_64-gnu.cuda-12.9.tar.gz",
+            "strip_prefix": "TensorRT-10.11.0.33",
+        },
     },
 }
 
@@ -69,6 +85,8 @@ TENSORRT_VERSIONS_DICT = {
 def check_new_tensorrt_version(
     major: int = 10, patch_from: int = 0
 ) -> tuple[bool, str, str, str, str]:
+    breakpoint()
+
     def check_file_availability(url: str) -> bool:
         try:
             response = requests.head(url, allow_redirects=True)
