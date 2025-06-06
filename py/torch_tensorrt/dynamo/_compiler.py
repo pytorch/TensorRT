@@ -255,7 +255,7 @@ def cross_compile_for_windows(
             x in enabled_precisions for x in {torch.float32, dtype.f32}
         ):
             raise AssertionError(
-                f"When use_explicit_typing is enabled, only torch.float32 is allowed in the enabled_precisions but found {enabled_precisions}"
+                f"use_explicit_typing was set to True, however found that enabled_precisions was also specified (saw: {enabled_precisions}, expected: {_defaults.ENABLED_PRECISIONS}). enabled_precisions should not be used when use_explicit_typing=True"
             )
 
     if use_fp32_acc:
@@ -586,7 +586,7 @@ def compile(
             x in enabled_precisions for x in {torch.float32, dtype.f32}
         ):
             raise AssertionError(
-                f"When use_explicit_typing is enabled, only torch.float32 is allowed in the enabled_precisions but found {enabled_precisions}"
+                f"use_explicit_typing was set to True, however found that enabled_precisions was also specified (saw: {enabled_precisions}, expected: {_defaults.ENABLED_PRECISIONS}). enabled_precisions should not be used when use_explicit_typing=True"
             )
 
     if use_fp32_acc:
