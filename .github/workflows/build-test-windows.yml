@@ -22,7 +22,6 @@ on:
 jobs:
   generate-windows-matrix:
     name: generate-windows-matrix
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     uses: pytorch/test-infra/.github/workflows/generate_binary_build_matrix.yml@main
     with:
       package-type: wheel
