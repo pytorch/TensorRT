@@ -6,6 +6,7 @@ on:
     inputs:
       job-name:
         required: true
+        type: string
         default: "build-test-linux-x86_64"
   push:
     branches:
