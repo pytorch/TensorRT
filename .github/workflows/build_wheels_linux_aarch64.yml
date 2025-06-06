@@ -257,6 +257,10 @@ jobs:
           export PYTORCH_VERSION="$(${CONDA_RUN} pip show torch | grep ^Version: | sed 's/Version: *//' | sed 's/+.\+//')"
           ${CONDA_RUN} python setup.py clean
           echo "Successfully ran `python setup.py clean`"
+          if [[ "$BUILD_VERSION" != *"+"${CU_VERSION} ]]; then
+            BUILD_VERSION="${BUILD_VERSION}+${CU_VERSION}"
+          fi
+          echo "BUILD_VERSION=$BUILD_VERSION"
           if [[ ${{ inputs.is-jetpack }} == false ]]; then
             ${CONDA_RUN} python setup.py bdist_wheel
           else
