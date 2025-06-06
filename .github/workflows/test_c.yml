@@ -2,6 +2,11 @@ name: Lan test c
 
 on:
   workflow_call:
+    inputs:
+      job-name:
+        required: true
+        type: string
+        default: "test-c"
 
 jobs:
   test:
