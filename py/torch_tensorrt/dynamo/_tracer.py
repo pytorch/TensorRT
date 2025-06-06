@@ -7,8 +7,8 @@ from typing import Any, Optional, Tuple, Union
 import torch
 from torch.export import Dim, export
 from torch_tensorrt._Input import Input
-from torch_tensorrt.dynamo._defaults import DEBUG, default_device
-from torch_tensorrt.dynamo.utils import get_torch_inputs, set_log_level, to_torch_device
+from torch_tensorrt.dynamo._defaults import default_device
+from torch_tensorrt.dynamo.utils import get_torch_inputs, to_torch_device
 
 logger = logging.getLogger(__name__)
 
@@ -69,10 +69,6 @@ def trace(
 
     if kwarg_inputs is None:
         kwarg_inputs = {}
-
-    debug = kwargs.get("debug", DEBUG)
-    if debug:
-        set_log_level(logger.parent, logging.DEBUG)
 
     device = to_torch_device(kwargs.get("device", default_device()))
     torch_arg_inputs = get_torch_inputs(arg_inputs, device)
