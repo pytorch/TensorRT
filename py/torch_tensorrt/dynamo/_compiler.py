@@ -29,6 +29,9 @@ from torch_tensorrt.dynamo.conversion import (
     repair_double_inputs,
 )
 from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
+    DYNAMO_ATEN_CONVERTERS,
+)
+from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
     DYNAMO_CONVERTERS as CONVERTERS,
 )
 from torch_tensorrt.dynamo.lowering import (
@@ -788,20 +791,49 @@ def compile_module(
             "Some nodes do not have metadata (shape and dtype information). This could lead to problems sometimes if the graph has PyTorch and TensorRT segments."
         )
 
+    ############ TODO: testing only ############
+    use_hierarchical_partitioner = False
+    backend_priority = ["inductor", "tensorrt"]
+    backend_support_map = {
+        "inductor": {
+            # operator.getitem,
+            torch.ops.aten.conv2d.default,
+            torch.ops.aten.convolution.default,
+        },
+        "tensorrt": set(DYNAMO_ATEN_CONVERTERS.keys()),
+    }
+    #############################################
     # Partition module into components that can be TRT-accelerated
     fast_partitioner_failed = False
     # If specified, try using the fast partitioner and fall back to the global one on failure
     if settings.use_fast_partitioner:
         try:
-            logger.info("Partitioning the graph via the fast partitioner")
-            partitioned_module, supported_ops = partitioning.fast_partition(
-                gm,
-                verbose=settings.debug,
-                min_block_size=settings.min_block_size,
-                torch_executed_ops=settings.torch_executed_ops,
-                require_full_compilation=settings.require_full_compilation,
-                skip_fusion=(num_supported_ops == total_ops),
-            )
+            if use_hierarchical_partitioner:
+                logger.info(
+                    "Partitioning the graph via the fast hierarchical partitioner"
+                )
+                partitioned_module, supported_ops = (
+                    partitioning.hierarchical_adjacency_partition(
+                        gm,
+                        verbose=settings.debug,
+                        min_block_size=settings.min_block_size,
+                        torch_executed_ops=settings.torch_executed_ops,
+                        require_full_compilation=settings.require_full_compilation,
+                        skip_fusion=(num_supported_ops == total_ops),
+                        backend_priority=backend_priority,
+                        backend_support_map=backend_support_map,
+                    )
+                )
+            else:
+                logger.info("Partitioning the graph via the fast partitioner")
+                partitioned_module, supported_ops = partitioning.fast_partition(
+                    gm,
+                    verbose=settings.debug,
+                    min_block_size=settings.min_block_size,
+                    torch_executed_ops=settings.torch_executed_ops,
+                    require_full_compilation=settings.require_full_compilation,
+                    skip_fusion=(num_supported_ops == total_ops),
+                )
 
         except torch.fx.passes.splitter_base.FxNetSplitterInternalError:
             logger.error(
@@ -836,7 +868,7 @@ def compile_module(
         submodule_node_dict[node.name] = node
 
     # Store TRT replicas of Torch subgraphs
-    trt_modules = {}
+    compiled_modules = {}
     # Iterate over all components that can be accelerated
     # Generate the corresponding TRT Module for those
 
@@ -913,26 +945,61 @@ def compile_module(
         dryrun_tracker.tensorrt_graph_count += 1
         dryrun_tracker.per_subgraph_data.append(subgraph_data)
 
-        # Create TRT engines from submodule
+        # Create TRT engines / compiled models from submodule
+        # torch._logging.set_logs(inductor=logging.DEBUG)
         if not settings.dryrun:
-            trt_module = convert_module(
-                submodule,
-                submodule_inputs,
-                settings=settings,
-                name=name,
-                engine_cache=engine_cache,
-            )
+            if use_hierarchical_partitioner:
+                # compile submodule with pytorch inductor
+                if "_run_on_acc_inductor" in name:
+                    sub_inputs = []
+                    for input in submodule_inputs:
+                        sub_input = (
+                            torch.randn(input.shape)
+                            .to(dtype.to(input.dtype, t=torch.dtype))
+                            .cuda()
+                        )
+                        sub_inputs.append(sub_input)
 
-            trt_modules[name] = trt_module
+                    compiled_func = torch._inductor.compile(
+                        submodule,
+                        sub_inputs,
+                    )
+                    # Wrap the compiled function to be a torch.nn.Module
+                    compiled_submodule = FunctionWrapper(compiled_func)
+
+                elif "_run_on_acc_tensorrt" in name:
+                    compiled_submodule = convert_module(
+                        submodule,
+                        submodule_inputs,
+                        settings=settings,
+                        name=name,
+                        engine_cache=engine_cache,
+                    )
+                else:
+                    raise ValueError(f"Unknown backend for submodule: {name}")
+            else:
+                compiled_submodule = convert_module(
+                    submodule,
+                    submodule_inputs,
+                    settings=settings,
+                    name=name,
+                    engine_cache=engine_cache,
+                )
+
+            compiled_modules[name] = compiled_submodule
 
     # Parse the graph I/O and store it in dryrun tracker
     parse_graph_io(gm, dryrun_tracker)
 
     # Replace all FX Modules with TRT Modules
-    for name, trt_module in trt_modules.items():
-        setattr(partitioned_module, name, trt_module)
+    for name, compiled_module in compiled_modules.items():
+        setattr(partitioned_module, name, compiled_module)
         if settings.lazy_engine_init and not settings.enable_cross_compile_for_windows:
-            getattr(partitioned_module, name).setup_engine()
+            if use_hierarchical_partitioner:
+                if "_run_on_acc_tensorrt" in name:
+                    getattr(partitioned_module, name).setup_engine()
+            else:
+                getattr(partitioned_module, name).setup_engine()
 
     # Reset settings object to user specification after fallback to global partitioning mode
     if fast_partitioner_failed:
@@ -1276,3 +1343,12 @@ def load_cross_compiled_exported_program(file_path: str = "") -> Any:
         )
 
     return replace_execute_engine_no_op_node(exp_program)
+
+
+class FunctionWrapper(torch.nn.Module):
+    def __init__(self, func):
+        super().__init__()
+        self.func = func
+
+    def forward(self, *args, **kwargs):
+        return self.func(*args, **kwargs)
