@@ -65,3 +65,15 @@ jobs:
       contents: read
       packages: write
     uses: ./.github/workflows/build-test-windows.yml
+
+  wait-all-jobs:
+    needs: [trigger-linux-test, trigger-windows-test]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wait for all jobs to complete
+        run: |
+          echo "Waiting for all jobs to complete..."
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref_name }}-${{ inputs.repository }}-${{ github.event_name == 'workflow_dispatch' }}-${{ inputs.job-name }}
+  cancel-in-progress: true
