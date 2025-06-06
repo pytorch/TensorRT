@@ -321,4 +321,4 @@ jobs:
 
 concurrency:
   group: ${{ github.workflow }}-windows-${{ github.event.pull_request.number || github.ref_name }}-${{ inputs.repository }}-${{ github.event_name == 'workflow_dispatch' }}-${{ inputs.job-name }}
-  cancel-in-progress: true
+  cancel-in-progress: false
