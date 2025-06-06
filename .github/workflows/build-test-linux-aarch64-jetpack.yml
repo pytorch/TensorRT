@@ -39,11 +39,12 @@ jobs:
       - name: Filter matrix
         id: filter
         env:
-           LIMIT_PR_BUILDS: ${{ github.event_name == 'pull_request' && !contains( github.event.pull_request.labels.*.name, 'ciflow/binaries/all') }}
+           LIMIT_PR_BUILDS: ${{ github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'ciflow/binaries/all') }}
         run: |
           set -eou pipefail
           echo "LIMIT_PR_BUILDS=${LIMIT_PR_BUILDS}"
-          echo '${{ toJson(github)}}'
+          echo '${{ github.event_name }}'
+          echo '${{ github.event.ref}}'
           MATRIX_BLOB=${{ toJSON(needs.generate-matrix.outputs.matrix) }}
           MATRIX_BLOB="$(python3 .github/scripts/filter-matrix.py --matrix "${MATRIX_BLOB}" --jetpack true --limit-pr-builds "${LIMIT_PR_BUILDS}")"
           echo "${MATRIX_BLOB}"
