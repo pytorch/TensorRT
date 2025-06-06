@@ -333,7 +333,7 @@ jobs:
     needs: build
     uses: pytorch/test-infra/.github/workflows/_binary_upload.yml@main
     # for jetpack builds, only upload to pytorch index for nightly builds
-    if: ${{ inputs.is-jetpack == false || (inputs.trigger-event == 'push' && startsWith(github.event.ref, 'refs/heads/nightly')) }}
+    if: ${{ inputs.is-jetpack == false || (github.event_name == 'push' && startsWith(github.event.ref, 'refs/heads/nightly')) }}
     with:
       repository: ${{ inputs.repository }}
       ref: ${{ inputs.ref }}
