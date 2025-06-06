@@ -1,3 +1,4 @@
+import pytest
 import torch
 import torch_tensorrt as torchtrt
 from parameterized import parameterized
@@ -14,6 +15,7 @@ class TestPreAllocatedOutputs(TestCase):
             ("cpp_runtime", False),
         ]
     )
+    @pytest.mark.critical
     def test_pre_allocated_outputs_default(self, _, use_python_runtime):
         class SampleModel(torch.nn.Module):
             def forward(self, x):

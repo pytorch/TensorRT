@@ -48,6 +48,7 @@ class TestOutputAllocatorStaticModel(TestCase):
             ("cpp_runtime", False),
         ]
     )
+    @pytest.mark.critical
     def test_cudagraphs_and_output_allocator(self, _, use_python_runtime):
         model = StaticModel().eval().cuda()
         inputs = [torch.randn((2, 3), dtype=torch.float).cuda()]
@@ -157,6 +158,7 @@ class TestOutputAllocatorDDSModel(TestCase):
             ("cpp_runtime", False),
         ]
     )
+    @pytest.mark.critical
     def test_cudagraphs_and_output_allocator(self, _, use_python_runtime):
         model = DDSModel().eval().cuda()
         inputs = (torch.randint(low=0, high=3, size=(10,), dtype=torch.int).to("cuda"),)

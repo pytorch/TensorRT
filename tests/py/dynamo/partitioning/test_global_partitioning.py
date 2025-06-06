@@ -95,6 +95,7 @@ class TestGlobalPartitioning(TestCase):
             "Single operators can be segmented if full compilation is required",
         )
 
+    @pytest.mark.critical
     def test_partition_fully_supported_multi_op(self):
         class FullySupportedMultiOp(torch.nn.Module):
             def __init__(self, *args, **kwargs) -> None:

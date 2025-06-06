@@ -11,6 +11,7 @@ from torch_tensorrt.dynamo.utils import COSINE_THRESHOLD, cosine_similarity
 assertions = unittest.TestCase()
 
 
+@pytest.mark.critical
 @pytest.mark.unit
 def test_base_dynamic(ir):
     """
@@ -175,6 +176,7 @@ def test_view(ir):
     )
 
 
+@pytest.mark.critical
 @pytest.mark.unit
 def test_resnet_dynamic(ir):
     """

@@ -71,6 +71,7 @@ def test_base_full_compile(ir):
 
 
 @pytest.mark.unit
+@pytest.mark.critical
 def test_base_full_compile_multiple_outputs(ir):
     """
     This tests export serde functionality on a base model

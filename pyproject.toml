@@ -88,6 +88,7 @@ dev = [
     "isort",
     "ruff",
     "pytest",
+    "pytest-cov",
     "pytest-xdist",
     "parameterized>=0.2.0",
     "expecttest==0.1.6",
@@ -112,6 +113,44 @@ Changelog = "https://github.com/pytorch/tensorrt/releases"
 [tool.setuptools]
 package-dir = { "" = "py" }
 include-package-data = false
+
+[tool.coverage.paths]
+source = [
+    "py/torch_tensorrt",
+    "*/site-packages/torch_tensorrt"
+]
+
+[tool.coverage.run]
+source = ["torch_tensorrt"]
+omit = [
+    "tests/*"
+]
+data_file=".coverage"
+relative_files=true
+branch = true
+
+[tool.coverage.report]
+skip_covered = true
+ignore_errors = true
+exclude_lines = [
+    "pragma: no cover",
+    # Don't complain about missing debug or verbose code
+    "def __repr__",
+    "if verbose",
+    # Don't complain if tests don't hit defensive exception handling code
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "raise RuntimeError",
+    "raise ValueError",
+    "raise KeyError",
+    "raise AttributeError",
+    "except ImportError",
+    # Don't complain if non-runnable code isn't run
+    "if __name__ == \"__main__\":",
+    "if TYPE_CHECKING:",
+    # Don't complain about abstract methods, they aren't run
+    "@(abc\\.)?abstractmethod",
+]
 
 [tool.uv]
 package = true

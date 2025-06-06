@@ -1,7 +1,11 @@
 name: Build and test Windows wheels
 
 on:
-  pull_request:
+  #pull_request:
+  workflow_run:
+    workflows: ["Build and test Linux x86_64 wheels"]
+    types:
+      - completed
   push:
     branches:
       - main
@@ -15,6 +19,7 @@ on:
 
 jobs:
   generate-matrix:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     uses: pytorch/test-infra/.github/workflows/generate_binary_build_matrix.yml@main
     with:
       package-type: wheel
