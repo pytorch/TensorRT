@@ -44,6 +44,7 @@ jobs:
         id: generate
         run: |
           set -eou pipefail
+          echo "${{ github.workflow }}-windows-${{ github.event.pull_request.number || github.ref_name }}-${{ inputs.repository }}-${{ github.event_name == 'workflow_dispatch' }}-${{ inputs.job-name }}"
           MATRIX_BLOB=${{ toJSON(needs.generate-windows-matrix.outputs.matrix) }}
           MATRIX_BLOB="$(python3 .github/scripts/filter-matrix.py --matrix "${MATRIX_BLOB}")"
           echo "${MATRIX_BLOB}"

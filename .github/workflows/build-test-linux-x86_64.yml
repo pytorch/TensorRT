@@ -3,6 +3,10 @@ name: Lan test workflow x86_64 wheels
 on:
   #pull_request:
   workflow_call:
+    inputs:
+      job-name:
+        required: true
+        default: "build-test-linux-x86_64"
   push:
     branches:
       - main
@@ -15,7 +19,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  generate-matrix:
+  generate-linux-x86_64-matrix:
     uses: pytorch/test-infra/.github/workflows/generate_binary_build_matrix.yml@main
     with:
       package-type: wheel
@@ -25,8 +29,8 @@ jobs:
       with-rocm: false
       with-cpu: false
 
-  filter-matrix:
-    needs: [generate-matrix]
+  filter-linux-x86_64-matrix:
+    needs: [generate-linux-x86_64-matrix]
     outputs:
       matrix: ${{ steps.generate.outputs.matrix }}
     runs-on: ubuntu-latest
@@ -41,9 +45,10 @@ jobs:
         id: generate
         run: |
           set -eou pipefail
-          MATRIX_BLOB=${{ toJSON(needs.generate-matrix.outputs.matrix) }}
+          MATRIX_BLOB=${{ toJSON(needs.generate-linux-x86_64-matrix.outputs.matrix) }}
           MATRIX_BLOB="$(python3 .github/scripts/filter-matrix.py --matrix "${MATRIX_BLOB}")"
           echo "${MATRIX_BLOB}"
+          echo "${{ github.workflow }}-linux-x86_64-${{ github.event.pull_request.number || github.ref_name }}-${{ inputs.repository }}-${{ github.event_name == 'workflow_dispatch' }}-${{ inputs.job-name }}"
           echo "matrix=${MATRIX_BLOB}" >> "${GITHUB_OUTPUT}"
 
   # build:

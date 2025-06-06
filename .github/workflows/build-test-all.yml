@@ -72,6 +72,8 @@ jobs:
       contents: read
       packages: write
     uses: ./.github/workflows/build-test-linux-x86_64.yml
+    with:
+      job-name: build-test-all-linux-x86_64
 
   trigger-windows-test:
     needs: [fail-fast-test]
@@ -82,6 +84,8 @@ jobs:
       contents: read
       packages: write
     uses: ./.github/workflows/build-test-windows.yml
+    with:
+      job-name: build-test-all-windows
 
   wait-all-jobs:
     needs: [trigger-linux-test, trigger-windows-test]
