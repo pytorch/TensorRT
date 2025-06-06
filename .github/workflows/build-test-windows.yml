@@ -3,11 +3,6 @@ name: Lan test Windows wheels
 on:
   #pull_request:
   workflow_call:
-    inputs:
-      job-name:
-        required: true
-        type: string
-        default: "build-test-windows"
   push:
     branches:
       - main
@@ -65,7 +60,7 @@ jobs:
         run: |
           echo matrix="$(echo '${{ needs.filter-matrix.outputs.matrix }}' | sed -e 's/windows.g4dn.xlarge/windows.g5.4xlarge.nvidia.gpu/g')" >> ${GITHUB_OUTPUT}
 
-  build-windows:
+  build:
     needs: substitute-runner
     permissions:
       id-token: write

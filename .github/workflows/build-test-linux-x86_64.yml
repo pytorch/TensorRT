@@ -3,11 +3,6 @@ name: Lan test workflow x86_64 wheels
 on:
   #pull_request:
   workflow_call:
-    inputs:
-      job-name:
-        required: true
-        type: string
-        default: "build-test-linux-x86_64"
   push:
     branches:
       - main
@@ -52,35 +47,35 @@ jobs:
           echo "${{ github.workflow }}-linux-x86_64-${{ github.event.pull_request.number || github.ref_name }}-${{ inputs.repository }}-${{ github.event_name == 'workflow_dispatch' }}-${{ inputs.job-name }}"
           echo "matrix=${MATRIX_BLOB}" >> "${GITHUB_OUTPUT}"
 
-  # build:
-  #   needs: filter-matrix
-  #   permissions:
-  #     id-token: write
-  #     contents: read
-  #   strategy:
-  #     fail-fast: false
-  #     matrix:
-  #       include:
-  #         - repository: pytorch/tensorrt
-  #           pre-script: packaging/pre_build_script.sh
-  #           env-var-script: packaging/env_vars.txt
-  #           post-script: packaging/post_build_script.sh
-  #           smoke-test-script: packaging/smoke_test_script.sh
-  #           package-name: torch_tensorrt
-  #   name: Build torch-tensorrt whl package
-  #   uses: pytorch/test-infra/.github/workflows/build_wheels_linux.yml@main
-  #   with:
-  #     repository: ${{ matrix.repository }}
-  #     ref: ""
-  #     test-infra-repository: pytorch/test-infra
-  #     test-infra-ref: main
-  #     build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
-  #     pre-script: ${{ matrix.pre-script }}
-  #     env-var-script: ${{ matrix.env-var-script }}
-  #     post-script: ${{ matrix.post-script }}
-  #     package-name: ${{ matrix.package-name }}
-  #     smoke-test-script: ${{ matrix.smoke-test-script }}
-  #     trigger-event: ${{ github.event_name }}
+  build:
+    needs: filter-matrix
+    permissions:
+      id-token: write
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - repository: pytorch/tensorrt
+            pre-script: packaging/pre_build_script.sh
+            env-var-script: packaging/env_vars.txt
+            post-script: packaging/post_build_script.sh
+            smoke-test-script: packaging/smoke_test_script.sh
+            package-name: torch_tensorrt
+    name: Build torch-tensorrt whl package
+    uses: pytorch/test-infra/.github/workflows/build_wheels_linux.yml@main
+    with:
+      repository: ${{ matrix.repository }}
+      ref: ""
+      test-infra-repository: pytorch/test-infra
+      test-infra-ref: main
+      build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
+      pre-script: ${{ matrix.pre-script }}
+      env-var-script: ${{ matrix.env-var-script }}
+      post-script: ${{ matrix.post-script }}
+      package-name: ${{ matrix.package-name }}
+      smoke-test-script: ${{ matrix.smoke-test-script }}
+      trigger-event: ${{ github.event_name }}
 
   # tests-py-fail-fast:
   #   name: Test fail fast [Python]
