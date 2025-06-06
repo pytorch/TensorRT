@@ -1,4 +1,4 @@
-name: Build and test Linux x86_64 wheels
+name: Lan test workflow x86_64 wheels
 
 on:
   pull_request:
