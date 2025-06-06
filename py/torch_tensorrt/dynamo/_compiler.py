@@ -65,7 +65,6 @@ def cross_compile_for_windows(
         Set[Union[torch.dtype, dtype]], Tuple[Union[torch.dtype, dtype]]
     ] = _defaults.ENABLED_PRECISIONS,
     engine_capability: EngineCapability = _defaults.ENGINE_CAPABILITY,
-    debug: bool = False,
     num_avg_timing_iters: int = _defaults.NUM_AVG_TIMING_ITERS,
     workspace_size: int = _defaults.WORKSPACE_SIZE,
     dla_sram_size: int = _defaults.DLA_SRAM_SIZE,
@@ -185,7 +184,7 @@ def cross_compile_for_windows(
             f"Cross compile for windows is only supported on x86-64 Linux architecture, current platform: {platform.system()=}, {platform.architecture()[0]=}"
         )
 
-    if debug:
+    if kwargs.get("debug", False):
         warnings.warn(
             "`debug` is deprecated. Please use `torch_tensorrt.dynamo.Debugger` to configure debugging options.",
             DeprecationWarning,
@@ -391,7 +390,6 @@ def compile(
         Set[Union[torch.dtype, dtype]], Tuple[Union[torch.dtype, dtype]]
     ] = _defaults.ENABLED_PRECISIONS,
     engine_capability: EngineCapability = _defaults.ENGINE_CAPABILITY,
-    debug: bool = False,
     num_avg_timing_iters: int = _defaults.NUM_AVG_TIMING_ITERS,
     workspace_size: int = _defaults.WORKSPACE_SIZE,
     dla_sram_size: int = _defaults.DLA_SRAM_SIZE,
@@ -508,7 +506,7 @@ def compile(
         torch.fx.GraphModule: Compiled FX Module, when run it will execute via TensorRT
     """
 
-    if debug:
+    if kwargs.get("debug", False):
         warnings.warn(
             "`debug` is deprecated. Please use `torch_tensorrt.dynamo.Debugger` for debugging functionality",
             DeprecationWarning,
@@ -969,7 +967,6 @@ def convert_exported_program_to_serialized_trt_engine(
     enabled_precisions: (
         Set[torch.dtype | dtype] | Tuple[torch.dtype | dtype]
     ) = _defaults.ENABLED_PRECISIONS,
-    debug: bool = False,
     assume_dynamic_shape_support: bool = _defaults.ASSUME_DYNAMIC_SHAPE_SUPPORT,
     workspace_size: int = _defaults.WORKSPACE_SIZE,
     min_block_size: int = _defaults.MIN_BLOCK_SIZE,
@@ -1070,7 +1067,7 @@ def convert_exported_program_to_serialized_trt_engine(
     Returns:
         bytes: Serialized TensorRT engine, can either be saved to a file or deserialized via TensorRT APIs
     """
-    if debug:
+    if kwargs.get("debug", False):
         warnings.warn(
             "`debug` is deprecated. Please use `torch_tensorrt.dynamo.Debugger` to configure debugging options.",
             DeprecationWarning,
@@ -1159,7 +1156,6 @@ def convert_exported_program_to_serialized_trt_engine(
     compilation_options = {
         "assume_dynamic_shape_support": assume_dynamic_shape_support,
         "enabled_precisions": enabled_precisions,
-        "debug": debug,
         "workspace_size": workspace_size,
         "min_block_size": min_block_size,
         "torch_executed_ops": torch_executed_ops,

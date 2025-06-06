@@ -22,6 +22,8 @@ _LOGGER = logging.getLogger("torch_tensorrt [TensorRT Conversion Context]")
 GRAPH_LEVEL = 5
 logging.addLevelName(GRAPH_LEVEL, "GRAPHS")
 
+DEFAULT_LOGGING_DIR = os.path.join(tempfile.gettempdir(), "torch_tensorrt/debug_logs")
+
 
 class Debugger:
     def __init__(
@@ -32,7 +34,7 @@ class Debugger:
         save_engine_profile: bool = False,
         profile_format: str = "perfetto",
         engine_builder_monitor: bool = True,
-        logging_dir: str = tempfile.gettempdir(),
+        logging_dir: str = DEFAULT_LOGGING_DIR,
         save_layer_info: bool = False,
     ):
         """Initialize a debugger for TensorRT conversion.
