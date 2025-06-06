@@ -13,10 +13,10 @@ jobs:
           echo "${{ github.workflow }}-a-${{ github.event.pull_request.number || github.ref_name }}-${{ inputs.repository }}-${{ github.event_name == 'workflow_dispatch' }}-${{ inputs.job-name }}"
 
   call-b:
-    uses: ./.github/workflows/workflow-b.yml
+    uses: ./.github/workflows/test_b.yml
 
   call-c:
-    uses: ./.github/workflows/workflow-c.yml
+    uses: ./.github/workflows/test_c.yml
 
   wait-all-jobs:
     needs: [call-b, call-c]
