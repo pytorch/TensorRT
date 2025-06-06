@@ -1,7 +1,8 @@
 name: Lan test workflow x86_64 wheels
 
 on:
-  pull_request:
+  #pull_request:
+  workflow_call:
   push:
     branches:
       - main

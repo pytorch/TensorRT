@@ -2,10 +2,7 @@ name: Lan test Windows wheels
 
 on:
   #pull_request:
-  workflow_run:
-    workflows: ["Build and test Linux x86_64 wheels"]
-    types:
-      - completed
+  workflow_call:
   push:
     branches:
       - main
