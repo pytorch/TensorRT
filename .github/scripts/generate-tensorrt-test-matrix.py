@@ -85,7 +85,6 @@ TENSORRT_VERSIONS_DICT = {
 def check_new_tensorrt_version(
     major: int = 10, patch_from: int = 0
 ) -> tuple[bool, str, str, str, str]:
-    breakpoint()
 
     def check_file_availability(url: str) -> bool:
         try:
