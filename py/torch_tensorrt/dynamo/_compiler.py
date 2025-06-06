@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import collections.abc
 import logging
+import os
 import platform
 import warnings
 from typing import Any, Collection, List, Optional, Sequence, Set, Tuple, Union
@@ -31,6 +32,8 @@ from torch_tensorrt.dynamo.conversion import (
 from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
     DYNAMO_CONVERTERS as CONVERTERS,
 )
+from torch_tensorrt.dynamo.debug._DebuggerConfig import DebuggerConfig
+from torch_tensorrt.dynamo.debug._supports_debugger import fn_supports_debugger
 from torch_tensorrt.dynamo.lowering import (
     get_decompositions,
     post_lowering,
@@ -41,7 +44,6 @@ from torch_tensorrt.dynamo.utils import (
     get_output_metadata,
     parse_graph_io,
     prepare_inputs,
-    set_log_level,
     to_torch_device,
     to_torch_tensorrt_device,
 )
@@ -63,7 +65,7 @@ def cross_compile_for_windows(
         Set[Union[torch.dtype, dtype]], Tuple[Union[torch.dtype, dtype]]
     ] = _defaults.ENABLED_PRECISIONS,
     engine_capability: EngineCapability = _defaults.ENGINE_CAPABILITY,
-    debug: bool = _defaults.DEBUG,
+    debug: bool = False,
     num_avg_timing_iters: int = _defaults.NUM_AVG_TIMING_ITERS,
     workspace_size: int = _defaults.WORKSPACE_SIZE,
     dla_sram_size: int = _defaults.DLA_SRAM_SIZE,
@@ -184,7 +186,11 @@ def cross_compile_for_windows(
         )
 
     if debug:
-        set_log_level(logger.parent, logging.DEBUG)
+        warnings.warn(
+            "`debug` is deprecated. Please use `torch_tensorrt.dynamo.Debugger` to configure debugging options.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
 
     if "truncate_long_and_double" in kwargs.keys():
         if truncate_double is not _defaults.TRUNCATE_DOUBLE:
@@ -295,7 +301,6 @@ def cross_compile_for_windows(
         "enabled_precisions": (
             enabled_precisions if enabled_precisions else _defaults.ENABLED_PRECISIONS
         ),
-        "debug": debug,
         "device": device,
         "assume_dynamic_shape_support": assume_dynamic_shape_support,
         "workspace_size": workspace_size,
@@ -386,7 +391,7 @@ def compile(
         Set[Union[torch.dtype, dtype]], Tuple[Union[torch.dtype, dtype]]
     ] = _defaults.ENABLED_PRECISIONS,
     engine_capability: EngineCapability = _defaults.ENGINE_CAPABILITY,
-    debug: bool = _defaults.DEBUG,
+    debug: bool = False,
     num_avg_timing_iters: int = _defaults.NUM_AVG_TIMING_ITERS,
     workspace_size: int = _defaults.WORKSPACE_SIZE,
     dla_sram_size: int = _defaults.DLA_SRAM_SIZE,
@@ -502,6 +507,13 @@ def compile(
     Returns:
         torch.fx.GraphModule: Compiled FX Module, when run it will execute via TensorRT
     """
+
+    if debug:
+        warnings.warn(
+            "`debug` is deprecated. Please use `torch_tensorrt.dynamo.Debugger` for debugging functionality",
+            DeprecationWarning,
+            stacklevel=2,
+        )
 
     if "truncate_long_and_double" in kwargs.keys():
         if truncate_double is not _defaults.TRUNCATE_DOUBLE:
@@ -633,7 +645,6 @@ def compile(
         "enabled_precisions": (
             enabled_precisions if enabled_precisions else _defaults.ENABLED_PRECISIONS
         ),
-        "debug": debug,
         "device": device,
         "assume_dynamic_shape_support": assume_dynamic_shape_support,
         "workspace_size": workspace_size,
@@ -694,12 +705,15 @@ def compile(
     return trt_gm
 
 
+@fn_supports_debugger
 def compile_module(
     gm: torch.fx.GraphModule,
     sample_arg_inputs: Sequence[Input],
     sample_kwarg_inputs: Optional[dict[Any, Any]] = None,
     settings: CompilationSettings = CompilationSettings(),
     engine_cache: Optional[BaseEngineCache] = None,
+    *,
+    _debugger_settings: Optional[DebuggerConfig] = None,
 ) -> torch.fx.GraphModule:
     """Compile a traced FX module
 
@@ -900,6 +914,34 @@ def compile_module(
 
             trt_modules[name] = trt_module
 
+            if _debugger_settings:
+
+                if _debugger_settings.save_engine_profile:
+                    if settings.use_python_runtime:
+                        if _debugger_settings.profile_format == "trex":
+                            logger.warning(
+                                "Profiling with TREX can only be enabled when using the C++ runtime. Python runtime profiling only support cudagraph visualization."
+                            )
+                            trt_module.enable_profiling()
+                    else:
+                        path = os.path.join(
+                            _debugger_settings.logging_dir, "engine_visualization"
+                        )
+                        os.makedirs(path, exist_ok=True)
+                        trt_module.enable_profiling(
+                            profiling_results_dir=path,
+                            profile_format=_debugger_settings.profile_format,
+                        )
+
+                if _debugger_settings.save_layer_info:
+                    with open(
+                        os.path.join(
+                            _debugger_settings.logging_dir, "engine_layer_info.json"
+                        ),
+                        "w",
+                    ) as f:
+                        f.write(trt_module.get_layer_info())
+
     # Parse the graph I/O and store it in dryrun tracker
     parse_graph_io(gm, dryrun_tracker)
 
@@ -927,7 +969,7 @@ def convert_exported_program_to_serialized_trt_engine(
     enabled_precisions: (
         Set[torch.dtype | dtype] | Tuple[torch.dtype | dtype]
     ) = _defaults.ENABLED_PRECISIONS,
-    debug: bool = _defaults.DEBUG,
+    debug: bool = False,
     assume_dynamic_shape_support: bool = _defaults.ASSUME_DYNAMIC_SHAPE_SUPPORT,
     workspace_size: int = _defaults.WORKSPACE_SIZE,
     min_block_size: int = _defaults.MIN_BLOCK_SIZE,
@@ -1029,7 +1071,11 @@ def convert_exported_program_to_serialized_trt_engine(
         bytes: Serialized TensorRT engine, can either be saved to a file or deserialized via TensorRT APIs
     """
     if debug:
-        set_log_level(logger.parent, logging.DEBUG)
+        warnings.warn(
+            "`debug` is deprecated. Please use `torch_tensorrt.dynamo.Debugger` to configure debugging options.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
 
     if "truncate_long_and_double" in kwargs.keys():
         if truncate_double is not _defaults.TRUNCATE_DOUBLE:

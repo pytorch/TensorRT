@@ -45,6 +45,8 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     get_trt_tensor,
     to_torch,
 )
+from torch_tensorrt.dynamo.debug._DebuggerConfig import DebuggerConfig
+from torch_tensorrt.dynamo.debug._supports_debugger import cls_supports_debugger
 from torch_tensorrt.dynamo.utils import DYNAMIC_DIM, to_torch_device
 from torch_tensorrt.fx.observer import Observer
 from torch_tensorrt.logging import TRT_LOGGER
@@ -70,6 +72,7 @@ class TRTInterpreterResult(NamedTuple):
     requires_output_allocator: bool
 
 
+@cls_supports_debugger
 class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
     def __init__(
         self,
@@ -78,12 +81,14 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         output_dtypes: Optional[Sequence[dtype]] = None,
         compilation_settings: CompilationSettings = CompilationSettings(),
         engine_cache: Optional[BaseEngineCache] = None,
+        *,
+        _debugger_settings: Optional[DebuggerConfig] = None,
     ):
         super().__init__(module)
 
         self.logger = TRT_LOGGER
         self.builder = trt.Builder(self.logger)
-
+        self._debugger_settings = _debugger_settings
         flag = 0
         if compilation_settings.use_explicit_typing:
             STRONGLY_TYPED = 1 << (int)(
@@ -204,7 +209,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
     ) -> trt.IBuilderConfig:
         builder_config = self.builder.create_builder_config()
 
-        if self.compilation_settings.debug:
+        if self._debugger_settings and self._debugger_settings.engine_builder_monitor:
             builder_config.progress_monitor = TRTBulderMonitor()
 
         if self.compilation_settings.workspace_size != 0:
@@ -215,7 +220,8 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         if version.parse(trt.__version__) >= version.parse("8.2"):
             builder_config.profiling_verbosity = (
                 trt.ProfilingVerbosity.DETAILED
-                if self.compilation_settings.debug
+                if self._debugger_settings
+                and self._debugger_settings.save_engine_profile
                 else trt.ProfilingVerbosity.LAYER_NAMES_ONLY
             )
 
