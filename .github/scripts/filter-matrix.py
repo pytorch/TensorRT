@@ -28,7 +28,9 @@ def validate_matrix(matrix_dict: Dict[str, Any]) -> None:
 
 
 def filter_matrix_item(
-    item: Dict[str, Any], is_jetpack: bool, limit_pr_builds: bool, is_nightly: bool
+    item: Dict[str, Any],
+    is_jetpack: bool,
+    limit_pr_builds: bool,
 ) -> bool:
     """Filter a single matrix item based on the build type and requirements."""
     if item["python_version"] in disabled_python_versions:
@@ -42,18 +44,10 @@ def filter_matrix_item(
             item["python_version"] = "3.10"
             item["container_image"] = jetpack_container_image
             return True
-        elif is_nightly:
-            # nightly build, matrix passed from test-infra is cu128, all python versions, change to cu126, python 3.10
+        else:
+            # nightly/main build, matrix passed from test-infra is cu128, all python versions, change to cu126, python 3.10
             if item["python_version"] in jetpack_python_versions:
                 item["desired_cuda"] = "cu126"
-                item["container_image"] = jetpack_container_image
-                return True
-            return False
-        else:
-            if (
-                item["python_version"] in jetpack_python_versions
-                and item["desired_cuda"] in jetpack_cuda_versions
-            ):
                 item["container_image"] = jetpack_container_image
                 return True
             return False
@@ -92,14 +86,6 @@ def main(args: list[str]) -> None:
         default=os.getenv("LIMIT_PR_BUILDS", "false"),
     )
 
-    parser.add_argument(
-        "--is-nightly",
-        help="If it is a nightly build",
-        type=str,
-        choices=["true", "false"],
-        default=os.getenv("LIMIT_PR_BUILDS", "false"),
-    )
-
     options = parser.parse_args(args)
     if options.matrix == "":
         raise ValueError("--matrix needs to be provided")
@@ -120,7 +106,6 @@ def main(args: list[str]) -> None:
             item,
             options.jetpack == "true",
             options.limit_pr_builds == "true",
-            options.is_nightly == "true",
         ):
             filtered_includes.append(item)
 
