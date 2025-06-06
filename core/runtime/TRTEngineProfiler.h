@@ -10,12 +10,14 @@ namespace torch_tensorrt {
 namespace core {
 namespace runtime {
 
+enum TraceFormat { kPERFETTO, kTREX };
+
 struct TRTEngineProfiler : public nvinfer1::IProfiler {
   struct Record {
     float time{0};
     int count{0};
   };
-
+  void set_profile_format(TraceFormat format);
   virtual void reportLayerTime(const char* layerName, float ms) noexcept;
   TRTEngineProfiler(
       const std::string& name,
@@ -27,6 +29,7 @@ struct TRTEngineProfiler : public nvinfer1::IProfiler {
   std::string name;
   std::vector<std::string> layer_names;
   std::map<std::string, Record> profile;
+  TraceFormat profile_format = TraceFormat::kPERFETTO;
 };
 
 } // namespace runtime

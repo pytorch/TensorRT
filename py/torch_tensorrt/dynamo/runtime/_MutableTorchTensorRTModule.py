@@ -1,5 +1,6 @@
 import inspect
 import logging
+import warnings
 from copy import deepcopy
 from enum import Enum, auto
 from typing import Any, Collection, Dict, Iterator, List, Optional, Set, Union
@@ -71,7 +72,7 @@ class MutableTorchTensorRTModule(object):
         ] = _defaults.ENABLED_PRECISIONS,
         engine_capability: EngineCapability = _defaults.ENGINE_CAPABILITY,
         immutable_weights: bool = False,
-        debug: bool = _defaults.DEBUG,
+        debug: bool = False,
         num_avg_timing_iters: int = _defaults.NUM_AVG_TIMING_ITERS,
         workspace_size: int = _defaults.WORKSPACE_SIZE,
         dla_sram_size: int = _defaults.DLA_SRAM_SIZE,
@@ -109,7 +110,6 @@ class MutableTorchTensorRTModule(object):
             sparse_weights (bool): Enable sparsity for convolution and fully connected layers.
             enabled_precision (Set(Union(torch.dtype, torch_tensorrt.dtype))): The set of datatypes that TensorRT can use when selecting kernels
             immutable_weights (bool): Build non-refittable engines. This is useful for some layers that are not refittable.
-            debug (bool): Enable debuggable engine
             capability (torch_tensorrt.EngineCapability): Restrict kernel selection to safe gpu kernels or safe dla kernels
             num_avg_timing_iters (int): Number of averaging timing iterations used to select kernels
             workspace_size (int): Maximum size of workspace given to TensorRT
@@ -156,6 +156,12 @@ class MutableTorchTensorRTModule(object):
         self.kwarg_inputs: dict[str, Any] = {}
         device = to_torch_tensorrt_device(device)
         enabled_precisions = {dtype._from(p) for p in enabled_precisions}
+        if debug:
+            warnings.warn(
+                "`debug` is deprecated. Please use `torch_tensorrt.dynamo.Debugger` to configure debugging options.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
         assert (
             not immutable_weights
         ), "`immutable_weights` has to be False for a MutableTorchTensorRTModule."
@@ -165,7 +171,6 @@ class MutableTorchTensorRTModule(object):
                 if enabled_precisions
                 else _defaults.ENABLED_PRECISIONS
             ),
-            "debug": debug,
             "device": device,
             "assume_dynamic_shape_support": assume_dynamic_shape_support,
             "workspace_size": workspace_size,

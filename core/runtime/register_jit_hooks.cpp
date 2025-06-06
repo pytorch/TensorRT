@@ -82,6 +82,7 @@ static auto TORCHTRT_UNUSED TRTEngineTSRegistrtion =
         .def("__repr__", &TRTEngine::to_str)
         .def("__obj_flatten__", &TRTEngine::__obj_flatten__)
         .def("enable_profiling", &TRTEngine::enable_profiling)
+        .def("set_profile_format", &TRTEngine::set_profile_format)
         .def("disable_profiling", &TRTEngine::disable_profiling)
         .def_readwrite("profile_path_prefix", &TRTEngine::profile_path_prefix)
         .def("dump_engine_layer_info_to_file", &TRTEngine::dump_engine_layer_info_to_file)

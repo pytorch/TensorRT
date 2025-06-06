@@ -6,7 +6,6 @@ from torch_tensorrt._Device import Device
 from torch_tensorrt._enums import EngineCapability, dtype
 
 ENABLED_PRECISIONS = {dtype.f32}
-DEBUG = False
 DEVICE = None
 DISABLE_TF32 = False
 ASSUME_DYNAMIC_SHAPE_SUPPORT = False
@@ -50,6 +49,7 @@ TILING_OPTIMIZATION_LEVEL = "none"
 L2_LIMIT_FOR_TILING = -1
 USE_DISTRIBUTED_MODE_TRACE = False
 OFFLOAD_MODULE_TO_CPU = False
+DEBUG_LOGGING_DIR = os.path.join(tempfile.gettempdir(), "torch_tensorrt/debug_logs")
 
 
 def default_device() -> Device:
