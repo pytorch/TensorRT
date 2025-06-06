@@ -597,7 +597,9 @@ except Exception as e:
     )
 else:
 
-    @dynamo_tensorrt_converter(torch.ops.tensorrt.quantize_op.default)
+    @dynamo_tensorrt_converter(
+        torch.ops.tensorrt.quantize_op.default, supports_dynamic_shapes=True
+    )
     def aten_ops_quantize_op(
         ctx: ConversionContext,
         target: Target,
