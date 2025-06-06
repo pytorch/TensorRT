@@ -33,6 +33,69 @@ llama_model = AutoModelForCausalLM.from_pretrained(
 LLAMA_CONFIG = llama_model.config
 
 def test_llama_attention(args):
+    
+    DTYPE = torch.float32
+    if args.precision == "FP16":
+        DTYPE = torch.float16
+    elif args.precision == "BF16":
+        DTYPE = torch.bfloat16
+    
+    # Set precision specific flags
+    use_fp32_acc = False 
+    use_explicit_typing = False
+    if args.precision == "FP16":
+        enabled_precisions = {torch.float32}
+        use_fp32_acc = True 
+        use_explicit_typing = True
+    elif args.precision == "BF16":
+        enabled_precisions = {torch.bfloat16}
+        use_fp32_acc = False
+    else:
+        enabled_precisions = {torch.float32}
+
+    # model = LlamaAttentionBlock().eval().cuda().to(DTYPE)
+    model = llama_model.model.layers[0].self_attn.to(DTYPE)
+    # llama3 
+    hidden_states = torch.randn((1, 6, 2048), dtype=DTYPE).cuda()
+    position_embeddings = (torch.randn((1, 6, 64), dtype=DTYPE).cuda(), torch.randn((1, 6, 64), dtype=DTYPE).cuda())
+
+    pyt_output = model(hidden_states, position_embeddings, None)
+    seq_len = torch.export.Dim("seq_len", min=2, max=2176)
+    dynamic_shapes = ({1: seq_len}, ({1: seq_len}, {1: seq_len}), None)
+    from torch.export._trace import _export
+    # ep = torch.export.export(model, (hidden_states, position_embeddings, None), dynamic_shapes=dynamic_shapes, strict=False)
+    ep = _export(
+                model,
+                args=(hidden_states, position_embeddings, None),
+                dynamic_shapes=dynamic_shapes,
+                strict=False,
+                allow_complex_guards_as_runtime_asserts=True,
+            )
+    
+    with (torch_tensorrt.logging.debug() if args.debug else nullcontext()):
+        trt_model = torch_tensorrt.dynamo.compile(ep, 
+                                                inputs=[hidden_states, position_embeddings, None], 
+                                                enabled_precisions=enabled_precisions,
+                                                disable_tf32=True,
+                                                use_fp32_acc=use_fp32_acc,
+                                                use_explicit_typing=use_explicit_typing,
+                                                debug=args.debug)
+    trt_output = trt_model(hidden_states, position_embeddings, None)
+    if isinstance(pyt_output, tuple):
+        print(f"Diff b/w pyt and trt: {torch.mean(torch.abs(pyt_output[0] - trt_output[0]))}")
+        assert torch.allclose(pyt_output[0], trt_output[0], atol=ATOL, rtol=RTOL)
+    else:
+        print(f"Diff b/w pyt and trt: {torch.mean(torch.abs(pyt_output - trt_output))}")
+        assert torch.allclose(pyt_output, trt_output, atol=ATOL, rtol=RTOL)
+    
+
+def print_diff(tensor1, tensor2, prefix=""):
+    """
+    Print the diff between two tensors
+    """
+    print(f"[{prefix}] Diff between tensor1 and tensor2: {torch.mean(torch.abs(tensor1 - tensor2))}")
+
+def test_llama_attention_with_static_cache(args):
     class LlamaAttentionBlock(nn.Module):
         def __init__(self):
             super().__init__()
@@ -63,56 +126,6 @@ def test_llama_attention(args):
         use_fp32_acc = False
     else:
         enabled_precisions = {torch.float32}
-
-    # model = LlamaAttentionBlock().eval().cuda().to(DTYPE)
-    model = llama_model.model.layers[0].self_attn.to(DTYPE)
-    # llama3 
-    hidden_states = torch.randn((1, 6, 2048), dtype=DTYPE).cuda()
-    position_embeddings = (torch.randn((1, 6, 64), dtype=DTYPE).cuda(), torch.randn((1, 6, 64), dtype=DTYPE).cuda())
-
-    pyt_output = model(hidden_states, position_embeddings, None)
-    
-    seq_len = torch.export.Dim("seq_len", min=2, max=2176)
-    dynamic_shapes = ({1: seq_len}, ({1: seq_len}, {1: seq_len}), None)
-    ep = torch.export.export(model, (hidden_states, position_embeddings, None), dynamic_shapes=dynamic_shapes)
-    
-    with (torch_tensorrt.logging.debug() if args.debug else nullcontext()):
-        trt_model = torch_tensorrt.dynamo.compile(ep, 
-                                                inputs=[hidden_states, position_embeddings, None], 
-                                                enabled_precisions=enabled_precisions,
-                                                disable_tf32=True,
-                                                use_fp32_acc=use_fp32_acc,
-                                                use_explicit_typing=use_explicit_typing,
-                                                debug=args.debug)
-    trt_output = trt_model(hidden_states, position_embeddings, None)
-    if isinstance(pyt_output, tuple):
-        print(f"Diff b/w pyt and trt: {torch.mean(torch.abs(pyt_output[0] - trt_output[0]))}")
-        breakpoint()
-        assert torch.allclose(pyt_output[0], trt_output[0], atol=ATOL, rtol=RTOL)
-    else:
-        print(f"Diff b/w pyt and trt: {torch.mean(torch.abs(pyt_output - trt_output))}")
-        assert torch.allclose(pyt_output, trt_output, atol=ATOL, rtol=RTOL)
-
-def print_diff(tensor1, tensor2, prefix=""):
-    """
-    Print the diff between two tensors
-    """
-    print(f"[{prefix}] Diff between tensor1 and tensor2: {torch.mean(torch.abs(tensor1 - tensor2))}")
-
-def test_llama_attention_with_static_cache(args):
-    class LlamaAttentionBlock(nn.Module):
-        def __init__(self):
-            super().__init__()
-                self.config = LLAMA_CONFIG
-            self.attn = LlamaAttention(
-                config=self.config,
-                layer_idx=0
-            )
-        def forward(self, hidden_states, position_embeddings):
-            attn_output, attn_weights = self.attn(hidden_states, position_embeddings, None)
-            return attn_output
-    
-    DTYPE = torch.float32
     model = llama_model.model.layers[0].self_attn.to(DTYPE)
 
     # Inputs 
@@ -131,15 +144,16 @@ def test_llama_attention_with_static_cache(args):
     seq_len = torch.export.Dim("seq_len", min=2, max=2176)
     dynamic_shapes = ({1: seq_len}, ({1: seq_len}, {1: seq_len}), None)
     ep = torch.export.export(model, (hidden_states, position_embeddings, None), dynamic_shapes=dynamic_shapes)
-    import register_sdpa
-    import static_cache2
+    import static_cache_v2
     with (torch_tensorrt.logging.debug() if args.debug else nullcontext()):
         trt_model = torch_tensorrt.dynamo.compile(ep, 
                                                 inputs=[hidden_states, position_embeddings, None, key_cache, value_cache, start_idx, end_idx, is_causal], 
-                                                enabled_precisions={torch.float32},
+                                                enabled_precisions=enabled_precisions,
                                                 disable_tf32=True,
                                                 debug=args.debug, 
-                                                # offload_module_to_cpu=True, 
+                                                # offload_module_to_cpu=True,
+                                                use_fp32_acc=use_fp32_acc, 
+                                                use_explicit_typing=use_explicit_typing,
                                                 use_python_runtime=True)
     
     # Test Prefill
@@ -167,8 +181,38 @@ def test_llama_attention_with_static_cache(args):
 
 def test_llama_decoder(args):
     
+    class LlamaDecoderLayerBlock(nn.Module):
+        def __init__(self, model):
+            super().__init__()
+            self.config = LLAMA_CONFIG
+            self.decoder = LlamaDecoderLayer(
+                config=self.config,
+                layer_idx=0)
+            self.model = model
+
+        def forward(self, hidden_states, position_embeddings):
+            return self.model(hidden_states, position_embeddings=position_embeddings)
+
     DTYPE = torch.float32
-    model = llama_model.model.layers[0].to(DTYPE)
+    if args.precision == "FP16":
+        DTYPE = torch.float16
+    elif args.precision == "BF16":
+        DTYPE = torch.bfloat16
+    
+    # Set precision specific flags
+    use_fp32_acc = False 
+    use_explicit_typing = False
+    if args.precision == "FP16":
+        enabled_precisions = {torch.float32}
+        use_fp32_acc = True 
+        use_explicit_typing = True
+    elif args.precision == "BF16":
+        enabled_precisions = {torch.bfloat16}
+        use_fp32_acc = False
+    else:
+        enabled_precisions = {torch.float32}
+
+    model = LlamaDecoderLayerBlock(llama_model.model.layers[0].to(DTYPE))
     # llama3 
     hidden_states = torch.randn((1, 6, 2048), dtype=DTYPE).cuda()
     position_embeddings = (torch.randn((1, 6, 64), dtype=DTYPE).cuda(), torch.randn((1, 6, 64), dtype=DTYPE).cuda())
@@ -181,12 +225,14 @@ def test_llama_decoder(args):
     with (torch_tensorrt.logging.debug() if args.debug else nullcontext()):
         trt_model = torch_tensorrt.dynamo.compile(ep, 
                                                 inputs=[hidden_states, position_embeddings], 
-                                                enabled_precisions={torch.float32},
-                                                debug=args.debug)
+                                                enabled_precisions=enabled_precisions,
+                                                debug=args.debug,
+                                                use_fp32_acc=use_fp32_acc,
+                                                use_explicit_typing=use_explicit_typing)
     trt_output = trt_model(hidden_states, position_embeddings)
 
-    print(f"Diff b/w pyt and trt: {torch.mean(torch.abs(pyt_output - trt_output))}")
-    assert torch.allclose(pyt_output, trt_output, atol=ATOL, rtol=RTOL)
+    print(f"Diff b/w pyt and trt: {torch.mean(torch.abs(pyt_output[0] - trt_output[0]))}")
+    assert torch.allclose(pyt_output[0], trt_output[0], atol=ATOL, rtol=RTOL)
 
 def test_llama_decoder_with_static_cache(args):
 
@@ -202,6 +248,23 @@ def test_llama_decoder_with_static_cache(args):
             return self.model(hidden_states, position_embeddings=position_embeddings)
 
     DTYPE = torch.float32
+    if args.precision == "FP16":
+        DTYPE = torch.float16
+    elif args.precision == "BF16":
+        DTYPE = torch.bfloat16
+    
+    # Set precision specific flags
+    use_fp32_acc = False 
+    use_explicit_typing = False
+    if args.precision == "FP16":
+        enabled_precisions = {torch.float32}
+        use_fp32_acc = True 
+        use_explicit_typing = True
+    elif args.precision == "BF16":
+        enabled_precisions = {torch.bfloat16}
+        use_fp32_acc = False
+    else:
+        enabled_precisions = {torch.float32}
     model = LlamaDecoderLayerBlock(llama_model.model.layers[0].to(DTYPE))
     
     # Inputs 
@@ -220,15 +283,16 @@ def test_llama_decoder_with_static_cache(args):
     seq_len = torch.export.Dim("seq_len", min=2, max=2176)
     dynamic_shapes = ({1: seq_len}, ({1: seq_len}, {1: seq_len}))
     ep = torch.export.export(model, args=(hidden_states, position_embeddings), dynamic_shapes=dynamic_shapes)
-    import register_sdpa
-    import static_cache2
+    import static_cache_v2
     with (torch_tensorrt.logging.debug() if args.debug else nullcontext()):
         trt_model = torch_tensorrt.dynamo.compile(ep, 
                                                 arg_inputs=[hidden_states, position_embeddings, key_cache, value_cache, start_idx, end_idx, is_causal], 
-                                                enabled_precisions={torch.float32},
+                                                enabled_precisions=enabled_precisions,
                                                 disable_tf32=True,
                                                 debug=args.debug, 
                                                 # offload_module_to_cpu=True, 
+                                                use_fp32_acc=use_fp32_acc, 
+                                                use_explicit_typing=use_explicit_typing,
                                                 use_python_runtime=True)
     
     # Test Prefill
@@ -253,9 +317,83 @@ def test_llama_decoder_with_static_cache(args):
         hidden_states = hidden_states_full
         position_embeddings = position_embeddings_full
 
+
+def test_llama_model(args):
+
+    DTYPE = torch.float32
+    if args.precision == "FP16":
+        DTYPE = torch.float16
+    elif args.precision == "BF16":
+        DTYPE = torch.bfloat16
+    
+    # Set precision specific flags
+    use_fp32_acc = False 
+    use_explicit_typing = False
+    if args.precision == "FP16":
+        enabled_precisions = {torch.float32}
+        use_fp32_acc = True 
+        use_explicit_typing = True
+    elif args.precision == "BF16":
+        enabled_precisions = {torch.bfloat16}
+        use_fp32_acc = False
+    else:
+        enabled_precisions = {torch.float32}
+
+    model = llama_model.model.to(DTYPE)
+
+    # Inputs 
+    ISL = 2048
+    NUM_TOKENS = 128
+    OSL = ISL + NUM_TOKENS
+    input_ids = torch.randint(1, 20, (1, ISL), dtype=torch.int64).cuda()
+    position_ids = torch.arange(input_ids.shape[1]).unsqueeze(0).cuda()
+
+    pyt_output = model(input_ids, position_ids)
+    seq_len = torch.export.Dim("seq_len", min=2, max=2176)
+    dynamic_shapes = ({1: seq_len}, {1: seq_len})
+    kwarg_inputs = {"position_ids":position_ids}
+    from torch.export._trace import _export
+    ep = _export(model, args=(input_ids,), kwargs=kwarg_inputs, dynamic_shapes=dynamic_shapes, strict=False, allow_complex_guards_as_runtime_asserts=True)
+
+    with (torch_tensorrt.logging.debug() if args.debug else nullcontext()):
+        trt_model = torch_tensorrt.dynamo.compile(ep, 
+                                                arg_inputs=[], 
+                                                kwarg_inputs=kwarg_inputs,
+                                                enabled_precisions=enabled_precisions,
+                                                disable_tf32=True,
+                                                debug=args.debug, 
+                                                offload_module_to_cpu=True, 
+                                                use_fp32_acc=use_fp32_acc, 
+                                                use_explicit_typing=use_explicit_typing,
+                                                use_python_runtime=True)
+    
+    trt_output = trt_model(input_ids, position_ids)
+    
+    print(f"Diff b/w pyt and trt: {torch.mean(torch.abs(pyt_output[0] - trt_output[0]))}")
+    # print(f"Diff b/w pyt and trt: {torch.mean(torch.abs(pyt_output[1] - trt_output[1]))}")
+    breakpoint()
+    assert torch.allclose(pyt_output, trt_output, atol=ATOL, rtol=RTOL)
+
 def test_llama_model_with_static_cache(args):
 
     DTYPE = torch.float32
+    if args.precision == "FP16":
+        DTYPE = torch.float16
+    elif args.precision == "BF16":
+        DTYPE = torch.bfloat16
+    
+    # Set precision specific flags
+    use_fp32_acc = False 
+    use_explicit_typing = False
+    if args.precision == "FP16":
+        enabled_precisions = {torch.float32}
+        use_fp32_acc = True 
+        use_explicit_typing = True
+    elif args.precision == "BF16":
+        enabled_precisions = {torch.bfloat16}
+        use_fp32_acc = False
+    else:
+        enabled_precisions = {torch.float32}
     model = llama_model.model.to(DTYPE)
 
     # Inputs 
@@ -276,16 +414,17 @@ def test_llama_model_with_static_cache(args):
     kwarg_inputs = {"input_ids":input_ids, "position_ids":position_ids}
     ep = torch.export.export(model, args=(), kwargs=kwarg_inputs, dynamic_shapes=dynamic_shapes)
 
-    import register_sdpa
-    import static_cache2
+    import static_cache_v2
     with (torch_tensorrt.logging.debug() if args.debug else nullcontext()):
         trt_model = torch_tensorrt.dynamo.compile(ep, 
                                                 arg_inputs=[], 
                                                 kwarg_inputs=kwarg_inputs,
-                                                enabled_precisions={torch.float32},
+                                                enabled_precisions=enabled_precisions,
                                                 disable_tf32=True,
                                                 debug=args.debug, 
                                                 # offload_module_to_cpu=True, 
+                                                use_fp32_acc=use_fp32_acc, 
+                                                use_explicit_typing=use_explicit_typing,
                                                 use_python_runtime=True)
     
     # Test Prefill
@@ -329,8 +468,9 @@ if __name__ == "__main__":
     )
     args = arg_parser.parse_args()
     with torch.inference_mode():
-        test_llama_attention(args)
+        # test_llama_attention(args)
         # test_llama_decoder(args)
+        test_llama_model(args)
         # test_llama_attention_with_static_cache(args)
         # test_llama_decoder_with_static_cache(args)
         # test_llama_model_with_static_cache(args)

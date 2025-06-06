@@ -41,7 +41,6 @@ def get_model(args):
                     args.model,
                     use_cache=False,
                     attn_implementation="sdpa",
-                    # num_hidden_layers=2
                 )
                 .eval()
                 .cuda()
@@ -209,6 +208,7 @@ if __name__ == "__main__":
         pyt_gen_tokens = None
         pyt_timings = None
         pyt_stats = None
+
         if args.enable_pytorch_run:
             pyt_gen_tokens = generate(
                 model, input_ids.clone(), MAX_OUTPUT_SEQ_LENGTH, tokenizer.eos_token_id
@@ -235,9 +235,9 @@ if __name__ == "__main__":
         elif args.cache == "dynamic":
             import dynamic_cache
 
-
+        # Compile the model with Torch-TensorRT
         trt_model = compile_torchtrt(model, input_ids, args) 
-            
+
         if args.cache == "static_v1" or args.cache == "static_v2":
             if args.cudagraph:
                 # Run a decoding loop with prefill and generate phases so that the CUDAGraph is recorded for both of these phases.

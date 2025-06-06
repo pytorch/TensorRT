@@ -4,7 +4,6 @@ from torch.export import export
 import torch_tensorrt
 from contextlib import nullcontext
 import argparse
-import register_sdpa
 from transformers.models.llama.modeling_llama import LlamaAttention, LlamaDecoderLayer
 from transformers.models.llama.configuration_llama import LlamaConfig
 from transformers import AutoModelForCausalLM
@@ -13,6 +12,11 @@ from torch_tensorrt.dynamo.lowering import (
     post_lowering,
     pre_export_lowering,
 )
+import sys
+import os
+
+# Register SDPA as a standalone operator. Converter and lowering pass are defined in register_sdpa.py
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
 ATOL = 1e-5
 RTOL = 1e-5
@@ -73,7 +77,7 @@ def eager_sdpa(query, key, value, attn_mask=None, dropout_p=0.0,
     L, S = query.size(-2), key.size(-2)
     scale_factor = 1 / math.sqrt(query.size(-1)) if scale is None else scale
     attn_bias = torch.zeros(L, S, dtype=query.dtype, device=query.device)
-    breakpoint()
+
     if is_causal:
         assert attn_mask is None
         temp_mask = torch.ones(L, S, dtype=torch.bool).tril(diagonal=0).cuda()
@@ -101,6 +105,46 @@ def print_diff(tensor1, tensor2, prefix=""):
     Print the diff between two tensors
     """
     print(f"[{prefix}] Diff between tensor1 and tensor2: {torch.mean(torch.abs(tensor1 - tensor2))}")
+
+
+def test_no_cache_model_with_torch_tensorrt(args):
+    """
+    Test the no cache model
+    """
+    with torch.inference_mode():
+        model_no_cache = ModelNoCache().eval().cuda()
+        # q = torch.randn(1, 32, 6, 64).cuda()
+        # k = torch.randn(1, 32, 6, 64).cuda()
+        # v = torch.randn(1, 32, 6, 64).cuda()
+        q = torch.load("query.pt")
+        k = torch.load("key.pt")
+        v = torch.load("value.pt")
+        out_no_cache = model_no_cache(q, k, v)
+        out_eager = eager_sdpa(q, k, v, is_causal=True)
+        q_seq_len = torch.export.Dim("q_seq_len", min=2, max=2176)
+        # Export the model
+        exported_program = torch.export.export(
+            model_no_cache,
+            args=(q, k, v),
+            dynamic_shapes=({2 : q_seq_len}, {2 : q_seq_len}, {2 : q_seq_len}),
+            strict=False
+        )
+        with (torch_tensorrt.logging.debug() if args.debug else nullcontext()):
+            trt_model = torch_tensorrt.dynamo.compile(
+                exported_program,
+                inputs=[q, k, v],
+                enabled_precisions={torch.float32},
+                disable_tf32=True,
+                debug=args.debug,
+                min_block_size=1,
+            )
+        out_trt = trt_model(q, k, v)
+        
+        print_diff(out_no_cache, out_eager, "out_no_cache vs out_eager")
+        print_diff(out_no_cache, out_trt, "out_no_cache vs out_trt")
+        print_diff(out_eager, out_trt, "out_eager vs out_trt")
+        breakpoint()
+
 
 def test_static_cache_model(args):
     """
@@ -330,9 +374,10 @@ def main():
     )
     args = arg_parser.parse_args()
     with torch.inference_mode():
-        test_static_cache_model(args)
-        test_static_cache_lowering(args)
-        test_static_cache_with_torch_tensorrt(args)
+        test_no_cache_model_with_torch_tensorrt(args)
+        # test_static_cache_model(args)
+        # test_static_cache_lowering(args)
+        # test_static_cache_with_torch_tensorrt(args)
     
 
 if __name__ == "__main__":

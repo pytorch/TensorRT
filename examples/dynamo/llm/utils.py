@@ -105,7 +105,7 @@ def generate(model, input_seq, max_output_seq_length, eos_token_id, benchmark=Tr
     num_tokens_generated = 0
     while num_tokens_generated < osl:
         position_ids = torch.arange(input_seq.shape[1]).unsqueeze(0).cuda()
-        outputs = model(input_seq, position_ids)
+        outputs = model(input_seq, position_ids=position_ids) 
         logits = outputs.logits
         next_token_logits = logits[:, -1, :]
         next_tokens = torch.argmax(next_token_logits, dim=-1)
@@ -126,7 +126,6 @@ def generate_with_static_cache(model, input_seq, max_output_seq_length, eos_toke
     position_ids = torch.arange(input_seq.shape[1]).unsqueeze(0).cuda()
     output_seq = input_seq.clone()
     # TODO: Confirm this: When end_idx = max_output_seq_length-1, number of tokens generated = OSL
-    logits_concat = []
     num_tokens_generated = 0
     kv_cache = get_zeroed_static_cache_inputs(model)
     while end_idx < max_output_seq_length:
@@ -136,7 +135,6 @@ def generate_with_static_cache(model, input_seq, max_output_seq_length, eos_toke
         logits_keys_values = model(*input_signature)
         num_tokens_generated += 1
         logits = logits_keys_values[0]
-        logits_concat.append(logits)
         kv_cache = logits_keys_values[1:]
         next_token_logits = logits[:, -1, :]
         next_tokens = torch.argmax(next_token_logits, dim=-1, keepdim=True)

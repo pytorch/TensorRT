@@ -68,17 +68,9 @@ def scaled_dot_product_attention(
     source_ir = SourceIR.ATEN
 
     # implementation as described here: https://pytorch.org/docs/stable/generated/torch.nn.functional.scaled_dot_product_attention.html
-    use_fp32_acc = False # kwargs.get("use_fp32_acc", False)
+    use_fp32_acc =  kwargs.get("use_fp32_acc", False)
     query_dtype = query.dtype
-
-    if use_fp32_acc and query_dtype == trt.float16:
-        query = cast_trt_tensor(
-                ctx, query, trt.float32, name + "_query_cast_to_fp32", target, source_ir
-            )
-        key = cast_trt_tensor(
-                ctx, key, trt.float32, name + "_key_cast_to_fp32", target, source_ir
-            )
-
+        
     if scale is None:
         scale = query.shape[-1]
         if scale < 0:
@@ -105,7 +97,15 @@ def scaled_dot_product_attention(
             key,
             scale,
         )
-
+    
+    if use_fp32_acc and query_dtype == trt.float16:
+        query = cast_trt_tensor(
+                ctx, query, trt.float32, name + "_query_cast_to_fp32", target, source_ir
+            )
+        key = cast_trt_tensor(
+                ctx, key, trt.float32, name + "_key_cast_to_fp32", target, source_ir
+            )
+        
     mm = impl.matmul.matrix_multiply(
         ctx,
         target,

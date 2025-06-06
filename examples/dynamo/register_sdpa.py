@@ -61,6 +61,7 @@ def replace_variants_of_sdpa(
                 elif len(node.args) == 5:
                     query, key, value, attn_mask, is_causal = node.args
                     dropout_p = 0.0
+                        
                 else:
                     raise ValueError(
                         f"Unexpected number of arguments for {node.target} in the graph"
@@ -85,12 +86,9 @@ def replace_variants_of_sdpa(
                     raise ValueError(
                         f"Unexpected number of arguments for {node.target} in the graph"
                     )
-            if attn_mask is not None:
-                logger.warning(
-                    f"This current version of SDPA converter does not support attn_mask for {node.target} in the graph. Ignoring it and using is_causal=True configuration."
-                )
-
-            modified_input_args = (query, key, value, None, dropout_p, is_causal)
+            
+            logger.warning(f"This current version of SDPA converter only supports attn_mask = None, dropout_p = 0.0 and is_causal = True configuration. This could cause issues with accuracy for models with different configurations.")
+            modified_input_args = (query, key, value, None, dropout_p, True)
             # Create a new node with torch.nn.functional.scaled_dot_product_attention
             # The input args is (query, key, value, is_causal). kwargs has scale
             with gm.graph.inserting_after(node):
