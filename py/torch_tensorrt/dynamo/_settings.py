@@ -7,6 +7,7 @@ from torch_tensorrt._enums import EngineCapability, dtype
 from torch_tensorrt.dynamo._defaults import (
     ASSUME_DYNAMIC_SHAPE_SUPPORT,
     CACHE_BUILT_ENGINES,
+    DEBUG,
     DISABLE_TF32,
     DLA_GLOBAL_DRAM_SIZE,
     DLA_LOCAL_DRAM_SIZE,
@@ -99,6 +100,7 @@ class CompilationSettings:
     """
 
     enabled_precisions: Set[dtype] = field(default_factory=lambda: ENABLED_PRECISIONS)
+    debug: bool = DEBUG
     workspace_size: int = WORKSPACE_SIZE
     min_block_size: int = MIN_BLOCK_SIZE
     torch_executed_ops: Collection[Target] = field(default_factory=set)

@@ -1,18 +1,10 @@
-import contextlib
-import functools
 import logging
 import os
 import tempfile
 from logging.config import dictConfig
 from typing import Any, List, Optional
-from unittest import mock
 
 import torch
-from torch_tensorrt.dynamo.debug._DebuggerConfig import DebuggerConfig
-from torch_tensorrt.dynamo.debug._supports_debugger import (
-    _DEBUG_ENABLED_CLS,
-    _DEBUG_ENABLED_FUNCS,
-)
 from torch_tensorrt.dynamo.lowering import (
     ATEN_POST_LOWERING_PASSES,
     ATEN_PRE_LOWERING_PASSES,
@@ -26,47 +18,13 @@ logging.addLevelName(GRAPH_LEVEL, "GRAPHS")
 class Debugger:
     def __init__(
         self,
-        log_level: str = "debug",
+        log_level: str,
         capture_fx_graph_before: Optional[List[str]] = None,
         capture_fx_graph_after: Optional[List[str]] = None,
         save_engine_profile: bool = False,
-        profile_format: str = "perfetto",
-        engine_builder_monitor: bool = True,
-        logging_dir: str = tempfile.gettempdir(),
-        save_layer_info: bool = False,
+        logging_dir: Optional[str] = None,
     ):
-        """Initialize a debugger for TensorRT conversion.
-
-        Args:
-            log_level (str): Logging level to use. Valid options are:
-                'debug', 'info', 'warning', 'error', 'internal_errors', 'graphs'.
-                Defaults to 'debug'.
-            capture_fx_graph_before (List[str], optional): List of pass names to visualize FX graph
-                before execution of a lowering pass. Defaults to None.
-            capture_fx_graph_after (List[str], optional): List of pass names to visualize FX graph
-                after execution of a lowering pass. Defaults to None.
-            save_engine_profile (bool): Whether to save TensorRT engine profiling information.
-                Defaults to False.
-            profile_format (str): Format for profiling data. Can be either 'perfetto' or 'trex'.
-                If you need to generate engine graph using the profiling files, set it to 'trex' .
-                Defaults to 'perfetto'.
-            engine_builder_monitor (bool): Whether to monitor TensorRT engine building process.
-                Defaults to True.
-            logging_dir (str): Directory to save debug logs and profiles.
-                Defaults to system temp directory.
-            save_layer_info (bool): Whether to save layer info.
-                Defaults to False.
-        """
-
-        os.makedirs(logging_dir, exist_ok=True)
-        self.cfg = DebuggerConfig(
-            log_level=log_level,
-            save_engine_profile=save_engine_profile,
-            engine_builder_monitor=engine_builder_monitor,
-            logging_dir=logging_dir,
-            profile_format=profile_format,
-            save_layer_info=save_layer_info,
-        )
+        self.debug_file_dir = tempfile.TemporaryDirectory().name
 
         if log_level == "debug":
             self.log_level = logging.DEBUG
@@ -89,10 +47,14 @@ class Debugger:
         self.capture_fx_graph_before = capture_fx_graph_before
         self.capture_fx_graph_after = capture_fx_graph_after
 
+        if logging_dir is not None:
+            self.debug_file_dir = logging_dir
+        os.makedirs(self.debug_file_dir, exist_ok=True)
+
     def __enter__(self) -> None:
         self.original_lvl = _LOGGER.getEffectiveLevel()
         self.rt_level = torch.ops.tensorrt.get_logging_level()
-        dictConfig(self.get_customized_logging_config())
+        dictConfig(self.get_config())
 
         if self.capture_fx_graph_before or self.capture_fx_graph_after:
             self.old_pre_passes, self.old_post_passes = (
@@ -101,7 +63,7 @@ class Debugger:
             )
             pre_pass_names = [p.__name__ for p in self.old_pre_passes]
             post_pass_names = [p.__name__ for p in self.old_post_passes]
-            path = os.path.join(self.cfg.logging_dir, "lowering_passes_visualization")
+            path = os.path.join(self.debug_file_dir, "lowering_passes_visualization")
             if self.capture_fx_graph_before is not None:
                 pre_vis_passes = [
                     p for p in self.capture_fx_graph_before if p in pre_pass_names
@@ -123,25 +85,9 @@ class Debugger:
                 ATEN_PRE_LOWERING_PASSES.insert_debug_pass_after(pre_vis_passes, path)
                 ATEN_POST_LOWERING_PASSES.insert_debug_pass_after(post_vis_passes, path)
 
-        self._context_stack = contextlib.ExitStack()
-
-        for f in _DEBUG_ENABLED_FUNCS:
-            f.__kwdefaults__["_debugger_settings"] = self.cfg
-
-        [
-            self._context_stack.enter_context(
-                mock.patch.object(
-                    c,
-                    "__init__",
-                    functools.partialmethod(c.__init__, _debugger_settings=self.cfg),
-                )
-            )
-            for c in _DEBUG_ENABLED_CLS
-        ]
-
     def __exit__(self, exc_type: Any, exc_value: Any, exc_tb: Any) -> None:
 
-        dictConfig(self.get_default_logging_config())
+        dictConfig(self.get_default_config())
         torch.ops.tensorrt.set_logging_level(self.rt_level)
         if self.capture_fx_graph_before or self.capture_fx_graph_after:
             ATEN_PRE_LOWERING_PASSES.passes, ATEN_POST_LOWERING_PASSES.passes = (
@@ -149,11 +95,6 @@ class Debugger:
                 self.old_post_passes,
             )
         self.debug_file_dir = tempfile.TemporaryDirectory().name
-
-        for f in _DEBUG_ENABLED_FUNCS:
-            f.__kwdefaults__["_debugger_settings"] = None
-
-        self._context_stack.close()
 
     def get_customized_logging_config(self) -> dict[str, Any]:
         config = {
@@ -173,7 +114,7 @@ class Debugger:
                 "file": {
                     "level": self.log_level,
                     "class": "logging.FileHandler",
-                    "filename": f"{self.cfg.logging_dir}/torch_tensorrt_logging.log",
+                    "filename": f"{self.debug_file_dir}/torch_tensorrt_logging.log",
                     "formatter": "standard",
                 },
                 "console": {

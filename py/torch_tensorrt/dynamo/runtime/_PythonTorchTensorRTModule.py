@@ -12,8 +12,6 @@ from torch.nn import Module
 from torch_tensorrt._Device import Device
 from torch_tensorrt._enums import Platform, dtype
 from torch_tensorrt.dynamo._settings import CompilationSettings
-from torch_tensorrt.dynamo.debug._DebuggerConfig import DebuggerConfig
-from torch_tensorrt.dynamo.debug._supports_debugger import cls_supports_debugger
 from torch_tensorrt.dynamo.utils import DYNAMIC_DIM
 from torch_tensorrt.logging import TRT_LOGGER
 from torch_tensorrt.runtime._utils import (
@@ -113,7 +111,6 @@ class TorchTRTRuntimeStates:
         )
 
 
-@cls_supports_debugger
 class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
     """PythonTorchTensorRTModule is a PyTorch module which encompasses an arbitrary TensorRT Engine.
 
@@ -131,7 +128,6 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         settings: CompilationSettings = CompilationSettings(),
         weight_name_map: Optional[dict[Any, Any]] = None,
         requires_output_allocator: bool = False,
-        _debugger_settings: Optional[DebuggerConfig] = None,
     ):
         """Takes a name, target device, serialized TensorRT engine, and binding names / order and constructs
         a PyTorch ``torch.nn.Module`` around it. Uses TensorRT Python APIs to run the engine
@@ -161,7 +157,6 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
 
         """
         self.context: Any
-        self._debugger_settings: Optional[DebuggerConfig] = _debugger_settings
         super(PythonTorchTensorRTModule, self).__init__()
         self._register_state_dict_hook(PythonTorchTensorRTModule._on_state_dict)
 
@@ -198,11 +193,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         self.target_device_properties = torch.cuda.get_device_properties(
             self.target_device_id
         )
-        self.profiling_enabled = (
-            _debugger_settings.save_engine_profile
-            if _debugger_settings is not None
-            else False
-        )
+        self.profiling_enabled = settings.debug if settings.debug is not None else False
         self.settings = settings
         self.engine = None
         self.weight_name_map = weight_name_map
