@@ -199,10 +199,10 @@ def test_resnet18_half(ir):
     torch._dynamo.reset()
 
 
-# @unittest.skipIf(
-#     torch.cuda.get_device_capability() < (10, 0),
-#     "FP4 quantization requires compute capability 10.0 or later",
-# )
+@unittest.skipIf(
+    torch.cuda.get_device_capability() < (10, 0),
+    "FP4 quantization requires compute capability 10.0 or later",
+)
 @unittest.skipIf(
     not importlib.util.find_spec("modelopt"),
     "ModelOpt is required to run this test",
@@ -247,9 +247,6 @@ def test_base_fp4_dynamic_shapes(ir):
             trt_model = torchtrt.dynamo.compile(
                 exp_program,
                 inputs=[dummy_inputs],
-                enabled_precisions={
-                    torch.float4_e2m1fn_x2,
-                },
                 min_block_size=1,
                 debug=True,
                 cache_built_engines=False,
@@ -261,14 +258,14 @@ def test_base_fp4_dynamic_shapes(ir):
             expected_output = model(input_tensor)
             outputs_trt = trt_model(input_tensor)
             abs_diff = torch.abs(expected_output - outputs_trt)
-            print(f"max /mean abs_diff: {abs_diff.max().item()=} {abs_diff.mean()=}")
+            print(f"max/mean abs_diff: {abs_diff.max().item()=} {abs_diff.mean()=}")
             assert torch.allclose(expected_output, outputs_trt, rtol=0.3, atol=0.3)
 
 
-# @unittest.skipIf(
-#     torch.cuda.get_device_capability() < (10, 0),
-#     "FP4 quantization requires compute capability 10.0 or later",
-# )
+@unittest.skipIf(
+    torch.cuda.get_device_capability() < (10, 0),
+    "FP4 quantization requires compute capability 10.0 or later",
+)
 @unittest.skipIf(
     not importlib.util.find_spec("modelopt"),
     "ModelOpt is required to run this test",
@@ -311,9 +308,6 @@ def test_base_fp4_static_shapes(ir):
             trt_model = torchtrt.dynamo.compile(
                 exp_program,
                 inputs=[input_tensor],
-                enabled_precisions={
-                    torch.float4_e2m1fn_x2,
-                },
                 min_block_size=1,
                 debug=True,
                 cache_built_engines=False,

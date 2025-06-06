@@ -49,7 +49,6 @@ def quantize(
                 axis,
             )
         elif ".input_quantizer" in name:
-            # quantize input tensor to fp4, output should be data tensor in fp4 and block scale tensor in fp8
             output = _dynamic_double_quantize(
                 ctx,
                 target,
@@ -59,7 +58,6 @@ def quantize(
                 global_scale,
                 axis,
             )
-
         else:
             raise ValueError(
                 f"quantizer received an input of {name}. Supported values: weight_quantizer | input_quantizer"
@@ -149,6 +147,20 @@ def _double_dequantize(
     axis: int = -1,
     output_type: trt.DataType = trt.DataType.FLOAT,
 ) -> TRTTensor:
+    """
+    double dequantize will first dequantize scale from fp8 to orignal dtype(default is float32)
+    and then dequantize data from fp4 to orignal dtype(default is float32)
+    Parameters:
+        ctx: ConversionContext,
+        target: Target,
+        source_ir: Optional[SourceIR]
+        name: str
+        quantized_data_in_fp4: TRTTensor
+        quantized_scale_in_fp8: TRTTensor
+        global_scale: torch.Tensor
+        axis: int
+        output_type: trt.DataType
+    """
     # dequantize scale from fp8 to orignal dtype(default is float32)
     dequantize_scale_layer = ctx.net.add_dequantize(
         quantized_scale_in_fp8, global_scale, output_type
@@ -220,9 +232,19 @@ def _static_double_quantize(
         global_scale,
     )[0]._quantized_data
 
-    block_scale_fp8 = get_trt_tensor(ctx, block_scale_fp8, name + "_block_scale_fp8")
+    block_scale_fp8 = get_trt_tensor(
+        ctx,
+        block_scale_fp8,
+        name + "_block_scale_fp8",
+        target_quantized_type=trt.DataType.FP8,
+    )
     global_scale = get_trt_tensor(ctx, global_scale, name + "_global_scale")
-    weights_tensor_fp4 = get_trt_tensor(ctx, weights_tensor_fp4, name + "_weights_fp4")
+    weights_tensor_fp4 = get_trt_tensor(
+        ctx,
+        weights_tensor_fp4,
+        name + "_weights_fp4",
+        target_quantized_type=trt.DataType.FP4,
+    )
 
     dequantized_data = _double_dequantize(
         ctx,

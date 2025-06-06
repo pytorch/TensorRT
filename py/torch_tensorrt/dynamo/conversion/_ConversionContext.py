@@ -23,6 +23,9 @@ class ConversionContext:
     )
     requires_output_allocator: bool = False
     mapping: dict[str, np.array] = field(default_factory=dict)
-    weights_reference_holder: dict[str, Union[torch.Tensor, np.array]] = field(
+    cpu_weights_reference_holder: dict[str, Union[torch.Tensor, np.array]] = field(
         default_factory=dict
     )
+
+    def clear_cpu_weights_reference_holder(self) -> None:
+        self.cpu_weights_reference_holder.clear()
