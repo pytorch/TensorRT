@@ -25,7 +25,7 @@ jobs:
       with-rocm: false
       with-cpu: false
 
-  filter-linux-x86_64-matrix:
+  filter-matrix:
     needs: [generate-linux-x86_64-matrix]
     outputs:
       matrix: ${{ steps.generate.outputs.matrix }}

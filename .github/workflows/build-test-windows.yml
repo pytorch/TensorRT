@@ -26,8 +26,7 @@ jobs:
       with-rocm: false
       with-cpu: false
 
-  filter-windows-matrix:
-    name: filter-windows-matrix
+  filter-matrix:
     needs: [generate-windows-matrix]
     outputs:
       matrix: ${{ steps.generate.outputs.matrix }}
@@ -50,7 +49,7 @@ jobs:
           echo "matrix=${MATRIX_BLOB}" >> "${GITHUB_OUTPUT}"
 
   substitute-runner:
-    needs: filter-windows-matrix
+    needs: filter-matrix
     outputs:
       matrix: ${{ steps.substitute.outputs.matrix }}
     runs-on: ubuntu-latest
