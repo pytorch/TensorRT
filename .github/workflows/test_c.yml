@@ -4,7 +4,7 @@ on:
   workflow_call:
     inputs:
       job-name:
-        required: true
+        required: false
         type: string
         default: "test-c"
 
