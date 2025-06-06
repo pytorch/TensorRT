@@ -12,8 +12,6 @@ namespace runtime {
 
 enum TraceFormat { kPERFETTO, kTREX };
 
-// Forward declare the function
-
 struct TRTEngineProfiler : public nvinfer1::IProfiler {
   struct Record {
     float time{0};

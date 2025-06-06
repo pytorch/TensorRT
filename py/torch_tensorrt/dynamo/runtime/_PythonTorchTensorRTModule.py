@@ -131,7 +131,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         settings: CompilationSettings = CompilationSettings(),
         weight_name_map: Optional[dict[Any, Any]] = None,
         requires_output_allocator: bool = False,
-        _debugger_settings: Optional[DebuggerConfig] = None,
+        _debugger_config: Optional[DebuggerConfig] = None,
     ):
         """Takes a name, target device, serialized TensorRT engine, and binding names / order and constructs
         a PyTorch ``torch.nn.Module`` around it. Uses TensorRT Python APIs to run the engine
@@ -161,7 +161,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
 
         """
         self.context: Any
-        self._debugger_settings: Optional[DebuggerConfig] = _debugger_settings
+        self._debugger_config: Optional[DebuggerConfig] = _debugger_config
         super(PythonTorchTensorRTModule, self).__init__()
         self._register_state_dict_hook(PythonTorchTensorRTModule._on_state_dict)
 
@@ -199,8 +199,8 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
             self.target_device_id
         )
         self.profiling_enabled = (
-            _debugger_settings.save_engine_profile
-            if _debugger_settings is not None
+            _debugger_config.save_engine_profile
+            if _debugger_config is not None
             else False
         )
         self.settings = settings
