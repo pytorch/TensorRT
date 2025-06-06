@@ -326,6 +326,7 @@ def create_constant(
     name: str,
     dtype: Optional[Union[torch.dtype, np.dtype, TRTDataType, _enums.dtype]],
     min_rank: Optional[int] = 1,
+    target_quantized_type: Optional[TRTDataType] = None,
 ) -> TRTTensor:
     """
     Add a TensorRT constant layer whose value is `value` to `ctx.net`.
@@ -338,6 +339,7 @@ def create_constant(
         dtype (Optional[Union[torch.dtype, np.dtype, TRTDataType]]):
             If a dtype is given, we will convert the type of the given `value` to this dtype.
         min_rank (int): minimum rank of the constant tensor.
+        target_quantized_type (Optional[TRTDataType]): If a quantized type is given, we will convert the type of the given `value` to this dtype.
     Returns:
         A TensorRT ITensor that represents the given value.
     """
@@ -361,12 +363,48 @@ def create_constant(
             shape = list(torch_value.shape)
 
         if torch_value is not None:
+            if torch_value.dtype == torch.float8_e4m3fn:
+                weights = trt.Weights(
+                    type=trt.DataType.FP8,
+                    ptr=torch_value.data_ptr(),
+                    count=torch_value.numel(),
+                )
+                constant = ctx.net.add_constant(
+                    shape,
+                    weights,
+                )
+                constant.name = name
+                ctx.cpu_weights_reference_holder[name + " FP8_CONSTANT"] = torch_value
+                return constant.get_output(0)
+
+            if torch_value.dtype == torch.uint8:
+                if (
+                    target_quantized_type is None
+                    or target_quantized_type != trt.DataType.FP4
+                ):
+                    # Iconstant layer does not support Uint8, it only support that FP4 data packed in uint8
+                    raise ValueError(
+                        "Currently supported target_quantized_type for uint8 is FP4, got {target_quantized_type=}"
+                    )
+                shape[-1] = shape[-1] * 2
+                weights = trt.Weights(
+                    type=trt.DataType.FP4,
+                    ptr=torch_value.data_ptr(),
+                    count=torch_value.numel() * 2,
+                )
+                constant = ctx.net.add_constant(
+                    shape,
+                    weights,
+                )
+                constant.name = name
+                ctx.cpu_weights_reference_holder[name + " FP4_CONSTANT"] = torch_value
+                return constant.get_output(0)
+
             if torch_value.dtype == torch.bfloat16:
                 torch_value_fp32 = torch_value.to(torch.float32)
                 numpy_value = torch_value_fp32.numpy()
             else:
                 numpy_value = torch_value.numpy()
-
             ctx.mapping[name + " CONSTANT"] = numpy_value.reshape(-1)
             constant = ctx.net.add_constant(
                 shape,
@@ -381,7 +419,6 @@ def create_constant(
                     trt.DataType.BF16,
                     name + "_bf16_cast",
                 )
-
             return constant.get_output(0)
         else:
             raise ValueError(
@@ -395,6 +432,7 @@ def get_trt_tensor(
     name: str,
     dtype: Optional[Union[torch.dtype, np.dtype, TRTDataType, _enums.dtype]] = None,
     min_rank: int = 1,
+    target_quantized_type: Optional[TRTDataType] = None,
 ) -> TRTTensor:
     """
     Given a value of random type, we try to convert it to a TensorRT ITensor.
@@ -408,6 +446,7 @@ def get_trt_tensor(
         dtype (Optional[Union[torch.dtype, np.dtype, TRTDataType]]):
             If dtype is provided, the given value will be converted to this dtype.
         min_rank (int): minimum rank of the constant tensor.
+        target_quantized_type (Optional[TRTDataType]): If a quantized type is given, we will convert the type of the given `value` to this dtype.
     Returns:
         A TensorRT ITensor that represents the given value.
     """
@@ -420,7 +459,9 @@ def get_trt_tensor(
             input_val = input_val.astype(np.float32)
 
     if isinstance(input_val, (torch.Tensor, np.ndarray, int, float, bool)):
-        return create_constant(ctx, input_val, name, dtype, min_rank)
+        return create_constant(
+            ctx, input_val, name, dtype, min_rank, target_quantized_type
+        )
     elif isinstance(input_val, TRTTensor):
         return input_val
     else:

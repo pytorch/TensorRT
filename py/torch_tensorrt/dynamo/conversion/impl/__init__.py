@@ -7,6 +7,7 @@ from torch_tensorrt.dynamo.conversion.impl import (
     condition,
     conv,
     deconv,
+    dynamic_block_quantize,
     elementwise,
     embedding,
     full,

@@ -200,6 +200,127 @@ def test_resnet18_half(ir):
 
 
 @unittest.skipIf(
+    torch.cuda.get_device_capability() < (10, 0),
+    "FP4 quantization requires compute capability 10.0 or later",
+)
+@unittest.skipIf(
+    not importlib.util.find_spec("modelopt"),
+    "ModelOpt is required to run this test",
+)
+@pytest.mark.unit
+def test_base_fp4_dynamic_shapes(ir):
+    import modelopt.torch.quantization as mtq
+    from modelopt.torch.quantization.utils import export_torch_mode
+
+    dtype = torch.float16
+
+    class SimpleNetwork(torch.nn.Module):
+        def __init__(self):
+            super(SimpleNetwork, self).__init__()
+            self.linear1 = torch.nn.Linear(
+                in_features=64, out_features=32, bias=True, dtype=dtype
+            )
+
+        def forward(self, x):
+            x = self.linear1(x)
+            return x
+
+    def calibrate_loop(model):
+        """Simple calibration function for testing."""
+        model(dummy_inputs)
+
+    BATCH_SIZE = torch.export.Dim("BATCH_SIZE", min=16, max=128)
+    batch_size = 64
+    dummy_inputs = torch.ones(batch_size, 64, dtype=dtype).cuda()
+
+    model = SimpleNetwork().eval().cuda()
+
+    quant_cfg = mtq.NVFP4_DEFAULT_CFG
+    mtq.quantize(model, quant_cfg, forward_loop=calibrate_loop)
+    # model has qdq nodes at this point
+    with torch.no_grad():
+        with export_torch_mode():
+            exp_program = torch.export.export(
+                model, (dummy_inputs,), strict=False, dynamic_shapes=({0: BATCH_SIZE},)
+            )
+
+            trt_model = torchtrt.dynamo.compile(
+                exp_program,
+                inputs=[dummy_inputs],
+                min_block_size=1,
+                debug=True,
+                cache_built_engines=False,
+                reuse_cached_engines=False,
+                use_explicit_typing=True,
+            )
+            batch_size = 128
+            input_tensor = torch.ones(batch_size, 64, dtype=dtype).cuda()
+            expected_output = model(input_tensor)
+            outputs_trt = trt_model(input_tensor)
+            abs_diff = torch.abs(expected_output - outputs_trt)
+            print(f"max/mean abs_diff: {abs_diff.max().item()=} {abs_diff.mean()=}")
+            assert torch.allclose(expected_output, outputs_trt, rtol=0.3, atol=0.3)
+
+
+@unittest.skipIf(
+    torch.cuda.get_device_capability() < (10, 0),
+    "FP4 quantization requires compute capability 10.0 or later",
+)
+@unittest.skipIf(
+    not importlib.util.find_spec("modelopt"),
+    "ModelOpt is required to run this test",
+)
+@pytest.mark.unit
+def test_base_fp4_static_shapes(ir):
+    import modelopt.torch.quantization as mtq
+    from modelopt.torch.quantization.utils import export_torch_mode
+
+    dtype = torch.bfloat16
+
+    class SimpleNetwork(torch.nn.Module):
+        def __init__(self):
+            super(SimpleNetwork, self).__init__()
+            self.linear1 = torch.nn.Linear(
+                in_features=64, out_features=32, bias=True, dtype=dtype
+            )
+
+        def forward(self, x):
+            x = self.linear1(x)
+            return x
+
+    def calibrate_loop(model):
+        """Simple calibration function for testing."""
+        model(input_tensor)
+
+    input_tensor = torch.randn(128, 64, dtype=dtype).cuda()
+
+    model = SimpleNetwork().eval().cuda()
+    expected_output = model(input_tensor)
+
+    quant_cfg = mtq.NVFP4_DEFAULT_CFG
+    mtq.quantize(model, quant_cfg, forward_loop=calibrate_loop)
+    # model has qdq nodes at this point
+    with torch.no_grad():
+        with export_torch_mode():
+            exp_program = torch.export.export(model, (input_tensor,), strict=False)
+            from torch.fx import passes
+
+            trt_model = torchtrt.dynamo.compile(
+                exp_program,
+                inputs=[input_tensor],
+                min_block_size=1,
+                debug=True,
+                cache_built_engines=False,
+                reuse_cached_engines=False,
+                use_explicit_typing=True,
+            )
+            outputs_trt = trt_model(input_tensor)
+            abs_diff = torch.abs(expected_output - outputs_trt)
+            print(f"max/mean abs_diff: {abs_diff.max().item()=} {abs_diff.mean()=}")
+            assert torch.allclose(expected_output, outputs_trt, rtol=0.3, atol=0.3)
+
+
+@unittest.skipIf(
     torch.cuda.get_device_capability() < (8, 9),
     "FP8 quantization requires compute capability 8.9 or later",
 )
@@ -230,8 +351,8 @@ def test_base_fp8(ir):
 
     input_tensor = torch.randn(1, 10).cuda()
     model = SimpleNetwork().eval().cuda()
-
     quant_cfg = mtq.FP8_DEFAULT_CFG
+
     mtq.quantize(model, quant_cfg, forward_loop=calibrate_loop)
     # model has FP8 qdq nodes at this point
     output_pyt = model(input_tensor)
