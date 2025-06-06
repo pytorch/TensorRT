@@ -1,4 +1,4 @@
-name: Build and test Linux wheels
+name: Build and test Linux x86_64 wheels
 
 on:
   pull_request:
@@ -191,7 +191,6 @@ jobs:
         pushd .
         cd tests/py
         python -m pip install -r requirements.txt
-        python -m pip install nvidia-modelopt[all] --extra-index-url https://pypi.nvidia.com
         cd dynamo
         python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/dynamo_converters_test_results.xml -n 4 conversion/
         python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/dynamo_converters_test_results.xml automatic_plugin/test_automatic_plugin.py
@@ -226,7 +225,6 @@ jobs:
         pushd .
         cd tests/py
         python -m pip install -r requirements.txt
-        python -m pip install nvidia-modelopt[all] --extra-index-url https://pypi.nvidia.com
         cd dynamo
         python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/dyn_models_export.xml --ir dynamo models/
         popd
