@@ -4,12 +4,12 @@ on:
   workflow_call:
 
 jobs:
-  test-b:
+  test:
     runs-on: ubuntu-latest
     steps:
       - name: Test c
         run: |
-          echo "Test c"
+          echo "Test c ${github.workflow} "
 
 concurrency:
   group: ${{ github.workflow }}-c-${{ github.event.pull_request.number || github.ref_name }}-${{ inputs.repository }}-${{ github.event_name == 'workflow_dispatch' }}-${{ inputs.job-name }}

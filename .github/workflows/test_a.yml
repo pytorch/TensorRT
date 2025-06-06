@@ -12,19 +12,21 @@ jobs:
           echo "Pre-test"
           echo "${{ github.workflow }}-a-${{ github.event.pull_request.number || github.ref_name }}-${{ inputs.repository }}-${{ github.event_name == 'workflow_dispatch' }}-${{ inputs.job-name }}"
 
-  call-b:
+  call-linux-x86_64:
+    needs: pre-test
     uses: ./.github/workflows/test_b.yml
 
-  call-c:
+  call-windows:
+    needs: pre-test
     uses: ./.github/workflows/test_c.yml
 
   wait-all-jobs:
-    needs: [call-b, call-c]
+    needs: [call-linux-x86_64, call-windows]
     runs-on: ubuntu-latest
     steps:
       - name: Wait for all jobs to complete
         run: |
-          echo "Waiting for all jobs to complete..."
+          echo "Waiting for all jobs to complete...  ${{ github.workflow }} "
 
 concurrency:
   group: ${{ github.workflow }}-a-${{ github.event.pull_request.number || github.ref_name }}-${{ inputs.repository }}-${{ github.event_name == 'workflow_dispatch' }}-${{ inputs.job-name }}

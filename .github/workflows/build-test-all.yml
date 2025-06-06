@@ -50,9 +50,23 @@ jobs:
           echo "${MATRIX_BLOB}"
           echo "matrix=${MATRIX_BLOB}" >> "${GITHUB_OUTPUT}"
 
-  trigger-linux-test:
+  fail-fast-test:
     needs: [filter-matrix]
     if: always()
+    permissions:
+      id-token: write
+      contents: read
+      packages: write
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fail fast test
+        run: |
+          echo "Fail fast test"
+
+  trigger-linux-test:
+    needs: [fail-fast-test]
+    if: always()
+    name: build-test on linux-x86_64
     permissions:
       id-token: write
       contents: read
@@ -60,8 +74,9 @@ jobs:
     uses: ./.github/workflows/build-test-linux-x86_64.yml
 
   trigger-windows-test:
-    needs: [filter-matrix]
+    needs: [fail-fast-test]
     if: always()
+    name: build-test on windows
     permissions:
       id-token: write
       contents: read
