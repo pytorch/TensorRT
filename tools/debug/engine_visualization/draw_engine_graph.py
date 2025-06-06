@@ -24,7 +24,7 @@ def draw_engine(dir_path: str):
         dir_path, "_run_on_acc_0_engine_layer_information.json"
     )
     profiling_json_fname = os.path.join(
-        dir_path, "_run_on_acc_0_engine_engine_exectuion_profile.trace"
+        dir_path, "_run_on_acc_0_engine_engine_execution_profile.trace"
     )
 
     graphviz_is_installed = shutil.which("dot") is not None

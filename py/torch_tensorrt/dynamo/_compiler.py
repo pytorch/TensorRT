@@ -68,7 +68,6 @@ def cross_compile_for_windows(
         Set[Union[torch.dtype, dtype]], Tuple[Union[torch.dtype, dtype]]
     ] = _defaults.ENABLED_PRECISIONS,
     engine_capability: EngineCapability = _defaults.ENGINE_CAPABILITY,
-    debug: bool = False,
     num_avg_timing_iters: int = _defaults.NUM_AVG_TIMING_ITERS,
     workspace_size: int = _defaults.WORKSPACE_SIZE,
     dla_sram_size: int = _defaults.DLA_SRAM_SIZE,
@@ -142,7 +141,6 @@ def cross_compile_for_windows(
         assume_dynamic_shape_support (bool): Setting this to true enables the converters work for both dynamic and static shapes. Default: False
         sparse_weights (bool): Enable sparsity for convolution and fully connected layers.
         enabled_precision (Set(Union(torch.dtype, torch_tensorrt.dtype))): The set of datatypes that TensorRT can use when selecting kernels
-        debug (bool): Enable debuggable engine
         capability (torch_tensorrt.EngineCapability): Restrict kernel selection to safe gpu kernels or safe dla kernels
         num_avg_timing_iters (int): Number of averaging timing iterations used to select kernels
         workspace_size (int): Maximum size of workspace given to TensorRT
@@ -189,9 +187,9 @@ def cross_compile_for_windows(
             f"Cross compile for windows is only supported on x86-64 Linux architecture, current platform: {platform.system()=}, {platform.architecture()[0]=}"
         )
 
-    if debug:
+    if kwargs.get("debug", False):
         warnings.warn(
-            "`debug` is deprecated. Please use `torch_tensorrt.dynamo.Debugger` to configure debugging options.",
+            "`debug` is deprecated. Please use `with torch_tensorrt.dynamo.Debugger(...)` to wrap your compilation call to enable debugging functionality.",
             DeprecationWarning,
             stacklevel=2,
         )
@@ -406,7 +404,6 @@ def compile(
         Set[Union[torch.dtype, dtype]], Tuple[Union[torch.dtype, dtype]]
     ] = _defaults.ENABLED_PRECISIONS,
     engine_capability: EngineCapability = _defaults.ENGINE_CAPABILITY,
-    debug: bool = False,
     num_avg_timing_iters: int = _defaults.NUM_AVG_TIMING_ITERS,
     workspace_size: int = _defaults.WORKSPACE_SIZE,
     dla_sram_size: int = _defaults.DLA_SRAM_SIZE,
@@ -482,7 +479,6 @@ def compile(
         assume_dynamic_shape_support (bool): Setting this to true enables the converters work for both dynamic and static shapes. Default: False
         sparse_weights (bool): Enable sparsity for convolution and fully connected layers.
         enabled_precision (Set(Union(torch.dtype, torch_tensorrt.dtype))): The set of datatypes that TensorRT can use when selecting kernels
-        debug (bool): Enable debuggable engine
         capability (torch_tensorrt.EngineCapability): Restrict kernel selection to safe gpu kernels or safe dla kernels
         num_avg_timing_iters (int): Number of averaging timing iterations used to select kernels
         workspace_size (int): Maximum size of workspace given to TensorRT
@@ -525,9 +521,9 @@ def compile(
         torch.fx.GraphModule: Compiled FX Module, when run it will execute via TensorRT
     """
 
-    if debug:
+    if kwargs.get("debug", False):
         warnings.warn(
-            "`debug` is deprecated. Please use `torch_tensorrt.dynamo.Debugger` for debugging functionality",
+            "`debug` is deprecated. Please use `with torch_tensorrt.dynamo.Debugger(...)` to wrap your compilation call to enable debugging functionality",
             DeprecationWarning,
             stacklevel=2,
         )
@@ -735,7 +731,7 @@ def compile_module(
     settings: CompilationSettings = CompilationSettings(),
     engine_cache: Optional[BaseEngineCache] = None,
     *,
-    _debugger_settings: Optional[DebuggerConfig] = None,
+    _debugger_config: Optional[DebuggerConfig] = None,
 ) -> torch.fx.GraphModule:
     """Compile a traced FX module
 
@@ -938,29 +934,36 @@ def compile_module(
 
             trt_modules[name] = trt_module
 
-            if _debugger_settings:
+            if _debugger_config:
 
-                if _debugger_settings.save_engine_profile:
+                if _debugger_config.save_engine_profile:
                     if settings.use_python_runtime:
-                        if _debugger_settings.profile_format == "trex":
-                            logger.warning(
+                        if _debugger_config.profile_format != "cudagraph":
+                            raise ValueError(
                                 "Profiling with TREX can only be enabled when using the C++ runtime. Python runtime profiling only support cudagraph visualization."
                             )
+                        else:
                             trt_module.enable_profiling()
                     else:
-                        path = os.path.join(
-                            _debugger_settings.logging_dir, "engine_visualization"
-                        )
-                        os.makedirs(path, exist_ok=True)
-                        trt_module.enable_profiling(
-                            profiling_results_dir=path,
-                            profile_format=_debugger_settings.profile_format,
-                        )
+                        if _debugger_config.profile_format == "cudagraph":
+                            raise ValueError(
+                                "Profiling with Cudagraph can only be enabled when using the Python runtime. C++ runtime profiling only support TREX/Perfetto visualization."
+                            )
+                        else:
+                            path = os.path.join(
+                                _debugger_config.logging_dir,
+                                "engine_visualization_profile",
+                            )
+                            os.makedirs(path, exist_ok=True)
+                            trt_module.enable_profiling(
+                                profiling_results_dir=path,
+                                profile_format=_debugger_config.profile_format,
+                            )
 
-                if _debugger_settings.save_layer_info:
+                if _debugger_config.save_layer_info:
                     with open(
                         os.path.join(
-                            _debugger_settings.logging_dir, "engine_layer_info.json"
+                            _debugger_config.logging_dir, "engine_layer_info.json"
                         ),
                         "w",
                     ) as f:
@@ -993,7 +996,6 @@ def convert_exported_program_to_serialized_trt_engine(
     enabled_precisions: (
         Set[torch.dtype | dtype] | Tuple[torch.dtype | dtype]
     ) = _defaults.ENABLED_PRECISIONS,
-    debug: bool = False,
     assume_dynamic_shape_support: bool = _defaults.ASSUME_DYNAMIC_SHAPE_SUPPORT,
     workspace_size: int = _defaults.WORKSPACE_SIZE,
     min_block_size: int = _defaults.MIN_BLOCK_SIZE,
@@ -1055,7 +1057,6 @@ def convert_exported_program_to_serialized_trt_engine(
                         torch.randn((1, 3, 224, 244)) # Use an example tensor and let torch_tensorrt infer settings
                     ]
         enabled_precisions (Optional[Set[torch.dtype | _enums.dtype]]): The set of datatypes that TensorRT can use
-        debug (bool): Whether to print out verbose debugging information
         workspace_size (int): Workspace TRT is allowed to use for the module (0 is default)
         min_block_size (int): Minimum number of operators per TRT-Engine Block
         torch_executed_ops (Set[str]): Set of operations to run in Torch, regardless of converter coverage
@@ -1095,9 +1096,9 @@ def convert_exported_program_to_serialized_trt_engine(
     Returns:
         bytes: Serialized TensorRT engine, can either be saved to a file or deserialized via TensorRT APIs
     """
-    if debug:
+    if kwargs.get("debug", False):
         warnings.warn(
-            "`debug` is deprecated. Please use `torch_tensorrt.dynamo.Debugger` to configure debugging options.",
+            "`debug` is deprecated. Please use `with torch_tensorrt.dynamo.Debugger(...)` to wrap your compilation call to enable debugging functionality.",
             DeprecationWarning,
             stacklevel=2,
         )
@@ -1184,7 +1185,6 @@ def convert_exported_program_to_serialized_trt_engine(
     compilation_options = {
         "assume_dynamic_shape_support": assume_dynamic_shape_support,
         "enabled_precisions": enabled_precisions,
-        "debug": debug,
         "workspace_size": workspace_size,
         "min_block_size": min_block_size,
         "torch_executed_ops": torch_executed_ops,

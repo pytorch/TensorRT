@@ -325,7 +325,7 @@ void TRTEngine::set_profiling_paths() {
   output_profile_path = std::filesystem::path{profile_path_prefix + "/" + name + "_output_profile.trace"}.string();
   enqueue_profile_path = std::filesystem::path{profile_path_prefix + "/" + name + "_enqueue_profile.trace"}.string();
   trt_engine_profile_path =
-      std::filesystem::path{profile_path_prefix + "/" + name + "_engine_exectuion_profile.trace"}.string();
+      std::filesystem::path{profile_path_prefix + "/" + name + "_engine_execution_profile.trace"}.string();
   cuda_graph_debug_path = std::filesystem::path{profile_path_prefix + "/" + name + "_cudagraph.dot"}.string();
 }
 

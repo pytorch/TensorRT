@@ -1,10 +1,10 @@
 import os
-import tempfile
 from typing import Any, Callable, List, Optional
 
 import torch
 from torch.fx import passes
 from torch.fx.passes.pass_manager import PassManager
+from torch_tensorrt.dynamo._defaults import DEBUG_LOGGING_DIR
 from torch_tensorrt.dynamo._settings import CompilationSettings
 
 
@@ -70,7 +70,7 @@ class DynamoPassManager(PassManager):  # type: ignore[misc]
         del self.passes[index]
 
     def insert_debug_pass_before(
-        self, passes: List[str], output_path_prefix: str = tempfile.gettempdir()
+        self, passes: List[str], output_path_prefix: str = DEBUG_LOGGING_DIR
     ) -> None:
         """Insert debug passes in the PassManager pass sequence prior to the execution of a particular pass.
 
@@ -96,7 +96,7 @@ class DynamoPassManager(PassManager):  # type: ignore[misc]
         self._validated = False
 
     def insert_debug_pass_after(
-        self, passes: List[str], output_path_prefix: str = tempfile.gettempdir()
+        self, passes: List[str], output_path_prefix: str = DEBUG_LOGGING_DIR
     ) -> None:
         """Insert debug passes in the PassManager pass sequence after the execution of a particular pass.
 

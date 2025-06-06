@@ -62,7 +62,7 @@ void dump_trace(const std::string& path, const TRTEngineProfiler& value) {
     } else { // kTREX
       out << "    \"timeMs\": " << elem.time << "," << std::endl;
       out << "    \"averageMs\": " << elem.time / elem.count << "," << std::endl;
-      out << "    \"percentage\": " << (elem.time * 100.0 / ts) << "," << std::endl;
+      out << "    \"percentage\": " << (elem.time * 100.0 / ts) << std::endl;
     }
     out << "  }," << std::endl;
     running_time += elem.time;

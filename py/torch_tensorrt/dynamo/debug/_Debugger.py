@@ -8,6 +8,7 @@ from typing import Any, List, Optional
 from unittest import mock
 
 import torch
+from torch_tensorrt.dynamo._defaults import DEBUG_LOGGING_DIR
 from torch_tensorrt.dynamo.debug._DebuggerConfig import DebuggerConfig
 from torch_tensorrt.dynamo.debug._supports_debugger import (
     _DEBUG_ENABLED_CLS,
@@ -18,7 +19,7 @@ from torch_tensorrt.dynamo.lowering import (
     ATEN_PRE_LOWERING_PASSES,
 )
 
-_LOGGER = logging.getLogger("torch_tensorrt [TensorRT Conversion Context]")
+_LOGGER = logging.getLogger(__name__)
 GRAPH_LEVEL = 5
 logging.addLevelName(GRAPH_LEVEL, "GRAPHS")
 
@@ -32,7 +33,7 @@ class Debugger:
         save_engine_profile: bool = False,
         profile_format: str = "perfetto",
         engine_builder_monitor: bool = True,
-        logging_dir: str = tempfile.gettempdir(),
+        logging_dir: str = DEBUG_LOGGING_DIR,
         save_layer_info: bool = False,
     ):
         """Initialize a debugger for TensorRT conversion.
@@ -47,8 +48,9 @@ class Debugger:
                 after execution of a lowering pass. Defaults to None.
             save_engine_profile (bool): Whether to save TensorRT engine profiling information.
                 Defaults to False.
-            profile_format (str): Format for profiling data. Can be either 'perfetto' or 'trex'.
-                If you need to generate engine graph using the profiling files, set it to 'trex' .
+            profile_format (str): Format for profiling data. Choose from 'perfetto', 'trex', 'cudagraph'.
+                If you need to generate engine graph using the profiling files, set it to 'trex' and use the C++ runtime.
+                If you need to generate cudagraph visualization, set it to 'cudagraph'.
                 Defaults to 'perfetto'.
             engine_builder_monitor (bool): Whether to monitor TensorRT engine building process.
                 Defaults to True.
@@ -92,7 +94,7 @@ class Debugger:
     def __enter__(self) -> None:
         self.original_lvl = _LOGGER.getEffectiveLevel()
         self.rt_level = torch.ops.tensorrt.get_logging_level()
-        dictConfig(self.get_customized_logging_config())
+        dictConfig(self.get_logging_config(self.log_level))
 
         if self.capture_fx_graph_before or self.capture_fx_graph_after:
             self.old_pre_passes, self.old_post_passes = (
@@ -126,14 +128,14 @@ class Debugger:
         self._context_stack = contextlib.ExitStack()
 
         for f in _DEBUG_ENABLED_FUNCS:
-            f.__kwdefaults__["_debugger_settings"] = self.cfg
+            f.__kwdefaults__["_debugger_config"] = self.cfg
 
         [
             self._context_stack.enter_context(
                 mock.patch.object(
                     c,
                     "__init__",
-                    functools.partialmethod(c.__init__, _debugger_settings=self.cfg),
+                    functools.partialmethod(c.__init__, _debugger_config=self.cfg),
                 )
             )
             for c in _DEBUG_ENABLED_CLS
@@ -141,7 +143,7 @@ class Debugger:
 
     def __exit__(self, exc_type: Any, exc_value: Any, exc_tb: Any) -> None:
 
-        dictConfig(self.get_default_logging_config())
+        dictConfig(self.get_logging_config(None))
         torch.ops.tensorrt.set_logging_level(self.rt_level)
         if self.capture_fx_graph_before or self.capture_fx_graph_after:
             ATEN_PRE_LOWERING_PASSES.passes, ATEN_POST_LOWERING_PASSES.passes = (
@@ -151,50 +153,13 @@ class Debugger:
         self.debug_file_dir = tempfile.TemporaryDirectory().name
 
         for f in _DEBUG_ENABLED_FUNCS:
-            f.__kwdefaults__["_debugger_settings"] = None
+            f.__kwdefaults__["_debugger_config"] = None
 
         self._context_stack.close()
 
-    def get_customized_logging_config(self) -> dict[str, Any]:
-        config = {
-            "version": 1,
-            "disable_existing_loggers": False,
-            "formatters": {
-                "brief": {
-                    "format": "%(asctime)s - %(levelname)s - %(message)s",
-                    "datefmt": "%H:%M:%S",
-                },
-                "standard": {
-                    "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-                    "datefmt": "%Y-%m-%d %H:%M:%S",
-                },
-            },
-            "handlers": {
-                "file": {
-                    "level": self.log_level,
-                    "class": "logging.FileHandler",
-                    "filename": f"{self.cfg.logging_dir}/torch_tensorrt_logging.log",
-                    "formatter": "standard",
-                },
-                "console": {
-                    "level": self.log_level,
-                    "class": "logging.StreamHandler",
-                    "formatter": "brief",
-                },
-            },
-            "loggers": {
-                "": {  # root logger
-                    "handlers": ["file", "console"],
-                    "level": self.log_level,
-                    "propagate": True,
-                },
-            },
-            "force": True,
-        }
-        return config
-
-    def get_default_logging_config(self) -> dict[str, Any]:
-        config = {
+    def get_logging_config(self, log_level: Optional[int] = None) -> dict[str, Any]:
+        level = log_level if log_level is not None else self.original_lvl
+        config: dict[str, Any] = {
             "version": 1,
             "disable_existing_loggers": False,
             "formatters": {
@@ -209,7 +174,7 @@ class Debugger:
             },
             "handlers": {
                 "console": {
-                    "level": self.original_lvl,
+                    "level": level,
                     "class": "logging.StreamHandler",
                     "formatter": "brief",
                 },
@@ -217,10 +182,18 @@ class Debugger:
             "loggers": {
                 "": {  # root logger
                     "handlers": ["console"],
-                    "level": self.original_lvl,
+                    "level": level,
                     "propagate": True,
                 },
             },
             "force": True,
         }
+        if log_level is not None:
+            config["handlers"]["file"] = {
+                "level": level,
+                "class": "logging.FileHandler",
+                "filename": f"{self.cfg.logging_dir}/torch_tensorrt_logging.log",
+                "formatter": "standard",
+            }
+            config["loggers"][""]["handlers"].append("file")
         return config
