@@ -52,6 +52,7 @@ jobs:
 
   trigger-linux-test:
     needs: [filter-matrix]
+    if: always()
     permissions:
       id-token: write
       contents: read
@@ -60,6 +61,7 @@ jobs:
 
   trigger-windows-test:
     needs: [filter-matrix]
+    if: always()
     permissions:
       id-token: write
       contents: read
