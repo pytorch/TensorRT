@@ -1,0 +1,32 @@
+name: Lan test a
+
+on:
+  pull_request:
+
+jobs:
+  pre-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Pre-test
+        run: |
+          echo "Pre-test"
+          echo "${{ github.workflow }}-a-${{ github.event.pull_request.number || github.ref_name }}-${{ inputs.repository }}-${{ github.event_name == 'workflow_dispatch' }}-${{ inputs.job-name }}"
+
+  call-b:
+    uses: ./.github/workflows/workflow-b.yml
+
+  call-c:
+    uses: ./.github/workflows/workflow-c.yml
+
+  wait-all-jobs:
+    needs: [call-b, call-c]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wait for all jobs to complete
+        run: |
+          echo "Waiting for all jobs to complete..."
+
+concurrency:
+  group: ${{ github.workflow }}-a-${{ github.event.pull_request.number || github.ref_name }}-${{ inputs.repository }}-${{ github.event_name == 'workflow_dispatch' }}-${{ inputs.job-name }}
+  cancel-in-progress: true
+

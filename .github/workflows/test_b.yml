@@ -1,0 +1,16 @@
+name: Lan test b
+
+on:
+  workflow_call:
+
+jobs:
+  test-b:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Test b
+        run: |
+          echo "Test b"
+
+concurrency:
+  group: ${{ github.workflow }}-b-${{ github.event.pull_request.number || github.ref_name }}-${{ inputs.repository }}-${{ github.event_name == 'workflow_dispatch' }}-${{ inputs.job-name }}
+  cancel-in-progress: true
