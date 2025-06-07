@@ -41,6 +41,7 @@ def get_model(args):
                     args.model,
                     use_cache=False,
                     attn_implementation="sdpa",
+                    # num_hidden_layers=1
                 )
                 .eval()
                 .cuda()
@@ -232,13 +233,16 @@ if __name__ == "__main__":
         if args.cache == "static_v2":
             # This import is required to register static v2 KV cache transformations as lowering passes
             import static_cache_v2
+        elif args.cache == "static_v3":
+            # This import is required to register static v3 KV cache transformations as lowering passes
+            import static_cache_v3
         elif args.cache == "dynamic":
             import dynamic_cache
 
         # Compile the model with Torch-TensorRT
         trt_model = compile_torchtrt(model, input_ids, args) 
 
-        if args.cache == "static_v1" or args.cache == "static_v2":
+        if args.cache == "static_v1" or args.cache == "static_v2" or args.cache == "static_v3":
             if args.cudagraph:
                 # Run a decoding loop with prefill and generate phases so that the CUDAGraph is recorded for both of these phases.
                 # trt_input_signature = (input_ids.clone(),) + get_zeroed_kv_cache_inputs(trt_model)

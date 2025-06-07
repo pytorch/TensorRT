@@ -1,10 +1,7 @@
 import logging
-from typing import Dict, List, Tuple, Union, Sequence, Any
+from typing import List, Tuple
 
 import torch
-from torch.fx.node import Target
-
-import torch_tensorrt
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.lowering.passes._aten_lowering_pass import (
     _aten_lowering_pass,
@@ -15,41 +12,9 @@ from torch_tensorrt.dynamo.lowering.passes.pass_utils import (
 )
 
 from cache_utils import add_graph_input, create_random_output_tensors, get_kv_nodes, is_op
-import tensorrt
 import torch.utils._pytree as pytree
 logger = logging.getLogger(__name__)
 
-@torch_tensorrt.dynamo.conversion.dynamo_tensorrt_converter(torch.ops.higher_order.cond, enabled=True, supports_dynamic_shapes=True)
-def cond_converter(
-    ctx: torch_tensorrt.dynamo.conversion.ConversionContext,
-    target: Target,
-    args: Tuple[Any, ...],
-    kwargs: Dict[str, Any],
-    name: str,
-) -> Union[tensorrt.ITensor, Sequence[tensorrt.ITensor]]:
-    """
-    Converter for torch.ops.higher_order.cond operation to TensorRT.
-    
-    This function handles the conversion of PyTorch's conditional operation to TensorRT.
-    The conditional operation selects between two tensors based on a boolean predicate.
-    
-    Args:
-        ctx (torch_tensorrt.dynamo.conversion.ConversionCtx): The conversion context
-        target (Target): The target operation to convert
-        args (Tuple[Argument, ...]): The arguments to the operation
-        kwargs (Dict[str, Argument]): The keyword arguments to the operation
-        name (str): The name to give to the TensorRT layer
-        
-    Returns:
-        Union[tensorrt.ITensor, Sequence[tensorrt.ITensor]]: The converted TensorRT tensor(s)
-    """
-    if_layer = ctx.net.add_if_conditional()
-    condition, true_branch, false_branch = args[0], args[1], args[2]
-    if_layer.set_condition(condition)
-    output_layer = if_layer.add_output(true_branch, false_branch)
-    output = output_layer.get_output(0)
-
-    return output
 
 def add_kv_as_outputs(gm):
     """

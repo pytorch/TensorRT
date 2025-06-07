@@ -6,6 +6,42 @@ from torch._subclasses.fake_tensor import FakeTensor, FakeTensorMode
 from torch.fx.passes.shape_prop import _extract_tensor_metadata
 from torch.utils._pytree import _LEAF_SPEC
 from torch._export.utils import _detect_fake_mode_from_gm
+import torch_tensorrt
+import tensorrt
+from typing import Any, Dict, Sequence
+from torch.fx.node import Target
+
+@torch_tensorrt.dynamo.conversion.dynamo_tensorrt_converter(torch.ops.higher_order.cond, enabled=True, supports_dynamic_shapes=True)
+def cond_converter(
+    ctx: torch_tensorrt.dynamo.conversion.ConversionContext,
+    target: Target,
+    args: Tuple[Any, ...],
+    kwargs: Dict[str, Any],
+    name: str,
+) -> Union[tensorrt.ITensor, Sequence[tensorrt.ITensor]]:
+    """
+    Converter for torch.ops.higher_order.cond operation to TensorRT.
+    
+    This function handles the conversion of PyTorch's conditional operation to TensorRT.
+    The conditional operation selects between two tensors based on a boolean predicate.
+    
+    Args:
+        ctx (torch_tensorrt.dynamo.conversion.ConversionCtx): The conversion context
+        target (Target): The target operation to convert
+        args (Tuple[Argument, ...]): The arguments to the operation
+        kwargs (Dict[str, Argument]): The keyword arguments to the operation
+        name (str): The name to give to the TensorRT layer
+        
+    Returns:
+        Union[tensorrt.ITensor, Sequence[tensorrt.ITensor]]: The converted TensorRT tensor(s)
+    """
+    if_layer = ctx.net.add_if_conditional()
+    condition, true_branch, false_branch = args[0], args[1], args[2]
+    if_layer.set_condition(condition)
+    output_layer = if_layer.add_output(true_branch, false_branch)
+    output = output_layer.get_output(0)
+
+    return output
 
 def get_kv_nodes(gm):
     """

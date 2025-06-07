@@ -251,7 +251,7 @@ def insert_kv_slicing_before_sdpa(gm, incoming_keys_values: List[Tuple[torch.Ten
 
 
 @_aten_lowering_pass
-def insert_kv_cache(
+def insert_static_cache_v2(
     gm: torch.fx.GraphModule, settings: CompilationSettings
 ) -> torch.fx.GraphModule:
     """Insert KV cache ops in the graph"""
