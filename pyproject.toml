@@ -8,7 +8,7 @@ requires = [
     "cffi>=1.15.1",
     "typing-extensions>=4.7.0",
     "future>=0.18.3",
-    "tensorrt-cu12>=10.9.0,<10.10.0; 'tegra' not in platform_release",
+    "tensorrt-cu12>=10.11.0,<10.12.0; 'tegra' not in platform_release",
     "tensorrt>=10.3.0,<10.4.0; 'tegra' in platform_release",
     "torch>=2.8.0.dev,<2.9.0; 'tegra' not in platform_release",
     "torch>=2.7.0,<2.8.0; 'tegra' in platform_release",
@@ -61,12 +61,12 @@ dependencies = [
     "torch>=2.8.0.dev,<2.9.0; 'tegra' not in platform_release",
     "torch>=2.7.0,<2.8.0; 'tegra' in platform_release",
 
-    "tensorrt>=10.9.0,<10.10.0; 'tegra' not in platform_release",
+    "tensorrt>=10.11.0,<10.12.0; 'tegra' not in platform_release",
     "tensorrt>=10.3.0,<10.4.0; 'tegra' in platform_release",
 
-    "tensorrt-cu12>=10.9.0,<10.10.0; 'tegra' not in platform_release",
-    "tensorrt-cu12-bindings>=10.9.0,<10.10.0; 'tegra' not in platform_release",
-    "tensorrt-cu12-libs>=10.9.0,<10.10.0; 'tegra' not in platform_release",
+    "tensorrt-cu12>=10.11.0,<10.12.0; 'tegra' not in platform_release",
+    "tensorrt-cu12-bindings>=10.11.0,<10.12.0; 'tegra' not in platform_release",
+    "tensorrt-cu12-libs>=10.11.0,<10.12.0; 'tegra' not in platform_release",
 
     "packaging>=23",
 
@@ -101,7 +101,6 @@ torchvision = [
 quantization = ["nvidia-modelopt[all]>=0.27.1"]
 monitoring-tools = ["rich>=13.7.1"]
 jupyter = ["rich[jupyter]>=13.7.1"]
-distributed = ["tensorrt-llm>=0.16.0"]
 
 [project.urls]
 Homepage = "https://pytorch.org/tensorrt"
