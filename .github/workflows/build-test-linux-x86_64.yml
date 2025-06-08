@@ -85,7 +85,7 @@ jobs:
 
   tests-py-fail-fast:
     name: Test fail fast [Python]
-    if: inputs.run-fail-fast-test-set == true
+    if: ${{ inputs.run-fail-fast-test-set == true }}
     needs: [filter-matrix, build]
     strategy:
       fail-fast: false
@@ -140,7 +140,7 @@ jobs:
   tests-py-torchscript-fe:
     name: Test torchscript frontend [Python]
     needs: [filter-matrix, build]
-    if: inputs.run-fail-fast-test-set == false
+    if: ${{ inputs.run-fail-fast-test-set == false }}
     strategy:
       fail-fast: false
       matrix:

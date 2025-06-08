@@ -34,7 +34,6 @@ jobs:
     needs: [trigger-fail-fast-test]
     strategy:
       fail-fast: false
-    if: always()
     name: build-test on linux-x86_64
     permissions:
       id-token: write
@@ -46,7 +45,6 @@ jobs:
 
   trigger-windows-test:
     needs: [trigger-fail-fast-test]
-    if: always()
     strategy:
       fail-fast: false
     name: build-test on windows
