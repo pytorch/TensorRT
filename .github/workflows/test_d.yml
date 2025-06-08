@@ -1,12 +1,10 @@
-name: Lan test c
+name: Lan test d
 
 on:
-  workflow_call:
-    inputs:
-      job-name:
-        required: false
-        type: string
-        default: "test-c"
+  workflow_run:
+    workflows: ["Lan test a"]
+    types:
+      - completed
 
 jobs:
   test:
@@ -14,7 +12,8 @@ jobs:
     steps:
       - name: Test c
         run: |
-          echo "Test c ${{ github.workflow }} "
+          echo "Test c ${{ github.workflow }}  "
+          echo "Test a github.event.workflow_run.conclusion ${{ github.event.workflow_run.conclusion }}"
 
 concurrency:
   group: ${{ github.workflow }}-c-${{ github.event.pull_request.number || github.ref_name }}-${{ inputs.repository }}-${{ github.event_name == 'workflow_dispatch' }}-${{ inputs.job-name }}

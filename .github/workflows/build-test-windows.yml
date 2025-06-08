@@ -15,8 +15,8 @@ on:
   workflow_dispatch:
 
 jobs:
-  generate-matrix:
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+  generate-windows-matrix:
+    name: generate-windows-matrix
     uses: pytorch/test-infra/.github/workflows/generate_binary_build_matrix.yml@main
     with:
       package-type: wheel
@@ -27,7 +27,7 @@ jobs:
       with-cpu: false
 
   filter-matrix:
-    needs: [generate-matrix]
+    needs: [generate-windows-matrix]
     outputs:
       matrix: ${{ steps.generate.outputs.matrix }}
     runs-on: ubuntu-latest
@@ -42,7 +42,8 @@ jobs:
         id: generate
         run: |
           set -eou pipefail
-          MATRIX_BLOB=${{ toJSON(needs.generate-matrix.outputs.matrix) }}
+          echo "${{ github.workflow }}-windows-${{ github.event.pull_request.number || github.ref_name }}-${{ inputs.repository }}-${{ github.event_name == 'workflow_dispatch' }}-${{ inputs.job-name }}"
+          MATRIX_BLOB=${{ toJSON(needs.generate-windows-matrix.outputs.matrix) }}
           MATRIX_BLOB="$(python3 .github/scripts/filter-matrix.py --matrix "${MATRIX_BLOB}")"
           echo "${MATRIX_BLOB}"
           echo "matrix=${MATRIX_BLOB}" >> "${GITHUB_OUTPUT}"
@@ -322,4 +323,4 @@ jobs:
 
 concurrency:
   group: ${{ github.workflow }}-windows-${{ github.event.pull_request.number || github.ref_name }}-${{ inputs.repository }}-${{ github.event_name == 'workflow_dispatch' }}-${{ inputs.job-name }}
-  cancel-in-progress: false
+  cancel-in-progress: true

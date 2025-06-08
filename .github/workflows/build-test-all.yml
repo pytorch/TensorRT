@@ -27,10 +27,13 @@ jobs:
     uses: ./.github/workflows/build-test-linux-x86_64.yml
     with:
       fail-fast: true
-  
+
   trigger-linux-test:
-    needs: [trigger-fail-fast-test]
+    needs: [fail-fast-test]
+    strategy:
+      fail-fast: false
     if: always()
+    name: build-test on linux-x86_64
     permissions:
       id-token: write
       contents: read
@@ -40,6 +43,7 @@ jobs:
   trigger-windows-test:
     needs: [trigger-fail-fast-test]
     if: always()
+    name: build-test on windows
     permissions:
       id-token: write
       contents: read
@@ -49,6 +53,8 @@ jobs:
   wait-all-jobs:
     needs: [trigger-linux-test, trigger-windows-test]
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
     steps:
       - name: Wait for all jobs to complete
         run: |
