@@ -19,39 +19,17 @@ permissions:
   packages: write
 
 jobs:
-  generate-matrix:
-    uses: pytorch/test-infra/.github/workflows/generate_binary_build_matrix.yml@main
+  trigger-fail-fast-test:
+    permissions:
+      id-token: write
+      contents: read
+      packages: write
+    uses: ./.github/workflows/build-test-linux-x86_64.yml
     with:
-      package-type: wheel
-      os: linux
-      test-infra-repository: pytorch/test-infra
-      test-infra-ref: main
-      with-rocm: false
-      with-cpu: false
-
-  filter-matrix:
-    needs: [generate-matrix]
-    outputs:
-      matrix: ${{ steps.generate.outputs.matrix }}
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-      - uses: actions/checkout@v4
-        with:
-          repository: pytorch/tensorrt
-      - name: Generate matrix
-        id: generate
-        run: |
-          set -eou pipefail
-          MATRIX_BLOB=${{ toJSON(needs.generate-matrix.outputs.matrix) }}
-          MATRIX_BLOB="$(python3 .github/scripts/filter-matrix.py --matrix "${MATRIX_BLOB}")"
-          echo "${MATRIX_BLOB}"
-          echo "matrix=${MATRIX_BLOB}" >> "${GITHUB_OUTPUT}"
-
+      fail-fast: true
+  
   trigger-linux-test:
-    needs: [filter-matrix]
+    needs: [trigger-fail-fast-test]
     if: always()
     permissions:
       id-token: write
@@ -60,7 +38,7 @@ jobs:
     uses: ./.github/workflows/build-test-linux-x86_64.yml
 
   trigger-windows-test:
-    needs: [filter-matrix]
+    needs: [trigger-fail-fast-test]
     if: always()
     permissions:
       id-token: write

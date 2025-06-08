@@ -2,10 +2,6 @@ name: Build and test Linux aarch64 wheels
 
 on:
   #pull_request:
-  workflow_run:
-    workflows: ["Build and test Linux x86_64 wheels"]
-    types:
-      - completed
   push:
     branches:
       - main

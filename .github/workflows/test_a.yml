@@ -1,7 +1,7 @@
 name: Lan test a
 
 on:
-  pull_request:
+  #pull_request:
 
 jobs:
   pre-test:

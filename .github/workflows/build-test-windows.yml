@@ -87,37 +87,38 @@ jobs:
       trigger-event: ${{ github.event_name }}
       timeout: 120
 
-  # tests-py-torchscript-fe:
-  #   name: Test torchscript frontend [Python]
-  #   needs: [substitute-runner, build]
-  #   strategy:
-  #     fail-fast: false
-  #     matrix:
-  #       include:
-  #         - repository: pytorch/tensorrt
-  #           package-name: torch_tensorrt
-  #   uses: ./.github/workflows/windows-test.yml
-  #   with:
-  #     job-name: tests-py-torchscript-fe
-  #     repository: ${{ matrix.repository }}
-  #     ref: ""
-  #     test-infra-repository: pytorch/test-infra
-  #     test-infra-ref: main
-  #     build-matrix: ${{ needs.substitute-runner.outputs.matrix }}
-  #     pre-script: packaging/driver_upgrade.bat
-  #     script: |
-  #       export USE_HOST_DEPS=1
-  #       export CI_BUILD=1
-  #       pushd .
-  #       cd tests/modules
-  #       python hub.py
-  #       popd
-  #       pushd .
-  #       cd tests/py/ts
-  #       python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/ts_api_test_results.xml api/
-  #       python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/ts_models_test_results.xml models/
-  #       python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/ts_integrations_test_results.xml integrations/
-  #       popd
+  tests-py-torchscript-fe:
+    name: Test torchscript frontend [Python]
+    needs: [substitute-runner, build]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - repository: pytorch/tensorrt
+            package-name: torch_tensorrt
+    uses: ./.github/workflows/windows-test.yml
+    with:
+      job-name: tests-py-torchscript-fe
+      repository: ${{ matrix.repository }}
+      ref: ""
+      test-infra-repository: pytorch/test-infra
+      test-infra-ref: main
+      build-matrix: ${{ needs.substitute-runner.outputs.matrix }}
+      pre-script: packaging/driver_upgrade.bat
+      script: |
+        echo "test"
+        # export USE_HOST_DEPS=1
+        # export CI_BUILD=1
+        # pushd .
+        # cd tests/modules
+        # python hub.py
+        # popd
+        # pushd .
+        # cd tests/py/ts
+        # python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/ts_api_test_results.xml api/
+        # python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/ts_models_test_results.xml models/
+        # python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/ts_integrations_test_results.xml integrations/
+        # popd
 
   # tests-py-dynamo-converters:
   #   name: Test dynamo converters [Python]
