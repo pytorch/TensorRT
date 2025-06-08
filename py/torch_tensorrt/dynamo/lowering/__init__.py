@@ -1,4 +1,5 @@
 from ._decomposition_groups import (
+    TORCH_TRT_DECOMPOSITIONS,
     torch_disabled_decompositions,
     torch_enabled_decompositions,
 )

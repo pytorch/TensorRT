@@ -1,8 +1,10 @@
 from dataclasses import dataclass, field
+from typing import Union
 
 import numpy as np
+import torch
 from torch_tensorrt.dynamo._settings import CompilationSettings
-from torch_tensorrt.fx.types import TRTNetwork
+from torch_tensorrt.dynamo.types import TRTNetwork
 
 
 @dataclass
@@ -21,3 +23,9 @@ class ConversionContext:
     )
     requires_output_allocator: bool = False
     mapping: dict[str, np.array] = field(default_factory=dict)
+    cpu_weights_reference_holder: dict[str, Union[torch.Tensor, np.array]] = field(
+        default_factory=dict
+    )
+
+    def clear_cpu_weights_reference_holder(self) -> None:
+        self.cpu_weights_reference_holder.clear()

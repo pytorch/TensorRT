@@ -14,7 +14,6 @@ from torch_tensorrt.dynamo.utils import COSINE_THRESHOLD, cosine_similarity
 from packaging.version import Version
 
 assertions = unittest.TestCase()
-import os
 
 
 @pytest.mark.unit
@@ -200,10 +199,10 @@ def test_resnet18_half(ir):
     torch._dynamo.reset()
 
 
-# @unittest.skipIf(
-#     torch.cuda.get_device_capability() < (10, 0),
-#     "FP4 quantization requires compute capability 10.0 or later",
-# )
+@unittest.skipIf(
+    torch.cuda.get_device_capability() < (10, 0),
+    "FP4 quantization requires compute capability 10.0 or later",
+)
 @unittest.skipIf(
     not importlib.util.find_spec("modelopt"),
     "ModelOpt is required to run this test",
@@ -235,11 +234,6 @@ def test_base_fp4_dynamic_shapes(ir):
     dummy_inputs = torch.ones(batch_size, 64, dtype=dtype).cuda()
 
     model = SimpleNetwork().eval().cuda()
-    # model.linear1.weight = torch.nn.Parameter(torch.ones(32, 64, dtype=dtype).cuda())
-    # model.linear1.bias = torch.nn.Parameter(torch.zeros(128, 32, dtype=dtype).cuda())
-
-    print(f"lan added model weight: {model.linear1.weight=}")
-    print(f"lan added model bias: {model.linear1.bias=}")
 
     quant_cfg = mtq.NVFP4_DEFAULT_CFG
     mtq.quantize(model, quant_cfg, forward_loop=calibrate_loop)
@@ -253,57 +247,35 @@ def test_base_fp4_dynamic_shapes(ir):
             trt_model = torchtrt.dynamo.compile(
                 exp_program,
                 inputs=[dummy_inputs],
-                enabled_precisions={
-                    torch.float4_e2m1fn_x2,
-                    torch.float8_e4m3fn,
-                    torch.float32,
-                    torch.float16,
-                },
                 min_block_size=1,
                 debug=True,
                 cache_built_engines=False,
                 reuse_cached_engines=False,
-                use_explicit_typing=dtype == torch.float16,
+                use_explicit_typing=True,
             )
             batch_size = 128
             input_tensor = torch.ones(batch_size, 64, dtype=dtype).cuda()
             expected_output = model(input_tensor)
             outputs_trt = trt_model(input_tensor)
-            if os.getenv("DISABLE_GEMM", "false").lower() == "true":
-                print("lan added disable_gemm is set, compring result with weights")
-                expected_output = model.linear1.weight
-            else:
-                print("lan added disable_gemm is not set, compring result with pytorch")
-
-            print(
-                f"lan added torch_tensorrt outputs_trt: {outputs_trt=} {outputs_trt.dtype=} {outputs_trt.shape=} {outputs_trt.abs().amax()=}"
-            )
-            print(
-                f"lan added expected output_pyt: {expected_output=} {expected_output.dtype=} {expected_output.shape=} {expected_output.abs().amax()=}"
-            )
-
             abs_diff = torch.abs(expected_output - outputs_trt)
-            print(
-                f"lan added max /mean abs_diff: {abs_diff.max().item()=} {abs_diff.mean()=}"
-            )
-            print(f"lan added abs_diff: {abs_diff=}")
-            assert torch.allclose(expected_output, outputs_trt, rtol=0.8, atol=0.8)
+            print(f"max/mean abs_diff: {abs_diff.max().item()=} {abs_diff.mean()=}")
+            assert torch.allclose(expected_output, outputs_trt, rtol=0.3, atol=0.3)
 
 
-# @unittest.skipIf(
-#     torch.cuda.get_device_capability() < (10, 0),
-#     "FP4 quantization requires compute capability 10.0 or later",
-# )
+@unittest.skipIf(
+    torch.cuda.get_device_capability() < (10, 0),
+    "FP4 quantization requires compute capability 10.0 or later",
+)
 @unittest.skipIf(
     not importlib.util.find_spec("modelopt"),
     "ModelOpt is required to run this test",
 )
 @pytest.mark.unit
-def test_base_fp4(ir):
+def test_base_fp4_static_shapes(ir):
     import modelopt.torch.quantization as mtq
     from modelopt.torch.quantization.utils import export_torch_mode
 
-    dtype = torch.float16
+    dtype = torch.bfloat16
 
     class SimpleNetwork(torch.nn.Module):
         def __init__(self):
@@ -320,17 +292,10 @@ def test_base_fp4(ir):
         """Simple calibration function for testing."""
         model(input_tensor)
 
-    input_tensor = torch.ones(128, 64, dtype=dtype).cuda()
+    input_tensor = torch.randn(128, 64, dtype=dtype).cuda()
 
     model = SimpleNetwork().eval().cuda()
-    model.linear1.weight = torch.nn.Parameter(torch.ones(32, 64, dtype=dtype).cuda())
-    model.linear1.bias = torch.nn.Parameter(torch.zeros(128, 32, dtype=dtype).cuda())
-    print(f"lan added amax: {input_tensor.abs().amax()=}")
-    print(f"lan added amax: {model.linear1.weight.abs().amax()=}")
     expected_output = model(input_tensor)
-    print(f"lan added model input: {input_tensor=}")
-    print(f"lan added model weight: {model.linear1.weight=}")
-    print(f"lan added model bias: {model.linear1.bias=}")
 
     quant_cfg = mtq.NVFP4_DEFAULT_CFG
     mtq.quantize(model, quant_cfg, forward_loop=calibrate_loop)
@@ -343,39 +308,16 @@ def test_base_fp4(ir):
             trt_model = torchtrt.dynamo.compile(
                 exp_program,
                 inputs=[input_tensor],
-                enabled_precisions={
-                    torch.float4_e2m1fn_x2,
-                    torch.float8_e4m3fn,
-                    torch.float32,
-                    torch.float16,
-                },
                 min_block_size=1,
                 debug=True,
                 cache_built_engines=False,
                 reuse_cached_engines=False,
-                use_explicit_typing=dtype == torch.float16,
+                use_explicit_typing=True,
             )
-
             outputs_trt = trt_model(input_tensor)
-            if os.getenv("DISABLE_GEMM", "false").lower() == "true":
-                print("lan added disable_gemm is set, compring result with weights")
-                expected_output = model.linear1.weight
-            else:
-                print("lan added disable_gemm is not set, compring result with pytorch")
-
-            print(
-                f"lan added torch_tensorrt outputs_trt: {outputs_trt=} {outputs_trt.dtype=} {outputs_trt.shape=} {outputs_trt.abs().amax()=}"
-            )
-            print(
-                f"lan added expected output_pyt: {expected_output=} {expected_output.dtype=} {expected_output.shape=} {expected_output.abs().amax()=}"
-            )
-
             abs_diff = torch.abs(expected_output - outputs_trt)
-            print(
-                f"lan added max /mean abs_diff: {abs_diff.max().item()=} {abs_diff.mean()=}"
-            )
-            print(f"lan added abs_diff: {abs_diff=}")
-            assert torch.allclose(expected_output, outputs_trt, rtol=0.8, atol=0.8)
+            print(f"max/mean abs_diff: {abs_diff.max().item()=} {abs_diff.mean()=}")
+            assert torch.allclose(expected_output, outputs_trt, rtol=0.3, atol=0.3)
 
 
 @unittest.skipIf(
@@ -481,3 +423,59 @@ def test_base_int8(ir):
             )
             outputs_trt = trt_model(input_tensor)
             assert torch.allclose(output_pyt, outputs_trt, rtol=5e-3, atol=1e-2)
+
+
+@unittest.skipIf(
+    platform.system() != "Linux"
+    or not importlib.util.find_spec("modelopt")
+    or Version(metadata.version("nvidia-modelopt")) < Version("0.17.0"),
+    "modelopt 0.17.0 or later is required, Int8 quantization is supported in modelopt since 0.17.0 or later for linux",
+)
+@pytest.mark.unit
+def test_base_int8_dynamic_shape(ir):
+    import modelopt.torch.quantization as mtq
+    from modelopt.torch.quantization.utils import export_torch_mode
+
+    dtype = torch.bfloat16
+
+    class SimpleNetwork(torch.nn.Module):
+        def __init__(self):
+            super(SimpleNetwork, self).__init__()
+            self.conv = torch.nn.Conv2d(3, 3, 3, dtype=dtype)
+            self.linear = torch.nn.Linear(222, 222, dtype=dtype)
+
+        def forward(self, x):
+            return self.linear(self.conv(x))
+
+    def calibrate_loop(model):
+        """Simple calibration function for testing."""
+        model(input_tensor)
+
+    BATCH_SIZE = torch.export.Dim("BATCH_SIZE", min=2, max=16)
+    batch_size = 8
+    input_tensor = torch.randn(batch_size, 3, 224, 224, dtype=dtype).cuda()
+    model = SimpleNetwork().eval().cuda()
+
+    quant_cfg = mtq.INT8_DEFAULT_CFG
+    mtq.quantize(model, quant_cfg, forward_loop=calibrate_loop)
+
+    # model has INT8 qdq nodes at this point
+    output_pyt = model(input_tensor)
+
+    with torch.no_grad():
+        with export_torch_mode():
+            exp_program = torch.export.export(
+                model, (input_tensor,), strict=False, dynamic_shapes=({0: BATCH_SIZE},)
+            )
+            trt_model = torchtrt.dynamo.compile(
+                exp_program,
+                inputs=[input_tensor],
+                enabled_precisions={torch.int8, dtype},
+                min_block_size=1,
+                debug=True,
+                cache_built_engines=False,
+                reuse_cached_engines=False,
+                truncate_double=True,
+            )
+            outputs_trt = trt_model(input_tensor)
+            assert torch.allclose(output_pyt, outputs_trt, rtol=5e-2, atol=5e-2)

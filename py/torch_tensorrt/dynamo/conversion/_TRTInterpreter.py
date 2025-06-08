@@ -274,13 +274,13 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                 self.compilation_settings.dla_global_dram_size,
             )
 
-        if not self.compilation_settings.use_explicit_typing and dtype.float16 in self.compilation_settings.enabled_precisions:
+        if dtype.float16 in self.compilation_settings.enabled_precisions:
             builder_config.set_flag(trt.BuilderFlag.FP16)
 
         if dtype.int8 in self.compilation_settings.enabled_precisions:
             builder_config.set_flag(trt.BuilderFlag.INT8)
 
-        if not self.compilation_settings.use_explicit_typing and dtype.fp8 in self.compilation_settings.enabled_precisions:
+        if dtype.fp8 in self.compilation_settings.enabled_precisions:
             builder_config.set_flag(trt.BuilderFlag.FP8)
 
         if dtype.bfloat16 in self.compilation_settings.enabled_precisions:
@@ -742,6 +742,8 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             f"Build TRT engine elapsed time: {datetime.now() - build_engine_start_time}"
         )
         _LOGGER.info(f"TRT Engine uses: {serialized_engine.nbytes} bytes of Memory")
+
+        self.ctx.clear_cpu_weights_reference_holder()
 
         self._save_timing_cache(
             builder_config, self.compilation_settings.timing_cache_path

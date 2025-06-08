@@ -581,13 +581,13 @@ def compile(
             "\nThis feature is unimplemented in Torch-TRT Dynamo currently."
         )
 
-    # if use_explicit_typing:
-    #     if len(enabled_precisions) != 1 or not any(
-    #         x in enabled_precisions for x in {torch.float32, dtype.f32}
-    #     ):
-    #         raise AssertionError(
-    #             f"When use_explicit_typing is enabled, only torch.float32 is allowed in the enabled_precisions but found {enabled_precisions}"
-    #         )
+    if use_explicit_typing:
+        if len(enabled_precisions) != 1 or not any(
+            x in enabled_precisions for x in {torch.float32, dtype.f32}
+        ):
+            raise AssertionError(
+                f"When use_explicit_typing is enabled, only torch.float32 is allowed in the enabled_precisions but found {enabled_precisions}"
+            )
 
     if use_fp32_acc:
         logger.debug(

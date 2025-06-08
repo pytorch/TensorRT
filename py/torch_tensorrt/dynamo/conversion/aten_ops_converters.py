@@ -625,7 +625,7 @@ try:
     assert torch.ops.tensorrt.dynamic_block_quantize_op.default
 except Exception as e:
     _LOGGER.warning(
-        "Unable to import dynamic block quantize op. Please install modelopt library (https://github.com/NVIDIA/TensorRT-Model-Optimizer?tab=readme-ov-file#installation) to add support for compiling dynamic blockquantized models"
+        "Unable to import quantize op. Please install modelopt library (https://github.com/NVIDIA/TensorRT-Model-Optimizer?tab=readme-ov-file#installation) to add support for compiling quantized models"
     )
 else:
 
@@ -640,7 +640,7 @@ else:
         kwargs: Dict[str, Argument],
         name: str,
     ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-        return impl.nvfp4_quantize.nvfp4_quantize(
+        return impl.dynamic_block_quantize.quantize(
             ctx,
             target,
             SourceIR.ATEN,

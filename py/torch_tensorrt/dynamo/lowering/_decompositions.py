@@ -9,6 +9,7 @@ from torch._export.utils import (
     _get_decomp_for_cia,
 )
 from torch._ops import OpOverload
+
 from torch_tensorrt.dynamo._defaults import default_device
 from torch_tensorrt.dynamo.conversion.converter_utils import get_positive_dim
 from torch_tensorrt.dynamo.utils import to_torch_device
@@ -432,8 +433,8 @@ def full_like_decomposition(*args, **kwargs) -> torch.Tensor:
     input = args[0]
     shape = args[0].shape
     fill_value = args[1]
-    kwargs["dtype"] = input.dtype
-    kwargs["device"] = to_torch_device(default_device())
+    kwargs["dtype"] = kwargs.get("dtype", None) or input.dtype
+    kwargs["device"] = kwargs.get("device", None) or input.device
     return torch.full(shape, fill_value, dtype=kwargs["dtype"], device=kwargs["device"])
 
 

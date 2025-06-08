@@ -87,6 +87,15 @@ http_archive(
     urls = ["https://download.pytorch.org/libtorch/nightly/cu128/libtorch-win-shared-with-deps-latest.zip"],
 )
 
+http_archive(
+    name = "torch_l4t",
+    build_file = "@//third_party/libtorch:BUILD",
+    strip_prefix = "torch",
+    type = "zip",
+    urls = ["https://pypi.jetson-ai-lab.dev/jp6/cu126/+f/6ef/f643c0a7acda9/torch-2.7.0-cp310-cp310-linux_aarch64.whl"],
+    sha256 = "6eff643c0a7acda92734cc798338f733ff35c7df1a4434576f5ff7c66fc97319"
+)
+
 # Download these tarballs manually from the NVIDIA website
 # Either place them in the distdir directory in third_party and use the --distdir flag
 # or modify the urls to "file:///<PATH TO TARBALL>/<TARBALL NAME>.tar.gz
@@ -94,9 +103,9 @@ http_archive(
 http_archive(
     name = "tensorrt",
     build_file = "@//third_party/tensorrt/archive:BUILD",
-    strip_prefix = "TensorRT-10.10.0.31",
+    strip_prefix = "TensorRT-10.9.0.34",
     urls = [
-        "https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.10.0/tars/TensorRT-10.10.0.31.Linux.x86_64-gnu.cuda-12.9.tar.gz",
+        "https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.9.0/tars/TensorRT-10.9.0.34.Linux.x86_64-gnu.cuda-12.8.tar.gz",
     ],
 )
 
