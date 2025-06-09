@@ -179,7 +179,7 @@ trt_gm = torch_tensorrt.dynamo.compile(
     ep,
     inputs=dummy_inputs,
     enabled_precisions=enabled_precisions,
-    use_explicit_typing=True,
+    use_explicit_typing=False,
     truncate_double=True,
     min_block_size=1,
     debug=False,
