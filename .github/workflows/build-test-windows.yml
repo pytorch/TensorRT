@@ -121,205 +121,212 @@ jobs:
         # python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/ts_integrations_test_results.xml integrations/
         # popd
 
-  # tests-py-dynamo-converters:
-  #   name: Test dynamo converters [Python]
-  #   needs: [substitute-runner, build]
-  #   strategy:
-  #     fail-fast: false
-  #     matrix:
-  #       include:
-  #         - repository: pytorch/tensorrt
-  #           package-name: torch_tensorrt
-  #   uses: ./.github/workflows/windows-test.yml
-  #   with:
-  #     job-name: tests-py-dynamo-converters
-  #     repository: ${{ matrix.repository }}
-  #     ref: ""
-  #     test-infra-repository: pytorch/test-infra
-  #     test-infra-ref: main
-  #     build-matrix: ${{ needs.substitute-runner.outputs.matrix }}
-  #     pre-script: packaging/driver_upgrade.bat
-  #     script: |
-  #       export USE_HOST_DEPS=1
-  #       export CI_BUILD=1
-  #       pushd .
-  #       cd tests/py
-  #       python -m pip install -r requirements.txt
-  #       cd dynamo
-  #       python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/dynamo_converters_test_results.xml -n 4 conversion/
-  #       popd
+  tests-py-dynamo-converters:
+    name: Test dynamo converters [Python]
+    needs: [substitute-runner, build]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - repository: pytorch/tensorrt
+            package-name: torch_tensorrt
+    uses: ./.github/workflows/windows-test.yml
+    with:
+      job-name: tests-py-dynamo-converters
+      repository: ${{ matrix.repository }}
+      ref: ""
+      test-infra-repository: pytorch/test-infra
+      test-infra-ref: main
+      build-matrix: ${{ needs.substitute-runner.outputs.matrix }}
+      pre-script: packaging/driver_upgrade.bat
+      script: |
+        echo "test"
+        # export USE_HOST_DEPS=1
+        # export CI_BUILD=1
+        # pushd .
+        # cd tests/py
+        # python -m pip install -r requirements.txt
+        # cd dynamo
+        # python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/dynamo_converters_test_results.xml -n 4 conversion/
+        # popd
 
-  # tests-py-dynamo-fe:
-  #   name: Test dynamo frontend [Python]
-  #   needs: [substitute-runner, build]
-  #   strategy:
-  #     fail-fast: false
-  #     matrix:
-  #       include:
-  #         - repository: pytorch/tensorrt
-  #           package-name: torch_tensorrt
-  #   uses: ./.github/workflows/windows-test.yml
-  #   with:
-  #     job-name: tests-py-dynamo-fe
-  #     repository: ${{ matrix.repository }}
-  #     ref: ""
-  #     test-infra-repository: pytorch/test-infra
-  #     test-infra-ref: main
-  #     build-matrix: ${{ needs.substitute-runner.outputs.matrix }}
-  #     pre-script: packaging/driver_upgrade.bat
-  #     script: |
-  #       export USE_HOST_DEPS=1
-  #       export CI_BUILD=1
-  #       pushd .
-  #       cd tests/py
-  #       python -m pip install -r requirements.txt
-  #       cd dynamo
-  #       python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/dyn_models_export.xml --ir dynamo models/
-  #       popd
+  tests-py-dynamo-fe:
+    name: Test dynamo frontend [Python]
+    needs: [substitute-runner, build]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - repository: pytorch/tensorrt
+            package-name: torch_tensorrt
+    uses: ./.github/workflows/windows-test.yml
+    with:
+      job-name: tests-py-dynamo-fe
+      repository: ${{ matrix.repository }}
+      ref: ""
+      test-infra-repository: pytorch/test-infra
+      test-infra-ref: main
+      build-matrix: ${{ needs.substitute-runner.outputs.matrix }}
+      pre-script: packaging/driver_upgrade.bat
+      script: |
+        echo "test"
+        # export USE_HOST_DEPS=1
+        # export CI_BUILD=1
+        # pushd .
+        # cd tests/py
+        # python -m pip install -r requirements.txt
+        # cd dynamo
+        # python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/dyn_models_export.xml --ir dynamo models/
+        # popd
 
-  # tests-py-dynamo-serde:
-  #   name: Test dynamo export serde [Python]
-  #   needs: [substitute-runner, build]
-  #   strategy:
-  #     fail-fast: false
-  #     matrix:
-  #       include:
-  #         - repository: pytorch/tensorrt
-  #           package-name: torch_tensorrt
-  #   uses: ./.github/workflows/windows-test.yml
-  #   with:
-  #     job-name: tests-py-dynamo-serde
-  #     repository: ${{ matrix.repository }}
-  #     ref: ""
-  #     test-infra-repository: pytorch/test-infra
-  #     test-infra-ref: main
-  #     build-matrix: ${{ needs.substitute-runner.outputs.matrix }}
-  #     pre-script: packaging/driver_upgrade.bat
-  #     script: |
-  #       export USE_HOST_DEPS=1
-  #       export CI_BUILD=1
-  #       pushd .
-  #       cd tests/py
-  #       python -m pip install -r requirements.txt
-  #       cd dynamo
-  #       python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/export_serde_test_results.xml --ir dynamo models/test_export_serde.py
-  #       python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/reexport_test_results.xml --ir dynamo models/test_reexport.py
-  #       popd
+  tests-py-dynamo-serde:
+    name: Test dynamo export serde [Python]
+    needs: [substitute-runner, build]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - repository: pytorch/tensorrt
+            package-name: torch_tensorrt
+    uses: ./.github/workflows/windows-test.yml
+    with:
+      job-name: tests-py-dynamo-serde
+      repository: ${{ matrix.repository }}
+      ref: ""
+      test-infra-repository: pytorch/test-infra
+      test-infra-ref: main
+      build-matrix: ${{ needs.substitute-runner.outputs.matrix }}
+      pre-script: packaging/driver_upgrade.bat
+      script: |
+        echo "test"
+        # export USE_HOST_DEPS=1
+        # export CI_BUILD=1
+        # pushd .
+        # cd tests/py
+        # python -m pip install -r requirements.txt
+        # cd dynamo
+        # python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/export_serde_test_results.xml --ir dynamo models/test_export_serde.py
+        # python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/reexport_test_results.xml --ir dynamo models/test_reexport.py
+        # popd
 
-  # tests-py-torch-compile-be:
-  #   name: Test torch compile backend [Python]
-  #   needs: [substitute-runner, build]
-  #   strategy:
-  #     fail-fast: false
-  #     matrix:
-  #       include:
-  #         - repository: pytorch/tensorrt
-  #           package-name: torch_tensorrt
-  #   uses: ./.github/workflows/windows-test.yml
-  #   with:
-  #     job-name: tests-py-torch-compile-be
-  #     repository: ${{ matrix.repository }}
-  #     ref: ""
-  #     test-infra-repository: pytorch/test-infra
-  #     test-infra-ref: main
-  #     build-matrix: ${{ needs.substitute-runner.outputs.matrix }}
-  #     pre-script: packaging/driver_upgrade.bat
-  #     script: |
-  #       export USE_HOST_DEPS=1
-  #       export CI_BUILD=1
-  #       pushd .
-  #       cd tests/py
-  #       python -m pip install -r requirements.txt
-  #       cd dynamo
-  #       python -m pytest -ra -n 10 --junitxml=${RUNNER_TEST_RESULTS_DIR}/torch_compile_be_test_results.xml backend/
-  #       python -m pytest -ra -n 4 --junitxml=${RUNNER_TEST_RESULTS_DIR}/torch_complete_be_e2e_test_results.xml --ir torch_compile models/test_models.py
-  #       python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/torch_compile_dyn_models_export.xml --ir torch_compile models/test_dyn_models.py
-  #       popd
+  tests-py-torch-compile-be:
+    name: Test torch compile backend [Python]
+    needs: [substitute-runner, build]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - repository: pytorch/tensorrt
+            package-name: torch_tensorrt
+    uses: ./.github/workflows/windows-test.yml
+    with:
+      job-name: tests-py-torch-compile-be
+      repository: ${{ matrix.repository }}
+      ref: ""
+      test-infra-repository: pytorch/test-infra
+      test-infra-ref: main
+      build-matrix: ${{ needs.substitute-runner.outputs.matrix }}
+      pre-script: packaging/driver_upgrade.bat
+      script: |
+        echo "test"
+        # export USE_HOST_DEPS=1
+        # export CI_BUILD=1
+        # pushd .
+        # cd tests/py
+        # python -m pip install -r requirements.txt
+        # cd dynamo
+        # python -m pytest -ra -n 10 --junitxml=${RUNNER_TEST_RESULTS_DIR}/torch_compile_be_test_results.xml backend/
+        # python -m pytest -ra -n 4 --junitxml=${RUNNER_TEST_RESULTS_DIR}/torch_complete_be_e2e_test_results.xml --ir torch_compile models/test_models.py
+        # python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/torch_compile_dyn_models_export.xml --ir torch_compile models/test_dyn_models.py
+        # popd
 
-  # tests-py-dynamo-core:
-  #   name: Test dynamo core [Python]
-  #   needs: [substitute-runner, build]
-  #   strategy:
-  #     fail-fast: false
-  #     matrix:
-  #       include:
-  #         - repository: pytorch/tensorrt
-  #           package-name: torch_tensorrt
-  #   uses: ./.github/workflows/windows-test.yml
-  #   with:
-  #     job-name: tests-py-dynamo-core
-  #     repository: ${{ matrix.repository }}
-  #     ref: ""
-  #     test-infra-repository: pytorch/test-infra
-  #     test-infra-ref: main
-  #     build-matrix: ${{ needs.substitute-runner.outputs.matrix }}
-  #     pre-script: packaging/driver_upgrade.bat
-  #     script: |
-  #       export USE_HOST_DEPS=1
-  #       export CI_BUILD=1
-  #       pushd .
-  #       cd tests/py
-  #       python -m pip install -r requirements.txt
-  #       cd dynamo
-  #       python -m pytest -ra -n 4 --junitxml=${RUNNER_TEST_RESULTS_DIR}/tests_py_dynamo_core_runtime_test_results.xml --ignore runtime/test_002_cudagraphs_py.py --ignore runtime/test_002_cudagraphs_cpp.py runtime/
-  #       python -m pytest -ra -n 4 --junitxml=${RUNNER_TEST_RESULTS_DIR}/tests_py_dynamo_core_partitioning_test_results.xml partitioning/
-  #       python -m pytest -ra -n 4 --junitxml=${RUNNER_TEST_RESULTS_DIR}/tests_py_dynamo_core_lowering_test_results.xml lowering/
-  #       popd
+  tests-py-dynamo-core:
+    name: Test dynamo core [Python]
+    needs: [substitute-runner, build]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - repository: pytorch/tensorrt
+            package-name: torch_tensorrt
+    uses: ./.github/workflows/windows-test.yml
+    with:
+      job-name: tests-py-dynamo-core
+      repository: ${{ matrix.repository }}
+      ref: ""
+      test-infra-repository: pytorch/test-infra
+      test-infra-ref: main
+      build-matrix: ${{ needs.substitute-runner.outputs.matrix }}
+      pre-script: packaging/driver_upgrade.bat
+      script: |
+        echo "test"
+        # export USE_HOST_DEPS=1
+        # export CI_BUILD=1
+        # pushd .
+        # cd tests/py
+        # python -m pip install -r requirements.txt
+        # cd dynamo
+        # python -m pytest -ra -n 4 --junitxml=${RUNNER_TEST_RESULTS_DIR}/tests_py_dynamo_core_runtime_test_results.xml --ignore runtime/test_002_cudagraphs_py.py --ignore runtime/test_002_cudagraphs_cpp.py runtime/
+        # python -m pytest -ra -n 4 --junitxml=${RUNNER_TEST_RESULTS_DIR}/tests_py_dynamo_core_partitioning_test_results.xml partitioning/
+        # python -m pytest -ra -n 4 --junitxml=${RUNNER_TEST_RESULTS_DIR}/tests_py_dynamo_core_lowering_test_results.xml lowering/
+        # popd
 
-  # tests-py-dynamo-cudagraphs:
-  #   name: Test dynamo cudagraphs [Python]
-  #   needs: [substitute-runner, build]
-  #   strategy:
-  #     fail-fast: false
-  #     matrix:
-  #       include:
-  #         - repository: pytorch/tensorrt
-  #           package-name: torch_tensorrt
-  #   uses: ./.github/workflows/windows-test.yml
-  #   with:
-  #     job-name: tests-py-dynamo-cudagraphs
-  #     repository: ${{ matrix.repository }}
-  #     ref: ""
-  #     test-infra-repository: pytorch/test-infra
-  #     test-infra-ref: main
-  #     build-matrix: ${{ needs.substitute-runner.outputs.matrix }}
-  #     pre-script: packaging/driver_upgrade.bat
-  #     script: |
-  #       export USE_HOST_DEPS=1
-  #       export CI_BUILD=1
-  #       pushd .
-  #       cd tests/py
-  #       python -m pip install -r requirements.txt
-  #       cd dynamo
-  #       python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/tests_py_dynamo_core_runtime_cudagraphs_cpp_test_results.xml runtime/test_002_cudagraphs_cpp.py
-  #       python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/tests_py_dynamo_core_runtime_cudagraphs_py_test_results.xml runtime/test_002_cudagraphs_py.py
-  #       popd
+  tests-py-dynamo-cudagraphs:
+    name: Test dynamo cudagraphs [Python]
+    needs: [substitute-runner, build]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - repository: pytorch/tensorrt
+            package-name: torch_tensorrt
+    uses: ./.github/workflows/windows-test.yml
+    with:
+      job-name: tests-py-dynamo-cudagraphs
+      repository: ${{ matrix.repository }}
+      ref: ""
+      test-infra-repository: pytorch/test-infra
+      test-infra-ref: main
+      build-matrix: ${{ needs.substitute-runner.outputs.matrix }}
+      pre-script: packaging/driver_upgrade.bat
+      script: |
+        echo "test"
+        # export USE_HOST_DEPS=1
+        # export CI_BUILD=1
+        # pushd .
+        # cd tests/py
+        # python -m pip install -r requirements.txt
+        # cd dynamo
+        # python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/tests_py_dynamo_core_runtime_cudagraphs_cpp_test_results.xml runtime/test_002_cudagraphs_cpp.py
+        # python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/tests_py_dynamo_core_runtime_cudagraphs_py_test_results.xml runtime/test_002_cudagraphs_py.py
+        # popd
 
-  # tests-py-core:
-  #   name: Test core [Python]
-  #   needs: [substitute-runner, build]
-  #   strategy:
-  #     fail-fast: false
-  #     matrix:
-  #       include:
-  #         - repository: pytorch/tensorrt
-  #           package-name: torch_tensorrt
-  #   uses: ./.github/workflows/windows-test.yml
-  #   with:
-  #     job-name: tests-py-core
-  #     repository: ${{ matrix.repository }}
-  #     ref: ""
-  #     test-infra-repository: pytorch/test-infra
-  #     test-infra-ref: main
-  #     build-matrix: ${{ needs.substitute-runner.outputs.matrix }}
-  #     pre-script: packaging/driver_upgrade.bat
-  #     script: |
-  #       export USE_HOST_DEPS=1
-  #       export CI_BUILD=1
-  #       pushd .
-  #       cd tests/py/core
-  #       python -m pytest -ra -n 4 --junitxml=${RUNNER_TEST_RESULTS_DIR}/tests_py_core_test_results.xml .
-  #       popd
+  tests-py-core:
+    name: Test core [Python]
+    needs: [substitute-runner, build]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - repository: pytorch/tensorrt
+            package-name: torch_tensorrt
+    uses: ./.github/workflows/windows-test.yml
+    with:
+      job-name: tests-py-core
+      repository: ${{ matrix.repository }}
+      ref: ""
+      test-infra-repository: pytorch/test-infra
+      test-infra-ref: main
+      build-matrix: ${{ needs.substitute-runner.outputs.matrix }}
+      pre-script: packaging/driver_upgrade.bat
+      script: |
+        echo "test"
+        # export USE_HOST_DEPS=1
+        # export CI_BUILD=1
+        # pushd .
+        # cd tests/py/core
+        # python -m pytest -ra -n 4 --junitxml=${RUNNER_TEST_RESULTS_DIR}/tests_py_core_test_results.xml .
+        # popd
 
 concurrency:
   group: ${{ github.workflow }}-windows-${{ github.event.pull_request.number || github.ref_name }}-${{ inputs.repository }}-${{ github.event_name == 'workflow_dispatch' }}-${{ inputs.job-name }}
