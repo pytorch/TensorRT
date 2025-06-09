@@ -3,6 +3,12 @@ name: Lan test Windows wheels
 on:
   #pull_request:
   workflow_call:
+    inputs:
+        job-name:
+        description: "Job name"
+        required: false
+        type: string
+        default: "build-test-windows"
   push:
     branches:
       - main

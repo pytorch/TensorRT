@@ -9,6 +9,11 @@ on:
         required: false
         type: boolean
         default: false
+      job-name:
+        description: "Job name"
+        required: false
+        type: string
+        default: "build-test-linux-x86_64"
   push:
     branches:
       - main
@@ -410,4 +415,4 @@ jobs:
 
 concurrency:
   group: ${{ github.workflow }}-linux-x86_64-${{ github.event.pull_request.number || github.ref_name }}-${{ inputs.repository }}-${{ github.event_name == 'workflow_dispatch' }}-${{ inputs.job-name }}
-  cancel-in-progress: false
+  cancel-in-progress: true

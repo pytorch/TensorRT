@@ -42,6 +42,7 @@ jobs:
     uses: ./.github/workflows/build-test-linux-x86_64.yml
     with:
       run-fail-fast-test-set: false
+      job-name: trigger-linux-test
 
   trigger-windows-test:
     needs: [trigger-fail-fast-test]
@@ -53,6 +54,8 @@ jobs:
       contents: read
       packages: write
     uses: ./.github/workflows/build-test-windows.yml
+    with:
+      job-name: trigger-windows-test
 
   wait-all-jobs:
     needs: [trigger-linux-test, trigger-windows-test]
@@ -65,5 +68,5 @@ jobs:
           echo "Waiting for all jobs to complete..."
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref_name }}-${{ inputs.repository }}-${{ github.event_name == 'workflow_dispatch' }}-${{ inputs.job-name }}
-  cancel-in-progress: false
+  group: ${{ github.workflow }}-all-${{ github.event.pull_request.number || github.ref_name }}-${{ inputs.repository }}-${{ github.event_name == 'workflow_dispatch' }}-${{ inputs.job-name }}
+  cancel-in-progress: true
