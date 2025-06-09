@@ -4,6 +4,7 @@
 # Load the ModelOpt-modified model architecture and weights using Huggingface APIs
 # Add argument parsing for dtype selection
 import argparse
+import gc
 import re
 
 import modelopt.torch.opt as mto
@@ -88,12 +89,12 @@ elif args.dtype == "fp32":
     dtype = torch.float32
 else:
     raise ValueError(f"Invalid dtype: {args.dtype}")
-print(f"\nUsing {args.dtype} quantization")
+print(f"\nUsing {args.dtype} quantization with {args=}")
 # %%
 DEVICE = "cuda:0"
 pipe = FluxPipeline.from_pretrained(
     "black-forest-labs/FLUX.1-dev",
-    torch_dtype=torch.float16,
+    torch_dtype=dtype,
 )
 
 total_params = sum(p.numel() for p in pipe.transformer.parameters())
@@ -219,11 +220,15 @@ dummy_inputs = {
     "timestep": torch.tensor([1.0] * batch_size, dtype=dtype).to(DEVICE),
     "txt_ids": torch.randn((512, 3), dtype=dtype).to(DEVICE),
     "img_ids": torch.randn((4096, 3), dtype=dtype).to(DEVICE),
-    "guidance": torch.tensor([1.0] * batch_size, dtype=dtype).to(DEVICE),
+    "guidance": torch.tensor([1.0] * batch_size, dtype=torch.float32).to(DEVICE),
     "joint_attention_kwargs": {},
     "return_dict": False,
 }
 
+
+torch.cuda.empty_cache()
+torch.cuda.reset_peak_memory_stats()
+gc.collect()
 # This will create an exported program which is going to be compiled with Torch-TensorRT
 with export_torch_mode():
     ep = _export(
@@ -234,6 +239,14 @@ with export_torch_mode():
         strict=False,
         allow_complex_guards_as_runtime_asserts=True,
     )
+
+peak_memory = torch.cuda.max_memory_allocated() / (1024**3)
+peak_reserved = torch.cuda.max_memory_reserved() / (1024**3)
+print(f"Peak memory allocated during torch-export: {peak_memory=}GB {peak_reserved=}GB")
+
+torch.cuda.empty_cache()
+torch.cuda.reset_peak_memory_stats()
+gc.collect()
 
 with torch_tensorrt.logging.debug():
     trt_gm = torch_tensorrt.dynamo.compile(
@@ -248,20 +261,33 @@ with torch_tensorrt.logging.debug():
         offload_module_to_cpu=True,
     )
 
+peak_memory = torch.cuda.max_memory_allocated() / (1024**3)
+peak_reserved = torch.cuda.max_memory_reserved() / (1024**3)
+print(
+    f"Peak memory allocated during torch dynamo compilation: {peak_memory=}GB {peak_reserved=}GB"
+)
 
 del ep
 pipe.transformer = trt_gm
 pipe.transformer.config = config
 
+torch.cuda.empty_cache()
+torch.cuda.reset_peak_memory_stats()
+gc.collect()
 
 # %%
+
 trt_gm.device = torch.device(DEVICE)
 # Function which generates images from the flux pipeline
 generate_image(pipe, ["A golden retriever"], "dog_code2")
 
+peak_memory = torch.cuda.max_memory_allocated() / (1024**3)
+peak_reserved = torch.cuda.max_memory_reserved() / (1024**3)
+print(f"Peak memory allocated during inference: {peak_memory=}GB {peak_reserved=}GB")
+
 if not args.debug:
     print(f"Benchmark TRT Module Latency at ({args.dtype}) started")
-    for batch_size in range(1, 9):
+    for batch_size in range(1, 3):
         benchmark(["Test"], 20, batch_size=batch_size, iterations=3)
     print(f"Benchmark TRT Module Latency at ({args.dtype}) ended")
 
