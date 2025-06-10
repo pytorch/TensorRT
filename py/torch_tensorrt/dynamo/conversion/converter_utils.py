@@ -8,10 +8,11 @@ from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union, 
 import numpy as np
 import tensorrt as trt
 import torch
-import torch_tensorrt.dynamo.conversion.impl as impl
 from torch.fx.experimental.proxy_tensor import unset_fake_temporarily
 from torch.fx.node import Argument, Target
 from torch.fx.passes.shape_prop import TensorMetadata
+
+import torch_tensorrt.dynamo.conversion.impl as impl
 from torch_tensorrt import _enums
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo._SourceIR import SourceIR
@@ -141,9 +142,9 @@ def cast_trt_tensor(
 ) -> TRTTensor:
     """Given a TRT Tensor, convert that Tensor to the specified dtype
 
-    Adds an Identity layer to the network which performs the conversion
-    if the input's dtype is different from the cast type. Otherwise returns
-    input unchanged
+    Adds a Cast layer to the network to convert the input tensor to the specified dtype.
+    If the input tensor already has the desired dtype, it is returned unchanged.
+    Otherwise, a Cast layer is added to perform the conversion
 
     Args:
         ctx (ConversionContext): A ConversionContext containing the TensorRT network
