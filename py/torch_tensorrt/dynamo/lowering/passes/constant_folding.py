@@ -101,6 +101,12 @@ class _TorchTensorRTConstantFolder(ConstantFolder):  # type: ignore[misc]
 
     # TODO: Update this function when quantization is added
     def is_impure(self, node: torch.fx.node.Node) -> bool:
-        if node.target in (torch.ops.tensorrt.quantize_op.default,):
+        quantization_ops = {}
+        try:
+            assert torch.ops.tensorrt.quantize_op.default
+            quantization_ops.add(torch.ops.tensorrt.quantize_op.default)
+        except Exception as e:
+            pass
+        if quantization_ops and node.target in quantization_ops:
             return True
         return False
