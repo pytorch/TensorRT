@@ -118,15 +118,11 @@ def add_kv_cache_inputs(gm, fixed_kv: bool = True):
     start_idx_input.meta["val"] = start_idx_unbacked_symint
     end_idx_input.meta["val"] = end_idx_unbacked_symint
 
-    # Add is_causal as input
-    is_causal_input = add_graph_input(gm, "is_causal", True)
-    is_causal_input.meta["val"] = torch.tensor(True)
-
-    return kv_inputs, start_idx_input, end_idx_input, is_causal_input
+    return kv_inputs, start_idx_input, end_idx_input
 
 
 
-def insert_kv_slicing_before_sdpa(gm, incoming_keys_values: List[Tuple[torch.Tensor, torch.Tensor]], start_idx_input: Node, end_idx_input: Node, is_causal_input: Node):
+def insert_kv_slicing_before_sdpa(gm, incoming_keys_values: List[Tuple[torch.Tensor, torch.Tensor]], start_idx_input: Node, end_idx_input: Node):
     """
     Insert slicing operations before each scaled_dot_product_attention operation.
     """
@@ -236,7 +232,7 @@ def insert_kv_slicing_before_sdpa(gm, incoming_keys_values: List[Tuple[torch.Ten
         
         kv_cache_for_graph.extend(kv_cache_for_sdpa_node)
 
-        sdpa_node.args = (q_node, new_keys_values[0], new_keys_values[1]) + (attn_mask, dropout_p, is_causal_input)
+        sdpa_node.args = (q_node, new_keys_values[0], new_keys_values[1]) + (attn_mask, dropout_p, True)
     
     return gm, kv_cache_for_graph
 
@@ -248,11 +244,11 @@ def insert_static_cache_v1(
     """Insert KV cache ops in the graph"""
     """Perform insertion of kv-caches and attention kernel."""
     # Add static key and value as inputs to the graph
-    kv_inputs, start_idx_input, end_idx_input, is_causal_input = add_kv_cache_inputs(gm, fixed_kv=True)
+    kv_inputs, start_idx_input, end_idx_input = add_kv_cache_inputs(gm, fixed_kv=True)
 
     # Build and update the KV cache using computed KV inputs for current token and 
     # incoming keys and values from previous tokens (which were added as inputs)
-    gm, kv_cache_for_graph = insert_kv_slicing_before_sdpa(gm, kv_inputs, start_idx_input, end_idx_input, is_causal_input)
+    gm, kv_cache_for_graph = insert_kv_slicing_before_sdpa(gm, kv_inputs, start_idx_input, end_idx_input)
 
     # Call the function to add KV as outputs
     logits_keys_values = add_kv_as_outputs(gm, kv_cache_for_graph)

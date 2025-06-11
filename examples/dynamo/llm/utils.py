@@ -56,8 +56,8 @@ def get_zeroed_static_cache_inputs(model: torch.fx.GraphModule):
     # placeholder nodes are expected to be in the following order:
     # input_ids, kv_cache_key, kv_cache_value, start_idx, end_idx
     placeholder_nodes = [node for node in model.graph.nodes if node.op == "placeholder"]
-    # The first two inputs are input_ids, position_ids. The last three inputs are start_idx, end_idx and is_causal. In between are the KV cache tensors.
-    kv_cache_inputs = placeholder_nodes[2:-3]
+    # The first two inputs are input_ids, position_ids. The last two inputs are start_idx, end_idx. In between are the KV cache tensors.
+    kv_cache_inputs = placeholder_nodes[2:-2]
     zeroed_kv_cache_inputs = []
     for input in kv_cache_inputs:
         zeroed_kv_cache_inputs.append(torch.zeros(input.meta["val"].shape, dtype=input.meta["val"].dtype, device=torch.device("cuda:0")))
@@ -129,9 +129,8 @@ def generate_with_static_cache(model, input_seq, max_output_seq_length, eos_toke
     num_tokens_generated = 0
     kv_cache = get_zeroed_static_cache_inputs(model)
     while end_idx < max_output_seq_length:
-        is_causal = True if input_seq.shape[1] > 1 else False
         position_ids = torch.tensor([[start_idx]], dtype=torch.int64).cuda() if input_seq.shape[1] == 1 else position_ids
-        input_signature = (input_seq, position_ids, *kv_cache, start_idx, end_idx, is_causal)
+        input_signature = (input_seq, position_ids, *kv_cache, start_idx, end_idx)
         logits_keys_values = model(*input_signature)
         num_tokens_generated += 1
         logits = logits_keys_values[0]
