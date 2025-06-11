@@ -9,15 +9,15 @@ from torch.fx.node import Target
 from torch_tensorrt.dynamo.conversion import impl
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
 from torch_tensorrt.dynamo.conversion.converter_utils import (
+    SourceIR,
     extend_attr_to_tuple,
     get_trt_tensor,
+    has_dynamic_shape,
     to_numpy,
     to_torch,
 )
 from torch_tensorrt.fx.converters.converter_utils import (
-    SourceIR,
     get_dyn_range,
-    has_dynamic_shape,
     mark_as_int8_layer,
     set_layer_name,
 )

@@ -13,14 +13,14 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     cast_trt_tensor,
     extend_attr_to_tuple,
     get_trt_tensor,
+    has_dynamic_shape,
+    set_layer_name,
     to_numpy,
     to_torch,
 )
 from torch_tensorrt.fx.converters.converter_utils import (
     get_dyn_range,
-    has_dynamic_shape,
     mark_as_int8_layer,
-    set_layer_name,
 )
 from torch_tensorrt.fx.types import TRTTensor
 
