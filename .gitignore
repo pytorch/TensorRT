@@ -79,3 +79,4 @@ MODULE.bazel.lock
 .coverage
 coverage.xml
 *.log
+*.pt2
