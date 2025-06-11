@@ -17,6 +17,7 @@ import os
 
 # Register SDPA as a standalone operator. Converter and lowering pass are defined in register_sdpa.py
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+import register_sdpa
 
 ATOL = 1e-5
 RTOL = 1e-5
@@ -295,7 +296,7 @@ def test_static_cache_with_torch_tensorrt(args):
     """
     Test the static cache model with torch_tensorrt
     """
-    import static_cache2
+    import static_cache_v2
 
     model_no_cache = ModelNoCache().eval().cuda()
     q = torch.randn(1, 32, 2, 64).cuda()
@@ -346,7 +347,7 @@ def test_static_cache_with_torch_tensorrt(args):
         q_full = torch.cat((q, q_curr), dim=2)
         k_full = torch.cat((k, k_curr), dim=2)
         v_full = torch.cat((v, v_curr), dim=2)   
-        is_causal = False
+        is_causal = True
         out_no_cache = model_no_cache(q_full, k_full, v_full)
         out_trt, trt_key_cache, trt_value_cache = trt_model(q_curr, k_curr, v_curr, trt_key_cache, trt_value_cache, start_idx, end_idx, is_causal)
         # breakpoint()
@@ -374,10 +375,10 @@ def main():
     )
     args = arg_parser.parse_args()
     with torch.inference_mode():
-        test_no_cache_model_with_torch_tensorrt(args)
+        # test_no_cache_model_with_torch_tensorrt(args)
         # test_static_cache_model(args)
         # test_static_cache_lowering(args)
-        # test_static_cache_with_torch_tensorrt(args)
+        test_static_cache_with_torch_tensorrt(args)
     
 
 if __name__ == "__main__":

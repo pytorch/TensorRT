@@ -66,7 +66,7 @@ def scaled_dot_product_attention(
     # TODO: remove this once we have a better way to handle the causal mask
     scale = kwargs.get("scale", None)
     source_ir = SourceIR.ATEN
-
+    is_causal = True
     # implementation as described here: https://pytorch.org/docs/stable/generated/torch.nn.functional.scaled_dot_product_attention.html
     use_fp32_acc =  kwargs.get("use_fp32_acc", False)
     query_dtype = query.dtype
@@ -121,58 +121,58 @@ def scaled_dot_product_attention(
                 ctx, mm, query_dtype, name + "_mm_cast_to_fp16", target, source_ir
             )
 
-    # If is_causal is True, we need to generate a causal mask
-    if is_causal:
-        L, S = query.shape[-2], key.shape[-2]
-        if L >= 0 and S >= 0:
-            # static shape
-            attn_bias = np.zeros((L, S), dtype=dtype._from(query_dtype).to(np.dtype))
-            temp_mask = np.logical_not(np.tril(np.ones((L, S), dtype=np.bool_), k=0))
-            attn_bias = np.ma.array(attn_bias, mask=temp_mask).filled(float("-inf"))
-            attn_bias = get_trt_tensor(ctx, attn_bias, name + "_attn_bias")
-        else:
-            # if any of the L or S is dynamic shape
-            if L < 0:
-                L = impl.shape.shape(
-                    ctx, target, source_ir, name + "_shape_0", query, 2
-                )
-            if S < 0:
-                S = impl.shape.shape(ctx, target, source_ir, name + "_shape_1", key, 2)
-
-            # generate the mask tensor
-            tril_tensor = tril(ctx, target, source_ir, name + "_tril", L, S)
-
-            temp_mask = impl.unary.logical_not(
-                ctx, target, source_ir, name + "_logical_not", tril_tensor
-            )
-            temp_mask_casted = cast_trt_tensor(
-                ctx, temp_mask, query_dtype, name + "_casted_bool", target, source_ir
-            )
-            one_minus_temp_mask = impl.elementwise.sub(
-                ctx,
-                target,
-                source_ir,
-                name + "_one_minus_temp_mask",
-                1.0,
-                temp_mask_casted,
-            )
-            attn_bias = impl.unary.log(
-                ctx, target, source_ir, name + "_log", one_minus_temp_mask
-            )
-
-        scaled_add_attn_bias = impl.elementwise.add(
-            ctx, target, source_ir, name + "_attn_bias_add", mm, attn_bias
-        )
+    L, S = query.shape[-2], key.shape[-2]
+    if L >= 0 and S >= 0:
+        # static shape
+        attn_bias = np.zeros((L, S), dtype=dtype._from(query_dtype).to(np.dtype))
+        temp_mask = np.logical_not(np.tril(np.ones((L, S), dtype=np.bool_), k=0))
+        attn_bias = np.ma.array(attn_bias, mask=temp_mask).filled(float("-inf"))
+        attn_bias = get_trt_tensor(ctx, attn_bias, name + "_attn_bias")
     else:
-        scaled_add_attn_bias = mm
-    
-    # Create a if condition to check if is_causal is True
-    if isinstance(is_causal, TRTTensor):
-        if_layer = ctx.net.add_if_conditional()
-        condition, true_branch, false_branch = is_causal, scaled_add_attn_bias, mm
-        if_layer.set_condition(condition)
-        output_layer = if_layer.add_output(true_branch, false_branch)
-        scaled_add_attn_bias = output_layer.get_output(0)
+        # if any of the L or S is dynamic shape
+        if L < 0:
+            L = impl.shape.shape(
+                ctx, target, source_ir, name + "_shape_0", query, 2
+            )
+        if S < 0:
+            S = impl.shape.shape(ctx, target, source_ir, name + "_shape_1", key, 2)
+
+        # generate the mask tensor
+        tril_tensor = tril(ctx, target, source_ir, name + "_tril", L, S)
+        
+        temp_mask = impl.unary.logical_not(
+            ctx, target, source_ir, name + "_logical_not", tril_tensor
+        )
+        
+        # This need_mask determines if we want to use the causal mask or not
+        # When KV caching is enabled, L = 1 and != S. In this case, we shouldn't use the causal mask.
+        # So need_mask will be all False values in this case.
+        # TODO: Implement more general case where L != 1 and S != L 
+        need_mask = impl.elementwise.eq(
+            ctx, target, source_ir, name + "_eq", L, S
+        )
+        temp_mask = impl.elementwise.logical_and(
+            ctx, target, source_ir, name + "_logical_and", need_mask, temp_mask
+        )
+        temp_mask_casted = cast_trt_tensor(
+            ctx, temp_mask, query_dtype, name + "_casted_bool", target, source_ir
+        )
+
+        one_minus_temp_mask = impl.elementwise.sub(
+            ctx,
+            target,
+            source_ir,
+            name + "_one_minus_temp_mask",
+            1.0,
+            temp_mask_casted,
+        )
+        attn_bias = impl.unary.log(
+            ctx, target, source_ir, name + "_log", one_minus_temp_mask
+        )
+
+    scaled_add_attn_bias = impl.elementwise.add(
+        ctx, target, source_ir, name + "_attn_bias_add", mm, attn_bias
+    )
 
     softmax = impl.normalization.softmax(
         ctx, target, source_ir, name + "_softmax", scaled_add_attn_bias, -1, False

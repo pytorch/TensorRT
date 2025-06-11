@@ -203,7 +203,6 @@ if __name__ == "__main__":
             input_ids = model_inputs["input_ids"].to(DEVICE)
             position_ids = torch.arange(input_ids.shape[1]).unsqueeze(0).to(DEVICE)
         
-
         MAX_OUTPUT_SEQ_LENGTH = input_ids.shape[1] + args.num_tokens
         # Pyt
         pyt_gen_tokens = None
