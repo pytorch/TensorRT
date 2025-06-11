@@ -13,6 +13,7 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     cast_trt_tensor,
     extend_attr_to_tuple,
     get_trt_tensor,
+    to_numpy,
     to_torch,
 )
 from torch_tensorrt.fx.converters.converter_utils import (
@@ -77,7 +78,13 @@ def convNd(
         # Append new dimension (unsqueeze) if the convolution is 1d
         if is_conv1d:
             weight = torch.unsqueeze(weight, -1)
-        weight = get_trt_tensor(ctx, weight, f"{name}_weight")
+
+        # For bfloat16, we need to convert to float32 and cast it back to BF16 using TRT cast layers.
+        # For all other types, we can just convert to numpy instead of using ITensor for performance reasons.
+        if weight.dtype == torch.bfloat16:
+            weight = get_trt_tensor(ctx, weight, f"{name}_weight")
+        else:
+            weight = to_numpy(weight)
 
     else:
         raise RuntimeError(
