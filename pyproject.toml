@@ -16,6 +16,7 @@ requires = [
     "numpy; 'tegra' not in platform_release",
     "numpy<2.0.0; 'tegra' in platform_release",
     "sympy",
+    "dllist",
 ]
 build-backend = "setuptools.build_meta"
 
@@ -74,6 +75,7 @@ dependencies = [
     "numpy<2.0.0; 'tegra' in platform_release",
 
     "typing-extensions>=4.7.0",
+    "dllist",
 ]
 
 dynamic = ["version"]

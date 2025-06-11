@@ -9,7 +9,7 @@ from typing import Any, Callable, List, Optional, Sequence, Set
 import torch
 import torch.fx
 from torch_tensorrt._enums import dtype
-from torch_tensorrt._features import ENABLED_FEATURES
+from torch_tensorrt._features import ENABLED_FEATURES, needs_cross_compile
 from torch_tensorrt._Input import Input
 from torch_tensorrt.dynamo import _defaults
 from torch_tensorrt.dynamo.runtime._CudaGraphsTorchTensorRTModule import (
@@ -301,6 +301,7 @@ def compile(
         raise RuntimeError("Module is an unknown format or the ir requested is unknown")
 
 
+@needs_cross_compile
 def cross_compile_for_windows(
     module: torch.nn.Module,
     file_path: str,
