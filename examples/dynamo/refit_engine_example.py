@@ -101,6 +101,7 @@ new_trt_gm = refit_module_weights(
 )
 
 # Check the output
+model2.to("cuda")
 expected_outputs, refitted_outputs = exp_program2.module()(*inputs), new_trt_gm(*inputs)
 for expected_output, refitted_output in zip(expected_outputs, refitted_outputs):
     assert torch.allclose(

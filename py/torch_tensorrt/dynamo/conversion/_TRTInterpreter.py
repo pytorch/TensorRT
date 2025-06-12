@@ -494,10 +494,8 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         _LOGGER.info("Building weight name mapping...")
         # Stage 1: Name mapping
         torch_device = to_torch_device(self.compilation_settings.device)
-        sd = {
-            k: v.reshape(-1).to(torch_device)
-            for k, v in self.module.state_dict().items()
-        }
+        self.module.to(torch_device)
+        sd = self.module.state_dict()
         weight_name_map: dict[str, Any] = {}
         np_map = self.ctx.mapping
         constant_mapping = {k: v for k, v in np_map.items() if v.size == 1}
@@ -570,7 +568,6 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
 
         weight_name_map["constant_mapping"] = constant_mapping
         self.weight_name_map = weight_name_map
-
         del np_map, sd
         gc.collect()
         torch.cuda.empty_cache()
@@ -721,6 +718,9 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         if not self.compilation_settings.immutable_weights:
             self._save_weight_mapping()
 
+        if self.compilation_settings.offload_module_to_cpu:
+            deallocate_module(self.module)
+
         build_engine_start_time = datetime.now()
         _LOGGER.info("Not found cached TRT engines. Start building engine.")
 
@@ -731,8 +731,6 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         self._create_timing_cache(
             builder_config, self.compilation_settings.timing_cache_path
         )
-        if self.compilation_settings.offload_module_to_cpu:
-            deallocate_module(self.module)
         serialized_engine = self.builder.build_serialized_network(
             self.ctx.net, builder_config
         )
