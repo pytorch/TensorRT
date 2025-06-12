@@ -11,6 +11,7 @@ from torch.export import ExportedProgram
 from torch.fx.node import Target
 from torch_tensorrt._Device import Device
 from torch_tensorrt._enums import EngineCapability, dtype
+from torch_tensorrt._features import needs_cross_compile
 from torch_tensorrt._Input import Input
 from torch_tensorrt.dynamo import _defaults, partitioning
 from torch_tensorrt.dynamo._DryRunTracker import (
@@ -50,6 +51,7 @@ from torch_tensorrt.dynamo.utils import (
 logger = logging.getLogger(__name__)
 
 
+@needs_cross_compile
 def cross_compile_for_windows(
     exported_program: ExportedProgram,
     inputs: Optional[Sequence[Sequence[Any]]] = None,
@@ -788,16 +790,17 @@ def compile_module(
             "Some nodes do not have metadata (shape and dtype information). This could lead to problems sometimes if the graph has PyTorch and TensorRT segments."
         )
 
-    
     # Store the original input spec for later use
-    original_in_spec = getattr(gm, '_in_spec', None)
-    original_out_spec = getattr(gm, '_out_spec', None)
-    
+    original_in_spec = getattr(gm, "_in_spec", None)
+    original_out_spec = getattr(gm, "_out_spec", None)
+
     # Function to preserve and restore module specs
-    def preserve_module_specs(in_spec, out_spec, target_module):
+    def preserve_module_specs(
+        in_spec: Any, out_spec: Any, target_module: torch.fx.GraphModule
+    ) -> None:
         """
         Applies input and output specs to the target module.
-        
+
         Args:
             in_spec: The input spec to apply
             out_spec: The output spec to apply
@@ -808,8 +811,6 @@ def compile_module(
             target_module._in_spec = in_spec
         if out_spec is not None:
             target_module._out_spec = out_spec
-            
-        return target_module
 
     # Partition module into components that can be TRT-accelerated
     fast_partitioner_failed = False
@@ -1195,7 +1196,7 @@ def convert_exported_program_to_serialized_trt_engine(
         "l2_limit_for_tiling": l2_limit_for_tiling,
         "offload_module_to_cpu": offload_module_to_cpu,
     }
-    
+
     settings = CompilationSettings(**compilation_options)
     logger.info("Compilation Settings: %s\n", settings)
 
@@ -1247,6 +1248,7 @@ def convert_exported_program_to_serialized_trt_engine(
     return serialized_engine
 
 
+@needs_cross_compile
 def save_cross_compiled_exported_program(
     gm: torch.fx.GraphModule,
     file_path: str,
