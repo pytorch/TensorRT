@@ -14,6 +14,7 @@ import torch_tensorrt
 from diffusers import FluxPipeline
 from diffusers.models.attention_processor import Attention
 from diffusers.models.transformers.transformer_flux import FluxTransformer2DModel
+from modelopt.core.torch.quantization.config import NVFP4_FP8_MHA_CONFIG
 from modelopt.torch.quantization.utils import export_torch_mode
 from torch.export._trace import _export
 from transformers import AutoModelForCausalLM
@@ -26,6 +27,12 @@ parser.add_argument(
     action="store_true",
     default=False,
     help="debug mode",
+)
+parser.add_argument(
+    "--mha",
+    action="store_true",
+    default=False,
+    help="NVFP4_FP8_MHA_CONFIG mode",
 )
 parser.add_argument(
     "--dtype",
@@ -74,7 +81,10 @@ elif args.dtype == "int8":  # int8
     )
     ptq_config = mtq.INT8_DEFAULT_CFG
 elif args.dtype == "fp4":
-    ptq_config = mtq.NVFP4_DEFAULT_CFG
+    if args.mha:
+        ptq_config = NVFP4_FP8_MHA_CONFIG
+    else:
+        ptq_config = mtq.NVFP4_DEFAULT_CFG  # mtq.NVFP4_DEFAULT_CFG
     use_explicit_typing = True
 elif args.dtype == "fp16":
     enabled_precisions.append(torch.float16) if not use_explicit_typing else None
@@ -106,10 +116,10 @@ elif dtype == torch.float32:
     total_size = total_params * 4 / 1024 / 1024 / 1024
     print(f"\n Total size: {total_size}GB")
 
-if args.debug:
-    pipe.transformer = FluxTransformer2DModel(
-        num_layers=1, num_single_layers=1, guidance_embeds=True
-    )
+# if args.debug:
+#     pipe.transformer = FluxTransformer2DModel(
+#         num_layers=1, num_single_layers=1, guidance_embeds=True
+#     )
 
 pipe.to(DEVICE).to(dtype)
 # Store the config and transformer backbone
@@ -141,6 +151,7 @@ def generate_image(pipe, prompt, image_name):
 def benchmark(prompt, inference_step, batch_size=1, iterations=1):
     from time import time
 
+    print(f"Benchmark TRT Module Latency started with {batch_size=} {iterations=}")
     start = time()
     for i in range(iterations):
         image = pipe(
@@ -287,7 +298,7 @@ print(f"Peak memory allocated during inference: {peak_memory=}GB {peak_reserved=
 
 if not args.debug:
     print(f"Benchmark TRT Module Latency at ({args.dtype}) started")
-    for batch_size in range(1, 3):
+    for batch_size in range(1, 9):
         benchmark(["Test"], 20, batch_size=batch_size, iterations=3)
     print(f"Benchmark TRT Module Latency at ({args.dtype}) ended")
 
