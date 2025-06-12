@@ -150,12 +150,12 @@ jobs:
           script: exec_script
       - name: Surface failing tests
         if: always()
-        uses: pmeier/pytest-results-action@v0.5.0
+        uses: pmeier/pytest-results-action@v0.7.2
         with:
           path: ${{ env.RUNNER_TEST_RESULTS_DIR }}/**/*.xml
           summary: true
           display-options: fEs
-          fail-on-empty: false
+          fail-on-empty: true
 
       - name: Prepare artifacts for upload
         working-directory: ${{ inputs.repository }}
