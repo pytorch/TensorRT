@@ -138,7 +138,15 @@ jobs:
         pushd .
         cd tests/py
         python -m pip install -r requirements.txt
-        python -m pip install flashinfer-python --no-deps
+        major=${PYTHON_VERSION%%.*}
+        minor=${PYTHON_VERSION#*.}
+        minor=${minor%%.*}
+        if (( major > 3 || (major == 3 && minor >= 13) )); then
+          echo "flashinfer-python is not supported for python version 3.13 or higher"
+        else
+          echo "Installing flashinfer-python"
+          python -m pip install flashinfer-python --no-deps
+        fi
         cd dynamo
         python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/dynamo_converters_test_results.xml -n 4 conversion/
         python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/dynamo_converters_test_results.xml automatic_plugin/test_automatic_plugin.py
