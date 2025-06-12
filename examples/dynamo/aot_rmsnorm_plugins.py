@@ -1,7 +1,7 @@
 """
-.. _auto_generate_converters:
+.. aot_rmsnorm_plugins:
 
-Automatically Generate a Plugin for a Custom Kernel
+Automatically Generate a Plugin but Use self defined kernels using TensorRT AOT Plugin
 ===================================================================
 
 We are going to demonstrate how to automatically generate a plugin for a custom kernel using Torch-TensorRT using
@@ -21,20 +21,22 @@ For these cases, it is possible to use a TensorRT plugin to replace the operator
 the performance and resource overhead from a graph break.
 
 Previously this involved a complex process in not only building a performant kernel but setting it up to run in TensorRT (see: `Using Custom Kernels within TensorRT Engines with Torch-TensorRT <https://pytorch.org/TensorRT/tutorials/_rendered_examples/dynamo/custom_kernel_plugins.html>`_).
-With TensorRT 10.7, there is a new Python native plugin system which greatly streamlines this process. This
+As of TensorRT 10.7, there is a new Python native plugin system which greatly streamlines this process. This
 plugin system also allows Torch-TensorRT to automatically generate the necessary conversion code to convert the
 operation in PyTorch to TensorRT.
+
+In addition, Torch-TensorRT provides automatic generation of TensorRT plugin feature (see: `Automatically Generate a Plugin for a Custom Kernel <https://docs.pytorch.org/TensorRT/tutorials/_rendered_examples/dynamo/auto_generate_plugins.html>`_).
+However, the above methods generates a JIT plugin that might not satisfy user's performance requirements.
+To support that, Torch-TensorRT provides auto generation of TensorRT AOT Plugin which raps a function to define an Ahead-of-Time (AOT) implementation for a plugin already registered.
+This provides a performance boost comparing to JIT plugin.
+
 """
 
 # %%
 # Writing Custom Operators in PyTorch
 # -----------------------------------------
 #
-#  Pervious tutorials already cover creating custom operators in PyTorch which later get used with Torch-TensorRT.
-# Here we define a simple elementwise multiplication operator in Triton. This operator is then registered as a custom op in PyTorch.
-# with its host launch code as well as a "meta-kernel", A meta-kernel is a function that describes the shape and data type
-# transformations that the operator will perform. This meta-kernel is used by Dynamo and Torch-TensorRT, so it
-# is necessary to define.
+#  Here we define a Triton kernel which will later be compiled ahead of time for TensorRT Plugin.
 #
 
 from typing import Tuple, Union
@@ -101,27 +103,41 @@ def flashinfer_rmsnorm(
     # Create output tensor
     output = torch.empty_like(input)
 
-    # Define block size
-    BLOCK_SIZE = 64
-
     b, n = input.shape
+
+    BLOCK_SIZE = 256
 
     grid = lambda meta: (triton.cdiv(input.numel(), meta["BLOCK_SIZE"]),)
 
-    rms_norm_kernel[grid](
-        input, weight, n, n, n, output, EPS=eps, BLOCK_SIZE=BLOCK_SIZE
+    num_warps = max(8, min(32, BLOCK_SIZE // 256))
+
+    rms_norm_kernel[(b,)](
+        input,
+        weight,
+        n,
+        n,
+        n,
+        output,
+        EPS=eps,
+        BLOCK_SIZE=BLOCK_SIZE,
+        num_warps=num_warps,
     )
 
     return output
 
 
-@trtp.register("flashinfer::rmsnorm")
-def add_plugin_desc(
-    input: trtp.TensorDesc, weight: trtp.TensorDesc, eps: float
-) -> Tuple[trtp.TensorDesc]:
-    return input.like()
+# Use Torch-TensorRT automatic plugin generation feature that generates:
+# 1. A TensorRT JIT Plugin
+# 2. A custom op converter
+#
+# Torch-TensorRT will try to use AOT Plugin if present. If there is no registered AOT Plugin, Torch-TensorRT will utilize the
+# JIT Plugin that is generated in this line.
+torch_tensorrt.dynamo.conversion.plugins.custom_op(
+    "flashinfer::rmsnorm", supports_dynamic_shapes=True, requires_output_allocator=False
+)
 
 
+# TensorRT AOT Plugin implmentation, if this function is not provided, Torch-TensorRT will fallback to use JIT Plugin.
 @trtp.aot_impl("flashinfer::rmsnorm")
 def flashinfer_rmsnorm(
     input: trtp.TensorDesc,
@@ -133,8 +149,12 @@ def flashinfer_rmsnorm(
     Union[str, bytes], Union[str, bytes], trtp.KernelLaunchParams, trtp.SymExprs
 ]:
     assert tactic == 0
-    block_size = 64
-    # breakpoint()
+
+    inp_dims = input.shape_expr
+
+    b = inp_dims[0]
+    n = inp_dims[1]
+    block_size = 256
 
     type_str = "fp32" if input.dtype == trt.float32 else "fp16"
 
@@ -150,26 +170,16 @@ def flashinfer_rmsnorm(
             "EPS": "constexpr",
             "BLOCK_SIZE": "constexpr",
         },
-        constants={
-            "EPS": eps,
-            "BLOCK_SIZE": block_size,
-        },
+        constants={"EPS": eps, "BLOCK_SIZE": block_size},
     )
 
     compiled_kernel = triton.compile(src)
     launch_params = trtp.KernelLaunchParams()
 
-    inp_dims = input.shape_expr
-    out_dims = outputs[0].shape_expr
-
-    b = inp_dims[0]
-    n = inp_dims[1]
-    # breakpoint()
-
     # grid dims
-    launch_params.grid_x = trtp.cdiv(out_dims.numel(), block_size)
-    # block dims
+    launch_params.grid_x = b
     launch_params.block_x = compiled_kernel.metadata.num_warps * 32
+
     # shared memory
     launch_params.shared_mem = compiled_kernel.metadata.shared
 
@@ -197,35 +207,7 @@ def _(input: torch.Tensor, weight: torch.Tensor, b: float = 1e-6) -> torch.Tenso
 
 
 # %%
-# Here we use automatic plugin creation feature in Torch-TensorRT which enables plugin registration using
-# TensorRT QDP APIs
-# torch_tensorrt.dynamo.conversion.plugins.generate_plugin(
-#     "flashinfer::rmsnorm"
-# )
-
-
-# # %%
-# # Generating the Converter
-# # -------------------------------------------------------------------
-# # Given that we have defined the custom operator in PyTorch and TensorRT, we can now generate the converter for the operation.
-# # As long as the namespace and names match, the following function will automatically generate the converter for the operation.
-
-
-torch_tensorrt.dynamo.conversion.plugins.generate_plugin_converter(
-    "flashinfer::rmsnorm",
-    supports_dynamic_shapes=False,
-    requires_output_allocator=False,
-    aot=True,
-)
-
-
-# # %%
-# # Above two commands can be replaced with the following single one line:
-# torch_tensorrt.dynamo.conversion.plugins.custom_op("torchtrt_ex::elementwise_scale_mul", supports_dynamic_shapes=True)
-
-
-# %%
-# Using our converter with a model
+# Using AOT Plugin within a model
 # -------------------------------------------------------------------
 #
 # Now we can use our custom operator in a model and compile it with Torch-TensorRT.
@@ -236,30 +218,14 @@ class MyModel(torch.nn.Module):  # type: ignore[misc]
         super().__init__()
 
     def forward(self, input: torch.Tensor, weight: torch.Tensor) -> torch.Tensor:
-        # z = torch.add(x, y)
         res = torch.ops.flashinfer.rmsnorm.default(input, weight)
 
         return res
 
 
-# input_tensor = torch.randn(10, 20, device="cuda", dtype=torch.float16)  # 10 samples, 20 features
-
-# # Weight tensor (usually learnable parameters)
-# weight_tensor = torch.ones(20, device = "cuda", dtype=torch.float16)  # Scaling factor for the features
-
-# # Small epsilon for numerical stability
-# eps = 1e-5
-
-# Apply RMS Normalization using flashinfer
-# output_tensor = flashinfer.norm.rmsnorm(input_tensor, weight_tensor, eps)
-
-# print(output_tensor)
-
-
 my_model = MyModel().to("cuda")
 m = torch.randn((64, 64), device="cuda", dtype=torch.float16)
 n = torch.randn((64,), device="cuda", dtype=torch.float16)
-
 
 with torch_tensorrt.logging.info():
     model_trt = torch_tensorrt.compile(
@@ -271,11 +237,9 @@ with torch_tensorrt.logging.info():
     )
     res = model_trt(m, n)
 
-    print(res)
-    print(my_model(m, n))
-    # for i in range(300):
-    #     res = model_trt(m, n)
-    #     assert torch.allclose(res, my_model(m, n))
+    for i in range(300):
+        res = model_trt(m, n)
+        assert torch.allclose(res, my_model(m, n))
 
 
-print("Ran with custom plugin!")
+print("Ran with AOT plugin!")

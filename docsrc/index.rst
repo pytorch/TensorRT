@@ -67,6 +67,7 @@ Tutorials
 * :ref:`custom_kernel_plugins`
 * :ref:`auto_generate_converters`
 * :ref:`auto_generate_plugins`
+* :ref:`aot_rmsnorm_plugins`
 * :ref:`mutable_torchtrt_module_example`
 * :ref:`weight_streaming_example`
 * :ref:`pre_allocated_output_example`
