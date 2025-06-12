@@ -144,7 +144,6 @@ jobs:
           } > "user_script"
           cat .github/scripts/install-torch-tensorrt.sh user_script > exec_script
       - name: Run Script
-        id: pytest
         uses: ./test-infra/.github/actions/run-script-with-cache
         with:
           repository: ${{ inputs.repository  }}
@@ -157,11 +156,7 @@ jobs:
           summary: true
           display-options: fEs
           fail-on-empty: false
-      - name: Fail if any tests failed
-        if: ${{ failure() && steps.pytest.outcome == 'failure' }}
-        run: |
-          echo "::error::Tests failed! See report above for details."
-          exit 1
+
       - name: Prepare artifacts for upload
         working-directory: ${{ inputs.repository }}
         id: check-artifacts
