@@ -1,5 +1,5 @@
 import logging
-from typing import Any
+from typing import Any, Set
 
 import torch
 from torch_tensorrt._utils import sanitized_torch_version
@@ -100,12 +100,13 @@ class _TorchTensorRTConstantFolder(ConstantFolder):  # type: ignore[misc]
         super().__init__(*args, **kwargs)
 
     def is_impure(self, node: torch.fx.node.Node) -> bool:
-        # Set of known quantization ops to be excluded from constant folding. 
+        # Set of known quantization ops to be excluded from constant folding.
         # Currently, we exclude all quantization ops coming from modelopt library.
-        quantization_ops = {}
+        quantization_ops: Set[torch._ops.OpOverload] = set()
         try:
-            # modelopt import ensures torch.ops.tensorrt.quantize_op.default is registered 
-            import modelopt.torch.quantization as mtq
+            # modelopt import ensures torch.ops.tensorrt.quantize_op.default is registered
+            import modelopt.torch.quantization as mtq  # noqa: F401
+
             assert torch.ops.tensorrt.quantize_op.default
             quantization_ops.add(torch.ops.tensorrt.quantize_op.default)
             quantization_ops.add(torch.ops.tensorrt.dynamic_block_quantize_op.default)
