@@ -2,19 +2,19 @@ import inspect
 import logging
 from copy import deepcopy
 from enum import Enum, auto
-from typing import Any, Collection, Dict, Iterator, List, Optional, Set, Union
+from typing import Any, Dict, Iterator, Optional, Union
 
 import numpy as np
 import torch
-from torch.fx.node import Target
+import torch_tensorrt
+from torch.export._trace import _export
 from torch_tensorrt._Device import Device
-from torch_tensorrt._enums import EngineCapability, dtype
 from torch_tensorrt.dynamo import _defaults
 from torch_tensorrt.dynamo._compiler import compile as dynamo_compile
 from torch_tensorrt.dynamo._refit import refit_module_weights
-from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.utils import (
     check_output_equal,
+    deallocate_module,
     to_torch_device,
     to_torch_tensorrt_device,
 )
@@ -63,35 +63,11 @@ class MutableTorchTensorRTModule(object):
         pytorch_model: torch.nn.Module,
         *,
         device: Optional[Union[Device, torch.device, str]] = _defaults.DEVICE,
-        disable_tf32: bool = _defaults.DISABLE_TF32,
-        assume_dynamic_shape_support: bool = _defaults.ASSUME_DYNAMIC_SHAPE_SUPPORT,
-        sparse_weights: bool = _defaults.SPARSE_WEIGHTS,
-        enabled_precisions: Set[
-            Union[torch.dtype, dtype]
-        ] = _defaults.ENABLED_PRECISIONS,
-        engine_capability: EngineCapability = _defaults.ENGINE_CAPABILITY,
-        immutable_weights: bool = False,
-        debug: bool = _defaults.DEBUG,
-        num_avg_timing_iters: int = _defaults.NUM_AVG_TIMING_ITERS,
-        workspace_size: int = _defaults.WORKSPACE_SIZE,
-        dla_sram_size: int = _defaults.DLA_SRAM_SIZE,
-        dla_local_dram_size: int = _defaults.DLA_LOCAL_DRAM_SIZE,
-        dla_global_dram_size: int = _defaults.DLA_GLOBAL_DRAM_SIZE,
-        truncate_double: bool = _defaults.TRUNCATE_DOUBLE,
-        require_full_compilation: bool = _defaults.REQUIRE_FULL_COMPILATION,
-        min_block_size: int = _defaults.MIN_BLOCK_SIZE,
-        torch_executed_ops: Optional[Collection[Target]] = None,
-        torch_executed_modules: Optional[List[str]] = None,
-        pass_through_build_failures: bool = _defaults.PASS_THROUGH_BUILD_FAILURES,
-        max_aux_streams: Optional[int] = _defaults.MAX_AUX_STREAMS,
-        version_compatible: bool = _defaults.VERSION_COMPATIBLE,
-        optimization_level: Optional[int] = _defaults.OPTIMIZATION_LEVEL,
         use_python_runtime: bool = _defaults.USE_PYTHON_RUNTIME,
-        use_fast_partitioner: bool = _defaults.USE_FAST_PARTITIONER,
-        enable_experimental_decompositions: bool = _defaults.ENABLE_EXPERIMENTAL_DECOMPOSITIONS,
-        dryrun: bool = _defaults.DRYRUN,
-        hardware_compatible: bool = _defaults.HARDWARE_COMPATIBLE,
-        timing_cache_path: str = _defaults.TIMING_CACHE_PATH,
+        immutable_weights: bool = False,
+        strict: bool = True,
+        allow_complex_guards_as_runtime_asserts: bool = False,
+        weight_streaming_budget: Optional[int] = None,
         **kwargs: Any,
     ) -> None:
         """
@@ -154,53 +130,35 @@ class MutableTorchTensorRTModule(object):
         self.exp_program: Any = None
         self.arg_inputs: tuple[Any, ...] = tuple()
         self.kwarg_inputs: dict[str, Any] = {}
-        device = to_torch_tensorrt_device(device)
-        enabled_precisions = {dtype._from(p) for p in enabled_precisions}
+        self.additional_settings = kwargs
+        self.strict = strict
+        self.allow_complex_guards_as_runtime_asserts = (
+            allow_complex_guards_as_runtime_asserts
+        )
+        self.use_python_runtime = use_python_runtime
+        self.trt_device = to_torch_tensorrt_device(device)
         assert (
             not immutable_weights
-        ), "`immutable_weights` has to be False for a MutableTorchTensorRTModule."
-        compilation_options = {
-            "enabled_precisions": (
-                enabled_precisions
-                if enabled_precisions
-                else _defaults.ENABLED_PRECISIONS
-            ),
-            "debug": debug,
-            "device": device,
-            "assume_dynamic_shape_support": assume_dynamic_shape_support,
-            "workspace_size": workspace_size,
-            "min_block_size": min_block_size,
-            "torch_executed_ops": (
-                torch_executed_ops if torch_executed_ops is not None else set()
-            ),
-            "pass_through_build_failures": pass_through_build_failures,
-            "max_aux_streams": max_aux_streams,
-            "version_compatible": version_compatible,
-            "optimization_level": optimization_level,
-            "use_python_runtime": use_python_runtime,
-            "truncate_double": truncate_double,
-            "use_fast_partitioner": use_fast_partitioner,
-            "num_avg_timing_iters": num_avg_timing_iters,
-            "enable_experimental_decompositions": enable_experimental_decompositions,
-            "require_full_compilation": require_full_compilation,
-            "disable_tf32": disable_tf32,
-            "sparse_weights": sparse_weights,
-            "immutable_weights": immutable_weights,
-            "engine_capability": engine_capability,
-            "dla_sram_size": dla_sram_size,
-            "dla_local_dram_size": dla_local_dram_size,
-            "dla_global_dram_size": dla_global_dram_size,
-            "dryrun": dryrun,
-            "hardware_compatible": hardware_compatible,
-            "timing_cache_path": timing_cache_path,
-        }
+        ), "`immutable_weights has to be False for a MutableTorchTensorRTModule"
+
         self.arg_dynamic_shapes: Optional[tuple[Any]] = None
         self.kwarg_dynamic_shapes: Optional[dict[Any, Any]] = None
-
-        self.settings = CompilationSettings(**compilation_options)
+        self.serializable_dynamic_shapes_dims: dict[str, tuple[str, int, int]] = {}
         self.run_info: Optional[tuple[Any, ...]] = None
         self.state_dict_metadata: dict[str, torch.Size] = {}
         self._store_state_dict_metadata()
+        self.enable_weight_streaming = (
+            kwargs["enable_weight_streaming"]
+            if "enable_weight_streaming" in kwargs
+            else False
+        )
+        self.weight_streaming_ctx = None
+        self.weight_streaming_budget = weight_streaming_budget
+        if self.enable_weight_streaming:
+            if weight_streaming_budget is None:
+                logger.warning(
+                    "Weight stremaing budget is not set. Using auto weight streaming budget"
+                )
 
         cls = self.__class__
         self.__class__ = type(
@@ -293,10 +251,9 @@ class MutableTorchTensorRTModule(object):
         # to determine whether refit/recompilation is needed. If the output is the same, no further process needed.
         if self.run_info:
             args, kwargs, result = self.run_info
-            self.original_model.to(to_torch_device(self.settings.device))
+            self.original_model.to(to_torch_device(self.trt_device))
             new_result = self.original_model(*args, **kwargs)
-            self.original_model.cpu()
-            torch.cuda.empty_cache()
+            deallocate_module(self.original_model, delete_module=False)
             if check_output_equal(result, new_result):
                 self.refit_state.set_state(RefitFlag.LIVE)
                 return
@@ -325,17 +282,17 @@ class MutableTorchTensorRTModule(object):
         MutableTorchTensorRTModule automatically catches weight value updates and call this function to refit the module.
         If it fails to catch the changes, please call this function manually to update the TRT graph module.
         """
-        self.original_model.to(to_torch_device(self.settings.device))
+
         if self.exp_program is None:
-            self.exp_program = torch.export.export(
-                self.original_model, self.arg_inputs, kwargs=self.kwarg_inputs
-            )
+            self.original_model.to(to_torch_device(self.trt_device))
+            self.exp_program = self.get_exported_program()
         else:
             self.exp_program._state_dict = (
                 MutableTorchTensorRTModule._transform_state_dict(
                     self.original_model.state_dict()
                 )
             )
+            self.exp_program.module().to(to_torch_device(self.trt_device))
         self.gm = refit_module_weights(
             self.gm,
             self.exp_program,
@@ -345,8 +302,45 @@ class MutableTorchTensorRTModule(object):
             in_place=True,
         )
 
-        self.original_model.cpu()
-        torch.cuda.empty_cache()
+        deallocate_module(self.original_model, delete_module=False)
+
+    def get_exported_program(self) -> torch.export.ExportedProgram:
+
+        def export_fn() -> torch.export.ExportedProgram:
+            if self.allow_complex_guards_as_runtime_asserts:
+                return _export(
+                    self.original_model,
+                    self.arg_inputs,
+                    kwargs=self.kwarg_inputs,
+                    dynamic_shapes=self._get_total_dynamic_shapes(),
+                    strict=self.strict,
+                    allow_complex_guards_as_runtime_asserts=self.allow_complex_guards_as_runtime_asserts,
+                )
+            else:
+                return torch.export.export(
+                    self.original_model,
+                    self.arg_inputs,
+                    kwargs=self.kwarg_inputs,
+                    dynamic_shapes=self._get_total_dynamic_shapes(),
+                    strict=self.strict,
+                )
+
+        if (
+            torch.float8_e4m3fn in self.additional_settings["enabled_precisions"]
+            or torch.int8 in self.additional_settings["enabled_precisions"]
+        ):
+            try:
+                from modelopt.torch.quantization.utils import export_torch_mode
+
+                assert torch.ops.tensorrt.quantize_op.default
+            except Exception as e:
+                logger.warning(
+                    "Unable to import quantization op. Please install modelopt library (https://github.com/NVIDIA/TensorRT-Model-Optimizer?tab=readme-ov-file#installation) to add support for compiling quantized models"
+                )
+            with export_torch_mode():
+                return export_fn()
+        else:
+            return export_fn()
 
     def compile(self) -> None:
         """
@@ -356,25 +350,36 @@ class MutableTorchTensorRTModule(object):
         If it fails to catch the changes, please call this function manually to recompile the TRT graph module.
         """
         # Export the module
-        self.original_model.to(to_torch_device(self.settings.device))
-        self.exp_program = torch.export.export(
-            self.original_model,
-            self.arg_inputs,
-            kwargs=self.kwarg_inputs,
-            dynamic_shapes=self._get_total_dynamic_shapes(),
-        )
+        self.original_model.to(to_torch_device(self.trt_device))
+        self.exp_program = self.get_exported_program()
         self.gm = dynamo_compile(
             self.exp_program,
             arg_inputs=self.arg_inputs,
             kwarg_inputs=self.kwarg_inputs,
-            **self.settings.__dict__,
+            immutable_weights=False,
+            use_python_runtime=self.use_python_runtime,
+            **self.additional_settings,
         )
-        self.original_model.cpu()
-        torch.cuda.empty_cache()
+        deallocate_module(self.original_model, delete_module=False)
+        if self.enable_weight_streaming:
+            self.set_weight_streaming_ctx(self.weight_streaming_budget)
+
+    def set_weight_streaming_ctx(self, requested_budget: Optional[int] = None) -> None:
+        """
+        Set the weight streaming budget. If budget is not set, then automatic weight streaming budget
+        is used.
+        """
+        self.weight_streaming_ctx = torch_tensorrt.runtime.weight_streaming(self.gm)
+        requested_budget = (
+            requested_budget
+            if requested_budget is not None
+            else self.weight_streaming_ctx.get_automatic_weight_streaming_budget()
+        )
+        self.weight_streaming_ctx.device_budget = requested_budget
 
     def _validate_inputs(self, *args: Any, **kwargs: Any) -> None:
 
-        if not self.arg_inputs:
+        if not self.arg_inputs and not self.kwarg_inputs:
             logger.info("First time compilation initiated. This may take some time.")
             self.refit_state.set_state(RefitFlag.NEEDS_RECOMPILE)
             self._store_inputs(args, kwargs)
@@ -491,14 +496,24 @@ class MutableTorchTensorRTModule(object):
                 self._store_state_dict_metadata()
             self.refit_state.set_state(RefitFlag.LIVE)
 
+        weight_streaming_ctx = (
+            self.weight_streaming_ctx if self.enable_weight_streaming else None
+        )
         result = self.gm(*args, **kwargs)
         # Storing inputs and outputs for verification when the state is unknown
         self.run_info = (args, kwargs, result)
         return result
 
-    def to(self, device: str) -> None:
-        logger.warning("Original PyTorch model is moved. CPU offload may failed.")
-        self.original_model.to(device)
+    def to(self, *args: Any, **kwargs: Any) -> None:
+        logger.warning(
+            "Trying to move the original PyTorch model. This will cause CPU offloading failing and increase GPU memory usage."
+            + "If this is absolute necessary, please call module.pytorch_model.to(...) \n"
+            + "The model is still on the original device."
+        )
+
+    @property
+    def device(self) -> torch.device:
+        return to_torch_device(self.trt_device)
 
     def __deepcopy__(self, memo: Any) -> Any:
         cls = self.__class__
@@ -624,18 +639,58 @@ class MutableTorchTensorRTModule(object):
 
         return True
 
+    def serialize_dynamic_shapes(self) -> None:
+        dims = self.serializable_dynamic_shapes_dims
+
+        def resursivly_serialize_dynamic_shape(obj: Any) -> None:
+            if isinstance(obj, dict):
+                for axis, v in obj.items():
+                    if isinstance(v, torch.export.dynamic_shapes._Dim):
+                        name = str(v).split("'")[1].split(".")[-1]
+                        # We use string of the hash to be the unique identifier of Dim object
+                        dims.setdefault(str(hash(v)), (name, v.min, v.max))
+                        obj[axis] = str(hash(v))
+                    else:
+                        resursivly_serialize_dynamic_shape(v)
+            if isinstance(obj, (tuple, list)):
+                for v in obj:
+                    resursivly_serialize_dynamic_shape(v)
+
+        resursivly_serialize_dynamic_shape(self.arg_dynamic_shapes)
+        resursivly_serialize_dynamic_shape(self.kwarg_dynamic_shapes)
+
+    def deserialize_dynamic_shapes(self) -> None:
+        dims = self.serializable_dynamic_shapes_dims
+
+        def resursivly_deserialize_dynamic_shape(obj: Any) -> None:
+            if isinstance(obj, dict):
+                for axis, v in obj.items():
+                    if isinstance(v, str):
+                        obj[axis] = torch.export.Dim(
+                            dims[v][0], min=dims[v][1], max=dims[v][2]
+                        )
+                    else:
+                        resursivly_deserialize_dynamic_shape(v)
+            if isinstance(obj, (tuple, list)):
+                for v in obj:
+                    resursivly_deserialize_dynamic_shape(v)
+
+        resursivly_deserialize_dynamic_shape(self.arg_dynamic_shapes)
+        resursivly_deserialize_dynamic_shape(self.kwarg_dynamic_shapes)
+
     @staticmethod
     def save(module: Any, path: str) -> None:
         # Cast the object back to MutableTorchTensorRTModule to save
         assert (
-            not module.settings.use_python_runtime
+            not module.use_python_runtime
         ), "Python runtime does not support serialization. Save failed."
         module.init_finished = False
         module.__class__ = MutableTorchTensorRTModule
         exp_program = module.exp_program
         module.pytorch_model = None
         module.exp_program = None
-        torch.save(module, path)
+        module.serialize_dynamic_shapes()
+        torch.save(module, path, pickle_protocol=4)
         # Restore deleted attributes
         module.exp_program = exp_program
         module.pytorch_model = _make_refit_change_trigger(
@@ -658,19 +713,26 @@ class MutableTorchTensorRTModule(object):
         module.pytorch_model = _make_refit_change_trigger(
             module.original_model, module.refit_state
         )
-        module.original_model.to(to_torch_device(module.settings.device))
+        module.original_model.to(to_torch_device(module.device))
         module.exp_program = torch.export.export(
             module.original_model, module.arg_inputs, kwargs=module.kwarg_inputs
         )
-        module.original_model.to("cpu")
+        deallocate_module(module.original_model, delete_module=False)
         cls = module.__class__
         module.__class__ = type(
             module.original_model.__class__.__name__,
             (cls, module.original_model.__class__),
             {},
         )
+        module.deserialize_dynamic_shapes()
         module.init_finished = True
         return module
+
+    def _reset_stateful_cache(obj: Any) -> None:
+        """
+        Does nothing. Support Huggingface CPU offload hooks. Override the huggingface cache reset function because we don't want the TRT module to be handled by HuggingFace.
+        """
+        return
 
 
 def recursively_remove_trigger(obj: Any) -> Any:

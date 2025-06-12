@@ -22,6 +22,7 @@ import numpy as np
 import torch
 import torch_tensorrt as torch_trt
 import torchvision.models as models
+from diffusers import DiffusionPipeline
 
 np.random.seed(5)
 torch.manual_seed(5)
@@ -31,7 +32,7 @@ inputs = [torch.rand((1, 3, 224, 224)).to("cuda")]
 # Initialize the Mutable Torch TensorRT Module with settings.
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 settings = {
-    "use_python": False,
+    "use_python_runtime": False,
     "enabled_precisions": {torch.float32},
     "immutable_weights": False,
 }
@@ -40,7 +41,6 @@ model = models.resnet18(pretrained=True).eval().to("cuda")
 mutable_module = torch_trt.MutableTorchTensorRTModule(model, **settings)
 # You can use the mutable module just like the original pytorch module. The compilation happens while you first call the mutable module.
 mutable_module(*inputs)
-
 # %%
 # Make modifications to the mutable module.
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -73,13 +73,12 @@ reload = torch_trt.MutableTorchTensorRTModule.load("mutable_module.pkl")
 # Stable Diffusion with Huggingface
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-from diffusers import DiffusionPipeline
 
 with torch.no_grad():
     settings = {
         "use_python_runtime": True,
         "enabled_precisions": {torch.float16},
-        "debug": True,
+        "debug": False,
         "immutable_weights": False,
     }
 
@@ -106,7 +105,7 @@ with torch.no_grad():
             "text_embeds": {0: BATCH},
             "time_ids": {0: BATCH},
         },
-        "return_dict": False,
+        "return_dict": None,
     }
     pipe.unet.set_expected_dynamic_shape_range(
         args_dynamic_shapes, kwargs_dynamic_shapes
