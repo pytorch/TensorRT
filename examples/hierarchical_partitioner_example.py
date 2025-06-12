@@ -2,9 +2,6 @@ import torch
 import torch.nn as nn
 import torch_tensorrt
 from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
-    DYNAMO_ATEN_CONVERTERS,
-)
-from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
     DYNAMO_CONVERTERS as CONVERTERS,
 )
 from torch_tensorrt.dynamo.lowering import (
@@ -15,6 +12,7 @@ from torch_tensorrt.dynamo.partitioning._adjacency_partitioner import partition
 from torch_tensorrt.dynamo.partitioning._hierarchical_partitioner import (
     hierarchical_adjacency_partition,
 )
+from torchvision import models
 
 
 class SimpleModel(nn.Module):
@@ -50,18 +48,18 @@ def main():
 
     gm = exported_program.module()
 
-    print(gm.graph)
+    print(gm)
 
     original_output = model(example_input)
 
-    # Partition the model using the adjacency partitioner
+    # Partition the model using the adjacency partitioner, compared with below
     # partitioned_model, op_support = partition(
     #     gm,
     #     verbose=True,
     #     min_block_size=1,
-    #     torch_executed_ops=[
-    #         torch.ops.aten.relu.default,
-    #     ],
+    #     torch_executed_ops={
+    #         "torch.ops.aten.relu.default",
+    #     },
     # )
 
     partitioned_model, op_support = hierarchical_adjacency_partition(
@@ -71,21 +69,18 @@ def main():
         backend_priority=["inductor", "tensorrt"],
         backend_support_map={
             "inductor": {
-                # operator.getitem,
-                torch.ops.aten.conv2d.default,
-                torch.ops.aten.convolution.default,
+                "torch.ops.aten.convolution.default",
             },
-            "tensorrt": set(DYNAMO_ATEN_CONVERTERS.keys()),
+            "tensorrt": CONVERTERS.keys(),
         },
-        torch_executed_ops=[
-            torch.ops.aten._native_batch_norm_legit_no_training.default
-        ],
+        torch_executed_ops={
+            "torch.ops.aten._native_batch_norm_legit_no_training.default"
+        },
         require_full_compilation=False,
-        skip_fusion=False,
+        skip_fusion=True,
     )
 
-    print("\nPartitioned Model Structure:")
-    print(partitioned_model)
+    print("\nPartitioned Model Structure:\n", partitioned_model)
 
     print("0. Original_output:", original_output)
 
@@ -98,8 +93,15 @@ def main():
         )
 
     compiled_model = torch_tensorrt.compile(
-        model, inputs=[example_input], min_block_size=1
+        model,
+        inputs=[example_input],
+        min_block_size=1,
+        torch_executed_ops={
+            "torch.ops.aten._native_batch_norm_legit_no_training.default"
+        },
     )
+    print("\nCompiled Model Structure:\n", compiled_model)
+
     with torch.no_grad():
         compiled_output = compiled_model(example_input)
         print("2. Compiled_output:", compiled_output)
