@@ -1,12 +1,11 @@
 import logging
 from dataclasses import dataclass
-from typing import Collection, Dict, List, Optional, Set, Tuple
+from typing import Collection, Dict, List, Optional, Tuple
 
 import torch
 import torch.fx.passes.operator_support as ops
-from torch._ops import OpOverload
 from torch.fx._compatibility import compatibility
-from torch.fx.node import Target, _get_qualified_name
+from torch.fx.node import Target
 from torch.fx.passes.splitter_base import (
     _SplitterBase,
     _SplitterSettingBase,
@@ -24,11 +23,16 @@ from torch_tensorrt.dynamo._defaults import (
     REQUIRE_FULL_COMPILATION,
 )
 from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
-    DYNAMO_ATEN_CONVERTERS,
+    DYNAMO_CONVERTERS as CONVERTERS,
+)
+from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
     ConverterRegistry,
 )
 
 logger = logging.getLogger(__name__)
+
+NON_COMPUTE_NODES = {"torch.ops.aten.view", "_operator.getitem"}
+NON_ACC_BACKEND_NAME = "None"
 
 
 @compatibility(is_backward_compatible=False)
@@ -45,7 +49,7 @@ class BackendOpSupportTester(ops.OperatorSupportBase):  # type: ignore
 
     def __init__(
         self,
-        backend_support_map: Dict[str, Set[OpOverload]],
+        backend_support_map: Dict[str, Collection[Target]],
         backend_priority: List[str],
         torch_executed_ops: Collection[Target] = set(),
     ) -> None:
@@ -62,12 +66,14 @@ class BackendOpSupportTester(ops.OperatorSupportBase):  # type: ignore
 
     def is_node_supported(
         self, submodules: Dict[str, torch.nn.Module], node: torch.fx.Node
-    ) -> Tuple[bool, Optional[str]]:
+    ) -> Tuple[bool, str]:
         node_name = ConverterRegistry.qualified_name_or_str(node.target)
 
         for i, backend_name in enumerate(self.backend_priority):
             supported_ops = self.backend_support_map.get(backend_name, set())
-            supported_ops = {_get_qualified_name(op) for op in supported_ops}
+            supported_ops = {
+                ConverterRegistry.qualified_name_or_str(op) for op in supported_ops
+            }
 
             if (
                 (node_name in supported_ops or node.op == "get_attr")
@@ -89,7 +95,7 @@ class BackendOpSupportTester(ops.OperatorSupportBase):  # type: ignore
                     else:
                         self.unsupported_operators[node_name] += 1
 
-        return False, None
+        return False, NON_ACC_BACKEND_NAME
 
     def print_support_overview(self, num_acc_subgraphs: Optional[int] = None) -> None:
         if num_acc_subgraphs is not None:
@@ -137,7 +143,7 @@ class HierarchicalAdjacencyPartitioner(_SplitterBase):  # type: ignore
         self,
         module: torch.fx.GraphModule,
         operator_support: ops.OperatorSupportBase,
-        backend_support_map: Dict[str, Set[Target]],
+        backend_support_map: Dict[str, Collection[Target]],
         backend_priority: List[str],
         allowed_single_node_partition_ops: Optional[Collection[str]] = None,
         min_block_size: int = MIN_BLOCK_SIZE,
@@ -488,8 +494,15 @@ class FxNetAccNodesFinder:
 
     def __call__(self) -> NodeSet:
         submodules = dict(self.module.named_modules())
+        backend = NON_ACC_BACKEND_NAME
         for n in self.module.graph.nodes:
-            n.backend = "None"
+            # Group non-compute nodes with previous compute nodes
+            if ConverterRegistry.qualified_name_or_str(n.target) in NON_COMPUTE_NODES:
+                n.backend = backend
+                if backend != NON_ACC_BACKEND_NAME:
+                    self.acc_nodes.add(n)
+                continue
+
             if n.op in CALLABLE_NODE_OPS:
                 is_supported, backend = self.operator_support.is_node_supported(
                     submodules, n
@@ -497,6 +510,8 @@ class FxNetAccNodesFinder:
                 if is_supported:
                     n.backend = backend
                     self.acc_nodes.add(n)
+                else:
+                    n.backend = NON_ACC_BACKEND_NAME
 
         if not self.allow_non_tensor:
             self.reduce_acc_nodes_non_tensor_input()
@@ -515,7 +530,7 @@ def hierarchical_adjacency_partition(
     verbose: bool = DEBUG,
     min_block_size: int = MIN_BLOCK_SIZE,
     torch_executed_ops: Collection[Target] = set(),
-    backend_support_map: Optional[Dict[str, Set[OpOverload]]] = None,
+    backend_support_map: Optional[Dict[str, Collection[Target]]] = None,
     backend_priority: Optional[List[str]] = None,
     require_full_compilation: bool = REQUIRE_FULL_COMPILATION,
     skip_fusion: bool = False,
@@ -542,7 +557,7 @@ def hierarchical_adjacency_partition(
     # Default backend support map if none provided
     if backend_support_map is None:
         backend_support_map = {
-            "tensorrt": set(DYNAMO_ATEN_CONVERTERS.keys()),
+            "tensorrt": CONVERTERS.keys(),
             "inductor": set(),
         }
 

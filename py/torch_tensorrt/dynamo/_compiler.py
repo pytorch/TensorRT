@@ -5,7 +5,17 @@ import logging
 import os
 import platform
 import warnings
-from typing import Any, Collection, List, Optional, Sequence, Set, Tuple, Union
+from typing import (
+    Any,
+    Callable,
+    Collection,
+    List,
+    Optional,
+    Sequence,
+    Set,
+    Tuple,
+    Union,
+)
 
 import torch
 from torch.export import ExportedProgram
@@ -29,9 +39,6 @@ from torch_tensorrt.dynamo.conversion import (
     convert_module,
     interpret_module_to_result,
     repair_double_inputs,
-)
-from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
-    DYNAMO_ATEN_CONVERTERS,
 )
 from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
     DYNAMO_CONVERTERS as CONVERTERS,
@@ -803,15 +810,13 @@ def compile_module(
         )
 
     ############ TODO: testing only ############
-    use_hierarchical_partitioner = False
+    use_hierarchical_partitioner = True
     backend_priority = ["inductor", "tensorrt"]
     backend_support_map = {
         "inductor": {
-            # operator.getitem,
-            torch.ops.aten.conv2d.default,
-            torch.ops.aten.convolution.default,
+            "torch.ops.aten.convolution.default",
         },
-        "tensorrt": set(DYNAMO_ATEN_CONVERTERS.keys()),
+        "tensorrt": CONVERTERS.keys(),
     }
     #############################################
     # Partition module into components that can be TRT-accelerated
@@ -944,11 +949,9 @@ def compile_module(
                 if "_run_on_acc_inductor" in name:
                     sub_inputs = []
                     for input in submodule_inputs:
-                        sub_input = (
-                            torch.randn(input.shape)
-                            .to(dtype.to(input.dtype, t=torch.dtype))
-                            .cuda()
-                        )
+                        sub_input = input.torch_tensor.to(
+                            dtype.to(input.dtype, t=torch.dtype)
+                        ).cuda()
                         sub_inputs.append(sub_input)
 
                     compiled_func = torch._inductor.compile(
@@ -956,7 +959,7 @@ def compile_module(
                         sub_inputs,
                     )
                     # Wrap the compiled function to be a torch.nn.Module
-                    compiled_submodule = FunctionWrapper(compiled_func)
+                    compiled_submodule = InductorModule(compiled_func)
 
                 elif "_run_on_acc_tensorrt" in name:
                     compiled_submodule = convert_module(
@@ -1373,10 +1376,12 @@ def load_cross_compiled_exported_program(file_path: str = "") -> Any:
     return replace_execute_engine_no_op_node(exp_program)
 
 
-class FunctionWrapper(torch.nn.Module):
-    def __init__(self, func):
+class InductorModule(torch.nn.Module):  # type: ignore[misc]
+    """Wrapper module for inductor compiled function."""
+
+    def __init__(self, func: Callable[..., Any]) -> None:
         super().__init__()
         self.func = func
 
-    def forward(self, *args, **kwargs):
+    def forward(self, *args: Any, **kwargs: Any) -> Any:
         return self.func(*args, **kwargs)
