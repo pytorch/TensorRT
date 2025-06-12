@@ -55,6 +55,7 @@ def constant_fold(
     del cf
 
     logger.debug(f"Graph after constant folding:\n{gm.graph}")
+
     return gm
 
 
@@ -98,6 +99,18 @@ class _TorchTensorRTConstantFolder(ConstantFolder):  # type: ignore[misc]
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
 
-    # TODO: Update this function when quantization is added
     def is_impure(self, node: torch.fx.node.Node) -> bool:
+        # Set of known quantization ops to be excluded from constant folding.
+        # Currently, we exclude all quantization ops coming from modelopt library.
+        quantization_ops = {}
+        try:
+            # modelopt import ensures torch.ops.tensorrt.quantize_op.default is registered
+            import modelopt.torch.quantization as mtq
+
+            assert torch.ops.tensorrt.quantize_op.default
+            quantization_ops.add(torch.ops.tensorrt.quantize_op.default)
+        except Exception as e:
+            pass
+        if quantization_ops and node.target in quantization_ops:
+            return True
         return False
