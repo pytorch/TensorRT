@@ -361,6 +361,7 @@ def create_constant(
             shape = list(torch_value.shape)
 
         if torch_value is not None:
+            # TODO : We should switch the mapping to use torch.Tensor instead of numpy.
             if torch_value.dtype == torch.bfloat16:
                 torch_value_fp32 = torch_value.to(torch.float32)
                 numpy_value = torch_value_fp32.numpy()
@@ -368,19 +369,13 @@ def create_constant(
                 numpy_value = torch_value.numpy()
 
             ctx.mapping[name + " CONSTANT"] = numpy_value.reshape(-1)
+
+            trt_weights = to_trt_weights(torch_value)
             constant = ctx.net.add_constant(
                 shape,
-                numpy_value,
+                trt_weights,
             )
             constant.name = name
-
-            if torch_value.dtype == torch.bfloat16:
-                return cast_trt_tensor(
-                    ctx,
-                    constant.get_output(0),
-                    trt.DataType.BF16,
-                    name + "_bf16_cast",
-                )
 
             return constant.get_output(0)
         else:
