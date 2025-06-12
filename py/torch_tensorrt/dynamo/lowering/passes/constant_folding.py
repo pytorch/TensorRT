@@ -100,14 +100,15 @@ class _TorchTensorRTConstantFolder(ConstantFolder):  # type: ignore[misc]
         super().__init__(*args, **kwargs)
 
     def is_impure(self, node: torch.fx.node.Node) -> bool:
-        # Set of known quantization ops to be excluded from constant folding. 
+        # Set of known quantization ops to be excluded from constant folding.
         # Currently, we exclude all quantization ops coming from modelopt library.
-        quantization_ops = {}
+        quantization_ops = []
         try:
-            # modelopt import ensures torch.ops.tensorrt.quantize_op.default is registered 
-            import modelopt.torch.quantization as mtq
+            # modelopt import ensures torch.ops.tensorrt.quantize_op.default is registered
+            import modelopt.torch.quantization as mtq  # noqa: F401
+
             assert torch.ops.tensorrt.quantize_op.default
-            quantization_ops.add(torch.ops.tensorrt.quantize_op.default)
+            quantization_ops.append(torch.ops.tensorrt.quantize_op.default)
         except Exception as e:
             pass
         if quantization_ops and node.target in quantization_ops:
