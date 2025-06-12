@@ -678,6 +678,34 @@ def to_torch(
         return output.to(torch_dtype) if torch_dtype else output
 
 
+def to_trt_weights(value: Union[torch.Tensor, np.ndarray]) -> trt.Weights:
+    """
+    Convert a PyTorch tensor or NumPy array to TensorRT weights.
+
+    Args:
+        value (Union[torch.Tensor, np.ndarray]): The tensor or array to convert to TRT weights
+
+    Returns:
+        trt.Weights: TensorRT weights object with appropriate data type
+
+    Note:
+        - Input tensors are made contiguous before conversion
+        - Data type is preserved from the original tensor/array
+    """
+    if isinstance(value, torch.Tensor):
+        value = value.contiguous()
+        value_trt_dtype = _enums.dtype._from(value.dtype).to(trt.DataType)
+        return trt.Weights(value_trt_dtype, value.data_ptr(), value.nelement())
+    elif isinstance(value, np.ndarray):
+        value = np.ascontiguousarray(value)
+        value_np_dtype = _enums.dtype._from(value.dtype).to(np.dtype, use_default=True)
+        return trt.Weights(value_np_dtype, value.data, value.size)
+    else:
+        raise AssertionError(
+            f"to_trt_weights can only be called on torch.Tensor or np.ndarray, got an object of type: {type(value)}"
+        )
+
+
 def flatten_dims(
     input: Sequence[Union[TRTTensor, torch.Tensor, np.ndarray]],
     start_dim: int,
