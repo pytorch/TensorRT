@@ -13,13 +13,14 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     cast_trt_tensor,
     extend_attr_to_tuple,
     get_trt_tensor,
+    has_dynamic_shape,
+    set_layer_name,
     to_torch,
+    to_trt_weights,
 )
 from torch_tensorrt.fx.converters.converter_utils import (
     get_dyn_range,
-    has_dynamic_shape,
     mark_as_int8_layer,
-    set_layer_name,
 )
 from torch_tensorrt.fx.types import TRTTensor
 
@@ -64,6 +65,8 @@ def convNd(
             f"Convolution {name} has bias of type {type(bias)}, Expected Torch Tensor or TRT Tensor"
         )
 
+    num_output_maps = 0
+    kernel_shape = ()
     # Process weight terms
     if isinstance(weight, TRTTensor):
         weight = get_trt_tensor(ctx, weight, f"{name}_weight")
@@ -72,23 +75,33 @@ def convNd(
             weight = impl.unsqueeze.unsqueeze(
                 ctx, target, source_ir, weight.name + "_unsqueeze_conv1d", weight, -1
             )
+        num_output_maps = weight.shape[0]
+        kernel_shape = weight.shape[2:]
     elif isinstance(weight, (torch.Tensor, np.ndarray)):
         weight = to_torch(weight, dtype=input.dtype)
         # Append new dimension (unsqueeze) if the convolution is 1d
         if is_conv1d:
             weight = torch.unsqueeze(weight, -1)
-        weight = get_trt_tensor(ctx, weight, f"{name}_weight")
+
+        num_output_maps = weight.shape[0]
+        kernel_shape = weight.shape[2:]
+        weight = to_trt_weights(weight)
 
     else:
         raise RuntimeError(
             f"Convolution {name} has weight of type {type(weight)}, Expect Optional[Tensor]"
         )
 
+    assert (
+        num_output_maps > 0
+    ), "Number of output channels in convolution must be greater than 0"
+    assert len(kernel_shape) > 0, "Convolution kernel shape must be non-empty"
+
     # add conv layer
     conv_layer = ctx.net.add_convolution_nd(
         input=input,
-        num_output_maps=weight.shape[0],
-        kernel_shape=weight.shape[2:],
+        num_output_maps=num_output_maps,
+        kernel_shape=kernel_shape,
         kernel=trt.Weights() if isinstance(weight, TRTTensor) else weight,
         bias=trt.Weights() if isinstance(bias, TRTTensor) else bias,
     )

@@ -78,7 +78,7 @@ def construct_refit_mapping(
     )
     interpreter._construct_trt_network_def()
 
-    return interpreter.ctx.mapping
+    return interpreter.ctx.weight_refit_map
 
 
 @needs_refit
