@@ -400,7 +400,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
     @staticmethod
     def find_weight(
         weight_name: str,
-        np_map: dict[str, Any],
+        weight_refit_map: dict[str, Any],
         state_dict: dict[str, Any],
         device: torch.device,
     ) -> str:
@@ -413,7 +413,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         state_dict: state of the graph module
         """
         with unset_fake_temporarily():
-            network_weight = torch.from_numpy(np_map[weight_name]).to(device)
+            network_weight = weight_refit_map[weight_name].to(device)
             for sd_w_name, sd_weight in state_dict.items():
                 if TRTInterpreter.check_weight_equal(sd_weight, network_weight, device):
                     del state_dict[sd_w_name]
@@ -427,8 +427,8 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         device: torch.device,
     ) -> Any:
         with unset_fake_temporarily():
-            if not isinstance(network_weight, torch.Tensor):
-                network_weight = torch.from_numpy(network_weight).to(device)
+            if network_weight.device != device:
+                network_weight = network_weight.to(device)
             try:
                 return sd_weight.shape == network_weight.shape and torch.all(
                     torch.abs(sd_weight - network_weight) < 0.01
@@ -497,8 +497,8 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         self.module.to(torch_device)
         sd = self.module.state_dict()
         weight_name_map: dict[str, Any] = {}
-        np_map = self.ctx.weight_refit_map
-        constant_mapping = {k: v for k, v in np_map.items() if v.size == 1}
+        weight_refit_map = self.ctx.weight_refit_map
+        constant_mapping = {k: v for k, v in weight_refit_map.items() if v.size == 1}
         net = self.ctx.net
         for i in range(net.num_layers):
             layer = net[i]
@@ -540,7 +540,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                     else:
                         sd_weight_name = f"{sd_weight_name}.{torch_attr}"
 
-                    if engine_weight_name in np_map:
+                    if engine_weight_name in weight_refit_map:
                         weight_name_map[engine_weight_name] = sd_weight_name
 
         # Stage 2: Value mapping
@@ -549,10 +549,10 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                 # There is no direct connection in batch_norm layer. So skip it
                 pass
             elif sd_weight_name not in sd or not TRTInterpreter.check_weight_equal(
-                sd[sd_weight_name], np_map[engine_weight_name], torch_device
+                sd[sd_weight_name], weight_refit_map[engine_weight_name], torch_device
             ):
                 weight_name_map[engine_weight_name] = TRTInterpreter.find_weight(
-                    engine_weight_name, np_map, sd, torch_device
+                    engine_weight_name, weight_refit_map, sd, torch_device
                 )
                 if (
                     weight_name_map[engine_weight_name] != ""
@@ -563,12 +563,13 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
 
             weight_name_map[engine_weight_name] = [
                 weight_name_map[engine_weight_name],
-                np_map[engine_weight_name].dtype,
+                weight_refit_map[engine_weight_name].dtype,
             ]
 
         weight_name_map["constant_mapping"] = constant_mapping
         self.weight_name_map = weight_name_map
-        del np_map, sd
+
+        del weight_refit_map, sd
         gc.collect()
         torch.cuda.empty_cache()
 

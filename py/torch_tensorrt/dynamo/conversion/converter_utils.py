@@ -418,15 +418,8 @@ def create_constant(
                 ctx.cpu_weights_reference_holder[name + " FP4_CONSTANT"] = torch_value
                 return constant.get_output(0)
 
-            # TODO: Refit map uses numpy arrays. Remove this once refit is updated to use torch.Tensor
-            if torch_value.dtype == torch.bfloat16:
-                torch_value_fp32 = torch_value.to(torch.float32)
-                numpy_value = torch_value_fp32.numpy()
-            else:
-                numpy_value = torch_value.numpy()
-
             # Used for refit
-            ctx.weight_refit_map[name + " CONSTANT"] = numpy_value.reshape(-1)
+            ctx.weight_refit_map[name + " CONSTANT"] = torch_value
 
             # This is a buffer to hold the torch.Tensor so that they are alive during the course of TRT compilation.
             ctx.cpu_weights_reference_holder[name] = torch_value
