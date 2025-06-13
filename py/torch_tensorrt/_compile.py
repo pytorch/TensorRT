@@ -586,6 +586,7 @@ def save(
     kwarg_inputs: Optional[dict[str, Any]] = None,
     retrace: bool = False,
     pickle_protocol: int = 2,
+    **kwargs: Any,
 ) -> None:
     """
     Save the model to disk in the specified output format.
@@ -595,7 +596,7 @@ def save(
         inputs (torch.Tensor): Torch input tensors
         arg_inputs (Tuple[Any, ...]): Same as inputs. Alias for better understanding with kwarg_inputs.
         kwarg_inputs (dict[Any, ...]): Optional, kwarg inputs to the module forward function.
-        output_format (str): Format to save the model. Options include exported_program | torchscript.
+        output_format (str): Format to save the model. Options include exported_program | torchscript | aot_inductor.
         retrace (bool): When the module type is a fx.GraphModule, this option re-exports the graph using torch.export.export(strict=False) to save it.
                 This flag is experimental for now.
         pickle_protocol (int): The pickle protocol to use to save the model. Default is 2. Increase this to 4 or higher for large models
@@ -603,7 +604,7 @@ def save(
     if isinstance(module, CudaGraphsTorchTensorRTModule):
         module = module.compiled_module
     module_type = _parse_module_type(module)
-    accepted_formats = {"exported_program", "torchscript"}
+    accepted_formats = {"exported_program", "torchscript", "aot_inductor"}
     if arg_inputs is not None and not all(
         isinstance(input, torch.Tensor) for input in arg_inputs
     ):
@@ -634,9 +635,9 @@ def save(
             "Input model is of type nn.Module. Saving nn.Module directly is not supported. Supported model types torch.jit.ScriptModule | torch.fx.GraphModule | torch.export.ExportedProgram."
         )
     elif module_type == _ModuleType.ts:
-        if output_format == "exported_program":
+        if not all([output_format == f for f in ["exported_program", "aot_inductor"]]):
             raise ValueError(
-                "Provided model is a torch.jit.ScriptModule but the output_format specified is exported_program. Please verify the output_format"
+                "Provided model is a torch.jit.ScriptModule but the output_format specified is not torchscript. Other output formats are not supported"
             )
         else:
             if arg_inputs is not None:
@@ -654,7 +655,22 @@ def save(
                 logger.warning(
                     "Provided model is a torch.export.ExportedProgram, inputs or arg_inputs is not necessary during save, it uses the inputs or arg_inputs provided during export and compile"
                 )
-            torch.export.save(module, file_path)
+            if output_format == "exported_program":
+                torch.export.save(module, file_path, pickle_protocol=pickle_protocol)
+            elif output_format == "aot_inductor":
+                inductor_configs = {}
+                if "inductor_configs" in kwargs:
+                    inductor_configs = kwargs["inductor_configs"]
+
+                torch._inductor.aoti_compile_and_package(
+                    exp_program,
+                    inductor_configs=inductor_configs,
+                    package_path=file_path,
+                )
+            else:
+                raise RuntimeError(
+                    "Attempted to serialize an exported program with an unsupported format. Exported programs support exported_program and aot_inductor"
+                )
     elif module_type == _ModuleType.fx:
         # The module type is torch.fx.GraphModule
         if output_format == "torchscript":
@@ -671,9 +687,24 @@ def save(
                         "Provided model is a torch.fx.GraphModule and retrace is False, inputs or arg_inputs is not necessary during save."
                     )
                 exp_program = export(module)
-                torch.export.save(
-                    exp_program, file_path, pickle_protocol=pickle_protocol
-                )
+                if output_format == "exported_program":
+                    torch.export.save(
+                        exp_program, file_path, pickle_protocol=pickle_protocol
+                    )
+                elif output_format == "aot_inductor":
+                    inductor_configs = {}
+                    if "inductor_configs" in kwargs:
+                        inductor_configs = kwargs["inductor_configs"]
+
+                    torch._inductor.aoti_compile_and_package(
+                        exp_program,
+                        inductor_configs=inductor_configs,
+                        package_path=file_path,
+                    )
+                else:
+                    raise RuntimeError(
+                        "Attempted to serialize an exported program with an unsupported format. Exported programs support exported_program and aot_inductor"
+                    )
             else:
                 if arg_inputs is None:
                     raise ValueError(
@@ -685,6 +716,22 @@ def save(
                     kwargs=kwarg_inputs,
                     strict=False,
                 )
-                torch.export.save(
-                    exp_program, file_path, pickle_protocol=pickle_protocol
-                )
+
+                if output_format == "exported_program":
+                    torch.export.save(
+                        exp_program, file_path, pickle_protocol=pickle_protocol
+                    )
+                elif output_format == "aot_inductor":
+                    inductor_configs = {}
+                    if "inductor_configs" in kwargs:
+                        inductor_configs = kwargs["inductor_configs"]
+
+                    torch._inductor.aoti_compile_and_package(
+                        exp_program,
+                        inductor_configs=inductor_configs,
+                        package_path=file_path,
+                    )
+                else:
+                    raise RuntimeError(
+                        "Attempted to serialize an exported program with an unsupported format. Exported programs support exported_program and aot_inductor"
+                    )
