@@ -70,6 +70,7 @@ class TestGatherNcclOpsConverter(DispatchTestCase):
             use_dynamo_tracer=True,
             enable_passes=True,
         )
+        dist.destroy_process_group()
 
 
 if __name__ == "__main__":
