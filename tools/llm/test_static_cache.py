@@ -58,12 +58,24 @@ class StaticCacheModel(nn.Module):
     def __init__(self):
         super().__init__()
 
-    # def forward(self, q, k, v, key_cache, value_cache, start_idx, end_idx, is_causal=True):
-    #     new_key_cache = torch.cat((key_cache[:, :, :start_idx, :], k, key_cache[:, :, end_idx:, :]), dim=2)
-    #     new_value_cache = torch.cat((value_cache[:, :, :start_idx, :], v, value_cache[:, :, end_idx:, :]), dim=2)
-    #     out = torch._C._nn.scaled_dot_product_attention(q, new_key_cache[:, :, :end_idx, :], new_value_cache[:, :, :end_idx, :], dropout_p=0.0, is_causal=is_causal)
+    def forward(
+        self, q, k, v, key_cache, value_cache, start_idx, end_idx, is_causal=True
+    ):
+        new_key_cache = torch.cat(
+            (key_cache[:, :, :start_idx, :], k, key_cache[:, :, end_idx:, :]), dim=2
+        )
+        new_value_cache = torch.cat(
+            (value_cache[:, :, :start_idx, :], v, value_cache[:, :, end_idx:, :]), dim=2
+        )
+        out = torch._C._nn.scaled_dot_product_attention(
+            q,
+            new_key_cache[:, :, :end_idx, :],
+            new_value_cache[:, :, :end_idx, :],
+            dropout_p=0.0,
+            is_causal=is_causal,
+        )
 
-    #     return out, new_key_cache, new_value_cache
+        return out, new_key_cache, new_value_cache
 
     def forward(
         self, q, k, v, key_cache, value_cache, start_idx, end_idx, is_causal=True
