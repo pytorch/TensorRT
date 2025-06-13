@@ -1,6 +1,12 @@
 #set -exou pipefail
 set -x
 
+dnf install -y sqlite-devel
+
+ldconfig -p | grep sqlite
+
+find /usr -print | grep libsqlite3.so
+
 TORCH_TORCHVISION=$(grep "^torch" ${PWD}/py/requirements.txt)
 INDEX_URL=https://download.pytorch.org/whl/${CHANNEL}/${CU_VERSION}
 PLATFORM=$(python -c "import sys; print(sys.platform)")

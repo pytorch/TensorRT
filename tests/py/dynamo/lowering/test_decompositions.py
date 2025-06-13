@@ -9,11 +9,12 @@ from torch.testing._internal.common_cuda import (
 )
 from torch.testing._internal.common_utils import TestCase, run_tests
 from torch_tensorrt.dynamo.utils import ATOL, RTOL
-
+import pytest
 from ..testing_utilities import DECIMALS_OF_AGREEMENT, lower_graph_testing
 
 
 class TestLowering(TestCase):
+    @pytest.mark.critical
     def test_lowering_inplace_op(self):
         class InPlace(torch.nn.Module):
             def __init__(self, *args, **kwargs) -> None:
