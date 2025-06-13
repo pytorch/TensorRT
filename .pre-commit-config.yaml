@@ -21,14 +21,14 @@ repos:
           - id: clang-format
             types_or: [c++, c, cuda]
     - repo: https://github.com/keith/pre-commit-buildifier
-      rev: 6.4.0
+      rev: 8.0.3
       hooks:
           - id: buildifier
             args:
                 - --warnings=all
           - id: buildifier-lint
     - repo: https://github.com/abravalheri/validate-pyproject
-      rev: v0.23
+      rev: v0.24.1
       hooks:
           - id: validate-pyproject
     - repo: https://github.com/pycqa/isort
@@ -37,17 +37,17 @@ repos:
           - id: isort
             name: isort (python)
     - repo: https://github.com/pre-commit/mirrors-mypy
-      rev: "v1.9.0"
+      rev: "v1.15.0"
       hooks:
           - id: mypy
             exclude: "^py/torch_tensorrt/fx|^examples|^tests|^py/torch_tensorrt/dynamo/_experimental|^tools|^docs|noxfile.py|setup.py|versions.py"
     - repo: https://github.com/astral-sh/ruff-pre-commit
       # Ruff version.
-      rev: v0.3.3
+      rev: v0.11.7
       hooks:
           - id: ruff
     - repo: https://github.com/psf/black
-      rev: 24.3.0
+      rev: 25.1.0
       hooks:
           - id: black
             exclude: ^examples/custom_converters/elu_converter/setup.py|^docs
@@ -57,7 +57,7 @@ repos:
           - id: typos
     - repo: https://github.com/astral-sh/uv-pre-commit
       # uv version.
-      rev: 0.5.5
+      rev: 0.7.1
       hooks:
           # Update the uv lockfile
           - id: uv-lock
