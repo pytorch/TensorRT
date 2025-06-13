@@ -821,8 +821,6 @@ class TestLowering(TestCase):
                 y = torch.ops.aten.slice_scatter(x, src, 1, 6, None, 1)
                 return y
 
-        fx_graph = torch.fx.symbolic_trace(sliceScatter())
-
         dim1 = torch.export.Dim("dim1", min=8, max=10)
         dynamic_shapes = {
             "x": [torch.export.Dim.STATIC, dim1],
