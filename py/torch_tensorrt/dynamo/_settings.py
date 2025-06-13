@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
-from typing import Collection, Optional, Set, Tuple, Union
+from typing import Any, Collection, Optional, Set, Tuple, Union
 
+import torch
 from torch.fx.node import Target
 from torch_tensorrt._Device import Device
 from torch_tensorrt._enums import EngineCapability, dtype
@@ -142,6 +143,16 @@ class CompilationSettings:
     l2_limit_for_tiling: int = L2_LIMIT_FOR_TILING
     use_distributed_mode_trace: bool = USE_DISTRIBUTED_MODE_TRACE
     offload_module_to_cpu: bool = OFFLOAD_MODULE_TO_CPU
+
+    def __getstate__(self) -> dict[str, Any]:
+        state = self.__dict__.copy()
+        state["torch_executed_ops"] = {str(op) for op in state["torch_executed_ops"]}
+        return state
+
+    def __setstate__(self, state: dict[str, Any]) -> None:
+        self.__dict__.update(state)
+        ops_str = self.torch_executed_ops
+        self.torch_executed_ops = {getattr(torch.ops, op) for op in ops_str}
 
 
 _SETTINGS_TO_BE_ENGINE_INVARIANT = (
