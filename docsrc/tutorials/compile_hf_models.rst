@@ -55,7 +55,7 @@ We have officially verified support for the following LLM families:
    * - Qwen 2.5
      - | Qwen/Qwen2.5-0.5B-Instruct
        | Qwen/Qwen2.5-1.5B-Instruct
-       | Qwen/Qwen2.5-4B-Instruct
+       | Qwen/Qwen2.5-3B-Instruct
        | Qwen/Qwen2.5-7B-Instruct
      - FP16, FP32
      - Yes
