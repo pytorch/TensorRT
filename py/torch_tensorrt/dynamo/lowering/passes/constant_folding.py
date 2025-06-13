@@ -98,18 +98,21 @@ def replace_node_with_constant(
 class _TorchTensorRTConstantFolder(ConstantFolder):  # type: ignore[misc]
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
-
-    def is_impure(self, node: torch.fx.node.Node) -> bool:
-        # Set of known quantization ops to be excluded from constant folding. 
+        # Set of known quantization ops to be excluded from constant folding.
         # Currently, we exclude all quantization ops coming from modelopt library.
-        quantization_ops = {}
+        self.quantization_ops = set()
         try:
-            # modelopt import ensures torch.ops.tensorrt.quantize_op.default is registered 
+            # modelopt import ensures torch.ops.tensorrt.quantize_op.default is registered
             import modelopt.torch.quantization as mtq
+
             assert torch.ops.tensorrt.quantize_op.default
-            quantization_ops.add(torch.ops.tensorrt.quantize_op.default)
+            self.quantization_ops.add(torch.ops.tensorrt.quantize_op.default)
         except Exception as e:
             pass
-        if quantization_ops and node.target in quantization_ops:
+
+    # TODO: Update this function when quantization is added
+    def is_impure(self, node: torch.fx.node.Node) -> bool:
+
+        if node.target in self.quantization_ops:
             return True
         return False

@@ -82,7 +82,7 @@ def compile_model(
         pipe.transformer = mod
         do_calibrate(
             pipe=pipe,
-            prompt="test",
+            prompt="a dog running in a park",
         )
 
     if args.dtype != "fp16":
