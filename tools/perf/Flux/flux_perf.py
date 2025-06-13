@@ -4,7 +4,7 @@ import sys
 from time import time
 
 sys.path.append(os.path.join(os.path.dirname(__file__), "../../../examples/apps"))
-from flux_demo import compile_model
+from flux_demo import compile_model, parse_args
 
 
 def benchmark(pipe, prompt, inference_step, batch_size=1, iterations=1):
@@ -57,15 +57,10 @@ if __name__ == "__main__":
         help="Use dynamic shapes",
     )
     parser.add_argument(
-        "--max_batch_size",
-        type=int,
-        default=1,
-        help="Maximum batch size to use",
-    )
-    parser.add_argument(
         "--debug",
         action="store_true",
         help="Use debug mode",
     )
+    parser.add_argument("--max_batch_size", type=int, default=1)
     args = parser.parse_args()
     main(args)
