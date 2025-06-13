@@ -6,10 +6,29 @@ import torch
 from torch.fx.experimental.proxy_tensor import unset_fake_temporarily
 from torch.fx.node import Target
 from torch_tensorrt.dynamo._SourceIR import SourceIR
+from torch_tensorrt.dynamo.conversion import impl
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
 from torch_tensorrt.dynamo.conversion.converter_utils import get_trt_tensor, to_torch
 from torch_tensorrt.fx.converters.converter_utils import set_layer_name
 from torch_tensorrt.fx.types import TRTTensor
+
+
+def get_ir(target: Target) -> SourceIR:
+    target_module = getattr(target, "__module__", "None")
+    if any(
+        target_module.startswith(prefix)
+        for prefix in ("torch.ops.aten", "torch._ops.aten")
+    ):
+        return SourceIR.ATEN
+    elif any(
+        target_module.startswith(prefix)
+        for prefix in ("torch.ops.prims", "torch._ops.prims")
+    ):
+        return SourceIR.PRIM
+    elif target_module.startswith("torch.nn"):
+        return SourceIR.NN
+
+    return SourceIR.UNKNOWN
 
 
 def quantize(
@@ -56,7 +75,6 @@ def quantize(
             dtype = trt.DataType.FP8
             max_bound = 448
 
-        amax = to_torch(amax, None)
         axis = None
         # int8 weight quantization is per-channel quantization(it can have one or multiple amax values)
         if dtype == trt.DataType.INT8 and amax.numel() > 1:
@@ -75,10 +93,32 @@ def quantize(
             assert (
                 amax.numel() == 1
             ), f"{name=} is per-tensor quantization, expected amax is a singular value, but got {amax.shape=}"
-        scale = torch.divide(amax, max_bound)
-        scale.masked_fill_(scale == 0, 1.0)
-        scale = get_trt_tensor(ctx, scale, name + "_scale")
-        input_tensor = get_trt_tensor(ctx, input_tensor, name)
+
+        if not isinstance(amax, trt.ITensor):
+            amax = to_torch(amax, None)
+            scale = torch.divide(amax, max_bound)
+            scale = get_trt_tensor(ctx, scale, name + "_scale", dtype=torch.float32)
+        else:
+            scale = impl.elementwise.div(
+                ctx,
+                target,
+                get_ir(target),
+                name,
+                amax,
+                max_bound,
+            )
+            scale = get_trt_tensor(ctx, scale, name + "_scale", dtype=torch.float32)
+
+        # Add Q node
+        if num_bits == 8 and exponent_bits == 0:
+            dtype = trt.DataType.INT8
+        elif num_bits == 8 and exponent_bits == 4:
+            dtype = trt.DataType.FP8
+
+        if not isinstance(input_tensor, TRTTensor):
+            input_tensor = get_trt_tensor(ctx, input_tensor, name + "_quantize_input")
+
+        quantize_layer = ctx.net.add_quantize(input_tensor, scale, dtype)
 
         # Add Q node
         quantize_layer = ctx.net.add_quantize(input_tensor, scale, dtype)
@@ -90,7 +130,6 @@ def quantize(
         dequantize_layer = ctx.net.add_dequantize(
             q_output, scale, output_type=input_tensor.dtype
         )
-        dequantize_layer.to_type = input_tensor.dtype
         if axis is not None:
             dequantize_layer.axis = axis
         set_layer_name(dequantize_layer, target, name + "_dequantize", source_ir)
