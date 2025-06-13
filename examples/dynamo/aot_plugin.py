@@ -1,3 +1,12 @@
+"""
+.. _aot_plugin:
+
+AOT Plugin
+==========
+
+This example demonstrates how to use an AOT plugin in Torch-TensorRT.
+"""
+
 import argparse
 from typing import Tuple, Union
 
