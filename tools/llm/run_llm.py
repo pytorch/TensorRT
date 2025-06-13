@@ -44,7 +44,6 @@ def get_model(args):
                 args.model,
                 use_cache=False,
                 attn_implementation="sdpa",
-                # num_hidden_layers=1
             )
             .eval()
             .cuda()

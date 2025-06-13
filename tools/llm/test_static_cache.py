@@ -67,7 +67,7 @@ class StaticCacheModel(nn.Module):
         new_value_cache = torch.cat(
             (value_cache[:, :, :start_idx, :], v, value_cache[:, :, end_idx:, :]), dim=2
         )
-        out = torch._C._nn.scaled_dot_product_attention(
+        attn_output = torch._C._nn.scaled_dot_product_attention(
             q,
             new_key_cache[:, :, :end_idx, :],
             new_value_cache[:, :, :end_idx, :],
@@ -75,24 +75,22 @@ class StaticCacheModel(nn.Module):
             is_causal=is_causal,
         )
 
-        return out, new_key_cache, new_value_cache
+        return attn_output, new_key_cache, new_value_cache
 
     def forward(
         self, q, k, v, key_cache, value_cache, start_idx, end_idx, is_causal=True
     ):
-        concat_keys = torch.cat(
-            (key_cache[:, :, :start_idx, :], k), dim=2
-        )  # key_cache[:, :, :6, :] + curr_keys + key_cache[:, : 7: ,: ]
+        concat_keys = torch.cat((key_cache[:, :, :start_idx, :], k), dim=2)
         concat_values = torch.cat((value_cache[:, :, :start_idx, :], v), dim=2)
         new_key_cache = torch.cat((concat_keys, key_cache[:, :, end_idx:, :]), dim=2)
         new_value_cache = torch.cat(
             (concat_values, value_cache[:, :, end_idx:, :]), dim=2
         )
-        out = torch._C._nn.scaled_dot_product_attention(
+        attn_output = torch._C._nn.scaled_dot_product_attention(
             q, concat_keys, concat_values, dropout_p=0.0, is_causal=is_causal
         )
 
-        return out, new_key_cache, new_value_cache
+        return attn_output, new_key_cache, new_value_cache
 
 
 def eager_sdpa(
