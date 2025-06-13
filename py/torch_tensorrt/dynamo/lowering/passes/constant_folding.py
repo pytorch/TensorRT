@@ -1,5 +1,5 @@
 import logging
-from typing import Any
+from typing import Any, Set
 
 import torch
 from torch_tensorrt._utils import sanitized_torch_version
@@ -100,7 +100,7 @@ class _TorchTensorRTConstantFolder(ConstantFolder):  # type: ignore[misc]
         super().__init__(*args, **kwargs)
         # Set of known quantization ops to be excluded from constant folding.
         # Currently, we exclude all quantization ops coming from modelopt library.
-        self.quantization_ops = set()
+        self.quantization_ops: Set[torch._ops.OpOverload] = set()
         try:
             # modelopt import ensures torch.ops.tensorrt.quantize_op.default is registered
             import modelopt.torch.quantization as mtq
