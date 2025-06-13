@@ -56,11 +56,6 @@ if __name__ == "__main__":
         action="store_true",
         help="Use dynamic shapes",
     )
-    parser.add_argument(
-        "--debug",
-        action="store_true",
-        help="Use debug mode",
-    )
     parser.add_argument("--max_batch_size", type=int, default=1)
     args = parser.parse_args()
     main(args)

@@ -75,7 +75,6 @@ def quantize(
             dtype = trt.DataType.FP8
             max_bound = 448
 
-
         axis = None
         # int8 weight quantization is per-channel quantization(it can have one or multiple amax values)
         if dtype == trt.DataType.INT8 and amax.numel() > 1:

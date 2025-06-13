@@ -44,11 +44,6 @@ def compile_model(
         torch_dtype=torch.float16,
     ).to(torch.float16)
 
-    if args.debug:
-        pipe.transformer = FluxTransformer2DModel(
-            num_layers=1, num_single_layers=1, guidance_embeds=True
-        ).to(torch.float16)
-
     if args.low_vram_mode:
         pipe.enable_model_cpu_offload()
     else:
@@ -265,11 +260,6 @@ if __name__ == "__main__":
         "-d",
         action="store_true",
         help="Use dynamic shapes",
-    )
-    parser.add_argument(
-        "--debug",
-        action="store_true",
-        help="Use debug mode",
     )
     args = parser.parse_args()
     main(args)
