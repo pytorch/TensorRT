@@ -499,7 +499,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             for k, v in self.module.state_dict().items()
         }
         weight_name_map: dict[str, Any] = {}
-        np_map = self.ctx.mapping
+        np_map = self.ctx.weight_refit_map
         constant_mapping = {k: v for k, v in np_map.items() if v.size == 1}
         net = self.ctx.net
         for i in range(net.num_layers):
@@ -742,6 +742,8 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             f"Build TRT engine elapsed time: {datetime.now() - build_engine_start_time}"
         )
         _LOGGER.info(f"TRT Engine uses: {serialized_engine.nbytes} bytes of Memory")
+
+        self.ctx.clear_cpu_weights_reference_holder()
 
         self._save_timing_cache(
             builder_config, self.compilation_settings.timing_cache_path

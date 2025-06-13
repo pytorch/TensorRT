@@ -80,6 +80,12 @@ class dtype(Enum):
     :meta hide-value:
     """
 
+    f4 = auto()
+    """4 bit floating-point number, equivalent to ``dtype.fp4`` and ``dtype.float4``
+
+    :meta hide-value:
+    """
+
     uint8 = u8
     int8 = i8
 
@@ -90,6 +96,9 @@ class dtype(Enum):
 
     float8 = f8
     fp8 = f8
+
+    float4 = f4
+    fp4 = f4
 
     half = f16
     fp16 = f16
@@ -162,6 +171,8 @@ class dtype(Enum):
                 return dtype.i32
             elif t == torch.float8_e4m3fn:
                 return dtype.f8
+            elif t == torch.float4_e2m1fn_x2:
+                return dtype.f4
             elif t == torch.half:
                 return dtype.f16
             elif t == torch.float:
@@ -188,6 +199,8 @@ class dtype(Enum):
                 return dtype.i8
             elif t == trt.DataType.FP8:
                 return dtype.f8
+            elif t == trt.DataType.FP4:
+                return dtype.fp4
             elif t == trt.DataType.INT32:
                 return dtype.i32
             elif t == trt.DataType.INT64:
@@ -357,6 +370,8 @@ class dtype(Enum):
                 return torch.long
             elif self == dtype.f8:
                 return torch.float8_e4m3fn
+            elif self == dtype.f4:
+                return torch.float4_e2m1fn_x2
             elif self == dtype.f16:
                 return torch.half
             elif self == dtype.f32:
@@ -394,6 +409,8 @@ class dtype(Enum):
                 return trt.DataType.BOOL
             elif self == dtype.bf16:
                 return trt.DataType.BF16
+            elif self == dtype.f4:
+                return trt.DataType.FP4
             elif use_default:
                 return trt.DataType.FLOAT
             else:
@@ -410,6 +427,8 @@ class dtype(Enum):
                 return np.int64
             elif self == dtype.f16:
                 return np.float16
+            elif self == dtype.f4:
+                return np.float4_e2m1fn_x2
             elif self == dtype.f32:
                 return np.float32
             elif self == dtype.f64:

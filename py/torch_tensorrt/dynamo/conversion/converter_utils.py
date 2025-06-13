@@ -320,12 +320,44 @@ def cast_int_or_float_to_bool(
     return tensor
 
 
+def to_trt_weights(
+    value: Any, target_quantized_type: Optional[trt.DataType] = None
+) -> trt.Weights:
+    """
+    Convert a PyTorch tensor or NumPy array to TensorRT weights.
+
+    Args:
+        value (Union[torch.Tensor, np.ndarray]): The tensor or array to convert to TRT weights
+
+    Returns:
+        trt.Weights: TensorRT weights object with appropriate data type
+
+    Note:
+        - Input tensors are made contiguous before conversion
+        - Data type is preserved from the original tensor/array
+    """
+    if isinstance(value, torch.Tensor):
+        # Tensor must be contiguous before conversion
+        value = value.contiguous()
+        value_trt_dtype = _enums.dtype._from(value.dtype).to(trt.DataType)
+        return trt.Weights(value_trt_dtype, value.data_ptr(), value.nelement())
+    elif isinstance(value, np.ndarray):
+        value = np.ascontiguousarray(value)
+        value_np_dtype = _enums.dtype._from(value.dtype).to(np.dtype, use_default=True)
+        return trt.Weights(value_np_dtype, value.data, value.size)
+    else:
+        raise AssertionError(
+            f"to_trt_weights can only be called on torch.Tensor or np.ndarray, got an object of type: {type(value)}"
+        )
+
+
 def create_constant(
     ctx: ConversionContext,
     value: Union[int, float, bool, np.ndarray, torch.Tensor],
     name: str,
     dtype: Optional[Union[torch.dtype, np.dtype, TRTDataType, _enums.dtype]],
     min_rank: Optional[int] = 1,
+    target_quantized_type: Optional[TRTDataType] = None,
 ) -> TRTTensor:
     """
     Add a TensorRT constant layer whose value is `value` to `ctx.net`.
@@ -338,6 +370,7 @@ def create_constant(
         dtype (Optional[Union[torch.dtype, np.dtype, TRTDataType]]):
             If a dtype is given, we will convert the type of the given `value` to this dtype.
         min_rank (int): minimum rank of the constant tensor.
+        target_quantized_type (Optional[TRTDataType]): If a quantized type is given, we will convert the type of the given `value` to this dtype.
     Returns:
         A TensorRT ITensor that represents the given value.
     """
@@ -361,15 +394,44 @@ def create_constant(
             shape = list(torch_value.shape)
 
         if torch_value is not None:
-            # TODO : We should switch the mapping to use torch.Tensor instead of numpy.
+
+            if torch_value.dtype == torch.uint8:
+                if (
+                    target_quantized_type is None
+                    or target_quantized_type != trt.DataType.FP4
+                ):
+                    # Iconstant layer does not support Uint8, it only support that FP4 data packed in uint8
+                    raise ValueError(
+                        "Currently supported target_quantized_type for uint8 is FP4, got {target_quantized_type=}"
+                    )
+                shape[-1] = shape[-1] * 2
+                weights = trt.Weights(
+                    type=trt.DataType.FP4,
+                    ptr=torch_value.data_ptr(),
+                    count=torch_value.numel() * 2,
+                )
+                constant = ctx.net.add_constant(
+                    shape,
+                    weights,
+                )
+                constant.name = name
+                ctx.cpu_weights_reference_holder[name + " FP4_CONSTANT"] = torch_value
+                return constant.get_output(0)
+
+            # TODO: Refit map uses numpy arrays. Remove this once refit is updated to use torch.Tensor
             if torch_value.dtype == torch.bfloat16:
                 torch_value_fp32 = torch_value.to(torch.float32)
                 numpy_value = torch_value_fp32.numpy()
             else:
                 numpy_value = torch_value.numpy()
 
-            ctx.mapping[name + " CONSTANT"] = numpy_value.reshape(-1)
+            # Used for refit
+            ctx.weight_refit_map[name + " CONSTANT"] = numpy_value.reshape(-1)
 
+            # This is a buffer to hold the torch.Tensor so that they are alive during the course of TRT compilation.
+            ctx.cpu_weights_reference_holder[name] = torch_value
+
+            # Convert the torch.Tensor to a trt.Weights object
             trt_weights = to_trt_weights(torch_value)
             constant = ctx.net.add_constant(
                 shape,
@@ -390,6 +452,7 @@ def get_trt_tensor(
     name: str,
     dtype: Optional[Union[torch.dtype, np.dtype, TRTDataType, _enums.dtype]] = None,
     min_rank: int = 1,
+    target_quantized_type: Optional[TRTDataType] = None,
 ) -> TRTTensor:
     """
     Given a value of random type, we try to convert it to a TensorRT ITensor.
@@ -403,6 +466,7 @@ def get_trt_tensor(
         dtype (Optional[Union[torch.dtype, np.dtype, TRTDataType]]):
             If dtype is provided, the given value will be converted to this dtype.
         min_rank (int): minimum rank of the constant tensor.
+        target_quantized_type (Optional[TRTDataType]): If a quantized type is given, we will convert the type of the given `value` to this dtype.
     Returns:
         A TensorRT ITensor that represents the given value.
     """
@@ -415,7 +479,9 @@ def get_trt_tensor(
             input_val = input_val.astype(np.float32)
 
     if isinstance(input_val, (torch.Tensor, np.ndarray, int, float, bool)):
-        return create_constant(ctx, input_val, name, dtype, min_rank)
+        return create_constant(
+            ctx, input_val, name, dtype, min_rank, target_quantized_type
+        )
     elif isinstance(input_val, TRTTensor):
         return input_val
     else:
@@ -671,34 +737,6 @@ def to_torch(
             )
 
         return output.to(torch_dtype) if torch_dtype else output
-
-
-def to_trt_weights(value: Union[torch.Tensor, np.ndarray]) -> trt.Weights:
-    """
-    Convert a PyTorch tensor or NumPy array to TensorRT weights.
-
-    Args:
-        value (Union[torch.Tensor, np.ndarray]): The tensor or array to convert to TRT weights
-
-    Returns:
-        trt.Weights: TensorRT weights object with appropriate data type
-
-    Note:
-        - Input tensors are made contiguous before conversion
-        - Data type is preserved from the original tensor/array
-    """
-    if isinstance(value, torch.Tensor):
-        value = value.contiguous()
-        value_trt_dtype = _enums.dtype._from(value.dtype).to(trt.DataType)
-        return trt.Weights(value_trt_dtype, value.data_ptr(), value.nelement())
-    elif isinstance(value, np.ndarray):
-        value = np.ascontiguousarray(value)
-        value_np_dtype = _enums.dtype._from(value.dtype).to(np.dtype, use_default=True)
-        return trt.Weights(value_np_dtype, value.data, value.size)
-    else:
-        raise AssertionError(
-            f"to_trt_weights can only be called on torch.Tensor or np.ndarray, got an object of type: {type(value)}"
-        )
 
 
 def flatten_dims(
