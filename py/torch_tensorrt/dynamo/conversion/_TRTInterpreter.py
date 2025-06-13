@@ -743,6 +743,8 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         )
         _LOGGER.info(f"TRT Engine uses: {serialized_engine.nbytes} bytes of Memory")
 
+        self.ctx.clear_cpu_weights_reference_holder()
+
         self._save_timing_cache(
             builder_config, self.compilation_settings.timing_cache_path
         )

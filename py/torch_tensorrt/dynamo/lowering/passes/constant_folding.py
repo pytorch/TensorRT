@@ -109,6 +109,7 @@ class _TorchTensorRTConstantFolder(ConstantFolder):  # type: ignore[misc]
 
             assert torch.ops.tensorrt.quantize_op.default
             quantization_ops.add(torch.ops.tensorrt.quantize_op.default)
+            quantization_ops.add(torch.ops.tensorrt.dynamic_block_quantize_op.default)
         except Exception as e:
             pass
         if quantization_ops and node.target in quantization_ops:
