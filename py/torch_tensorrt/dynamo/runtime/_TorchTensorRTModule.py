@@ -4,7 +4,7 @@ import base64
 import copy
 import logging
 import pickle
-from typing import Any, List, Optional, Tuple, Union
+from typing import Any, List, Optional, Set, Tuple, Union
 
 import torch
 from torch_tensorrt._Device import Device
@@ -227,6 +227,11 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
 
     def encode_metadata(self, metadata: Any) -> str:
         metadata = copy.deepcopy(metadata)
+        metadata["settings"].torch_executed_ops = (
+            TorchTensorRTModule.serialize_aten_ops(
+                metadata["settings"].torch_executed_ops
+            )
+        )
         dumped_metadata = pickle.dumps(metadata)
         encoded_metadata = base64.b64encode(dumped_metadata).decode("utf-8")
         return encoded_metadata
@@ -235,7 +240,20 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
     def decode_metadata(encoded_metadata: bytes) -> Any:
         dumped_metadata = base64.b64decode(encoded_metadata.encode("utf-8"))
         metadata = pickle.loads(dumped_metadata)
+        metadata["settings"].torch_executed_ops = (
+            TorchTensorRTModule.deserialize_aten_ops(
+                metadata["settings"].torch_executed_ops
+            )
+        )
         return metadata
+
+    @staticmethod
+    def serialize_aten_ops(aten_ops: Set[torch._ops.OpOverload]) -> Set[str]:
+        return {str(op) for op in aten_ops}
+
+    @staticmethod
+    def deserialize_aten_ops(aten_ops: Set[str]) -> Set[torch._ops.OpOverload]:
+        return {eval("torch.ops." + str(v)) for v in aten_ops}
 
     def get_extra_state(self) -> SerializedTorchTensorRTModuleFmt:
         if self.engine:
