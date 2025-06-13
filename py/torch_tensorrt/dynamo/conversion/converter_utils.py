@@ -358,6 +358,7 @@ def create_constant(
     dtype: Optional[Union[torch.dtype, np.dtype, TRTDataType, _enums.dtype]],
     min_rank: Optional[int] = 1,
     target_quantized_type: Optional[TRTDataType] = None,
+    return_trt_weights: Optional[bool] = False,
 ) -> TRTTensor:
     """
     Add a TensorRT constant layer whose value is `value` to `ctx.net`.
@@ -371,6 +372,7 @@ def create_constant(
             If a dtype is given, we will convert the type of the given `value` to this dtype.
         min_rank (int): minimum rank of the constant tensor.
         target_quantized_type (Optional[TRTDataType]): If a quantized type is given, we will convert the type of the given `value` to this dtype.
+        return_trt_weights (Optional[bool]): If True, return a TensorRT Weights object instead of a TensorRT ITensor.
     Returns:
         A TensorRT ITensor that represents the given value.
     """
@@ -393,8 +395,8 @@ def create_constant(
         else:
             shape = list(torch_value.shape)
 
+        cpu_weight_reference_key: str = name
         if torch_value is not None:
-
             if torch_value.dtype == torch.uint8:
                 if (
                     target_quantized_type is None
@@ -405,41 +407,38 @@ def create_constant(
                         "Currently supported target_quantized_type for uint8 is FP4, got {target_quantized_type=}"
                     )
                 shape[-1] = shape[-1] * 2
-                weights = trt.Weights(
+                trt_weights = trt.Weights(
                     type=trt.DataType.FP4,
                     ptr=torch_value.data_ptr(),
                     count=torch_value.numel() * 2,
                 )
-                constant = ctx.net.add_constant(
-                    shape,
-                    weights,
-                )
-                constant.name = name
-                ctx.cpu_weights_reference_holder[name + " FP4_CONSTANT"] = torch_value
-                return constant.get_output(0)
-
-            # TODO: Refit map uses numpy arrays. Remove this once refit is updated to use torch.Tensor
-            if torch_value.dtype == torch.bfloat16:
-                torch_value_fp32 = torch_value.to(torch.float32)
-                numpy_value = torch_value_fp32.numpy()
+                cpu_weight_reference_key = name + " FP4_CONSTANT"
             else:
-                numpy_value = torch_value.numpy()
+                # TODO: Refit map uses numpy arrays. Remove this once refit is updated to use torch.Tensor
+                if torch_value.dtype == torch.bfloat16:
+                    torch_value_fp32 = torch_value.to(torch.float32)
+                    numpy_value = torch_value_fp32.numpy()
+                else:
+                    numpy_value = torch_value.numpy()
 
-            # Used for refit
-            ctx.weight_refit_map[name + " CONSTANT"] = numpy_value.reshape(-1)
+                # Used for refit
+                ctx.weight_refit_map[name + " CONSTANT"] = numpy_value.reshape(-1)
+
+                # Convert the torch.Tensor to a trt.Weights object
+                trt_weights = to_trt_weights(torch_value)
 
             # This is a buffer to hold the torch.Tensor so that they are alive during the course of TRT compilation.
-            ctx.cpu_weights_reference_holder[name] = torch_value
+            ctx.cpu_weights_reference_holder[cpu_weight_reference_key] = torch_value
 
-            # Convert the torch.Tensor to a trt.Weights object
-            trt_weights = to_trt_weights(torch_value)
-            constant = ctx.net.add_constant(
-                shape,
-                trt_weights,
-            )
-            constant.name = name
-
-            return constant.get_output(0)
+            if return_trt_weights:
+                return trt_weights
+            else:
+                constant = ctx.net.add_constant(
+                    shape,
+                    trt_weights,
+                )
+                constant.name = name
+                return constant.get_output(0)
         else:
             raise ValueError(
                 f"Cannot convert tensor '{name}' to a TensorRT constant because its value is None."
@@ -453,6 +452,7 @@ def get_trt_tensor(
     dtype: Optional[Union[torch.dtype, np.dtype, TRTDataType, _enums.dtype]] = None,
     min_rank: int = 1,
     target_quantized_type: Optional[TRTDataType] = None,
+    return_trt_weights: Optional[bool] = False,
 ) -> TRTTensor:
     """
     Given a value of random type, we try to convert it to a TensorRT ITensor.
@@ -480,7 +480,13 @@ def get_trt_tensor(
 
     if isinstance(input_val, (torch.Tensor, np.ndarray, int, float, bool)):
         return create_constant(
-            ctx, input_val, name, dtype, min_rank, target_quantized_type
+            ctx,
+            input_val,
+            name,
+            dtype,
+            min_rank,
+            target_quantized_type,
+            return_trt_weights,
         )
     elif isinstance(input_val, TRTTensor):
         return input_val

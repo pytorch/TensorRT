@@ -16,7 +16,6 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     has_dynamic_shape,
     set_layer_name,
     to_torch,
-    to_trt_weights,
 )
 from torch_tensorrt.fx.converters.converter_utils import (
     get_dyn_range,
@@ -55,7 +54,8 @@ def convNd(
     # Process bias terms
     if isinstance(bias, (torch.Tensor, np.ndarray)):
         bias = to_torch(bias, dtype=input.dtype)
-        bias = get_trt_tensor(ctx, bias, f"{name}_bias")
+        # This should return a trt.Weights object
+        bias = get_trt_tensor(ctx, bias, f"{name}_bias", return_trt_weights=True)
 
     elif isinstance(bias, TRTTensor):
         bias = get_trt_tensor(ctx, bias, f"{name}_bias")
@@ -85,7 +85,8 @@ def convNd(
 
         num_output_maps = weight.shape[0]
         kernel_shape = weight.shape[2:]
-        weight = to_trt_weights(weight)
+        # This should return a trt.Weights object
+        weight = get_trt_tensor(ctx, weight, f"{name}_weight", return_trt_weights=True)
 
     else:
         raise RuntimeError(
