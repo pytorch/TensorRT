@@ -79,6 +79,7 @@ def convNd(
         kernel_shape = weight.shape[2:]
     elif isinstance(weight, (torch.Tensor, np.ndarray)):
         weight = to_torch(weight, dtype=input.dtype)
+        torch_weight = weight
         # Append new dimension (unsqueeze) if the convolution is 1d
         if is_conv1d:
             weight = torch.unsqueeze(weight, -1)
@@ -105,10 +106,15 @@ def convNd(
         kernel=trt.Weights() if isinstance(weight, TRTTensor) else weight,
         bias=trt.Weights() if isinstance(bias, TRTTensor) else bias,
     )
+
+    set_layer_name(conv_layer, target, name, source_ir)
+
     # If the weight is a TRTTensor, set it as an input of the layer
     if isinstance(weight, TRTTensor):
         weight = cast_trt_tensor(ctx, weight, input.dtype, name)
         conv_layer.set_input(1, weight)
+    elif weight is not None:
+        ctx.weight_refit_map[f"{conv_layer.name} KERNEL"] = torch_weight
 
     # If the bias is a TRTTensor, set it as an input of the layer
     if isinstance(bias, TRTTensor):
@@ -144,8 +150,6 @@ def convNd(
         dilation = (
             extend_attr_to_tuple(dilation, 2) if dilation is not None else dilation
         )
-
-    set_layer_name(conv_layer, target, name, source_ir)
 
     # Set relevant attributes of convolution layer
     if padding is not None:
