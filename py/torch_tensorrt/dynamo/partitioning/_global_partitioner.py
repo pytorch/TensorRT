@@ -7,14 +7,15 @@ from torch.fx.node import Target
 from torch.fx.passes.infra.partitioner import CapabilityBasedPartitioner, Partition
 from torch.fx.passes.operator_support import OperatorSupport, SupportDict
 from torch_tensorrt.dynamo._defaults import (
-    DEBUG,
     MIN_BLOCK_SIZE,
     REQUIRE_FULL_COMPILATION,
 )
 from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
     DYNAMO_CONVERTERS as CONVERTERS,
 )
-from torch_tensorrt.dynamo.conversion._ConverterRegistry import ConverterRegistry
+from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
+    ConverterRegistry,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -200,7 +201,6 @@ class TorchTensorRTOperatorSupport(OperatorSupport):  # type: ignore[misc]
 
 def partition(
     gm: torch.fx.GraphModule,
-    verbose: bool = DEBUG,
     min_block_size: int = MIN_BLOCK_SIZE,
     torch_executed_ops: Collection[Target] = set(),
     require_full_compilation: bool = REQUIRE_FULL_COMPILATION,
@@ -229,7 +229,6 @@ def partition(
     # Then, fuse partitions and display overview of supported/unsupported operators
     partitions = partitioner.propose_partitions()
     fused_graph = partitioner.fuse_partitions(partitions, prefix="_run_on_acc_")
-    if verbose:
-        supported_ops.print_support_overview(len(partitions))
+    supported_ops.print_support_overview(len(partitions))
 
     return fused_graph, supported_ops

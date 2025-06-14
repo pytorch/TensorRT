@@ -45,6 +45,8 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     get_trt_tensor,
     to_torch,
 )
+from torch_tensorrt.dynamo.debug._DebuggerConfig import DebuggerConfig
+from torch_tensorrt.dynamo.debug._supports_debugger import cls_supports_debugger
 from torch_tensorrt.dynamo.utils import DYNAMIC_DIM, deallocate_module, to_torch_device
 from torch_tensorrt.fx.observer import Observer
 from torch_tensorrt.logging import TRT_LOGGER
@@ -70,21 +72,23 @@ class TRTInterpreterResult(NamedTuple):
     requires_output_allocator: bool
 
 
+@cls_supports_debugger
 class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
     def __init__(
         self,
         module: torch.fx.GraphModule,
         input_specs: Sequence[Input],
-        logger_level: trt.ILogger.Severity = trt.ILogger.Severity.WARNING,
         output_dtypes: Optional[Sequence[dtype]] = None,
         compilation_settings: CompilationSettings = CompilationSettings(),
         engine_cache: Optional[BaseEngineCache] = None,
+        *,
+        _debugger_config: Optional[DebuggerConfig] = None,
     ):
         super().__init__(module)
 
         self.logger = TRT_LOGGER
         self.builder = trt.Builder(self.logger)
-
+        self._debugger_config = _debugger_config
         flag = 0
         if compilation_settings.use_explicit_typing:
             STRONGLY_TYPED = 1 << (int)(
@@ -205,7 +209,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
     ) -> trt.IBuilderConfig:
         builder_config = self.builder.create_builder_config()
 
-        if self.compilation_settings.debug:
+        if self._debugger_config and self._debugger_config.engine_builder_monitor:
             builder_config.progress_monitor = TRTBulderMonitor()
 
         if self.compilation_settings.workspace_size != 0:
@@ -216,7 +220,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         if version.parse(trt.__version__) >= version.parse("8.2"):
             builder_config.profiling_verbosity = (
                 trt.ProfilingVerbosity.DETAILED
-                if self.compilation_settings.debug
+                if self._debugger_config and self._debugger_config.save_engine_profile
                 else trt.ProfilingVerbosity.LAYER_NAMES_ONLY
             )
 
@@ -494,12 +498,10 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         _LOGGER.info("Building weight name mapping...")
         # Stage 1: Name mapping
         torch_device = to_torch_device(self.compilation_settings.device)
-        sd = {
-            k: v.reshape(-1).to(torch_device)
-            for k, v in self.module.state_dict().items()
-        }
+        self.module.to(torch_device)
+        sd = self.module.state_dict()
         weight_name_map: dict[str, Any] = {}
-        np_map = self.ctx.mapping
+        np_map = self.ctx.weight_refit_map
         constant_mapping = {k: v for k, v in np_map.items() if v.size == 1}
         net = self.ctx.net
         for i in range(net.num_layers):
@@ -570,7 +572,6 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
 
         weight_name_map["constant_mapping"] = constant_mapping
         self.weight_name_map = weight_name_map
-
         del np_map, sd
         gc.collect()
         torch.cuda.empty_cache()
@@ -721,6 +722,9 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         if not self.compilation_settings.immutable_weights:
             self._save_weight_mapping()
 
+        if self.compilation_settings.offload_module_to_cpu:
+            deallocate_module(self.module)
+
         build_engine_start_time = datetime.now()
         _LOGGER.info("Not found cached TRT engines. Start building engine.")
 
@@ -731,8 +735,6 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         self._create_timing_cache(
             builder_config, self.compilation_settings.timing_cache_path
         )
-        if self.compilation_settings.offload_module_to_cpu:
-            deallocate_module(self.module)
         serialized_engine = self.builder.build_serialized_network(
             self.ctx.net, builder_config
         )
