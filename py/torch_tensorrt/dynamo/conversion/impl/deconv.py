@@ -80,6 +80,7 @@ def deconvNd(
 
     elif isinstance(weight, (torch.Tensor, np.ndarray)):
         weight = to_torch(weight, dtype=input.dtype)
+        torch_weight = weight
         # Append new dimension (unsqueeze) if the deconvolution is 1d
         if is_deconv1d:
             weight = torch.unsqueeze(weight, -1)
@@ -105,11 +106,13 @@ def deconvNd(
         kernel=trt.Weights() if isinstance(weight, TRTTensor) else weight,
         bias=trt.Weights() if isinstance(bias, TRTTensor) else bias,
     )
+    set_layer_name(deconv_layer, target, name, source_ir)
 
     # If the weight is a TRTTensor, set it as an input of the layer
     if isinstance(weight, TRTTensor):
         deconv_layer.set_input(1, weight)
-
+    elif weight is not None:
+        ctx.weight_refit_map[f"{deconv_layer.name} KERNEL"] = torch_weight
     # If the bias is a TRTTensor, set it as an input of the layer
     if isinstance(bias, TRTTensor):
         deconv_layer.set_input(2, bias)
@@ -134,8 +137,6 @@ def deconvNd(
             if output_padding is not None
             else output_padding
         )
-
-    set_layer_name(deconv_layer, target, name, source_ir)
 
     # Set relevant attributes of deconvolution layer
     if padding is not None:
