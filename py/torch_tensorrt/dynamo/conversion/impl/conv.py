@@ -79,14 +79,22 @@ def convNd(
         kernel_shape = weight.shape[2:]
     elif isinstance(weight, (torch.Tensor, np.ndarray)):
         weight = to_torch(weight, dtype=input.dtype)
-        torch_weight = weight
         # Append new dimension (unsqueeze) if the convolution is 1d
         if is_conv1d:
             weight = torch.unsqueeze(weight, -1)
 
         num_output_maps = weight.shape[0]
         kernel_shape = weight.shape[2:]
-        weight = to_trt_weights(weight)
+        weight = to_trt_weights(
+            weight,
+            record_weight=True,
+            name=name,
+            ctx=ctx,
+            target=target,
+            layer_type_name="CONVOLUTION",
+            weight_type_name="KERNEL",
+            source_ir=source_ir,
+        )
 
     else:
         raise RuntimeError(
@@ -113,8 +121,6 @@ def convNd(
     if isinstance(weight, TRTTensor):
         weight = cast_trt_tensor(ctx, weight, input.dtype, name)
         conv_layer.set_input(1, weight)
-    elif weight is not None:
-        ctx.weight_refit_map[f"{conv_layer.name} KERNEL"] = torch_weight
 
     # If the bias is a TRTTensor, set it as an input of the layer
     if isinstance(bias, TRTTensor):
