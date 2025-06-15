@@ -7,6 +7,7 @@ from packaging import version
 logger = logging.getLogger(__name__)
 
 if version.parse(sanitized_torch_version()) >= version.parse("2.1.dev"):
+    from . import debug
     from ._compiler import (
         compile,
         convert_exported_program_to_serialized_trt_engine,
@@ -20,4 +21,3 @@ if version.parse(sanitized_torch_version()) >= version.parse("2.1.dev"):
     from ._SourceIR import SourceIR
     from ._tracer import trace
     from .debug._Debugger import Debugger
-    from . import debug
