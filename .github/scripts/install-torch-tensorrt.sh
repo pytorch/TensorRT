@@ -1,7 +1,7 @@
 #set -exou pipefail
 set -x
 
-TORCH=$(grep "^torch" ${PWD}/py/requirements.txt)
+TORCH=$(grep "^torch>" ${PWD}/py/requirements.txt)
 TORCHVISION=$(grep "^torchvision" ${PWD}/py/requirements.txt)
 INDEX_URL=https://download.pytorch.org/whl/${CHANNEL}/${CU_VERSION}
 PLATFORM=$(python -c "import sys; print(sys.platform)")
