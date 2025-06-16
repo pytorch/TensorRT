@@ -1,7 +1,6 @@
 from dataclasses import dataclass, field
 from typing import Any, Collection, Optional, Set, Tuple, Union
 
-import torch
 from torch.fx.node import Target
 from torch_tensorrt._Device import Device
 from torch_tensorrt._enums import EngineCapability, dtype
@@ -145,14 +144,19 @@ class CompilationSettings:
     offload_module_to_cpu: bool = OFFLOAD_MODULE_TO_CPU
 
     def __getstate__(self) -> dict[str, Any]:
+        from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
+            ConverterRegistry,
+        )
+
         state = self.__dict__.copy()
-        state["torch_executed_ops"] = {str(op) for op in state["torch_executed_ops"]}
+        state["torch_executed_ops"] = {
+            op if isinstance(op, str) else ConverterRegistry.qualified_name_or_str(op)
+            for op in state["torch_executed_ops"]
+        }
         return state
 
     def __setstate__(self, state: dict[str, Any]) -> None:
         self.__dict__.update(state)
-        ops_str = self.torch_executed_ops
-        self.torch_executed_ops = {getattr(torch.ops, op) for op in ops_str}
 
 
 _SETTINGS_TO_BE_ENGINE_INVARIANT = (

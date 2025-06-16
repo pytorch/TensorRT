@@ -85,6 +85,41 @@ def test_resnet18_cpu_offload(ir):
 
 
 @pytest.mark.unit
+def test_resnet18_torch_exec_ops(ir):
+    model = models.resnet18(pretrained=True).eval().to("cuda")
+    input = torch.randn((1, 3, 224, 224)).to("cuda")
+
+    compile_spec = {
+        "inputs": [
+            torchtrt.Input(
+                min_shape=(1, 3, 224, 224),
+                opt_shape=(8, 3, 224, 224),
+                max_shape=(16, 3, 224, 224),
+                dtype=torch.float32,
+            )
+        ],
+        "ir": ir,
+        "enabled_precisions": {torch.float32, torch.float16, torch.bfloat16},
+        "min_block_size": 1,
+        "debug": True,
+        "output_format": "exported_program",
+        "cache_built_engines": True,
+        "reuse_cached_engines": True,
+        "torch_executed_ops": {torch.ops.aten.matmul, "torch.ops.aten.add"},
+    }
+
+    trt_mod = torchtrt.compile(model, **compile_spec)
+    cos_sim = cosine_similarity(model(input), trt_mod(input))
+    assertions.assertTrue(
+        cos_sim > COSINE_THRESHOLD,
+        msg=f"Resnet18 TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
+    )
+
+    # Clean up model env
+    torch._dynamo.reset()
+
+
+@pytest.mark.unit
 def test_mobilenet_v2(ir):
     model = models.mobilenet_v2(pretrained=True).eval().to("cuda")
     input = torch.randn((1, 3, 224, 224)).to("cuda")
