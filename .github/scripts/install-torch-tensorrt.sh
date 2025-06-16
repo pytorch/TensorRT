@@ -2,6 +2,7 @@
 set -x
 
 TORCH=$(grep "^torch" ${PWD}/py/requirements.txt)
+TORCHVISION=$(grep "^torchvision" ${PWD}/py/requirements.txt)
 INDEX_URL=https://download.pytorch.org/whl/${CHANNEL}/${CU_VERSION}
 PLATFORM=$(python -c "import sys; print(sys.platform)")
 
@@ -13,6 +14,7 @@ fi
 
 # Install all the dependencies required for Torch-TensorRT
 pip install --pre ${TORCH} --index-url ${INDEX_URL}
+pip install --pre ${TORCHVISION} --index-url ${INDEX_URL}
 pip install --pre -r ${PWD}/tests/py/requirements.txt
 
 # Install Torch-TensorRT

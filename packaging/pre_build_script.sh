@@ -45,7 +45,7 @@ if [[ ${IS_JETPACK} == true ]]; then
     # install torch 2.7 for jp6.2
     pip install torch==2.7.0 --index-url=https://pypi.jetson-ai-lab.dev/jp6/cu126/
 else
-    TORCH=$(grep "^torch" py/requirements.txt)
+    TORCH=$(grep "^torch>" py/requirements.txt)
     INDEX_URL=https://download.pytorch.org/whl/${CHANNEL}/${CU_VERSION}
 
     # Install all the dependencies required for Torch-TensorRT

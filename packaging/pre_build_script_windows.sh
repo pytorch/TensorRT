@@ -25,7 +25,7 @@ if [[ "${CU_VERSION::4}" < "cu12" ]]; then
          pyproject.toml
 fi
 
-TORCH=$(grep "^torch" py/requirements.txt)
+TORCH=$(grep "^torch>" py/requirements.txt)
 INDEX_URL=https://download.pytorch.org/whl/${CHANNEL}/${CU_VERSION}
 
 # Install all the dependencies required for Torch-TensorRT

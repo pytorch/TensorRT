@@ -3,6 +3,7 @@ packaging
 pybind11==2.6.2
 --extra-index-url https://download.pytorch.org/whl/nightly/cu128
 torch>=2.8.0.dev,<2.9.0
+torchvision>=0.22.0.dev,<0.23.0
 --extra-index-url https://pypi.ngc.nvidia.com
 pyyaml
 dllist
