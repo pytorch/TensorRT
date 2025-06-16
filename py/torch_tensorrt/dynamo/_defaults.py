@@ -68,7 +68,7 @@ else:
     current_user = getpass.getuser()
 
 DEBUG_LOGGING_DIR = os.path.join(
-    tempfile.gettempdir(), current_user, "torch_tensorrt/debug_logs"
+    tempfile.gettempdir(), f"torch_tensorrt_{current_user}/debug_logs"
 )
 
 
