@@ -29,6 +29,15 @@ class ConversionContext:
     )
 
     def record_weight(self, name: str, weight: torch.Tensor) -> None:
+        """
+        Record the weight and name for refitting and CPU reference.
+        For the refit map, the key is the weight name that appears in the TRT engine and the value is the weight tensor.
+        For the CPU reference holder, we need to hold the reference to the weight tensor until the whole compilation process is complete.
+
+        Args:
+            name: Name of the weight
+            weight: Weight to record
+        """
         self.weight_refit_map[name] = weight
         self.cpu_weights_reference_holder[name + " CPU_REFERENCE"] = weight
 

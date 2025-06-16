@@ -345,7 +345,7 @@ def to_trt_weights(
         - Input tensors are made contiguous before conversion
         - Data type is preserved from the original tensor/array
     """
-    if isinstance(value, np.ndarray):
+    if not isinstance(value, torch.Tensor):
         raise AssertionError(
             f"to_trt_weights can only be called on torch.Tensor, got an object of type: {type(value)}"
         )
@@ -355,10 +355,10 @@ def to_trt_weights(
     supported_weight_types = ["KERNEL", "BIAS", "CONSTANT"]
     assert (
         layer_type_name in supported_layer_types
-    ), f"Unsupported layer type: {layer_type_name}. Please add the layer type to this function to enable refitting."
+    ), f"Encountered unsupported layer type: {layer_type_name}. Supported types are: {supported_layer_types}. Manually calling to_trt_weights with a custom layer type is not intended for general use."
     assert (
         weight_type_name in supported_weight_types
-    ), f"Unsupported weight type: {weight_type_name}. Please add the weight type to this function to enable refitting."
+    ), f"Encountered unsupported weight type: {weight_type_name}. Supported types are: {supported_weight_types}. Manually calling to_trt_weights with a custom weight type is not intended for general use."
 
     if weight_type_name == "CONSTANT" and layer_type_name == "CONSTANT":
         weight_name = f"{name} CONSTANT"

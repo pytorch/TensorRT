@@ -55,7 +55,15 @@ def convNd(
     # Process bias terms
     if isinstance(bias, (torch.Tensor, np.ndarray)):
         bias = to_torch(bias, dtype=input.dtype)
-        bias = get_trt_tensor(ctx, bias, f"{name}_bias")
+        bias = to_trt_weights(
+            ctx,
+            bias,
+            name,
+            layer_type_name="CONVOLUTION",
+            weight_type_name="BIAS",
+            target=target,
+            source_ir=source_ir,
+        )
 
     elif isinstance(bias, TRTTensor):
         bias = get_trt_tensor(ctx, bias, f"{name}_bias")
