@@ -86,13 +86,12 @@ def deconvNd(
         num_output_maps = weight.shape[1]
         kernel_shape = weight.shape[2:]
         weight = to_trt_weights(
+            ctx,
             weight,
-            record_weight=True,
-            name=name,
-            ctx=ctx,
-            target=target,
-            layer_type_name="DECONVOLUTION",
+            name,
+            layer_type_name="CONVOLUTION",
             weight_type_name="KERNEL",
+            target=target,
             source_ir=source_ir,
         )
 
