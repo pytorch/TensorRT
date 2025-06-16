@@ -1,3 +1,34 @@
+"""
+.. aot_plugin:
+Automatically Generate a TensorRT AOT Plugin 
+===================================================================
+We are going to demonstrate how to automatically generate a plugin for a custom kernel using Torch-TensorRT using
+the new Python based plugin system in TensorRT 10.7.
+
+Torch-TensorRT supports falling back to PyTorch implementations of operations in the case that Torch-TensorRT
+does not know how to compile them in TensorRT. However, this comes at the cost of a graph break and will reduce the performance of the model.
+The easiest way to fix lack of support for ops is by adding a decomposition (see:
+`Writing lowering passes for the Dynamo frontend <https://pytorch.org/TensorRT/contributors/writing_dynamo_aten_lowering_passes.html>`_) - which defines the operator
+in terms of PyTorch ops that are supported in Torch-TensorRT or a converter (see:
+`Writing converters for the Dynamo frontend <https://pytorch.org/TensorRT/contributors/dynamo_converters.html>`_) - which defines the operator in terms of TensorRT operators.
+
+In some cases there isn't a great way to do either of these, perhaps because the operator is a custom kernel that is not part of standard PyTorch or
+TensorRT cannot support it natively.
+
+For these cases, it is possible to use a TensorRT plugin to replace the operator **inside** the TensorRT engine, thereby avoiding
+the performance and resource overhead from a graph break.
+
+Previously this involved a complex process in not only building a performant kernel but setting it up to run in TensorRT (see: `Using Custom Kernels within TensorRT Engines with Torch-TensorRT <https://pytorch.org/TensorRT/tutorials/_rendered_examples/dynamo/custom_kernel_plugins.html>`_).
+As of TensorRT 10.7, there is a new Python native plugin system which greatly streamlines this process. This
+plugin system also allows Torch-TensorRT to automatically generate the necessary conversion code to convert the
+operation in PyTorch to TensorRT.
+
+In addition, Torch-TensorRT provides automatic generation of TensorRT plugin feature (see: `Automatically Generate a Plugin for a Custom Kernel <https://docs.pytorch.org/TensorRT/tutorials/_rendered_examples/dynamo/auto_generate_plugins.html>`_).
+However, the above methods generates a JIT plugin that might not satisfy user's performance requirements.
+To support that, Torch-TensorRT provides auto generation of TensorRT AOT Plugin which raps a function to define an Ahead-of-Time (AOT) implementation for a plugin already registered.
+This provides a performance boost comparing to JIT plugin.
+"""
+
 import argparse
 from typing import Tuple, Union
 
