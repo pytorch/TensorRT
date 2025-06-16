@@ -1,7 +1,7 @@
 #set -exou pipefail
 set -x
 
-TORCH_TORCHVISION=$(grep "^torch" ${PWD}/py/requirements.txt)
+TORCH=$(grep "^torch" ${PWD}/py/requirements.txt)
 INDEX_URL=https://download.pytorch.org/whl/${CHANNEL}/${CU_VERSION}
 PLATFORM=$(python -c "import sys; print(sys.platform)")
 
@@ -12,7 +12,7 @@ if [[ $(uname -m) == "aarch64" ]]; then
 fi
 
 # Install all the dependencies required for Torch-TensorRT
-pip install --pre ${TORCH_TORCHVISION} --index-url ${INDEX_URL}
+pip install --pre ${TORCH} --index-url ${INDEX_URL}
 pip install --pre -r ${PWD}/tests/py/requirements.txt
 
 # Install Torch-TensorRT

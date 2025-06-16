@@ -1,14 +1,23 @@
-import unittest
-import torch_tensorrt as torchtrt
-import torch
-import torchvision.models as models
 import copy
-import timm
+import importlib
+import unittest
 from typing import Dict
-from utils import cosine_similarity, COSINE_THRESHOLD
+
+import torch
+import torch_tensorrt as torchtrt
+from utils import COSINE_THRESHOLD, cosine_similarity
+
+if importlib.util.find_spec("torchvision"):
+    import torchvision.models as models
+
+if importlib.util.find_spec("timm"):
+    import timm
 
 
 class TestModelToEngineToModel(unittest.TestCase):
+    @unittest.skipIf(
+        not importlib.util.find_spec("torchvision"), "torchvision not installed"
+    )
     def test_resnet50(self):
         self.model = models.resnet50(pretrained=True).eval().to("cuda")
         self.input = torch.randn((1, 3, 224, 224)).to("cuda")
@@ -37,6 +46,7 @@ class TestModelToEngineToModel(unittest.TestCase):
             msg=f"Resnet50 TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
         )
 
+    @unittest.skipIf(not importlib.util.find_spec("timm"), "timm not installed")
     def test_efficientnet_b0(self):
         self.model = (
             timm.create_model("efficientnet_b0", pretrained=True).eval().to("cuda")

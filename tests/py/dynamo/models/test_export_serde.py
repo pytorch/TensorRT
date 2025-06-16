@@ -1,3 +1,4 @@
+import importlib
 import os
 import tempfile
 import unittest
@@ -5,7 +6,6 @@ import unittest
 import pytest
 import torch
 import torch_tensorrt as torchtrt
-import torchvision.models as models
 from torch_tensorrt.dynamo.utils import (
     COSINE_THRESHOLD,
     cosine_similarity,
@@ -13,6 +13,8 @@ from torch_tensorrt.dynamo.utils import (
 )
 
 assertions = unittest.TestCase()
+if importlib.util.find_spec("torchvision"):
+    import torchvision.models as models
 
 trt_ep_path = os.path.join(tempfile.gettempdir(), "trt.ep")
 
@@ -247,6 +249,10 @@ def test_hybrid_relu_fallback(ir):
 
 
 @pytest.mark.unit
+@unittest.skipIf(
+    not importlib.util.find_spec("torchvision"),
+    "torchvision is not installed",
+)
 def test_resnet18(ir):
     """
     This tests export save and load functionality on Resnet18 model
@@ -288,6 +294,10 @@ def test_resnet18(ir):
 
 
 @pytest.mark.unit
+@unittest.skipIf(
+    not importlib.util.find_spec("torchvision"),
+    "torchvision is not installed",
+)
 def test_resnet18_cpu_offload(ir):
     """
     This tests export save and load functionality on Resnet18 model
@@ -335,6 +345,10 @@ def test_resnet18_cpu_offload(ir):
 
 
 @pytest.mark.unit
+@unittest.skipIf(
+    not importlib.util.find_spec("torchvision"),
+    "torchvision is not installed",
+)
 def test_resnet18_dynamic(ir):
     """
     This tests export save and load functionality on Resnet18 model
