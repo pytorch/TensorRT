@@ -71,7 +71,7 @@ class _CudagraphsContextManager(object):
         self.cudagraphs_module: Optional[CudaGraphsTorchTensorRTModule] = None
         self.old_module = None
 
-    def __enter__(self) -> torch.nn.Module | torch.fx.GraphModule:
+    def __enter__(self) -> Union[torch.nn.Module, torch.fx.GraphModule]:
 
         if isinstance(self.compiled_module, torch_tensorrt.MutableTorchTensorRTModule):
             self.old_module = self.compiled_module.gm
@@ -92,7 +92,7 @@ class _CudagraphsContextManager(object):
 
 def get_cuda_graph_module(
     compiled_module: torch.fx.GraphModule,
-) -> torch.nn.Module | torch.fx.GraphModule:
+) -> Union[torch.nn.Module, torch.fx.GraphModule]:
     global _PY_RT_CUDAGRAPHS
 
     num_torch_module = 0

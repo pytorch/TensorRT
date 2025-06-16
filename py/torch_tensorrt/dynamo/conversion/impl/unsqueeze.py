@@ -22,11 +22,13 @@ def unsqueeze(
     input: TRTTensor,
     dim: int,
 ) -> TRTTensor:
-    from importlib.metadata import version
+    from importlib import metadata
 
-    if version("tensorrt") < "10.7.0":
+    from packaging.version import Version
+
+    if Version(metadata.version("tensorrt")) < Version("10.7.0"):
         logger.warning(
-            f"IUnsqueezeLayer is supported starting from TensorRT 10.7.0, using the old unsqueeze implementation in the current TensorRT version: {version('tensorrt')}"
+            f"IUnsqueezeLayer is supported starting from TensorRT 10.7.0, using the old unsqueeze implementation in the current TensorRT version: {metadata.version('tensorrt')}"
         )
         return unsqueeze_old(ctx, target, source_ir, name, input, dim)
     axes = get_trt_tensor(ctx, dim, f"{name}_axes")
