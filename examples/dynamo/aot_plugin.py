@@ -1,6 +1,6 @@
 """
 .. aot_plugin:
-Automatically Generate a TensorRT AOT Plugin 
+Automatically Generate a TensorRT AOT Plugin
 ===================================================================
 We are going to demonstrate how to automatically generate a plugin for a custom kernel using Torch-TensorRT using
 the new Python based plugin system in TensorRT 10.7.
