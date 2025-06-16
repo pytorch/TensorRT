@@ -155,7 +155,7 @@ jobs:
           path: ${{ env.RUNNER_TEST_RESULTS_DIR }}/**/*.xml
           summary: true
           display-options: fEs
-          fail-on-empty: false
+          fail-on-empty: true
 
       - name: Prepare artifacts for upload
         working-directory: ${{ inputs.repository }}
