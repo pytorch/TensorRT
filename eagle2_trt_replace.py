@@ -119,8 +119,7 @@ def compile_submodules(base_model, device="cuda:1"):
     dummy_seq = 2050
     dummy_embeds = torch.randn(1, dummy_seq, hidden_size, dtype=torch.float16, device=device)
 
-    # B3 = torch.export.Dim("batch3", min=1, max=4)
-    S3 = torch.export.Dim("seq_lm", min=2048, max=2559)
+    S3 = torch.export.Dim("seq_lm", min=2048, max=2560)
     dyn_shapes_lm = {
         "inputs_embeds": {1: S3},
     }
@@ -142,9 +141,7 @@ def compile_submodules(base_model, device="cuda:1"):
         use_explicit_typing=True,
         use_fp32_acc=True,
     )
-        # enabled_precisions = {torch.float32}
-        # use_fp32_acc = True 
-        # use_explicit_typing = True
+
     trt_lm_wrapper = TRTLanguageWrapper(trt_lm, base_model.language_model, device)
 
     return vision_model, mlp1, trt_lm_wrapper # trt_vis, trt_mlp1, trt_lm_wrapper
@@ -209,149 +206,146 @@ def build_trt_model(device="cuda:1"):
     base_model, processor = load_base(device)
     base_model.config.use_cache = False
     
-    trt_vis, trt_mlp1, trt_lm = compile_submodules(base_model, device) # None, None, None # 
+    trt_vis, trt_mlp1, trt_lm = None, None, None #compile_submodules(base_model, device)
 
     trt_model = copy.deepcopy(base_model)
     trt_model.vision_model = trt_vis
     trt_model.mlp1 = trt_mlp1
     trt_model.language_model = trt_lm
-############################################################################################################################################
-    # def paligemma_style_forward(
-    #     self,
-    #     pixel_values=None,
-    #     input_ids=None,
-    #     attention_mask=None,
-    #     position_ids=None,
-    #     past_key_values=None,
-    #     use_cache=None,
-    #     output_attentions=None,
-    #     output_hidden_states=None,
-    #     return_dict=None,
-    #     **kwargs,
-    # ):
-    #     """Forward pass that extracts visual features once and re-uses them on later decoding steps."""
 
-    #     return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+    def paligemma_style_forward(
+        self,
+        pixel_values=None,
+        input_ids=None,
+        attention_mask=None,
+        position_ids=None,
+        past_key_values=None,
+        use_cache=None,
+        output_attentions=None,
+        output_hidden_states=None,
+        return_dict=None,
+        **kwargs,
+    ):
+        """Forward pass that extracts visual features once and re-uses them on later decoding steps."""
 
-    #     # 1) Visual features (ViT) – run once then cache
-    #     vit_embeds = None
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+
+        # 1) Visual features (ViT) – run once then cache
+        vit_embeds = None
         
-    #     if pixel_values is not None:
-    #         # --- Vision encoder timing ---
-    #         vis_s = torch.cuda.Event(enable_timing=True); vis_e = torch.cuda.Event(enable_timing=True)
-    #         vis_s.record()
-    #         vit_out = self.vision_model(pixel_values=pixel_values.to(torch.float16)) # , output_hidden_states=False, return_dict=True)
-    #         vis_e.record(); torch.cuda.synchronize()
-    #         PROF_TIMINGS["vis"] += vis_s.elapsed_time(vis_e) / 1000.0
+        if pixel_values is not None:
+            # --- Vision encoder timing ---
+            vis_s = torch.cuda.Event(enable_timing=True); vis_e = torch.cuda.Event(enable_timing=True)
+            vis_s.record()
+            vit_out = self.vision_model(pixel_values=pixel_values.to(torch.float16)) # , output_hidden_states=False, return_dict=True)
+            vis_e.record(); torch.cuda.synchronize()
+            PROF_TIMINGS["vis"] += vis_s.elapsed_time(vis_e) / 1000.0
 
-    #         vit_embeds = vit_out.last_hidden_state if hasattr(vit_out, "last_hidden_state") else vit_out
+            vit_embeds = vit_out.last_hidden_state if hasattr(vit_out, "last_hidden_state") else vit_out
 
-    #         # pixel-shuffle + downsample (same math as original extract_feature)
-    #         h = w = int(vit_embeds.shape[1] ** 0.5)
-    #         vit_embeds = vit_embeds.reshape(vit_embeds.shape[0], h, w, -1)
-    #         vit_embeds = self.pixel_shuffle(vit_embeds, scale_factor=self.downsample_ratio)
-    #         vit_embeds = vit_embeds.reshape(vit_embeds.shape[0], -1, vit_embeds.shape[-1])
+            # pixel-shuffle + downsample (same math as original extract_feature)
+            h = w = int(vit_embeds.shape[1] ** 0.5)
+            vit_embeds = vit_embeds.reshape(vit_embeds.shape[0], h, w, -1)
+            vit_embeds = self.pixel_shuffle(vit_embeds, scale_factor=self.downsample_ratio)
+            vit_embeds = vit_embeds.reshape(vit_embeds.shape[0], -1, vit_embeds.shape[-1])
 
-    #         # --- MLP timing ---
-    #         mlp_s = torch.cuda.Event(enable_timing=True); mlp_e = torch.cuda.Event(enable_timing=True)
-    #         mlp_s.record()
-    #         vit_embeds = self.mlp1(vit_embeds)
-    #         mlp_e.record(); torch.cuda.synchronize()
-    #         PROF_TIMINGS["mlp"] += mlp_s.elapsed_time(mlp_e) / 1000.0
+            # --- MLP timing ---
+            mlp_s = torch.cuda.Event(enable_timing=True); mlp_e = torch.cuda.Event(enable_timing=True)
+            mlp_s.record()
+            vit_embeds = self.mlp1(vit_embeds)
+            mlp_e.record(); torch.cuda.synchronize()
+            PROF_TIMINGS["mlp"] += mlp_s.elapsed_time(mlp_e) / 1000.0
 
-    #         self._cached_visual_features = vit_embeds
-    #     else:
-    #         vit_embeds = getattr(self, "_cached_visual_features", None)
+            self._cached_visual_features = vit_embeds
+        else:
+            vit_embeds = getattr(self, "_cached_visual_features", None)
 
-    #     # 2) Text token embeddings
-    #     input_embeds = self.language_model.get_input_embeddings()(input_ids)
+        # 2) Text token embeddings
+        input_embeds = self.language_model.get_input_embeddings()(input_ids)
 
-    #     if vit_embeds is not None:
-    #         B, N, C = input_embeds.shape
-    #         flat_emb = input_embeds.view(B * N, C)
+        if vit_embeds is not None:
+            B, N, C = input_embeds.shape
+            flat_emb = input_embeds.view(B * N, C)
             
-    #         mask = (input_ids.view(B * N) == self.image_token_index)
-    #         try:
-    #             flat_emb[mask] = vit_embeds.reshape(-1, C).to(flat_emb.dtype)[: mask.sum()]
-    #         except Exception:
-    #             # Fallback in unlikely size-mismatch cases
-    #             flat_emb[mask] = vit_embeds.reshape(-1, C)[: mask.sum()].to(flat_emb.dtype)
-    #         input_embeds = flat_emb.view(B, N, C)
-    #         print(f"After insertion: input_embeds min={input_embeds.min()}, max={input_embeds.max()}")
+            mask = (input_ids.view(B * N) == self.image_token_index)
+            try:
+                flat_emb[mask] = vit_embeds.reshape(-1, C).to(flat_emb.dtype)[: mask.sum()]
+            except Exception:
+                # Fallback in unlikely size-mismatch cases
+                flat_emb[mask] = vit_embeds.reshape(-1, C)[: mask.sum()].to(flat_emb.dtype)
+            input_embeds = flat_emb.view(B, N, C)
+            print(f"After insertion: input_embeds min={input_embeds.min()}, max={input_embeds.max()}")
             
-    #     # 4) Delegate to language model (time this call separately)
-    #     # if position_ids is None:
-    #     #     position_ids = torch.arange(input_ids.shape[1], device=input_ids.device).unsqueeze(0).expand(B, -1)
-    #     # lm_out = self.language_model(inputs_embeds=input_embeds, position_ids=position_ids, **lm_kwargs)
+        # 4) Delegate to language model (time this call separately)
+        # if position_ids is None:
+        #     position_ids = torch.arange(input_ids.shape[1], device=input_ids.device).unsqueeze(0).expand(B, -1)
+        # lm_out = self.language_model(inputs_embeds=input_embeds, position_ids=position_ids, **lm_kwargs)
 
-    #     lm_kwargs = {
-    #         "attention_mask": attention_mask,
-    #         "position_ids": position_ids,
-    #         "past_key_values": past_key_values,
-    #         "use_cache": use_cache if use_cache is not None else False,
-    #         "output_attentions": output_attentions,
-    #         "output_hidden_states": output_hidden_states,
-    #         "return_dict": return_dict,
-    #     }
+        lm_kwargs = {
+            "attention_mask": attention_mask,
+            "position_ids": position_ids,
+            "past_key_values": past_key_values,
+            "use_cache": use_cache if use_cache is not None else False,
+            "output_attentions": output_attentions,
+            "output_hidden_states": output_hidden_states,
+            "return_dict": return_dict,
+        }
 
         
-    #     lm_kwargs.update({k: v for k, v in kwargs.items() if k != "inputs_embeds"})
+        lm_kwargs.update({k: v for k, v in kwargs.items() if k != "inputs_embeds"})
 
-    #     # --- Language model timing ---
-    #     start_lm = torch.cuda.Event(enable_timing=True); end_lm = torch.cuda.Event(enable_timing=True)
-    #     start_lm.record()
-    #     lm_out = self.language_model(inputs_embeds=input_embeds, **lm_kwargs)
-    #     end_lm.record(); torch.cuda.synchronize()
-    #     step_s = start_lm.elapsed_time(end_lm) / 1000.0
-    #     PROF_TIMINGS["lm"] += step_s
-    #     STEP_TIMINGS["lm"].append(step_s)
+        # --- Language model timing ---
+        start_lm = torch.cuda.Event(enable_timing=True); end_lm = torch.cuda.Event(enable_timing=True)
+        start_lm.record()
+        lm_out = self.language_model(inputs_embeds=input_embeds, **lm_kwargs)
+        end_lm.record(); torch.cuda.synchronize()
+        step_s = start_lm.elapsed_time(end_lm) / 1000.0
+        PROF_TIMINGS["lm"] += step_s
+        STEP_TIMINGS["lm"].append(step_s)
 
-    #     return lm_out
+        return lm_out
 
-    # def prepare_inputs_for_generation(self, input_ids, attention_mask=None, **model_kwargs):
-    #     model_inputs = {
-    #         "input_ids": input_ids,
-    #     }
-    #     if "pixel_values" in model_kwargs and "pixel_values" not in model_inputs:
-    #         model_inputs["pixel_values"] = model_kwargs["pixel_values"]
-    #     # print("Inputs prepared:", {k: v.shape for k, v in model_inputs.items()})
-    #     return model_inputs
+    def prepare_inputs_for_generation(self, input_ids, attention_mask=None, **model_kwargs):
+        model_inputs = {
+            "input_ids": input_ids,
+        }
+        if "pixel_values" in model_kwargs and "pixel_values" not in model_inputs:
+            model_inputs["pixel_values"] = model_kwargs["pixel_values"]
+        # print("Inputs prepared:", {k: v.shape for k, v in model_inputs.items()})
+        return model_inputs
     
-    # import types
-    # base_model.prepare_inputs_for_generation = types.MethodType(prepare_inputs_for_generation, base_model)
+    import types
+    base_model.prepare_inputs_for_generation = types.MethodType(prepare_inputs_for_generation, base_model)
 
-    # import types
-    # trt_model.forward = types.MethodType(paligemma_style_forward, trt_model)
-############################################################################################################################################
+    import types
+    trt_model.forward = types.MethodType(paligemma_style_forward, trt_model)
+
     # ------------------------------------------------------------------
     # NEW: ensure `pixel_values` is only used at the very first decoding
     #       step by stripping it from `model_kwargs` after step-0. This
     #       prevents the ViT path from running on every autoregressive
     #       iteration.
     # ------------------------------------------------------------------
-    # def _update_model_kwargs_for_generation(self, outputs, model_kwargs, is_encoder_decoder=False, num_new_tokens=1):
-    #     """Wrap the default GenerationMixin helper but drop `pixel_values`."""
-    #     # Call the vanilla helper from GenerationMixin to handle cache & masks
-    #     model_kwargs = GenerationMixin._update_model_kwargs_for_generation(
-    #         self, outputs, model_kwargs, is_encoder_decoder=is_encoder_decoder, num_new_tokens=num_new_tokens
-    #     )
-    #     # After the first step, `pixel_values` is no longer needed.
-    #     model_kwargs.pop("pixel_values", None)
-    #     return model_kwargs
+    def _update_model_kwargs_for_generation(self, outputs, model_kwargs, is_encoder_decoder=False, num_new_tokens=1):
+        """Wrap the default GenerationMixin helper but drop `pixel_values`."""
+        # Call the vanilla helper from GenerationMixin to handle cache & masks
+        model_kwargs = GenerationMixin._update_model_kwargs_for_generation(
+            self, outputs, model_kwargs, is_encoder_decoder=is_encoder_decoder, num_new_tokens=num_new_tokens
+        )
+        # After the first step, `pixel_values` is no longer needed.
+        model_kwargs.pop("pixel_values", None)
+        return model_kwargs
 
-    # # Bind the method to the TRTT-wrapped model instance.
-    # trt_model._update_model_kwargs_for_generation = types.MethodType(_update_model_kwargs_for_generation, trt_model)
+    # Bind the method to the TRTT-wrapped model instance.
+    trt_model._update_model_kwargs_for_generation = types.MethodType(_update_model_kwargs_for_generation, trt_model)
 
     print("TensorRT-integrated model built")
 
-    # # 이미 정의돼 있는 paligemma_style_forward, _update_model_kwargs_for_generation 재사용
-    # base_model.forward = types.MethodType(paligemma_style_forward, base_model)
-    # base_model._update_model_kwargs_for_generation = types.MethodType(
-    #     _update_model_kwargs_for_generation, base_model
-    # )
-
-############################################################################################################################################
-
+    # 이미 정의돼 있는 paligemma_style_forward, _update_model_kwargs_for_generation 재사용
+    base_model.forward = types.MethodType(paligemma_style_forward, base_model)
+    base_model._update_model_kwargs_for_generation = types.MethodType(
+        _update_model_kwargs_for_generation, base_model
+    )
     base_model.config.use_cache = False
 
     return base_model, trt_model, processor
@@ -368,9 +362,8 @@ if __name__ == "__main__":
     image = Image.open(requests.get(url, stream=True).raw)
 
     # Build a 230-word placeholder prompt ("token token …") so that ISL totals 256 tokens after template overhead.
-    prompt_tokens = "Describe the image." # ["token"] * 230
-    # prompt_text = " ".join(prompt_tokens)
-    prompt_text = prompt_tokens
+    prompt_tokens = ["token"] * 230
+    prompt_text = " ".join(prompt_tokens)
 
     messages = [{
         "role": "user",
@@ -404,7 +397,7 @@ if __name__ == "__main__":
     # Ensure dtypes are what PyTorch-SDPA expects
     if "attention_mask" in model_inputs and model_inputs["attention_mask"].dtype != torch.bool:
         model_inputs["attention_mask"] = model_inputs["attention_mask"].bool()
-    # model_inputs["attention_mask"] = None
+    model_inputs["attention_mask"] = None
 
     # Ensure pixel_values are fp16 and drop unused keys
     if "pixel_values" in model_inputs and model_inputs["pixel_values"].dtype != torch.float16:
@@ -427,8 +420,6 @@ if __name__ == "__main__":
         end = torch.cuda.Event(enable_timing=True)
 
         start.record()
-        if label == "TensorRT":
-            model_inputs["attention_mask"] = None
         with torch.inference_mode():
             out = model.generate(**model_inputs, **gen_kwargs)
         end.record()
@@ -436,8 +427,8 @@ if __name__ == "__main__":
 
         runtime_s = start.elapsed_time(end) / 1000.0  # milliseconds → seconds
         # Decode *only* the tokens that the model actually generated (exclude the prompt).
-        # gen_only = out[:, model_inputs["input_ids"].shape[1]:]  # slice away the input sequence (ISL)
-        text_out = processor.batch_decode(out, skip_special_tokens=True)[0]
+        gen_only = out[:, model_inputs["input_ids"].shape[1]:]  # slice away the input sequence (ISL)
+        text_out = processor.batch_decode(gen_only, skip_special_tokens=True)[0]
 
         # Breakdown timings (seconds)
         vis_t = PROF_TIMINGS.get("vis", 0.0)
