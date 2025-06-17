@@ -5,10 +5,8 @@ import os
 import custom_models as cm
 import torch
 
-if importlib.util.find_spec("timm"):
-    import timm
-
 if importlib.util.find_spec("torchvision"):
+    import timm
     import torchvision.models as models
 
 torch.hub._validate_not_a_forked_repo = lambda a, b, c: True
@@ -115,6 +113,14 @@ def main():
             ),
             "path": "both",
         },
+        "efficientnet_b0": {
+            "model": timm.create_model("efficientnet_b0", pretrained=True),
+            "path": "script",
+        },
+        "vit": {
+            "model": timm.create_model("vit_base_patch16_224", pretrained=True),
+            "path": "script",
+        },
         "pooling": {"model": cm.Pool(), "path": "trace"},
         "module_fallback": {"model": cm.ModuleFallbackMain(), "path": "script"},
         "loop_fallback_eval": {"model": cm.LoopFallbackEval(), "path": "script"},
@@ -132,15 +138,6 @@ def main():
         },
         # "bert_base_uncased": {"model": cm.BertModule(), "path": "trace"},
     }
-    if importlib.util.find_spec("timm"):
-        models["efficientnet_b0"] = {
-            "model": timm.create_model("efficientnet_b0", pretrained=True),
-            "path": "script",
-        }
-        models["vit"] = {
-            "model": timm.create_model("vit_base_patch16_224", pretrained=True),
-            "path": "script",
-        }
 
     manifest = None
     version_matches = False

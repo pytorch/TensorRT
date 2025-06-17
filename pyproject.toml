@@ -8,13 +8,13 @@ requires = [
     "cffi>=1.15.1",
     "typing-extensions>=4.7.0",
     "future>=0.18.3",
-    "tensorrt-cu12>=10.11.0,<10.12.0; 'tegra' not in platform_release",
-    "tensorrt>=10.3.0,<10.4.0; 'tegra' in platform_release",
-    "torch>=2.8.0.dev,<2.9.0; 'tegra' not in platform_release",
-    "torch>=2.7.0,<2.8.0; 'tegra' in platform_release",
+    "tensorrt-cu12>=10.11.0,<10.12.0; platform_machine != 'aarch64' or (platform_machine == 'aarch64' and 'tegra' not in platform_release)",
+    "tensorrt-cu12>=10.3.0,<10.4.0; platform_machine == 'aarch64' and 'tegra' in platform_release",
+    "torch>=2.8.0.dev,<2.9.0; platform_machine != 'aarch64' or (platform_machine == 'aarch64' and 'tegra' not in platform_release)",
+    "torch>=2.7.0,<2.8.0; platform_machine == 'aarch64' and 'tegra' in platform_release",
     "pybind11==2.6.2",
-    "numpy; 'tegra' not in platform_release",
-    "numpy<2.0.0; 'tegra' in platform_release",
+    "numpy; platform_machine != 'aarch64' or (platform_machine == 'aarch64' and 'tegra' not in platform_release)",
+    "numpy<2.0.0; platform_machine == 'aarch64' and 'tegra' in platform_release",
     "sympy",
     "dllist",
 ]
@@ -59,20 +59,23 @@ keywords = [
     "inference",
 ]
 dependencies = [
-    "torch>=2.8.0.dev,<2.9.0; 'tegra' not in platform_release",
-    "torch>=2.7.0,<2.8.0; 'tegra' in platform_release",
+    "torch>=2.8.0.dev,<2.9.0; platform_machine != 'aarch64' or (platform_machine == 'aarch64' and 'tegra' not in platform_release)",
+    "torch>=2.7.0,<2.8.0; platform_machine == 'aarch64' and 'tegra' in platform_release",
 
-    "tensorrt>=10.11.0,<10.12.0; 'tegra' not in platform_release",
-    "tensorrt>=10.3.0,<10.4.0; 'tegra' in platform_release",
+    "tensorrt>=10.11.0,<10.12.0; platform_machine != 'aarch64' or (platform_machine == 'aarch64' and 'tegra' not in platform_release)",
+    "tensorrt-cu12>=10.11.0,<10.12.0; platform_machine != 'aarch64' or (platform_machine == 'aarch64' and 'tegra' not in platform_release)",
+    "tensorrt-cu12-bindings>=10.11.0,<10.12.0; platform_machine != 'aarch64' or (platform_machine == 'aarch64' and 'tegra' not in platform_release)",
+    "tensorrt-cu12-libs>=10.11.0,<10.12.0; platform_machine != 'aarch64' or (platform_machine == 'aarch64' and 'tegra' not in platform_release)",
 
-    "tensorrt-cu12>=10.11.0,<10.12.0; 'tegra' not in platform_release",
-    "tensorrt-cu12-bindings>=10.11.0,<10.12.0; 'tegra' not in platform_release",
-    "tensorrt-cu12-libs>=10.11.0,<10.12.0; 'tegra' not in platform_release",
+    "tensorrt>=10.3.0,<10.4.0;platform_machine == 'aarch64' and 'tegra' in platform_release",
+    "tensorrt-cu12>=10.3.0,<10.4.0; platform_machine == 'aarch64' and 'tegra' in platform_release",
+    "tensorrt-cu12-bindings>=10.3.0,<10.4.0; platform_machine == 'aarch64' and 'tegra' in platform_release",
+    "tensorrt-cu12-libs>=10.3.0,<10.4.0; platform_machine == 'aarch64' and 'tegra' in platform_release",
 
     "packaging>=23",
 
-    "numpy; 'tegra' not in platform_release",
-    "numpy<2.0.0; 'tegra' in platform_release",
+    "numpy; platform_machine != 'aarch64' or (platform_machine == 'aarch64' and 'tegra' not in platform_release)",
+    "numpy<2.0.0; platform_machine == 'aarch64' and 'tegra' in platform_release",
 
     "typing-extensions>=4.7.0",
     "dllist",
@@ -89,10 +92,6 @@ dev = [
     "mypy",
     "isort",
     "ruff",
-    "pytest",
-    "pytest-xdist",
-    "parameterized>=0.2.0",
-    "expecttest==0.1.6",
     "pyyaml",
 ]
 
@@ -102,13 +101,21 @@ debug = [
     "graphviz >= 0.20.3"
 ]
 
+test = [
+    "pytest",
+    "pytest-xdist",
+    "parameterized>=0.2.0",
+    "expecttest==0.1.6",
+    "timm>=1.0.3",
+    "transformers>=4.49.0",
+]
+
 [project.optional-dependencies]
 torchvision = [
-    "torchvision",
-] #Leaving torchvisions dependency unconstrained so uv can just install something that should work for the torch we have. TV's on PyT makes it hard to put version constrains in
+    "torchvision>=0.23.0.dev,<0.24.0; platform_machine != 'aarch64' or (platform_machine == 'aarch64' and 'tegra' not in platform_release)",
+    "torchvision>=0.22.0,<0.23.0; platform_machine == 'aarch64' and 'tegra' in platform_release",
+]
 quantization = ["nvidia-modelopt[all]>=0.27.1"]
-monitoring-tools = ["rich>=13.7.1"]
-jupyter = ["rich[jupyter]>=13.7.1"]
 
 [project.urls]
 Homepage = "https://pytorch.org/tensorrt"
@@ -124,15 +131,26 @@ include-package-data = false
 package = true
 environments = ["sys_platform == 'linux'", "sys_platform == 'windows'"]
 prerelease = "if-necessary-or-explicit"
-index-strategy = "unsafe-best-match"                                    # Needed for TRT-LLM
+index-strategy = "unsafe-best-match"
 
 [tool.uv.sources]
-torch = [{ index = "pytorch-nightly-cu128" }]
-torchvision = [{ index = "pytorch-nightly-cu128" }]
+torch = [
+    { index = "pytorch-nightly-cu128", marker = "platform_machine != 'aarch64' or (platform_machine == 'aarch64' and 'tegra' not in platform_release)" },
+    { index = "jetson-containers", marker = "platform_machine == 'aarch64' and 'tegra' in platform_release" },
+]
+torchvision = [
+    { index = "pytorch-nightly-cu128", marker = "platform_machine != 'aarch64' or (platform_machine == 'aarch64' and 'tegra' not in platform_release)" },
+    { index = "jetson-containers", marker = "platform_machine == 'aarch64' and 'tegra' in platform_release" },
+]
 
 [[tool.uv.index]]
 name = "pytorch-nightly-cu128"
 url = "https://download.pytorch.org/whl/nightly/cu128"
+explicit = false
+
+[[tool.uv.index]]
+name = "jetson-containers"
+url = "https://pypi.jetson-ai-lab.dev/jp6/cu126/+simple"
 explicit = false
 
 [[tool.uv.index]]
