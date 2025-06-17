@@ -73,7 +73,6 @@ def main():
     # 1. Partition the model into blocks that can be executed by different backends
     partitioned_model, op_support = hierarchical_adjacency_partition(
         gm,
-        verbose=True,
         min_block_size=1,
         backend_priority=["inductor", "tensorrt"],
         backend_support_map={

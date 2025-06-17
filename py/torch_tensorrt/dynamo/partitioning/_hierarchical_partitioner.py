@@ -18,7 +18,6 @@ from torch.fx.passes.tools_common import (
     is_node_output_tensor,
 )
 from torch_tensorrt.dynamo._defaults import (
-    DEBUG,
     MIN_BLOCK_SIZE,
     REQUIRE_FULL_COMPILATION,
 )
@@ -390,8 +389,8 @@ class HierarchicalAdjacencyPartitioner(_SplitterBase):  # type: ignore
 
         return subgraphs
 
-    def tag(self, subgraphs: list[Subgraph]):
-        self.tags = []
+    def tag(self, subgraphs: list[Subgraph]) -> None:
+        self.tags: list[str] = []
         for subgraph in subgraphs:
             tag = (
                 f"_run_on_acc_{subgraph.backend}_{len(self.tags)}"
@@ -403,7 +402,7 @@ class HierarchicalAdjacencyPartitioner(_SplitterBase):  # type: ignore
                 if hasattr(node, "tag"):
                     raise FxNetSplitterInternalError(f"Node {node} was already tagged")
 
-                node.tag = tag  # type: ignore[attr-defined]
+                node.tag = tag
                 self._node_submodule_map[node.name] = tag
 
 
@@ -433,7 +432,7 @@ class FxNetAccNodesFinder:
         self.allow_non_tensor = allow_non_tensor
         self.acc_nodes: NodeSet = set()
 
-    def reduce_acc_nodes_non_tensor_input_helper(self, cpu_worklist: NodeList):
+    def reduce_acc_nodes_non_tensor_input_helper(self, cpu_worklist: NodeList) -> None:
         """
         Transitively excludes nodes from ACC supported set.
         For every node in the worklist:
@@ -450,7 +449,7 @@ class FxNetAccNodesFinder:
                     if not is_node_output_tensor(user):
                         cpu_worklist.append(user)
 
-    def reduce_acc_nodes_non_tensor_input(self):
+    def reduce_acc_nodes_non_tensor_input(self) -> None:
         """
         Excludes nodes from ACC supported set that have direct
         upstream CPU nodes that produce non-tensor outputs.
@@ -468,7 +467,7 @@ class FxNetAccNodesFinder:
 
         self.reduce_acc_nodes_non_tensor_input_helper(non_tensor_cpu_nodes)
 
-    def reduce_acc_nodes_non_tensor_output(self):
+    def reduce_acc_nodes_non_tensor_output(self) -> None:
         """
         Excludes nodes from ACC supported set that produce non-tensor
         outputs and have downstream CPU nodes.
@@ -527,7 +526,6 @@ class FxNetSplitterInternalError(Exception):
 
 def hierarchical_adjacency_partition(
     gm: torch.fx.GraphModule,
-    verbose: bool = DEBUG,
     min_block_size: int = MIN_BLOCK_SIZE,
     torch_executed_ops: Collection[Target] = set(),
     backend_support_map: Optional[Dict[str, Collection[Target]]] = None,
@@ -540,7 +538,6 @@ def hierarchical_adjacency_partition(
 
     Args:
         gm: FX GraphModule to partition
-        verbose: Bool representing whether to print operator support
         min_block_size: Minimum number of operators per TRT-Engine Block
         backend_support_map: Dictionary mapping backend names to sets of supported operators
         backend_priority: Ordered list of backend names, from highest to lowest priority
@@ -583,7 +580,6 @@ def hierarchical_adjacency_partition(
 
     partitioned_graph = partitioner.partition_graph()
 
-    if verbose:
-        supported_ops.print_support_overview(partitioner.num_accelerated_subgraphs)
+    supported_ops.print_support_overview(partitioner.num_accelerated_subgraphs)
 
     return partitioned_graph, supported_ops
