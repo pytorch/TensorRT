@@ -4,7 +4,6 @@ import operator
 from typing import Callable, Sequence, Tuple
 
 import torch
-from sdpa_converter import *
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.conversion.aten_ops_converters import args_bounds_check
 from torch_tensorrt.dynamo.lowering import TORCH_TRT_DECOMPOSITIONS
@@ -14,6 +13,8 @@ from torch_tensorrt.dynamo.lowering.passes._aten_lowering_pass import (
 from torch_tensorrt.dynamo.lowering.passes.pass_utils import (
     clean_up_graph_after_modifications,
 )
+
+from .sdpa_converter import *
 
 logger = logging.getLogger(__name__)
 

@@ -12,44 +12,19 @@ from torch.fx.passes.shape_prop import _extract_tensor_metadata
 from torch.utils._pytree import _LEAF_SPEC
 
 
-@torch_tensorrt.dynamo.conversion.dynamo_tensorrt_converter(
-    torch.ops.higher_order.cond, enabled=True, supports_dynamic_shapes=True
-)
-def cond_converter(
-    ctx: torch_tensorrt.dynamo.conversion.ConversionContext,
-    target: Target,
-    args: Tuple[Any, ...],
-    kwargs: Dict[str, Any],
-    name: str,
-) -> Union[tensorrt.ITensor, Sequence[tensorrt.ITensor]]:
-    """
-    Converter for torch.ops.higher_order.cond operation to TensorRT.
-
-    This function handles the conversion of PyTorch's conditional operation to TensorRT.
-    The conditional operation selects between two tensors based on a boolean predicate.
-
-    Args:
-        ctx (torch_tensorrt.dynamo.conversion.ConversionCtx): The conversion context
-        target (Target): The target operation to convert
-        args (Tuple[Argument, ...]): The arguments to the operation
-        kwargs (Dict[str, Argument]): The keyword arguments to the operation
-        name (str): The name to give to the TensorRT layer
-
-    Returns:
-        Union[tensorrt.ITensor, Sequence[tensorrt.ITensor]]: The converted TensorRT tensor(s)
-    """
-    if_layer = ctx.net.add_if_conditional()
-    condition, true_branch, false_branch = args[0], args[1], args[2]
-    if_layer.set_condition(condition)
-    output_layer = if_layer.add_output(true_branch, false_branch)
-    output = output_layer.get_output(0)
-
-    return output
-
-
 def get_kv_nodes(gm):
     """
-    Get the key and value nodes from the graph.
+    Extract key and value nodes from scaled dot-product attention operations in the graph.
+
+    This function searches through the graph for scaled_dot_product_attention operations
+    and extracts the key and value tensor nodes from each operation's arguments.
+
+    Args:
+        gm: A torch.fx.GraphModule containing the computational graph
+
+    Returns:
+        List[Tuple[Node, Node]]: A list of tuples, where each tuple contains
+            (key_node, value_node) from a scaled dot-product attention operation
     """
     kv_nodes = []
     for node in gm.graph.nodes:
@@ -127,7 +102,7 @@ def create_random_output_tensors(nodes: List[Node]) -> List[torch.Tensor]:
     return random_tensors
 
 
-def add_graph_input(
+def _add_graph_input(
     gm: GraphModule, name: str, val: Optional[torch.Tensor] = None, dynamic_shape=None
 ) -> Node:
     """Add a graph input to the given GraphModule and return the newly created node.

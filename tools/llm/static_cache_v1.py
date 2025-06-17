@@ -3,7 +3,7 @@ from typing import List, Tuple
 
 import torch
 import torch.utils._pytree as pytree
-from cache_utils import add_graph_input, create_random_output_tensors, get_kv_nodes
+from cache_utils import _add_graph_input, create_random_output_tensors, get_kv_nodes
 from torch.fx import Node
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.lowering.passes._aten_lowering_pass import (
@@ -89,14 +89,14 @@ def add_kv_cache_inputs(gm, fixed_kv: bool = True):
             k_val = get_static_tensor(k_val)
             v_val = get_static_tensor(v_val)
 
-        # Add new inputs using add_graph_input
-        k_input = add_graph_input(gm, key_value[0].name + "_k_input", k_val)
-        v_input = add_graph_input(gm, key_value[1].name + "_v_input", v_val)
+        # Add new inputs using _add_graph_input
+        k_input = _add_graph_input(gm, key_value[0].name + "_k_input", k_val)
+        v_input = _add_graph_input(gm, key_value[1].name + "_v_input", v_val)
         kv_inputs.append((k_input, v_input))
 
     # Add start_idx and end_idx as inputs
-    start_idx_input = add_graph_input(gm, "start_idx", torch.tensor(0))
-    end_idx_input = add_graph_input(gm, "end_idx", torch.tensor(1))
+    start_idx_input = _add_graph_input(gm, "start_idx", torch.tensor(0))
+    end_idx_input = _add_graph_input(gm, "end_idx", torch.tensor(1))
 
     # Get the max sequence length from the first key_cache node. The order of nodes is: input_ids, is_causal, key_cache1, value_cache1, key_cache2, value_cache2, ..
     input_nodes = [node for node in gm.graph.nodes if node.op == "placeholder"]

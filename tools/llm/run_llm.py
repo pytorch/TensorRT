@@ -1,10 +1,10 @@
 """
-.. _torch_export_gpt2:
+.. _run_llm:
 
-Compiling GPT2 using the dynamo backend
+Running LLM inference with Torch-TensorRT
 ==========================================================
 
-This script illustrates Torch-TensorRT workflow with dynamo backend on popular GPT2 model.
+This script illustrates Torch-TensorRT workflow with dynamo backend on popular LLM models.
 """
 
 import argparse
@@ -18,12 +18,11 @@ from contextlib import nullcontext
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 import torch
 import torch_tensorrt
-from register_sdpa import *
+from torchtrt_ext import register_sdpa
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from utils import (
     export_llm,
     generate,
-    generate_with_dynamic_cache,
     generate_with_static_cache,
     recordStats,
     time_generate,
@@ -33,17 +32,29 @@ DEVICE = torch.device("cuda:0")
 
 
 def get_model(args):
+    """
+    Load and configure the language model for inference.
+
+    This function loads a pre-trained causal language model using the specified
+    model name and configures it with the appropriate precision and settings
+    for inference.
+
+    Args:
+        args: Parsed command line arguments containing:
+            - model (str): Name or path of the model to load
+            - precision (str): Precision to use ("FP16", "BF16", or "FP32")
+
+    Returns:
+        torch.nn.Module: The loaded and configured model ready for inference,
+            moved to CUDA device with the specified precision
+    """
     with torch.no_grad():
-        # Supported list of models:
-        # - meta-llama/Llama-3.2-1B-Instruct
-        # - meta-llama/Llama-3.2-3B-Instruct
-        # - meta-llama/Llama-3.1-8B-Instruct
-        # - Qwen/Qwen2.5-1.5B-Instruct
         model = (
             AutoModelForCausalLM.from_pretrained(
                 args.model,
                 use_cache=False,
                 attn_implementation="sdpa",
+                num_hidden_layers=1,
             )
             .eval()
             .cuda()
@@ -59,6 +70,26 @@ def get_model(args):
 
 
 def compile_torchtrt(model, input_ids, args):
+    """
+    Compile a PyTorch model to TensorRT using torch_tensorrt.dynamo.compile.
+
+    This function exports the given model to a TorchScript representation and then
+    compiles it to TensorRT for optimized inference. The compilation process includes
+    precision-specific optimizations and various performance tuning parameters.
+
+    Args:
+        model (torch.nn.Module): The PyTorch model to compile
+        input_ids (torch.Tensor): Input token IDs tensor used for model export
+        args: Parsed command line arguments containing:
+            - num_tokens (int): Number of tokens to generate (used for max sequence length)
+            - precision (str): Precision to use ("FP16", "BF16", or "FP32")
+            - debug (bool): Whether to enable debug logging
+            - min_block_size (int): Minimum block size for TensorRT compilation
+
+    Returns:
+        torch_tensorrt.dynamo.TorchTensorRTModule: The compiled TensorRT model ready
+            for optimized inference
+    """
     max_seq_len = input_ids.shape[1] + args.num_tokens
     ep = export_llm(model, input_ids, max_seq_len=max_seq_len)
     position_ids = torch.arange(input_ids.shape[1]).unsqueeze(0).to(DEVICE)
@@ -191,7 +222,7 @@ if __name__ == "__main__":
         "--cache",
         type=str,
         default="",
-        help="Type of KV cache to use. Options: static_v1, static_v2, dynamic",
+        help="Type of KV cache to use. Options: static_v1, static_v2",
     )
     arg_parser.add_argument(
         "--cudagraph", action="store_true", help="Enable cudagraphs (default: False)"
@@ -249,12 +280,10 @@ if __name__ == "__main__":
 
         if args.cache == "static_v1":
             # This import is required to register static v1 KV cache transformations as lowering passes
-            import static_cache_v1
+            from torchtrt_ext import static_cache_v1
         if args.cache == "static_v2":
             # This import is required to register static v2 KV cache transformations as lowering passes
-            import static_cache_v2
-        elif args.cache == "dynamic":
-            import dynamic_cache
+            from torchtrt_ext import static_cache_v2
 
         # Compile the model with Torch-TensorRT
         trt_model = compile_torchtrt(model, input_ids, args)
@@ -275,22 +304,6 @@ if __name__ == "__main__":
             if args.benchmark:
                 trt_timings = time_generate(
                     generate_with_static_cache,
-                    trt_model,
-                    input_ids.clone(),
-                    MAX_OUTPUT_SEQ_LENGTH,
-                    tokenizer.eos_token_id,
-                    iterations=args.iterations,
-                )
-        elif args.cache == "dynamic":
-            trt_gen_tokens = generate_with_dynamic_cache(
-                trt_model,
-                input_ids.clone(),
-                MAX_OUTPUT_SEQ_LENGTH,
-                tokenizer.eos_token_id,
-            )
-            if args.benchmark:
-                trt_timings = time_generate(
-                    generate_with_dynamic_cache,
                     trt_model,
                     input_ids.clone(),
                     MAX_OUTPUT_SEQ_LENGTH,

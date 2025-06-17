@@ -887,10 +887,9 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         else:
             return converter(self.ctx, target, args, kwargs, self._cur_node_name)
 
-    def get_attr(self, target: str, args: Any, kwargs: Any) -> np.ndarray:
+    def get_attr(self, target: str, args: Any, kwargs: Any) -> torch.Tensor:
         with _disable_current_modes(), unset_fake_temporarily():
             frozen_attr = self.fetch_attr(target)
-
             if isinstance(frozen_attr, torch.nn.Parameter):
                 constant_tensor = frozen_attr.data
             else:
