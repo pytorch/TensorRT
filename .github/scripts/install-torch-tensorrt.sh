@@ -13,9 +13,10 @@ if [[ $(uname -m) == "aarch64" ]]; then
 fi
 
 # Install all the dependencies required for Torch-TensorRT
-pip install --pre ${TORCH} --index-url ${INDEX_URL}
-pip install --pre ${TORCHVISION} --index-url ${INDEX_URL}
 pip install --pre -r ${PWD}/tests/py/requirements.txt
+pip install --force-reinstall --pre ${TORCH} --index-url ${INDEX_URL}
+pip install --force-reinstall --pre ${TORCHVISION} --index-url ${INDEX_URL}
+
 
 # Install Torch-TensorRT
 if [[ ${PLATFORM} == win32 ]]; then
