@@ -80,3 +80,4 @@ MODULE.bazel.lock
 coverage.xml
 *.log
 *.pt2
+examples/torchtrt_aoti_example/torchtrt_aoti_example

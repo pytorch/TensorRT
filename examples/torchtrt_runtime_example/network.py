@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-import torch_tensorrt
+import torch_tensorrt as torchtrt
 
 
 # create a simple norm layer.
@@ -29,41 +29,21 @@ class ConvGelu(torch.nn.Module):
 
 def main():
     model = ConvGelu().eval().cuda()
-    torch_ex_input = torch.randn([1, 3, 5, 5], device="cuda")
+    scripted_model = torch.jit.script(model)
+
     compile_settings = {
-        "arg_inputs": [torch_ex_input],
-        "ir": "dynamo",
+        "inputs": [torchtrt.Input([1, 3, 5, 5])],
         "enabled_precisions": {torch.float32},
-        "min_block_size": 1,
     }
 
-    cg_trt_module = torch_tensorrt.compile(model, **compile_settings)
-    torch_tensorrt.save(
-        cg_trt_module,
-        file_path="torchtrt_aoti_conv_gelu.pt2",
-        output_format="aot_inductor",
-        retrace=True,
-        arg_inputs=[torch_ex_input],
-    )
+    trt_ts_module = torchtrt.compile(scripted_model, **compile_settings)
+    torch.jit.save(trt_ts_module, "conv_gelu.jit")
 
     norm_model = Norm().eval().cuda()
-    norm_trt_module = torch_tensorrt.compile(norm_model, **compile_settings)
-    torch_tensorrt.save(
-        norm_trt_module,
-        file_path="torchtrt_aoti_norm.pt2",
-        output_format="aot_inductor",
-        retrace=True,
-        arg_inputs=[torch_ex_input],
-    )
-    print("Generated TorchTRT-AOTI models.")
-
-    loaded_cg_trt_module = torch._inductor.aoti_load_package(
-        "torchtrt_aoti_conv_gelu.pt2"
-    )
-    loaded_norm_trt_module = torch._inductor.aoti_load_package("torchtrt_aoti_norm.pt2")
-    with torch.inference_mode():
-        print(loaded_cg_trt_module(torch_ex_input))
-        print(loaded_norm_trt_module(torch_ex_input))
+    norm_ts_module = torch.jit.script(norm_model)
+    norm_trt_ts = torchtrt.compile(norm_ts_module, **compile_settings)
+    torch.jit.save(norm_trt_ts, "norm.jit")
+    print("Generated Torchscript-TRT models.")
 
 
 if __name__ == "__main__":
