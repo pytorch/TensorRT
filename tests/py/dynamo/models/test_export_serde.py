@@ -1,3 +1,4 @@
+import importlib
 import os
 import tempfile
 import unittest
@@ -372,7 +373,9 @@ def test_resnet18_dynamic(ir):
     )
 
 
-@pytest.mark.unit
+@unittest.skipIf(
+    not importlib.util.find_spec("torchvision"), "torchvision not installed"
+)
 def test_resnet18_torch_exec_ops_serde(ir):
     """
     This tests export save and load functionality on Resnet18 model

@@ -84,7 +84,9 @@ def test_resnet18_cpu_offload(ir):
     torch._dynamo.reset()
 
 
-@pytest.mark.unit
+@unittest.skipIf(
+    not importlib.util.find_spec("torchvision"), "torchvision not installed"
+)
 def test_resnet18_torch_exec_ops(ir):
     model = models.resnet18(pretrained=True).eval().to("cuda")
     input = torch.randn((1, 3, 224, 224)).to("cuda")
