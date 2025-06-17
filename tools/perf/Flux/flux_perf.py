@@ -4,7 +4,7 @@ import sys
 from time import time
 
 sys.path.append(os.path.join(os.path.dirname(__file__), "../../../examples/apps"))
-from flux_demo import compile_model, parse_args
+from flux_demo import compile_model
 
 
 def benchmark(pipe, prompt, inference_step, batch_size=1, iterations=1):
