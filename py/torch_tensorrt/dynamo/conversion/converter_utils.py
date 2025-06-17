@@ -3,7 +3,18 @@ import ctypes
 import functools
 import logging
 import os
-from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union, overload
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    List,
+    Literal,
+    Optional,
+    Sequence,
+    Tuple,
+    Union,
+    overload,
+)
 
 import numpy as np
 import tensorrt as trt
@@ -324,8 +335,8 @@ def to_trt_weights(
     ctx: ConversionContext,
     value: torch.Tensor,
     name: str,
-    layer_type_name: str,
-    weight_type_name: str,
+    layer_type_name: Literal["CONVOLUTION", "DECONVOLUTION", "CONSTANT"],
+    weight_type_name: Literal["KERNEL", "BIAS", "CONSTANT"],
     target: Optional[Union[Target, str]] = None,
     source_ir: Optional[SourceIR] = None,
     target_quantized_type: Optional[trt.DataType] = None,
