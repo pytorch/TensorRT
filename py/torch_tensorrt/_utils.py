@@ -1,6 +1,5 @@
-from typing import Any
 import sys
-import platform
+from typing import Any
 
 import torch
 
@@ -16,9 +15,9 @@ def sanitized_torch_version() -> Any:
 def check_cross_compile_trt_win_lib() -> bool:
     # cross compile feature is only available on linux
     # build engine on linux and run on windows
-    import dllist
-
     if sys.platform.startswith("linux"):
+        import dllist
+
         loaded_libs = dllist.dllist()
         target_lib = "libnvinfer_builder_resource_win.so.*"
         if target_lib in loaded_libs:
