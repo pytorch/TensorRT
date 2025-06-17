@@ -7,6 +7,7 @@ from transformers.generation.stopping_criteria import (
 import numpy as np 
 import copy 
 import timeit
+import time
 
 def export_llm(model, inputs, min_seq_len=1, max_seq_len=16):
     """
@@ -215,3 +216,107 @@ def recordStats(backend, timings, precision, batch_size=1, compile_time_s=None):
         "Compile Time(s)": compile_time_s,
     }
     return stats
+
+
+def generate_mm(
+    model,
+    pixel_values: torch.Tensor | None,
+    input_ids: torch.Tensor,
+    eos_token_id: int,
+    emb_layer: torch.nn.Embedding,
+    max_new_tokens: int = 64,
+    use_cache: bool = False,
+):
+    """Greedy decode for Eagle2-style VLM.
+
+    Parameters
+    ----------
+    model : nn.Module
+        Must expose vision_model, mlp1, language_model, pixel_shuffle, downsample_ratio, image_token_index.
+    pixel_values : Tensor | None
+        Input image batch (B,C,H,W) or None.
+    input_ids : LongTensor  (B, N_prompt)
+        Text prompt token ids including [IMG] placeholder(s).
+    eos_token_id : int
+        Stop generation when all sequences emit EOS.
+    max_new_tokens : int
+        Maximum tokens to generate **in addition to** the prompt.
+    use_cache : bool
+        If True, uses KV-cache and feeds 1-token per step (requires LM compiled with cache).
+    """
+
+    vit_embeds = None
+    
+    if pixel_values is not None:
+        # --- Vision encoder timing ---
+        vis_s = torch.cuda.Event(enable_timing=True); vis_e = torch.cuda.Event(enable_timing=True)
+        vis_s.record()
+        vit_out = model.vision_model(pixel_values)
+        vis_e.record(); torch.cuda.synchronize()
+
+        vit_embeds = vit_out.last_hidden_state if hasattr(vit_out, "last_hidden_state") else vit_out
+
+        h = w = int(vit_embeds.shape[1] ** 0.5)
+        vit_embeds = vit_embeds.reshape(vit_embeds.shape[0], h, w, -1)
+        vit_embeds = model.pixel_shuffle(vit_embeds, scale_factor=model.downsample_ratio)
+        vit_embeds = vit_embeds.reshape(vit_embeds.shape[0], -1, vit_embeds.shape[-1])
+        vit_embeds = model.mlp1(vit_embeds)
+
+    # 2) Text token embeddings
+    seq_tokens = input_ids.clone()
+    seq_embeds = emb_layer(seq_tokens)
+
+    if vit_embeds is not None:
+        B, N, C = seq_embeds.shape
+        flat_emb = seq_embeds.view(B * N, C)
+        
+        mask = (seq_tokens.view(B * N) == model.image_token_index)
+        try:
+            flat_emb[mask] = vit_embeds.reshape(-1, C).to(flat_emb.dtype)[: mask.sum()]
+        except Exception:
+            # Fallback in unlikely size-mismatch cases
+            flat_emb[mask] = vit_embeds.reshape(-1, C)[: mask.sum()].to(flat_emb.dtype)
+        seq_embeds = flat_emb.view(B, N, C)
+        print(f"After insertion: seq_embeds min={seq_embeds.min()}, max={seq_embeds.max()}")
+        
+    # ───────────────────────────────── Greedy loop ───────────────────────────────────────────────────
+    step_times = []
+    generated = 0
+    past_key_values = None
+
+    while generated < max_new_tokens:
+        torch.cuda.synchronize()
+        t0 = time.perf_counter()
+
+        if use_cache and past_key_values is not None:
+            cur_embeds = seq_embeds[:, -1:, :]  # last token
+        else:
+            cur_embeds = seq_embeds  # full seq first step or cache off
+
+        with torch.no_grad():
+            if use_cache:
+                out = model.language_model(
+                    inputs_embeds=cur_embeds,
+                    use_cache=True,
+                    past_key_values=past_key_values,
+                )
+                logits, past_key_values = out.logits, out.past_key_values
+            else:
+                logits = model.language_model(inputs_embeds=cur_embeds)
+                if hasattr(logits, "logits"):
+                    logits = logits.logits
+
+        next_tok = torch.argmax(logits[:, -1, :], dim=-1)  # (B,)
+
+        torch.cuda.synchronize()
+        step_times.append(time.perf_counter() - t0)
+
+        # append token & embed
+        seq_tokens = torch.cat([seq_tokens, next_tok[:, None]], dim=-1)
+        seq_embeds = torch.cat([seq_embeds, emb_layer(next_tok)[:, None, :]], dim=1)
+
+        generated += 1
+        if (next_tok == eos_token_id).all():
+            break
+
+    return seq_tokens, step_times
