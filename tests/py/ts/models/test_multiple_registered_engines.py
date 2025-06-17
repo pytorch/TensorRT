@@ -1,17 +1,22 @@
 import copy
+import importlib
 import unittest
 from typing import Dict
 
-import timm
 import torch
 import torch_tensorrt as torchtrt
-import torchvision.models as models
 from utils import COSINE_THRESHOLD, cosine_similarity
+
+if importlib.util.find_spec("torchvision"):
+    import torchvision.models as models
 
 
 @unittest.skipIf(
     not torchtrt.ENABLED_FEATURES.torchscript_frontend,
     "TorchScript Frontend is not available",
+)
+@unittest.skipIf(
+    not importlib.util.find_spec("torchvision"), "torchvision not installed"
 )
 class TestModelToEngineToModel(unittest.TestCase):
     def test_multiple_engines(self):
