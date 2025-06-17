@@ -14,10 +14,8 @@ from torch_tensorrt.dynamo.utils import (
 assertions = unittest.TestCase()
 
 if importlib.util.find_spec("torchvision"):
-    import torchvision.models as models
-
-if importlib.util.find_spec("timm"):
     import timm
+    import torchvision.models as models
 
 
 @pytest.mark.unit
@@ -133,7 +131,10 @@ def test_mobilenet_v2(ir):
 
 
 @pytest.mark.unit
-@unittest.skipIf(not importlib.util.find_spec("timm"), "timm not installed")
+@unittest.skipIf(
+    not importlib.util.find_spec("timm") or not importlib.util.find_spec("torchvision"),
+    "timm or torchvision not installed",
+)
 def test_efficientnet_b0(ir):
     model = timm.create_model("efficientnet_b0", pretrained=True).eval().to("cuda")
     input = torch.randn((1, 3, 224, 224)).to("cuda")
