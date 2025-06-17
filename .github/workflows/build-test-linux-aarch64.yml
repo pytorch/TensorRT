@@ -101,6 +101,7 @@ jobs:
       pre-script: ${{ matrix.pre-script }}
       architecture: "aarch64"
       script: |
+        set -euo pipefail
         export USE_HOST_DEPS=1
         export CI_BUILD=1
         export LD_LIBRARY_PATH=/usr/lib64:$LD_LIBRARY_PATH
@@ -138,6 +139,7 @@ jobs:
       pre-script: ${{ matrix.pre-script }}
       architecture: "aarch64"
       script: |
+        set -euo pipefail
         export USE_HOST_DEPS=1
         export CI_BUILD=1
         pushd .
@@ -172,6 +174,7 @@ jobs:
       pre-script: ${{ matrix.pre-script }}
       architecture: "aarch64"
       script: |
+        set -euo pipefail
         export USE_HOST_DEPS=1
         export CI_BUILD=1
         pushd .
@@ -204,6 +207,7 @@ jobs:
       pre-script: ${{ matrix.pre-script }}
       architecture: "aarch64"
       script: |
+        set -euo pipefail
         export USE_HOST_DEPS=1
         export CI_BUILD=1
         pushd .
@@ -237,6 +241,7 @@ jobs:
       pre-script: ${{ matrix.pre-script }}
       architecture: "aarch64"
       script: |
+        set -euo pipefail
         export USE_HOST_DEPS=1
         export CI_BUILD=1
         pushd .
@@ -271,6 +276,7 @@ jobs:
       pre-script: ${{ matrix.pre-script }}
       architecture: "aarch64"
       script: |
+        set -euo pipefail
         export USE_HOST_DEPS=1
         export CI_BUILD=1
         pushd .
@@ -305,6 +311,7 @@ jobs:
       pre-script: ${{ matrix.pre-script }}
       architecture: "aarch64"
       script: |
+        set -euo pipefail
         export USE_HOST_DEPS=1
         export CI_BUILD=1
         pushd .
@@ -339,6 +346,7 @@ jobs:
       pre-script: ${{ matrix.pre-script }}
       architecture: "aarch64"
       script: |
+        set -euo pipefail
         export USE_HOST_DEPS=1
         export CI_BUILD=1
         pushd .
