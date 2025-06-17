@@ -15,6 +15,8 @@ class ConversionContext:
         net: TensorRT Network being built
         compilation_settings: Settings selected by the user for compilation
         requires_output_allocator: Boolean flag indicating if the converter creates operators which require an Output Allocator to run (e.g. data dependent operators)
+        weight_refit_map: Dictionary mapping weight names to their corresponding np.array
+        cpu_weights_reference_holder: Dictionary mapping weight names to their corresponding torch.Tensor
     """
 
     net: TRTNetwork
@@ -22,8 +24,8 @@ class ConversionContext:
         default_factory=CompilationSettings
     )
     requires_output_allocator: bool = False
-    mapping: dict[str, np.array] = field(default_factory=dict)
-    cpu_weights_reference_holder: dict[str, Union[torch.Tensor, np.array]] = field(
+    weight_refit_map: dict[str, np.array] = field(default_factory=dict)
+    cpu_weights_reference_holder: dict[str, Union[torch.Tensor]] = field(
         default_factory=dict
     )
 

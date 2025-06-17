@@ -9,14 +9,15 @@ from torch.fx.node import Target
 from torch_tensorrt.dynamo.conversion import impl
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
 from torch_tensorrt.dynamo.conversion.converter_utils import (
+    SourceIR,
     extend_attr_to_tuple,
     get_trt_tensor,
+    has_dynamic_shape,
     to_torch,
+    to_trt_weights,
 )
 from torch_tensorrt.fx.converters.converter_utils import (
-    SourceIR,
     get_dyn_range,
-    has_dynamic_shape,
     mark_as_int8_layer,
     set_layer_name,
 )
@@ -40,6 +41,7 @@ def deconvNd(
     scale: Optional[Union[torch.Tensor, float]] = None,
     zero_point: Optional[Union[torch.Tensor, float]] = None,
 ) -> TRTTensor:
+
     if has_dynamic_shape(input.shape):
         assert input.shape[1] != -1, "Channel dim can't be dynamic for deconvolution."
 
@@ -64,6 +66,8 @@ def deconvNd(
         )
 
     # Process weight terms
+    num_output_maps = 0
+    kernel_shape = ()
     if isinstance(weight, TRTTensor):
         weight = get_trt_tensor(ctx, weight, f"{name}_weight")
         # Append new dimension (unsqueeze) if the deconvolution is 1d
@@ -71,25 +75,33 @@ def deconvNd(
             input = impl.unsqueeze.unsqueeze(
                 ctx, target, source_ir, name + "_unsqueeze_weight", weight, -1
             )
+        num_output_maps = weight.shape[1]
+        kernel_shape = weight.shape[2:]
 
     elif isinstance(weight, (torch.Tensor, np.ndarray)):
         weight = to_torch(weight, dtype=input.dtype)
         # Append new dimension (unsqueeze) if the deconvolution is 1d
         if is_deconv1d:
             weight = torch.unsqueeze(weight, -1)
-
-        weight = get_trt_tensor(ctx, weight, f"{name}_weight")
+        num_output_maps = weight.shape[1]
+        kernel_shape = weight.shape[2:]
+        weight = to_trt_weights(weight)
 
     else:
         raise RuntimeError(
-            f"Convolution {name} has weight of type {type(weight)}, Expect Optional[Tensor]"
+            f"Deconvolution {name} has weight of type {type(weight)}, Expect Optional[Tensor]"
         )
+
+    assert (
+        num_output_maps > 0
+    ), "Number of output channels in deconvolution must be greater than 0"
+    assert len(kernel_shape) > 0, "Deconvolution kernel shape must be non-empty"
 
     # add deconv layer
     deconv_layer = ctx.net.add_deconvolution_nd(
         input=input,
-        num_output_maps=weight.shape[1] * groups,
-        kernel_shape=weight.shape[2:],
+        num_output_maps=num_output_maps * groups,
+        kernel_shape=kernel_shape,
         kernel=trt.Weights() if isinstance(weight, TRTTensor) else weight,
         bias=trt.Weights() if isinstance(bias, TRTTensor) else bias,
     )
