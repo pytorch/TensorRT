@@ -693,7 +693,8 @@ def compile(
 
     # Move the weights in the state_dict to CPU
     if offload_module_to_cpu:
-        deallocate_module(exported_program.module(), delete_module=False)
+        deallocate_module(gm, delete_module=False)
+        # deallocate_module(exported_program.module(), delete_module=False)
         logger.info(
             "The PyTorch model was moved to the CPU to allocate all GPU memory to TensorRT. To retain the model on the GPU, set offload_module_to_cpu=False"
         )

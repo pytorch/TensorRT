@@ -512,8 +512,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         _LOGGER.info("Building weight name mapping...")
         # Stage 1: Name mapping
         torch_device = to_torch_device(self.compilation_settings.device)
-        self.module.to(torch_device)
-        sd = self.module.state_dict()
+        sd = {k: v.to(torch_device) for k, v in self.module.state_dict().items()}
         weight_name_map: dict[str, Any] = {}
         weight_refit_map = self.ctx.weight_refit_map
         constant_mapping = {k: v for k, v in weight_refit_map.items() if v.size == 1}
