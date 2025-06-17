@@ -22,7 +22,7 @@ if not torch.cuda.is_available():
 # Downloads all model files again if manifest file is not present
 MANIFEST_FILE = "model_manifest.json"
 
-models = {}
+to_test_models = {}
 
 
 def get(n, m, manifest):
@@ -55,10 +55,10 @@ def get(n, m, manifest):
 def download_models(version_matches, manifest):
     # Download all models if torch version is different than model version
     if not version_matches:
-        for n, m in models.items():
+        for n, m in to_test_models.items():
             manifest = get(n, m, manifest)
     else:
-        for n, m in models.items():
+        for n, m in to_test_models.items():
             scripted_filename = n + "_scripted.jit.pt"
             traced_filename = n + "_traced.jit.pt"
             # Check if model file exists on disk
@@ -81,7 +81,7 @@ def main():
         print(f"torchvision is not installed, skip models download")
         return
 
-    models = {
+    to_test_models = {
         "alexnet": {"model": models.alexnet(pretrained=True), "path": "both"},
         "vgg16": {"model": models.vgg16(pretrained=True), "path": "both"},
         "squeezenet": {"model": models.squeezenet1_0(pretrained=True), "path": "both"},
