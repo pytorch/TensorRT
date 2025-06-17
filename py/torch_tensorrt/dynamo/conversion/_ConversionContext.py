@@ -1,5 +1,4 @@
 from dataclasses import dataclass, field
-from typing import Union
 
 import torch
 from torch_tensorrt.dynamo._settings import CompilationSettings
@@ -24,9 +23,7 @@ class ConversionContext:
     )
     requires_output_allocator: bool = False
     weight_refit_map: dict[str, torch.Tensor] = field(default_factory=dict)
-    cpu_weights_reference_holder: dict[str, Union[torch.Tensor]] = field(
-        default_factory=dict
-    )
+    cpu_weights_reference_holder: list[torch.Tensor] = field(default_factory=list)
 
     def record_weight(self, name: str, weight: torch.Tensor) -> None:
         """
@@ -39,7 +36,7 @@ class ConversionContext:
             weight: Weight to record
         """
         self.weight_refit_map[name] = weight
-        self.cpu_weights_reference_holder[name + " CPU_REFERENCE"] = weight
+        self.cpu_weights_reference_holder.append(weight)
 
     def clear_cpu_weights_reference_holder(self) -> None:
         self.cpu_weights_reference_holder.clear()
