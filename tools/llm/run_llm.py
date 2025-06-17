@@ -24,7 +24,7 @@ from utils import (
     export_llm,
     generate,
     generate_with_static_cache,
-    recordStats,
+    record_stats,
     time_generate,
 )
 
@@ -54,7 +54,6 @@ def get_model(args):
                 args.model,
                 use_cache=False,
                 attn_implementation="sdpa",
-                num_hidden_layers=1,
             )
             .eval()
             .cuda()
@@ -126,6 +125,9 @@ def compile_torchtrt(model, input_ids, args):
 
 
 def print_outputs(backend_name, gen_tokens, tokenizer):
+    """
+    Print the generated tokens from the model.
+    """
     print(f"========= {backend_name} =========")
     print(
         f"{backend_name} model generated text: ",
@@ -135,11 +137,10 @@ def print_outputs(backend_name, gen_tokens, tokenizer):
 
 
 def measure_perf(trt_model, input_signature, backend_name):
-    # Measure average time for 10 iterations
-    import timeit
-
-    import numpy as np
-
+    """
+    Measure the performance of a TensorRT model by running it multiple times and
+    calculating the average time per iteration.
+    """
     total_time = 0
     iterations = 10
 
@@ -156,7 +157,6 @@ def measure_perf(trt_model, input_signature, backend_name):
         end_time = timeit.default_timer()
         iter_time = end_time - start_time
         total_time += iter_time
-        # print(f"Iteration {i+1}: {iter_time:.4f} seconds")
 
     avg_time = total_time / iterations
     print(
@@ -270,7 +270,7 @@ if __name__ == "__main__":
                     tokenizer.eos_token_id,
                     iterations=args.iterations,
                 )
-                pyt_stats = recordStats(
+                pyt_stats = record_stats(
                     "PyTorch",
                     pyt_timings,
                     args.precision,
@@ -328,7 +328,7 @@ if __name__ == "__main__":
                 )
 
         if args.benchmark:
-            trt_stats = recordStats(
+            trt_stats = record_stats(
                 "TensorRT",
                 trt_timings,
                 args.precision,

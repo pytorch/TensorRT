@@ -217,7 +217,7 @@ def time_generate(
     return timings
 
 
-def recordStats(backend, timings, precision, batch_size=1, compile_time_s=None):
+def record_stats(backend, timings, precision, batch_size=1, compile_time_s=None):
     """
     Records different timing stats and adds it to the result
     """
