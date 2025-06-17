@@ -373,7 +373,7 @@ def test_resnet18_dynamic(ir):
 
 
 @pytest.mark.unit
-def test_resnet18_dynamic_torch_exec_ops(ir):
+def test_resnet18_torch_exec_ops_serde(ir):
     """
     This tests export save and load functionality on Resnet18 model
     """
@@ -381,15 +381,7 @@ def test_resnet18_dynamic_torch_exec_ops(ir):
     input = torch.randn((1, 3, 224, 224)).to("cuda")
 
     compile_spec = {
-        "inputs": [
-            torchtrt.Input(
-                min_shape=(1, 3, 224, 224),
-                opt_shape=(4, 3, 224, 224),
-                max_shape=(8, 3, 224, 224),
-                dtype=torch.float32,
-                name="x",
-            )
-        ],
+        "inputs": [input],
         "ir": ir,
         "min_block_size": 1,
         "cache_built_engines": False,
