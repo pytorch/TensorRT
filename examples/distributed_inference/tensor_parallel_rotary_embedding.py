@@ -34,13 +34,7 @@ with torch.no_grad():
 
     logger.info("Torch-tensorrt compilation for rotary embedding")
 
-    # Compile the model
-    # for single GPU let us first try without this optiob
-
     model = torch.compile(model, backend="torch_tensorrt", options={"debug": True})
-    # model = torch_tensorrt.compile(model, target_ir="torch_compile", options={
-    #     "debug": True,
-    # })
 
     for i in range(15):
         # seeding with dp_rank to ensure identical inputs for TP groups
