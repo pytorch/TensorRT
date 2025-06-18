@@ -1,3 +1,4 @@
+import re
 import sys
 from typing import Any
 
@@ -18,8 +19,10 @@ def check_cross_compile_trt_win_lib() -> bool:
     if sys.platform.startswith("linux"):
         import dllist
 
+        pattern = re.compile(r".*libnvinfer_builder_resource_win\.so(\.\d+)*$")
+
         loaded_libs = dllist.dllist()
-        target_lib = "libnvinfer_builder_resource_win.so.*"
-        if target_lib in loaded_libs:
-            return True
+        for lib in loaded_libs:
+            if pattern.match(lib):
+                return True
     return False
