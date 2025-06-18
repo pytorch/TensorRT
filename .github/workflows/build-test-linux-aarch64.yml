@@ -140,11 +140,22 @@ jobs:
       architecture: "aarch64"
       script: |
         set -euo pipefail
+        set -x
         export USE_HOST_DEPS=1
         export CI_BUILD=1
         pushd .
         cd tests/py
         cd dynamo
+        ls -l /usr/local/cuda
+        nvcc --version
+        nvidia-smi
+        echo $PATH
+        echo $LD_LIBRARY_PATH
+        echo $CUDA_HOME
+        python -c "import torch; print(f'{torch.cuda.is_available()=}')"
+        python -c "import torch; print(f'{torch.version.cuda=}')"
+        python -c "import torch; print(f'{torch.cuda.get_device_name(0)=}')"
+
         python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/dynamo_converters_test_results.xml -n 4 conversion/
         python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/dynamo_converters_test_results.xml automatic_plugin/test_automatic_plugin.py
         python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/dynamo_converters_test_results.xml automatic_plugin/test_automatic_plugin_with_attrs.py

@@ -53,12 +53,15 @@ cc_library(
             allow_empty = True,
         ),
     }),
-    hdrs = glob([
-        "include/**/*.h",
-        "include/**/*.hpp",
-        "include/**/*.inl",
-        "include/**/*",
-    ]),
+    hdrs = glob(
+        [
+            "include/**/*.h",
+            "include/**/*.hpp",
+            "include/**/*.inl",
+            "include/**/*",
+        ],
+        allow_empty = True,
+    ),
     includes = ["include/"],
     linkopts = ["-Wl,-rpath,lib/"],
 )
@@ -76,12 +79,15 @@ cc_library(
             allow_empty = True,
         ),
     }),
-    hdrs = glob([
-        "include/**/*cublas*.h",
-        "include/**/*.hpp",
-        "include/**/*.inl",
-        "include/**/*",
-    ]),
+    hdrs = glob(
+        [
+            "include/**/*cublas*.h",
+            "include/**/*.hpp",
+            "include/**/*.inl",
+            "include/**/*",
+        ],
+        allow_empty = True,
+    ),
     includes = ["include/"],
     linkopts = ["-Wl,-rpath,lib/"],
 )
