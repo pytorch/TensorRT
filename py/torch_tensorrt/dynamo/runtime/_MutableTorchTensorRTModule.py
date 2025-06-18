@@ -1,15 +1,15 @@
 import inspect
 import logging
-import warnings
 from copy import deepcopy
 from enum import Enum, auto
-from typing import Any, Dict, Iterator, Optional, Union
+from typing import Any, Dict, Iterator, Optional, Set, Union
 
 import numpy as np
 import torch
 import torch_tensorrt
 from torch.export._trace import _export
 from torch_tensorrt._Device import Device
+from torch_tensorrt._enums import dtype
 from torch_tensorrt.dynamo import _defaults
 from torch_tensorrt.dynamo._compiler import compile as dynamo_compile
 from torch_tensorrt.dynamo._refit import refit_module_weights
@@ -69,6 +69,7 @@ class MutableTorchTensorRTModule(object):
         strict: bool = True,
         allow_complex_guards_as_runtime_asserts: bool = False,
         weight_streaming_budget: Optional[int] = None,
+        enabled_precisions: Optional[Set[torch.dtype | dtype]] = None,
         **kwargs: Any,
     ) -> None:
         """
@@ -109,6 +110,7 @@ class MutableTorchTensorRTModule(object):
             hardware_compatible (bool): Build the TensorRT engines compatible with GPU architectures other than that of the GPU on which the engine was built (currently works for NVIDIA Ampere and newer)
             timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation
             lazy_engine_init (bool): Defer setting up engines until the compilation of all engines is complete. Can allow larger models with multiple graph breaks to compile but can lead to oversubscription of GPU memory at runtime.
+            enabled_precisions (Set(Union(torch.dtype, torch_tensorrt.dtype))): The set of datatypes that TensorRT can use when selecting kernels
             **kwargs: Any,
         Returns:
             MutableTorchTensorRTModule
@@ -159,6 +161,9 @@ class MutableTorchTensorRTModule(object):
                 logger.warning(
                     "Weight stremaing budget is not set. Using auto weight streaming budget"
                 )
+        self.enabled_precisions = enabled_precisions
+        if self.enabled_precisions is None:
+            self.enabled_precisions = _defaults.ENABLED_PRECISIONS
 
         cls = self.__class__
         self.__class__ = type(
@@ -325,9 +330,10 @@ class MutableTorchTensorRTModule(object):
                     strict=self.strict,
                 )
 
-        if (
-            torch.float8_e4m3fn in self.additional_settings["enabled_precisions"]
-            or torch.int8 in self.additional_settings["enabled_precisions"]
+        # Check if any quantization precision is enabled
+        if self.enabled_precisions and any(
+            precision in self.enabled_precisions
+            for precision in (torch.float8_e4m3fn, torch.int8)
         ):
             try:
                 from modelopt.torch.quantization.utils import export_torch_mode
@@ -358,6 +364,7 @@ class MutableTorchTensorRTModule(object):
             kwarg_inputs=self.kwarg_inputs,
             immutable_weights=False,
             use_python_runtime=self.use_python_runtime,
+            enabled_precisions=self.enabled_precisions,
             **self.additional_settings,
         )
         deallocate_module(self.original_model, delete_module=False)
