@@ -393,7 +393,6 @@ class TestDeconvolution(TestCase):
             backend="torch_tensorrt",
             options={
                 "min_block_size": 1,
-                "debug": True,
             },
         )
         with torch.no_grad():
