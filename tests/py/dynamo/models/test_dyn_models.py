@@ -1,9 +1,8 @@
 # type: ignore
-
+import importlib
 import unittest
 
 import pytest
-import timm
 import torch
 import torch_tensorrt as torchtrt
 from torch_tensorrt.dynamo.utils import COSINE_THRESHOLD, cosine_similarity
@@ -175,6 +174,9 @@ def test_view(ir):
     )
 
 
+@unittest.skipIf(
+    not importlib.util.find_spec("torchvision"), "torchvision not installed"
+)
 @pytest.mark.unit
 def test_resnet_dynamic(ir):
     """

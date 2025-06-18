@@ -1,3 +1,4 @@
+import importlib
 import os
 import pickle
 import shutil
@@ -5,7 +6,6 @@ import unittest
 
 import torch
 import torch_tensorrt as torch_trt
-import torchvision.models as models
 from torch.testing._internal.common_utils import TestCase
 from torch_tensorrt.dynamo import convert_exported_program_to_serialized_trt_engine
 from torch_tensorrt.dynamo._defaults import TIMING_CACHE_PATH
@@ -14,11 +14,18 @@ from torch_tensorrt.dynamo.utils import COSINE_THRESHOLD, cosine_similarity
 
 assertions = unittest.TestCase()
 
+if importlib.util.find_spec("torchvision"):
+    import torchvision.models as models
+
 
 class TestWeightStrippedEngine(TestCase):
     @unittest.skipIf(
         not torch_trt.ENABLED_FEATURES.refit,
         "Engine caching requires refit feature that is not supported in Python 3.13 or higher",
+    )
+    @unittest.skipIf(
+        not importlib.util.find_spec("torchvision"),
+        "torchvision is not installed",
     )
     def test_three_ways_to_compile(self):
         pyt_model = models.resnet18(pretrained=True).eval().to("cuda")
@@ -65,6 +72,10 @@ class TestWeightStrippedEngine(TestCase):
         not torch_trt.ENABLED_FEATURES.refit,
         "Engine caching requires refit feature that is not supported in Python 3.13 or higher",
     )
+    @unittest.skipIf(
+        not importlib.util.find_spec("torchvision"),
+        "torchvision is not installed",
+    )
     def test_three_ways_to_compile_weight_stripped_engine(self):
         pyt_model = models.resnet18(pretrained=True).eval().to("cuda")
         example_inputs = (torch.randn((100, 3, 224, 224)).to("cuda"),)
@@ -100,6 +111,10 @@ class TestWeightStrippedEngine(TestCase):
     @unittest.skipIf(
         not torch_trt.ENABLED_FEATURES.refit,
         "Engine caching requires refit feature that is not supported in Python 3.13 or higher",
+    )
+    @unittest.skipIf(
+        not importlib.util.find_spec("torchvision"),
+        "torchvision is not installed",
     )
     def test_weight_stripped_engine_sizes(self):
         pyt_model = models.resnet18(pretrained=True).eval().to("cuda")
@@ -141,6 +156,10 @@ class TestWeightStrippedEngine(TestCase):
     @unittest.skipIf(
         not torch_trt.ENABLED_FEATURES.refit,
         "Engine caching requires refit feature that is not supported in Python 3.13 or higher",
+    )
+    @unittest.skipIf(
+        not importlib.util.find_spec("torchvision"),
+        "torchvision is not installed",
     )
     def test_weight_stripped_engine_results(self):
         pyt_model = models.resnet18(pretrained=True).eval().to("cuda")
@@ -207,6 +226,10 @@ class TestWeightStrippedEngine(TestCase):
         not torch_trt.ENABLED_FEATURES.refit,
         "Engine caching requires refit feature that is not supported in Python 3.13 or higher",
     )
+    @unittest.skipIf(
+        not importlib.util.find_spec("torchvision"),
+        "torchvision is not installed",
+    )
     def test_engine_caching_saves_weight_stripped_engine(self):
         pyt_model = models.resnet18(pretrained=True).eval().to("cuda")
         example_inputs = (torch.randn((100, 3, 224, 224)).to("cuda"),)
@@ -256,6 +279,10 @@ class TestWeightStrippedEngine(TestCase):
     @unittest.skipIf(
         not torch_trt.ENABLED_FEATURES.refit,
         "Engine caching requires refit feature that is not supported in Python 3.13 or higher",
+    )
+    @unittest.skipIf(
+        not importlib.util.find_spec("torchvision"),
+        "torchvision is not installed",
     )
     def test_dynamo_compile_with_refittable_weight_stripped_engine(self):
         pyt_model = models.resnet18(pretrained=True).eval().to("cuda")
@@ -339,6 +366,10 @@ class TestWeightStrippedEngine(TestCase):
             msg=f"Engine caching didn't speed up the compilation. Time taken without engine caching: {times[0]} ms, time taken with engine caching: {times[2]} ms",
         )
 
+    @unittest.skipIf(
+        not importlib.util.find_spec("torchvision"),
+        "torchvision is not installed",
+    )
     def test_torch_compile_with_refittable_weight_stripped_engine(self):
         pyt_model = models.resnet18(pretrained=True).eval().to("cuda")
 
@@ -519,6 +550,10 @@ class TestWeightStrippedEngine(TestCase):
         not torch_trt.ENABLED_FEATURES.refit,
         "Engine caching requires refit feature that is not supported in Python 3.13 or higher",
     )
+    @unittest.skipIf(
+        not importlib.util.find_spec("torchvision"),
+        "torchvision is not installed",
+    )
     def test_two_TRTRuntime_in_refitting(self):
         pyt_model = models.resnet18(pretrained=True).eval().to("cuda")
         example_inputs = (torch.randn((100, 3, 224, 224)).to("cuda"),)
@@ -562,6 +597,10 @@ class TestWeightStrippedEngine(TestCase):
     @unittest.skipIf(
         not torch_trt.ENABLED_FEATURES.refit,
         "Engine caching requires refit feature that is not supported in Python 3.13 or higher",
+    )
+    @unittest.skipIf(
+        not importlib.util.find_spec("torchvision"),
+        "torchvision is not installed",
     )
     def test_refit_identical_engine_weights(self):
         pyt_model = models.resnet18(pretrained=True).eval().to("cuda")
