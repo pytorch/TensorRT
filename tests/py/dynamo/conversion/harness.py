@@ -368,6 +368,12 @@ class DispatchTestCase(TRTTestCase):
                 tuple(torch_export_inputs),
                 dynamic_shapes=torch_export_dynamic_shapes,
             )
+            # for the dynamo tracer, with dynamic shapes,
+            # we need to apply the post lowering passes especially remove _assert_scalar nodes
+            for dynamic_shape_spec in torch_export_dynamic_shapes.values():
+                if len(dynamic_shape_spec) > 0:
+                    enable_passes = True
+                    break
             if enable_passes:
                 exported_program = pre_export_lowering(exported_program, settings)
                 exported_program = exported_program.run_decompositions(

@@ -1,10 +1,13 @@
+import importlib
 import json
 import os
 
 import custom_models as cm
-import timm
 import torch
-import torchvision.models as models
+
+if importlib.util.find_spec("torchvision"):
+    import timm
+    import torchvision.models as models
 
 torch.hub._validate_not_a_forked_repo = lambda a, b, c: True
 
@@ -19,53 +22,7 @@ if not torch.cuda.is_available():
 # Downloads all model files again if manifest file is not present
 MANIFEST_FILE = "model_manifest.json"
 
-models = {
-    "alexnet": {"model": models.alexnet(pretrained=True), "path": "both"},
-    "vgg16": {"model": models.vgg16(pretrained=True), "path": "both"},
-    "squeezenet": {"model": models.squeezenet1_0(pretrained=True), "path": "both"},
-    "densenet": {"model": models.densenet161(pretrained=True), "path": "both"},
-    "inception_v3": {"model": models.inception_v3(pretrained=True), "path": "both"},
-    "shufflenet": {"model": models.shufflenet_v2_x1_0(pretrained=True), "path": "both"},
-    "mobilenet_v2": {"model": models.mobilenet_v2(pretrained=True), "path": "both"},
-    "resnext50_32x4d": {
-        "model": models.resnext50_32x4d(pretrained=True),
-        "path": "both",
-    },
-    "wideresnet50_2": {
-        "model": models.wide_resnet50_2(pretrained=True),
-        "path": "both",
-    },
-    "mnasnet": {"model": models.mnasnet1_0(pretrained=True), "path": "both"},
-    "resnet18": {
-        "model": torch.hub.load("pytorch/vision:v0.9.0", "resnet18", pretrained=True),
-        "path": "both",
-    },
-    "resnet50": {
-        "model": torch.hub.load("pytorch/vision:v0.9.0", "resnet50", pretrained=True),
-        "path": "both",
-    },
-    "efficientnet_b0": {
-        "model": timm.create_model("efficientnet_b0", pretrained=True),
-        "path": "script",
-    },
-    "vit": {
-        "model": timm.create_model("vit_base_patch16_224", pretrained=True),
-        "path": "script",
-    },
-    "pooling": {"model": cm.Pool(), "path": "trace"},
-    "module_fallback": {"model": cm.ModuleFallbackMain(), "path": "script"},
-    "loop_fallback_eval": {"model": cm.LoopFallbackEval(), "path": "script"},
-    "loop_fallback_no_eval": {"model": cm.LoopFallbackNoEval(), "path": "script"},
-    "conditional": {"model": cm.FallbackIf(), "path": "script"},
-    "inplace_op_if": {"model": cm.FallbackInplaceOPIf(), "path": "script"},
-    "standard_tensor_input": {"model": cm.StandardTensorInput(), "path": "script"},
-    "tuple_input": {"model": cm.TupleInput(), "path": "script"},
-    "list_input": {"model": cm.ListInput(), "path": "script"},
-    "tuple_input_output": {"model": cm.TupleInputOutput(), "path": "script"},
-    "list_input_output": {"model": cm.ListInputOutput(), "path": "script"},
-    "list_input_tuple_output": {"model": cm.ListInputTupleOutput(), "path": "script"},
-    # "bert_base_uncased": {"model": cm.BertModule(), "path": "trace"},
-}
+to_test_models = {}
 
 
 def get(n, m, manifest):
@@ -98,10 +55,10 @@ def get(n, m, manifest):
 def download_models(version_matches, manifest):
     # Download all models if torch version is different than model version
     if not version_matches:
-        for n, m in models.items():
+        for n, m in to_test_models.items():
             manifest = get(n, m, manifest)
     else:
-        for n, m in models.items():
+        for n, m in to_test_models.items():
             scripted_filename = n + "_scripted.jit.pt"
             traced_filename = n + "_traced.jit.pt"
             # Check if model file exists on disk
@@ -120,6 +77,68 @@ def download_models(version_matches, manifest):
 
 
 def main():
+    if not importlib.util.find_spec("torchvision"):
+        print(f"torchvision is not installed, skip models download")
+        return
+
+    to_test_models = {
+        "alexnet": {"model": models.alexnet(pretrained=True), "path": "both"},
+        "vgg16": {"model": models.vgg16(pretrained=True), "path": "both"},
+        "squeezenet": {"model": models.squeezenet1_0(pretrained=True), "path": "both"},
+        "densenet": {"model": models.densenet161(pretrained=True), "path": "both"},
+        "inception_v3": {"model": models.inception_v3(pretrained=True), "path": "both"},
+        "shufflenet": {
+            "model": models.shufflenet_v2_x1_0(pretrained=True),
+            "path": "both",
+        },
+        "mobilenet_v2": {"model": models.mobilenet_v2(pretrained=True), "path": "both"},
+        "resnext50_32x4d": {
+            "model": models.resnext50_32x4d(pretrained=True),
+            "path": "both",
+        },
+        "wideresnet50_2": {
+            "model": models.wide_resnet50_2(pretrained=True),
+            "path": "both",
+        },
+        "mnasnet": {"model": models.mnasnet1_0(pretrained=True), "path": "both"},
+        "resnet18": {
+            "model": torch.hub.load(
+                "pytorch/vision:v0.9.0", "resnet18", pretrained=True
+            ),
+            "path": "both",
+        },
+        "resnet50": {
+            "model": torch.hub.load(
+                "pytorch/vision:v0.9.0", "resnet50", pretrained=True
+            ),
+            "path": "both",
+        },
+        "efficientnet_b0": {
+            "model": timm.create_model("efficientnet_b0", pretrained=True),
+            "path": "script",
+        },
+        "vit": {
+            "model": timm.create_model("vit_base_patch16_224", pretrained=True),
+            "path": "script",
+        },
+        "pooling": {"model": cm.Pool(), "path": "trace"},
+        "module_fallback": {"model": cm.ModuleFallbackMain(), "path": "script"},
+        "loop_fallback_eval": {"model": cm.LoopFallbackEval(), "path": "script"},
+        "loop_fallback_no_eval": {"model": cm.LoopFallbackNoEval(), "path": "script"},
+        "conditional": {"model": cm.FallbackIf(), "path": "script"},
+        "inplace_op_if": {"model": cm.FallbackInplaceOPIf(), "path": "script"},
+        "standard_tensor_input": {"model": cm.StandardTensorInput(), "path": "script"},
+        "tuple_input": {"model": cm.TupleInput(), "path": "script"},
+        "list_input": {"model": cm.ListInput(), "path": "script"},
+        "tuple_input_output": {"model": cm.TupleInputOutput(), "path": "script"},
+        "list_input_output": {"model": cm.ListInputOutput(), "path": "script"},
+        "list_input_tuple_output": {
+            "model": cm.ListInputTupleOutput(),
+            "path": "script",
+        },
+        # "bert_base_uncased": {"model": cm.BertModule(), "path": "trace"},
+    }
+
     manifest = None
     version_matches = False
     manifest_exists = False

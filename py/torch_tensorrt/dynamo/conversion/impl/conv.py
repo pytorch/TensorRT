@@ -55,7 +55,15 @@ def convNd(
     # Process bias terms
     if isinstance(bias, (torch.Tensor, np.ndarray)):
         bias = to_torch(bias, dtype=input.dtype)
-        bias = get_trt_tensor(ctx, bias, f"{name}_bias")
+        bias = to_trt_weights(
+            ctx,
+            bias,
+            name,
+            layer_type_name="CONVOLUTION",
+            weight_type_name="BIAS",
+            target=target,
+            source_ir=source_ir,
+        )
 
     elif isinstance(bias, TRTTensor):
         bias = get_trt_tensor(ctx, bias, f"{name}_bias")
@@ -85,7 +93,15 @@ def convNd(
 
         num_output_maps = weight.shape[0]
         kernel_shape = weight.shape[2:]
-        weight = to_trt_weights(weight)
+        weight = to_trt_weights(
+            ctx,
+            weight,
+            name,
+            layer_type_name="CONVOLUTION",
+            weight_type_name="KERNEL",
+            target=target,
+            source_ir=source_ir,
+        )
 
     else:
         raise RuntimeError(
@@ -105,6 +121,9 @@ def convNd(
         kernel=trt.Weights() if isinstance(weight, TRTTensor) else weight,
         bias=trt.Weights() if isinstance(bias, TRTTensor) else bias,
     )
+
+    set_layer_name(conv_layer, target, name, source_ir)
+
     # If the weight is a TRTTensor, set it as an input of the layer
     if isinstance(weight, TRTTensor):
         weight = cast_trt_tensor(ctx, weight, input.dtype, name)
@@ -144,8 +163,6 @@ def convNd(
         dilation = (
             extend_attr_to_tuple(dilation, 2) if dilation is not None else dilation
         )
-
-    set_layer_name(conv_layer, target, name, source_ir)
 
     # Set relevant attributes of convolution layer
     if padding is not None:
