@@ -1,4 +1,5 @@
 import logging
+import operator
 from typing import Callable, List, Optional, Set, Tuple
 
 import torch
@@ -33,8 +34,7 @@ class ComplexSubGraphInfo:
 
 
 class ComplexOpDetector:
-    def __init__(self, logger):
-        self.logger = logger
+    def __init__(self):
         pass
 
     def is_complex_dtype(self, node: Node) -> bool:
@@ -45,15 +45,13 @@ class ComplexOpDetector:
             if hasattr(val, "dtype"):
                 dtype = val.dtype
 
-        self.logger.debug(f"dtype of node: {dtype}")
+        logger.debug(f"dtype of node: {dtype}")
         return dtype in {torch.complex64, torch.complex128}
 
     def node_include_in_subgraph(self, node: Node) -> bool:
         # Include only call_function ops on complex tensors
-        self.logger.debug(f"node.op: {node.op}, node name: {node.name}")
-        self.logger.debug(f"is_complex_dtype: {self.is_complex_dtype(node)}")
         if node.op == "call_function" and self.is_complex_dtype(node):
-            self.logger.debug(
+            logger.debug(
                 f"node.op is added to subgraph: {node.op}, node name: {node.name} is complex"
             )
         return node.op == "call_function" and self.is_complex_dtype(node)
@@ -67,13 +65,11 @@ class ComplexOpDetector:
             if n in subgraph_nodes:
                 continue
             subgraph_nodes.add(n)
-            self.logger.debug(f"node {n.name} is added to subgraph")
+            logger.debug(f"node {n.name} is added to subgraph")
             for inp in n.all_input_nodes:
                 if self.node_include_in_subgraph(inp):
-                    print("node inp is added to stack:", inp.name)
                     stack.append(inp)
                 else:
-                    print("node inp is not added to stack BUT INP:", inp.name)
                     input_nodes.add(inp)
         return ComplexSubGraphInfo(
             [anchor_node], list(subgraph_nodes), list(input_nodes)
@@ -85,13 +81,12 @@ class ComplexOpDetector:
         complex_op_subgraphs: List[ComplexSubGraphInfo] = []
         for node in gm.graph.nodes:
             if node.target == anchor_target:
-                self.logger.debug(f"node.target {node.target} node.name: {node.name}")
                 new_sub = self.subgraph_from_anchor(node)
                 # if any intersecting nodes between seen and sub.subgraph_nodes they should be merged
                 merged = False
                 for existing_sub in complex_op_subgraphs:
                     if set(existing_sub.subgraph_nodes) & set(new_sub.subgraph_nodes):
-                        self.logger.debug(f"merging subgraphs {existing_sub} {new_sub}")
+                        logger.debug(f"merging subgraphs {existing_sub} {new_sub}")
                         # merge the two subgraphs
                         existing_sub.subgraph_nodes = list(
                             set(existing_sub.subgraph_nodes)
@@ -113,7 +108,7 @@ class ComplexOpDetector:
 def complex_graph_detection(
     gm: GraphModule, settings: CompilationSettings
 ) -> List[ComplexSubGraphInfo]:
-    complex_op_detector = ComplexOpDetector(logger)
+    complex_op_detector = ComplexOpDetector()
     complex_subgraphs = complex_op_detector.find_complex_op_subgraphs(
         gm, anchor_target=torch.ops.aten.view_as_real.default
     )
@@ -174,17 +169,24 @@ class ComplexGraphRewriter:
 
         elif input_node.op == "get_attr":
             new_attr_name = input_node.target + "_reshaped"
-            original_tensor = self.get_attr_tensor(input_node.target)
-            stacked_tensor = torch.stack(
-                [original_tensor.real, original_tensor.imag], dim=-1
-            )
-            self.gm.register_buffer(new_attr_name, stacked_tensor)
+            from torch._subclasses.fake_tensor import unset_fake_temporarily
+
+            with unset_fake_temporarily():
+                original_tensor = self.get_attr_tensor(input_node.target)
+                stacked_tensor = torch.stack(
+                    [original_tensor.real, original_tensor.imag], dim=-1
+                )
+                self.gm.register_buffer(new_attr_name, stacked_tensor)
             with self.gm.graph.inserting_after(input_node):
                 new_node = self.gm.graph.get_attr(new_attr_name)
 
         else:
-            logger.debug(f"Unsupported node type: {input_node.op}")
-            logger.debug("This node type does not need to replaced")
+            logger.debug(
+                f"Unsupported node type in replacement of input node: {input_node.op}"
+            )
+            logger.debug(
+                "This complex subgraph inputnode type does not need to replaced"
+            )
 
         input_node.replace_all_uses_with(new_node)
         self.gm.graph.erase_node(input_node)
@@ -211,6 +213,8 @@ class ComplexGraphRewriter:
 
                     def match_complex_mul(
                         match: torch.fx.subgraph_rewriter.Match,
+                        original_graph,
+                        pattern_graph,
                     ) -> bool:
                         for original_node in match.nodes_map.values():
                             if original_node.name == node.name:
@@ -230,10 +234,9 @@ class ComplexGraphRewriter:
                     self.gm.graph.erase_node(node)
                 else:
                     logger.debug(f"Unsupported node target: {node.target}")
-                    logger.debug(f"This node type does not need to replaced")
-            if modified:
-                self.gm.graph.lint()
-                self.gm.recompile()
+                    logger.debug(
+                        "This complex subgraphnode type does not need to replaced"
+                    )
 
         if modified:
             self.gm.graph.lint()
@@ -256,16 +259,28 @@ def complex_mul_replacement() -> Tuple[
 
     # Original pattern: torch.mul for complex tensors
     def original_mul(x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
-        return torch.mul(x, y)
+        return torch.ops.aten.mul.Tensor(x, y)
 
     # Replacement function: manual complex multiplication on real/imag stacked tensors
     def replacement(x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
-        x_real, x_imag = x[..., 0], x[..., 1]
-        y_real, y_imag = y[..., 0], y[..., 1]
+        x_real = torch.ops.aten.select.int(x, -1, 0)
+        x_imag = torch.ops.aten.select.int(x, -1, 1)  # x is reshape tensor
+        y_real, y_imag = y[..., 0], y[..., 1]  # y is frozen param
 
-        real = x_real * y_real - x_imag * y_imag
-        imag = x_real * y_imag + x_imag * y_real
+        real_part1 = torch.ops.aten.mul.Tensor(x_real, y_real)
+        real_part2 = torch.ops.aten.mul.Tensor(x_imag, y_imag)
+        real = torch.ops.aten.sub.Tensor(real_part1, real_part2)
 
-        return torch.stack((real, imag), dim=-1)
+        imag_part1 = torch.ops.aten.mul.Tensor(x_real, y_imag)
+        imag_part2 = torch.ops.aten.mul.Tensor(x_imag, y_real)
+        imag = torch.ops.aten.add.Tensor(imag_part1, imag_part2)
+
+        return torch.ops.aten.cat.default(
+            [
+                torch.ops.aten.unsqueeze.default(real, -1),
+                torch.ops.aten.unsqueeze.default(imag, -1),
+            ],
+            dim=-1,
+        )
 
     return (original_mul, replacement)

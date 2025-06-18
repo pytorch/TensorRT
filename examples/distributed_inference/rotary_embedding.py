@@ -88,25 +88,21 @@ class RotaryAttention(nn.Module):
         self.wo = nn.Linear(dim, dim)
         self.seq_len = seq_len
         self.n_parallel = 1
-        self.register_buffer(
-            "freqs_cis",
-            self._precompute_freqs_cis(),
-            persistent=True,
+        theta = 10000.0
+        self.freqs_cis = precompute_freqs_cis(
+            self.dim, self.seq_len, theta, self.n_parallel
         )
+        self.register_buffer("freqs_cis", self.freqs_cis, persistent=True)
         self.init_weights()
 
     def init_weights(self):
         with torch.device(self.freqs_cis.device):
-            self.freqs_cis = self._precompute_freqs_cis()
-
-    def _precompute_freqs_cis(self) -> torch.Tensor:
-        theta = 10000.0
-        return precompute_freqs_cis(self.dim, self.seq_len, theta, self.n_parallel)
+            self.freqs_cis = self.freqs_cis
 
     def forward(self, x):
         q = self.wq(x)
         k = self.wk(x)
         # calculate rotary embedding
-        freqs_cis = self._precompute_freqs_cis().to(q.device)
+        freqs_cis = self.freqs_cis.to(q.device)
         q, k = rotary_embedding(q, k, self.dim, freqs_cis=freqs_cis)
         return self.wo(q)
