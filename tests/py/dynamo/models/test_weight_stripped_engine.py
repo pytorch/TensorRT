@@ -35,7 +35,6 @@ class TestWeightStrippedEngine(TestCase):
         settings = {
             "use_python_runtime": False,
             "enabled_precisions": {torch.float},
-            "debug": False,
             "min_block_size": 1,
             "immutable_weights": False,
             "strip_engine_weights": False,
@@ -83,7 +82,6 @@ class TestWeightStrippedEngine(TestCase):
         settings = {
             "use_python_runtime": False,
             "enabled_precisions": {torch.float},
-            "debug": False,
             "min_block_size": 1,
             "immutable_weights": False,
             "strip_engine_weights": True,
@@ -203,7 +201,6 @@ class TestWeightStrippedEngine(TestCase):
             options={
                 "use_python_runtime": False,
                 "enabled_precisions": {torch.float},
-                "debug": False,
                 "min_block_size": 1,
                 "immutable_weights": False,
                 "cache_built_engines": False,
@@ -410,7 +407,6 @@ class TestWeightStrippedEngine(TestCase):
                 options={
                     "use_python_runtime": False,
                     "enabled_precisions": {torch.float},
-                    "debug": False,
                     "min_block_size": 1,
                     "immutable_weights": False,
                     "cache_built_engines": cache_built_engines,
@@ -488,7 +484,6 @@ class TestWeightStrippedEngine(TestCase):
                 options={
                     "use_python_runtime": True,
                     "enabled_precisions": {torch.float},
-                    "debug": False,
                     "min_block_size": 1,
                     "immutable_weights": False,
                     "cache_built_engines": True,

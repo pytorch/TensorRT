@@ -423,7 +423,6 @@ class TestEngineCache(TestCase):
                 options={
                     "use_python_runtime": False,
                     "enabled_precisions": {torch.float},
-                    "debug": False,
                     "min_block_size": 1,
                     "immutable_weights": False,
                     "cache_built_engines": cache_built_engines,
@@ -490,7 +489,6 @@ class TestEngineCache(TestCase):
                 options={
                     "use_python_runtime": False,
                     "enabled_precisions": {torch.float},
-                    "debug": False,
                     "min_block_size": 1,
                     "immutable_weights": False,
                     "cache_built_engines": cache_built_engines,
@@ -547,7 +545,6 @@ class TestEngineCache(TestCase):
                 **{
                     "use_python_runtime": True,
                     "enabled_precisions": {torch.float},
-                    "debug": False,
                     "min_block_size": 1,
                     "immutable_weights": False,
                     "cache_built_engines": True,
@@ -590,7 +587,6 @@ class TestEngineCache(TestCase):
                 options={
                     "use_python_runtime": True,
                     "enabled_precisions": {torch.float},
-                    "debug": False,
                     "min_block_size": 1,
                     "immutable_weights": False,
                     "cache_built_engines": True,
