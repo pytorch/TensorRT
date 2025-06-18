@@ -146,7 +146,12 @@ jobs:
           echo "flashinfer-python is not supported for python version 3.13 or higher"
         else
           echo "Installing flashinfer-python"
-          python -m pip install flashinfer-python --no-deps
+          # flashinfer-python is broken on python 3.9 at the moment, so we skip it for now
+          if (major == 3 && minor == 9); then
+            echo "Skipping flashinfer-python for python 3.9"
+          else
+            python -m pip install flashinfer-python --no-deps
+          fi
         fi
         cd dynamo
         python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/dynamo_converters_test_results.xml -n 4 conversion/
