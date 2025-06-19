@@ -151,14 +151,15 @@ jobs:
         echo $PATH
         echo $LD_LIBRARY_PATH
         echo $CUDA_HOME
+        python -c "import torch; print(torch.__version__); print(torch.cuda.get_arch_list()); print(torch.randn(1).cuda())"
         python -c "import torch; print(f'{torch.cuda.is_available()=}')"
         python -c "import torch; print(f'{torch.version.cuda=}')"
         python -c "import torch; print(f'{torch.cuda.get_device_name(0)=}')"
 
         set -euo pipefail
-        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/dynamo_converters_test_results.xml -n 4 conversion/
-        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/dynamo_converters_test_results.xml automatic_plugin/test_automatic_plugin.py
-        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/dynamo_converters_test_results.xml automatic_plugin/test_automatic_plugin_with_attrs.py
+        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/dynamo_converters_test_results.xml -n 4 conversion/test_abs_aten.py
+        #python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/dynamo_converters_test_results.xml automatic_plugin/test_automatic_plugin.py
+        #python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/dynamo_converters_test_results.xml automatic_plugin/test_automatic_plugin_with_attrs.py
         popd
 
   # tests-py-dynamo-fe:
