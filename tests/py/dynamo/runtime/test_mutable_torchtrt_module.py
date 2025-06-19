@@ -299,6 +299,9 @@ def test_save():
     not torch_trt.ENABLED_FEATURES.refit,
     "Refit feature is not supported in Python 3.13 or higher",
 )
+@unittest.skipIf(
+    not importlib.util.find_spec("torchvision"), "torchvision not installed"
+)
 @pytest.mark.unit
 def test_resnet18_modify_attribute():
     torch.manual_seed(0)
@@ -342,6 +345,9 @@ def test_resnet18_modify_attribute():
 @unittest.skipIf(
     not torch_trt.ENABLED_FEATURES.refit,
     "Refit feature is not supported in Python 3.13 or higher",
+)
+@unittest.skipIf(
+    not importlib.util.find_spec("torchvision"), "torchvision not installed"
 )
 @pytest.mark.unit
 def test_resnet18_modify_attribute_no_refit():

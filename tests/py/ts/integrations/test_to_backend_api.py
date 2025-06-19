@@ -22,7 +22,6 @@ class TestToBackendLowering(unittest.TestCase):
                     "inputs": [torchtrt.Input([1, 3, 300, 300])],
                     "enabled_precisions": {torch.float},
                     "refit": False,
-                    "debug": False,
                     "device": {
                         "device_type": torchtrt.DeviceType.GPU,
                         "gpu_id": 0,
