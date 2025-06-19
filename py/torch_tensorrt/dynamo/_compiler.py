@@ -993,9 +993,9 @@ def convert_exported_program_to_serialized_trt_engine(
     *,
     arg_inputs: Optional[Sequence[Sequence[Any]]] = None,
     kwarg_inputs: Optional[dict[Any, Any]] = None,
-    enabled_precisions: (
-        Set[torch.dtype | dtype] | Tuple[torch.dtype | dtype]
-    ) = _defaults.ENABLED_PRECISIONS,
+    enabled_precisions: Union[
+        Set[Union[torch.dtype, dtype]], Tuple[Union[torch.dtype, dtype]]
+    ] = _defaults.ENABLED_PRECISIONS,
     assume_dynamic_shape_support: bool = _defaults.ASSUME_DYNAMIC_SHAPE_SUPPORT,
     workspace_size: int = _defaults.WORKSPACE_SIZE,
     min_block_size: int = _defaults.MIN_BLOCK_SIZE,
