@@ -752,7 +752,14 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         # Representation of input shapes to a given model
         # Shapes are concatenated as so:
         # x: (3, 4), y: (4, 5) --> Key: (3,4)(4,5)
-        new_shape_key = "".join(str(tuple(t.shape)).replace(" ", "") for t in inputs)
+        tensor_inputs = []
+        for t in inputs:
+            if not isinstance(t, torch.Tensor):
+                return True
+            tensor_inputs.append(t)
+        new_shape_key = "".join(
+            str(tuple(t.shape)).replace(" ", "") for t in tensor_inputs
+        )
 
         # If the new shape key differs from the existing one,
         # invalidate the old shape key and remove the CUDAGraph
