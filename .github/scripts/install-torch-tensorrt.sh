@@ -6,11 +6,11 @@ TORCHVISION=$(grep "^torchvision" ${PWD}/py/requirements.txt)
 INDEX_URL=https://download.pytorch.org/whl/${CHANNEL}/${CU_VERSION}
 PLATFORM=$(python -c "import sys; print(sys.platform)")
 
-# if [[ $(uname -m) == "aarch64" ]]; then
-#     # install cuda for aarch64
-#     source .github/scripts/install-cuda-aarch64.sh
-#     install_cuda_aarch64
-# fi
+if [[ $(uname -m) == "aarch64" ]]; then
+    # install cuda for aarch64
+    source .github/scripts/install-cuda-aarch64.sh
+    install_cuda_aarch64
+fi
 
 # Install all the dependencies required for Torch-TensorRT
 pip install --pre -r ${PWD}/tests/py/requirements.txt

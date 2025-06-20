@@ -115,20 +115,10 @@ jobs:
   #       python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/ts_models_test_results.xml models/
   #       python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/ts_integrations_test_results.xml integrations/
   #       popd
-  substitute-runner:
-    needs: filter-matrix
-    outputs:
-      matrix: ${{ steps.substitute.outputs.matrix }}
-    runs-on: ubuntu-latest
-    steps:
-      - name: Substitute runner
-        id: substitute
-        run: |
-          echo matrix="$(echo '${{ needs.filter-matrix.outputs.matrix }}' | sed -e 's/quay.io\/pypa\/manylinux_2_34_aarch64/pytorch\/manylinuxaarch64-builder:cuda12.9/g')" >> ${GITHUB_OUTPUT}
 
   tests-py-dynamo-converters:
     name: Test dynamo converters [Python]
-    needs: [build, substitute-runner]
+    needs: [filter-matrix, build]
     strategy:
       fail-fast: false
       matrix:
@@ -157,38 +147,10 @@ jobs:
         cd dynamo
         ls -l /usr/local/cuda
         nvcc --version
+        nvidia-smi
         echo $PATH
         echo $LD_LIBRARY_PATH
         echo $CUDA_HOME
-        # Check if nvidia-smi is available and working
-        if command -v nvidia-smi &> /dev/null; then
-            nvidia-smi
-        else
-            echo "nvidia-smi not found - no NVIDIA GPU or drivers installed"
-        fi
-        # Check for NVIDIA device files in /dev
-        if compgen -G "/dev/nvidia[0-9]" >/dev/null; then
-            echo "NVIDIA GPU devices found:"
-            ls -la /dev/nvidia*
-        else
-            echo "No NVIDIA GPU devices found in /dev"
-        fi
-        # Check for NVIDIA GPU controllers in PCI devices
-        if lspci -v | grep -e 'controller.*NVIDIA' >/dev/null 2>/dev/null; then
-            echo "NVIDIA GPU found"
-            lspci | grep -i nvidia
-        else
-            echo "No NVIDIA GPU found"
-        fi
-
-        # Check if NVIDIA kernel module is loaded
-        if lsmod | grep -q nvidia; then
-            echo "NVIDIA kernel module is loaded"
-            lsmod | grep nvidia
-        else
-            echo "NVIDIA kernel module not loaded"
-        fi
-
         python -c "import torch; print(torch.__version__); print(torch.cuda.get_arch_list()); print(torch.randn(1).cuda())"
         python -c "import torch; print(f'{torch.cuda.is_available()=}')"
         python -c "import torch; print(f'{torch.version.cuda=}')"
