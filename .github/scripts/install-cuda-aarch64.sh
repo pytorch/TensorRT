@@ -14,6 +14,35 @@ install_cuda_aarch64() {
     export LD_LIBRARY_PATH=/usr/local/cuda/lib64:/usr/lib64:$LD_LIBRARY_PATH
     ls -lart /usr/local/
     nvcc --version
+    # Check if nvidia-smi is available and working
+    if command -v nvidia-smi &> /dev/null; then
+        nvidia-smi
+    else
+        echo "nvidia-smi not found - no NVIDIA GPU or drivers installed"
+    fi
+    # Check for NVIDIA device files in /dev
+    if compgen -G "/dev/nvidia[0-9]" >/dev/null; then
+        echo "NVIDIA GPU devices found:"
+        ls -la /dev/nvidia*
+    else
+        echo "No NVIDIA GPU devices found in /dev"
+    fi
+    # Check for NVIDIA GPU controllers in PCI devices
+    if lspci -v | grep -e 'controller.*NVIDIA' >/dev/null 2>/dev/null; then
+        echo "NVIDIA GPU found"
+        lspci | grep -i nvidia
+    else
+        echo "No NVIDIA GPU found"
+    fi
+
+    # Check if NVIDIA kernel module is loaded
+    if lsmod | grep -q nvidia; then
+        echo "NVIDIA kernel module is loaded"
+        lsmod | grep nvidia
+    else
+        echo "NVIDIA kernel module not loaded"
+    fi
+
     echo "cuda ${CU_VER} installed successfully"
 }
 
