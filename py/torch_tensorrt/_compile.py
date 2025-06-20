@@ -4,7 +4,7 @@ import collections.abc
 import logging
 import platform
 from enum import Enum
-from typing import Any, Callable, List, Optional, Sequence, Set
+from typing import Any, Callable, List, Optional, Sequence, Set, Union
 
 import torch
 import torch.fx
@@ -170,7 +170,7 @@ def compile(
     inputs: Optional[Sequence[Input | torch.Tensor | InputTensorSpec]] = None,
     arg_inputs: Optional[Sequence[Sequence[Any]]] = None,
     kwarg_inputs: Optional[dict[Any, Any]] = None,
-    enabled_precisions: Optional[Set[torch.dtype | dtype]] = None,
+    enabled_precisions: Optional[Set[Union[torch.dtype, dtype]]] = None,
     **kwargs: Any,
 ) -> (
     torch.nn.Module | torch.jit.ScriptModule | torch.fx.GraphModule | Callable[..., Any]
@@ -213,7 +213,7 @@ def compile(
     """
 
     input_list = inputs if inputs is not None else []
-    enabled_precisions_set: Set[dtype | torch.dtype] = (
+    enabled_precisions_set: Set[Union[torch.dtype, dtype]] = (
         enabled_precisions
         if enabled_precisions is not None
         else _defaults.ENABLED_PRECISIONS
@@ -308,7 +308,7 @@ def cross_compile_for_windows(
     inputs: Optional[Sequence[Input | torch.Tensor]] = None,
     arg_inputs: Optional[Sequence[Sequence[Any]]] = None,
     kwarg_inputs: Optional[dict[Any, Any]] = None,
-    enabled_precisions: Optional[Set[torch.dtype | dtype]] = None,
+    enabled_precisions: Optional[Set[Union[torch.dtype, dtype]]] = None,
     **kwargs: Any,
 ) -> None:
     """Compile a PyTorch module using TensorRT in Linux for Inference in Windows
@@ -424,7 +424,7 @@ def convert_method_to_trt_engine(
     arg_inputs: Optional[Sequence[Sequence[Any]]] = None,
     kwarg_inputs: Optional[dict[Any, Any]] = None,
     ir: str = "default",
-    enabled_precisions: Optional[Set[torch.dtype | dtype]] = None,
+    enabled_precisions: Optional[Set[Union[torch.dtype, dtype]]] = None,
     **kwargs: Any,
 ) -> bytes:
     """Convert a TorchScript module method to a serialized TensorRT engine
