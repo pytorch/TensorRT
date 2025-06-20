@@ -14,6 +14,7 @@ fi
 
 # Install all the dependencies required for Torch-TensorRT
 pip install --pre -r ${PWD}/tests/py/requirements.txt
+pip uninstall -y torch torchvision
 pip install --force-reinstall --pre ${TORCH} --index-url ${INDEX_URL}
 pip install --force-reinstall --pre ${TORCHVISION} --index-url ${INDEX_URL}
 
