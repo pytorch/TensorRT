@@ -69,7 +69,7 @@ class MutableTorchTensorRTModule(object):
         strict: bool = True,
         allow_complex_guards_as_runtime_asserts: bool = False,
         weight_streaming_budget: Optional[int] = None,
-        enabled_precisions: Optional[Set[torch.dtype | dtype]] = None,
+        enabled_precisions: Optional[Set[Union[torch.dtype,dtype]]] = None,
         **kwargs: Any,
     ) -> None:
         """
