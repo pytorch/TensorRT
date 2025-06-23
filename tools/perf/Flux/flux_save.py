@@ -7,31 +7,14 @@ sys.path.append(os.path.join(os.path.dirname(__file__), "../../../examples/apps"
 from flux_demo import compile_model
 
 
-def benchmark(pipe, prompt, inference_step, batch_size=1, iterations=1):
-
-    start = time()
-    for i in range(iterations):
-        image = pipe(
-            prompt,
-            output_type="pil",
-            num_inference_steps=inference_step,
-            num_images_per_prompt=batch_size,
-        ).images
-    end = time()
-
-    print(f"Batch Size: {batch_size}")
-    print("Time Elapse for", iterations, "iterations:", end - start)
-    print(
-        "Average Latency Per Step:",
-        (end - start) / inference_step / iterations / batch_size,
-    )
-    return image
-
-
 def main(args):
     pipe, backbone, trt_gm = compile_model(args)
-    for batch_size in range(1, args.max_batch_size + 1):
-        benchmark(pipe, ["Test"], 20, batch_size=batch_size, iterations=3)
+    if args.save_full_path:
+        trt_ep_path = args.save_full_path
+    else:
+        trt_ep_path = os.path.join(os.path.dirname(__file__), "flux_trt.ep")
+    torch_tensorrt.save(trt_gm, trt_ep_path)
+    print(f"Model saved to {trt_ep_path=}")
 
 
 if __name__ == "__main__":
@@ -74,6 +57,11 @@ if __name__ == "__main__":
         "--use_torch_dynamo_compile",
         action="store_true",
         help="Use torch.dynamo.compile() to compile the model",
+    )
+    parser.add_argument(
+        "--save_full_path",
+        "-s",
+        help="Save the model to a full path",
     )
     parser.add_argument("--max_batch_size", type=int, default=1)
     args = parser.parse_args()

@@ -1,4 +1,5 @@
 import argparse
+import gc
 import os
 import re
 import sys
@@ -19,30 +20,55 @@ from register_sdpa import *
 DEVICE = "cuda:0"
 
 
+def print_peak_memory(stage, debug=False):
+    if debug:
+        peak_memory = torch.cuda.max_memory_allocated() / (1024**3)
+        peak_reserved = torch.cuda.max_memory_reserved() / (1024**3)
+        print(
+            f"Peak memory allocated during {stage}: {peak_memory=}GB {peak_reserved=}GB"
+        )
+        torch.cuda.empty_cache()
+        torch.cuda.reset_peak_memory_stats()
+        gc.collect()
+
+
 def compile_model(
     args,
 ) -> tuple[
-    FluxPipeline, FluxTransformer2DModel, torch_tensorrt.MutableTorchTensorRTModule
+    FluxPipeline,
+    FluxTransformer2DModel,
+    Union[torch_tensorrt.MutableTorchTensorRTModule, torch.fx.GraphModule],
 ]:
-
+    original_dtype = torch.float16
+    use_explicit_typing = args.use_explicit_typing
     if args.dtype == "fp8":
         enabled_precisions = {torch.float8_e4m3fn, torch.float16}
         ptq_config = mtq.FP8_DEFAULT_CFG
-
+    elif args.dtype == "fp4":
+        enabled_precisions = {torch.float32}
+        if args.fp4_mha:
+            ptq_config = mtq.NVFP4_FP8_MHA_CONFIG
+        else:
+            ptq_config = mtq.NVFP4_DEFAULT_CFG
+        # fp4 requires explicit typing
+        use_explicit_typing = True
     elif args.dtype == "int8":
         enabled_precisions = {torch.int8, torch.float16}
         ptq_config = mtq.INT8_DEFAULT_CFG
-        ptq_config["quant_cfg"]["*weight_quantizer"]["axis"] = None
+        # ptq_config["quant_cfg"]["*weight_quantizer"]["axis"] = None
 
     elif args.dtype == "fp16":
         enabled_precisions = {torch.float16}
+    elif args.dtype == "bf16":
+        enabled_precisions = {torch.bfloat16}
+        original_dtype = torch.bfloat16
 
     print(f"\nUsing {args.dtype}")
 
     pipe = FluxPipeline.from_pretrained(
         "black-forest-labs/FLUX.1-dev",
-        torch_dtype=torch.float16,
-    ).to(torch.float16)
+        torch_dtype=original_dtype,
+    ).to(original_dtype)
 
     if args.low_vram_mode:
         pipe.enable_model_cpu_offload()
@@ -80,9 +106,11 @@ def compile_model(
             prompt="a dog running in a park",
         )
 
-    if args.dtype != "fp16":
+    if args.dtype not in ["fp16", "bf16"]:
+        print_peak_memory("before mtq.quantize()", args.debug)
         backbone = mtq.quantize(backbone, ptq_config, forward_loop)
         mtq.disable_quantizer(backbone, filter_func)
+        print_peak_memory("after mtq.quantize()", args.debug)
 
     batch_size = 2 if args.dynamic_shapes else 1
     if args.dynamic_shapes:
@@ -107,20 +135,59 @@ def compile_model(
         "enabled_precisions": enabled_precisions,
         "truncate_double": True,
         "min_block_size": 1,
-        "debug": False,
-        "use_python_runtime": True,
+        "use_python_runtime": False,
         "immutable_weights": False,
-        "offload_module_to_cpu": True,
+        "offload_module_to_cpu": args.low_vram_mode,
+        "debug": args.debug,
+        "use_explicit_typing": use_explicit_typing,
     }
     if args.low_vram_mode:
         pipe.remove_all_hooks()
         pipe.enable_sequential_cpu_offload()
         remove_hook_from_module(pipe.transformer, recurse=True)
         pipe.transformer.to(DEVICE)
-    trt_gm = torch_tensorrt.MutableTorchTensorRTModule(backbone, **settings)
-    if dynamic_shapes:
-        trt_gm.set_expected_dynamic_shape_range((), dynamic_shapes)
+
+    print_peak_memory("before TRT", args.debug)
+    if args.use_torch_dynamo_compile:
+        with torch.no_grad():
+            with export_torch_mode():
+                dummy_inputs = {
+                    "hidden_states": torch.randn(
+                        (batch_size, 4096, 64), dtype=original_dtype
+                    ).to(DEVICE),
+                    "encoder_hidden_states": torch.randn(
+                        (batch_size, 512, 4096), dtype=original_dtype
+                    ).to(DEVICE),
+                    "pooled_projections": torch.randn(
+                        (batch_size, 768), dtype=original_dtype
+                    ).to(DEVICE),
+                    "timestep": torch.tensor(
+                        [1.0] * batch_size, dtype=original_dtype
+                    ).to(DEVICE),
+                    "txt_ids": torch.randn((512, 3), dtype=original_dtype).to(DEVICE),
+                    "img_ids": torch.randn((4096, 3), dtype=original_dtype).to(DEVICE),
+                    "guidance": torch.tensor(
+                        [1.0] * batch_size, dtype=torch.float32
+                    ).to(DEVICE),
+                    "joint_attention_kwargs": {},
+                }
+                ep = torch.export.export(
+                    backbone,
+                    args=(),
+                    kwargs=dummy_inputs,
+                    dynamic=dynamic_shapes,
+                    strict=False,
+                    allow_complex_guards_as_runtime_asserts=True,
+                )
+                trt_gm = torch_tensorrt.dynamo.compile(
+                    ep, inputs=dummy_inputs, **settings
+                )
+    else:
+        trt_gm = torch_tensorrt.MutableTorchTensorRTModule(backbone, **settings)
+        if dynamic_shapes:
+            trt_gm.set_expected_dynamic_shape_range((), dynamic_shapes)
     pipe.transformer = trt_gm
+    print_peak_memory("after TRT", args.debug)
 
     image = pipe(
         "Test",
@@ -233,22 +300,31 @@ def launch_gradio(pipeline, backbone, trt_gm):
         demo.launch()
 
 
-def main(args):
-    pipe, backbone, trt_gm = compile_model(args)
-    launch_gradio(pipe, backbone, trt_gm)
-
-
-# Launch the interface
-if __name__ == "__main__":
+def parse_args():
     parser = argparse.ArgumentParser(
         description="Run Flux quantization with different dtypes"
     )
 
     parser.add_argument(
         "--dtype",
-        choices=["fp8", "int8", "fp16"],
+        choices=["fp8", "int8", "fp16", "fp4", "bf16"],
         default="fp16",
-        help="Select the data type to use (fp8 or int8 or fp16)",
+        help="Select the data type to use (fp8 or int8 or fp16 or fp4 or bf16)",
+    )
+    parser.add_argument(
+        "--fp4_mha",
+        action="store_true",
+        help="Use FP4 MHA",
+    )
+    parser.add_argument(
+        "--use_explicit_typing",
+        action="store_true",
+        help="Use explicit typing",
+    )
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="Debug mode",
     )
     parser.add_argument(
         "--low_vram_mode",
@@ -261,5 +337,21 @@ if __name__ == "__main__":
         action="store_true",
         help="Use dynamic shapes",
     )
+    parser.add_argument(
+        "--use_torch_dynamo_compile",
+        action="store_true",
+        help="Use torch.dynamo.compile() to compile the model",
+    )
     args = parser.parse_args()
+    return args
+
+
+def main(args):
+    pipe, backbone, trt_gm = compile_model(args)
+    launch_gradio(pipe, backbone, trt_gm)
+
+
+# Launch the interface
+if __name__ == "__main__":
+    args = parse_args()
     main(args)
