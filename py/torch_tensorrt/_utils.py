@@ -1,4 +1,3 @@
-import re
 import sys
 from typing import Any
 
@@ -17,6 +16,8 @@ def check_cross_compile_trt_win_lib() -> bool:
     # cross compile feature is only available on linux
     # build engine on linux and run on windows
     if sys.platform.startswith("linux"):
+        import re
+
         import dllist
 
         loaded_libs = dllist.dllist()
