@@ -150,38 +150,34 @@ def compile_model(
     print_peak_memory("before TRT", args.debug)
     if args.use_torch_dynamo_compile:
         with torch.no_grad():
-            with export_torch_mode():
-                dummy_inputs = {
-                    "hidden_states": torch.randn(
-                        (batch_size, 4096, 64), dtype=original_dtype
-                    ).to(DEVICE),
-                    "encoder_hidden_states": torch.randn(
-                        (batch_size, 512, 4096), dtype=original_dtype
-                    ).to(DEVICE),
-                    "pooled_projections": torch.randn(
-                        (batch_size, 768), dtype=original_dtype
-                    ).to(DEVICE),
-                    "timestep": torch.tensor(
-                        [1.0] * batch_size, dtype=original_dtype
-                    ).to(DEVICE),
-                    "txt_ids": torch.randn((512, 3), dtype=original_dtype).to(DEVICE),
-                    "img_ids": torch.randn((4096, 3), dtype=original_dtype).to(DEVICE),
-                    "guidance": torch.tensor(
-                        [1.0] * batch_size, dtype=torch.float32
-                    ).to(DEVICE),
-                    "joint_attention_kwargs": {},
-                }
-                ep = torch.export.export(
-                    backbone,
-                    args=(),
-                    kwargs=dummy_inputs,
-                    dynamic=dynamic_shapes,
-                    strict=False,
-                    allow_complex_guards_as_runtime_asserts=True,
-                )
-                trt_gm = torch_tensorrt.dynamo.compile(
-                    ep, inputs=dummy_inputs, **settings
-                )
+            dummy_inputs = {
+                "hidden_states": torch.randn(
+                    (batch_size, 4096, 64), dtype=original_dtype
+                ).to(DEVICE),
+                "encoder_hidden_states": torch.randn(
+                    (batch_size, 512, 4096), dtype=original_dtype
+                ).to(DEVICE),
+                "pooled_projections": torch.randn(
+                    (batch_size, 768), dtype=original_dtype
+                ).to(DEVICE),
+                "timestep": torch.tensor([1.0] * batch_size, dtype=original_dtype).to(
+                    DEVICE
+                ),
+                "txt_ids": torch.randn((512, 3), dtype=original_dtype).to(DEVICE),
+                "img_ids": torch.randn((4096, 3), dtype=original_dtype).to(DEVICE),
+                "guidance": torch.tensor([1.0] * batch_size, dtype=torch.float32).to(
+                    DEVICE
+                ),
+                "joint_attention_kwargs": {},
+            }
+            ep = torch.export.export(
+                backbone,
+                args=(),
+                kwargs=dummy_inputs,
+                dynamic_shapes=dynamic_shapes,
+                strict=False,
+            )
+            trt_gm = torch_tensorrt.dynamo.compile(ep, inputs=dummy_inputs, **settings)
     else:
         trt_gm = torch_tensorrt.MutableTorchTensorRTModule(backbone, **settings)
         if dynamic_shapes:
