@@ -1,3 +1,14 @@
+"""
+
+.. _hierarchical_partitioner_example:
+
+Hierarchical Partitioner Example
+================================
+
+Basic example on how to use the hierarchical adjacency partitioner function and manually compile the partitioned model.
+Not yet available in the compile API.
+"""
+
 from typing import Any, Callable
 
 import torch
