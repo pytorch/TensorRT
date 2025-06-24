@@ -2,7 +2,6 @@
 set -x
 
 TORCH=$(grep "^torch>" ${PWD}/py/requirements.txt)
-TORCHVISION=$(grep "^torchvision" ${PWD}/py/requirements.txt)
 INDEX_URL=https://download.pytorch.org/whl/${CHANNEL}/${CU_VERSION}
 PLATFORM=$(python -c "import sys; print(sys.platform)")
 
@@ -14,9 +13,8 @@ fi
 
 # Install all the dependencies required for Torch-TensorRT
 pip install --pre -r ${PWD}/tests/py/requirements.txt
+pip install --pre -r ${PWD}/tests/py/requirements_no_deps.txt --no-deps --extra-index-url ${INDEX_URL}
 pip install --force-reinstall --pre ${TORCH} --index-url ${INDEX_URL}
-pip install --force-reinstall --pre ${TORCHVISION} --index-url ${INDEX_URL}
-
 
 # Install Torch-TensorRT
 if [[ ${PLATFORM} == win32 ]]; then
