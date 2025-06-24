@@ -61,6 +61,8 @@ ENABLED_FEATURES = FeatureSet(
     _WINDOWS_CROSS_COMPILE,
 )
 
+T = TypeVar("T")
+
 
 def _enabled_features_str() -> str:
     enabled = lambda x: "ENABLED" if x else "DISABLED"
@@ -128,9 +130,6 @@ def needs_cross_compile(f: Callable[..., Any]) -> Callable[..., Any]:
             return not_implemented(*args, **kwargs)
 
     return wrapper
-
-
-T = TypeVar("T")
 
 
 def for_all_methods(

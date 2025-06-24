@@ -55,7 +55,15 @@ def deconvNd(
     if isinstance(bias, (torch.Tensor, np.ndarray)):
         # Transform the bias constant into a Numpy array
         bias = to_torch(bias, dtype=input.dtype)
-        bias = get_trt_tensor(ctx, bias, f"{name}_bias")
+        bias = to_trt_weights(
+            ctx,
+            bias,
+            name,
+            layer_type_name="CONVOLUTION",
+            weight_type_name="BIAS",
+            target=target,
+            source_ir=source_ir,
+        )
 
     elif isinstance(bias, TRTTensor):
         bias = get_trt_tensor(ctx, bias, f"{name}_bias")
@@ -85,7 +93,15 @@ def deconvNd(
             weight = torch.unsqueeze(weight, -1)
         num_output_maps = weight.shape[1]
         kernel_shape = weight.shape[2:]
-        weight = to_trt_weights(weight)
+        weight = to_trt_weights(
+            ctx,
+            weight,
+            name,
+            layer_type_name="CONVOLUTION",
+            weight_type_name="KERNEL",
+            target=target,
+            source_ir=source_ir,
+        )
 
     else:
         raise RuntimeError(
@@ -105,6 +121,7 @@ def deconvNd(
         kernel=trt.Weights() if isinstance(weight, TRTTensor) else weight,
         bias=trt.Weights() if isinstance(bias, TRTTensor) else bias,
     )
+    set_layer_name(deconv_layer, target, name, source_ir)
 
     # If the weight is a TRTTensor, set it as an input of the layer
     if isinstance(weight, TRTTensor):
@@ -134,8 +151,6 @@ def deconvNd(
             if output_padding is not None
             else output_padding
         )
-
-    set_layer_name(deconv_layer, target, name, source_ir)
 
     # Set relevant attributes of deconvolution layer
     if padding is not None:

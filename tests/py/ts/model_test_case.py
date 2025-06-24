@@ -1,7 +1,7 @@
-import unittest
-import torch
-import torchvision.models as models
 import os
+import unittest
+
+import torch
 
 REPO_ROOT = os.path.abspath(os.getcwd()) + "/../../"
 

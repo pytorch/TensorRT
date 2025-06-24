@@ -1,7 +1,7 @@
 from typing import Any, Callable, Type, TypeVar
 
-T = TypeVar("T")
 F = TypeVar("F", bound=Callable[..., Any])
+T = TypeVar("T")
 
 _DEBUG_ENABLED_FUNCS = []
 _DEBUG_ENABLED_CLS = []

@@ -9,7 +9,6 @@ import torch
 import torch.nn.functional as F
 import torch_tensorrt as torchtrt
 import torch_tensorrt as torch_trt
-import torchvision.models as models
 from torch import nn
 from torch_tensorrt.dynamo import refit_module_weights
 from torch_tensorrt.dynamo._refit import (
@@ -25,6 +24,9 @@ from torch_tensorrt.logging import TRT_LOGGER
 
 assertions = unittest.TestCase()
 
+if importlib.util.find_spec("torchvision"):
+    import torchvision.models as models
+
 
 @unittest.skipIf(
     not torch_trt.ENABLED_FEATURES.torch_tensorrt_runtime,
@@ -33,6 +35,10 @@ assertions = unittest.TestCase()
 @unittest.skipIf(
     not torch_trt.ENABLED_FEATURES.refit,
     "Refit feature is not supported in Python 3.13 or higher",
+)
+@unittest.skipIf(
+    not importlib.util.find_spec("torchvision"),
+    "torchvision is not installed",
 )
 @pytest.mark.unit
 def test_mapping():
@@ -93,6 +99,10 @@ def test_mapping():
     not torch_trt.ENABLED_FEATURES.refit,
     "Refit feature is not supported in Python 3.13 or higher",
 )
+@unittest.skipIf(
+    not importlib.util.find_spec("torchvision"),
+    "torchvision is not installed",
+)
 @pytest.mark.unit
 def test_refit_one_engine_with_weightmap():
     model = models.resnet18(pretrained=False).eval().to("cuda")
@@ -146,6 +156,10 @@ def test_refit_one_engine_with_weightmap():
 @unittest.skipIf(
     not torch_trt.ENABLED_FEATURES.refit,
     "Refit feature is not supported in Python 3.13 or higher",
+)
+@unittest.skipIf(
+    not importlib.util.find_spec("torchvision"),
+    "torchvision is not installed",
 )
 @pytest.mark.unit
 def test_refit_one_engine_no_map_with_weightmap():
@@ -201,6 +215,10 @@ def test_refit_one_engine_no_map_with_weightmap():
 @unittest.skipIf(
     not torch_trt.ENABLED_FEATURES.refit,
     "Refit feature is not supported in Python 3.13 or higher",
+)
+@unittest.skipIf(
+    not importlib.util.find_spec("torchvision"),
+    "torchvision is not installed",
 )
 @pytest.mark.unit
 def test_refit_one_engine_with_wrong_weightmap():

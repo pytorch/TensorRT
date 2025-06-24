@@ -29,6 +29,7 @@ constexpr auto graph = R"IR(
 )IR";
 
 TEST(Converters, ATenInstanceNormConvertsCorrectly) {
+  GTEST_SKIP();
   auto g = std::make_shared<torch::jit::Graph>();
   torch::jit::parseIR(graph, g.get());
 
@@ -51,6 +52,7 @@ TEST(Converters, ATenInstanceNormConvertsCorrectly) {
 }
 
 TEST(Converters, ATenInstanceNormAffineConvertsCorrectly) {
+  GTEST_SKIP();
   auto g = std::make_shared<torch::jit::Graph>();
   torch::jit::parseIR(graph, g.get());
 

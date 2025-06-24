@@ -25,12 +25,12 @@ if [[ "${CU_VERSION::4}" < "cu12" ]]; then
          pyproject.toml
 fi
 
-TORCH_TORCHVISION=$(grep "^torch" py/requirements.txt)
+TORCH=$(grep "^torch>" py/requirements.txt)
 INDEX_URL=https://download.pytorch.org/whl/${CHANNEL}/${CU_VERSION}
 
 # Install all the dependencies required for Torch-TensorRT
 pip uninstall -y torch torchvision
-pip install --force-reinstall --pre ${TORCH_TORCHVISION} --index-url ${INDEX_URL}
+pip install --force-reinstall --pre ${TORCH} --index-url ${INDEX_URL}
 
 export CUDA_HOME="$(echo ${CUDA_PATH} | sed -e 's#\\#\/#g')"
 export TORCH_INSTALL_PATH="$(python -c "import torch, os; print(os.path.dirname(torch.__file__))" | sed -e 's#\\#\/#g')"

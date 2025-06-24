@@ -15,6 +15,17 @@ config_setting(
     ],
 )
 
+config_setting(
+    name = "jetpack",
+    constraint_values = [
+        "@platforms//cpu:aarch64",
+    ],
+    flag_values = {
+        "//toolchains/dep_collection:compute_libs": "jetpack"
+    },
+)
+
+
 lowering_test(
     name = "test_linear_to_addmm",
 )
@@ -30,8 +41,8 @@ cc_test(
         "@googletest//:gtest_main",
     ] + select({
         ":windows": ["@libtorch_win//:libtorch"],
-        ":use_pre_cxx11_abi": ["@libtorch_pre_cxx11_abi//:libtorch"],
-        "//conditions:default": ["@libtorch"],
+	":jetpack": ["@torch_l4t//:libtorch"],
+	"//conditions:default": ["@libtorch"],
     }),
 )
 

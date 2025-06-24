@@ -239,3 +239,16 @@ In this example we will collect the arithmetic ops in a TensorRT segment and the
 In some cases this approach may create adjacent segments in the partition which have the same target. As a clean-up step we can consolidate these adjacent segments to further reduce the number of segments in the final partition.
 The merge segments step identifies a list of segments that are adjacent in the graph, have the same target, and are not marked as `do_not_merge`. The nodes from these segments will be combined into a single new segment that will replace the merged segments in the partition.
 The `do_not_merge` marking is used to prevent merging of segments created for conditional nodes and loops that are handled as special cases in graph stitching and should not be merged with adjacent segments of the same type.
+
+
+Hierarchical Partitioner for Dynamo
+===================================
+
+The Hierarchical Partitioner is an extension to the standard TensorRT partitioner that allows for more sophisticated partitioning strategies by considering backend priority and operator support. This is particularly useful when you want to distribute different parts of your model across multiple backends based on their capabilities and priorities.
+
+We currently support hierarchical adjacency partitioner, which extends the standard adjacency partitioner with the following capabilities:
+
+1. **Backend priority ordering**: Assign operators to backends based on a priority order, ensuring that operators are assigned to the highest-priority backend that supports them.
+2. **Multi-backend support**: Distribute model execution across multiple backends based on operator support.
+
+Please refer to `hierarchical_partitioner_example <https://github.com/pytorch/TensorRT/blob/main/examples/dynamo/hierarchical_partitioner_example.py>`_ for more details.

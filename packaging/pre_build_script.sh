@@ -42,14 +42,14 @@ curl -L https://github.com/bazelbuild/bazelisk/releases/download/v1.26.0/bazelis
 pip uninstall -y torch torchvision
 
 if [[ ${IS_JETPACK} == true ]]; then
-    # install torch 2.7 torchvision 0.22.0 for jp6.2
-    pip install torch==2.7.0 torchvision==0.22.0  --index-url=https://pypi.jetson-ai-lab.dev/jp6/cu126/
+    # install torch 2.7 for jp6.2
+    pip install torch==2.7.0 --index-url=https://pypi.jetson-ai-lab.dev/jp6/cu126/
 else
-    TORCH_TORCHVISION=$(grep "^torch" py/requirements.txt)
+    TORCH=$(grep "^torch>" py/requirements.txt)
     INDEX_URL=https://download.pytorch.org/whl/${CHANNEL}/${CU_VERSION}
 
     # Install all the dependencies required for Torch-TensorRT
-    pip install --force-reinstall --pre ${TORCH_TORCHVISION} --index-url ${INDEX_URL}
+    pip install --force-reinstall --pre ${TORCH} --index-url ${INDEX_URL}
 fi
 
 export TORCH_BUILD_NUMBER=$(python -c "import torch, urllib.parse as ul; print(ul.quote_plus(torch.__version__))")

@@ -261,7 +261,6 @@ def partition(
 
     Args:
         gm: FX GraphModule to partition
-        verbose: Bool representing whether to print operator support
         min_block_size: Minimum number of operators per TRT-Engine Block
         torch_executed_ops: Collection of operations to run in Torch, regardless of converter coverage
         require_full_compilation: Require that all computational operators be run in TRT

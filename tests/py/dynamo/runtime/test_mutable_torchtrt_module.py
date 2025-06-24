@@ -1,19 +1,21 @@
 # type: ignore
+import importlib
 import os
 import tempfile
 import unittest
 
 import pytest
-import timm
 import torch
 import torch.nn.functional as F
 import torch_tensorrt as torch_trt
-import torchvision.models as models
 from torch import nn
 from torch_tensorrt.dynamo.runtime._MutableTorchTensorRTModule import RefitFlag
 from torch_tensorrt.dynamo.utils import check_output_equal
 
 assertions = unittest.TestCase()
+
+if importlib.util.find_spec("torchvision"):
+    import torchvision.models as models
 
 
 @pytest.mark.unit
@@ -209,6 +211,10 @@ def test_model_complex_dynamic_shape_with_saving():
     not torch_trt.ENABLED_FEATURES.refit,
     "Refit feature is not supported in Python 3.13 or higher",
 )
+@unittest.skipIf(
+    not importlib.util.find_spec("torchvision"),
+    "torchvision is not installed",
+)
 @pytest.mark.unit
 def test_resnet18():
     torch.manual_seed(0)
@@ -249,6 +255,10 @@ def test_resnet18():
     not torch_trt.ENABLED_FEATURES.refit,
     "Refit feature is not supported in Python 3.13 or higher",
 )
+@unittest.skipIf(
+    not importlib.util.find_spec("torchvision"),
+    "torchvision is not installed",
+)
 @pytest.mark.unit
 def test_save():
     torch.manual_seed(0)
@@ -288,6 +298,9 @@ def test_save():
 @unittest.skipIf(
     not torch_trt.ENABLED_FEATURES.refit,
     "Refit feature is not supported in Python 3.13 or higher",
+)
+@unittest.skipIf(
+    not importlib.util.find_spec("torchvision"), "torchvision not installed"
 )
 @pytest.mark.unit
 def test_resnet18_modify_attribute():
@@ -332,6 +345,9 @@ def test_resnet18_modify_attribute():
 @unittest.skipIf(
     not torch_trt.ENABLED_FEATURES.refit,
     "Refit feature is not supported in Python 3.13 or higher",
+)
+@unittest.skipIf(
+    not importlib.util.find_spec("torchvision"), "torchvision not installed"
 )
 @pytest.mark.unit
 def test_resnet18_modify_attribute_no_refit():

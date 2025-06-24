@@ -3,7 +3,18 @@ import ctypes
 import functools
 import logging
 import os
-from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union, overload
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    List,
+    Literal,
+    Optional,
+    Sequence,
+    Tuple,
+    Union,
+    overload,
+)
 
 import numpy as np
 import tensorrt as trt
@@ -321,7 +332,16 @@ def cast_int_or_float_to_bool(
 
 
 def to_trt_weights(
-    value: Any, target_quantized_type: Optional[trt.DataType] = None
+    ctx: ConversionContext,
+    value: torch.Tensor,
+    name: str,
+    layer_type_name: Literal["CONVOLUTION", "DECONVOLUTION", "CONSTANT"],
+    weight_type_name: Literal["KERNEL", "BIAS", "CONSTANT"],
+    target: Optional[Union[Target, str]] = None,
+    source_ir: Optional[SourceIR] = None,
+    target_quantized_type: Optional[trt.DataType] = None,
+    dtype: Optional[trt.DataType] = None,
+    count: Optional[int] = None,
 ) -> trt.Weights:
     """
     Convert a PyTorch tensor or NumPy array to TensorRT weights.
@@ -336,19 +356,50 @@ def to_trt_weights(
         - Input tensors are made contiguous before conversion
         - Data type is preserved from the original tensor/array
     """
-    if isinstance(value, torch.Tensor):
-        # Tensor must be contiguous before conversion
-        value = value.contiguous()
-        value_trt_dtype = _enums.dtype._from(value.dtype).to(trt.DataType)
-        return trt.Weights(value_trt_dtype, value.data_ptr(), value.nelement())
-    elif isinstance(value, np.ndarray):
-        value = np.ascontiguousarray(value)
-        value_np_dtype = _enums.dtype._from(value.dtype).to(np.dtype, use_default=True)
-        return trt.Weights(value_np_dtype, value.data, value.size)
-    else:
+    if not isinstance(value, torch.Tensor):
         raise AssertionError(
-            f"to_trt_weights can only be called on torch.Tensor or np.ndarray, got an object of type: {type(value)}"
+            f"to_trt_weights can only be called on torch.Tensor, got an object of type: {type(value)}"
         )
+
+    # Weight Recording
+    supported_layer_types = ["CONVOLUTION", "DECONVOLUTION", "CONSTANT"]
+    supported_weight_types = ["KERNEL", "BIAS", "CONSTANT"]
+    assert (
+        layer_type_name in supported_layer_types
+    ), f"Encountered unsupported layer type: {layer_type_name}. Supported types are: {supported_layer_types}. Manually calling to_trt_weights with a custom layer type is not intended for general use."
+    assert (
+        weight_type_name in supported_weight_types
+    ), f"Encountered unsupported weight type: {weight_type_name}. Supported types are: {supported_weight_types}. Manually calling to_trt_weights with a custom weight type is not intended for general use."
+
+    if weight_type_name == "CONSTANT" and layer_type_name == "CONSTANT":
+        weight_name = f"{name} CONSTANT"
+        ctx.record_weight(weight_name, value)
+
+    else:
+        assert (
+            target is not None
+        ), "target must be provided if the weight type and layer type is not CONSTANT"
+        source_ir = source_ir if source_ir is not None else SourceIR.UNKNOWN
+        target_name = (
+            f"{source_ir}_ops.{target}"
+            if isinstance(target, str)
+            else f"{source_ir}_ops.{target.__name__}"
+        )
+
+        weight_name = f"[{layer_type_name}]-[{target_name}]-[{name}] {weight_type_name}"
+        ctx.record_weight(weight_name, value)
+
+    # TRT Weights Creation
+
+    # Tensor must be contiguous before conversion
+    value = value.contiguous()
+    if dtype is None:
+        dtype = _enums.dtype._from(value.dtype).to(trt.DataType)
+
+    if count is None:
+        count = value.nelement()
+
+    return trt.Weights(dtype, value.data_ptr(), count)
 
 
 def create_constant(
@@ -405,9 +456,13 @@ def create_constant(
                         "Currently supported target_quantized_type for uint8 is FP4, got {target_quantized_type=}"
                     )
                 shape[-1] = shape[-1] * 2
-                weights = trt.Weights(
-                    type=trt.DataType.FP4,
-                    ptr=torch_value.data_ptr(),
+                weights = to_trt_weights(
+                    ctx,
+                    torch_value,
+                    name,
+                    "CONSTANT",
+                    "CONSTANT",
+                    dtype=trt.DataType.FP4,
                     count=torch_value.numel() * 2,
                 )
                 constant = ctx.net.add_constant(
@@ -415,24 +470,12 @@ def create_constant(
                     weights,
                 )
                 constant.name = name
-                ctx.cpu_weights_reference_holder[name + " FP4_CONSTANT"] = torch_value
                 return constant.get_output(0)
 
-            # TODO: Refit map uses numpy arrays. Remove this once refit is updated to use torch.Tensor
-            if torch_value.dtype == torch.bfloat16:
-                torch_value_fp32 = torch_value.to(torch.float32)
-                numpy_value = torch_value_fp32.numpy()
-            else:
-                numpy_value = torch_value.numpy()
-
-            # Used for refit
-            ctx.weight_refit_map[name + " CONSTANT"] = numpy_value.reshape(-1)
-
-            # This is a buffer to hold the torch.Tensor so that they are alive during the course of TRT compilation.
-            ctx.cpu_weights_reference_holder[name] = torch_value
+            # Record the weight in ctx for refit and cpu memory reference
 
             # Convert the torch.Tensor to a trt.Weights object
-            trt_weights = to_trt_weights(torch_value)
+            trt_weights = to_trt_weights(ctx, torch_value, name, "CONSTANT", "CONSTANT")
             constant = ctx.net.add_constant(
                 shape,
                 trt_weights,

@@ -3,10 +3,8 @@ import importlib
 import unittest
 
 import pytest
-import timm
 import torch
 import torch_tensorrt as torchtrt
-import torchvision.models as models
 from torch_tensorrt.dynamo.utils import (
     COSINE_THRESHOLD,
     cosine_similarity,
@@ -15,8 +13,16 @@ from torch_tensorrt.dynamo.utils import (
 
 assertions = unittest.TestCase()
 
+if importlib.util.find_spec("torchvision"):
+    import timm
+    import torchvision.models as models
+
 
 @pytest.mark.unit
+@unittest.skipIf(
+    not importlib.util.find_spec("torchvision"),
+    "torchvision is not installed",
+)
 def test_resnet18(ir):
     model = models.resnet18(pretrained=True).eval().to("cuda")
     input = torch.randn((1, 3, 224, 224)).to("cuda")
@@ -48,6 +54,10 @@ def test_resnet18(ir):
 
 
 @pytest.mark.unit
+@unittest.skipIf(
+    not importlib.util.find_spec("torchvision"),
+    "torchvision is not installed",
+)
 def test_resnet18_cpu_offload(ir):
     model = models.resnet18(pretrained=True).eval().to("cuda")
     input = torch.randn((1, 3, 224, 224)).to("cuda")
@@ -85,6 +95,10 @@ def test_resnet18_cpu_offload(ir):
 
 
 @pytest.mark.unit
+@unittest.skipIf(
+    not importlib.util.find_spec("torchvision"),
+    "torchvision is not installed",
+)
 def test_mobilenet_v2(ir):
     model = models.mobilenet_v2(pretrained=True).eval().to("cuda")
     input = torch.randn((1, 3, 224, 224)).to("cuda")
@@ -117,6 +131,10 @@ def test_mobilenet_v2(ir):
 
 
 @pytest.mark.unit
+@unittest.skipIf(
+    not importlib.util.find_spec("timm") or not importlib.util.find_spec("torchvision"),
+    "timm or torchvision not installed",
+)
 def test_efficientnet_b0(ir):
     model = timm.create_model("efficientnet_b0", pretrained=True).eval().to("cuda")
     input = torch.randn((1, 3, 224, 224)).to("cuda")
@@ -253,6 +271,10 @@ def test_bert_base_uncased_cpu_offload(ir):
 
 
 @pytest.mark.unit
+@unittest.skipIf(
+    not importlib.util.find_spec("torchvision"),
+    "torchvision is not installed",
+)
 def test_resnet18_half(ir):
     model = models.resnet18(pretrained=True).eval().to("cuda").half()
     input = torch.randn((1, 3, 224, 224)).to("cuda").half()
