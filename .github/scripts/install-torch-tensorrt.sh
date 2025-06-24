@@ -13,8 +13,12 @@ fi
 
 # Install all the dependencies required for Torch-TensorRT
 pip install --pre -r ${PWD}/tests/py/requirements.txt
-pip install --pre -r ${PWD}/tests/py/requirements_no_deps.txt --no-deps --extra-index-url ${INDEX_URL}
+# intentionally not using --no-deps here, because we need to install the dependencies
+pip install --pre -r ${PWD}/tests/py/requirements_no_deps.txt --extra-index-url ${INDEX_URL}
+# reinstall torch to make sure we have the correct version
+pip uninstall -y torch
 pip install --force-reinstall --pre ${TORCH} --index-url ${INDEX_URL}
+
 
 # Install Torch-TensorRT
 if [[ ${PLATFORM} == win32 ]]; then
