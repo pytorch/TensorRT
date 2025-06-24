@@ -7,8 +7,8 @@ import pytest
 import torch
 import torch_tensorrt
 from torch.testing._internal.common_utils import TestCase
-from torch_tensorrt.dynamo.utils import get_model_device
 from torch_tensorrt._utils import check_cross_compile_trt_win_lib
+from torch_tensorrt.dynamo.utils import get_model_device
 
 from ..testing_utilities import DECIMALS_OF_AGREEMENT
 
@@ -85,8 +85,12 @@ class TestCrossCompileSaveForWindows(TestCase):
     @pytest.mark.unit
     def test_dynamo_cross_compile_for_windows_cpu_offload(self):
         class Add(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.linear = torch.nn.Linear(3, 3)
+
             def forward(self, a, b):
-                return torch.add(a, b)
+                return torch.add(self.linear(a), b)
 
         model = Add().eval().cuda()
         inputs = (torch.randn(2, 3).cuda(), torch.randn(2, 3).cuda())
@@ -101,7 +105,7 @@ class TestCrossCompileSaveForWindows(TestCase):
             trt_gm = torch_tensorrt.dynamo.cross_compile_for_windows(
                 exp_program, **compile_spec
             )
-            assert get_model_device(trt_gm).type == "cpu"
+            assert get_model_device(model).type == "cpu"
             torch_tensorrt.dynamo.save_cross_compiled_exported_program(
                 trt_gm, file_path=trt_ep_path
             )
@@ -111,6 +115,10 @@ class TestCrossCompileSaveForWindows(TestCase):
     @unittest.skipIf(
         platform.system() != "Linux" or platform.architecture()[0] != "64bit",
         "Cross compile for windows can only be enabled on linux x86-64 platform",
+    )
+    @unittest.skipIf(
+        not (check_cross_compile_trt_win_lib()),
+        "TRT windows lib for cross compile not found",
     )
     @pytest.mark.unit
     def test_dynamo_cross_compile_for_windows_multiple_output(self):
