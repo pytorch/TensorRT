@@ -100,15 +100,23 @@ def _register_with_torch() -> None:
     )
     linked_file_full_path = os.path.join(trtorch_dir, linked_file)
     linked_file_runtime_full_path = os.path.join(trtorch_dir, linked_file_runtime)
+    import traceback
 
-    if os.path.isfile(linked_file_full_path):
-        assert ENABLED_FEATURES.torchscript_frontend
-        assert ENABLED_FEATURES.torch_tensorrt_runtime
-        torch.ops.load_library(linked_file_full_path)
+    try:
+        if os.path.isfile(linked_file_full_path):
+            assert ENABLED_FEATURES.torchscript_frontend
+            assert ENABLED_FEATURES.torch_tensorrt_runtime
+            print(f"Loading library: {linked_file_full_path=}")
+            torch.ops.load_library(linked_file_full_path)
 
-    elif os.path.isfile(linked_file_runtime_full_path):
-        assert ENABLED_FEATURES.torch_tensorrt_runtime
-        torch.ops.load_library(linked_file_runtime_full_path)
+        elif os.path.isfile(linked_file_runtime_full_path):
+            assert ENABLED_FEATURES.torch_tensorrt_runtime
+            print(f"Loading library: {linked_file_runtime_full_path=}")
+            torch.ops.load_library(linked_file_runtime_full_path)
+    except Exception as e:
+        print(f"Error loading library: {e}")
+        print(traceback.format_exc())
+        raise e from e
 
 
 _register_with_torch()
