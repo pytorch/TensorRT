@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 from copy import deepcopy
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional, Set, Union
 
+import tensorrt as trt
 import torch
 import torch_tensorrt._C.ts as _ts_C
 from torch_tensorrt import _C
@@ -12,8 +13,6 @@ from torch_tensorrt._Input import Input
 from torch_tensorrt.ts._Device import TorchScriptDevice
 from torch_tensorrt.ts._Input import TorchScriptInput
 from torch_tensorrt.ts.logging import Level, log
-
-import tensorrt as trt
 
 
 def _internal_input_to_torch_class_input(i: _C.Input) -> torch.classes.tensorrt._Input:
@@ -310,7 +309,7 @@ def TensorRTCompileSpec(
     device: Optional[torch.device | Device] = None,
     disable_tf32: bool = False,
     sparse_weights: bool = False,
-    enabled_precisions: Optional[Set[torch.dtype | dtype]] = None,
+    enabled_precisions: Optional[Set[Union[torch.dtype, dtype]]] = None,
     refit: bool = False,
     debug: bool = False,
     capability: EngineCapability = EngineCapability.STANDARD,

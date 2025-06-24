@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import warnings
-from typing import Any, List, Optional, Sequence, Set, Tuple
+from typing import Any, List, Optional, Sequence, Set, Tuple, Union
 
 import torch
 import torch_tensorrt._C.ts as _C
@@ -18,7 +18,7 @@ def compile(
     device: Device = Device._current_device(),
     disable_tf32: bool = False,
     sparse_weights: bool = False,
-    enabled_precisions: Optional[Set[torch.dtype | dtype]] = None,
+    enabled_precisions: Optional[Set[Union[torch.dtype, dtype]]] = None,
     refit: bool = False,
     debug: bool = False,
     capability: EngineCapability = EngineCapability.STANDARD,
@@ -172,7 +172,7 @@ def convert_method_to_trt_engine(
     device: Device = Device._current_device(),
     disable_tf32: bool = False,
     sparse_weights: bool = False,
-    enabled_precisions: Optional[Set[torch.dtype | dtype]] = None,
+    enabled_precisions: Optional[Set[Union[torch.dtype, dtype]]] = None,
     refit: bool = False,
     debug: bool = False,
     capability: EngineCapability = EngineCapability.STANDARD,
