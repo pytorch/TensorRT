@@ -106,12 +106,12 @@ def _register_with_torch() -> None:
         if os.path.isfile(linked_file_full_path):
             assert ENABLED_FEATURES.torchscript_frontend
             assert ENABLED_FEATURES.torch_tensorrt_runtime
-            print(f"Loading library: {linked_file_full_path=}")
+            print(f"Loading library: {linked_file_full_path=} {torch.__version__=} {torch.cuda.is_available()=}")
             torch.ops.load_library(linked_file_full_path)
 
         elif os.path.isfile(linked_file_runtime_full_path):
             assert ENABLED_FEATURES.torch_tensorrt_runtime
-            print(f"Loading library: {linked_file_runtime_full_path=}")
+            print(f"Loading library: {linked_file_runtime_full_path=} {torch.__version__=} {torch.cuda.is_available()=}")
             torch.ops.load_library(linked_file_runtime_full_path)
     except Exception as e:
         print(f"Error loading library: {e}")
