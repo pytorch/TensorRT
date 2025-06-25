@@ -17,14 +17,6 @@ if [[ ${TENSORRT_VERSION} != "" ]]; then
          pyproject.toml
 fi
 
-if [[ "${CU_VERSION::4}" < "cu12" ]]; then
-  # replace dependencies from tensorrt-cu12-bindings/libs to tensorrt-cu11-bindings/libs
-  sed -i -e "s/tensorrt-cu12/tensorrt-${CU_VERSION::4}/g" \
-         -e "s/tensorrt-cu12-bindings/tensorrt-${CU_VERSION::4}-bindings/g" \
-         -e "s/tensorrt-cu12-libs/tensorrt-${CU_VERSION::4}-libs/g" \
-         pyproject.toml
-fi
-
 TORCH=$(grep "^torch>" py/requirements.txt)
 INDEX_URL=https://download.pytorch.org/whl/${CHANNEL}/${CU_VERSION}
 

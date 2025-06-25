@@ -50,7 +50,6 @@ def compile_bert(iterations=3):
             "use_python_runtime": False,
             "enabled_precisions": {torch.float},
             "truncate_double": True,
-            "debug": False,
             "min_block_size": 1,
             "immutable_weights": False,
             "cache_built_engines": cache_built_engines,

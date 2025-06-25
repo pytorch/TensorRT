@@ -73,7 +73,6 @@ model_half = Model().eval().cuda()
 # py/torch_tensorrt/dynamo/_settings.py
 backend_kwargs = {
     "enabled_precisions": {torch.half},
-    "debug": True,
     "min_block_size": 2,
     "torch_executed_ops": {"torch.ops.aten.sub.Tensor"},
     "optimization_level": 4,

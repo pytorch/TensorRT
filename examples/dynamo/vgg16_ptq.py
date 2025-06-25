@@ -244,7 +244,6 @@ with torch.no_grad():
             inputs=[input_tensor],
             enabled_precisions=enabled_precisions,
             min_block_size=1,
-            debug=False,
         )
         # You can also use torch compile path to compile the model with Torch-TensorRT:
         # trt_model = torch.compile(model, backend="tensorrt")

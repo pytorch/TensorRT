@@ -39,7 +39,6 @@ torch.manual_seed(0)
 
 model = models.resnet18(pretrained=True).eval().to("cuda")
 enabled_precisions = {torch.float}
-debug = False
 min_block_size = 1
 use_python_runtime = False
 
@@ -95,7 +94,6 @@ def torch_compile(iterations=3):
             options={
                 "use_python_runtime": True,
                 "enabled_precisions": enabled_precisions,
-                "debug": debug,
                 "min_block_size": min_block_size,
                 "immutable_weights": False,
                 "cache_built_engines": cache_built_engines,
@@ -155,7 +153,6 @@ def dynamo_compile(iterations=3):
             tuple(inputs),
             use_python_runtime=use_python_runtime,
             enabled_precisions=enabled_precisions,
-            debug=debug,
             min_block_size=min_block_size,
             immutable_weights=False,
             cache_built_engines=cache_built_engines,
@@ -266,7 +263,6 @@ def torch_compile_my_cache(iterations=3):
             options={
                 "use_python_runtime": True,
                 "enabled_precisions": enabled_precisions,
-                "debug": debug,
                 "min_block_size": min_block_size,
                 "immutable_weights": False,
                 "cache_built_engines": cache_built_engines,

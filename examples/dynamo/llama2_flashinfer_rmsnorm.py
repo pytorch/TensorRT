@@ -249,7 +249,6 @@ with torch_tensorrt.logging.errors():
         disable_tf32=True,
         use_explicit_typing=False,
         use_fp32_acc=True,
-        # debug=True,
     )
 
 input_ids = input_ids.to(DEVICE)

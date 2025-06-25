@@ -14,10 +14,9 @@ library with the Torch-TensorRT workflow on Stable Diffusion model.
 # Imports and Model Definition
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 import torch
+import torch_tensorrt
 from accelerate import PartialState
 from diffusers import DiffusionPipeline
-
-import torch_tensorrt
 
 model_id = "CompVis/stable-diffusion-v1-4"
 
@@ -41,7 +40,6 @@ pipe.unet = torch.compile(  # %%
     options={
         "truncate_long_and_double": True,
         "precision": torch.float16,
-        "debug": True,
         "use_python_runtime": True,
     },
     dynamic=False,

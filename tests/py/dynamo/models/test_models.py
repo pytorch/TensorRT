@@ -113,7 +113,6 @@ def test_resnet18_torch_exec_ops(ir):
         "ir": ir,
         "enabled_precisions": {torch.float32, torch.float16, torch.bfloat16},
         "min_block_size": 1,
-        "debug": True,
         "output_format": "exported_program",
         "cache_built_engines": True,
         "reuse_cached_engines": True,

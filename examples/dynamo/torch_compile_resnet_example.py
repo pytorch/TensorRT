@@ -28,8 +28,6 @@ inputs = [torch.randn((1, 3, 224, 224)).to("cuda").half()]
 # Enabled precision for TensorRT optimization
 enabled_precisions = {torch.half}
 
-# Whether to print verbose logs
-debug = True
 
 # Workspace size for TensorRT
 workspace_size = 20 << 30
@@ -51,7 +49,6 @@ optimized_model = torch_tensorrt.compile(
     ir="torch_compile",
     inputs=inputs,
     enabled_precisions=enabled_precisions,
-    debug=debug,
     workspace_size=workspace_size,
     min_block_size=min_block_size,
     torch_executed_ops=torch_executed_ops,
@@ -88,7 +85,6 @@ optimized_model = torch_tensorrt.compile(
     ir="torch_compile",
     inputs=inputs_bs8,
     enabled_precisions=enabled_precisions,
-    debug=debug,
     workspace_size=workspace_size,
     min_block_size=min_block_size,
     torch_executed_ops=torch_executed_ops,

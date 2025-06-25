@@ -174,9 +174,7 @@ m = torch.full((64, 64), 2, device="cuda", dtype=torch.float)
 n = torch.full((64, 64), 3, device="cuda", dtype=torch.float)
 
 with torch_tensorrt.logging.errors():
-    model_trt = torch_tensorrt.compile(
-        my_model, inputs=[m, n], debug=True, min_block_size=1
-    )
+    model_trt = torch_tensorrt.compile(my_model, inputs=[m, n], min_block_size=1)
     for i in range(300):
         res = model_trt(m, n)
         assert torch.allclose(res, my_model(m, n))

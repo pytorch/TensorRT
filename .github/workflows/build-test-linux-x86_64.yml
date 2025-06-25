@@ -138,22 +138,7 @@ jobs:
         export USE_HOST_DEPS=1
         export CI_BUILD=1
         pushd .
-        cd tests/py
-        major=${PYTHON_VERSION%%.*}
-        minor=${PYTHON_VERSION#*.}
-        minor=${minor%%.*}
-        if (( major > 3 || (major == 3 && minor >= 13) )); then
-          echo "flashinfer-python is not supported for python version 3.13 or higher"
-        else
-          echo "Installing flashinfer-python"
-          # flashinfer-python is broken on python 3.9 at the moment, so we skip it for now
-          if (major == 3 && minor == 9); then
-            echo "Skipping flashinfer-python for python 3.9"
-          else
-            python -m pip install flashinfer-python --no-deps
-          fi
-        fi
-        cd dynamo
+        cd tests/py/dynamo
         python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/dynamo_converters_test_results.xml -n 4 conversion/
         python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/dynamo_converters_test_results.xml automatic_plugin/test_automatic_plugin.py
         python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/dynamo_converters_test_results.xml automatic_plugin/test_automatic_plugin_with_attrs.py

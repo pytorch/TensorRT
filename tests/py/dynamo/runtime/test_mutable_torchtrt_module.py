@@ -112,7 +112,7 @@ def test_model_complex_dynamic_shape_with_saving():
         "c": {"a": {}, "b": [{}, {1: dim2}]},
     }
     # Export the model first with custom dynamic shape constraints
-    trt_gm = torch_trt.MutableTorchTensorRTModule(model, debug=True, min_block_size=1)
+    trt_gm = torch_trt.MutableTorchTensorRTModule(model, min_block_size=1)
     trt_gm.set_expected_dynamic_shape_range(args_dynamic_shapes, kwarg_dynamic_shapes)
     # Run inference
     trt_gm(*inputs, **kwargs)

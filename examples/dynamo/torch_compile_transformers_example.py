@@ -32,9 +32,6 @@ inputs = [
 # Enabled precision for TensorRT optimization
 enabled_precisions = {torch.float}
 
-# Whether to print verbose logs
-debug = True
-
 # Workspace size for TensorRT
 workspace_size = 20 << 30
 
@@ -52,7 +49,6 @@ torch_executed_ops = {}
 # Define backend compilation keyword arguments
 compilation_kwargs = {
     "enabled_precisions": enabled_precisions,
-    "debug": debug,
     "workspace_size": workspace_size,
     "min_block_size": min_block_size,
     "torch_executed_ops": torch_executed_ops,
