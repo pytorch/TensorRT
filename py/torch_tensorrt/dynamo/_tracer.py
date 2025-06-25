@@ -70,6 +70,9 @@ def trace(
     if kwarg_inputs is None:
         kwarg_inputs = {}
 
+    # After validation above, arg_inputs is guaranteed to be non-None
+    assert arg_inputs is not None, "arg_inputs should not be None after validation"
+
     device = to_torch_device(kwargs.get("device", default_device()))
     torch_arg_inputs = get_torch_inputs(arg_inputs, device)
     torch_kwarg_inputs = get_torch_inputs(kwarg_inputs, device)
@@ -81,6 +84,7 @@ def trace(
         tuple(torch_arg_inputs),
         kwargs=torch_kwarg_inputs,
         dynamic_shapes=dynamic_shapes,
+        strict=kwargs.get("strict", False),
     )
 
     return exp_program

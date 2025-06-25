@@ -458,7 +458,7 @@ def test_resnet18_dynamic(ir):
 
     dyn_batch = torch.export.Dim("batch", min=1, max=8)
     exp_program = torch.export.export(
-        model, (input_bs2,), dynamic_shapes=({0: dyn_batch},)
+        model, (input_bs2,), dynamic_shapes=({0: dyn_batch},), strict=False
     )
     trt_module = torchtrt.dynamo.compile(exp_program, **compile_spec)
 
@@ -532,8 +532,9 @@ def test_resnet18_dynamic_fallback(ir):
     }
 
     dyn_batch = torch.export.Dim("batch", min=1, max=8)
+
     exp_program = torch.export.export(
-        model, (input_bs2,), dynamic_shapes=({0: dyn_batch},)
+        model, (input_bs2,), dynamic_shapes=({0: dyn_batch},), strict=False
     )
     trt_module = torchtrt.dynamo.compile(exp_program, **compile_spec)
 
@@ -610,6 +611,7 @@ def test_bitwise_and_dynamic_fallback(ir):
         model,
         inputs_4,
         dynamic_shapes={"lhs_val": {1: dyn_dim}, "rhs_val": {0: dyn_dim}},
+        strict=False,
     )
     trt_module = torchtrt.dynamo.compile(exp_program, **compile_spec)
 
@@ -699,13 +701,17 @@ def test_random_dynamic_fallback(ir):
 
     dyn_dim = torch.export.Dim("batch", min=1, max=64)
     exp_program = torch.export.export(
-        model, torch_inputs_bs50, dynamic_shapes=({0: dyn_dim},)
+        model, torch_inputs_bs50, dynamic_shapes=({0: dyn_dim},), strict=False
     )
     trt_module = torchtrt.dynamo.compile(exp_program, **compile_spec)
 
     # Reexport with dynamic dimensions
     trt_exp_program = torch.export.export(
-        trt_module, torch_inputs_bs50, strict=False, dynamic_shapes=({0: dyn_dim},)
+        trt_module,
+        torch_inputs_bs50,
+        strict=False,
+        dynamic_shapes=({0: dyn_dim},),
+        strict=False,
     )
     torch.export.save(trt_exp_program, trt_ep_path)
 
