@@ -300,7 +300,7 @@ def refit_module_weights(
 
     # Check the number of supported operations in the graph
     num_supported_ops, total_ops = partitioning.get_graph_converter_support(
-        new_gm, settings.debug, settings.torch_executed_ops
+        new_gm, settings.torch_executed_ops
     )
 
     if num_supported_ops == 0 or (
