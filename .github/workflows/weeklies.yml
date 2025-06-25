@@ -32,10 +32,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          repository: pytorch/torch-tensorrt
+          repository: pytorch/tensorrt
           ref: main
-          path: torch-tensorrt
-          fetch-depth: 0
+          fetch-depth: -1
+          path: pytorch/tensorrt
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
