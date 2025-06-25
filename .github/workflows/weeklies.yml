@@ -1,0 +1,84 @@
+name: Routine WeeklyCron Job
+
+on:
+  pull_request:
+  schedule:
+    - cron: '0 0 * * 1'  # Runs at 00:00 UTC every Monday (minute hour day-of-month month-of-year day-of-week)
+
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+  packages: write
+
+jobs:
+  upgrade_uv_lock:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: Clean workspace
+        shell: bash -l {0}
+        run: |
+          set -euxo pipefail
+          echo "::group::Cleanup debug output"
+          rm -rf "${GITHUB_WORKSPACE}"
+          mkdir -p "${GITHUB_WORKSPACE}"
+
+          if [[ "${{ inputs.architecture }}" = "aarch64" ]]; then
+            rm -rf "${RUNNER_TEMP}/*"
+          fi
+          echo "::endgroup::"
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          repository: pytorch/torch-tensorrt
+          ref: main
+          path: torch-tensorrt
+          fetch-depth: 0
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install uv and upgrade lock file
+        run: |
+          set -euo pipefail
+          set -x
+          python -m pip install uv
+          uv sync --upgrade
+      - name: Create Branch and Commit changes
+        id: commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          set -x
+          git config --global user.email "pytorchbot@pytorch.com"
+          git config --global user.name "pytorchbot"
+          # Check for changes only in uv.lock
+          if git diff --quiet uv.lock; then
+            echo "changes=false" >> $GITHUB_OUTPUT
+            echo "No dependency updates found for uv.lock file"
+          else
+            echo "changes=true" >> $GITHUB_OUTPUT
+            echo "uv.lock file changed"
+            timestamp=$(date +%s)
+            branch_name="deps/uv-upgrade-$timestamp"
+            echo "branch=$branch_name" >> $GITHUB_OUTPUT
+            git checkout -b $branch_name
+            git add uv.lock
+            git commit -m "chore(deps): weekly automated upgrade via uv"
+            git push -u origin $branch_name
+          fi
+      - name: Create Pull Request
+        if: steps.commit.outputs.changes == 'true'
+        uses: peter-evans/create-pull-request@v6
+        with:
+          title: "chore(deps): weekly automated upgrade via uv"
+          body: "This PR is automatically created by the weekly routine job"
+          base: main
+          branch: ${{ steps.commit.outputs.branch }}
+          labels: "dependencies,automated"
+          assignees: "lanl@nvidia.com"   # Add your team's GitHub usernames
+          reviewers: "lanl@nvidia.com"   # Add reviewers if desired
+          commit-message: "chore(deps): weekly automated upgrade via uv"  # Keep the commit we already made
+          delete-branch: true  # Auto-delete branch after merge
