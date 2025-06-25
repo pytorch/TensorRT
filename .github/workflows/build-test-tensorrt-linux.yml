@@ -94,6 +94,7 @@ jobs:
       build-matrix: ${{ needs.generate-tensorrt-matrix.outputs.matrix }}
       pre-script: ${{ matrix.pre-script }}
       script: |
+        set -euo pipefail
         export USE_HOST_DEPS=1
         export CI_BUILD=1
         export LD_LIBRARY_PATH=/usr/lib64:$LD_LIBRARY_PATH
@@ -130,6 +131,7 @@ jobs:
       build-matrix: ${{ needs.generate-tensorrt-matrix.outputs.matrix }}
       pre-script: ${{ matrix.pre-script }}
       script: |
+        set -euo pipefail
         export USE_HOST_DEPS=1
         export CI_BUILD=1
         pushd .
@@ -160,6 +162,7 @@ jobs:
       build-matrix: ${{ needs.generate-tensorrt-matrix.outputs.matrix }}
       pre-script: ${{ matrix.pre-script }}
       script: |
+        set -euo pipefail
         export USE_HOST_DEPS=1
         export CI_BUILD=1
         pushd .
@@ -190,6 +193,7 @@ jobs:
       build-matrix: ${{ needs.generate-tensorrt-matrix.outputs.matrix }}
       pre-script: ${{ matrix.pre-script }}
       script: |
+        set -euo pipefail
         export USE_HOST_DEPS=1
         export CI_BUILD=1
         pushd .
@@ -220,6 +224,7 @@ jobs:
       build-matrix: ${{ needs.generate-tensorrt-matrix.outputs.matrix }}
       pre-script: ${{ matrix.pre-script }}
       script: |
+        set -euo pipefail
         export USE_HOST_DEPS=1
         export CI_BUILD=1
         pushd .
@@ -252,6 +257,7 @@ jobs:
       build-matrix: ${{ needs.generate-tensorrt-matrix.outputs.matrix }}
       pre-script: ${{ matrix.pre-script }}
       script: |
+        set -euo pipefail
         export USE_HOST_DEPS=1
         export CI_BUILD=1
         pushd .
@@ -284,6 +290,7 @@ jobs:
       build-matrix: ${{ needs.generate-tensorrt-matrix.outputs.matrix }}
       pre-script: ${{ matrix.pre-script }}
       script: |
+        set -euo pipefail
         export USE_HOST_DEPS=1
         export CI_BUILD=1
         pushd .
@@ -316,6 +323,7 @@ jobs:
       build-matrix: ${{ needs.generate-tensorrt-matrix.outputs.matrix }}
       pre-script: ${{ matrix.pre-script }}
       script: |
+        set -euo pipefail
         export USE_HOST_DEPS=1
         export CI_BUILD=1
         pushd .
