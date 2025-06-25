@@ -110,7 +110,7 @@ jobs:
         if: ${{ matrix.tensorrt == '' }}
         uses: actions/download-artifact@v4
         with:
-          name: ${{ env.ARTIFACT_NAME }}_${{ inputs.architecture }}
+          name: ${{ env.ARTIFACT_NAME }}${{ inputs.architecture }}
           path: ${{ runner.temp }}/artifacts/
       - name: Download artifacts
         if: ${{ matrix.tensorrt != '' }}
