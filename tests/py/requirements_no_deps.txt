@@ -1,7 +1,0 @@
-# flashinfer-python is not supported for python version 3.13 or higher
-# flashinfer-python is broken on python 3.9 at the moment, so skip it for now
-flashinfer-python; python_version >'3.9' and python_version <'3.13'
---extra-index-url https://download.pytorch.org/whl/nightly/cu129
-torchvision>=0.23.0.dev,<0.24.0
-timm>=1.0.3
-

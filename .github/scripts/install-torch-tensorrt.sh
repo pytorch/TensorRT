@@ -2,6 +2,7 @@
 set -x
 
 TORCH=$(grep "^torch>" ${PWD}/py/requirements.txt)
+TORCHVISION=$(grep "^torchvision>" ${PWD}/tests/py/requirements.txt)
 INDEX_URL=https://download.pytorch.org/whl/${CHANNEL}/${CU_VERSION}
 PLATFORM=$(python -c "import sys; print(sys.platform)")
 
@@ -13,10 +14,11 @@ fi
 
 # Install all the dependencies required for Torch-TensorRT
 pip install --pre -r ${PWD}/tests/py/requirements.txt
-# intentionally not using --no-deps here, because we need to install the dependencies
-pip install --pre -r ${PWD}/tests/py/requirements_no_deps.txt --extra-index-url ${INDEX_URL}
-# reinstall torch to make sure we have the correct version
-pip uninstall -y torch
+# dependencies in the tests/py/requirements.txt might install a different version of torch or torchvision
+# eg. timm will install the latest torchvision, however we want to use the torchvision from nightly
+# reinstall torch torchvisionto make sure we have the correct version
+pip uninstall -y torch torchvision
+pip install --force-reinstall --pre ${TORCHVISION} --index-url ${INDEX_URL} --no-deps
 pip install --force-reinstall --pre ${TORCH} --index-url ${INDEX_URL}
 
 
