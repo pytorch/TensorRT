@@ -711,7 +711,6 @@ def test_random_dynamic_fallback(ir):
         torch_inputs_bs50,
         strict=False,
         dynamic_shapes=({0: dyn_dim},),
-        strict=False,
     )
     torch.export.save(trt_exp_program, trt_ep_path)
 
