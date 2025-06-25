@@ -70,9 +70,6 @@ def trace(
     if kwarg_inputs is None:
         kwarg_inputs = {}
 
-    # This assertion is a workaround to fix the mypy type error. The validation above is enough to guarantee arg_inputs is not None.
-    # assert arg_inputs is not None, "arg_inputs should not be None after validation"
-
     device = to_torch_device(kwargs.get("device", default_device()))
     torch_arg_inputs = get_torch_inputs(arg_inputs, device)
     torch_kwarg_inputs = get_torch_inputs(kwarg_inputs, device)
