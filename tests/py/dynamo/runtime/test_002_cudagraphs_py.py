@@ -61,7 +61,6 @@ class TestCudagraphsPython(TestCase):
             min_block_size=1,
             pass_through_build_failures=True,
             use_python_runtime=True,
-            debug=True,
         )
 
         result_samples = []
@@ -107,7 +106,6 @@ class TestCudagraphsPython(TestCase):
             pass_through_build_failures=True,
             use_python_runtime=True,
             offload_module_to_cpu=True,
-            debug=True,
         )
         optimized_model.cuda()
         result_samples = []

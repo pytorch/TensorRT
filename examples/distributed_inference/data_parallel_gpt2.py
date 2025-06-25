@@ -15,10 +15,9 @@ library with the Torch-TensorRT workflow on GPT2 model.
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 import torch
+import torch_tensorrt
 from accelerate import PartialState
 from transformers import AutoTokenizer, GPT2LMHeadModel
-
-import torch_tensorrt
 
 tokenizer = AutoTokenizer.from_pretrained("gpt2")
 
@@ -42,7 +41,6 @@ model.forward = torch.compile(
     options={
         "truncate_long_and_double": True,
         "enabled_precisions": {torch.float16},
-        "debug": True,
     },
     dynamic=False,
 )

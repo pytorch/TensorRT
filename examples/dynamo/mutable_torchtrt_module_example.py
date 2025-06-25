@@ -78,7 +78,6 @@ with torch.no_grad():
     settings = {
         "use_python_runtime": True,
         "enabled_precisions": {torch.float16},
-        "debug": False,
         "immutable_weights": False,
     }
 
@@ -180,7 +179,7 @@ kwarg_dynamic_shapes = {
     },  # a's shape does not change so we give it an empty dict
 }
 # Export the model first with custom dynamic shape constraints
-model = torch_trt.MutableTorchTensorRTModule(model, debug=True, min_block_size=1)
+model = torch_trt.MutableTorchTensorRTModule(model, min_block_size=1)
 model.set_expected_dynamic_shape_range(args_dynamic_shapes, kwarg_dynamic_shapes)
 # Compile
 model(*inputs, **kwargs)
@@ -211,7 +210,6 @@ model = torch_trt.MutableTorchTensorRTModule(
     model,
     use_python_runtime=True,
     enabled_precisions={torch.float},
-    debug=True,
     min_block_size=1,
     immutable_weights=False,
     cache_built_engines=True,
