@@ -7,44 +7,35 @@ on:
 
   workflow_dispatch:
 
-permissions:
-  id-token: write
-  contents: read
-  packages: write
-
 jobs:
   upgrade_uv_lock:
-    runs-on: ubuntu-latest
+    runs-on: linux.g5.4xlarge.nvidia.gpu
+    environment: pytorchbot-env
+    container:
+      image: docker.io/pytorch/manylinux2_28-builder:cuda12.8
+      options: --gpus all
+    env:
+      CUDA_HOME: /usr/local/cuda-12.8
+      VERSION_SUFFIX: cu128
+      CU_VERSION: cu128
     timeout-minutes: 120
     steps:
-      - name: Clean workspace
-        shell: bash -l {0}
-        run: |
-          set -euxo pipefail
-          echo "::group::Cleanup debug output"
-          rm -rf "${GITHUB_WORKSPACE}"
-          mkdir -p "${GITHUB_WORKSPACE}"
-
-          if [[ "${{ inputs.architecture }}" = "aarch64" ]]; then
-            rm -rf "${RUNNER_TEMP}/*"
-          fi
-          echo "::endgroup::"
-      - name: Checkout repository
+      - name: Checkout Repository
         uses: actions/checkout@v4
         with:
           repository: pytorch/tensorrt
           ref: main
-          fetch-depth: -1
-          path: pytorch/tensorrt
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
+          token: ${{ secrets.GH_PYTORCHBOT_TOKEN }}
       - name: Install uv and upgrade lock file
         run: |
           set -euo pipefail
           set -x
           python -m pip install uv
+          echo "github.ref_name: ${{ github.ref_name }}"
+          echo "github.head_ref: ${{ github.head_ref }}"
+          pwd
+          ls -lart
+          git config --global --add safe.directory /__w/TensorRT/TensorRT
           uv sync --upgrade
       - name: Create Branch and Commit changes
         id: commit
@@ -82,3 +73,7 @@ jobs:
           reviewers: "lanl@nvidia.com"   # Add reviewers if desired
           commit-message: "chore(deps): weekly automated upgrade via uv"  # Keep the commit we already made
           delete-branch: true  # Auto-delete branch after merge
+
+concurrency:
+    group: ${{ github.workflow }}-${{ github.ref_name }}
+    cancel-in-progress: true
