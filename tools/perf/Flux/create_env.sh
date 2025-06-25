@@ -15,9 +15,8 @@ bazel
 cd /home/TensorRT
 
 python -m pip install --pre -e . --extra-index-url https://download.pytorch.org/whl/nightly/cu128
-pip install tensorrt==10.9.0.34 --force-reinstall
+pip3 install --pre torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cu128
 
-pip3 install --pre  torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cu128
 
 
 pip install sentencepiece=="0.2.0" transformers=="4.48.2" accelerate=="1.3.0" diffusers=="0.32.2" protobuf=="5.29.3"
@@ -25,3 +24,4 @@ pip install sentencepiece=="0.2.0" transformers=="4.48.2" accelerate=="1.3.0" di
 pip install notebook
 pip install gradio safetensors peft pyinstrument
 pip install nvidia-modelopt onnx torchprofile pulp onnxruntime
+
