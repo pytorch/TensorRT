@@ -386,6 +386,38 @@ def test_resnet18_dynamic(ir):
     )
 
 
+@unittest.skipIf(
+    not importlib.util.find_spec("torchvision"), "torchvision not installed"
+)
+def test_resnet18_torch_exec_ops_serde(ir):
+    """
+    This tests export save and load functionality on Resnet18 model
+    """
+    model = models.resnet18().eval().cuda()
+    input = torch.randn((1, 3, 224, 224)).to("cuda")
+
+    compile_spec = {
+        "inputs": [input],
+        "ir": ir,
+        "min_block_size": 1,
+        "cache_built_engines": False,
+        "reuse_cached_engines": False,
+        "torch_executed_ops": {torch.ops.aten.addmm, "torch.ops.aten.add"},
+    }
+
+    exp_program = torchtrt.dynamo.trace(model, **compile_spec)
+    trt_module = torchtrt.dynamo.compile(exp_program, **compile_spec)
+    torchtrt.save(trt_module, trt_ep_path)
+    deser_trt_module = torchtrt.load(trt_ep_path).module()
+    outputs_pyt = deser_trt_module(input)
+    outputs_trt = trt_module(input)
+    cos_sim = cosine_similarity(outputs_pyt, outputs_trt[0])
+    assertions.assertTrue(
+        cos_sim > COSINE_THRESHOLD,
+        msg=f"test_resnet18 TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
+    )
+
+
 @pytest.mark.unit
 def test_hybrid_conv_fallback(ir):
     """
