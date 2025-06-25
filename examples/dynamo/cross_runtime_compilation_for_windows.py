@@ -71,7 +71,6 @@ else:
             "cross runtime compiled model for windows can only be compiled in Linux system"
         )
     compile_spec = {
-        "debug": True,
         "min_block_size": 1,
     }
     torchtrt.cross_compile_for_windows(

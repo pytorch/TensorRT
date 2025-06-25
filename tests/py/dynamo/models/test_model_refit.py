@@ -50,7 +50,6 @@ def test_mapping():
         for i in inputs
     ]
     enabled_precisions = {torch.float}
-    debug = False
     min_block_size = 1
     use_python_runtime = False
 
@@ -62,7 +61,6 @@ def test_mapping():
         tuple(inputs),
         use_python_runtime=use_python_runtime,
         enabled_precisions=enabled_precisions,
-        debug=debug,
         min_block_size=min_block_size,
         immutable_weights=False,
     )
@@ -109,7 +107,6 @@ def test_refit_one_engine_with_weightmap():
     model2 = models.resnet18(pretrained=True).eval().to("cuda")
     inputs = [torch.randn((1, 3, 224, 224)).to("cuda")]
     enabled_precisions = {torch.float}
-    debug = False
     min_block_size = 1
     use_python_runtime = True
 
@@ -121,7 +118,6 @@ def test_refit_one_engine_with_weightmap():
         tuple(inputs),
         use_python_runtime=use_python_runtime,
         enabled_precisions=enabled_precisions,
-        debug=debug,
         min_block_size=min_block_size,
         immutable_weights=False,
     )
@@ -167,7 +163,6 @@ def test_refit_one_engine_no_map_with_weightmap():
     model2 = models.resnet18(pretrained=True).eval().to("cuda")
     inputs = [torch.randn((1, 3, 224, 224)).to("cuda")]
     enabled_precisions = {torch.float}
-    debug = False
     min_block_size = 1
     use_python_runtime = False
 
@@ -179,7 +174,6 @@ def test_refit_one_engine_no_map_with_weightmap():
         tuple(inputs),
         use_python_runtime=use_python_runtime,
         enabled_precisions=enabled_precisions,
-        debug=debug,
         min_block_size=min_block_size,
         immutable_weights=False,
     )
@@ -226,7 +220,6 @@ def test_refit_one_engine_with_wrong_weightmap():
     model2 = models.resnet18(pretrained=True).eval().to("cuda")
     inputs = [torch.randn((1, 3, 224, 224)).to("cuda")]
     enabled_precisions = {torch.float}
-    debug = False
     min_block_size = 1
     use_python_runtime = True
 
@@ -238,7 +231,6 @@ def test_refit_one_engine_with_wrong_weightmap():
         tuple(inputs),
         use_python_runtime=use_python_runtime,
         enabled_precisions=enabled_precisions,
-        debug=debug,
         min_block_size=min_block_size,
         immutable_weights=False,
     )
@@ -294,7 +286,6 @@ def test_refit_one_engine_bert_with_weightmap():
     model2 = BertModel.from_pretrained("bert-base-uncased").eval().to("cuda")
     nn.init.xavier_normal_(model2.embeddings.word_embeddings.weight)
     enabled_precisions = {torch.float}
-    debug = False
     min_block_size = 1
     use_python_runtime = True
 
@@ -306,7 +297,6 @@ def test_refit_one_engine_bert_with_weightmap():
         tuple(inputs),
         use_python_runtime=use_python_runtime,
         enabled_precisions=enabled_precisions,
-        debug=debug,
         min_block_size=min_block_size,
         immutable_weights=False,
     )
@@ -352,7 +342,6 @@ def test_refit_one_engine_inline_runtime_with_weightmap():
     model2 = models.resnet18(pretrained=True).eval().to("cuda")
     inputs = [torch.randn((1, 3, 224, 224)).to("cuda")]
     enabled_precisions = {torch.float}
-    debug = False
     min_block_size = 1
     use_python_runtime = False
 
@@ -364,7 +353,6 @@ def test_refit_one_engine_inline_runtime_with_weightmap():
         tuple(inputs),
         use_python_runtime=use_python_runtime,
         enabled_precisions=enabled_precisions,
-        debug=debug,
         min_block_size=min_block_size,
         immutable_weights=False,
     )
@@ -402,7 +390,6 @@ def test_refit_one_engine_python_runtime_with_weightmap():
     model2 = models.resnet18(pretrained=True).eval().to("cuda")
     inputs = [torch.randn((1, 3, 224, 224)).to("cuda")]
     enabled_precisions = {torch.float}
-    debug = False
     min_block_size = 1
     use_python_runtime = True
 
@@ -414,7 +401,6 @@ def test_refit_one_engine_python_runtime_with_weightmap():
         tuple(inputs),
         use_python_runtime=use_python_runtime,
         enabled_precisions=enabled_precisions,
-        debug=debug,
         min_block_size=min_block_size,
         immutable_weights=False,
     )
@@ -475,7 +461,6 @@ def test_refit_multiple_engine_with_weightmap():
 
     inputs = [torch.randn((1, 3, 224, 224)).to("cuda")]
     enabled_precisions = {torch.float}
-    debug = False
     min_block_size = 1
     use_python_runtime = False
 
@@ -488,7 +473,6 @@ def test_refit_multiple_engine_with_weightmap():
         tuple(inputs),
         use_python_runtime=use_python_runtime,
         enabled_precisions=enabled_precisions,
-        debug=debug,
         min_block_size=min_block_size,
         immutable_weights=False,
         torch_executed_ops=torch_executed_ops,
@@ -543,7 +527,6 @@ def test_refit_multiple_engine_with_weightmap_cpu_offload():
 
     inputs = [torch.randn((1, 3, 224, 224)).to("cuda")]
     enabled_precisions = {torch.float}
-    debug = False
     min_block_size = 1
     use_python_runtime = False
 
@@ -556,7 +539,6 @@ def test_refit_multiple_engine_with_weightmap_cpu_offload():
         tuple(inputs),
         use_python_runtime=use_python_runtime,
         enabled_precisions=enabled_precisions,
-        debug=debug,
         min_block_size=min_block_size,
         immutable_weights=False,
         torch_executed_ops=torch_executed_ops,
@@ -599,7 +581,6 @@ def test_refit_one_engine_without_weightmap():
     model2 = models.resnet18(pretrained=False).eval().to("cuda")
     inputs = [torch.randn((1, 3, 224, 224)).to("cuda")]
     enabled_precisions = {torch.float}
-    debug = False
     min_block_size = 1
     use_python_runtime = False
 
@@ -611,7 +592,6 @@ def test_refit_one_engine_without_weightmap():
         tuple(inputs),
         use_python_runtime=use_python_runtime,
         enabled_precisions=enabled_precisions,
-        debug=debug,
         min_block_size=min_block_size,
         immutable_weights=False,
     )
@@ -661,7 +641,6 @@ def test_refit_one_engine_bert_without_weightmap():
     model2 = BertModel.from_pretrained("bert-base-uncased").eval().to("cuda")
     nn.init.xavier_normal_(model2.embeddings.word_embeddings.weight)
     enabled_precisions = {torch.float}
-    debug = False
     min_block_size = 1
     use_python_runtime = False
 
@@ -673,7 +652,6 @@ def test_refit_one_engine_bert_without_weightmap():
         tuple(inputs),
         use_python_runtime=use_python_runtime,
         enabled_precisions=enabled_precisions,
-        debug=debug,
         min_block_size=min_block_size,
         immutable_weights=False,
     )
@@ -719,7 +697,6 @@ def test_refit_one_engine_inline_runtime_without_weightmap():
     model2 = models.resnet18(pretrained=False).eval().to("cuda")
     inputs = [torch.randn((1, 3, 224, 224)).to("cuda")]
     enabled_precisions = {torch.float}
-    debug = False
     min_block_size = 1
     use_python_runtime = False
 
@@ -731,7 +708,6 @@ def test_refit_one_engine_inline_runtime_without_weightmap():
         tuple(inputs),
         use_python_runtime=use_python_runtime,
         enabled_precisions=enabled_precisions,
-        debug=debug,
         min_block_size=min_block_size,
         immutable_weights=False,
     )
@@ -769,7 +745,6 @@ def test_refit_one_engine_python_runtime_without_weightmap():
     model2 = models.resnet18(pretrained=False).eval().to("cuda")
     inputs = [torch.randn((1, 3, 224, 224)).to("cuda")]
     enabled_precisions = {torch.float}
-    debug = False
     min_block_size = 1
     use_python_runtime = True
 
@@ -781,7 +756,6 @@ def test_refit_one_engine_python_runtime_without_weightmap():
         tuple(inputs),
         use_python_runtime=use_python_runtime,
         enabled_precisions=enabled_precisions,
-        debug=debug,
         min_block_size=min_block_size,
         immutable_weights=False,
     )
@@ -842,7 +816,6 @@ def test_refit_multiple_engine_without_weightmap():
 
     inputs = [torch.randn((1, 3, 224, 224)).to("cuda")]
     enabled_precisions = {torch.float}
-    debug = False
     min_block_size = 1
     use_python_runtime = False
 
@@ -855,7 +828,6 @@ def test_refit_multiple_engine_without_weightmap():
         tuple(inputs),
         use_python_runtime=use_python_runtime,
         enabled_precisions=enabled_precisions,
-        debug=debug,
         min_block_size=min_block_size,
         immutable_weights=False,
         torch_executed_ops=torch_executed_ops,
@@ -913,7 +885,6 @@ def test_refit_cumsum_fallback():
             exp_program,
             tuple(inputs),
             enabled_precisions={torch.float},
-            debug=True,
             min_block_size=1,
             immutable_weights=False,
         )
