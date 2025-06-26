@@ -1,15 +1,13 @@
 import importlib
+import importlib.util
 import json
 import os
 
 import custom_models as cm
 import torch
 
-if importlib.util.find_spec("torchvision"):
-    import timm
-    import torchvision.models as models
-
 torch.hub._validate_not_a_forked_repo = lambda a, b, c: True
+
 
 torch_version = torch.__version__
 
@@ -19,49 +17,10 @@ if not torch.cuda.is_available():
         "No GPU found. Please check if installed torch version is compatible with CUDA version"
     )
 
-if not importlib.util.find_spec("torchvision"):
-    print(f"torchvision is not installed, skip models download")
-    exit(0)
-
 # Downloads all model files again if manifest file is not present
 MANIFEST_FILE = "model_manifest.json"
 
 to_test_models = {
-    "alexnet": {"model": models.alexnet(pretrained=True), "path": "both"},
-    "vgg16": {"model": models.vgg16(pretrained=True), "path": "both"},
-    "squeezenet": {"model": models.squeezenet1_0(pretrained=True), "path": "both"},
-    "densenet": {"model": models.densenet161(pretrained=True), "path": "both"},
-    "inception_v3": {"model": models.inception_v3(pretrained=True), "path": "both"},
-    "shufflenet": {
-        "model": models.shufflenet_v2_x1_0(pretrained=True),
-        "path": "both",
-    },
-    "mobilenet_v2": {"model": models.mobilenet_v2(pretrained=True), "path": "both"},
-    "resnext50_32x4d": {
-        "model": models.resnext50_32x4d(pretrained=True),
-        "path": "both",
-    },
-    "wideresnet50_2": {
-        "model": models.wide_resnet50_2(pretrained=True),
-        "path": "both",
-    },
-    "mnasnet": {"model": models.mnasnet1_0(pretrained=True), "path": "both"},
-    "resnet18": {
-        "model": torch.hub.load("pytorch/vision:v0.9.0", "resnet18", pretrained=True),
-        "path": "both",
-    },
-    "resnet50": {
-        "model": torch.hub.load("pytorch/vision:v0.9.0", "resnet50", pretrained=True),
-        "path": "both",
-    },
-    "efficientnet_b0": {
-        "model": timm.create_model("efficientnet_b0", pretrained=True),
-        "path": "script",
-    },
-    "vit": {
-        "model": timm.create_model("vit_base_patch16_224", pretrained=True),
-        "path": "script",
-    },
     "pooling": {"model": cm.Pool(), "path": "trace"},
     "module_fallback": {"model": cm.ModuleFallbackMain(), "path": "script"},
     "loop_fallback_eval": {"model": cm.LoopFallbackEval(), "path": "script"},
@@ -79,6 +38,53 @@ to_test_models = {
     },
     # "bert_base_uncased": {"model": cm.BertModule(), "path": "trace"},
 }
+
+if importlib.util.find_spec("torchvision"):
+    import timm
+    import torchvision.models as models
+
+    torchvision_models = {
+        "alexnet": {"model": models.alexnet(pretrained=True), "path": "both"},
+        "vgg16": {"model": models.vgg16(pretrained=True), "path": "both"},
+        "squeezenet": {"model": models.squeezenet1_0(pretrained=True), "path": "both"},
+        "densenet": {"model": models.densenet161(pretrained=True), "path": "both"},
+        "inception_v3": {"model": models.inception_v3(pretrained=True), "path": "both"},
+        "shufflenet": {
+            "model": models.shufflenet_v2_x1_0(pretrained=True),
+            "path": "both",
+        },
+        "mobilenet_v2": {"model": models.mobilenet_v2(pretrained=True), "path": "both"},
+        "resnext50_32x4d": {
+            "model": models.resnext50_32x4d(pretrained=True),
+            "path": "both",
+        },
+        "wideresnet50_2": {
+            "model": models.wide_resnet50_2(pretrained=True),
+            "path": "both",
+        },
+        "mnasnet": {"model": models.mnasnet1_0(pretrained=True), "path": "both"},
+        "resnet18": {
+            "model": torch.hub.load(
+                "pytorch/vision:v0.9.0", "resnet18", pretrained=True
+            ),
+            "path": "both",
+        },
+        "resnet50": {
+            "model": torch.hub.load(
+                "pytorch/vision:v0.9.0", "resnet50", pretrained=True
+            ),
+            "path": "both",
+        },
+        "efficientnet_b0": {
+            "model": timm.create_model("efficientnet_b0", pretrained=True),
+            "path": "script",
+        },
+        "vit": {
+            "model": timm.create_model("vit_base_patch16_224", pretrained=True),
+            "path": "script",
+        },
+    }
+    to_test_models.update(torchvision_models)
 
 
 def get(n, m, manifest):
