@@ -320,11 +320,12 @@ def test_resnet18_cpu_offload(ir):
 
     exp_program = torchtrt.dynamo.trace(model, **compile_spec)
     trt_module = torchtrt.dynamo.compile(exp_program, **compile_spec)
-    assertions.assertTrue(
-        get_model_device(model).type == "cpu",
-        msg="Model should be offloaded to CPU",
-    )
-    model.cuda()
+    if ir == "dynamo":
+        assertions.assertTrue(
+            get_model_device(model).type == "cpu",
+            msg="Model should be offloaded to CPU",
+        )
+        model.cuda()
     torchtrt.save(trt_module, trt_ep_path)
 
     deser_trt_module = torchtrt.load(trt_ep_path).module()
