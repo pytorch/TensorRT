@@ -77,6 +77,9 @@ dir_path = os.path.join(str(get_root_dir()), "py")
 
 IS_AARCH64 = platform.uname().processor == "aarch64"
 IS_JETPACK = True if "tegra" in platform.uname().release else False
+print(f"platform.uname().release: {platform.uname().release}")
+print(f"IS_AARCH64: {IS_AARCH64}")
+print(f"IS_JETPACK: {IS_JETPACK}")
 
 PY_ONLY = False
 NO_TS = False
@@ -150,6 +153,7 @@ if IS_AARCH64:
         IS_SBSA = True
 
 IS_SBSA = True if IS_AARCH64 and not IS_JETPACK else False
+print(f"IS_SBSA: {IS_SBSA}")
 
 if IS_JETPACK and "bdist_wheel" in sys.argv:
     needs_append_plat_name = True
@@ -212,7 +216,6 @@ def build_libtorchtrt_cxx11_abi(
         print("Jetpack build")
 
     if IS_SBSA:
-        cmd.append("--platforms=//toolchains:sbsa")
         print("SBSA build")
 
     if CI_BUILD:

@@ -60,3 +60,15 @@ new_local_repository(
    path = "/usr/",
    build_file = "@//third_party/tensorrt/local:BUILD"
 )
+
+new_local_repository(
+   name = "tensorrt_sbsa",
+   path = "/usr/",
+   build_file = "@//third_party/tensorrt/local:BUILD"
+)
+
+new_local_repository(
+   name = "tensorrt_l4t",
+   path = "/usr/",
+   build_file = "@//third_party/tensorrt/local:BUILD"
+)
