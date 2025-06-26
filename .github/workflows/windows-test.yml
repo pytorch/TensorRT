@@ -39,7 +39,10 @@ on:
         description: "Prevents a job from failing when a step fails. Set to true to allow a job to pass when exec script step fails."
         default: false
         type: boolean
-
+      architecture:
+        description: 'CPU architecture to build for'
+        default: "x64"
+        type: string
 jobs:
   test:
     strategy:
@@ -107,7 +110,7 @@ jobs:
         if: ${{ matrix.tensorrt == '' }}
         uses: actions/download-artifact@v4
         with:
-          name: ${{ env.ARTIFACT_NAME }}
+          name: ${{ env.ARTIFACT_NAME }}${{ inputs.architecture }}
           path: ${{ runner.temp }}/artifacts/
       - name: Download artifacts
         if: ${{ matrix.tensorrt != '' }}

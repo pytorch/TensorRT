@@ -163,7 +163,6 @@ if __name__ == "__main__":
         model_trt = torch_tensorrt.compile(
             my_model,
             inputs=trt_inputs,
-            debug=True,
             min_block_size=1,
         )
         print("Model compiled successfully!")

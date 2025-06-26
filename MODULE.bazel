@@ -66,7 +66,7 @@ http_archive(
     name = "libtorch",
     build_file = "@//third_party/libtorch:BUILD",
     strip_prefix = "libtorch",
-    urls = ["https://download.pytorch.org/libtorch/nightly/cu128/libtorch-cxx11-abi-shared-with-deps-latest.zip"],
+    urls = ["https://download.pytorch.org/libtorch/nightly/cu128/libtorch-shared-with-deps-latest.zip"],
 )
 
 # in aarch64 platform you can get libtorch via either local or wheel file
