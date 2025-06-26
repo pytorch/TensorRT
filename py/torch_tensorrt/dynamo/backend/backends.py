@@ -91,7 +91,7 @@ def aot_torch_tensorrt_aten_backend(
 
     if settings.offload_module_to_cpu:
         logger.warning(
-            "`offload_module_to_cpu` is not supported for `torch_compile` backend."
+            "The offload_module_to_cpu option is set, but it is being ignored since the torch_compile backend does not support this feature"
         )
     return _pretraced_backend(gm, sample_inputs, settings, engine_cache)
 
