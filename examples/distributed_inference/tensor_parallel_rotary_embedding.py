@@ -5,7 +5,10 @@ import time
 import torch
 import torch_tensorrt
 from rotary_embedding import RotaryAttention, parallel_rotary_block
-from tensor_parallel_initialize_dist import initialize_distributed_env
+from tensor_parallel_initialize_dist import (
+    cleanup_distributed_env,
+    initialize_distributed_env,
+)
 
 device_mesh, _world_size, _rank, logger = initialize_distributed_env(
     "./tensor_parallel_rotary_embedding"
@@ -22,8 +25,6 @@ HEADS = 4
 DIM = 128
 
 with torch.no_grad():
-    xq = torch.randn(BATCH, SEQ_LEN, HEADS, DIM)
-    xk = torch.randn(BATCH, SEQ_LEN, HEADS, DIM)
     model = RotaryAttention(DIM, SEQ_LEN)
     parallel_rotary_block(model, device_mesh)
     device = torch.device("cuda", device_mesh.get_rank())
@@ -36,16 +37,22 @@ with torch.no_grad():
 
     model = torch.compile(model, backend="torch_tensorrt", options={"debug": True})
 
-    for i in range(15):
-        # seeding with dp_rank to ensure identical inputs for TP groups
-        torch.manual_seed(i)
-        start = time.time()
-        output = model(x)
-        end = time.time()
-        if i == 0:
-            logger.info(f"Compilation time is {end-start}")
-            assert (
-                python_result - output
-            ).std() < 0.01, "Compilation result is not correct."
-        elif _rank == 0:
-            logger.info(f"Inference time is {end-start}")
+    try:
+        for i in range(15):
+            # seeding with dp_rank to ensure identical inputs for TP groups
+            torch.manual_seed(i)
+            start = time.time()
+            output = model(x)
+            end = time.time()
+            if i == 0:
+                logger.info(f"Compilation time is {end-start}")
+                assert (
+                    python_result - output
+                ).std() < 0.01, "Compilation result is not correct."
+            elif _rank == 0:
+                logger.info(f"Inference time is {end-start}")
+    except Exception as e:
+        logger.error(f"Error: {e}")
+        raise e
+    finally:
+        cleanup_distributed_env()

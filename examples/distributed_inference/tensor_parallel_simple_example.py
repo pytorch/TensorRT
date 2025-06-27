@@ -5,7 +5,10 @@ import torch
 import torch.distributed as dist
 import torch.nn as nn
 import torch_tensorrt
-from tensor_parallel_initialize_dist import initialize_distributed_env
+from tensor_parallel_initialize_dist import (
+    cleanup_distributed_env,
+    initialize_distributed_env,
+)
 from torch.distributed._tensor import Shard
 from torch.distributed.tensor.parallel import (
     ColwiseParallel,
@@ -97,5 +100,4 @@ try:
             logger.info(f"Inference time is {end-start}")
 finally:
     # This cleans up the distributed process group
-    if dist.is_initialized():
-        dist.destroy_process_group()
+    cleanup_distributed_env()

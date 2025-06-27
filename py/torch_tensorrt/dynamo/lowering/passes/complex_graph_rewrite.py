@@ -105,24 +105,12 @@ class ComplexOpDetector:
         return complex_op_subgraphs
 
 
-def complex_graph_detection(
-    gm: GraphModule, settings: CompilationSettings
-) -> List[ComplexSubGraphInfo]:
-    complex_op_detector = ComplexOpDetector()
-    complex_subgraphs = complex_op_detector.find_complex_op_subgraphs(
-        gm, anchor_target=torch.ops.aten.view_as_real.default
-    )
-    complex_graph_rewriter = ComplexGraphRewriter(gm, settings.truncate_double)
-    complex_graph_rewriter.rewrite_subgraph_nodes(complex_subgraphs)
-    return gm
-
-
 class ComplexGraphRewriter:
     def __init__(self, gm: GraphModule, truncate_double: bool = False):
         self.gm = gm
         self.truncate_double = truncate_double
 
-    def extract_shape_and_dtype(self, input_node):
+    def extract_shape_dtype_device(self, input_node):
         if input_node.op == "placeholder":
             tensor_val = input_node.meta["val"]
 
@@ -135,6 +123,7 @@ class ComplexGraphRewriter:
         node_shape = tensor_val.size()
         dtype = tensor_val.dtype
         new_node_shape = node_shape + (2,)
+        device = tensor_val.device
 
         if dtype == torch.complex64:
             new_node_dtype = torch.float32
@@ -143,7 +132,7 @@ class ComplexGraphRewriter:
         else:
             new_node_dtype = torch.float64
 
-        return new_node_shape, new_node_dtype
+        return new_node_shape, new_node_dtype, device
 
     def get_attr_tensor(self, target):
         # Check if target is param or buffer
@@ -157,14 +146,16 @@ class ComplexGraphRewriter:
             )
 
     def replace_input_node(self, input_node):
+        modified = False
         logger.debug(f"Replacing input node: {input_node.name}")
-        new_shape, new_dtype = self.extract_shape_and_dtype(input_node)
-        real_tensor = torch.empty(new_shape, dtype=new_dtype)
+        new_shape, new_dtype, device = self.extract_shape_dtype_device(input_node)
+        real_tensor = torch.empty(new_shape, dtype=new_dtype, device=device)
 
         if input_node.op == "placeholder":
             with FakeTensorMode() as fake_mode:
                 fake_tensor = fake_mode.from_tensor(real_tensor)
-            new_node = self.gm.graph.placeholder(input_node.target + "_reshaped")
+            with self.gm.graph.inserting_before(input_node):
+                new_node = self.gm.graph.placeholder(input_node.target + "_reshaped")
             new_node.meta["val"] = fake_tensor
 
         elif input_node.op == "get_attr":
@@ -179,7 +170,6 @@ class ComplexGraphRewriter:
                 self.gm.register_buffer(new_attr_name, stacked_tensor)
             with self.gm.graph.inserting_after(input_node):
                 new_node = self.gm.graph.get_attr(new_attr_name)
-
         else:
             logger.debug(
                 f"Unsupported node type in replacement of input node: {input_node.op}"
@@ -187,9 +177,9 @@ class ComplexGraphRewriter:
             logger.debug(
                 "This complex subgraph inputnode type does not need to replaced"
             )
-
         input_node.replace_all_uses_with(new_node)
         self.gm.graph.erase_node(input_node)
+        clean_up_graph_after_modifications(self.gm)
 
     def rewrite_subgraph_nodes(self, subgraphs):
         modified = False
@@ -198,7 +188,6 @@ class ComplexGraphRewriter:
                 logger.debug(f"Input node rewrite: {input_node.name}")
                 if input_node.op not in ("call_function"):
                     self.replace_input_node(input_node)
-                    modified = True
             for node in subgraph.subgraph_nodes:
                 logger.debug(f"Subgraph Node rewrite: {node.name}")
                 if node.target == torch.ops.aten.view_as_complex.default:
@@ -229,6 +218,7 @@ class ComplexGraphRewriter:
                         ignore_literals=True,
                     )
                     replaced_nodes += nodes
+                    modified = True
                 elif node.target == torch.ops.aten.view_as_real.default:
                     node.replace_all_uses_with(node.args[0])
                     self.gm.graph.erase_node(node)
@@ -239,8 +229,35 @@ class ComplexGraphRewriter:
                     )
 
         if modified:
+            self.propagate_metadata()
             self.gm.graph.lint()
             self.gm.recompile()
+
+    def propagate_metadata(self):
+        fake_inputs = []
+        from torch._subclasses.fake_tensor import FakeTensorMode
+        from torch.fx.passes.fake_tensor_prop import FakeTensorProp
+
+        for node in self.gm.graph.nodes:
+            if node.op == "placeholder":
+                if "val" in node.meta:
+                    with FakeTensorMode(allow_non_fake_inputs=True):
+                        fake_val = node.meta["val"]
+                        fake_inputs.append(
+                            fake_val.to("cuda")
+                            if fake_val.device.type == "cuda"
+                            else fake_val
+                        )
+                else:
+                    fake_tensor = torch.empty(
+                        [s if s != 0 else 1 for s in node.meta["tensor_meta"].shape],
+                        dtype=node.meta["tensor_meta"].dtype,
+                        device=node.meta["tensor_meta"].device,
+                    )
+                    fake_inputs.append(fake_tensor)
+        FakeTensorProp(
+            self.gm, mode=FakeTensorMode(allow_non_fake_inputs=True)
+        ).propagate(*fake_inputs)
 
 
 def complex_mul_replacement() -> Tuple[
@@ -280,7 +297,23 @@ def complex_mul_replacement() -> Tuple[
                 torch.ops.aten.unsqueeze.default(real, -1),
                 torch.ops.aten.unsqueeze.default(imag, -1),
             ],
-            dim=-1,
+            -1,
         )
 
     return (original_mul, replacement)
+
+
+# This lowering pass is used to detect and rewrite complex subgraphs in the graph
+# This lowering pass works for complex tensor in mul which are parameter or buffers in the graph
+def complex_graph_detection(
+    gm: GraphModule, settings: CompilationSettings
+) -> List[ComplexSubGraphInfo]:
+    complex_op_detector = ComplexOpDetector()
+    complex_subgraphs = complex_op_detector.find_complex_op_subgraphs(
+        gm, anchor_target=torch.ops.aten.view_as_real.default
+    )
+    for subgraph in complex_subgraphs:
+        logger.debug(f"Complex subgraph info: {subgraph}")
+    complex_graph_rewriter = ComplexGraphRewriter(gm, settings.truncate_double)
+    complex_graph_rewriter.rewrite_subgraph_nodes(complex_subgraphs)
+    return gm

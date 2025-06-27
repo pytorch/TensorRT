@@ -49,13 +49,13 @@ def rotary_embedding(xq, xk, dim, freqs_cis=None):
     Returns:
         tuple: Tuple containing the rotated query and key tensors.
     """
-    freqs_cis = freqs_cis[None, :, None, :]  # [1, seq, 1, dim/2]
+
     xq_ = torch.view_as_complex(xq.float().reshape(*xq.shape[:-1], -1, 2))
     xk_ = torch.view_as_complex(xk.float().reshape(*xk.shape[:-1], -1, 2))
 
     xq_out = torch.view_as_real(xq_ * freqs_cis).flatten(3)
     xk_out = torch.view_as_real(xk_ * freqs_cis).flatten(3)
-    return xq_out.type_as(xq), xk_out.type_as(xk)
+    return (xq_out.type_as(xq), xk_out.type_as(xk))
 
 
 ########Tensor Parallel########
@@ -73,7 +73,7 @@ def parallel_rotary_block(rotary_block, tp_mesh):
         "wk": ColwiseParallel(),
         "wo": RowwiseParallel(output_layouts=Shard(0)),
     }
-    rotary_block.n_parallel = 2
+    rotary_block.n_parallel = 1  # this is for single GPU, to do remove this hardcode
 
     parallelize_module(rotary_block, tp_mesh, plan)
 
@@ -82,18 +82,18 @@ class RotaryAttention(nn.Module):
     def __init__(self, dim: int, seq_len: int):
         super().__init__()
         self.dim = dim
-        # self.rotary = RotaryEmbedding(dim)
         self.wq = nn.Linear(dim, dim)
         self.wk = nn.Linear(dim, dim)
         self.wo = nn.Linear(dim, dim)
         self.seq_len = seq_len
         self.n_parallel = 1
         theta = 10000.0
-        self.freqs_cis = precompute_freqs_cis(
-            self.dim, self.seq_len, theta, self.n_parallel
-        )
-        self.register_buffer("freqs_cis", self.freqs_cis, persistent=True)
+        self.register_buffer("freqs_cis", self._precompute_freqs_cis(), persistent=True)
         self.init_weights()
+
+    def _precompute_freqs_cis(self) -> torch.Tensor:
+        theta = 10000.0
+        return precompute_freqs_cis(self.dim, self.seq_len, theta, self.n_parallel)
 
     def init_weights(self):
         with torch.device(self.freqs_cis.device):
@@ -102,7 +102,6 @@ class RotaryAttention(nn.Module):
     def forward(self, x):
         q = self.wq(x)
         k = self.wk(x)
-        # calculate rotary embedding
-        freqs_cis = self.freqs_cis.to(q.device)
+        freqs_cis = self._precompute_freqs_cis().to(q.device)
         q, k = rotary_embedding(q, k, self.dim, freqs_cis=freqs_cis)
         return self.wo(q)
