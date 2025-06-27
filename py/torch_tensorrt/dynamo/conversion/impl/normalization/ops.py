@@ -48,7 +48,9 @@ def batch_norm(
 
     # Save the original output shape for later use
     output_shape = input.shape
-
+    # We perform constant folding for batch norm when the weight, bias, running_mean, and running_var are all tensors.
+    # Batch norm operation can be fused into a single layer, which is more efficient than the original implementation.
+    # In this way, the batch norm layer will be fused with the Convolution layer and get a performance boost.
     if all(
         [
             isinstance(weight, torch.Tensor),
