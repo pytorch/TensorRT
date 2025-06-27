@@ -101,6 +101,7 @@ jobs:
       build-matrix: ${{ needs.substitute-runner.outputs.matrix }}
       pre-script: packaging/driver_upgrade.bat
       script: |
+        set -euo pipefail
         export USE_HOST_DEPS=1
         export CI_BUILD=1
         pushd .
@@ -133,6 +134,7 @@ jobs:
       build-matrix: ${{ needs.substitute-runner.outputs.matrix }}
       pre-script: packaging/driver_upgrade.bat
       script: |
+        set -euo pipefail
         export USE_HOST_DEPS=1
         export CI_BUILD=1
         pushd .
@@ -160,6 +162,7 @@ jobs:
       build-matrix: ${{ needs.substitute-runner.outputs.matrix }}
       pre-script: packaging/driver_upgrade.bat
       script: |
+        set -euo pipefail
         export USE_HOST_DEPS=1
         export CI_BUILD=1
         pushd .
@@ -187,6 +190,7 @@ jobs:
       build-matrix: ${{ needs.substitute-runner.outputs.matrix }}
       pre-script: packaging/driver_upgrade.bat
       script: |
+        set -euo pipefail
         export USE_HOST_DEPS=1
         export CI_BUILD=1
         pushd .
@@ -214,6 +218,7 @@ jobs:
       build-matrix: ${{ needs.substitute-runner.outputs.matrix }}
       pre-script: packaging/driver_upgrade.bat
       script: |
+        set -euo pipefail
         export USE_HOST_DEPS=1
         export CI_BUILD=1
         pushd .
@@ -243,6 +248,7 @@ jobs:
       build-matrix: ${{ needs.substitute-runner.outputs.matrix }}
       pre-script: packaging/driver_upgrade.bat
       script: |
+        set -euo pipefail
         export USE_HOST_DEPS=1
         export CI_BUILD=1
         pushd .
@@ -272,6 +278,7 @@ jobs:
       build-matrix: ${{ needs.substitute-runner.outputs.matrix }}
       pre-script: packaging/driver_upgrade.bat
       script: |
+        set -euo pipefail
         export USE_HOST_DEPS=1
         export CI_BUILD=1
         pushd .
@@ -300,6 +307,7 @@ jobs:
       build-matrix: ${{ needs.substitute-runner.outputs.matrix }}
       pre-script: packaging/driver_upgrade.bat
       script: |
+        set -euo pipefail
         export USE_HOST_DEPS=1
         export CI_BUILD=1
         pushd .
