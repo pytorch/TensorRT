@@ -1,11 +1,28 @@
 from __future__ import annotations
 
+import ctypes
 import gc
+import getpass
 import logging
+import os
+import tempfile
+import urllib.request
 import warnings
+from contextlib import contextmanager
 from dataclasses import fields, replace
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
+from pathlib import Path
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    Iterator,
+    List,
+    Optional,
+    Sequence,
+    Tuple,
+    Union,
+)
 
 import numpy as np
 import sympy
@@ -14,9 +31,10 @@ import torch
 from torch._subclasses.fake_tensor import FakeTensor
 from torch.fx.experimental.proxy_tensor import unset_fake_temporarily
 from torch_tensorrt._Device import Device
-from torch_tensorrt._enums import dtype
+from torch_tensorrt._enums import Platform, dtype
 from torch_tensorrt._features import ENABLED_FEATURES
 from torch_tensorrt._Input import Input
+from torch_tensorrt._version import __tensorrt_llm_version__
 from torch_tensorrt.dynamo import _defaults
 from torch_tensorrt.dynamo._defaults import default_device
 from torch_tensorrt.dynamo._engine_cache import BaseEngineCache
@@ -33,6 +51,7 @@ DYNAMIC_DIM = -1
 RTOL = 5e-3
 ATOL = 5e-3
 CPU_DEVICE = "cpu"
+_WHL_CPYTHON_VERSION = "3.10"
 
 
 class Frameworks(Enum):
@@ -819,4 +838,175 @@ def get_output_dtypes(output: Any, truncate_doulbe: bool = False) -> List[dtype]
 def is_tegra_platform() -> bool:
     if torch.cuda.get_device_capability() in [(8, 7), (7, 2)]:
         return True
+    return False
+
+
+@contextmanager
+def download_plugin_lib_path(platform: str) -> Iterator[str]:
+    """
+    Downloads (if needed) and extracts the TensorRT-LLM plugin wheel for the specified platform,
+    then yields the path to the extracted shared library (.so or .dll).
+
+    The wheel file is cached in a user-specific temporary directory to avoid repeated downloads.
+    Extraction happens in a temporary directory that is cleaned up after use.
+
+    Args:
+        platform (str): The platform identifier string (e.g., 'linux_x86_64') to select the correct wheel.
+
+    Yields:
+        str: The full path to the extracted TensorRT-LLM shared library file.
+
+    Raises:
+        ImportError: If the 'zipfile' module is not available.
+        RuntimeError: If the wheel file is missing, corrupted, or extraction fails.
+    """
+    plugin_lib_path = None
+    username = getpass.getuser()
+    torchtrt_cache_dir = Path(tempfile.gettempdir()) / f"torch_tensorrt_{username}"
+    torchtrt_cache_dir.mkdir(parents=True, exist_ok=True)
+    file_name = f"tensorrt_llm-{__tensorrt_llm_version__}-{_WHL_CPYTHON_VERSION}-{_WHL_CPYTHON_VERSION}-{platform}.whl"
+    torchtrt_cache_trtllm_whl = torchtrt_cache_dir / file_name
+
+    if not torchtrt_cache_trtllm_whl.exists():
+        # Downloading TRT-LLM lib
+        base_url = "https://pypi.nvidia.com/tensorrt-llm/"
+        download_url = base_url + file_name
+        downloaded_file_path = torchtrt_cache_trtllm_whl
+        try:
+            logger.debug(f"Downloading {download_url} ...")
+            urllib.request.urlretrieve(download_url, downloaded_file_path)
+            logger.debug("Download succeeded and TRT-LLM wheel is now present")
+        except urllib.error.HTTPError as e:
+            logger.error(
+                f"HTTP error {e.code} when trying to download {download_url}: {e.reason}"
+            )
+        except urllib.error.URLError as e:
+            logger.error(
+                f"URL error when trying to download {download_url}: {e.reason}"
+            )
+        except OSError as e:
+            logger.error(f"Local file write error: {e}")
+
+    # Proceeding with the unzip of the wheel file in tmpdir
+    if "linux" in platform:
+        lib_filename = "libnvinfer_plugin_tensorrt_llm.so"
+    else:
+        lib_filename = "libnvinfer_plugin_tensorrt_llm.dll"
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        try:
+            import zipfile
+        except ImportError:
+            raise ImportError(
+                "zipfile module is required but not found. Please install zipfile"
+            )
+        try:
+            with zipfile.ZipFile(downloaded_file_path, "r") as zip_ref:
+                zip_ref.extractall(tmpdir)  # Extract to a folder named 'tensorrt_llm'
+        except FileNotFoundError as e:
+            # This should capture the errors in the download failure above
+            logger.error(f"Wheel file not found at {downloaded_file_path}: {e}")
+            raise RuntimeError(
+                f"Failed to find downloaded wheel file at {downloaded_file_path}"
+            ) from e
+        except zipfile.BadZipFile as e:
+            logger.error(f"Invalid or corrupted wheel file: {e}")
+            raise RuntimeError(
+                "Downloaded wheel file is corrupted or not a valid zip archive"
+            ) from e
+        except Exception as e:
+            logger.error(f"Unexpected error while extracting wheel: {e}")
+            raise RuntimeError(
+                "Unexpected error during extraction of TensorRT-LLM wheel"
+            ) from e
+        plugin_lib_path = os.path.join(tmpdir, "tensorrt_llm/libs", lib_filename)
+        yield plugin_lib_path
+
+
+def load_and_initialize_trtllm_plugin(plugin_lib_path: str) -> bool:
+    """
+    Loads and initializes the TensorRT-LLM plugin from the given shared library path.
+
+    Args:
+        plugin_lib_path (str): Path to the shared TensorRT-LLM plugin library.
+
+    Returns:
+        bool: True if successful, False otherwise.
+    """
+    try:
+        handle = ctypes.CDLL(plugin_lib_path)
+        logger.info(f"Successfully loaded plugin library: {plugin_lib_path}")
+    except OSError as e_os_error:
+        if "libmpi" in str(e_os_error):
+            logger.warning(
+                f"Failed to load libnvinfer_plugin_tensorrt_llm.so from {plugin_lib_path}. "
+                f"The dependency libmpi.so is missing. "
+                f"Please install the packages libmpich-dev and libopenmpi-dev.",
+                exc_info=e_os_error,
+            )
+        else:
+            logger.warning(
+                f"Failed to load libnvinfer_plugin_tensorrt_llm.so from {plugin_lib_path}. "
+                f"Ensure the path is correct and the library is compatible.",
+                exc_info=e_os_error,
+            )
+        return False
+
+    try:
+        handle.initTrtLlmPlugins.argtypes = [ctypes.c_void_p, ctypes.c_char_p]
+        handle.initTrtLlmPlugins.restype = ctypes.c_bool
+    except AttributeError as e_plugin_unavailable:
+        logger.warning(
+            "Unable to initialize the TensorRT-LLM plugin library",
+            exc_info=e_plugin_unavailable,
+        )
+        return False
+
+    try:
+        if handle.initTrtLlmPlugins(None, b"tensorrt_llm"):
+            logger.info("TensorRT-LLM plugin successfully initialized")
+            return True
+        else:
+            logger.warning("TensorRT-LLM plugin library failed in initialization")
+            return False
+    except Exception as e_initialization_error:
+        logger.warning(
+            "Exception occurred during TensorRT-LLM plugin library initialization",
+            exc_info=e_initialization_error,
+        )
+        return False
+    return False
+
+
+def load_tensorrt_llm() -> bool:
+    """
+    Attempts to load the TensorRT-LLM plugin and initialize it.
+    Either the env variable TRTLLM_PLUGINS_PATH can specify the path
+    Or the user can specify USE_TRTLLM_PLUGINS as either of (1, true, yes, on) to download the TRT-LLM distribution and load it
+
+    Returns:
+        bool: True if the plugin was successfully loaded and initialized, False otherwise.
+    """
+    plugin_lib_path = os.environ.get("TRTLLM_PLUGINS_PATH")
+    if plugin_lib_path:
+        return load_and_initialize_trtllm_plugin(plugin_lib_path)
+    else:
+        # this option can be used by user if TRTLLM_PLUGINS_PATH is not set by user
+        use_trtllm_plugin = os.environ.get("USE_TRTLLM_PLUGINS", "0").lower() in (
+            "1",
+            "true",
+            "yes",
+            "on",
+        )
+        if not use_trtllm_plugin:
+            logger.warning(
+                "Neither TRTLLM_PLUGIN_PATH is set nor is it directed to download the shared library. Please set either of the two to use TRT-LLM libraries in torchTRT"
+            )
+            return False
+        else:
+            platform = Platform.current_platform()
+            platform = str(platform).lower()
+
+        with download_plugin_lib_path(platform) as plugin_lib_path:
+            return load_and_initialize_trtllm_plugin(plugin_lib_path)
     return False
