@@ -58,6 +58,7 @@ def get_model(args):
             .eval()
             .cuda()
         )
+
     if args.precision == "FP16":
         model = model.to(torch.float16)
     elif args.precision == "BF16":
@@ -280,10 +281,10 @@ if __name__ == "__main__":
 
         if args.cache == "static_v1":
             # This import is required to register static v1 KV cache transformations as lowering passes
-            from torchtrt_ext import static_cache_v1
+            import static_cache_v1
         if args.cache == "static_v2":
             # This import is required to register static v2 KV cache transformations as lowering passes
-            from torchtrt_ext import static_cache_v2
+            import static_cache_v2
 
         # Compile the model with Torch-TensorRT
         trt_model = compile_torchtrt(model, input_ids, args)
