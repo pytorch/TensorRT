@@ -78,8 +78,9 @@ def construct_refit_mapping(
         compilation_settings=settings,
     )
     interpreter._construct_trt_network_def()
+    weight_refit_map: dict[str, torch.Tensor] = interpreter.ctx.weight_refit_map
 
-    return interpreter.ctx.weight_refit_map
+    return weight_refit_map
 
 
 @needs_refit
@@ -90,7 +91,18 @@ def construct_refit_mapping_from_weight_name_map(
 ) -> dict[Any, Any]:
     engine_weight_map = {}
     for engine_weight_name, (sd_weight_name, np_weight_type) in weight_name_map.items():
-        if sd_weight_name not in state_dict:
+        if engine_weight_name.split(" ")[-1] in ["SCALE", "SHIFT"]:
+            # Batch Norm Layer
+            params = {}
+            for w in sd_weight_name:
+                params[w.split(".")[-1]] = state_dict[w].cuda()
+            scale = params["weight"] / torch.sqrt(params["running_var"] + 1e-7)
+            shift = params["bias"] - params["running_mean"] * scale
+            # Set scale to scale or shift to shift
+            engine_weight_map[engine_weight_name] = eval(
+                engine_weight_name.split(" ")[-1].lower()
+            )
+        elif sd_weight_name not in state_dict:
             # If weights is not in sd, we can leave it unchanged
             continue
         else:
@@ -300,7 +312,7 @@ def refit_module_weights(
 
     # Check the number of supported operations in the graph
     num_supported_ops, total_ops = partitioning.get_graph_converter_support(
-        new_gm, settings.debug, settings.torch_executed_ops
+        new_gm, settings.torch_executed_ops
     )
 
     if num_supported_ops == 0 or (
@@ -363,7 +375,6 @@ def refit_module_weights(
 
     # Iterate over all components that can be accelerated
     # Generate the corresponding TRT Module for those
-    new_weight_module.module().to(CPU_DEVICE)
     for name, new_submodule in new_partitioned_module.named_children():
         # Refit each submodule
         # Extract engine from the submodule
