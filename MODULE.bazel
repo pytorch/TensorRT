@@ -52,7 +52,7 @@ new_local_repository(
 new_local_repository(
     name = "cuda_win",
     build_file = "@//third_party/cuda:BUILD",
-    path = "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v12.8/",
+    path = "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v12.9/",
 )
 
 http_archive = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
@@ -66,7 +66,7 @@ http_archive(
     name = "libtorch",
     build_file = "@//third_party/libtorch:BUILD",
     strip_prefix = "libtorch",
-    urls = ["https://download.pytorch.org/libtorch/nightly/cu128/libtorch-shared-with-deps-latest.zip"],
+    urls = ["https://download.pytorch.org/libtorch/nightly/cu129/libtorch-shared-with-deps-latest.zip"],
 )
 
 # in aarch64 platform you can get libtorch via either local or wheel file
@@ -84,7 +84,7 @@ http_archive(
     name = "libtorch_win",
     build_file = "@//third_party/libtorch:BUILD",
     strip_prefix = "libtorch",
-    urls = ["https://download.pytorch.org/libtorch/nightly/cu128/libtorch-win-shared-with-deps-latest.zip"],
+    urls = ["https://download.pytorch.org/libtorch/nightly/cu129/libtorch-win-shared-with-deps-latest.zip"],
 )
 
 http_archive(
