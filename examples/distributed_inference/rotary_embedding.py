@@ -87,7 +87,6 @@ class RotaryAttention(nn.Module):
         self.wo = nn.Linear(dim, dim)
         self.seq_len = seq_len
         self.n_parallel = 1
-        theta = 10000.0
         self.register_buffer("freqs_cis", self._precompute_freqs_cis(), persistent=True)
         self.init_weights()
 

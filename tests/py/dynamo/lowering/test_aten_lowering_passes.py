@@ -239,7 +239,7 @@ class TestFP32Accumulation(TestCase):
 
 def rotary_embedding(x, dim, freqs_cis=None):
     x_ = torch.view_as_complex(x.float().reshape(*x.shape[:-1], -1, 2))
-    x_out_flatten = torch.view_as_real(x_ * freqs_cis).flatten(3)
+    x_out_flatten = torch.view_as_real(x_ * freqs_cis)
     return x_out_flatten.type_as(x)
 
 
@@ -269,10 +269,6 @@ class TestComplexSubgraph(TestCase):
 
                 z = torch.complex(real, imag)
                 return z
-
-            def init_weights(self):
-                with torch.device(self.freqs_ex_tensor.device):
-                    self.freqs_ex_tensor = self.freqs_ex_tensor
 
             def forward(self, x):
                 q = self.wq(x)
