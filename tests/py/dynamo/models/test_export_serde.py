@@ -647,8 +647,8 @@ def test_save_load_ts(ir):
 
 @pytest.mark.unit
 @unittest.skipIf(
-    platform.system() != "Linux" or platform.architecture()[0] != "64bit",
-    "Save and load in AOTI format is only supported on 64bit Linux, not supported on Windows",
+    platform.system() != "Linux",
+    "Save and load in AOT Inductor format is only supported on Linux",
 )
 def test_save_load_aoti(ir, tmp_path):
     """
