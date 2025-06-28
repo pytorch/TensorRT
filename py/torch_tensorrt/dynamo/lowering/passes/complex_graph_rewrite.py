@@ -1,11 +1,10 @@
 import logging
-import operator
-from typing import Callable, List, Optional, Set, Tuple
+from typing import Callable, List, Set, Tuple
 
 import torch
 from torch._subclasses.fake_tensor import FakeTensorMode
 from torch.fx import GraphModule, Node
-from torch.fx.subgraph_rewriter import Match
+from torch.fx.experimental.proxy_tensor import unset_fake_temporarily
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.lowering.passes.pass_utils import (
     clean_up_graph_after_modifications,
@@ -25,7 +24,7 @@ class ComplexSubGraphInfo:
         self.subgraph_nodes = subgraph_nodes
         self.input_nodes = input_nodes
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return (
             f"ComplexOpSubGraphInfo(anchor_nodes={[n.name for n in self.anchor_nodes]}, "
             f"subgraph={[n.name for n in self.subgraph_nodes]}, "
@@ -34,7 +33,7 @@ class ComplexSubGraphInfo:
 
 
 class ComplexOpDetector:
-    def __init__(self):
+    def __init__(self) -> None:
         pass
 
     def is_complex_dtype(self, node: Node) -> bool:
@@ -106,16 +105,18 @@ class ComplexOpDetector:
 
 
 class ComplexGraphRewriter:
-    def __init__(self, gm: GraphModule, truncate_double: bool = False):
+    def __init__(self, gm: GraphModule, truncate_double: bool = False) -> None:
         self.gm = gm
         self.truncate_double = truncate_double
 
-    def extract_shape_dtype_device(self, input_node):
+    def extract_shape_dtype_device(
+        self, input_node: Node
+    ) -> Tuple[Tuple[int, ...], torch.dtype, torch.device]:
         if input_node.op == "placeholder":
             tensor_val = input_node.meta["val"]
 
         elif input_node.op == "get_attr":
-            tensor_val = self.get_attr_tensor(input_node.target)
+            tensor_val = self.get_attr_tensor(input_node.target)  # type: ignore
 
         else:
             raise ValueError(f"Unsupported node type: {input_node.op}")
@@ -134,7 +135,7 @@ class ComplexGraphRewriter:
 
         return new_node_shape, new_node_dtype, device
 
-    def get_attr_tensor(self, target):
+    def get_attr_tensor(self, target):  # type: ignore
         # Check if target is param or buffer
         if target in dict(self.gm.named_parameters()):
             return self.gm.get_parameter(target)
@@ -145,7 +146,7 @@ class ComplexGraphRewriter:
                 f"Attribute {target} not found in gm parameters or buffers."
             )
 
-    def replace_input_node(self, input_node):
+    def replace_input_node(self, input_node: Node) -> None:
         modified = False
         logger.debug(f"Replacing input node: {input_node.name}")
         new_shape, new_dtype, device = self.extract_shape_dtype_device(input_node)
@@ -160,10 +161,8 @@ class ComplexGraphRewriter:
 
         elif input_node.op == "get_attr":
             new_attr_name = input_node.target + "_reshaped"
-            from torch._subclasses.fake_tensor import unset_fake_temporarily
-
             with unset_fake_temporarily():
-                original_tensor = self.get_attr_tensor(input_node.target)
+                original_tensor = self.get_attr_tensor(input_node.target)  # type: ignore
                 stacked_tensor = torch.stack(
                     [original_tensor.real, original_tensor.imag], dim=-1
                 )
@@ -181,7 +180,7 @@ class ComplexGraphRewriter:
         self.gm.graph.erase_node(input_node)
         clean_up_graph_after_modifications(self.gm)
 
-    def rewrite_subgraph_nodes(self, subgraphs):
+    def rewrite_subgraph_nodes(self, subgraphs: List[ComplexSubGraphInfo]) -> None:
         modified = False
         for subgraph in subgraphs:
             for input_node in subgraph.input_nodes:
@@ -196,11 +195,20 @@ class ComplexGraphRewriter:
                 elif node.target == torch.ops.aten.mul.Tensor:
                     # this is complex mul where inputs = a+ib and output = c+id.
                     # complex mul returns (ac - bd) + (ad + bc)i
-                    # which is then view_as_real as (ac-bd), ad+bc stacked along the last dimension with last dimension size 2
-                    replaced_nodes = []
-                    original_mul, replacement = complex_mul_replacement()
+                    # which is then view_as_real as (ac-bd), (ad+bc) stacked along the last dimension with last dimension size 2
+                    x_placeholder_or_func = (
+                        True if node.args[0].op != "get_attr" else False
+                    )
+                    y_placeholder_or_func = (
+                        True if node.args[1].op != "get_attr" else False
+                    )
 
-                    def match_complex_mul(
+                    replaced_nodes = []
+                    original_mul, replacement = complex_mul_replacement(
+                        x_placeholder_or_func, y_placeholder_or_func
+                    )
+
+                    def match_complex_mul(  # type: ignore[no-untyped-def]
                         match: torch.fx.subgraph_rewriter.Match,
                         original_graph,
                         pattern_graph,
@@ -233,7 +241,7 @@ class ComplexGraphRewriter:
             self.gm.graph.lint()
             self.gm.recompile()
 
-    def propagate_metadata(self):
+    def propagate_metadata(self) -> None:
         fake_inputs = []
         from torch._subclasses.fake_tensor import FakeTensorMode
         from torch.fx.passes.fake_tensor_prop import FakeTensorProp
@@ -260,7 +268,34 @@ class ComplexGraphRewriter:
         ).propagate(*fake_inputs)
 
 
-def complex_mul_replacement() -> Tuple[
+def extract_real_imag(input, placeholder_or_func: bool = True):  # type: ignore
+    """Extract real and imaginary parts from a tensor.
+    This function handles different tensor types based on whether they are placeholder/function
+    tensors or get_attr tensors. For placeholder/function tensors, it uses select operations,
+    while for get_attr tensors, it uses indexing.
+    Args:
+        input: Input tensor to extract real and imaginary parts from
+        placeholder_or_func: Boolean flag indicating if the input is a placeholder/function tensor (True)
+                           or a get_attr tensor (False). Defaults to True.
+    Returns:
+        Tuple of (real_part, imaginary_part) where both parts have the same type as the input
+    Note:
+        - When placeholder_or_func=True: Uses torch.ops.aten.select.int operations
+        - When placeholder_or_func=False: Uses tensor indexing [..., 0] and [..., 1]
+    """
+    if placeholder_or_func:
+        # For ITensor, use select operations
+        real_part = torch.ops.aten.select.int(input, -1, 0)
+        imag_part = torch.ops.aten.select.int(input, -1, 1)
+        return real_part, imag_part
+    else:
+        # For get_attr, use indexing
+        return input[..., 0], input[..., 1]
+
+
+def complex_mul_replacement(
+    x_placeholder_or_func: bool = True, y_placeholder_or_func: bool = True
+) -> Tuple[
     Callable[[torch.Tensor, torch.Tensor], torch.Tensor],
     Callable[[torch.Tensor, torch.Tensor], torch.Tensor],
 ]:
@@ -280,9 +315,8 @@ def complex_mul_replacement() -> Tuple[
 
     # Replacement function: manual complex multiplication on real/imag stacked tensors
     def replacement(x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
-        x_real = torch.ops.aten.select.int(x, -1, 0)
-        x_imag = torch.ops.aten.select.int(x, -1, 1)  # x is reshape tensor
-        y_real, y_imag = y[..., 0], y[..., 1]  # y is frozen param
+        x_real, x_imag = extract_real_imag(x, x_placeholder_or_func)
+        y_real, y_imag = extract_real_imag(y, y_placeholder_or_func)
 
         real_part1 = torch.ops.aten.mul.Tensor(x_real, y_real)
         real_part2 = torch.ops.aten.mul.Tensor(x_imag, y_imag)
@@ -304,10 +338,18 @@ def complex_mul_replacement() -> Tuple[
 
 
 # This lowering pass is used to detect and rewrite complex subgraphs in the graph
-# This lowering pass works for complex tensor in mul which are parameter or buffers in the graph
 def complex_graph_detection(
     gm: GraphModule, settings: CompilationSettings
-) -> List[ComplexSubGraphInfo]:
+) -> GraphModule:
+    """Detect and rewrite complex subgraphs in the graph.
+    This lowering pass is used to detect and rewrite complex subgraphs in the graph.
+    This lowering pass works for complex tensor in mul which are parameter or buffers in the graph.
+    Args:
+        gm: The GraphModule to process
+        settings: Compilation settings
+    Returns:
+        The modified GraphModule with complex subgraphs rewritten
+    """
     complex_op_detector = ComplexOpDetector()
     complex_subgraphs = complex_op_detector.find_complex_op_subgraphs(
         gm, anchor_target=torch.ops.aten.view_as_real.default

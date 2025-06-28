@@ -1,3 +1,24 @@
+"""
+.. _tensor_parallel_simple_example:
+
+Torch Parallel Distributed example for simple model
+=========================================
+
+Below example shows how to use Torch-TensorRT backend for distributed inference with tensor parallelism.
+
+This example demonstrates:
+    - Setting up distributed environment for tensor parallelism
+    - Model sharding across multiple GPUs
+    - Compilation with Torch-TensorRT
+    - Distributed inference execution
+
+Usage
+-----
+.. code-block:: bash
+
+    mpirun -n 2 --allow-run-as-root python tensor_parallel_simple_example.py
+"""
+
 import time
 
 import tensorrt as trt
@@ -21,7 +42,7 @@ device_mesh, _world_size, _rank, logger = initialize_distributed_env(
 )
 
 """
-This example copies some code from https://github.com/pytorch/examples/blob/main/distributed/tensor_parallelism/tensor_parallel_example.py
+This example takes some code from https://github.com/pytorch/examples/blob/main/distributed/tensor_parallelism/tensor_parallel_example.py
 """
 
 

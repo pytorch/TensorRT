@@ -1,3 +1,14 @@
+"""
+.. _tensor_parallel_rotary_embedding:
+Tensor Parallel Rotary Embedding Example
+=======================================
+
+This example demonstrates how to use Torch-TensorRT with tensor parallel distributed inference
+for models that use rotary positional embeddings (RoPE). It lowers the complex
+operations in attention models with rotary embeddings across multiple GPUs.
+
+"""
+
 import logging
 import os
 import time
@@ -17,6 +28,7 @@ device_mesh, _world_size, _rank, logger = initialize_distributed_env(
 
 """
 This example covers the rotary embedding in Llama3 model and is derived from https://lightning.ai/lightning-ai/studios/tensor-parallelism-supercharging-large-model-training-with-pytorch-lightning
+Command to run with single GPU: mpirun -n 1 --allow-run-as-root python tensor_parallel_rotary_embedding.pyx
 """
 
 BATCH = 2
@@ -35,7 +47,7 @@ with torch.no_grad():
 
     logger.info("Torch-tensorrt compilation for rotary embedding")
 
-    model = torch.compile(model, backend="torch_tensorrt", options={"debug": True})
+    model = torch.compile(model, backend="torch_tensorrt")
 
     try:
         for i in range(15):

@@ -1,3 +1,14 @@
+"""
+.. _rotary_embedding:
+
+Rotary Embedding Implementation for Tensor Parallel Attention
+============================================================
+
+This module provides an implementation of rotary positional embeddings (RoPE) for transformer models
+with support for tensor parallel distributed inference. Rotary embeddings are used to encode positional
+information in transformer attention mechanisms.
+"""
+
 import time
 
 import tensorrt as trt
@@ -49,7 +60,7 @@ def rotary_embedding(xq, xk, dim, freqs_cis=None):
     Returns:
         tuple: Tuple containing the rotated query and key tensors.
     """
-
+    freqs_cis = freqs_cis[None, :, None, :]
     xq_ = torch.view_as_complex(xq.float().reshape(*xq.shape[:-1], -1, 2))
     xk_ = torch.view_as_complex(xk.float().reshape(*xk.shape[:-1], -1, 2))
 

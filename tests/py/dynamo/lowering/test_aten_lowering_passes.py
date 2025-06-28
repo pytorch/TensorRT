@@ -237,12 +237,6 @@ class TestFP32Accumulation(TestCase):
         torch._dynamo.reset()
 
 
-def rotary_embedding(x, dim, freqs_cis=None):
-    x_ = torch.view_as_complex(x.float().reshape(*x.shape[:-1], -1, 2))
-    x_out_flatten = torch.view_as_real(x_ * freqs_cis)
-    return x_out_flatten.type_as(x)
-
-
 class TestComplexSubgraph(TestCase):
     def test_complex_subgraph(self):
         BATCH = 1
@@ -263,6 +257,11 @@ class TestComplexSubgraph(TestCase):
                     persistent=True,
                 )
 
+            def rotary_embedding(self, x, dim, freqs_cis=None):
+                x_ = torch.view_as_complex(x.float().reshape(*x.shape[:-1], -1, 2))
+                x_out_flatten = torch.view_as_real(x_ * freqs_cis)
+                return x_out_flatten.type_as(x)
+
             def _freqs_ex_tensor(self):
                 real = torch.tensor([[[[1.0000]], [[2.0000]]]], device="cuda")
                 imag = torch.tensor([[[[0.0000]], [[3.0000]]]], device="cuda")
@@ -273,14 +272,13 @@ class TestComplexSubgraph(TestCase):
             def forward(self, x):
                 q = self.wq(x)
                 freqs_cis = self._freqs_ex_tensor().to(q.device)
-                q_out = rotary_embedding(q, self.dim, freqs_cis=freqs_cis)
+                q_out = self.rotary_embedding(q, self.dim, freqs_cis=freqs_cis)
                 return q_out
 
         inputs = [torch.randn(BATCH, SEQ_LEN, HEADS, DIM).cuda()]
         model = RotaryAttention()
         model = model.cuda()
 
-        fx_graph = torch.fx.symbolic_trace(RotaryAttention().cuda())
         expected_ops = {torch.ops.aten.mul.Tensor}
         unexpected_ops = {
             torch.ops.aten.view_as_complex.default,
