@@ -16,6 +16,7 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     get_trt_tensor,
     has_dynamic_shape,
     set_layer_name,
+    to_trt_weights,
 )
 from torch_tensorrt.dynamo.conversion.impl.cat import cat
 from torch_tensorrt.dynamo.conversion.impl.elementwise.ops import ge
@@ -47,90 +48,163 @@ def batch_norm(
 
     # Save the original output shape for later use
     output_shape = input.shape
+    # We perform constant folding for batch norm when the weight, bias, running_mean, and running_var are all tensors.
+    # Batch norm operation can be fused into a single layer, which is more efficient than the original implementation.
+    # In this way, the batch norm layer will be fused with the Convolution layer and get a performance boost.
+    if all(
+        [
+            isinstance(weight, torch.Tensor),
+            isinstance(bias, torch.Tensor),
+            isinstance(running_mean, torch.Tensor),
+            isinstance(running_var, torch.Tensor),
+        ]
+    ):
+        if weight is None:
+            weight = 1.0
 
-    # We name the weight here according to the state_dict name
-    weight = (
-        get_trt_tensor(ctx, 1.0, f"{name}_weight")
-        if weight is None
-        else get_trt_tensor(ctx, weight, f"{name}_weight")
-    )
-    bias = (
-        get_trt_tensor(ctx, 0.0, f"{name}_bias")
-        if bias is None
-        else get_trt_tensor(ctx, bias, f"{name}_bias")
-    )
-    running_mean = (
-        get_trt_tensor(ctx, 0.0, f"{name}_running_mean")
-        if running_mean is None
-        else get_trt_tensor(ctx, running_mean, f"{name}_running_mean")
-    )
-    running_var = (
-        get_trt_tensor(ctx, 1.0, f"{name}_running_var")
-        if running_var is None
-        else get_trt_tensor(ctx, running_var, f"{name}_running_var")
-    )
+        if bias is None:
+            bias = 0.0
 
-    # eps_tensor for numerical stability
-    eps_tensor = get_trt_tensor(ctx, eps, f"{name}_eps")
+        if running_mean is None:
+            running_mean = 0.0
 
-    # adjusted_var = running_var + eps
-    adjusted_var = impl.elementwise.add(
-        ctx, target, source_ir, f"{name}_adjusted_var", running_var, eps_tensor
-    )
+        if running_var is None:
+            running_var = 1.0
+        adjusted_scale = weight / torch.sqrt(running_var + eps)
+        adjusted_bias = bias - running_mean * adjusted_scale
+        power = torch.ones_like(adjusted_scale)
+        adjusted_scale = to_trt_weights(
+            ctx,
+            adjusted_scale,
+            name,
+            layer_type_name="SCALE",
+            weight_type_name="SCALE",
+            target=target,
+            source_ir=source_ir,
+        )
+        adjusted_bias = to_trt_weights(
+            ctx,
+            adjusted_bias,
+            name,
+            layer_type_name="SCALE",
+            weight_type_name="SHIFT",
+            target=target,
+            source_ir=source_ir,
+        )
 
-    # sqrt_adjusted_var = sqrt(adjusted_var)
-    sqrt_adjusted_var = impl.unary.sqrt(
-        ctx, target, source_ir, f"{name}_sqrt", adjusted_var
-    )
+        power = to_trt_weights(
+            ctx,
+            power,
+            name,
+            layer_type_name="SCALE",
+            weight_type_name="POWER",
+            target=target,
+            source_ir=source_ir,
+        )
 
-    # scale = weight / sqrt_adjusted_var
-    scale = impl.elementwise.div(
-        ctx, target, source_ir, f"{name}_scale", weight, sqrt_adjusted_var
-    )
+        output_shape = input.shape
+        if len(input.shape) < 4:
 
-    # scaled_running_mean = running_mean * scale
-    scaled_running_mean = impl.elementwise.mul(
-        ctx, target, source_ir, f"{name}_scaled_running_mean", running_mean, scale
-    )
+            new_shape = (
+                (input.shape[0], input.shape[1], 1, 1)
+                if len(input.shape) == 2
+                else (input.shape[0], input.shape[1], input.shape[2], 1)
+            )
+            input = impl.shuffle.reshape(
+                ctx, target, source_ir, f"{name}_reshape_2d", input, new_shape
+            )
 
-    # bias_adjusted = bias - scaled_running_mean
-    bias_adjusted = impl.elementwise.sub(
-        ctx, target, source_ir, f"{name}_bias_adjusted", bias, scaled_running_mean
-    )
+        layer = ctx.net.add_scale_nd(
+            input, trt.ScaleMode.CHANNEL, adjusted_bias, adjusted_scale, power, 1
+        )
+        set_layer_name(layer, target, name, source_ir)
+        output = layer.get_output(0)
 
-    # Reshape scale and bias_adjusted to match input shape for broadcasting
-    expanded_shape = [1] * len(output_shape)
-    expanded_shape[1] = output_shape[1]  # Set channel dimension
+    else:
 
-    scale_reshape = impl.shuffle.reshape(
-        ctx,
-        target,
-        source_ir,
-        f"{name}_reshape_scale",
-        scale,
-        tuple(expanded_shape),
-    )
-    bias_adjusted_reshape = impl.shuffle.reshape(
-        ctx,
-        target,
-        source_ir,
-        f"{name}_reshape_bias",
-        bias_adjusted,
-        tuple(expanded_shape),
-    )
+        # We name the weight here according to the state_dict name
+        weight = (
+            get_trt_tensor(ctx, 1.0, f"{name}_weight")
+            if weight is None
+            else get_trt_tensor(ctx, weight, f"{name}_weight")
+        )
+        bias = (
+            get_trt_tensor(ctx, 0.0, f"{name}_bias")
+            if bias is None
+            else get_trt_tensor(ctx, bias, f"{name}_bias")
+        )
+        running_mean = (
+            get_trt_tensor(ctx, 0.0, f"{name}_running_mean")
+            if running_mean is None
+            else get_trt_tensor(ctx, running_mean, f"{name}_running_mean")
+        )
+        running_var = (
+            get_trt_tensor(ctx, 1.0, f"{name}_running_var")
+            if running_var is None
+            else get_trt_tensor(ctx, running_var, f"{name}_running_var")
+        )
 
-    # Apply the scale and bias to the input
-    scaled_input = impl.elementwise.mul(
-        ctx, target, source_ir, f"{name}_scaled_input", input, scale_reshape
-    )
-    output = impl.elementwise.add(
-        ctx,
-        target,
-        source_ir,
-        f"{name}_output",
-        scaled_input,
-        bias_adjusted_reshape,
-    )
+        # eps_tensor for numerical stability
+        eps_tensor = get_trt_tensor(ctx, eps, f"{name}_eps")
+
+        # adjusted_var = running_var + eps
+        adjusted_var = impl.elementwise.add(
+            ctx, target, source_ir, f"{name}_adjusted_var", running_var, eps_tensor
+        )
+
+        # sqrt_adjusted_var = sqrt(adjusted_var)
+        sqrt_adjusted_var = impl.unary.sqrt(
+            ctx, target, source_ir, f"{name}_sqrt", adjusted_var
+        )
+
+        # scale = weight / sqrt_adjusted_var
+        scale = impl.elementwise.div(
+            ctx, target, source_ir, f"{name}_scale", weight, sqrt_adjusted_var
+        )
+
+        # scaled_running_mean = running_mean * scale
+        scaled_running_mean = impl.elementwise.mul(
+            ctx, target, source_ir, f"{name}_scaled_running_mean", running_mean, scale
+        )
+
+        # bias_adjusted = bias - scaled_running_mean
+        bias_adjusted = impl.elementwise.sub(
+            ctx, target, source_ir, f"{name}_bias_adjusted", bias, scaled_running_mean
+        )
+
+        # Reshape scale and bias_adjusted to match input shape for broadcasting
+        expanded_shape = [1] * len(output_shape)
+        expanded_shape[1] = output_shape[1]  # Set channel dimension
+
+        scale_reshape = impl.shuffle.reshape(
+            ctx,
+            target,
+            source_ir,
+            f"{name}_reshape_scale",
+            scale,
+            tuple(expanded_shape),
+        )
+        bias_adjusted_reshape = impl.shuffle.reshape(
+            ctx,
+            target,
+            source_ir,
+            f"{name}_reshape_bias",
+            bias_adjusted,
+            tuple(expanded_shape),
+        )
+
+        # Apply the scale and bias to the input
+        scaled_input = impl.elementwise.mul(
+            ctx, target, source_ir, f"{name}_scaled_input", input, scale_reshape
+        )
+        output = impl.elementwise.add(
+            ctx,
+            target,
+            source_ir,
+            f"{name}_output",
+            scaled_input,
+            bias_adjusted_reshape,
+        )
 
     # For BatchNorm1d, reshape output back to original shape if necessary
     if len(output_shape) < 4:
