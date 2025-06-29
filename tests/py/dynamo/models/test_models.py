@@ -79,11 +79,12 @@ def test_resnet18_cpu_offload(ir):
     }
 
     trt_mod = torchtrt.compile(model, **compile_spec)
-    assertions.assertTrue(
-        get_model_device(model).type == "cpu",
-        msg="Model should be offloaded to CPU",
-    )
-    model.cuda()
+    if ir == "dynamo":
+        assertions.assertTrue(
+            get_model_device(model).type == "cpu",
+            msg="Model should be offloaded to CPU",
+        )
+        model.cuda()
     cos_sim = cosine_similarity(model(input), trt_mod(input))
     assertions.assertTrue(
         cos_sim > COSINE_THRESHOLD,
@@ -286,11 +287,12 @@ def test_bert_base_uncased_cpu_offload(ir):
         "offload_module_to_cpu": True,
     }
     trt_mod = torchtrt.compile(model, **compile_spec)
-    assertions.assertTrue(
-        get_model_device(model).type == "cpu",
-        msg="Model should be offloaded to CPU",
-    )
-    model.cuda()
+    if ir == "dynamo":
+        assertions.assertTrue(
+            get_model_device(model).type == "cpu",
+            msg="Model should be offloaded to CPU",
+        )
+        model.cuda()
 
     model_outputs = model(input, input2)
     trt_model_outputs = trt_mod(input, input2)

@@ -39,7 +39,6 @@ from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (
 from torch_tensorrt.dynamo.utils import (
     CPU_DEVICE,
     check_module_output,
-    deallocate_module,
     get_model_device,
     get_torch_inputs,
     to_torch_device,
@@ -300,7 +299,7 @@ def refit_module_weights(
 
     # Check the number of supported operations in the graph
     num_supported_ops, total_ops = partitioning.get_graph_converter_support(
-        new_gm, settings.debug, settings.torch_executed_ops
+        new_gm, settings.torch_executed_ops
     )
 
     if num_supported_ops == 0 or (
@@ -363,7 +362,6 @@ def refit_module_weights(
 
     # Iterate over all components that can be accelerated
     # Generate the corresponding TRT Module for those
-    new_weight_module.module().to(CPU_DEVICE)
     for name, new_submodule in new_partitioned_module.named_children():
         # Refit each submodule
         # Extract engine from the submodule
@@ -466,7 +464,6 @@ def refit_module_weights(
                     settings=settings,
                     weight_name_map=None,
                 )
-        deallocate_module(new_submodule)
 
         # clear EXCLUDE_WEIGHTS flag
         serialization_config = engine.create_serialization_config()
@@ -488,8 +485,6 @@ def refit_module_weights(
         del engine
         gc.collect()
         torch.cuda.empty_cache()
-
-    deallocate_module(new_partitioned_module)
 
     if verify_output and arg_inputs is not None:
         new_gm.to(to_torch_device(settings.device))
