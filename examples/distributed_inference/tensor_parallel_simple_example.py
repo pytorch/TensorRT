@@ -1,3 +1,24 @@
+"""
+.. _tensor_parallel_simple_example:
+
+Torch Parallel Distributed example for simple model
+=========================================
+
+Below example shows how to use Torch-TensorRT backend for distributed inference with tensor parallelism.
+
+This example demonstrates:
+    - Setting up distributed environment for tensor parallelism
+    - Model sharding across multiple GPUs
+    - Compilation with Torch-TensorRT
+    - Distributed inference execution
+
+Usage
+-----
+.. code-block:: bash
+
+    mpirun -n 2 --allow-run-as-root python tensor_parallel_simple_example.py
+"""
+
 import time
 
 import tensorrt as trt
@@ -5,7 +26,10 @@ import torch
 import torch.distributed as dist
 import torch.nn as nn
 import torch_tensorrt
-from tensor_parallel_initialize_dist import initialize_distributed_env
+from tensor_parallel_initialize_dist import (
+    cleanup_distributed_env,
+    initialize_distributed_env,
+)
 from torch.distributed._tensor import Shard
 from torch.distributed.tensor.parallel import (
     ColwiseParallel,
@@ -18,7 +42,7 @@ device_mesh, _world_size, _rank, logger = initialize_distributed_env(
 )
 
 """
-This example copies some code from https://github.com/pytorch/examples/blob/main/distributed/tensor_parallelism/tensor_parallel_example.py
+This example takes some code from https://github.com/pytorch/examples/blob/main/distributed/tensor_parallelism/tensor_parallel_example.py
 """
 
 
@@ -97,5 +121,4 @@ try:
             logger.info(f"Inference time is {end-start}")
 finally:
     # This cleans up the distributed process group
-    if dist.is_initialized():
-        dist.destroy_process_group()
+    cleanup_distributed_env()
