@@ -215,7 +215,6 @@ def build_libtorchtrt_cxx11_abi(
         print("Jetpack build")
 
     if IS_SBSA:
-        cmd.append("--platforms=//toolchains:sbsa")
         print("SBSA build")
 
     if CI_BUILD:

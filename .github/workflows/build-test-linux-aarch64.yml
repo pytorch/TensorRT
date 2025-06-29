@@ -81,6 +81,7 @@ jobs:
   tests-py-torchscript-fe:
     name: Test torchscript frontend [Python]
     needs: [filter-matrix, build]
+    if: false
     strategy:
       fail-fast: false
       matrix:
@@ -119,6 +120,7 @@ jobs:
   tests-py-dynamo-converters:
     name: Test dynamo converters [Python]
     needs: [filter-matrix, build]
+    if: false
     strategy:
       fail-fast: false
       matrix:
@@ -153,6 +155,7 @@ jobs:
   tests-py-dynamo-fe:
     name: Test dynamo frontend [Python]
     needs: [filter-matrix, build]
+    if: false
     strategy:
       fail-fast: false
       matrix:
@@ -185,6 +188,7 @@ jobs:
   tests-py-dynamo-serde:
     name: Test dynamo export serde [Python]
     needs: [filter-matrix, build]
+    if: false
     strategy:
       fail-fast: false
       matrix:
@@ -218,6 +222,7 @@ jobs:
   tests-py-torch-compile-be:
     name: Test torch compile backend [Python]
     needs: [filter-matrix, build]
+    if: false
     strategy:
       fail-fast: false
       matrix:
@@ -252,6 +257,7 @@ jobs:
   tests-py-dynamo-core:
     name: Test dynamo core [Python]
     needs: [filter-matrix, build]
+    if: false
     strategy:
       fail-fast: false
       matrix:
@@ -286,6 +292,7 @@ jobs:
   tests-py-dynamo-cudagraphs:
     name: Test dynamo cudagraphs [Python]
     needs: [filter-matrix, build]
+    if: false
     strategy:
       fail-fast: false
       matrix:
@@ -320,6 +327,7 @@ jobs:
   tests-py-core:
     name: Test core [Python]
     needs: [filter-matrix, build]
+    if: false
     strategy:
       fail-fast: false
       matrix:

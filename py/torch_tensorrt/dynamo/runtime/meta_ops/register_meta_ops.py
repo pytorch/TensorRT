@@ -60,7 +60,7 @@ def fake_tensorrt_execute_engine(
                     output_sym_int = ctx.new_dynamic_size(min=min_val, max=max_val)
                     # Update var to val (hint)
                     output_sym_int_shape_env = output_sym_int.node.shape_env
-                    output_sym_int_shape_env.add_var_to_val(
+                    output_sym_int_shape_env.set_unbacked_var_to_val(
                         output_sym_int.node.expr, opt_val
                     )
                     output_shape.append(output_sym_int)
@@ -152,7 +152,7 @@ class FakeTRTEngine:
         pass
 
 
-@torch.library.custom_op(
+@torch.library.custom_op(  # type: ignore
     "tensorrt::no_op_placeholder_for_execute_engine", mutates_args=()
 )
 def no_op_placeholder_for_execute_engine(

@@ -81,6 +81,7 @@ def trace(
         tuple(torch_arg_inputs),
         kwargs=torch_kwarg_inputs,
         dynamic_shapes=dynamic_shapes,
+        strict=kwargs.get("strict", False),
     )
 
     return exp_program

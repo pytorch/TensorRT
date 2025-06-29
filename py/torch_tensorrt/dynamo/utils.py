@@ -375,8 +375,10 @@ def extract_var_range_info(symbolic_integer: torch.SymInt) -> Dict[str, int]:
     # https://pytorch.org/docs/stable/generated/torch.fx.experimental.symbolic_shapes.ShapeEnv.html#torch.fx.experimental.symbolic_shapes.ShapeEnv.bound_sympy
     # expr.xreplace replaces the symbolic variables with their current values and computes the expression.
     var_range = shape_env.var_to_range.get(expr, None) or shape_env.bound_sympy(expr)
-    var_val = shape_env.var_to_val.get(expr, None) or expr.xreplace(
-        shape_env.var_to_val
+    var_val = (
+        shape_env.var_to_val.get(expr, None)
+        or shape_env.unbacked_var_to_val.get(expr, None)
+        or expr.xreplace(shape_env.var_to_val)
     )
     assert var_range, var_val
     min_val, max_val = int(var_range.lower), int(var_range.upper)
@@ -385,8 +387,9 @@ def extract_var_range_info(symbolic_integer: torch.SymInt) -> Dict[str, int]:
     min_max_opt = {}
     min_max_opt["min"] = min_val
     min_max_opt["max"] = max_val
-    if isinstance(var_val, sympy.core.numbers.Integer):
+    if isinstance(var_val, (sympy.core.numbers.Integer, int)):
         min_max_opt["opt"] = int(var_val)
+
     return min_max_opt
 
 
@@ -447,9 +450,9 @@ def get_graph_io_attrs(
             metadata = node.meta["val"]
             if isinstance(metadata, (tuple, list)):
                 for tensor in metadata:
-                    graph_io_attrs.append(attr_fn(tensor))  # type: ignore
+                    graph_io_attrs.append(attr_fn(tensor))
             else:
-                graph_io_attrs.append(attr_fn(metadata))  # type: ignore
+                graph_io_attrs.append(attr_fn(metadata))
 
     return graph_io_attrs
 

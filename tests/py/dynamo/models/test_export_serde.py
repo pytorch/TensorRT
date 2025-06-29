@@ -1,5 +1,6 @@
 import importlib
 import os
+import platform
 import tempfile
 import unittest
 
@@ -645,6 +646,10 @@ def test_save_load_ts(ir):
 
 
 @pytest.mark.unit
+@unittest.skipIf(
+    platform.system() != "Linux",
+    "Save and load in AOT Inductor format is only supported on Linux",
+)
 def test_save_load_aoti(ir, tmp_path):
     """
     This tests save/load API on the AOTI format

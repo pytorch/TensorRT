@@ -1,8 +1,7 @@
-import pytest
-
-flashinfer = pytest.importorskip("flashinfer")
+import importlib
 import unittest
 
+import pytest
 import torch
 import torch.nn as nn
 import torch_tensorrt
@@ -11,6 +10,9 @@ from torch.testing._internal.common_utils import run_tests
 from torch_tensorrt._enums import dtype
 
 from ..conversion.harness import DispatchTestCase
+
+if importlib.util.find_spec("flashinfer"):
+    import flashinfer
 
 
 @torch.library.custom_op("flashinfer::rmsnorm", mutates_args=())  # type: ignore[misc]
@@ -31,6 +33,7 @@ torch_tensorrt.dynamo.conversion.plugins.custom_op(
 
 
 @unittest.skip("Not Available")
+@unittest.skipIf(not importlib.util.find_spec("flashinfer"), "flashinfer not installed")
 class TestAutomaticPlugin(DispatchTestCase):
     @parameterized.expand(
         [
