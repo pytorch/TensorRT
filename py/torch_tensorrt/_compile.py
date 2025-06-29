@@ -627,6 +627,10 @@ def save(
         raise ValueError(
             f"Provided output_format {output_format} is not supported. Supported options are exported_program | torchscript"
         )
+    if output_format == "aot_inductor" and platform.system() != "Linux":
+        raise ValueError(
+            f"The AOT Inductor format is only supported on Linux, {platform.system()} is not a supported platform for this format"
+        )
     if not file_path:
         raise ValueError("File path cannot be empty. Please provide a valid file path")
 
