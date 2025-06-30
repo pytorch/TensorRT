@@ -30,8 +30,20 @@ def benchmark(pipe, prompt, inference_step, batch_size=1, iterations=1):
 
 def main(args):
     pipe, backbone, trt_gm = compile_model(args)
-    for batch_size in range(1, args.max_batch_size + 1):
-        benchmark(pipe, ["Test"], 20, batch_size=batch_size, iterations=3)
+    # warmup
+    warmup_prompt = "Beach and Kids"
+    start = time()
+    images = pipe(
+        warmup_prompt,
+        output_type="pil",
+        num_inference_steps=20,
+        num_images_per_prompt=1,
+    ).images
+    print(f"Warmup done in {time() - start} seconds, generated {len(images)} images")
+
+    if not args.debug:
+        for batch_size in range(1, args.max_batch_size + 1):
+            benchmark(pipe, ["Test"], 20, batch_size=batch_size, iterations=3)
 
 
 if __name__ == "__main__":
@@ -41,9 +53,19 @@ if __name__ == "__main__":
 
     parser.add_argument(
         "--dtype",
-        choices=["fp8", "int8", "fp16"],
+        choices=["fp4", "fp8", "int8", "fp16"],
         default="fp16",
-        help="Select the data type to use (fp8 or int8 or fp16)",
+        help="Select the data type to use (fp4 or fp8 or int8 or fp16)",
+    )
+    parser.add_argument(
+        "--fp4_mha",
+        action="store_true",
+        help="Use NVFP4_FP8_MHA_CONFIG config instead of NVFP4_FP8_MHA_CONFIG",
+    )
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="Use debug mode",
     )
     parser.add_argument(
         "--low_vram_mode",

@@ -24,8 +24,14 @@ def compile_model(
 ) -> tuple[
     FluxPipeline, FluxTransformer2DModel, torch_tensorrt.MutableTorchTensorRTModule
 ]:
-
-    if args.dtype == "fp8":
+    use_explicit_precision = False
+    if args.dtype == "fp4":
+        use_explicit_precision = True
+        enabled_precisions = {torch.float4_e2m1fn_x2}
+        ptq_config = mtq.FP4_DEFAULT_CFG
+        if args.fp4_mha:
+            ptq_config = mtq.NVFP4_FP8_MHA_CONFIG
+    elif args.dtype == "fp8":
         enabled_precisions = {torch.float8_e4m3fn, torch.float16}
         ptq_config = mtq.FP8_DEFAULT_CFG
 
@@ -43,6 +49,12 @@ def compile_model(
         "black-forest-labs/FLUX.1-dev",
         torch_dtype=torch.float16,
     ).to(torch.float16)
+
+    # Use a small transformer for debugging
+    if args.debug:
+        pipe.transformer = FluxTransformer2DModel(
+            num_layers=1, num_single_layers=1, guidance_embeds=True
+        )
 
     if args.low_vram_mode:
         pipe.enable_model_cpu_offload()
@@ -109,7 +121,8 @@ def compile_model(
         "min_block_size": 1,
         "use_python_runtime": True,
         "immutable_weights": False,
-        "offload_module_to_cpu": True,
+        "offload_module_to_cpu": args.low_vram_mode,
+        "use_explicit_precision": use_explicit_precision,
     }
     if args.low_vram_mode:
         pipe.remove_all_hooks()
@@ -245,9 +258,19 @@ if __name__ == "__main__":
 
     parser.add_argument(
         "--dtype",
-        choices=["fp8", "int8", "fp16"],
+        choices=["fp4", "fp8", "int8", "fp16"],
         default="fp16",
-        help="Select the data type to use (fp8 or int8 or fp16)",
+        help="Select the data type to use (fp4 or fp8 or int8 or fp16)",
+    )
+    parser.add_argument(
+        "--fp4_mha",
+        action="store_true",
+        help="Use NVFP4_FP8_MHA_CONFIG config instead of NVFP4_FP8_MHA_CONFIG",
+    )
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="Use debug mode",
     )
     parser.add_argument(
         "--low_vram_mode",
