@@ -102,6 +102,136 @@ def test_mapping():
     "torchvision is not installed",
 )
 @pytest.mark.unit
+def test_batch_norm_refit_one_engine_with_weightmap():
+    class net(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.conv = nn.Conv2d(3, 3, 1)
+            self.bn = nn.BatchNorm2d(3)
+
+        def forward(self, x):
+            return self.bn(self.conv(x))
+
+    model = net().eval().to("cuda")
+    model2 = net().eval().to("cuda")
+    inputs = [torch.randn((1, 3, 224, 224)).to("cuda")]
+    enabled_precisions = {torch.float}
+    min_block_size = 1
+    use_python_runtime = True
+
+    exp_program = torch.export.export(model, tuple(inputs))
+    exp_program2 = torch.export.export(model2, tuple(inputs))
+
+    trt_gm = torchtrt.dynamo.compile(
+        exp_program,
+        tuple(inputs),
+        use_python_runtime=use_python_runtime,
+        enabled_precisions=enabled_precisions,
+        min_block_size=min_block_size,
+        immutable_weights=False,
+    )
+
+    new_trt_gm = refit_module_weights(
+        compiled_module=trt_gm,
+        new_weight_module=exp_program2,
+        arg_inputs=inputs,
+        use_weight_map_cache=True,
+        verify_output=True,
+    )
+
+    # Check the output
+    model2.to("cuda")
+    expected_outputs, refitted_outputs = exp_program2.module()(*inputs), new_trt_gm(
+        *inputs
+    )
+    for expected_output, refitted_output in zip(expected_outputs, refitted_outputs):
+        assertions.assertTrue(
+            torch.allclose(expected_output, refitted_output, 1e-2, 1e-2),
+            "Refit Result is not correct. Refit failed",
+        )
+        # Clean up model env
+
+    torch._dynamo.reset()
+
+
+@unittest.skipIf(
+    not torch_trt.ENABLED_FEATURES.torch_tensorrt_runtime,
+    "TorchScript Frontend is not available",
+)
+@unittest.skipIf(
+    not torch_trt.ENABLED_FEATURES.refit,
+    "Refit feature is not supported in Python 3.13 or higher",
+)
+@unittest.skipIf(
+    not importlib.util.find_spec("torchvision"),
+    "torchvision is not installed",
+)
+@pytest.mark.unit
+def test_batch_norm_refit_one_engine_without_weightmap():
+    class net(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.conv = nn.Conv2d(3, 3, 1)
+            self.bn = nn.BatchNorm2d(3)
+
+        def forward(self, x):
+            return self.bn(self.conv(x))
+
+    model = net().eval().to("cuda")
+    model2 = net().eval().to("cuda")
+    inputs = [torch.randn((1, 3, 224, 224)).to("cuda")]
+    enabled_precisions = {torch.float}
+    min_block_size = 1
+    use_python_runtime = True
+
+    exp_program = torch.export.export(model, tuple(inputs))
+    exp_program2 = torch.export.export(model2, tuple(inputs))
+
+    trt_gm = torchtrt.dynamo.compile(
+        exp_program,
+        tuple(inputs),
+        use_python_runtime=use_python_runtime,
+        enabled_precisions=enabled_precisions,
+        min_block_size=min_block_size,
+        immutable_weights=False,
+    )
+
+    new_trt_gm = refit_module_weights(
+        compiled_module=trt_gm,
+        new_weight_module=exp_program2,
+        arg_inputs=inputs,
+        use_weight_map_cache=False,
+        verify_output=True,
+    )
+
+    # Check the output
+    model2.to("cuda")
+    expected_outputs, refitted_outputs = exp_program2.module()(*inputs), new_trt_gm(
+        *inputs
+    )
+    for expected_output, refitted_output in zip(expected_outputs, refitted_outputs):
+        assertions.assertTrue(
+            torch.allclose(expected_output, refitted_output, 1e-2, 1e-2),
+            "Refit Result is not correct. Refit failed",
+        )
+        # Clean up model env
+
+    torch._dynamo.reset()
+
+
+@unittest.skipIf(
+    not torch_trt.ENABLED_FEATURES.torch_tensorrt_runtime,
+    "TorchScript Frontend is not available",
+)
+@unittest.skipIf(
+    not torch_trt.ENABLED_FEATURES.refit,
+    "Refit feature is not supported in Python 3.13 or higher",
+)
+@unittest.skipIf(
+    not importlib.util.find_spec("torchvision"),
+    "torchvision is not installed",
+)
+@pytest.mark.unit
 def test_refit_one_engine_with_weightmap():
     model = models.resnet18(pretrained=False).eval().to("cuda")
     model2 = models.resnet18(pretrained=True).eval().to("cuda")
