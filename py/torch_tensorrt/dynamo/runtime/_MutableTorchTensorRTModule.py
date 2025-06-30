@@ -1,5 +1,6 @@
 import inspect
 import logging
+import warnings
 from copy import deepcopy
 from enum import Enum, auto
 from typing import Any, Dict, Iterator, Optional, Set, Union
@@ -475,8 +476,10 @@ class MutableTorchTensorRTModule(object):
             + "Allowed input types: {torch_tensorrt.Input, torch.Tensor, list, tuple, dict}"
         )
 
-    # Due to https://github.com/pytorch/pytorch/issues/157183, we cannot use forward as a workaround.
-    # This is a temporary fix.
+    def forward(self, *args: Any, **kwargs: Any) -> Any:
+        warnings.warn("Direct calls to {self.__class__}.forward() are currently broken by due to https://github.com/pytorch/pytorch/issues/157183. Either call {self.__class__}(...) directly or use {self.__class__}._forward as a work around")
+        return self._forward(*args, **kwargs)
+
     def _forward(self, *args: Any, **kwargs: Any) -> Any:
         # Step 1: Check whether the input shape has changed
         kwargs = MutableTorchTensorRTModule._process_kwarg_inputs(kwargs)
@@ -537,6 +540,8 @@ class MutableTorchTensorRTModule(object):
         return result
 
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
+        # Due to https://github.com/pytorch/pytorch/issues/157183, we cannot use forward call, use _forward as a workaround.
+        # This is a temporary fix.
         return self._forward(*args, **kwargs)
 
     def __getattr__(self, name: str) -> Any:
