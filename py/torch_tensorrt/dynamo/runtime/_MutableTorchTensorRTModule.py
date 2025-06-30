@@ -477,7 +477,9 @@ class MutableTorchTensorRTModule(object):
         )
 
     def forward(self, *args: Any, **kwargs: Any) -> Any:
-        warnings.warn("Direct calls to {self.__class__}.forward() are currently broken by due to https://github.com/pytorch/pytorch/issues/157183. Either call {self.__class__}(...) directly or use {self.__class__}._forward as a work around")
+        warnings.warn(
+            "Direct calls to {self.__class__}.forward() are currently broken by due to https://github.com/pytorch/pytorch/issues/157183. Either call {self.__class__}(...) directly or use {self.__class__}._forward as a work around"
+        )
         return self._forward(*args, **kwargs)
 
     def _forward(self, *args: Any, **kwargs: Any) -> Any:
