@@ -14,12 +14,12 @@ jobs:
         if: ${{ ! contains(github.actor, 'pytorchbot') }}
         environment: pytorchbot-env
         container:
-            image: docker.io/pytorch/manylinux2_28-builder:cuda12.8
+            image: docker.io/pytorch/manylinux2_28-builder:cuda12.9
             options: --gpus all
         env:
-            CUDA_HOME: /usr/local/cuda-12.8
-            VERSION_SUFFIX: cu128
-            CU_VERSION: cu128
+            CUDA_HOME: /usr/local/cuda-12.9
+            VERSION_SUFFIX: cu129
+            CU_VERSION: cu129
             CHANNEL: nightly
             CI_BUILD: 1
         steps:
@@ -35,14 +35,14 @@ jobs:
             - name: Install base deps
               run: |
                   python3 -m pip install pip --upgrade
-                  python3 -m pip install pyyaml numpy torch --pre --extra-index-url https://download.pytorch.org/whl/nightly/cu128
+                  python3 -m pip install pyyaml numpy torch --pre --extra-index-url https://download.pytorch.org/whl/nightly/cu129
                   ./packaging/pre_build_script.sh
             - name: Get HEAD SHA
               id: vars
               run: echo "sha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
             - name: Build Python Package
               run: |
-                  python3 -m pip install --pre . --extra-index-url https://download.pytorch.org/whl/nightly/cu128
+                  python3 -m pip install --pre . --extra-index-url https://download.pytorch.org/whl/nightly/cu129
             - name: Generate New Docs
               run: |
                   cd docsrc
