@@ -477,7 +477,7 @@ class MutableTorchTensorRTModule(object):
 
     # Due to https://github.com/pytorch/pytorch/issues/157183, we cannot use forward as a workaround.
     # This is a temporary fix.
-    def call_forward(self, *args: Any, **kwargs: Any) -> Any:
+    def _forward(self, *args: Any, **kwargs: Any) -> Any:
         # Step 1: Check whether the input shape has changed
         kwargs = MutableTorchTensorRTModule._process_kwarg_inputs(kwargs)
         self._validate_inputs(*args, **kwargs)
@@ -537,7 +537,7 @@ class MutableTorchTensorRTModule(object):
         return result
 
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
-        return self.call_forward(*args, **kwargs)
+        return self._forward(*args, **kwargs)
 
     def __getattr__(self, name: str) -> Any:
         if name in self.__dict__:
