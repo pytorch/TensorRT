@@ -22,6 +22,9 @@ from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
     DYNAMO_CONVERTERS as CONVERTERS,
 )
 from torch_tensorrt.dynamo.conversion._TRTInterpreter import TRTInterpreter
+from torch_tensorrt.dynamo.conversion.impl.normalization.ops import (
+    batch_norm_constant_folding,
+)
 from torch_tensorrt.dynamo.conversion.truncate_double import repair_double_inputs
 from torch_tensorrt.dynamo.lowering import (
     get_decompositions,
@@ -91,13 +94,15 @@ def construct_refit_mapping_from_weight_name_map(
 ) -> dict[Any, Any]:
     engine_weight_map = {}
     for engine_weight_name, (sd_weight_name, np_weight_type) in weight_name_map.items():
+        # Add more constant folding converters here
         if engine_weight_name.split(" ")[-1] in ["SCALE", "SHIFT"]:
             # Batch Norm Layer
             params = {}
             for w in sd_weight_name:
                 params[w.split(".")[-1]] = state_dict[w].cuda()
-            scale = params["weight"] / torch.sqrt(params["running_var"] + 1e-7)
-            shift = params["bias"] - params["running_mean"] * scale
+            # Batch norm constant folding
+
+            scale, shift = batch_norm_constant_folding(**params, eps=1e-7)
             # Set scale to scale or shift to shift
             engine_weight_map[engine_weight_name] = eval(
                 engine_weight_name.split(" ")[-1].lower()
