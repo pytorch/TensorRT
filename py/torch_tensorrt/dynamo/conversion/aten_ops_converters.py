@@ -1935,6 +1935,7 @@ def aten_ops_minimum(
     )
 
 
+@dynamo_tensorrt_converter(operator.sub, supports_dynamic_shapes=True)
 @dynamo_tensorrt_converter(torch.ops.aten.sub.Tensor, supports_dynamic_shapes=True)
 @dynamo_tensorrt_converter(torch.ops.aten.sub.Scalar, supports_dynamic_shapes=True)
 def aten_ops_sub(
