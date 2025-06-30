@@ -195,10 +195,12 @@ def _refit_single_trt_engine_with_gm(
             for layer_name in weight_list:
                 if layer_name not in mapping:
                     raise AssertionError(f"{layer_name} is not found in weight mapping")
-                # Use Numpy to create weights
+                # Use Tensor to create weights
                 weight = mapping[layer_name]
                 trt_dtype = dtype._from(weight.dtype).to(trt.DataType)
-                trt_wt_tensor = trt.Weights(trt_dtype, weight.ctypes.data, weight.size)
+                trt_wt_tensor = trt.Weights(
+                    trt_dtype, weight.data_ptr(), torch.numel(weight)
+                )
                 refitter.set_named_weights(layer_name, trt_wt_tensor, trt_wt_location)
                 refitted.add(layer_name)
 
