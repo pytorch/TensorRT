@@ -103,22 +103,15 @@ tp_model = torch.compile(
     dynamic=None,
 )
 
-try:
-    for i in range(10):
-        # For TP, input needs to be same across all TP ranks.
-        # Setting the random seed is to mimic the behavior of dataloader.
-        torch.manual_seed(i)
-        inp = torch.rand(20, 10, device="cuda")
-        start = time.time()
-        output = tp_model(inp)
-        end = time.time()
-        if i == 0:
-            logger.info(f"Compilation time is {end-start}")
-            assert (
-                python_result - output
-            ).std() < 0.01, "Compilation result is not correct."
-        elif _rank == 0:
-            logger.info(f"Inference time is {end-start}")
-finally:
-    # This cleans up the distributed process group
-    cleanup_distributed_env()
+# For TP, input needs to be same across all TP ranks.
+# Setting the random seed is to mimic the behavior of dataloader.
+torch.manual_seed(0)
+inp = torch.rand(20, 10, device="cuda")
+start = time.time()
+output = tp_model(inp)
+end = time.time()
+logger.info(f"Compilation time is {end - start}")
+assert (python_result - output).std() < 0.01, "Result is not correct."
+
+# This cleans up the distributed process group
+cleanup_distributed_env()

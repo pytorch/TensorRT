@@ -28,7 +28,7 @@ device_mesh, _world_size, _rank, logger = initialize_distributed_env(
 
 """
 This example covers the rotary embedding in Llama3 model and is derived from https://lightning.ai/lightning-ai/studios/tensor-parallelism-supercharging-large-model-training-with-pytorch-lightning
-Command to run with single GPU: mpirun -n 1 --allow-run-as-root python tensor_parallel_rotary_embedding.pyx
+Command to run with single GPU: mpirun -n 1 --allow-run-as-root python tensor_parallel_rotary_embedding.py
 """
 
 BATCH = 2
@@ -49,22 +49,11 @@ with torch.no_grad():
 
     model = torch.compile(model, backend="torch_tensorrt")
 
-    try:
-        for i in range(15):
-            # seeding with dp_rank to ensure identical inputs for TP groups
-            torch.manual_seed(i)
-            start = time.time()
-            output = model(x)
-            end = time.time()
-            if i == 0:
-                logger.info(f"Compilation time is {end-start}")
-                assert (
-                    python_result - output
-                ).std() < 0.01, "Compilation result is not correct."
-            elif _rank == 0:
-                logger.info(f"Inference time is {end-start}")
-    except Exception as e:
-        logger.error(f"Error: {e}")
-        raise e
-    finally:
-        cleanup_distributed_env()
+    torch.manual_seed(0)
+    start = time.time()
+    output = model(x)
+    end = time.time()
+    logger.info(f"Compilation time is {end-start}")
+    assert (python_result - output).std() < 0.01, "Compilation result is not correct."
+
+    cleanup_distributed_env()

@@ -313,7 +313,6 @@ class TestComplexSubgraph(TestCase):
             inputs,
             min_block_size=1,
             pass_through_build_failures=True,
-            debug=True,
         )
         optimized_model_results = optimized_model(*inputs)[0].detach().cpu()
         torch_model_results = model(*inputs)[0].detach().cpu()
