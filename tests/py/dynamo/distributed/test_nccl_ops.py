@@ -1,4 +1,5 @@
 import os
+import unittest
 
 import torch
 import torch.distributed as dist
@@ -19,12 +20,13 @@ from conversion.harness import DispatchTestCase
 platform_str = str(Platform.current_platform()).lower()
 
 
-@unittest.skipIf(
-    "win" in platform_str, "Skipped on Windows: NCCL backend is not supported."
-)
 class TestGatherNcclOpsConverter(DispatchTestCase):
+    @unittest.skipIf(
+        "win" or "aarch64" in platform_str,
+        "Skipped on Windows and Jetson: NCCL backend is not supported.",
+    )
     @parameterized.expand([8])
-    def test_nccl_ops(self, linear_layer_dim):
+    def test_nccl_ops_gather(self, linear_layer_dim):
         class DistributedGatherModel(nn.Module):
             def __init__(self, input_dim):
                 super().__init__()
@@ -48,6 +50,10 @@ class TestGatherNcclOpsConverter(DispatchTestCase):
             enable_passes=True,
         )
 
+    @unittest.skipIf(
+        "win" or "aarch64" in platform_str,
+        "Skipped on Windows and Jetson: NCCL backend is not supported.",
+    )
     @parameterized.expand([8])
     def test_nccl_ops_scatter(self, linear_layer_dim):
 
