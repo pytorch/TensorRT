@@ -35,7 +35,7 @@ def main(args):
     pipe, backbone, trt_gm = compile_model(args)
     # warmup
     seed = 42
-    warmup_prompt = "Beach and Kids"
+    warmup_prompt = ["Beach and Kids"]
     start = time()
     images = pipe(
         warmup_prompt,
@@ -82,6 +82,12 @@ if __name__ == "__main__":
         "-d",
         action="store_true",
         help="Use dynamic shapes",
+    )
+    parser.add_argument(
+        "--use_dynamo",
+        action="store_true",
+        help="Use dynamo compile",
+        default=False,
     )
     parser.add_argument("--max_batch_size", type=int, default=1)
     args = parser.parse_args()

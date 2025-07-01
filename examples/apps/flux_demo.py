@@ -134,25 +134,73 @@ def compile_model(
         pipe.enable_sequential_cpu_offload()
         remove_hook_from_module(pipe.transformer, recurse=True)
         pipe.transformer.to(DEVICE)
+    if args.use_dynamo:
+        dummy_inputs = {
+            "hidden_states": torch.randn(
+                (batch_size, 4096, 64), dtype=torch.float16
+            ).to(DEVICE),
+            "encoder_hidden_states": torch.randn(
+                (batch_size, 512, 4096), dtype=torch.float16
+            ).to(DEVICE),
+            "pooled_projections": torch.randn(
+                (batch_size, 768), dtype=torch.float16
+            ).to(DEVICE),
+            "timestep": torch.tensor([1.0] * batch_size, dtype=torch.float16).to(
+                DEVICE
+            ),
+            "txt_ids": torch.randn((512, 3), dtype=torch.float16).to(DEVICE),
+            "img_ids": torch.randn((4096, 3), dtype=torch.float16).to(DEVICE),
+            "guidance": torch.tensor([1.0] * batch_size, dtype=torch.float32).to(
+                DEVICE
+            ),
+            "joint_attention_kwargs": {},
+            "return_dict": False,
+        }
+        from modelopt.torch.quantization.utils import export_torch_mode
 
-    if args.debug:
-        with torch_tensorrt.dynamo.Debugger(
-            "graphs",
-            logging_dir=DEBUG_LOGGING_DIR,
-            capture_fx_graph_after=["remove_num_users_is_0_nodes"],
-            save_engine_profile=True,
-            profile_format="trex",
-            engine_builder_monitor=True,
-        ):
-            trt_gm = torch_tensorrt.MutableTorchTensorRTModule(backbone, **settings)
+        with export_torch_mode():
+            ep = torch.export.export(
+                backbone,
+                args=(),
+                kwargs=dummy_inputs,
+                dynamic_shapes=dynamic_shapes,
+                strict=False,
+            )
+        if args.debug:
+            with torch_tensorrt.dynamo.Debugger(
+                "graphs",
+                logging_dir=DEBUG_LOGGING_DIR,
+                capture_fx_graph_after=["remove_num_users_is_0_nodes"],
+                save_engine_profile=True,
+                profile_format="trex",
+                engine_builder_monitor=True,
+            ):
+                trt_gm = torch_tensorrt.dynamo.compile(
+                    ep, inputs=dummy_inputs, **settings
+                )
+        else:
+            trt_gm = torch_tensorrt.dynamo.compile(ep, inputs=dummy_inputs, **settings)
+        pipe.transformer = trt_gm
+        pipe.transformer.config = backbone.config
     else:
-        trt_gm = torch_tensorrt.MutableTorchTensorRTModule(backbone, **settings)
-    if dynamic_shapes:
-        trt_gm.set_expected_dynamic_shape_range((), dynamic_shapes)
-    pipe.transformer = trt_gm
+        if args.debug:
+            with torch_tensorrt.dynamo.Debugger(
+                "graphs",
+                logging_dir=DEBUG_LOGGING_DIR,
+                capture_fx_graph_after=["remove_num_users_is_0_nodes"],
+                save_engine_profile=True,
+                profile_format="trex",
+                engine_builder_monitor=True,
+            ):
+                trt_gm = torch_tensorrt.MutableTorchTensorRTModule(backbone, **settings)
+        else:
+            trt_gm = torch_tensorrt.MutableTorchTensorRTModule(backbone, **settings)
+        if dynamic_shapes:
+            trt_gm.set_expected_dynamic_shape_range((), dynamic_shapes)
+        pipe.transformer = trt_gm
     seed = 42
     image = pipe(
-        "Beach and Kids",
+        ["Beach and Kids"],
         output_type="pil",
         num_inference_steps=20,
         num_images_per_prompt=batch_size,
@@ -281,6 +329,12 @@ if __name__ == "__main__":
         choices=["fp4", "fp8", "int8", "fp16"],
         default="fp16",
         help="Select the data type to use (fp4 or fp8 or int8 or fp16)",
+    )
+    parser.add_argument(
+        "--use_dynamo",
+        action="store_true",
+        help="Use dynamo compile",
+        default=False,
     )
     parser.add_argument(
         "--fp4_mha",
