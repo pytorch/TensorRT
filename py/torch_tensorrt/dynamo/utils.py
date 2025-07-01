@@ -872,6 +872,29 @@ def is_tegra_platform() -> bool:
     return False
 
 
+def is_platform_supported_for_trtllm(platform: str) -> bool:
+    """
+    Checks if the current platform supports TensorRT-LLM plugins for NCCL backend
+    Returns:
+        bool: True if the platform supports TensorRT-LLM plugins for NCCL backend, False otherwise.
+    Note:
+        TensorRT-LLM plugins for NCCL backend are not supported on:
+        - Windows platforms
+        - Jetson devices (aarch64 architecture)
+    """
+    if "windows" in platform:
+        logger.info(
+            "TensorRT-LLM plugins for NCCL backend are not supported on Windows"
+        )
+        return False
+    if "aarch64" in platform:
+        logger.info(
+            "TensorRT-LLM plugins for NCCL backend are not supported on Jetson devices (aarch64)"
+        )
+        return False
+    return True
+
+
 @contextmanager
 def download_plugin_lib_path(platform: str) -> Iterator[str]:
     """
@@ -922,6 +945,7 @@ def download_plugin_lib_path(platform: str) -> Iterator[str]:
     if "linux" in platform:
         lib_filename = "libnvinfer_plugin_tensorrt_llm.so"
     else:
+        # This condition is never met though
         lib_filename = "libnvinfer_plugin_tensorrt_llm.dll"
 
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -954,7 +978,7 @@ def download_plugin_lib_path(platform: str) -> Iterator[str]:
         yield plugin_lib_path
 
 
-def load_and_initialize_trtllm_plugin(plugin_lib_path: str, platform: str) -> bool:
+def load_and_initialize_trtllm_plugin(plugin_lib_path: str) -> bool:
     """
     Loads and initializes the TensorRT-LLM plugin from the given shared library path.
 
@@ -964,9 +988,6 @@ def load_and_initialize_trtllm_plugin(plugin_lib_path: str, platform: str) -> bo
     Returns:
         bool: True if successful, False otherwise.
     """
-    if "windows" in platform:
-        logger.info("NCCL backend is not supported on Windows")
-        return False
     try:
         handle = ctypes.CDLL(plugin_lib_path)
         logger.info(f"Successfully loaded plugin library: {plugin_lib_path}")
@@ -1012,7 +1033,7 @@ def load_and_initialize_trtllm_plugin(plugin_lib_path: str, platform: str) -> bo
     return False
 
 
-def load_tensorrt_llm() -> bool:
+def load_tensorrt_llm_for_nccl() -> bool:
     """
     Attempts to load the TensorRT-LLM plugin and initialize it.
     Either the env variable TRTLLM_PLUGINS_PATH can specify the path
@@ -1021,11 +1042,15 @@ def load_tensorrt_llm() -> bool:
     Returns:
         bool: True if the plugin was successfully loaded and initialized, False otherwise.
     """
-    plugin_lib_path = os.environ.get("TRTLLM_PLUGINS_PATH")
+    # Check platform compatibility first
     platform = Platform.current_platform()
     platform = str(platform).lower()
+    if not is_platform_supported_for_trtllm(platform):
+        return False
+    plugin_lib_path = os.environ.get("TRTLLM_PLUGINS_PATH")
+
     if plugin_lib_path:
-        return load_and_initialize_trtllm_plugin(plugin_lib_path, platform)
+        return load_and_initialize_trtllm_plugin(plugin_lib_path)
     else:
         # this option can be used by user if TRTLLM_PLUGINS_PATH is not set by user
         use_trtllm_plugin = os.environ.get("USE_TRTLLM_PLUGINS", "0").lower() in (
@@ -1041,5 +1066,5 @@ def load_tensorrt_llm() -> bool:
             return False
 
         with download_plugin_lib_path(platform) as plugin_lib_path:
-            return load_and_initialize_trtllm_plugin(plugin_lib_path, platform)
+            return load_and_initialize_trtllm_plugin(plugin_lib_path)
     return False
