@@ -286,19 +286,6 @@ def set_log_level(parent_logger: Any, level: Any) -> None:
     """
     if parent_logger:
         parent_logger.setLevel(level)
-        print("Handlers for parent_logger:", parent_logger.handlers)
-        print("bool check--", parent_logger.hasHandlers())
-        if parent_logger.hasHandlers():
-            ch = logging.StreamHandler()
-            ch.setLevel(logging.DEBUG)  # Allow debug messages on handler
-            formatter = logging.Formatter(
-                "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-            )
-            ch.setFormatter(formatter)
-            parent_logger.addHandler(ch)
-            print("Logger level:", parent_logger.level)
-            # print("Parent logger level:", logger.parent.level)
-            print("Root logger level:", logging.getLogger().level)
 
     if ENABLED_FEATURES.torch_tensorrt_runtime:
         if level == logging.DEBUG:
@@ -916,7 +903,6 @@ def download_plugin_lib_path(platform: str) -> Iterator[str]:
         # Downloading TRT-LLM lib
         base_url = "https://pypi.nvidia.com/tensorrt-llm/"
         download_url = base_url + file_name
-        print("Downloading TRT-LLM wheel")
         try:
             logger.debug(f"Downloading {download_url} ...")
             urllib.request.urlretrieve(download_url, downloaded_file_path)
@@ -968,7 +954,7 @@ def download_plugin_lib_path(platform: str) -> Iterator[str]:
         yield plugin_lib_path
 
 
-def load_and_initialize_trtllm_plugin(plugin_lib_path: str) -> bool:
+def load_and_initialize_trtllm_plugin(plugin_lib_path: str, platform: str) -> bool:
     """
     Loads and initializes the TensorRT-LLM plugin from the given shared library path.
 
@@ -978,6 +964,9 @@ def load_and_initialize_trtllm_plugin(plugin_lib_path: str) -> bool:
     Returns:
         bool: True if successful, False otherwise.
     """
+    if "windows" in platform:
+        logger.info("NCCL backend is not supported on Windows")
+        return False
     try:
         handle = ctypes.CDLL(plugin_lib_path)
         logger.info(f"Successfully loaded plugin library: {plugin_lib_path}")
@@ -1033,8 +1022,10 @@ def load_tensorrt_llm() -> bool:
         bool: True if the plugin was successfully loaded and initialized, False otherwise.
     """
     plugin_lib_path = os.environ.get("TRTLLM_PLUGINS_PATH")
+    platform = Platform.current_platform()
+    platform = str(platform).lower()
     if plugin_lib_path:
-        return load_and_initialize_trtllm_plugin(plugin_lib_path)
+        return load_and_initialize_trtllm_plugin(plugin_lib_path, platform)
     else:
         # this option can be used by user if TRTLLM_PLUGINS_PATH is not set by user
         use_trtllm_plugin = os.environ.get("USE_TRTLLM_PLUGINS", "0").lower() in (
@@ -1048,10 +1039,7 @@ def load_tensorrt_llm() -> bool:
                 "Neither TRTLLM_PLUGIN_PATH is set nor is it directed to download the shared library. Please set either of the two to use TRT-LLM libraries in torchTRT"
             )
             return False
-        else:
-            platform = Platform.current_platform()
-            platform = str(platform).lower()
 
         with download_plugin_lib_path(platform) as plugin_lib_path:
-            return load_and_initialize_trtllm_plugin(plugin_lib_path)
+            return load_and_initialize_trtllm_plugin(plugin_lib_path, platform)
     return False
