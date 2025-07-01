@@ -13,10 +13,6 @@ from diffusers import FluxPipeline
 from diffusers.models.transformers.transformer_flux import FluxTransformer2DModel
 from torch_tensorrt.dynamo._defaults import DEBUG_LOGGING_DIR
 
-# Register SDPA as a standalone operator. Converter and lowering pass are defined in register_sdpa.py
-sys.path.append(os.path.join(os.path.dirname(__file__), "../dynamo"))
-from register_sdpa import *
-
 DEVICE = "cuda:0"
 
 
@@ -26,6 +22,11 @@ def compile_model(
     FluxPipeline, FluxTransformer2DModel, torch_tensorrt.MutableTorchTensorRTModule
 ]:
     use_explicit_typing = False
+    if args.use_sdpa:
+        # Register SDPA as a standalone operator. Converter and lowering pass are defined in register_sdpa.py
+        sys.path.append(os.path.join(os.path.dirname(__file__), "../dynamo"))
+        import register_sdpa
+
     if args.dtype == "fp4":
         use_explicit_typing = True
         enabled_precisions = {torch.float4_e2m1fn_x2}
@@ -124,7 +125,7 @@ def compile_model(
         "enabled_precisions": enabled_precisions,
         "truncate_double": True,
         "min_block_size": 1,
-        "use_python_runtime": True,
+        "use_python_runtime": False,
         "immutable_weights": False,
         "offload_module_to_cpu": args.low_vram_mode,
         "use_explicit_typing": use_explicit_typing,
@@ -323,7 +324,12 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Run Flux quantization with different dtypes"
     )
-
+    parser.add_argument(
+        "--use_sdpa",
+        action="store_true",
+        help="Use sdpa",
+        default=False,
+    )
     parser.add_argument(
         "--dtype",
         choices=["fp4", "fp8", "int8", "fp16"],

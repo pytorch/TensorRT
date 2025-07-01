@@ -359,15 +359,25 @@ class MutableTorchTensorRTModule(object):
         # Export the module
         self.original_model.to(to_torch_device(self.trt_device))
         self.exp_program = self.get_exported_program()
-        self.gm = dynamo_compile(
-            self.exp_program,
-            arg_inputs=self.arg_inputs,
-            kwarg_inputs=self.kwarg_inputs,
-            immutable_weights=False,
-            use_python_runtime=self.use_python_runtime,
-            enabled_precisions=self.enabled_precisions,
-            **self.additional_settings,
-        )
+        from torch_tensorrt.dynamo._defaults import DEBUG_LOGGING_DIR
+
+        with torch_tensorrt.dynamo.Debugger(
+            "graphs",
+            logging_dir=DEBUG_LOGGING_DIR,
+            capture_fx_graph_after=["remove_num_users_is_0_nodes"],
+            save_engine_profile=True,
+            profile_format="trex",
+            engine_builder_monitor=True,
+        ):
+            self.gm = dynamo_compile(
+                self.exp_program,
+                arg_inputs=self.arg_inputs,
+                kwarg_inputs=self.kwarg_inputs,
+                immutable_weights=False,
+                use_python_runtime=self.use_python_runtime,
+                enabled_precisions=self.enabled_precisions,
+                **self.additional_settings,
+            )
         deallocate_module(self.original_model, delete_module=False)
         if self.enable_weight_streaming:
             self.set_weight_streaming_ctx(self.weight_streaming_budget)
