@@ -3,6 +3,8 @@ import os
 import sys
 from time import time
 
+import torch
+
 sys.path.append(os.path.join(os.path.dirname(__file__), "../../../examples/apps"))
 from flux_demo import compile_model
 
@@ -29,21 +31,24 @@ def benchmark(pipe, prompt, inference_step, batch_size=1, iterations=1):
 
 
 def main(args):
+    print(f"Running flux_perfwith args: {args}")
     pipe, backbone, trt_gm = compile_model(args)
     # warmup
+    seed = 42
     warmup_prompt = "Beach and Kids"
     start = time()
     images = pipe(
         warmup_prompt,
         output_type="pil",
-        num_inference_steps=20,
-        num_images_per_prompt=1,
+        num_inference_steps=30,
+        generator=torch.Generator("cuda").manual_seed(seed),
     ).images
     print(f"Warmup done in {time() - start} seconds, generated {len(images)} images")
+    images[0].save("warmup2.png")
 
-    if not args.debug:
-        for batch_size in range(1, args.max_batch_size + 1):
-            benchmark(pipe, ["Test"], 20, batch_size=batch_size, iterations=3)
+    # if not args.debug:
+    #     for batch_size in range(1, args.max_batch_size + 1):
+    #         benchmark(pipe, ["Test"], 20, batch_size=batch_size, iterations=3)
 
 
 if __name__ == "__main__":

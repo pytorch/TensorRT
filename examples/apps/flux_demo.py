@@ -11,6 +11,7 @@ import torch_tensorrt
 from accelerate.hooks import remove_hook_from_module
 from diffusers import FluxPipeline
 from diffusers.models.transformers.transformer_flux import FluxTransformer2DModel
+from torch_tensorrt.dynamo._defaults import DEBUG_LOGGING_DIR
 
 # Register SDPA as a standalone operator. Converter and lowering pass are defined in register_sdpa.py
 sys.path.append(os.path.join(os.path.dirname(__file__), "../dynamo"))
@@ -24,13 +25,16 @@ def compile_model(
 ) -> tuple[
     FluxPipeline, FluxTransformer2DModel, torch_tensorrt.MutableTorchTensorRTModule
 ]:
-    use_explicit_precision = False
+    use_explicit_typing = False
     if args.dtype == "fp4":
-        use_explicit_precision = True
+        use_explicit_typing = True
         enabled_precisions = {torch.float4_e2m1fn_x2}
-        ptq_config = mtq.FP4_DEFAULT_CFG
+        ptq_config = mtq.NVFP4_DEFAULT_CFG
         if args.fp4_mha:
-            ptq_config = mtq.NVFP4_FP8_MHA_CONFIG
+            from modelopt.core.torch.quantization.config import NVFP4_FP8_MHA_CONFIG
+
+            ptq_config = NVFP4_FP8_MHA_CONFIG
+
     elif args.dtype == "fp8":
         enabled_precisions = {torch.float8_e4m3fn, torch.float16}
         ptq_config = mtq.FP8_DEFAULT_CFG
@@ -50,11 +54,12 @@ def compile_model(
         torch_dtype=torch.float16,
     ).to(torch.float16)
 
-    # Use a small transformer for debugging
-    if args.debug:
-        pipe.transformer = FluxTransformer2DModel(
-            num_layers=1, num_single_layers=1, guidance_embeds=True
-        )
+    # # Use a small transformer for debugging
+    # if args.debug:
+    #     pipe.transformer = FluxTransformer2DModel(
+    #         num_layers=1, num_single_layers=1, guidance_embeds=True
+    #     )
+    #     pipe.to(torch.float16)
 
     if args.low_vram_mode:
         pipe.enable_model_cpu_offload()
@@ -122,24 +127,39 @@ def compile_model(
         "use_python_runtime": True,
         "immutable_weights": False,
         "offload_module_to_cpu": args.low_vram_mode,
-        "use_explicit_precision": use_explicit_precision,
+        "use_explicit_typing": use_explicit_typing,
     }
     if args.low_vram_mode:
         pipe.remove_all_hooks()
         pipe.enable_sequential_cpu_offload()
         remove_hook_from_module(pipe.transformer, recurse=True)
         pipe.transformer.to(DEVICE)
-    trt_gm = torch_tensorrt.MutableTorchTensorRTModule(backbone, **settings)
+
+    if args.debug:
+        with torch_tensorrt.dynamo.Debugger(
+            "graphs",
+            logging_dir=DEBUG_LOGGING_DIR,
+            capture_fx_graph_after=["remove_num_users_is_0_nodes"],
+            save_engine_profile=True,
+            profile_format="trex",
+            engine_builder_monitor=True,
+        ):
+            trt_gm = torch_tensorrt.MutableTorchTensorRTModule(backbone, **settings)
+    else:
+        trt_gm = torch_tensorrt.MutableTorchTensorRTModule(backbone, **settings)
     if dynamic_shapes:
         trt_gm.set_expected_dynamic_shape_range((), dynamic_shapes)
     pipe.transformer = trt_gm
-
+    seed = 42
     image = pipe(
-        "Test",
+        "Beach and Kids",
         output_type="pil",
-        num_inference_steps=2,
+        num_inference_steps=20,
         num_images_per_prompt=batch_size,
+        generator=torch.Generator("cuda").manual_seed(seed),
     ).images
+    print(f"generated {len(image)} images")
+    image[0].save("warmup1.png")
 
     torch.cuda.empty_cache()
 
