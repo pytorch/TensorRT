@@ -6,6 +6,7 @@ import torch.nn as nn
 from distributed_utils import set_environment_variables_pytest
 from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
+from torch_tensorrt._enums import Platform
 
 set_environment_variables_pytest()
 dist.init_process_group(backend="nccl", init_method="env://")
@@ -15,7 +16,12 @@ world_size = 1
 
 from conversion.harness import DispatchTestCase
 
+platform_str = str(Platform.current_platform()).lower()
 
+
+@unittest.skipIf(
+    "win" in platform_str, "Skipped on Windows: NCCL backend is not supported."
+)
 class TestGatherNcclOpsConverter(DispatchTestCase):
     @parameterized.expand([8])
     def test_nccl_ops(self, linear_layer_dim):
