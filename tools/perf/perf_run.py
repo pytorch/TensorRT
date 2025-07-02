@@ -282,7 +282,7 @@ def run_dynamo(model, input_tensors, params, precision, batch_size):
         cache_built_engines=params.get("cache_built_engines", False),
         reuse_cached_engines=params.get("reuse_cached_engines", False),
         use_python_runtime=params.get("use_python_runtime", False),
-        optimization_level=5,
+        optimization_level=params.get("optimization_level", 5),
     )
     end_compile = timeit.default_timer()
     compile_time_s = end_compile - start_compile
@@ -455,7 +455,7 @@ def run_tensorrt(
         config = builder.create_builder_config()
         if precision == "fp16":
             config.set_flag(trt.BuilderFlag.FP16)
-        config.builder_optimization_level = 5
+        config.builder_optimization_level = params.get("optimization_level", 5)
         start_compile = timeit.default_timer()
         serialized_engine = builder.build_serialized_network(network, config)
         end_compile = timeit.default_timer()
@@ -679,6 +679,12 @@ if __name__ == "__main__":
         "--truncate",
         action="store_true",
         help="Truncate long and double weights in the network in Torch-TensorRT",
+    )
+    arg_parser.add_argument(
+        "--optimization_level",
+        type=int,
+        default=5,
+        help="Builder optimization level for TensorRT",
     )
     arg_parser.add_argument(
         "--is_trt_engine",
