@@ -364,7 +364,8 @@ class MutableTorchTensorRTModule(object):
         with torch_tensorrt.dynamo.Debugger(
             "graphs",
             logging_dir=DEBUG_LOGGING_DIR,
-            capture_fx_graph_after=["remove_num_users_is_0_nodes"],
+            # whenever try to draw svg it hangs
+            # capture_fx_graph_after=["remove_num_users_is_0_nodes"],
             save_engine_profile=True,
             profile_format="trex",
             engine_builder_monitor=True,

@@ -46,9 +46,9 @@ def main(args):
     print(f"Warmup done in {time() - start} seconds, generated {len(images)} images")
     images[0].save("warmup2.png")
 
-    # if not args.debug:
-    #     for batch_size in range(1, args.max_batch_size + 1):
-    #         benchmark(pipe, ["Test"], 20, batch_size=batch_size, iterations=3)
+    if not args.debug:
+        for batch_size in range(1, args.max_batch_size + 1):
+            benchmark(pipe, ["Test"], 20, batch_size=batch_size, iterations=3)
 
 
 if __name__ == "__main__":
