@@ -335,8 +335,8 @@ def to_trt_weights(
     ctx: ConversionContext,
     value: torch.Tensor,
     name: str,
-    layer_type_name: Literal["CONVOLUTION", "DECONVOLUTION", "CONSTANT"],
-    weight_type_name: Literal["KERNEL", "BIAS", "CONSTANT"],
+    layer_type_name: Literal["CONVOLUTION", "DECONVOLUTION", "CONSTANT", "SCALE"],
+    weight_type_name: Literal["KERNEL", "BIAS", "CONSTANT", "SCALE", "SHIFT", "POWER"],
     target: Optional[Union[Target, str]] = None,
     source_ir: Optional[SourceIR] = None,
     target_quantized_type: Optional[trt.DataType] = None,
@@ -362,8 +362,8 @@ def to_trt_weights(
         )
 
     # Weight Recording
-    supported_layer_types = ["CONVOLUTION", "DECONVOLUTION", "CONSTANT"]
-    supported_weight_types = ["KERNEL", "BIAS", "CONSTANT"]
+    supported_layer_types = ["CONVOLUTION", "DECONVOLUTION", "CONSTANT", "SCALE"]
+    supported_weight_types = ["KERNEL", "BIAS", "CONSTANT", "SCALE", "SHIFT", "POWER"]
     assert (
         layer_type_name in supported_layer_types
     ), f"Encountered unsupported layer type: {layer_type_name}. Supported types are: {supported_layer_types}. Manually calling to_trt_weights with a custom layer type is not intended for general use."
