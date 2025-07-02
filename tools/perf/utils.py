@@ -176,6 +176,8 @@ def torch_dtype_from_trt(dtype):
         return torch.bool
     elif dtype == trt.int32:
         return torch.int32
+    elif dtype == trt.int64:
+        return torch.int64
     elif dtype == trt.float16:
         return torch.float16
     elif dtype == trt.float32:
