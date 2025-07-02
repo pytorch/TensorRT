@@ -10,7 +10,20 @@ from flux_demo import compile_model
 
 
 def benchmark(pipe, prompt, inference_step, batch_size=1, iterations=1):
+    # warmup
+    for i in range(10):
+        start = time()
+        images = pipe(
+            prompt,
+            output_type="pil",
+            num_inference_steps=inference_step,
+            num_images_per_prompt=batch_size,
+        ).images
+        print(
+            f"Warmup {i} done in {time() - start} seconds, with {batch_size=} {inference_step=}, generated {len(images)} images"
+        )
 
+    # actual benchmark
     start = time()
     for i in range(iterations):
         image = pipe(
@@ -20,35 +33,33 @@ def benchmark(pipe, prompt, inference_step, batch_size=1, iterations=1):
             num_images_per_prompt=batch_size,
         ).images
     end = time()
-
     print(f"Batch Size: {batch_size}")
     print("Time Elapse for", iterations, "iterations:", end - start)
     print(
         "Average Latency Per Step:",
         (end - start) / inference_step / iterations / batch_size,
     )
-    return image
+
+    # run the perf tool
+    from cuda import cudart
+
+    cudart.cudaProfilerStart()
+    image = pipe(
+        prompt,
+        output_type="pil",
+        num_inference_steps=inference_step,
+        num_images_per_prompt=batch_size,
+    ).images
+    cudart.cudaProfilerStop()
+    return
 
 
 def main(args):
     print(f"Running flux_perfwith args: {args}")
     pipe, backbone, trt_gm = compile_model(args)
-    # warmup
-    seed = 42
-    warmup_prompt = ["Beach and Kids"]
-    start = time()
-    images = pipe(
-        warmup_prompt,
-        output_type="pil",
-        num_inference_steps=30,
-        generator=torch.Generator("cuda").manual_seed(seed),
-    ).images
-    print(f"Warmup done in {time() - start} seconds, generated {len(images)} images")
-    images[0].save("warmup2.png")
 
-    if not args.debug:
-        for batch_size in range(1, args.max_batch_size + 1):
-            benchmark(pipe, ["Test"], 20, batch_size=batch_size, iterations=3)
+    for batch_size in range(1, args.max_batch_size + 1):
+        benchmark(pipe, ["Test"], 20, batch_size=batch_size, iterations=3)
 
 
 if __name__ == "__main__":
