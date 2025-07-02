@@ -327,9 +327,11 @@ def generate_mm(
 
     while generated < osl:
         cur_embeds = seq_embeds  # full seq first step or cache off
-
+        position_ids = (
+                torch.arange(cur_embeds.shape[1]).unsqueeze(0).to(cur_embeds.device)
+            )
         with torch.no_grad():
-            logits = model.language_model(inputs_embeds=cur_embeds)
+            logits = model.language_model(inputs_embeds=cur_embeds, position_ids=position_ids)
             if hasattr(logits, "logits"):
                 logits = logits.logits
 
