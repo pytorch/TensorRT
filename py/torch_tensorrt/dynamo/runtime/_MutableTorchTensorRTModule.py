@@ -468,7 +468,7 @@ class MutableTorchTensorRTModule(object):
             + "Allowed input types: {torch_tensorrt.Input, torch.Tensor, list, tuple, dict}"
         )
 
-    def forward(self, *args: Any, **kwargs: Any) -> Any:
+    def _forward(self, *args: Any, **kwargs: Any) -> Any:
         # Step 1: Check whether the input shape has changed
         kwargs = MutableTorchTensorRTModule._process_kwarg_inputs(kwargs)
         self._validate_inputs(*args, **kwargs)
@@ -528,7 +528,7 @@ class MutableTorchTensorRTModule(object):
         return result
 
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
-        return self.forward(*args, **kwargs)
+        return self._forward(*args, **kwargs)
 
     def __getattr__(self, name: str) -> Any:
         if name in self.__dict__:
