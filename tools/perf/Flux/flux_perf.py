@@ -73,7 +73,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--fp4_mha",
         action="store_true",
-        help="Use NVFP4_FP8_MHA_CONFIG config instead of NVFP4_FP8_MHA_CONFIG",
+        help="Use NVFP4_FP8_MHA_CONFIG config instead of NVFP4_DEFAULT_CFG",
     )
     parser.add_argument(
         "--low_vram_mode",

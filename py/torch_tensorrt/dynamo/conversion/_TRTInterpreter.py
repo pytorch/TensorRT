@@ -220,8 +220,8 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         if version.parse(trt.__version__) >= version.parse("8.2"):
             builder_config.profiling_verbosity = (
                 trt.ProfilingVerbosity.DETAILED
-                # if self._debugger_config and self._debugger_config.save_engine_profile
-                # else trt.ProfilingVerbosity.LAYER_NAMES_ONLY
+                if self._debugger_config and self._debugger_config.save_engine_profile
+                else trt.ProfilingVerbosity.LAYER_NAMES_ONLY
             )
 
         if version.parse(trt.__version__) >= version.parse("8.6"):
