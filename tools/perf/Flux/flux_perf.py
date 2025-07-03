@@ -10,6 +10,7 @@ from flux_demo import compile_model
 
 
 def benchmark(pipe, prompt, inference_step, batch_size=1, iterations=1):
+    print(f"Running warmup with {batch_size=} {inference_step=} iterations=10")
     # warmup
     for i in range(10):
         start = time()
@@ -24,6 +25,7 @@ def benchmark(pipe, prompt, inference_step, batch_size=1, iterations=1):
         )
 
     # actual benchmark
+    print(f"Running benchmark with {batch_size=} {inference_step=} {iterations=}")
     start = time()
     for i in range(iterations):
         image = pipe(
@@ -41,8 +43,10 @@ def benchmark(pipe, prompt, inference_step, batch_size=1, iterations=1):
     )
 
     # run the perf tool
+    print(f"Running cudart perf tool with {inference_step=} {batch_size=}")
     from cuda import cudart
 
+    cudart.cudaInit(0)
     cudart.cudaProfilerStart()
     image = pipe(
         prompt,
@@ -51,6 +55,22 @@ def benchmark(pipe, prompt, inference_step, batch_size=1, iterations=1):
         num_images_per_prompt=batch_size,
     ).images
     cudart.cudaProfilerStop()
+
+    # print(f"Running torch profiler with {inference_step=} {batch_size=}")
+    # with torch.profiler.profile(
+    #     activities=[torch.profiler.ProfilerActivity.CUDA],
+    #     record_shapes=True,
+    #     profile_memory=True,
+    #     with_stack=True,
+    # ) as prof:
+    #     with torch.profiler.record_function("model_inference"):
+    #         pipe(
+    #             prompt,
+    #             output_type="pil",
+    #             num_inference_steps=inference_step,
+    #             num_images_per_prompt=batch_size,
+    #         ).images
+    # print(prof.key_averages().table(sort_by="cuda_time_total", row_limit=100))
     return
 
 
