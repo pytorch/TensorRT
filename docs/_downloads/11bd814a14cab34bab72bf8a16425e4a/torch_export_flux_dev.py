@@ -19,6 +19,8 @@ There are different components of the ``FLUX.1-dev`` pipeline such as ``transfor
 we demonstrate optimizing the ``transformer`` component of the model (which typically consumes >95% of the e2e diffusion latency)
 """
 
+import register_sdpa  # Register SDPA as a standalone operator
+
 # %%
 # Import the following libraries
 # -----------------------------
@@ -112,6 +114,8 @@ trt_gm = torch_tensorrt.dynamo.compile(
     min_block_size=1,
     use_fp32_acc=True,
     use_explicit_typing=True,
+    immutable_weights=False,
+    offload_module_to_cpu=True,
 )
 
 # %%
@@ -119,14 +123,13 @@ trt_gm = torch_tensorrt.dynamo.compile(
 # ---------------------------
 # Release the GPU memory occupied by the exported program and the pipe.transformer
 # Set the transformer in the Flux pipeline to the Torch-TRT compiled model
-
-del ep
-backbone.to("cpu")
+pipe.transformer = None
 pipe.to(DEVICE)
-torch.cuda.empty_cache()
 pipe.transformer = trt_gm
+del ep
+torch.cuda.empty_cache()
 pipe.transformer.config = config
-
+trt_gm.device = torch.device("cuda")
 # %%
 # Image generation using prompt
 # ---------------------------

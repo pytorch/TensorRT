@@ -801,6 +801,28 @@ def compile_module(
             "Some nodes do not have metadata (shape and dtype information). This could lead to problems sometimes if the graph has PyTorch and TensorRT segments."
         )
 
+    # Store the original input spec for later use
+    original_in_spec = getattr(gm, "_in_spec", None)
+    original_out_spec = getattr(gm, "_out_spec", None)
+
+    # Function to preserve and restore module specs
+    def preserve_module_specs(
+        in_spec: Any, out_spec: Any, target_module: torch.fx.GraphModule
+    ) -> None:
+        """
+        Applies input and output specs to the target module.
+
+        Args:
+            in_spec: The input spec to apply
+            out_spec: The output spec to apply
+            target_module: The module to apply specs to
+        """
+        # Apply specs to target module
+        if in_spec is not None:
+            target_module._in_spec = in_spec
+        if out_spec is not None:
+            target_module._out_spec = out_spec
+
     # Partition module into components that can be TRT-accelerated
     fast_partitioner_failed = False
     # If specified, try using the fast partitioner and fall back to the global one on failure
@@ -846,6 +868,7 @@ def compile_module(
             continue
         submodule_node_dict[node.name] = node
 
+    preserve_module_specs(original_in_spec, original_out_spec, partitioned_module)
     # Store TRT replicas of Torch subgraphs
     trt_modules = {}
     # Iterate over all components that can be accelerated

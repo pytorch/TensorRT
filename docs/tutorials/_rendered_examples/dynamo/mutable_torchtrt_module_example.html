@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Mutable Torch TensorRT Module &mdash; Torch-TensorRT v2.8.0.dev0+ee32da0 documentation</title>
+  <title>Mutable Torch TensorRT Module &mdash; Torch-TensorRT v2.9.0.dev0+1d597b3 documentation</title>
   
 
   
@@ -293,7 +293,7 @@
               
               
                 <div class="version">
-                  v2.8.0.dev0+ee32da0
+                  v2.9.0.dev0+1d597b3
                 </div>
               
             
@@ -324,7 +324,7 @@
               <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../../getting_started/installation.html">Installation</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../../getting_started/jetpack.html">Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../getting_started/jetpack.html">Torch-TensorRT in JetPack</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../getting_started/quick_start.html">Quick Start</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">User Guide</span></p>
@@ -376,9 +376,8 @@
 <li class="toctree-l1"><a class="reference internal" href="torch_compile_resnet_example.html">Compiling ResNet with dynamic shapes using the <cite>torch.compile</cite> backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="torch_compile_transformers_example.html">Compiling BERT using the <cite>torch.compile</cite> backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="torch_compile_stable_diffusion.html">Compiling Stable Diffusion model using the <cite>torch.compile</cite> backend</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../compile_hf_models.html">Compiling LLM models from Huggingface</a></li>
 <li class="toctree-l1"><a class="reference internal" href="torch_compile_gpt2.html">Compiling GPT2 using the Torch-TensorRT <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code> frontend</a></li>
-<li class="toctree-l1"><a class="reference internal" href="torch_export_gpt2.html">Compiling GPT2 using the dynamo backend</a></li>
-<li class="toctree-l1"><a class="reference internal" href="torch_export_llama2.html">Compiling Llama2 using the dynamo backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="torch_export_sam2.html">Compiling SAM2 using the dynamo backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="torch_export_flux_dev.html">Compiling FLUX.1-dev model using the Torch-TensorRT dynamo backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../notebooks.html">Legacy notebooks</a></li>
@@ -515,6 +514,7 @@ The Mutable Torch TensorRT Module is designed to address these challenges, makin
 <span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">torch_tensorrt</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">torch_trt</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">torchvision.models</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">models</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">diffusers</span><span class="w"> </span><span class="kn">import</span> <span class="n">DiffusionPipeline</span>
 
 <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">seed</span><span class="p">(</span><span class="mi">5</span><span class="p">)</span>
 <span class="n">torch</span><span class="o">.</span><span class="n">manual_seed</span><span class="p">(</span><span class="mi">5</span><span class="p">)</span>
@@ -524,7 +524,7 @@ The Mutable Torch TensorRT Module is designed to address these challenges, makin
 <section id="initialize-the-mutable-torch-tensorrt-module-with-settings">
 <h2>Initialize the Mutable Torch TensorRT Module with settings.<a class="headerlink" href="#initialize-the-mutable-torch-tensorrt-module-with-settings" title="Permalink to this heading">¶</a></h2>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">settings</span> <span class="o">=</span> <span class="p">{</span>
-    <span class="s2">&quot;use_python&quot;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="s2">&quot;use_python_runtime&quot;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
     <span class="s2">&quot;enabled_precisions&quot;</span><span class="p">:</span> <span class="p">{</span><span class="n">torch</span><span class="o">.</span><span class="n">float32</span><span class="p">},</span>
     <span class="s2">&quot;immutable_weights&quot;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
 <span class="p">}</span>
@@ -565,13 +565,10 @@ The Mutable Torch TensorRT Module is designed to address these challenges, makin
 </section>
 <section id="stable-diffusion-with-huggingface">
 <h2>Stable Diffusion with Huggingface<a class="headerlink" href="#stable-diffusion-with-huggingface" title="Permalink to this heading">¶</a></h2>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">diffusers</span><span class="w"> </span><span class="kn">import</span> <span class="n">DiffusionPipeline</span>
-
-<span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
     <span class="n">settings</span> <span class="o">=</span> <span class="p">{</span>
         <span class="s2">&quot;use_python_runtime&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
         <span class="s2">&quot;enabled_precisions&quot;</span><span class="p">:</span> <span class="p">{</span><span class="n">torch</span><span class="o">.</span><span class="n">float16</span><span class="p">},</span>
-        <span class="s2">&quot;debug&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
         <span class="s2">&quot;immutable_weights&quot;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
     <span class="p">}</span>
 
@@ -598,7 +595,7 @@ The Mutable Torch TensorRT Module is designed to address these challenges, makin
             <span class="s2">&quot;text_embeds&quot;</span><span class="p">:</span> <span class="p">{</span><span class="mi">0</span><span class="p">:</span> <span class="n">BATCH</span><span class="p">},</span>
             <span class="s2">&quot;time_ids&quot;</span><span class="p">:</span> <span class="p">{</span><span class="mi">0</span><span class="p">:</span> <span class="n">BATCH</span><span class="p">},</span>
         <span class="p">},</span>
-        <span class="s2">&quot;return_dict&quot;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="s2">&quot;return_dict&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
     <span class="p">}</span>
     <span class="n">pipe</span><span class="o">.</span><span class="n">unet</span><span class="o">.</span><span class="n">set_expected_dynamic_shape_range</span><span class="p">(</span>
         <span class="n">args_dynamic_shapes</span><span class="p">,</span> <span class="n">kwargs_dynamic_shapes</span>
@@ -671,7 +668,7 @@ Note that you should exclude keyword arguments with value None as those will be 
     <span class="p">},</span>  <span class="c1"># a&#39;s shape does not change so we give it an empty dict</span>
 <span class="p">}</span>
 <span class="c1"># Export the model first with custom dynamic shape constraints</span>
-<span class="n">model</span> <span class="o">=</span> <span class="n">torch_trt</span><span class="o">.</span><span class="n">MutableTorchTensorRTModule</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">debug</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">min_block_size</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">torch_trt</span><span class="o">.</span><span class="n">MutableTorchTensorRTModule</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">min_block_size</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
 <span class="n">model</span><span class="o">.</span><span class="n">set_expected_dynamic_shape_range</span><span class="p">(</span><span class="n">args_dynamic_shapes</span><span class="p">,</span> <span class="n">kwarg_dynamic_shapes</span><span class="p">)</span>
 <span class="c1"># Compile</span>
 <span class="n">model</span><span class="p">(</span><span class="o">*</span><span class="n">inputs</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
@@ -703,7 +700,6 @@ Note that you should exclude keyword arguments with value None as those will be 
     <span class="n">model</span><span class="p">,</span>
     <span class="n">use_python_runtime</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
     <span class="n">enabled_precisions</span><span class="o">=</span><span class="p">{</span><span class="n">torch</span><span class="o">.</span><span class="n">float</span><span class="p">},</span>
-    <span class="n">debug</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
     <span class="n">min_block_size</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
     <span class="n">immutable_weights</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
     <span class="n">cache_built_engines</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>

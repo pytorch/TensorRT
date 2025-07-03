@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Overview &mdash; Torch-TensorRT v2.8.0.dev0+ee32da0 documentation</title>
+  <title>Torch-TensorRT in JetPack &mdash; Torch-TensorRT v2.9.0.dev0+1d597b3 documentation</title>
   
 
   
@@ -293,7 +293,7 @@
               
               
                 <div class="version">
-                  v2.8.0.dev0+ee32da0
+                  v2.9.0.dev0+1d597b3
                 </div>
               
             
@@ -324,7 +324,7 @@
               <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
-<li class="toctree-l1 current"><a class="current reference internal" href="#">Overview</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Torch-TensorRT in JetPack</a></li>
 <li class="toctree-l1"><a class="reference internal" href="quick_start.html">Quick Start</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">User Guide</span></p>
@@ -376,9 +376,8 @@
 <li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/torch_compile_resnet_example.html">Compiling ResNet with dynamic shapes using the <cite>torch.compile</cite> backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/torch_compile_transformers_example.html">Compiling BERT using the <cite>torch.compile</cite> backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/torch_compile_stable_diffusion.html">Compiling Stable Diffusion model using the <cite>torch.compile</cite> backend</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/compile_hf_models.html">Compiling LLM models from Huggingface</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/torch_compile_gpt2.html">Compiling GPT2 using the Torch-TensorRT <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code> frontend</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/torch_export_gpt2.html">Compiling GPT2 using the dynamo backend</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/torch_export_llama2.html">Compiling Llama2 using the dynamo backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/torch_export_sam2.html">Compiling SAM2 using the dynamo backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/torch_export_flux_dev.html">Compiling FLUX.1-dev model using the Torch-TensorRT dynamo backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../tutorials/notebooks.html">Legacy notebooks</a></li>
@@ -455,7 +454,7 @@
       </li>
 
         
-      <li>Overview</li>
+      <li>Torch-TensorRT in JetPack</li>
     
     
       <li class="pytorch-breadcrumbs-aside">
@@ -491,98 +490,112 @@
             <div role="main" class="main-content" itemscope="itemscope" itemtype="http://schema.org/Article">
              <article itemprop="articleBody" id="pytorch-article" class="pytorch-article">
               
-  <section id="overview">
-<h1>Overview<a class="headerlink" href="#overview" title="Permalink to this heading">¶</a></h1>
-<section id="jetpack-6-1">
-<h2>JetPack 6.1<a class="headerlink" href="#jetpack-6-1" title="Permalink to this heading">¶</a></h2>
-<p>Nvida JetPack 6.1 is the latest production release ofJetPack 6.
-With this release it incorporates:
-CUDA 12.6
-TensorRT 10.3
-cuDNN 9.3
-DLFW 24.09</p>
-<p>You can find more details for the JetPack 6.1:</p>
-<blockquote>
-<div><ul class="simple">
-<li><p><a class="reference external" href="https://docs.nvidia.com/jetson/jetpack/release-notes/index.html">https://docs.nvidia.com/jetson/jetpack/release-notes/index.html</a></p></li>
-<li><p><a class="reference external" href="https://docs.nvidia.com/deeplearning/frameworks/install-pytorch-jetson-platform/index.html">https://docs.nvidia.com/deeplearning/frameworks/install-pytorch-jetson-platform/index.html</a></p></li>
-</ul>
-</div></blockquote>
+  <section id="torch-tensorrt-in-jetpack">
+<span id="id1"></span><h1>Torch-TensorRT in JetPack<a class="headerlink" href="#torch-tensorrt-in-jetpack" title="Permalink to this heading">¶</a></h1>
+<section id="overview">
+<h2>Overview<a class="headerlink" href="#overview" title="Permalink to this heading">¶</a></h2>
+<section id="jetpack-6-2">
+<h3>JetPack 6.2<a class="headerlink" href="#jetpack-6-2" title="Permalink to this heading">¶</a></h3>
+<p>NVIDIA JetPack 6.2 is the latest production release for Jetson platforms, featuring:
+- CUDA 12.6
+- TensorRT 10.3
+- cuDNN 9.3</p>
+<p>For detailed information about JetPack 6.2, refer to:
+* <a class="reference external" href="https://docs.nvidia.com/jetson/jetpack/release-notes/index.html">JetPack 6.2 Release Notes</a>
+* <a class="reference external" href="https://docs.nvidia.com/deeplearning/frameworks/install-pytorch-jetson-platform/index.html">PyTorch for Jetson Platform</a></p>
+</section>
+</section>
 <section id="prerequisites">
-<h3>Prerequisites<a class="headerlink" href="#prerequisites" title="Permalink to this heading">¶</a></h3>
-<p>Ensure your jetson developer kit has been flashed with the latest JetPack 6.1. You can find more details on how to flash Jetson board via sdk-manager:</p>
-<blockquote>
-<div><ul class="simple">
-<li><p><a class="reference external" href="https://developer.nvidia.com/sdk-manager">https://developer.nvidia.com/sdk-manager</a></p></li>
-</ul>
-</div></blockquote>
-<p>check the current jetpack version using</p>
+<h2>Prerequisites<a class="headerlink" href="#prerequisites" title="Permalink to this heading">¶</a></h2>
+<section id="system-preparation">
+<h3>System Preparation<a class="headerlink" href="#system-preparation" title="Permalink to this heading">¶</a></h3>
+<ol class="arabic">
+<li><p><strong>Flash your Jetson device</strong></p>
+<p>with JetPack 6.2 using SDK Manager:
+- <a class="reference external" href="https://developer.nvidia.com/sdk-manager">SDK Manager Guide</a></p>
+</li>
+<li><p><strong>Verify JetPack installation</strong>:</p>
 <div class="highlight-sh notranslate"><div class="highlight"><pre><span></span>apt<span class="w"> </span>show<span class="w"> </span>nvidia-jetpack
 </pre></div>
 </div>
-<p>Ensure you have installed JetPack Dev components. This step is required if you need to build on jetson board.</p>
-<p>You can only install the dev components that you require: ex, tensorrt-dev would be the meta-package for all TRT development or install everthing.</p>
-<p>Ensure you have cuda 12.6 installed(this should be installed automatically from nvidia-jetpack)</p>
-<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span><span class="c1"># check the cuda version</span>
-nvcc<span class="w"> </span>--version
-<span class="c1"># if not installed or the version is not 12.6, install via the below cmd:</span>
-sudo<span class="w"> </span>apt-get<span class="w"> </span>update
+</li>
+<li><p><strong>Install development components</strong>:
+.. code-block:: sh</p>
+<blockquote>
+<div><p>sudo apt-get update
+sudo apt-get install nvidia-jetpack</p>
+</div></blockquote>
+</li>
+<li><p><strong>Confirm CUDA 12.6 installation</strong>:</p>
+<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span>nvcc<span class="w"> </span>--version
+<span class="c1"># If missing or incorrect version:</span>
 sudo<span class="w"> </span>apt-get<span class="w"> </span>install<span class="w"> </span>cuda-toolkit-12-6
 </pre></div>
 </div>
-<p>Ensure libcusparseLt.so exists at /usr/local/cuda/lib64/:</p>
-<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span><span class="c1"># if not exist, download and copy to the directory</span>
+</li>
+<li><p><strong>Validate cuSPARSELt library</strong>:</p>
+<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span><span class="c1"># Check library presence</span>
+ls<span class="w"> </span>/usr/local/cuda/lib64/libcusparseLt.so
+
+<span class="c1"># Install if missing</span>
 wget<span class="w"> </span>https://developer.download.nvidia.com/compute/cusparselt/redist/libcusparse_lt/linux-sbsa/libcusparse_lt-linux-sbsa-0.5.2.1-archive.tar.xz
 tar<span class="w"> </span>xf<span class="w"> </span>libcusparse_lt-linux-sbsa-0.5.2.1-archive.tar.xz
 sudo<span class="w"> </span>cp<span class="w"> </span>-a<span class="w"> </span>libcusparse_lt-linux-sbsa-0.5.2.1-archive/include/*<span class="w"> </span>/usr/local/cuda/include/
 sudo<span class="w"> </span>cp<span class="w"> </span>-a<span class="w"> </span>libcusparse_lt-linux-sbsa-0.5.2.1-archive/lib/*<span class="w"> </span>/usr/local/cuda/lib64/
 </pre></div>
 </div>
+</li>
+</ol>
 </section>
-<section id="build-torch-tensorrt">
-<h3>Build torch_tensorrt<a class="headerlink" href="#build-torch-tensorrt" title="Permalink to this heading">¶</a></h3>
-<p>Install bazel</p>
-<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span>wget<span class="w"> </span>-v<span class="w"> </span>https://github.com/bazelbuild/bazelisk/releases/download/v1.20.0/bazelisk-linux-arm64
+</section>
+<section id="building-torch-tensorrt">
+<h2>Building Torch-TensorRT<a class="headerlink" href="#building-torch-tensorrt" title="Permalink to this heading">¶</a></h2>
+<section id="build-environment-setup">
+<h3>Build Environment Setup<a class="headerlink" href="#build-environment-setup" title="Permalink to this heading">¶</a></h3>
+<ol class="arabic">
+<li><p><strong>Install Build Dependencies</strong>:</p>
+<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span>wget<span class="w"> </span>https://github.com/bazelbuild/bazelisk/releases/download/v1.26.0/bazelisk-linux-arm64
 sudo<span class="w"> </span>mv<span class="w"> </span>bazelisk-linux-arm64<span class="w"> </span>/usr/bin/bazel
-chmod<span class="w"> </span>+x<span class="w"> </span>/usr/bin/bazel
+sudo<span class="w"> </span>chmod<span class="w"> </span>+x<span class="w"> </span>/usr/bin/bazel
 </pre></div>
 </div>
-<dl class="simple">
-<dt>Install pip and required python packages:</dt><dd><ul class="simple">
-<li><p><a class="reference external" href="https://pip.pypa.io/en/stable/installation/">https://pip.pypa.io/en/stable/installation/</a></p></li>
-</ul>
-</dd>
-</dl>
-<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span><span class="c1"># install pip</span>
-wget<span class="w"> </span>https://bootstrap.pypa.io/get-pip.py
+<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span>apt-get<span class="w"> </span>install<span class="w"> </span>ninja-build<span class="w"> </span>vim<span class="w"> </span>libopenblas-dev<span class="w"> </span>git
+</pre></div>
+</div>
+</li>
+<li><p><strong>Install Python dependencies</strong>:</p>
+<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span>wget<span class="w"> </span>https://bootstrap.pypa.io/get-pip.py
 python<span class="w"> </span>get-pip.py
+python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>pyyaml
 </pre></div>
 </div>
-<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span><span class="c1"># install pytorch from nvidia jetson distribution: https://developer.download.nvidia.com/compute/redist/jp/v61/pytorch</span>
-python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>torch<span class="w"> </span>https://developer.download.nvidia.com/compute/redist/jp/v61/pytorch/torch-2.5.0a0+872d972e41.nv24.08.17622132-cp310-cp310-linux_aarch64.whl
+</li>
+<li><p><strong>Install PyTorch</strong>:</p>
+<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span><span class="c1"># Can only install the torch and torchvision wheel from the JPL repo which is built specifically for JetPack 6.2</span>
+python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span><span class="nv">torch</span><span class="o">==</span><span class="m">2</span>.7.0<span class="w"> </span><span class="nv">torchvision</span><span class="o">==</span><span class="m">0</span>.22.0<span class="w">  </span>--index-url<span class="o">=</span>https://pypi.jetson-ai-lab.dev/jp6/cu126/
 </pre></div>
 </div>
-<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span><span class="c1"># install required python packages</span>
-python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>-r<span class="w"> </span>toolchains/jp_workspaces/requirements.txt
-
-<span class="c1"># if you want to run the test cases, then install the test required python packages</span>
-python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>-r<span class="w"> </span>toolchains/jp_workspaces/test_requirements.txt
-</pre></div>
-</div>
-<p>Build and Install torch_tensorrt wheel file</p>
-<p>Since torch_tensorrt version has dependencies on torch version. torch version supported by JetPack6.1 is from DLFW 24.08/24.09(torch 2.5.0).</p>
-<p>Please make sure to build torch_tensorrt wheel file from source release/2.5 branch
-(TODO: lanl to update the branch name once release/ngc branch is available)</p>
-<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span><span class="nv">cuda_version</span><span class="o">=</span><span class="k">$(</span>nvcc<span class="w"> </span>--version<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>Cuda<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>release<span class="w"> </span><span class="p">|</span><span class="w"> </span>cut<span class="w"> </span>-d<span class="w"> </span><span class="s1">&#39;,&#39;</span><span class="w"> </span>-f<span class="w"> </span><span class="m">2</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>sed<span class="w"> </span>-e<span class="w"> </span><span class="s1">&#39;s/ release //g&#39;</span><span class="k">)</span>
-<span class="nb">export</span><span class="w"> </span><span class="nv">TORCH_INSTALL_PATH</span><span class="o">=</span><span class="k">$(</span>python<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;import torch, os; print(os.path.dirname(torch.__file__))&quot;</span><span class="k">)</span>
-<span class="nb">export</span><span class="w"> </span><span class="nv">SITE_PACKAGE_PATH</span><span class="o">=</span><span class="si">${</span><span class="nv">TORCH_INSTALL_PATH</span><span class="p">:</span><span class="k">:-</span><span class="nv">6</span><span class="si">}</span>
-<span class="nb">export</span><span class="w"> </span><span class="nv">CUDA_HOME</span><span class="o">=</span>/usr/local/cuda-<span class="si">${</span><span class="nv">cuda_version</span><span class="si">}</span>/
-<span class="c1"># replace the MODULE.bazel with the jetpack one</span>
-cat<span class="w"> </span>toolchains/jp_workspaces/MODULE.bazel.tmpl<span class="w"> </span><span class="p">|</span><span class="w"> </span>envsubst<span class="w"> </span>&gt;<span class="w"> </span>MODULE.bazel
-<span class="c1"># build and install torch_tensorrt wheel file</span>
-python<span class="w"> </span>setup.py<span class="w"> </span>install<span class="w"> </span>--user
-</pre></div>
-</div>
+</li>
+</ol>
+</section>
+<section id="building-the-wheel">
+<h3>Building the Wheel<a class="headerlink" href="#building-the-wheel" title="Permalink to this heading">¶</a></h3>
+</section>
+<section id="installation">
+<h3>Installation<a class="headerlink" href="#installation" title="Permalink to this heading">¶</a></h3>
+</section>
+<section id="post-installation-verification">
+<h3>Post-Installation Verification<a class="headerlink" href="#post-installation-verification" title="Permalink to this heading">¶</a></h3>
+<p>Verify installation by importing in Python:
+.. code-block:: python</p>
+<blockquote>
+<div><p># verify whether the torch-tensorrt can be imported
+import torch
+import torch_tensorrt
+print(torch_tensorrt.__version__)</p>
+<p># verify whether the examples can be run
+python examples/dynamo/torch_compile_resnet_example.py</p>
+</div></blockquote>
 </section>
 </section>
 </section>
@@ -630,10 +643,20 @@ python<span class="w"> </span>setup.py<span class="w"> </span>install<span class
           <div class="pytorch-right-menu" id="pytorch-right-menu">
             <div class="pytorch-side-scroll" id="pytorch-side-scroll-right">
               <ul>
-<li><a class="reference internal" href="#">Overview</a><ul>
-<li><a class="reference internal" href="#jetpack-6-1">JetPack 6.1</a><ul>
-<li><a class="reference internal" href="#prerequisites">Prerequisites</a></li>
-<li><a class="reference internal" href="#build-torch-tensorrt">Build torch_tensorrt</a></li>
+<li><a class="reference internal" href="#">Torch-TensorRT in JetPack</a><ul>
+<li><a class="reference internal" href="#overview">Overview</a><ul>
+<li><a class="reference internal" href="#jetpack-6-2">JetPack 6.2</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#prerequisites">Prerequisites</a><ul>
+<li><a class="reference internal" href="#system-preparation">System Preparation</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#building-torch-tensorrt">Building Torch-TensorRT</a><ul>
+<li><a class="reference internal" href="#build-environment-setup">Build Environment Setup</a></li>
+<li><a class="reference internal" href="#building-the-wheel">Building the Wheel</a></li>
+<li><a class="reference internal" href="#installation">Installation</a></li>
+<li><a class="reference internal" href="#post-installation-verification">Post-Installation Verification</a></li>
 </ul>
 </li>
 </ul>

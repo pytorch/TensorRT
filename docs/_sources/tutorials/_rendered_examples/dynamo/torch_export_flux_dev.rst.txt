@@ -37,12 +37,20 @@ To run this demo, you need to have access to Flux model (request for access if y
 There are different components of the ``FLUX.1-dev`` pipeline such as ``transformer``, ``vae``, ``text_encoder``, ``tokenizer`` and ``scheduler``. In this example,
 we demonstrate optimizing the ``transformer`` component of the model (which typically consumes >95% of the e2e diffusion latency)
 
-.. GENERATED FROM PYTHON SOURCE LINES 23-25
+.. GENERATED FROM PYTHON SOURCE LINES 21-24
+
+.. code-block:: python
+
+
+    import register_sdpa  # Register SDPA as a standalone operator
+
+
+.. GENERATED FROM PYTHON SOURCE LINES 25-27
 
 Import the following libraries
 -----------------------------
 
-.. GENERATED FROM PYTHON SOURCE LINES 25-30
+.. GENERATED FROM PYTHON SOURCE LINES 27-32
 
 .. code-block:: python
 
@@ -52,7 +60,7 @@ Import the following libraries
     from torch.export._trace import _export
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 31-36
+.. GENERATED FROM PYTHON SOURCE LINES 33-38
 
 Define the FLUX-1.dev model
 -----------------------------
@@ -60,7 +68,7 @@ Load the ``FLUX-1.dev`` pretrained pipeline using ``FluxPipeline`` class.
 ``FluxPipeline`` includes different components such as ``transformer``, ``vae``, ``text_encoder``, ``tokenizer`` and ``scheduler`` necessary
 to generate an image. We load the weights in ``FP16`` precision using ``torch_dtype`` argument
 
-.. GENERATED FROM PYTHON SOURCE LINES 36-46
+.. GENERATED FROM PYTHON SOURCE LINES 38-48
 
 .. code-block:: python
 
@@ -75,14 +83,14 @@ to generate an image. We load the weights in ``FP16`` precision using ``torch_dt
     backbone = pipe.transformer.to(DEVICE)
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 47-51
+.. GENERATED FROM PYTHON SOURCE LINES 49-53
 
 Export the backbone using torch.export
 --------------------------------------------------
 Define the dummy inputs and their respective dynamic shapes. We export the transformer backbone with dynamic shapes with a ``batch_size=2``
 due to `0/1 specialization <https://docs.google.com/document/d/16VPOa3d-Liikf48teAOmxLc92rgvJdfosIy-yoT38Io/edit?fbclid=IwAR3HNwmmexcitV0pbZm_x1a4ykdXZ9th_eJWK-3hBtVgKnrkmemz6Pm5jRQ&tab=t.0#heading=h.ez923tomjvyk>`_
 
-.. GENERATED FROM PYTHON SOURCE LINES 51-96
+.. GENERATED FROM PYTHON SOURCE LINES 53-98
 
 .. code-block:: python
 
@@ -132,7 +140,7 @@ due to `0/1 specialization <https://docs.google.com/document/d/16VPOa3d-Liikf48t
     )
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 97-107
+.. GENERATED FROM PYTHON SOURCE LINES 99-109
 
 Torch-TensorRT compilation
 ---------------------------
@@ -145,7 +153,7 @@ We also enable explicit typing to ensure TensorRT respects the datatypes set by 
 Since this is a 12 billion parameter model, it takes around 20-30 min to compile on H100 GPU. The model is completely convertible and results in
 a single TensorRT engine.
 
-.. GENERATED FROM PYTHON SOURCE LINES 107-117
+.. GENERATED FROM PYTHON SOURCE LINES 109-121
 
 .. code-block:: python
 
@@ -157,37 +165,38 @@ a single TensorRT engine.
         min_block_size=1,
         use_fp32_acc=True,
         use_explicit_typing=True,
+        immutable_weights=False,
+        offload_module_to_cpu=True,
     )
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 118-122
+.. GENERATED FROM PYTHON SOURCE LINES 122-126
 
 Post Processing
 ---------------------------
 Release the GPU memory occupied by the exported program and the pipe.transformer
 Set the transformer in the Flux pipeline to the Torch-TRT compiled model
 
-.. GENERATED FROM PYTHON SOURCE LINES 122-130
+.. GENERATED FROM PYTHON SOURCE LINES 126-133
 
 .. code-block:: python
 
-
-    del ep
-    backbone.to("cpu")
+    pipe.transformer = None
     pipe.to(DEVICE)
-    torch.cuda.empty_cache()
     pipe.transformer = trt_gm
+    del ep
+    torch.cuda.empty_cache()
     pipe.transformer.config = config
+    trt_gm.device = torch.device("cuda")
 
-
-.. GENERATED FROM PYTHON SOURCE LINES 131-135
+.. GENERATED FROM PYTHON SOURCE LINES 134-138
 
 Image generation using prompt
 ---------------------------
 Provide a prompt and the file name of the image to be generated. Here we use the
 prompt ``A golden retriever holding a sign to code``.
 
-.. GENERATED FROM PYTHON SOURCE LINES 135-152
+.. GENERATED FROM PYTHON SOURCE LINES 138-155
 
 .. code-block:: python
 
@@ -209,7 +218,7 @@ prompt ``A golden retriever holding a sign to code``.
     generate_image(pipe, ["A golden retriever holding a sign to code"], "dog_code")
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 153-157
+.. GENERATED FROM PYTHON SOURCE LINES 156-160
 
 The generated image is as shown below
 

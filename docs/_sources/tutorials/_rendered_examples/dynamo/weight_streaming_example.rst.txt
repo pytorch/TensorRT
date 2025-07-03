@@ -44,7 +44,7 @@ Torch-TensorRT.
 Imports and Model Definition
 ----------------------------------
 
-.. GENERATED FROM PYTHON SOURCE LINES 27-85
+.. GENERATED FROM PYTHON SOURCE LINES 27-121
 
 .. code-block:: python
 
@@ -56,7 +56,43 @@ Imports and Model Definition
     import torch
     import torch_tensorrt
     from transformers import AutoModelForCausalLM
-    from utils import export_llm
+
+
+    def export_llm(model, inputs, min_seq_len=1, max_seq_len=16):
+        """
+        Exports the LLM model into an ExportedProgram with dynamic shapes.
+        In the case of guard failures due to some PyTorch kernel implements, we also
+        try to re-export the graph by expressing them as runtime assert nodes
+        """
+        with torch.no_grad():
+            # max=1024 has contraint violation error. https://github.com/pytorch/pytorch/issues/125604
+            seq_len = torch.export.Dim("seq_len", min=min_seq_len, max=max_seq_len)
+            position_ids = torch.arange(inputs.shape[1]).unsqueeze(0).to(inputs.device)
+            try:
+                print("Trying to export the model using torch.export.export()..")
+                # strict=False only enables aotautograd tracing and excludes dynamo.
+                ep = torch.export.export(
+                    model,
+                    args=(inputs,),
+                    kwargs={"position_ids": position_ids},
+                    dynamic_shapes=({1: seq_len}, {1: seq_len}),
+                    strict=False,
+                )
+            except:
+                print(
+                    "Trying torch.export._trace._export to trace the graph since torch.export.export() failed"
+                )
+                # This API is used to express the constraint violation guards as asserts in the graph.
+                ep = torch.export._trace._export(
+                    model,
+                    args=(inputs,),
+                    kwargs={"position_ids": position_ids},
+                    dynamic_shapes=({1: seq_len}, {1: seq_len}),
+                    strict=False,
+                    allow_complex_guards_as_runtime_asserts=True,
+                )
+
+        return ep
 
 
     def time_generate(model, inputs, output_seq_length, iterations=10):
@@ -107,7 +143,7 @@ Imports and Model Definition
     llama2_ep = export_llm(model, input_tensors[0], max_seq_len=osl)
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 86-93
+.. GENERATED FROM PYTHON SOURCE LINES 122-129
 
 Compiler option
 ----------------------------------
@@ -117,7 +153,7 @@ the engine with weight streaming feature. use_explicit_typing=True option create
 `strongly typed network <https://docs.nvidia.com/deeplearning/tensorrt/developer-guide/index.html#strongly-typed-networks>`_ and only float32 precision is allowed in enabled_precisions option
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 93-108
+.. GENERATED FROM PYTHON SOURCE LINES 129-144
 
 .. code-block:: python
 
@@ -137,7 +173,7 @@ the engine with weight streaming feature. use_explicit_typing=True option create
     _ = time_generate(trt_model, input_tensors, osl, 3)
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 109-115
+.. GENERATED FROM PYTHON SOURCE LINES 145-151
 
 Running with automatic budget size
 ----------------------------------
@@ -146,7 +182,7 @@ Once you specify the enable_weight_streaming compile option, automatic budget si
 This automatic size may not always provide the optimal solution because the automatically determined
 budget lacks insight into the user's specific memory constraints and usage patterns
 
-.. GENERATED FROM PYTHON SOURCE LINES 115-128
+.. GENERATED FROM PYTHON SOURCE LINES 151-164
 
 .. code-block:: python
 
@@ -164,7 +200,7 @@ budget lacks insight into the user's specific memory constraints and usage patte
     )
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 129-137
+.. GENERATED FROM PYTHON SOURCE LINES 165-173
 
 Running with weight streaming context manager
 ----------------------------------
@@ -175,7 +211,7 @@ The permissible range for the budget size is from 0 to ctx.total_device_budget.
 equal to ctx.total_device_budget will disable weight streaming.
 If multiple trt engines are created, budgets are distributed proportionally
 
-.. GENERATED FROM PYTHON SOURCE LINES 137-175
+.. GENERATED FROM PYTHON SOURCE LINES 173-211
 
 .. code-block:: python
 

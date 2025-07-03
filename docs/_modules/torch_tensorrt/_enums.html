@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt._enums &mdash; Torch-TensorRT v2.8.0.dev0+ee32da0 documentation</title>
+  <title>torch_tensorrt._enums &mdash; Torch-TensorRT v2.9.0.dev0+1d597b3 documentation</title>
   
 
   
@@ -290,7 +290,7 @@
               
               
                 <div class="version">
-                  v2.8.0.dev0+ee32da0
+                  v2.9.0.dev0+1d597b3
                 </div>
               
             
@@ -321,7 +321,7 @@
               <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../getting_started/installation.html">Installation</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../getting_started/jetpack.html">Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../getting_started/jetpack.html">Torch-TensorRT in JetPack</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../getting_started/quick_start.html">Quick Start</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">User Guide</span></p>
@@ -373,9 +373,8 @@
 <li class="toctree-l1"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/torch_compile_resnet_example.html">Compiling ResNet with dynamic shapes using the <cite>torch.compile</cite> backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/torch_compile_transformers_example.html">Compiling BERT using the <cite>torch.compile</cite> backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/torch_compile_stable_diffusion.html">Compiling Stable Diffusion model using the <cite>torch.compile</cite> backend</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../tutorials/compile_hf_models.html">Compiling LLM models from Huggingface</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/torch_compile_gpt2.html">Compiling GPT2 using the Torch-TensorRT <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code> frontend</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/torch_export_gpt2.html">Compiling GPT2 using the dynamo backend</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/torch_export_llama2.html">Compiling Llama2 using the dynamo backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/torch_export_sam2.html">Compiling SAM2 using the dynamo backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/torch_export_flux_dev.html">Compiling FLUX.1-dev model using the Torch-TensorRT dynamo backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../tutorials/notebooks.html">Legacy notebooks</a></li>
@@ -569,6 +568,12 @@
 <span class="sd">    :meta hide-value:</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
+    <span class="n">f4</span> <span class="o">=</span> <span class="n">auto</span><span class="p">()</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;4 bit floating-point number, equivalent to ``dtype.fp4`` and ``dtype.float4``</span>
+
+<span class="sd">    :meta hide-value:</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
     <span class="n">uint8</span> <span class="o">=</span> <span class="n">u8</span>
     <span class="n">int8</span> <span class="o">=</span> <span class="n">i8</span>
 
@@ -579,6 +584,9 @@
 
     <span class="n">float8</span> <span class="o">=</span> <span class="n">f8</span>
     <span class="n">fp8</span> <span class="o">=</span> <span class="n">f8</span>
+
+    <span class="n">float4</span> <span class="o">=</span> <span class="n">f4</span>
+    <span class="n">fp4</span> <span class="o">=</span> <span class="n">f4</span>
 
     <span class="n">half</span> <span class="o">=</span> <span class="n">f16</span>
     <span class="n">fp16</span> <span class="o">=</span> <span class="n">f16</span>
@@ -651,6 +659,8 @@
                 <span class="k">return</span> <span class="n">dtype</span><span class="o">.</span><span class="n">i32</span>
             <span class="k">elif</span> <span class="n">t</span> <span class="o">==</span> <span class="n">torch</span><span class="o">.</span><span class="n">float8_e4m3fn</span><span class="p">:</span>
                 <span class="k">return</span> <span class="n">dtype</span><span class="o">.</span><span class="n">f8</span>
+            <span class="k">elif</span> <span class="n">t</span> <span class="o">==</span> <span class="n">torch</span><span class="o">.</span><span class="n">float4_e2m1fn_x2</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">dtype</span><span class="o">.</span><span class="n">f4</span>
             <span class="k">elif</span> <span class="n">t</span> <span class="o">==</span> <span class="n">torch</span><span class="o">.</span><span class="n">half</span><span class="p">:</span>
                 <span class="k">return</span> <span class="n">dtype</span><span class="o">.</span><span class="n">f16</span>
             <span class="k">elif</span> <span class="n">t</span> <span class="o">==</span> <span class="n">torch</span><span class="o">.</span><span class="n">float</span><span class="p">:</span>
@@ -677,6 +687,8 @@
                 <span class="k">return</span> <span class="n">dtype</span><span class="o">.</span><span class="n">i8</span>
             <span class="k">elif</span> <span class="n">t</span> <span class="o">==</span> <span class="n">trt</span><span class="o">.</span><span class="n">DataType</span><span class="o">.</span><span class="n">FP8</span><span class="p">:</span>
                 <span class="k">return</span> <span class="n">dtype</span><span class="o">.</span><span class="n">f8</span>
+            <span class="k">elif</span> <span class="n">t</span> <span class="o">==</span> <span class="n">trt</span><span class="o">.</span><span class="n">DataType</span><span class="o">.</span><span class="n">FP4</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">dtype</span><span class="o">.</span><span class="n">fp4</span>
             <span class="k">elif</span> <span class="n">t</span> <span class="o">==</span> <span class="n">trt</span><span class="o">.</span><span class="n">DataType</span><span class="o">.</span><span class="n">INT32</span><span class="p">:</span>
                 <span class="k">return</span> <span class="n">dtype</span><span class="o">.</span><span class="n">i32</span>
             <span class="k">elif</span> <span class="n">t</span> <span class="o">==</span> <span class="n">trt</span><span class="o">.</span><span class="n">DataType</span><span class="o">.</span><span class="n">INT64</span><span class="p">:</span>
@@ -846,6 +858,8 @@
                 <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">long</span>
             <span class="k">elif</span> <span class="bp">self</span> <span class="o">==</span> <span class="n">dtype</span><span class="o">.</span><span class="n">f8</span><span class="p">:</span>
                 <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">float8_e4m3fn</span>
+            <span class="k">elif</span> <span class="bp">self</span> <span class="o">==</span> <span class="n">dtype</span><span class="o">.</span><span class="n">f4</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">float4_e2m1fn_x2</span>
             <span class="k">elif</span> <span class="bp">self</span> <span class="o">==</span> <span class="n">dtype</span><span class="o">.</span><span class="n">f16</span><span class="p">:</span>
                 <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">half</span>
             <span class="k">elif</span> <span class="bp">self</span> <span class="o">==</span> <span class="n">dtype</span><span class="o">.</span><span class="n">f32</span><span class="p">:</span>
@@ -883,6 +897,8 @@
                 <span class="k">return</span> <span class="n">trt</span><span class="o">.</span><span class="n">DataType</span><span class="o">.</span><span class="n">BOOL</span>
             <span class="k">elif</span> <span class="bp">self</span> <span class="o">==</span> <span class="n">dtype</span><span class="o">.</span><span class="n">bf16</span><span class="p">:</span>
                 <span class="k">return</span> <span class="n">trt</span><span class="o">.</span><span class="n">DataType</span><span class="o">.</span><span class="n">BF16</span>
+            <span class="k">elif</span> <span class="bp">self</span> <span class="o">==</span> <span class="n">dtype</span><span class="o">.</span><span class="n">f4</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">trt</span><span class="o">.</span><span class="n">DataType</span><span class="o">.</span><span class="n">FP4</span>
             <span class="k">elif</span> <span class="n">use_default</span><span class="p">:</span>
                 <span class="k">return</span> <span class="n">trt</span><span class="o">.</span><span class="n">DataType</span><span class="o">.</span><span class="n">FLOAT</span>
             <span class="k">else</span><span class="p">:</span>
@@ -899,6 +915,8 @@
                 <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">int64</span>
             <span class="k">elif</span> <span class="bp">self</span> <span class="o">==</span> <span class="n">dtype</span><span class="o">.</span><span class="n">f16</span><span class="p">:</span>
                 <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">float16</span>
+            <span class="k">elif</span> <span class="bp">self</span> <span class="o">==</span> <span class="n">dtype</span><span class="o">.</span><span class="n">f4</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">float4_e2m1fn_x2</span>
             <span class="k">elif</span> <span class="bp">self</span> <span class="o">==</span> <span class="n">dtype</span><span class="o">.</span><span class="n">f32</span><span class="p">:</span>
                 <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">float32</span>
             <span class="k">elif</span> <span class="bp">self</span> <span class="o">==</span> <span class="n">dtype</span><span class="o">.</span><span class="n">f64</span><span class="p">:</span>
