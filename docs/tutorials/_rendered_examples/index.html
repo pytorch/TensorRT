@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Torch-TensorRT Tutorials &mdash; Torch-TensorRT v2.8.0.dev0+ee32da0 documentation</title>
+  <title>Torch-TensorRT Tutorials &mdash; Torch-TensorRT v2.9.0.dev0+cf65477 documentation</title>
   
 
   
@@ -291,7 +291,7 @@
               
               
                 <div class="version">
-                  v2.8.0.dev0+ee32da0
+                  v2.9.0.dev0+cf65477
                 </div>
               
             
@@ -322,7 +322,7 @@
               <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../getting_started/installation.html">Installation</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../getting_started/jetpack.html">Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../getting_started/jetpack.html">Torch-TensorRT in JetPack</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../getting_started/quick_start.html">Quick Start</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">User Guide</span></p>
@@ -374,9 +374,8 @@
 <li class="toctree-l1"><a class="reference internal" href="dynamo/torch_compile_resnet_example.html">Compiling ResNet with dynamic shapes using the <cite>torch.compile</cite> backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="dynamo/torch_compile_transformers_example.html">Compiling BERT using the <cite>torch.compile</cite> backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="dynamo/torch_compile_stable_diffusion.html">Compiling Stable Diffusion model using the <cite>torch.compile</cite> backend</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compile_hf_models.html">Compiling LLM models from Huggingface</a></li>
 <li class="toctree-l1"><a class="reference internal" href="dynamo/torch_compile_gpt2.html">Compiling GPT2 using the Torch-TensorRT <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code> frontend</a></li>
-<li class="toctree-l1"><a class="reference internal" href="dynamo/torch_export_gpt2.html">Compiling GPT2 using the dynamo backend</a></li>
-<li class="toctree-l1"><a class="reference internal" href="dynamo/torch_export_llama2.html">Compiling Llama2 using the dynamo backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="dynamo/torch_export_sam2.html">Compiling SAM2 using the dynamo backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="dynamo/torch_export_flux_dev.html">Compiling FLUX.1-dev model using the Torch-TensorRT dynamo backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../notebooks.html">Legacy notebooks</a></li>
@@ -529,12 +528,12 @@
 </div><div class="sphx-glr-thumbcontainer" tooltip="This interactive script is intended as an overview of the process by which torch_tensorrt.compi..."><img alt="" src="../../_images/sphx_glr_torch_compile_advanced_usage_thumb.png" />
 <p><a class="reference internal" href="dynamo/torch_compile_advanced_usage.html#sphx-glr-tutorials-rendered-examples-dynamo-torch-compile-advanced-usage-py"><span class="std std-ref">Torch Compile Advanced Usage</span></a></p>
   <div class="sphx-glr-thumbnail-title">Torch Compile Advanced Usage</div>
-</div><div class="sphx-glr-thumbcontainer" tooltip="CUDA Graphs allow multiple GPU operations to be launched through a single CPU operation, reduci..."><img alt="" src="../../_images/sphx_glr_torch_export_cudagraphs_thumb.png" />
-<p><a class="reference internal" href="dynamo/torch_export_cudagraphs.html#sphx-glr-tutorials-rendered-examples-dynamo-torch-export-cudagraphs-py"><span class="std std-ref">Torch Export with Cudagraphs</span></a></p>
-  <div class="sphx-glr-thumbnail-title">Torch Export with Cudagraphs</div>
 </div><div class="sphx-glr-thumbcontainer" tooltip="Small caching example on BERT."><img alt="" src="../../_images/sphx_glr_engine_caching_bert_example_thumb.png" />
 <p><a class="reference internal" href="dynamo/engine_caching_bert_example.html#sphx-glr-tutorials-rendered-examples-dynamo-engine-caching-bert-example-py"><span class="std std-ref">Engine Caching (BERT)</span></a></p>
   <div class="sphx-glr-thumbnail-title">Engine Caching (BERT)</div>
+</div><div class="sphx-glr-thumbcontainer" tooltip="CUDA Graphs allow multiple GPU operations to be launched through a single CPU operation, reduci..."><img alt="" src="../../_images/sphx_glr_torch_export_cudagraphs_thumb.png" />
+<p><a class="reference internal" href="dynamo/torch_export_cudagraphs.html#sphx-glr-tutorials-rendered-examples-dynamo-torch-export-cudagraphs-py"><span class="std std-ref">Torch Export with Cudagraphs</span></a></p>
+  <div class="sphx-glr-thumbnail-title">Torch Export with Cudagraphs</div>
 </div><div class="sphx-glr-thumbcontainer" tooltip="The TensorRT runtime module acts as a wrapper around a PyTorch model (or subgraph) that has bee..."><img alt="" src="../../_images/sphx_glr_pre_allocated_output_example_thumb.png" />
 <p><a class="reference internal" href="dynamo/pre_allocated_output_example.html#sphx-glr-tutorials-rendered-examples-dynamo-pre-allocated-output-example-py"><span class="std std-ref">Pre-allocated output buffer</span></a></p>
   <div class="sphx-glr-thumbnail-title">Pre-allocated output buffer</div>
@@ -544,12 +543,6 @@
 </div><div class="sphx-glr-thumbcontainer" tooltip="This example illustrates the state of the art model FLUX.1-dev optimized using Torch-TensorRT."><img alt="" src="../../_images/sphx_glr_torch_export_flux_dev_thumb.png" />
 <p><a class="reference internal" href="dynamo/torch_export_flux_dev.html#sphx-glr-tutorials-rendered-examples-dynamo-torch-export-flux-dev-py"><span class="std std-ref">Compiling FLUX.1-dev model using the Torch-TensorRT dynamo backend</span></a></p>
   <div class="sphx-glr-thumbnail-title">Compiling FLUX.1-dev model using the Torch-TensorRT dynamo backend</div>
-</div><div class="sphx-glr-thumbcontainer" tooltip="This script illustrates Torch-TensorRT workflow with dynamo backend on popular GPT2 model."><img alt="" src="../../_images/sphx_glr_torch_export_gpt2_thumb.png" />
-<p><a class="reference internal" href="dynamo/torch_export_gpt2.html#sphx-glr-tutorials-rendered-examples-dynamo-torch-export-gpt2-py"><span class="std std-ref">Compiling GPT2 using the dynamo backend</span></a></p>
-  <div class="sphx-glr-thumbnail-title">Compiling GPT2 using the dynamo backend</div>
-</div><div class="sphx-glr-thumbcontainer" tooltip="This script illustrates Torch-TensorRT workflow with dynamo backend on popular Llama2 model."><img alt="" src="../../_images/sphx_glr_torch_export_llama2_thumb.png" />
-<p><a class="reference internal" href="dynamo/torch_export_llama2.html#sphx-glr-tutorials-rendered-examples-dynamo-torch-export-llama2-py"><span class="std std-ref">Compiling Llama2 using the dynamo backend</span></a></p>
-  <div class="sphx-glr-thumbnail-title">Compiling Llama2 using the dynamo backend</div>
 </div><div class="sphx-glr-thumbcontainer" tooltip="We are going to demonstrate how to automatically generate a converter for a custom kernel using..."><img alt="" src="../../_images/sphx_glr_auto_generate_converters_thumb.png" />
 <p><a class="reference internal" href="dynamo/auto_generate_converters.html#sphx-glr-tutorials-rendered-examples-dynamo-auto-generate-converters-py"><span class="std std-ref">Automatically Generate a Converter for a Custom Kernel</span></a></p>
   <div class="sphx-glr-thumbnail-title">Automatically Generate a Converter for a Custom Kernel</div>
@@ -559,12 +552,18 @@
 </div><div class="sphx-glr-thumbcontainer" tooltip="If for some reason you want to change the conversion behavior of a specific PyTorch operation t..."><img alt="" src="../../_images/sphx_glr_converter_overloading_thumb.png" />
 <p><a class="reference internal" href="dynamo/converter_overloading.html#sphx-glr-tutorials-rendered-examples-dynamo-converter-overloading-py"><span class="std std-ref">Overloading Torch-TensorRT Converters with Custom Converters</span></a></p>
   <div class="sphx-glr-thumbnail-title">Overloading Torch-TensorRT Converters with Custom Converters</div>
-</div><div class="sphx-glr-thumbcontainer" tooltip="Weight streaming in TensorRT is a powerful feature designed to overcome GPU memory limitations ..."><img alt="" src="../../_images/sphx_glr_weight_streaming_example_thumb.png" />
-<p><a class="reference internal" href="dynamo/weight_streaming_example.html#sphx-glr-tutorials-rendered-examples-dynamo-weight-streaming-example-py"><span class="std std-ref">Weight Streaming</span></a></p>
-  <div class="sphx-glr-thumbnail-title">Weight Streaming</div>
+</div><div class="sphx-glr-thumbcontainer" tooltip="In some cases there isn&#x27;t a great way to do either of these, perhaps because the operator is a ..."><img alt="" src="../../_images/sphx_glr_aot_plugin_thumb.png" />
+<p><span class="xref std std-ref">sphx_glr_tutorials__rendered_examples_dynamo_aot_plugin.py</span></p>
+  <div class="sphx-glr-thumbnail-title">Torch-TensorRT supports falling back to PyTorch implementations of operations in the case that Torch-TensorRT</div>
+</div><div class="sphx-glr-thumbcontainer" tooltip="Basic example on how to use the hierarchical adjacency partitioner function and manually compil..."><img alt="" src="../../_images/sphx_glr_hierarchical_partitioner_example_thumb.png" />
+<p><a class="reference internal" href="dynamo/hierarchical_partitioner_example.html#sphx-glr-tutorials-rendered-examples-dynamo-hierarchical-partitioner-example-py"><span class="std std-ref">Hierarchical Partitioner Example</span></a></p>
+  <div class="sphx-glr-thumbnail-title">Hierarchical Partitioner Example</div>
 </div><div class="sphx-glr-thumbcontainer" tooltip="We are going to demonstrate how we can easily use Mutable Torch TensorRT Module to compile, int..."><img alt="" src="../../_images/sphx_glr_mutable_torchtrt_module_example_thumb.png" />
 <p><a class="reference internal" href="dynamo/mutable_torchtrt_module_example.html#sphx-glr-tutorials-rendered-examples-dynamo-mutable-torchtrt-module-example-py"><span class="std std-ref">Mutable Torch TensorRT Module</span></a></p>
   <div class="sphx-glr-thumbnail-title">Mutable Torch TensorRT Module</div>
+</div><div class="sphx-glr-thumbcontainer" tooltip="Weight streaming in TensorRT is a powerful feature designed to overcome GPU memory limitations ..."><img alt="" src="../../_images/sphx_glr_weight_streaming_example_thumb.png" />
+<p><a class="reference internal" href="dynamo/weight_streaming_example.html#sphx-glr-tutorials-rendered-examples-dynamo-weight-streaming-example-py"><span class="std std-ref">Weight Streaming</span></a></p>
+  <div class="sphx-glr-thumbnail-title">Weight Streaming</div>
 </div><div class="sphx-glr-thumbcontainer" tooltip="This example illustrates the state of the art model Segment Anything Model 2 (SAM2) optimized u..."><img alt="" src="../../_images/sphx_glr_torch_export_sam2_thumb.png" />
 <p><a class="reference internal" href="dynamo/torch_export_sam2.html#sphx-glr-tutorials-rendered-examples-dynamo-torch-export-sam2-py"><span class="std std-ref">Compiling SAM2 using the dynamo backend</span></a></p>
   <div class="sphx-glr-thumbnail-title">Compiling SAM2 using the dynamo backend</div>

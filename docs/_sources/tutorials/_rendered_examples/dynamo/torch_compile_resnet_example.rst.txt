@@ -55,7 +55,7 @@ Imports and Model Definition
 Optional Input Arguments to `torch_tensorrt.compile`
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. GENERATED FROM PYTHON SOURCE LINES 27-44
+.. GENERATED FROM PYTHON SOURCE LINES 27-42
 
 .. code-block:: python
 
@@ -63,8 +63,6 @@ Optional Input Arguments to `torch_tensorrt.compile`
     # Enabled precision for TensorRT optimization
     enabled_precisions = {torch.half}
 
-    # Whether to print verbose logs
-    debug = True
 
     # Workspace size for TensorRT
     workspace_size = 20 << 30
@@ -77,12 +75,12 @@ Optional Input Arguments to `torch_tensorrt.compile`
     torch_executed_ops = {}
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 45-47
+.. GENERATED FROM PYTHON SOURCE LINES 43-45
 
 Compilation with `torch_tensorrt.compile`
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. GENERATED FROM PYTHON SOURCE LINES 47-60
+.. GENERATED FROM PYTHON SOURCE LINES 45-57
 
 .. code-block:: python
 
@@ -93,24 +91,23 @@ Compilation with `torch_tensorrt.compile`
         ir="torch_compile",
         inputs=inputs,
         enabled_precisions=enabled_precisions,
-        debug=debug,
         workspace_size=workspace_size,
         min_block_size=min_block_size,
         torch_executed_ops=torch_executed_ops,
     )
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 61-63
+.. GENERATED FROM PYTHON SOURCE LINES 58-60
 
 Equivalently, we could have run the above via the torch.compile frontend, as so:
 `optimized_model = torch.compile(model, backend="torch_tensorrt", options={"enabled_precisions": enabled_precisions, ...}); optimized_model(*inputs)`
 
-.. GENERATED FROM PYTHON SOURCE LINES 65-67
+.. GENERATED FROM PYTHON SOURCE LINES 62-64
 
 Inference
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. GENERATED FROM PYTHON SOURCE LINES 67-72
+.. GENERATED FROM PYTHON SOURCE LINES 64-69
 
 .. code-block:: python
 
@@ -120,7 +117,7 @@ Inference
     new_outputs = optimized_model(*new_inputs)
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 73-78
+.. GENERATED FROM PYTHON SOURCE LINES 70-75
 
 .. code-block:: python
 
@@ -130,12 +127,12 @@ Inference
     new_batch_size_outputs = optimized_model(*new_batch_size_inputs)
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 79-81
+.. GENERATED FROM PYTHON SOURCE LINES 76-78
 
 Avoid recompilation by specifying dynamic shapes before Torch-TRT compilation
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. GENERATED FROM PYTHON SOURCE LINES 81-121
+.. GENERATED FROM PYTHON SOURCE LINES 78-117
 
 .. code-block:: python
 
@@ -149,7 +146,6 @@ Avoid recompilation by specifying dynamic shapes before Torch-TRT compilation
         ir="torch_compile",
         inputs=inputs_bs8,
         enabled_precisions=enabled_precisions,
-        debug=debug,
         workspace_size=workspace_size,
         min_block_size=min_block_size,
         torch_executed_ops=torch_executed_ops,

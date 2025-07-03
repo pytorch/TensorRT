@@ -33,7 +33,7 @@ Key features:
 
 This example illustrates advanced extensibility in Torch-TensorRT through automatic plugin generation and operator lowering customization.
 
-.. GENERATED FROM PYTHON SOURCE LINES 17-259
+.. GENERATED FROM PYTHON SOURCE LINES 17-258
 
 .. code-block:: python
 
@@ -272,7 +272,6 @@ This example illustrates advanced extensibility in Torch-TensorRT through automa
             disable_tf32=True,
             use_explicit_typing=False,
             use_fp32_acc=True,
-            # debug=True,
         )
 
     input_ids = input_ids.to(DEVICE)

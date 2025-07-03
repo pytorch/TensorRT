@@ -24,7 +24,7 @@ programs just as you would otherwise via PyTorch API.
 
 .. note:: If you are linking ``libtorchtrt_runtime.so``, likely using the following flags will help ``-Wl,--no-as-needed -ltorchtrt -Wl,--as-needed`` as there's no direct symbol dependency to anything in the Torch-TensorRT runtime for most Torch-TensorRT runtime applications
 
-An example of how to use ``libtorchtrt_runtime.so`` can be found here: https://github.com/pytorch/TensorRT/tree/master/examples/torchtrt_runtime_example
+An example of how to use ``libtorchtrt_runtime.so`` can be found here: https://github.com/pytorch/TensorRT/tree/master/examples/torchtrt_aoti_example
 
 Plugin Library
 ---------------
@@ -87,8 +87,8 @@ Cudagraphs can accelerate certain models by reducing kernel overheads, as docume
     with torch_tensorrt.runtime.enable_cudagraphs(trt_module):
         ...
 
-In the current implementation, use of a new input shape (for instance in dynamic shape 
-cases), will cause the cudagraph to be re-recorded. Cudagraph recording is generally 
+In the current implementation, use of a new input shape (for instance in dynamic shape
+cases), will cause the cudagraph to be re-recorded. Cudagraph recording is generally
 not latency intensive, and future improvements include caching cudagraphs for multiple input shapes.
 
 Dynamic Output Allocation Mode
@@ -101,11 +101,11 @@ Without dynamic output allocation, the output buffer is allocated based on the i
 
 There are two scenarios in which dynamic output allocation is enabled:
 
-1. The model has been identified at compile time to require dynamic output allocation for at least one TensorRT subgraph. 
-These models will engage the runtime mode automatically (with logging) and are incompatible with other runtime modes 
+1. The model has been identified at compile time to require dynamic output allocation for at least one TensorRT subgraph.
+These models will engage the runtime mode automatically (with logging) and are incompatible with other runtime modes
 such as CUDA Graphs.
 
-Converters can declare that subgraphs that they produce will require the output allocator using `requires_output_allocator=True` 
+Converters can declare that subgraphs that they produce will require the output allocator using `requires_output_allocator=True`
 there by forcing any model which utilizes the converter to automatically use the output allocator runtime mode. e.g.,
 
 .. code-block:: python
@@ -131,3 +131,127 @@ there by forcing any model which utilizes the converter to automatically use the
     # Enables Dynamic Output Allocation Mode, then resets the mode to its prior setting
     with torch_tensorrt.runtime.enable_output_allocator(trt_module):
         ...
+
+Deploying Torch-TensorRT Programs without Python
+--------------------------------------------------------
+
+AOT-Inductor
+~~~~~~~~~~~~~~~~
+
+AOTInductor is a specialized version of TorchInductor, designed to process exported PyTorch models, optimize them, and produce shared
+libraries as well as other relevant artifacts. These compiled artifacts are specifically crafted for deployment in non-Python environments,
+which are frequently employed for inference deployments on the server side.
+
+Torch-TensorRT is able to accelerate subgraphs within AOTInductor exports in the same way it does in Python.
+
+.. code-block:: py
+
+    dynamo_model = torch_tensorrt.compile(model, ir="dynamo", arg_inputs=[...])
+    torch_tensorrt.save(
+        dynamo_model,
+        file_path=os.path.join(os.getcwd(), "model.pt2"),
+        output_format="aot_inductor",
+        retrace=True,
+        arg_inputs=[...],
+    )
+
+This artifact then can be loaded in a C++ application to be executed with out a Python dependency.
+
+.. code-block:: c++
+
+    #include <iostream>
+    #include <vector>
+
+    #include "torch/torch.h"
+    #include "torch/csrc/inductor/aoti_package/model_package_loader.h"
+
+    int main(int argc, const char* argv[]) {
+    // Check for correct number of command-line arguments
+    std::string trt_aoti_module_path = "model.pt2";
+
+    if (argc == 2) {
+        trt_aoti_module_path = argv[1];
+    }
+
+        std::cout << trt_aoti_module_path << std::endl;
+
+        // Get the path to the TRT AOTI model package from the command line
+        c10::InferenceMode mode;
+
+        torch::inductor::AOTIModelPackageLoader loader(trt_aoti_module_path);
+        // Assume running on CUDA
+        std::vector<torch::Tensor> inputs = {torch::randn({8, 10}, at::kCUDA)};
+        std::vector<torch::Tensor> outputs = loader.run(inputs);
+        std::cout << "Result from the first inference:"<< std::endl;
+        std::cout << outputs << std::endl;
+
+        // The second inference uses a different batch size and it works because we
+        // specified that dimension as dynamic when compiling model.pt2.
+        std::cout << "Result from the second inference:"<< std::endl;
+        // Assume running on CUDA
+        std::cout << loader.run({torch::randn({1, 10}, at::kCUDA)}) << std::endl;
+
+        return 0;
+    }
+
+Note: Similar to Python, at runtime, no Torch-TensorRT APIs are used to operate the model. Therefore typically additional
+flags are needed to make sure that ``libtorchtrt_runtime.so`` gets optimized out (see above).
+
+See: ``//examples/torchtrt_aoti_example`` for a full end to end demo of this workflow
+
+
+TorchScript
+~~~~~~~~~~~~~~
+
+TorchScript is a legacy compiler stack for PyTorch that includes a Python-less interpreter for TorchScript programs.
+It has historically been used by Torch-TensorRT to execute models without Python. Even after the transition to TorchDynamo,
+the TorchScript interpreter can continue to be used to run PyTorch models with TensorRT engines outside of Python.
+
+.. code-block:: py
+
+    dynamo_model = torch_tensorrt.compile(model, ir="dynamo", arg_inputs=[...])
+    ts_model = torch.jit.trace(dynamo_model, inputs=[...])
+    torch.jit.save(ts_model, os.path.join(os.getcwd(), "model.ts"),)
+
+This artifact then can be loaded in a C++ application to be executed with out a Python dependency.
+
+.. code-block:: c++
+
+    #include <fstream>
+    #include <iostream>
+    #include <memory>
+    #include <sstream>
+    #include <vector>
+    #include "torch/script.h"
+
+    int main(int argc, const char* argv[]) {
+        if (argc < 2) {
+            std::cerr << "usage: samplertapp <path-to-pre-built-trt-ts module>\n";
+            return -1;
+        }
+
+        std::string trt_ts_module_path = argv[1];
+
+        torch::jit::Module trt_ts_mod;
+        try {
+            // Deserialize the ScriptModule from a file using torch::jit::load().
+            trt_ts_mod = torch::jit::load(trt_ts_module_path);
+        } catch (const c10::Error& e) {
+            std::cerr << "error loading the model from : " << trt_ts_module_path << std::endl;
+            return -1;
+        }
+
+        std::cout << "Running TRT engine" << std::endl;
+        std::vector<torch::jit::IValue> trt_inputs_ivalues;
+        trt_inputs_ivalues.push_back(at::randint(-5, 5, {1, 3, 5, 5}, {at::kCUDA}).to(torch::kFloat32));
+        torch::jit::IValue trt_results_ivalues = trt_ts_mod.forward(trt_inputs_ivalues);
+        std::cout << "==================TRT outputs================" << std::endl;
+        std::cout << trt_results_ivalues << std::endl;
+        std::cout << "=============================================" << std::endl;
+        std::cout << "TRT engine execution completed. " << std::endl;
+    }
+
+Note: Similar to Python, at runtime, no Torch-TensorRT APIs are used to operate the model. Therefore typically additional
+flags are needed to make sure that ``libtorchtrt_runtime.so`` gets optimized out (see above).
+
+See: ``//examples/torchtrt_runtime_example`` for a full end to end demo of this workflow

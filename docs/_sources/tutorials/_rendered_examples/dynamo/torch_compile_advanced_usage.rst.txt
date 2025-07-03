@@ -109,7 +109,7 @@ Compilation with `torch.compile` Using Custom Settings
     model_half = Model().eval().cuda()
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 66-92
+.. GENERATED FROM PYTHON SOURCE LINES 66-91
 
 .. code-block:: python
 
@@ -123,7 +123,6 @@ Compilation with `torch.compile` Using Custom Settings
     # py/torch_tensorrt/dynamo/_settings.py
     backend_kwargs = {
         "enabled_precisions": {torch.half},
-        "debug": True,
         "min_block_size": 2,
         "torch_executed_ops": {"torch.ops.aten.sub.Tensor"},
         "optimization_level": 4,
@@ -140,12 +139,12 @@ Compilation with `torch.compile` Using Custom Settings
     optimized_model_custom(*sample_inputs_half)
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 93-95
+.. GENERATED FROM PYTHON SOURCE LINES 92-94
 
 Cleanup
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. GENERATED FROM PYTHON SOURCE LINES 95-99
+.. GENERATED FROM PYTHON SOURCE LINES 94-98
 
 .. code-block:: python
 
@@ -154,7 +153,7 @@ Cleanup
     torch._dynamo.reset()
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 100-109
+.. GENERATED FROM PYTHON SOURCE LINES 99-108
 
 Cuda Driver Error Note
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

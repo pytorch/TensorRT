@@ -80,7 +80,7 @@ these setttings will not be able to be refit.
 
 In this case we are going to compile a ResNet18 model with randomly initialized weights and save it.
 
-.. GENERATED FROM PYTHON SOURCE LINES 55-80
+.. GENERATED FROM PYTHON SOURCE LINES 55-78
 
 .. code-block:: python
 
@@ -88,7 +88,6 @@ In this case we are going to compile a ResNet18 model with randomly initialized 
     model = models.resnet18(pretrained=False).eval().to("cuda")
     exp_program = torch.export.export(model, tuple(inputs))
     enabled_precisions = {torch.float}
-    debug = False
     workspace_size = 20 << 30
     min_block_size = 0
     use_python_runtime = False
@@ -98,7 +97,6 @@ In this case we are going to compile a ResNet18 model with randomly initialized 
         tuple(inputs),
         use_python_runtime=use_python_runtime,
         enabled_precisions=enabled_precisions,
-        debug=debug,
         min_block_size=min_block_size,
         torch_executed_ops=torch_executed_ops,
         immutable_weights=False,
@@ -110,7 +108,7 @@ In this case we are going to compile a ResNet18 model with randomly initialized 
 
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 81-88
+.. GENERATED FROM PYTHON SOURCE LINES 79-86
 
 Refit the Program with Pretrained Weights
 ------------------------------------------
@@ -120,7 +118,7 @@ refit the model with the pretrained weights. This is done by setting up another 
 with the target weights and exporting it as an ExportedProgram. Then the ``refit_module_weights``
 function is used to update the weights of the compiled module with the new weights.
 
-.. GENERATED FROM PYTHON SOURCE LINES 88-112
+.. GENERATED FROM PYTHON SOURCE LINES 86-111
 
 .. code-block:: python
 
@@ -140,6 +138,7 @@ function is used to update the weights of the compiled module with the new weigh
     )
 
     # Check the output
+    model2.to("cuda")
     expected_outputs, refitted_outputs = exp_program2.module()(*inputs), new_trt_gm(*inputs)
     for expected_output, refitted_output in zip(expected_outputs, refitted_outputs):
         assert torch.allclose(
@@ -149,7 +148,7 @@ function is used to update the weights of the compiled module with the new weigh
     print("Refit successfully!")
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 113-141
+.. GENERATED FROM PYTHON SOURCE LINES 112-140
 
 Advanced Usage
 -----------------------------

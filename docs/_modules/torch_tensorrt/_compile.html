@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt._compile &mdash; Torch-TensorRT v2.8.0.dev0+ee32da0 documentation</title>
+  <title>torch_tensorrt._compile &mdash; Torch-TensorRT v2.9.0.dev0+cf65477 documentation</title>
   
 
   
@@ -290,7 +290,7 @@
               
               
                 <div class="version">
-                  v2.8.0.dev0+ee32da0
+                  v2.9.0.dev0+cf65477
                 </div>
               
             
@@ -321,7 +321,7 @@
               <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../getting_started/installation.html">Installation</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../getting_started/jetpack.html">Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../getting_started/jetpack.html">Torch-TensorRT in JetPack</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../getting_started/quick_start.html">Quick Start</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">User Guide</span></p>
@@ -373,9 +373,8 @@
 <li class="toctree-l1"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/torch_compile_resnet_example.html">Compiling ResNet with dynamic shapes using the <cite>torch.compile</cite> backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/torch_compile_transformers_example.html">Compiling BERT using the <cite>torch.compile</cite> backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/torch_compile_stable_diffusion.html">Compiling Stable Diffusion model using the <cite>torch.compile</cite> backend</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../tutorials/compile_hf_models.html">Compiling LLM models from Huggingface</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/torch_compile_gpt2.html">Compiling GPT2 using the Torch-TensorRT <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code> frontend</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/torch_export_gpt2.html">Compiling GPT2 using the dynamo backend</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/torch_export_llama2.html">Compiling Llama2 using the dynamo backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/torch_export_sam2.html">Compiling SAM2 using the dynamo backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/torch_export_flux_dev.html">Compiling FLUX.1-dev model using the Torch-TensorRT dynamo backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../tutorials/notebooks.html">Legacy notebooks</a></li>
@@ -493,12 +492,12 @@
 <span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">platform</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">enum</span><span class="w"> </span><span class="kn">import</span> <span class="n">Enum</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Callable</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Sequence</span><span class="p">,</span> <span class="n">Set</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Callable</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Sequence</span><span class="p">,</span> <span class="n">Set</span><span class="p">,</span> <span class="n">Union</span>
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">torch.fx</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt._enums</span><span class="w"> </span><span class="kn">import</span> <span class="n">dtype</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt._features</span><span class="w"> </span><span class="kn">import</span> <span class="n">ENABLED_FEATURES</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt._features</span><span class="w"> </span><span class="kn">import</span> <span class="n">ENABLED_FEATURES</span><span class="p">,</span> <span class="n">needs_cross_compile</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt._Input</span><span class="w"> </span><span class="kn">import</span> <span class="n">Input</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo</span><span class="w"> </span><span class="kn">import</span> <span class="n">_defaults</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.runtime._CudaGraphsTorchTensorRTModule</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
@@ -659,7 +658,7 @@
     <span class="n">inputs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Sequence</span><span class="p">[</span><span class="n">Input</span> <span class="o">|</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span> <span class="o">|</span> <span class="n">InputTensorSpec</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">arg_inputs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Sequence</span><span class="p">[</span><span class="n">Sequence</span><span class="p">[</span><span class="n">Any</span><span class="p">]]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">kwarg_inputs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-    <span class="n">enabled_precisions</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Set</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">dtype</span> <span class="o">|</span> <span class="n">dtype</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">enabled_precisions</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Set</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">dtype</span><span class="p">]]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="p">(</span>
     <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span> <span class="o">|</span> <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">ScriptModule</span> <span class="o">|</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span> <span class="o">|</span> <span class="n">Callable</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span>
@@ -702,7 +701,7 @@
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">input_list</span> <span class="o">=</span> <span class="n">inputs</span> <span class="k">if</span> <span class="n">inputs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="p">[]</span>
-    <span class="n">enabled_precisions_set</span><span class="p">:</span> <span class="n">Set</span><span class="p">[</span><span class="n">dtype</span> <span class="o">|</span> <span class="n">torch</span><span class="o">.</span><span class="n">dtype</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+    <span class="n">enabled_precisions_set</span><span class="p">:</span> <span class="n">Set</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">dtype</span><span class="p">]]</span> <span class="o">=</span> <span class="p">(</span>
         <span class="n">enabled_precisions</span>
         <span class="k">if</span> <span class="n">enabled_precisions</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
         <span class="k">else</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">ENABLED_PRECISIONS</span>
@@ -790,13 +789,14 @@
         <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;Module is an unknown format or the ir requested is unknown&quot;</span><span class="p">)</span></div>
 
 
-<div class="viewcode-block" id="cross_compile_for_windows"><a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.cross_compile_for_windows">[docs]</a><span class="k">def</span><span class="w"> </span><span class="nf">cross_compile_for_windows</span><span class="p">(</span>
+<span class="nd">@needs_cross_compile</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">cross_compile_for_windows</span><span class="p">(</span>
     <span class="n">module</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">,</span>
     <span class="n">file_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">inputs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Sequence</span><span class="p">[</span><span class="n">Input</span> <span class="o">|</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">arg_inputs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Sequence</span><span class="p">[</span><span class="n">Sequence</span><span class="p">[</span><span class="n">Any</span><span class="p">]]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">kwarg_inputs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-    <span class="n">enabled_precisions</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Set</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">dtype</span> <span class="o">|</span> <span class="n">dtype</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">enabled_precisions</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Set</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">dtype</span><span class="p">]]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Compile a PyTorch module using TensorRT in Linux for Inference in Windows</span>
@@ -886,7 +886,7 @@
     <span class="p">)</span>
 
     <span class="n">dynamo_save_cross_compiled_exported_program</span><span class="p">(</span><span class="n">trt_gm</span><span class="p">,</span> <span class="n">file_path</span><span class="p">)</span>
-    <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;successfully compiled and saved the module for windows&quot;</span><span class="p">)</span></div>
+    <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;successfully compiled and saved the module for windows&quot;</span><span class="p">)</span>
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">torch_compile</span><span class="p">(</span><span class="n">module</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
@@ -912,7 +912,7 @@
     <span class="n">arg_inputs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Sequence</span><span class="p">[</span><span class="n">Sequence</span><span class="p">[</span><span class="n">Any</span><span class="p">]]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">kwarg_inputs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">ir</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;default&quot;</span><span class="p">,</span>
-    <span class="n">enabled_precisions</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Set</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">dtype</span> <span class="o">|</span> <span class="n">dtype</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">enabled_precisions</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Set</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">dtype</span><span class="p">]]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bytes</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Convert a TorchScript module method to a serialized TensorRT engine</span>
@@ -1074,6 +1074,7 @@
     <span class="n">kwarg_inputs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">retrace</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
     <span class="n">pickle_protocol</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">2</span><span class="p">,</span>
+    <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Save the model to disk in the specified output format.</span>
@@ -1083,7 +1084,7 @@
 <span class="sd">        inputs (torch.Tensor): Torch input tensors</span>
 <span class="sd">        arg_inputs (Tuple[Any, ...]): Same as inputs. Alias for better understanding with kwarg_inputs.</span>
 <span class="sd">        kwarg_inputs (dict[Any, ...]): Optional, kwarg inputs to the module forward function.</span>
-<span class="sd">        output_format (str): Format to save the model. Options include exported_program | torchscript.</span>
+<span class="sd">        output_format (str): Format to save the model. Options include exported_program | torchscript | aot_inductor.</span>
 <span class="sd">        retrace (bool): When the module type is a fx.GraphModule, this option re-exports the graph using torch.export.export(strict=False) to save it.</span>
 <span class="sd">                This flag is experimental for now.</span>
 <span class="sd">        pickle_protocol (int): The pickle protocol to use to save the model. Default is 2. Increase this to 4 or higher for large models</span>
@@ -1091,7 +1092,7 @@
     <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">module</span><span class="p">,</span> <span class="n">CudaGraphsTorchTensorRTModule</span><span class="p">):</span>
         <span class="n">module</span> <span class="o">=</span> <span class="n">module</span><span class="o">.</span><span class="n">compiled_module</span>
     <span class="n">module_type</span> <span class="o">=</span> <span class="n">_parse_module_type</span><span class="p">(</span><span class="n">module</span><span class="p">)</span>
-    <span class="n">accepted_formats</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;exported_program&quot;</span><span class="p">,</span> <span class="s2">&quot;torchscript&quot;</span><span class="p">}</span>
+    <span class="n">accepted_formats</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;exported_program&quot;</span><span class="p">,</span> <span class="s2">&quot;torchscript&quot;</span><span class="p">,</span> <span class="s2">&quot;aot_inductor&quot;</span><span class="p">}</span>
     <span class="k">if</span> <span class="n">arg_inputs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="ow">not</span> <span class="nb">all</span><span class="p">(</span>
         <span class="nb">isinstance</span><span class="p">(</span><span class="nb">input</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">)</span> <span class="k">for</span> <span class="nb">input</span> <span class="ow">in</span> <span class="n">arg_inputs</span>
     <span class="p">):</span>
@@ -1114,6 +1115,10 @@
         <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
             <span class="sa">f</span><span class="s2">&quot;Provided output_format </span><span class="si">{</span><span class="n">output_format</span><span class="si">}</span><span class="s2"> is not supported. Supported options are exported_program | torchscript&quot;</span>
         <span class="p">)</span>
+    <span class="k">if</span> <span class="n">output_format</span> <span class="o">==</span> <span class="s2">&quot;aot_inductor&quot;</span> <span class="ow">and</span> <span class="n">platform</span><span class="o">.</span><span class="n">system</span><span class="p">()</span> <span class="o">!=</span> <span class="s2">&quot;Linux&quot;</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;The AOT Inductor format is only supported on Linux, </span><span class="si">{</span><span class="n">platform</span><span class="o">.</span><span class="n">system</span><span class="p">()</span><span class="si">}</span><span class="s2"> is not a supported platform for this format&quot;</span>
+        <span class="p">)</span>
     <span class="k">if</span> <span class="ow">not</span> <span class="n">file_path</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;File path cannot be empty. Please provide a valid file path&quot;</span><span class="p">)</span>
 
@@ -1122,9 +1127,9 @@
             <span class="s2">&quot;Input model is of type nn.Module. Saving nn.Module directly is not supported. Supported model types torch.jit.ScriptModule | torch.fx.GraphModule | torch.export.ExportedProgram.&quot;</span>
         <span class="p">)</span>
     <span class="k">elif</span> <span class="n">module_type</span> <span class="o">==</span> <span class="n">_ModuleType</span><span class="o">.</span><span class="n">ts</span><span class="p">:</span>
-        <span class="k">if</span> <span class="n">output_format</span> <span class="o">==</span> <span class="s2">&quot;exported_program&quot;</span><span class="p">:</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">all</span><span class="p">([</span><span class="n">output_format</span> <span class="o">==</span> <span class="n">f</span> <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;exported_program&quot;</span><span class="p">,</span> <span class="s2">&quot;aot_inductor&quot;</span><span class="p">]]):</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                <span class="s2">&quot;Provided model is a torch.jit.ScriptModule but the output_format specified is exported_program. Please verify the output_format&quot;</span>
+                <span class="s2">&quot;Provided model is a torch.jit.ScriptModule but the output_format specified is not torchscript. Other output formats are not supported&quot;</span>
             <span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="k">if</span> <span class="n">arg_inputs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
@@ -1142,7 +1147,22 @@
                 <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
                     <span class="s2">&quot;Provided model is a torch.export.ExportedProgram, inputs or arg_inputs is not necessary during save, it uses the inputs or arg_inputs provided during export and compile&quot;</span>
                 <span class="p">)</span>
-            <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">module</span><span class="p">,</span> <span class="n">file_path</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">output_format</span> <span class="o">==</span> <span class="s2">&quot;exported_program&quot;</span><span class="p">:</span>
+                <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">module</span><span class="p">,</span> <span class="n">file_path</span><span class="p">,</span> <span class="n">pickle_protocol</span><span class="o">=</span><span class="n">pickle_protocol</span><span class="p">)</span>
+            <span class="k">elif</span> <span class="n">output_format</span> <span class="o">==</span> <span class="s2">&quot;aot_inductor&quot;</span><span class="p">:</span>
+                <span class="n">inductor_configs</span> <span class="o">=</span> <span class="p">{}</span>
+                <span class="k">if</span> <span class="s2">&quot;inductor_configs&quot;</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">:</span>
+                    <span class="n">inductor_configs</span> <span class="o">=</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;inductor_configs&quot;</span><span class="p">]</span>
+
+                <span class="n">torch</span><span class="o">.</span><span class="n">_inductor</span><span class="o">.</span><span class="n">aoti_compile_and_package</span><span class="p">(</span>
+                    <span class="n">exp_program</span><span class="p">,</span>
+                    <span class="n">inductor_configs</span><span class="o">=</span><span class="n">inductor_configs</span><span class="p">,</span>
+                    <span class="n">package_path</span><span class="o">=</span><span class="n">file_path</span><span class="p">,</span>
+                <span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
+                    <span class="s2">&quot;Attempted to serialize an exported program with an unsupported format. Exported programs support exported_program and aot_inductor&quot;</span>
+                <span class="p">)</span>
     <span class="k">elif</span> <span class="n">module_type</span> <span class="o">==</span> <span class="n">_ModuleType</span><span class="o">.</span><span class="n">fx</span><span class="p">:</span>
         <span class="c1"># The module type is torch.fx.GraphModule</span>
         <span class="k">if</span> <span class="n">output_format</span> <span class="o">==</span> <span class="s2">&quot;torchscript&quot;</span><span class="p">:</span>
@@ -1159,9 +1179,24 @@
                         <span class="s2">&quot;Provided model is a torch.fx.GraphModule and retrace is False, inputs or arg_inputs is not necessary during save.&quot;</span>
                     <span class="p">)</span>
                 <span class="n">exp_program</span> <span class="o">=</span> <span class="n">export</span><span class="p">(</span><span class="n">module</span><span class="p">)</span>
-                <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">save</span><span class="p">(</span>
-                    <span class="n">exp_program</span><span class="p">,</span> <span class="n">file_path</span><span class="p">,</span> <span class="n">pickle_protocol</span><span class="o">=</span><span class="n">pickle_protocol</span>
-                <span class="p">)</span>
+                <span class="k">if</span> <span class="n">output_format</span> <span class="o">==</span> <span class="s2">&quot;exported_program&quot;</span><span class="p">:</span>
+                    <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">save</span><span class="p">(</span>
+                        <span class="n">exp_program</span><span class="p">,</span> <span class="n">file_path</span><span class="p">,</span> <span class="n">pickle_protocol</span><span class="o">=</span><span class="n">pickle_protocol</span>
+                    <span class="p">)</span>
+                <span class="k">elif</span> <span class="n">output_format</span> <span class="o">==</span> <span class="s2">&quot;aot_inductor&quot;</span><span class="p">:</span>
+                    <span class="n">inductor_configs</span> <span class="o">=</span> <span class="p">{}</span>
+                    <span class="k">if</span> <span class="s2">&quot;inductor_configs&quot;</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">:</span>
+                        <span class="n">inductor_configs</span> <span class="o">=</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;inductor_configs&quot;</span><span class="p">]</span>
+
+                    <span class="n">torch</span><span class="o">.</span><span class="n">_inductor</span><span class="o">.</span><span class="n">aoti_compile_and_package</span><span class="p">(</span>
+                        <span class="n">exp_program</span><span class="p">,</span>
+                        <span class="n">inductor_configs</span><span class="o">=</span><span class="n">inductor_configs</span><span class="p">,</span>
+                        <span class="n">package_path</span><span class="o">=</span><span class="n">file_path</span><span class="p">,</span>
+                    <span class="p">)</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
+                        <span class="s2">&quot;Attempted to serialize an exported program with an unsupported format. Exported programs support exported_program and aot_inductor&quot;</span>
+                    <span class="p">)</span>
             <span class="k">else</span><span class="p">:</span>
                 <span class="k">if</span> <span class="n">arg_inputs</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
                     <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
@@ -1173,9 +1208,25 @@
                     <span class="n">kwargs</span><span class="o">=</span><span class="n">kwarg_inputs</span><span class="p">,</span>
                     <span class="n">strict</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
                 <span class="p">)</span>
-                <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">save</span><span class="p">(</span>
-                    <span class="n">exp_program</span><span class="p">,</span> <span class="n">file_path</span><span class="p">,</span> <span class="n">pickle_protocol</span><span class="o">=</span><span class="n">pickle_protocol</span>
-                <span class="p">)</span></div>
+
+                <span class="k">if</span> <span class="n">output_format</span> <span class="o">==</span> <span class="s2">&quot;exported_program&quot;</span><span class="p">:</span>
+                    <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">save</span><span class="p">(</span>
+                        <span class="n">exp_program</span><span class="p">,</span> <span class="n">file_path</span><span class="p">,</span> <span class="n">pickle_protocol</span><span class="o">=</span><span class="n">pickle_protocol</span>
+                    <span class="p">)</span>
+                <span class="k">elif</span> <span class="n">output_format</span> <span class="o">==</span> <span class="s2">&quot;aot_inductor&quot;</span><span class="p">:</span>
+                    <span class="n">inductor_configs</span> <span class="o">=</span> <span class="p">{}</span>
+                    <span class="k">if</span> <span class="s2">&quot;inductor_configs&quot;</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">:</span>
+                        <span class="n">inductor_configs</span> <span class="o">=</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;inductor_configs&quot;</span><span class="p">]</span>
+
+                    <span class="n">torch</span><span class="o">.</span><span class="n">_inductor</span><span class="o">.</span><span class="n">aoti_compile_and_package</span><span class="p">(</span>
+                        <span class="n">exp_program</span><span class="p">,</span>
+                        <span class="n">inductor_configs</span><span class="o">=</span><span class="n">inductor_configs</span><span class="p">,</span>
+                        <span class="n">package_path</span><span class="o">=</span><span class="n">file_path</span><span class="p">,</span>
+                    <span class="p">)</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
+                        <span class="s2">&quot;Attempted to serialize an exported program with an unsupported format. Exported programs support exported_program and aot_inductor&quot;</span>
+                    <span class="p">)</span></div>
 </pre></div>
 
              </article>
