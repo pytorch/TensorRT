@@ -4,7 +4,6 @@ import operator
 from typing import Callable, Sequence, Tuple
 
 import torch
-from sdpa_converter import *
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.conversion.aten_ops_converters import args_bounds_check
 from torch_tensorrt.dynamo.lowering import TORCH_TRT_DECOMPOSITIONS
@@ -15,15 +14,19 @@ from torch_tensorrt.dynamo.lowering.passes.pass_utils import (
     clean_up_graph_after_modifications,
 )
 
+from .sdpa_converter import *
+
 logger = logging.getLogger(__name__)
 
 # Remove decompositions for aten.scaled_dot_product_attention, aten._scaled_dot_product_efficient_attention, aten._scaled_dot_product_flash_attention
 # This is because we want to have SDPA as a standalone operator in the graph and invoke the custom converter for it.
-TORCH_TRT_DECOMPOSITIONS.pop(torch.ops.aten.scaled_dot_product_attention.default)
+TORCH_TRT_DECOMPOSITIONS.pop(torch.ops.aten.scaled_dot_product_attention.default, None)
 TORCH_TRT_DECOMPOSITIONS.pop(
-    torch.ops.aten._scaled_dot_product_efficient_attention.default
+    torch.ops.aten._scaled_dot_product_efficient_attention.default, None
 )
-TORCH_TRT_DECOMPOSITIONS.pop(torch.ops.aten._scaled_dot_product_flash_attention.default)
+TORCH_TRT_DECOMPOSITIONS.pop(
+    torch.ops.aten._scaled_dot_product_flash_attention.default, None
+)
 
 REPLACEABLE_ATEN_OPS = {
     torch.ops.aten._scaled_dot_product_efficient_attention.default,
@@ -59,6 +62,7 @@ def replace_variants_of_sdpa(
                 elif len(node.args) == 5:
                     query, key, value, attn_mask, is_causal = node.args
                     dropout_p = 0.0
+
                 else:
                     raise ValueError(
                         f"Unexpected number of arguments for {node.target} in the graph"
@@ -71,6 +75,8 @@ def replace_variants_of_sdpa(
                     query, key, value, dropout_p, is_causal, return_debug_mask = (
                         node.args
                     )
+                if len(node.args) == 5:
+                    query, key, value, dropout_p, is_causal = node.args
                 elif len(node.args) == 3:
                     query, key, value = node.args
                     dropout_p = 0.0
@@ -79,20 +85,21 @@ def replace_variants_of_sdpa(
                     raise ValueError(
                         f"Unexpected number of arguments for {node.target} in the graph"
                     )
-            if attn_mask is not None:
-                logger.warning(
-                    f"This current version of SDPA converter does not support attn_mask for {node.target} in the graph. Ignoring it and using is_causal=True configuration."
-                )
 
-            modified_input_args = (query, key, value, None, dropout_p, is_causal)
-
+            logger.warning(
+                f"This current version of SDPA converter only supports attn_mask = None, dropout_p = 0.0 and is_causal = True configuration. This could cause issues with accuracy for models with different configurations."
+            )
+            modified_input_args = (query, key, value, None, dropout_p, True)
             # Create a new node with torch.nn.functional.scaled_dot_product_attention
             # The input args is (query, key, value, is_causal). kwargs has scale
             with gm.graph.inserting_after(node):
                 new_node = gm.graph.call_function(
                     torch.nn.functional.scaled_dot_product_attention,
                     args=modified_input_args,
-                    kwargs={"scale": node.kwargs.get("scale", None)},
+                    kwargs={
+                        "scale": node.kwargs.get("scale", None),
+                        "use_fp32_acc": settings.use_fp32_acc,
+                    },
                 )
 
                 # Deep copy encounters RuntimeError: Cannot access data pointer of Tensor (e.g. FakeTensor, FunctionalTensor). So we use copy instead.
@@ -113,7 +120,7 @@ def replace_variants_of_sdpa(
     # Clean up the graph
     clean_up_graph_after_modifications(gm)
 
-    logger.info(
+    logger.debug(
         "Replaced variants of scaled_dot_product_attention with torch.nn.functional.scaled_dot_product_attention"
     )
     return gm
