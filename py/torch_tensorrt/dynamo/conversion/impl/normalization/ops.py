@@ -16,11 +16,11 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     get_trt_tensor,
     has_dynamic_shape,
     set_layer_name,
+    to_trt_weights,
 )
 from torch_tensorrt.dynamo.conversion.impl.cat import cat
 from torch_tensorrt.dynamo.conversion.impl.elementwise.ops import ge
 from torch_tensorrt.dynamo.conversion.impl.shape import shape as get_shape
-from torch_tensorrt.dynamo.types import TRTTensor
 from torch_tensorrt.dynamo.utils import DYNAMIC_DIM
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
@@ -31,106 +31,180 @@ def batch_norm(
     target: Target,
     source_ir: Optional[SourceIR],
     name: str,
-    input: TRTTensor,
-    weight: Optional[Union[TRTTensor, torch.Tensor, np.ndarray]],
-    bias: Optional[Union[TRTTensor, torch.Tensor, np.ndarray]],
-    running_mean: Optional[Union[TRTTensor, torch.Tensor, np.ndarray]],
-    running_var: Optional[Union[TRTTensor, torch.Tensor, np.ndarray]],
+    input: trt.ITensor,
+    weight: Optional[Union[trt.ITensor, torch.Tensor, np.ndarray]],
+    bias: Optional[Union[trt.ITensor, torch.Tensor, np.ndarray]],
+    running_mean: Optional[Union[trt.ITensor, torch.Tensor, np.ndarray]],
+    running_var: Optional[Union[trt.ITensor, torch.Tensor, np.ndarray]],
     training: bool,
     momentum: float,
     eps: float,
     cudnn_enabled: bool,
     return_mean_rstd: bool,
-) -> Union[TRTTensor, Tuple[TRTTensor, torch.Tensor, torch.Tensor]]:
+) -> Union[trt.ITensor, Tuple[trt.ITensor, torch.Tensor, torch.Tensor]]:
     if has_dynamic_shape(input.shape):
         assert input.shape[1] != -1, "Channel dim can't be dynamic for batch norm."
 
     # Save the original output shape for later use
     output_shape = input.shape
+    # We perform constant folding for batch norm when the weight, bias, running_mean, and running_var are all tensors.
+    # Batch norm operation can be fused into a single layer, which is more efficient than the original implementation.
+    # In this way, the batch norm layer will be fused with the Convolution layer and get a performance boost.
+    if any(
+        [
+            isinstance(weight, trt.ITensor),
+            isinstance(bias, trt.ITensor),
+            isinstance(running_mean, trt.ITensor),
+            isinstance(running_var, trt.ITensor),
+        ]
+    ):
+        # We name the weight here according to the state_dict name
+        weight = (
+            get_trt_tensor(ctx, 1.0, f"{name}_weight")
+            if weight is None
+            else get_trt_tensor(ctx, weight, f"{name}_weight")
+        )
+        bias = (
+            get_trt_tensor(ctx, 0.0, f"{name}_bias")
+            if bias is None
+            else get_trt_tensor(ctx, bias, f"{name}_bias")
+        )
+        running_mean = (
+            get_trt_tensor(ctx, 0.0, f"{name}_running_mean")
+            if running_mean is None
+            else get_trt_tensor(ctx, running_mean, f"{name}_running_mean")
+        )
+        running_var = (
+            get_trt_tensor(ctx, 1.0, f"{name}_running_var")
+            if running_var is None
+            else get_trt_tensor(ctx, running_var, f"{name}_running_var")
+        )
 
-    # We name the weight here according to the state_dict name
-    weight = (
-        get_trt_tensor(ctx, 1.0, f"{name}_weight")
-        if weight is None
-        else get_trt_tensor(ctx, weight, f"{name}_weight")
-    )
-    bias = (
-        get_trt_tensor(ctx, 0.0, f"{name}_bias")
-        if bias is None
-        else get_trt_tensor(ctx, bias, f"{name}_bias")
-    )
-    running_mean = (
-        get_trt_tensor(ctx, 0.0, f"{name}_running_mean")
-        if running_mean is None
-        else get_trt_tensor(ctx, running_mean, f"{name}_running_mean")
-    )
-    running_var = (
-        get_trt_tensor(ctx, 1.0, f"{name}_running_var")
-        if running_var is None
-        else get_trt_tensor(ctx, running_var, f"{name}_running_var")
-    )
+        # eps_tensor for numerical stability
+        eps_tensor = get_trt_tensor(ctx, eps, f"{name}_eps")
 
-    # eps_tensor for numerical stability
-    eps_tensor = get_trt_tensor(ctx, eps, f"{name}_eps")
+        # adjusted_var = running_var + eps
+        adjusted_var = impl.elementwise.add(
+            ctx, target, source_ir, f"{name}_adjusted_var", running_var, eps_tensor
+        )
 
-    # adjusted_var = running_var + eps
-    adjusted_var = impl.elementwise.add(
-        ctx, target, source_ir, f"{name}_adjusted_var", running_var, eps_tensor
-    )
+        # sqrt_adjusted_var = sqrt(adjusted_var)
+        sqrt_adjusted_var = impl.unary.sqrt(
+            ctx, target, source_ir, f"{name}_sqrt", adjusted_var
+        )
 
-    # sqrt_adjusted_var = sqrt(adjusted_var)
-    sqrt_adjusted_var = impl.unary.sqrt(
-        ctx, target, source_ir, f"{name}_sqrt", adjusted_var
-    )
+        # scale = weight / sqrt_adjusted_var
+        scale = impl.elementwise.div(
+            ctx, target, source_ir, f"{name}_scale", weight, sqrt_adjusted_var
+        )
 
-    # scale = weight / sqrt_adjusted_var
-    scale = impl.elementwise.div(
-        ctx, target, source_ir, f"{name}_scale", weight, sqrt_adjusted_var
-    )
+        # scaled_running_mean = running_mean * scale
+        scaled_running_mean = impl.elementwise.mul(
+            ctx, target, source_ir, f"{name}_scaled_running_mean", running_mean, scale
+        )
 
-    # scaled_running_mean = running_mean * scale
-    scaled_running_mean = impl.elementwise.mul(
-        ctx, target, source_ir, f"{name}_scaled_running_mean", running_mean, scale
-    )
+        # bias_adjusted = bias - scaled_running_mean
+        bias_adjusted = impl.elementwise.sub(
+            ctx, target, source_ir, f"{name}_bias_adjusted", bias, scaled_running_mean
+        )
 
-    # bias_adjusted = bias - scaled_running_mean
-    bias_adjusted = impl.elementwise.sub(
-        ctx, target, source_ir, f"{name}_bias_adjusted", bias, scaled_running_mean
-    )
+        # Reshape scale and bias_adjusted to match input shape for broadcasting
+        expanded_shape = [1] * len(output_shape)
+        expanded_shape[1] = output_shape[1]  # Set channel dimension
 
-    # Reshape scale and bias_adjusted to match input shape for broadcasting
-    expanded_shape = [1] * len(output_shape)
-    expanded_shape[1] = output_shape[1]  # Set channel dimension
+        scale_reshape = impl.shuffle.reshape(
+            ctx,
+            target,
+            source_ir,
+            f"{name}_reshape_scale",
+            scale,
+            tuple(expanded_shape),
+        )
+        bias_adjusted_reshape = impl.shuffle.reshape(
+            ctx,
+            target,
+            source_ir,
+            f"{name}_reshape_bias",
+            bias_adjusted,
+            tuple(expanded_shape),
+        )
 
-    scale_reshape = impl.shuffle.reshape(
-        ctx,
-        target,
-        source_ir,
-        f"{name}_reshape_scale",
-        scale,
-        tuple(expanded_shape),
-    )
-    bias_adjusted_reshape = impl.shuffle.reshape(
-        ctx,
-        target,
-        source_ir,
-        f"{name}_reshape_bias",
-        bias_adjusted,
-        tuple(expanded_shape),
-    )
+        # Apply the scale and bias to the input
+        scaled_input = impl.elementwise.mul(
+            ctx, target, source_ir, f"{name}_scaled_input", input, scale_reshape
+        )
+        output = impl.elementwise.add(
+            ctx,
+            target,
+            source_ir,
+            f"{name}_output",
+            scaled_input,
+            bias_adjusted_reshape,
+        )
 
-    # Apply the scale and bias to the input
-    scaled_input = impl.elementwise.mul(
-        ctx, target, source_ir, f"{name}_scaled_input", input, scale_reshape
-    )
-    output = impl.elementwise.add(
-        ctx,
-        target,
-        source_ir,
-        f"{name}_output",
-        scaled_input,
-        bias_adjusted_reshape,
-    )
+    else:
+        if weight is None:
+            weight = 1.0
+
+        if bias is None:
+            bias = 0.0
+
+        if running_mean is None:
+            running_mean = 0.0
+
+        if running_var is None:
+            running_var = 1.0
+        adjusted_scale, adjusted_bias = batch_norm_constant_folding(
+            weight, bias, running_mean, running_var, eps
+        )
+        power = torch.ones_like(adjusted_scale)
+
+        adjusted_scale = to_trt_weights(
+            ctx,
+            adjusted_scale,
+            name,
+            layer_type_name="SCALE",
+            weight_type_name="SCALE",
+            target=target,
+            source_ir=source_ir,
+        )
+        adjusted_bias = to_trt_weights(
+            ctx,
+            adjusted_bias,
+            name,
+            layer_type_name="SCALE",
+            weight_type_name="SHIFT",
+            target=target,
+            source_ir=source_ir,
+        )
+
+        power = to_trt_weights(
+            ctx,
+            power,
+            name,
+            layer_type_name="SCALE",
+            weight_type_name="POWER",
+            target=target,
+            source_ir=source_ir,
+        )
+
+        output_shape = input.shape
+        if len(input.shape) < 4:
+
+            new_shape = (
+                (input.shape[0], input.shape[1], 1, 1)
+                if len(input.shape) == 2
+                else (input.shape[0], input.shape[1], input.shape[2], 1)
+            )
+            input = impl.shuffle.reshape(
+                ctx, target, source_ir, f"{name}_reshape_2d", input, new_shape
+            )
+
+        layer = ctx.net.add_scale_nd(
+            input, trt.ScaleMode.CHANNEL, adjusted_bias, adjusted_scale, power, 1
+        )
+        set_layer_name(layer, target, name, source_ir)
+        output = layer.get_output(0)
 
     # For BatchNorm1d, reshape output back to original shape if necessary
     if len(output_shape) < 4:
@@ -150,17 +224,29 @@ def batch_norm(
     return output
 
 
+def batch_norm_constant_folding(
+    weight: torch.Tensor,
+    bias: torch.Tensor,
+    running_mean: torch.Tensor,
+    running_var: torch.Tensor,
+    eps: float,
+) -> Tuple[torch.Tensor, torch.Tensor]:
+    adjusted_scale = weight / torch.sqrt(running_var + eps)
+    adjusted_bias = bias - running_mean * adjusted_scale
+    return adjusted_scale, adjusted_bias
+
+
 def native_layer_norm(
     ctx: ConversionContext,
     target: Target,
     source_ir: Optional[SourceIR],
     name: str,
-    input: TRTTensor,
+    input: trt.ITensor,
     normalized_shape: List[int],
-    weight: Optional[Union[TRTTensor, torch.Tensor, np.ndarray]],
-    bias: Optional[Union[TRTTensor, torch.Tensor, np.ndarray]],
+    weight: Optional[Union[trt.ITensor, torch.Tensor, np.ndarray]],
+    bias: Optional[Union[trt.ITensor, torch.Tensor, np.ndarray]],
     eps: float,
-) -> Tuple[TRTTensor, torch.Tensor, torch.Tensor]:
+) -> Tuple[trt.ITensor, torch.Tensor, torch.Tensor]:
     dims = list(range(len(input.shape) - len(normalized_shape), len(input.shape)))
     axes = get_axes_for_reduce_op(dims)
 
@@ -200,15 +286,15 @@ def native_group_norm(
     target: Target,
     source_ir: Optional[SourceIR],
     name: str,
-    input: TRTTensor,
-    weight: Optional[Union[TRTTensor, torch.Tensor, np.ndarray]],
-    bias: Optional[Union[TRTTensor, torch.Tensor, np.ndarray]],
+    input: trt.ITensor,
+    weight: Optional[Union[trt.ITensor, torch.Tensor, np.ndarray]],
+    bias: Optional[Union[trt.ITensor, torch.Tensor, np.ndarray]],
     N: int,
     C: int,
     HxW: int,
     group: int,
     eps: float,
-) -> Tuple[TRTTensor, torch.Tensor, torch.Tensor]:
+) -> Tuple[trt.ITensor, torch.Tensor, torch.Tensor]:
     rank = len(input.shape)
 
     assert rank >= 3, f"Expected at least 3 dimensions for input tensor but got {rank}"
@@ -229,7 +315,7 @@ def native_group_norm(
         ctx, target, source_ir, f"{name}_expand_bias_zero", bias_zero, shape
     )
 
-    axes = get_axes_for_reduce_op([i for i in range(1 if group == 1 else 2, rank)])
+    axes = get_axes_for_reduce_op(list(range(1 if group == 1 else 2, rank)))
 
     # INormalizationLayer scales the normalized output per-group, but PyTorch scales the normalized output per-channel,
     # hence causing diverse result. Let TensorRT does no-op for scaling here, and do scaling ourselves later
@@ -274,10 +360,10 @@ def softmax(
     target: Target,
     source_ir: Optional[SourceIR],
     name: str,
-    input: TRTTensor,
+    input: trt.ITensor,
     dim: int,
     half_to_float: bool,
-) -> Union[TRTTensor, Sequence[TRTTensor]]:
+) -> Union[trt.ITensor, Sequence[trt.ITensor]]:
     dim = get_positive_dim(dim, len(input.shape))
 
     if half_to_float:
@@ -294,9 +380,9 @@ def pdist(
     target: Target,
     source_ir: Optional[SourceIR],
     name: str,
-    input: TRTTensor,
+    input: trt.ITensor,
     p: float = 2,
-) -> Union[TRTTensor, Sequence[TRTTensor]]:
+) -> Union[trt.ITensor, Sequence[trt.ITensor]]:
     shape = input.shape
     # Extend input from shape [N, D] to [N, 1, D]
     extend_input = impl.unsqueeze.unsqueeze(
@@ -390,8 +476,8 @@ def tri_upper_indices(
     target: Target,
     source_ir: Optional[SourceIR],
     name: str,
-    size_tensor: TRTTensor,
-) -> TRTTensor:
+    size_tensor: trt.ITensor,
+) -> trt.ITensor:
     """
     Return the indices for the upper-triangle part of a square size of matrix in a N-by-2 Tensor,
     where the diagonal offset = 1. One loop is used to calculate the indices like below.
@@ -410,7 +496,7 @@ def tri_upper_indices(
         target (Target): Target of calling node.
         source_ir (Optional[SourceIR]): SourceIR of calling converter.
         name (str): Name of the calling layer.
-        size_tensor (TRTTensor): number of rows in the 2-D square matrix. scalar tensor.
+        size_tensor (trt.ITensor): number of rows in the 2-D square matrix. scalar tensor.
 
     Example:
         if size_tensor is 4, it will return [[0, 1], [0, 2], [0, 3], [1, 2], [1, 3], [2, 3]]
@@ -560,11 +646,11 @@ def cdist_forward(
     target: Target,
     source_ir: Optional[SourceIR],
     name: str,
-    x1: TRTTensor,
-    x2: TRTTensor,
+    x1: trt.ITensor,
+    x2: trt.ITensor,
     p: float,
     compute_mode: Optional[int],
-) -> Union[TRTTensor, Sequence[TRTTensor]]:
+) -> Union[trt.ITensor, Sequence[trt.ITensor]]:
     """
     Computes pairwise distances between sets of vectors in tensors x1 and x2 using the p-norm. The function treats the last dimension
     of x1 and x2 as feature dimensions, which must be identical for both inputs. The second-to-last dimensions can differ, reflecting
