@@ -10,8 +10,6 @@ import torch
 import torch_tensorrt
 from accelerate.hooks import remove_hook_from_module
 from diffusers import FluxPipeline
-from diffusers.models.transformers.transformer_flux import FluxTransformer2DModel
-from torch_tensorrt.dynamo._defaults import DEBUG_LOGGING_DIR
 
 DEVICE = "cuda:0"
 
@@ -23,6 +21,7 @@ def compile_model(
 ]:
     use_explicit_typing = False
     if args.use_sdpa:
+        # currently use sdpa is not working correctly with flux model, so we don't use it
         # Register SDPA as a standalone operator. Converter and lowering pass are defined in register_sdpa.py
         sys.path.append(os.path.join(os.path.dirname(__file__), "../dynamo"))
         import register_sdpa
@@ -54,13 +53,6 @@ def compile_model(
         "black-forest-labs/FLUX.1-dev",
         torch_dtype=torch.float16,
     ).to(torch.float16)
-
-    # # Use a small transformer for debugging
-    # if args.debug:
-    #     pipe.transformer = FluxTransformer2DModel(
-    #         num_layers=1, num_single_layers=1, guidance_embeds=True
-    #     )
-    #     pipe.to(torch.float16)
 
     if args.low_vram_mode:
         pipe.enable_model_cpu_offload()
@@ -135,70 +127,11 @@ def compile_model(
         pipe.enable_sequential_cpu_offload()
         remove_hook_from_module(pipe.transformer, recurse=True)
         pipe.transformer.to(DEVICE)
-    if args.use_dynamo:
-        dummy_inputs = {
-            "hidden_states": torch.randn(
-                (batch_size, 4096, 64), dtype=torch.float16
-            ).to(DEVICE),
-            "encoder_hidden_states": torch.randn(
-                (batch_size, 512, 4096), dtype=torch.float16
-            ).to(DEVICE),
-            "pooled_projections": torch.randn(
-                (batch_size, 768), dtype=torch.float16
-            ).to(DEVICE),
-            "timestep": torch.tensor([1.0] * batch_size, dtype=torch.float16).to(
-                DEVICE
-            ),
-            "txt_ids": torch.randn((512, 3), dtype=torch.float16).to(DEVICE),
-            "img_ids": torch.randn((4096, 3), dtype=torch.float16).to(DEVICE),
-            "guidance": torch.tensor([1.0] * batch_size, dtype=torch.float32).to(
-                DEVICE
-            ),
-            "joint_attention_kwargs": {},
-            "return_dict": False,
-        }
-        from modelopt.torch.quantization.utils import export_torch_mode
 
-        with export_torch_mode():
-            ep = torch.export.export(
-                backbone,
-                args=(),
-                kwargs=dummy_inputs,
-                dynamic_shapes=dynamic_shapes,
-                strict=False,
-            )
-        if args.debug:
-            with torch_tensorrt.dynamo.Debugger(
-                "graphs",
-                logging_dir=DEBUG_LOGGING_DIR,
-                # capture_fx_graph_after=["remove_num_users_is_0_nodes"],
-                save_engine_profile=True,
-                profile_format="trex",
-                engine_builder_monitor=True,
-            ):
-                trt_gm = torch_tensorrt.dynamo.compile(
-                    ep, inputs=dummy_inputs, **settings
-                )
-        else:
-            trt_gm = torch_tensorrt.dynamo.compile(ep, inputs=dummy_inputs, **settings)
-        pipe.transformer = trt_gm
-        pipe.transformer.config = backbone.config
-    else:
-        if args.debug:
-            with torch_tensorrt.dynamo.Debugger(
-                "graphs",
-                logging_dir=DEBUG_LOGGING_DIR,
-                capture_fx_graph_after=["remove_num_users_is_0_nodes"],
-                save_engine_profile=True,
-                profile_format="trex",
-                engine_builder_monitor=True,
-            ):
-                trt_gm = torch_tensorrt.MutableTorchTensorRTModule(backbone, **settings)
-        else:
-            trt_gm = torch_tensorrt.MutableTorchTensorRTModule(backbone, **settings)
-        if dynamic_shapes:
-            trt_gm.set_expected_dynamic_shape_range((), dynamic_shapes)
-        pipe.transformer = trt_gm
+    trt_gm = torch_tensorrt.MutableTorchTensorRTModule(backbone, **settings)
+    if dynamic_shapes:
+        trt_gm.set_expected_dynamic_shape_range((), dynamic_shapes)
+    pipe.transformer = trt_gm
     seed = 42
     image = pipe(
         ["Beach and Kids"],
@@ -208,7 +141,7 @@ def compile_model(
         generator=torch.Generator("cuda").manual_seed(seed),
     ).images
     print(f"generated {len(image)} images")
-    image[0].save("warmup1.png")
+    image[0].save("beach_kids.png")
 
     torch.cuda.empty_cache()
 
@@ -337,20 +270,9 @@ if __name__ == "__main__":
         help="Select the data type to use (fp4 or fp8 or int8 or fp16)",
     )
     parser.add_argument(
-        "--use_dynamo",
-        action="store_true",
-        help="Use dynamo compile",
-        default=False,
-    )
-    parser.add_argument(
         "--fp4_mha",
         action="store_true",
         help="Use NVFP4_FP8_MHA_CONFIG config instead of NVFP4_FP8_MHA_CONFIG",
-    )
-    parser.add_argument(
-        "--debug",
-        action="store_true",
-        help="Use debug mode",
     )
     parser.add_argument(
         "--low_vram_mode",

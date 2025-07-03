@@ -44,32 +44,6 @@ def benchmark(pipe, prompt, inference_step, batch_size=1, iterations=1):
 
     # run the perf tool
     print(f"Running cudart perf tool with {inference_step=} {batch_size=}")
-    from cuda import cudart
-
-    cudart.cudaProfilerStart()
-    image = pipe(
-        prompt,
-        output_type="pil",
-        num_inference_steps=inference_step,
-        num_images_per_prompt=batch_size,
-    ).images
-    cudart.cudaProfilerStop()
-
-    # print(f"Running torch profiler with {inference_step=} {batch_size=}")
-    # with torch.profiler.profile(
-    #     activities=[torch.profiler.ProfilerActivity.CUDA],
-    #     record_shapes=True,
-    #     profile_memory=True,
-    #     with_stack=True,
-    # ) as prof:
-    #     with torch.profiler.record_function("model_inference"):
-    #         pipe(
-    #             prompt,
-    #             output_type="pil",
-    #             num_inference_steps=inference_step,
-    #             num_images_per_prompt=batch_size,
-    #         ).images
-    # print(prof.key_averages().table(sort_by="cuda_time_total", row_limit=100))
     return
 
 
@@ -102,11 +76,6 @@ if __name__ == "__main__":
         help="Use NVFP4_FP8_MHA_CONFIG config instead of NVFP4_FP8_MHA_CONFIG",
     )
     parser.add_argument(
-        "--debug",
-        action="store_true",
-        help="Use debug mode",
-    )
-    parser.add_argument(
         "--low_vram_mode",
         action="store_true",
         help="Use low VRAM mode when you have a small GPU (<=32GB)",
@@ -116,12 +85,6 @@ if __name__ == "__main__":
         "-d",
         action="store_true",
         help="Use dynamic shapes",
-    )
-    parser.add_argument(
-        "--use_dynamo",
-        action="store_true",
-        help="Use dynamo compile",
-        default=False,
     )
     parser.add_argument("--max_batch_size", type=int, default=1)
     args = parser.parse_args()
