@@ -46,7 +46,6 @@ def benchmark(pipe, prompt, inference_step, batch_size=1, iterations=1):
     print(f"Running cudart perf tool with {inference_step=} {batch_size=}")
     from cuda import cudart
 
-    cudart.cudaInit(0)
     cudart.cudaProfilerStart()
     image = pipe(
         prompt,
@@ -78,8 +77,7 @@ def main(args):
     print(f"Running flux_perfwith args: {args}")
     pipe, backbone, trt_gm = compile_model(args)
 
-    for batch_size in range(1, args.max_batch_size + 1):
-        benchmark(pipe, ["Test"], 20, batch_size=batch_size, iterations=3)
+    benchmark(pipe, ["Test"], 20, batch_size=args.max_batch_size, iterations=3)
 
 
 if __name__ == "__main__":
