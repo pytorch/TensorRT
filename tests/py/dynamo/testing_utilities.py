@@ -92,7 +92,7 @@ def compile_module_testing(
         )
 
     # Store intermediate graph from partitioned module
-    store_intermediate_graphs.append(deepcopy(partitioned_module))
+    store_intermediate_graphs.append(partitioned_module)
 
     return partitioned_module
 

@@ -1,3 +1,11 @@
+"""
+.. _tensor_parallel_initialize_dist:
+Tensor Parallel Initialize Distributed Environment
+==================================================
+
+This module provides functions to initialize and clean up the distributed environment for tensor parallel distributed inference.
+"""
+
 import logging
 import os
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
@@ -65,3 +73,9 @@ def initialize_distributed_env(logger_file_name, rank=0, world_size=1, port=2950
     torch.cuda.set_device(device_id)
 
     return device_mesh, world_size, rank, logger
+
+
+def cleanup_distributed_env():
+    """Clean up distributed process group to prevent resource leaks."""
+    if dist.is_initialized():
+        dist.destroy_process_group()
