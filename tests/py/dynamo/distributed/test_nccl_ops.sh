@@ -70,51 +70,6 @@ ensure_pytest_installed(){
 
 echo "Setting up the environment"
 
-OS="$(uname -s)"
-ARCH="$(uname -m)"
-
-
-#getting the file name for TensorRT-LLM download
-if [[ "$OS" == "Linux" && "$ARCH" == "x86_64"]]; then
-    FILE="tensorrt_llm-0.17.0.post1-cp312-cp312-linux_x86_64.whl"
-elif [[ "$OS" == "Linux" && "$ARCH" == "aarch64"]]; then
-    FILE="tensorrt_llm-0.17.0.post1-cp312-cp312-linux_aarch64.whl"
-else:
-    echo "Unsupported platform: OS=$OS ARCH=$ARCH
-    exit 1
-fi
-
-# Download the selected file
-URL="https://pypi.nvidia.com/tensorrt-llm/$FILE"
-echo "Downloading $FILE from $URL..."
-
-#Installing wget
-ensure_installed wget
-
-#Downloading the file
-filename=$(basename "$URL")
-if [ -f "$filename" ]; then
-    echo "File already exists: $filename"
-else
-    wget "$URL"
-fi
-echo "Download complete: $FILE"
-
-UNZIP_DIR="tensorrt_llm_unzip"
-if [[ ! -d "$UNZIP_DIR" ]]; then
-    echo "Creating directory: $UNZIP_DIR"
-    mkdir -p "$UNZIP_DIR"
-    echo "extracting $FILE to $UNZIP_DIR ..."
-    #Installing unzip
-    ensure_installed unzip
-    #unzip the TensorRT-LLM package
-    unzip -q "$FILE" -d "$UNZIP_DIR"
-    echo "Unzip complete"
-fi
-
-
-export TRTLLM_PLUGINS_PATH="$(pwd)/${UNZIP_DIR}/tensorrt_llm/libs/libnvinfer_plugin_tensorrt_llm.so"
-echo ${TRTLLM_PLUGINS_PATH}
 
 ensure_mpi_installed libmpich-dev
 ensure_mpi_installed libopenmpi-dev
@@ -123,7 +78,7 @@ run_tests() {
     cd ..
     export PYTHONPATH=$(pwd)
     echo "Running pytest on distributed/test_nccl_ops.py..."
-    pytest distributed/test_nccl_ops.py
+    USE_TRTLLM_PLUGINS=1 pytest distributed/test_nccl_ops.py
 }
 
 run_mpi_tests(){
