@@ -8,7 +8,6 @@ import os
 import tempfile
 import urllib.request
 import warnings
-from contextlib import contextmanager
 from dataclasses import fields, replace
 from enum import Enum
 from pathlib import Path
@@ -16,7 +15,6 @@ from typing import (
     Any,
     Callable,
     Dict,
-    Iterator,
     List,
     Optional,
     Sequence,
@@ -895,40 +893,52 @@ def is_platform_supported_for_trtllm(platform: str) -> bool:
     return True
 
 
-@contextmanager
-def download_plugin_lib_path(platform: str) -> Iterator[str]:
-    """
-    Downloads (if needed) and extracts the TensorRT-LLM plugin wheel for the specified platform,
-    then yields the path to the extracted shared library (.so or .dll).
+def _cache_root() -> Path:
+    username = getpass.getuser()
+    return Path(tempfile.gettempdir()) / f"torch_tensorrt_{username}"
 
-    The wheel file is cached in a user-specific temporary directory to avoid repeated downloads.
-    Extraction happens in a temporary directory that is cleaned up after use.
+
+def _extracted_dir_trtllm(platform: str) -> Path:
+    return _cache_root() / "trtllm" / f"{__tensorrt_llm_version__}_{platform}"
+
+
+def download_and_get_plugin_lib_path(platform: str) -> Optional[str]:
+    """
+    Returns the path to the TensorRT‑LLM shared library, downloading and extracting if necessary.
 
     Args:
-        platform (str): The platform identifier string (e.g., 'linux_x86_64') to select the correct wheel.
+        platform (str): Platform identifier (e.g., 'linux_x86_64')
 
-    Yields:
-        str: The full path to the extracted TensorRT-LLM shared library file.
-
-    Raises:
-        ImportError: If the 'zipfile' module is not available.
-        RuntimeError: If the wheel file is missing, corrupted, or extraction fails.
+    Returns:
+        Optional[str]: Path to shared library or None if operation fails.
     """
-    plugin_lib_path = None
-    username = getpass.getuser()
-    torchtrt_cache_dir = Path(tempfile.gettempdir()) / f"torch_tensorrt_{username}"
-    torchtrt_cache_dir.mkdir(parents=True, exist_ok=True)
-    file_name = f"tensorrt_llm-{__tensorrt_llm_version__}-{_WHL_CPYTHON_VERSION}-{_WHL_CPYTHON_VERSION}-{platform}.whl"
-    torchtrt_cache_trtllm_whl = torchtrt_cache_dir / file_name
-    downloaded_file_path = torchtrt_cache_trtllm_whl
+    wheel_filename = (
+        f"tensorrt_llm-{__tensorrt_llm_version__}-{_WHL_CPYTHON_VERSION}-"
+        f"{_WHL_CPYTHON_VERSION}-{platform}.whl"
+    )
+    wheel_path = _cache_root() / wheel_filename
+    extract_dir = _extracted_dir_trtllm(platform)
+    # else will never be met though
+    lib_filename = (
+        "libnvinfer_plugin_tensorrt_llm.so"
+        if "linux" in platform
+        else "libnvinfer_plugin_tensorrt_llm.dll"
+    )
+    # eg: /tmp/torch_tensorrt_<username>/trtllm/0.17.0.post1_linux_x86_64/tensorrt_llm/libs/libnvinfer_plugin_tensorrt_llm.so
+    plugin_lib_path = extract_dir / "tensorrt_llm" / "libs" / lib_filename
 
-    if not torchtrt_cache_trtllm_whl.exists():
-        # Downloading TRT-LLM lib
+    if plugin_lib_path.exists():
+        return str(plugin_lib_path)
+
+    wheel_path.parent.mkdir(parents=True, exist_ok=True)
+    extract_dir.mkdir(parents=True, exist_ok=True)
+
+    if not wheel_path.exists():
         base_url = "https://pypi.nvidia.com/tensorrt-llm/"
-        download_url = base_url + file_name
+        download_url = base_url + wheel_filename
         try:
             logger.debug(f"Downloading {download_url} ...")
-            urllib.request.urlretrieve(download_url, downloaded_file_path)
+            urllib.request.urlretrieve(download_url, wheel_path)
             logger.debug("Download succeeded and TRT-LLM wheel is now present")
         except urllib.error.HTTPError as e:
             logger.error(
@@ -941,41 +951,45 @@ def download_plugin_lib_path(platform: str) -> Iterator[str]:
         except OSError as e:
             logger.error(f"Local file write error: {e}")
 
-    # Proceeding with the unzip of the wheel file in tmpdir
-    if "linux" in platform:
-        lib_filename = "libnvinfer_plugin_tensorrt_llm.so"
-    else:
-        # This condition is never met though
-        lib_filename = "libnvinfer_plugin_tensorrt_llm.dll"
+    try:
+        import zipfile
+    except ImportError as e:
+        raise ImportError(
+            "zipfile module is required but not found. Please install zipfile"
+        )
+    try:
+        with zipfile.ZipFile(wheel_path) as zip_ref:
+            zip_ref.extractall(extract_dir)
+            logger.debug(f"Extracted wheel to {extract_dir}")
+    except FileNotFoundError as e:
+        # This should capture the errors in the download failure above
+        logger.error(f"Wheel file not found at {wheel_path}: {e}")
+        raise RuntimeError(
+            f"Failed to find downloaded wheel file at {wheel_path}"
+        ) from e
+    except zipfile.BadZipFile as e:
+        logger.error(f"Invalid or corrupted wheel file: {e}")
+        raise RuntimeError(
+            "Downloaded wheel file is corrupted or not a valid zip archive"
+        ) from e
+    except Exception as e:
+        logger.error(f"Unexpected error while extracting wheel: {e}")
+        raise RuntimeError(
+            "Unexpected error during extraction of TensorRT-LLM wheel"
+        ) from e
 
-    with tempfile.TemporaryDirectory() as tmpdir:
-        try:
-            import zipfile
-        except ImportError:
-            raise ImportError(
-                "zipfile module is required but not found. Please install zipfile"
-            )
-        try:
-            with zipfile.ZipFile(downloaded_file_path, "r") as zip_ref:
-                zip_ref.extractall(tmpdir)  # Extract to a folder named 'tensorrt_llm'
-        except FileNotFoundError as e:
-            # This should capture the errors in the download failure above
-            logger.error(f"Wheel file not found at {downloaded_file_path}: {e}")
-            raise RuntimeError(
-                f"Failed to find downloaded wheel file at {downloaded_file_path}"
-            ) from e
-        except zipfile.BadZipFile as e:
-            logger.error(f"Invalid or corrupted wheel file: {e}")
-            raise RuntimeError(
-                "Downloaded wheel file is corrupted or not a valid zip archive"
-            ) from e
-        except Exception as e:
-            logger.error(f"Unexpected error while extracting wheel: {e}")
-            raise RuntimeError(
-                "Unexpected error during extraction of TensorRT-LLM wheel"
-            ) from e
-        plugin_lib_path = os.path.join(tmpdir, "tensorrt_llm/libs", lib_filename)
-        yield plugin_lib_path
+    try:
+        wheel_path.unlink(missing_ok=True)
+        logger.debug(f"Deleted wheel file: {wheel_path}")
+    except Exception as e:
+        logger.warning(f"Could not delete wheel file {wheel_path}: {e}")
+    if not plugin_lib_path.exists():
+        logger.error(
+            f"Plugin library not found at expected location: {plugin_lib_path}"
+        )
+        return None
+
+    return str(plugin_lib_path)
 
 
 def load_and_initialize_trtllm_plugin(plugin_lib_path: str) -> bool:
@@ -1065,6 +1079,6 @@ def load_tensorrt_llm_for_nccl() -> bool:
             )
             return False
 
-        with download_plugin_lib_path(platform) as plugin_lib_path:
-            return load_and_initialize_trtllm_plugin(plugin_lib_path)
+        plugin_lib_path = download_and_get_plugin_lib_path(platform)
+        return load_and_initialize_trtllm_plugin(plugin_lib_path)  # type: ignore[arg-type]
     return False
