@@ -1034,6 +1034,7 @@ def to_copy_dtype_validator(
             torch.bool,
             torch.int8,
             torch.float16,
+            torch.bfloat16,
         }
 
         # Validate input node has convertible kwargs
