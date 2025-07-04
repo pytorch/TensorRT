@@ -25,7 +25,7 @@ Engine Caching (BERT)
 
 Small caching example on BERT.
 
-.. GENERATED FROM PYTHON SOURCE LINES 10-76
+.. GENERATED FROM PYTHON SOURCE LINES 10-75
 
 .. code-block:: python
 
@@ -72,7 +72,6 @@ Small caching example on BERT.
                 "use_python_runtime": False,
                 "enabled_precisions": {torch.float},
                 "truncate_double": True,
-                "debug": False,
                 "min_block_size": 1,
                 "immutable_weights": False,
                 "cache_built_engines": cache_built_engines,

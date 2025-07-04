@@ -64,6 +64,21 @@ class TestToCopyConverter(DispatchTestCase):
             precision=torch.float,
         )
 
+    def test_to_copy_bfloat16(self):
+        class ToCopyBFloat16(nn.Module):
+            def forward(self, x):
+                y = torch.ops.aten._to_copy.default(x, dtype=torch.bfloat16)
+                y = y**2
+                return y
+
+        inputs = [torch.rand((1, 3, 10), dtype=torch.float32)]
+        self.run_test(
+            ToCopyBFloat16(),
+            inputs,
+            precision=torch.float,
+            use_explicit_typing=True,
+        )
+
     def test_to_copy_i64b(self):
         class ToCopy64Bit(nn.Module):
             def forward(self, x):

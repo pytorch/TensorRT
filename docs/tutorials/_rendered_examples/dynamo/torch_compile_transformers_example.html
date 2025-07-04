@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Compiling BERT using the torch.compile backend &mdash; Torch-TensorRT v2.8.0.dev0+ee32da0 documentation</title>
+  <title>Compiling BERT using the torch.compile backend &mdash; Torch-TensorRT v2.9.0.dev0+bb6598d documentation</title>
   
 
   
@@ -293,7 +293,7 @@
               
               
                 <div class="version">
-                  v2.8.0.dev0+ee32da0
+                  v2.9.0.dev0+bb6598d
                 </div>
               
             
@@ -324,7 +324,7 @@
               <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../../getting_started/installation.html">Installation</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../../getting_started/jetpack.html">Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../getting_started/jetpack.html">Torch-TensorRT in JetPack</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../getting_started/quick_start.html">Quick Start</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">User Guide</span></p>
@@ -376,9 +376,8 @@
 <li class="toctree-l1"><a class="reference internal" href="torch_compile_resnet_example.html">Compiling ResNet with dynamic shapes using the <cite>torch.compile</cite> backend</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Compiling BERT using the <cite>torch.compile</cite> backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="torch_compile_stable_diffusion.html">Compiling Stable Diffusion model using the <cite>torch.compile</cite> backend</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../compile_hf_models.html">Compiling LLM models from Huggingface</a></li>
 <li class="toctree-l1"><a class="reference internal" href="torch_compile_gpt2.html">Compiling GPT2 using the Torch-TensorRT <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code> frontend</a></li>
-<li class="toctree-l1"><a class="reference internal" href="torch_export_gpt2.html">Compiling GPT2 using the dynamo backend</a></li>
-<li class="toctree-l1"><a class="reference internal" href="torch_export_llama2.html">Compiling Llama2 using the dynamo backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="torch_export_sam2.html">Compiling SAM2 using the dynamo backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="torch_export_flux_dev.html">Compiling FLUX.1-dev model using the Torch-TensorRT dynamo backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../notebooks.html">Legacy notebooks</a></li>
@@ -520,9 +519,6 @@ to download the full example code</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Enabled precision for TensorRT optimization</span>
 <span class="n">enabled_precisions</span> <span class="o">=</span> <span class="p">{</span><span class="n">torch</span><span class="o">.</span><span class="n">float</span><span class="p">}</span>
 
-<span class="c1"># Whether to print verbose logs</span>
-<span class="n">debug</span> <span class="o">=</span> <span class="kc">True</span>
-
 <span class="c1"># Workspace size for TensorRT</span>
 <span class="n">workspace_size</span> <span class="o">=</span> <span class="mi">20</span> <span class="o">&lt;&lt;</span> <span class="mi">30</span>
 
@@ -540,7 +536,6 @@ to download the full example code</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Define backend compilation keyword arguments</span>
 <span class="n">compilation_kwargs</span> <span class="o">=</span> <span class="p">{</span>
     <span class="s2">&quot;enabled_precisions&quot;</span><span class="p">:</span> <span class="n">enabled_precisions</span><span class="p">,</span>
-    <span class="s2">&quot;debug&quot;</span><span class="p">:</span> <span class="n">debug</span><span class="p">,</span>
     <span class="s2">&quot;workspace_size&quot;</span><span class="p">:</span> <span class="n">workspace_size</span><span class="p">,</span>
     <span class="s2">&quot;min_block_size&quot;</span><span class="p">:</span> <span class="n">min_block_size</span><span class="p">,</span>
     <span class="s2">&quot;torch_executed_ops&quot;</span><span class="p">:</span> <span class="n">torch_executed_ops</span><span class="p">,</span>

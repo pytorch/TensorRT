@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Refitting Torch-TensorRT Programs with New Weights &mdash; Torch-TensorRT v2.8.0.dev0+ee32da0 documentation</title>
+  <title>Refitting Torch-TensorRT Programs with New Weights &mdash; Torch-TensorRT v2.9.0.dev0+bb6598d documentation</title>
   
 
   
@@ -293,7 +293,7 @@
               
               
                 <div class="version">
-                  v2.8.0.dev0+ee32da0
+                  v2.9.0.dev0+bb6598d
                 </div>
               
             
@@ -324,7 +324,7 @@
               <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../../getting_started/installation.html">Installation</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../../getting_started/jetpack.html">Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../getting_started/jetpack.html">Torch-TensorRT in JetPack</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../getting_started/quick_start.html">Quick Start</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">User Guide</span></p>
@@ -376,9 +376,8 @@
 <li class="toctree-l1"><a class="reference internal" href="torch_compile_resnet_example.html">Compiling ResNet with dynamic shapes using the <cite>torch.compile</cite> backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="torch_compile_transformers_example.html">Compiling BERT using the <cite>torch.compile</cite> backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="torch_compile_stable_diffusion.html">Compiling Stable Diffusion model using the <cite>torch.compile</cite> backend</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../compile_hf_models.html">Compiling LLM models from Huggingface</a></li>
 <li class="toctree-l1"><a class="reference internal" href="torch_compile_gpt2.html">Compiling GPT2 using the Torch-TensorRT <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code> frontend</a></li>
-<li class="toctree-l1"><a class="reference internal" href="torch_export_gpt2.html">Compiling GPT2 using the dynamo backend</a></li>
-<li class="toctree-l1"><a class="reference internal" href="torch_export_llama2.html">Compiling Llama2 using the dynamo backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="torch_export_sam2.html">Compiling SAM2 using the dynamo backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="torch_export_flux_dev.html">Compiling FLUX.1-dev model using the Torch-TensorRT dynamo backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../notebooks.html">Legacy notebooks</a></li>
@@ -543,7 +542,6 @@ these setttings will not be able to be refit.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">model</span> <span class="o">=</span> <span class="n">models</span><span class="o">.</span><span class="n">resnet18</span><span class="p">(</span><span class="n">pretrained</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">&quot;cuda&quot;</span><span class="p">)</span>
 <span class="n">exp_program</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">export</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">inputs</span><span class="p">))</span>
 <span class="n">enabled_precisions</span> <span class="o">=</span> <span class="p">{</span><span class="n">torch</span><span class="o">.</span><span class="n">float</span><span class="p">}</span>
-<span class="n">debug</span> <span class="o">=</span> <span class="kc">False</span>
 <span class="n">workspace_size</span> <span class="o">=</span> <span class="mi">20</span> <span class="o">&lt;&lt;</span> <span class="mi">30</span>
 <span class="n">min_block_size</span> <span class="o">=</span> <span class="mi">0</span>
 <span class="n">use_python_runtime</span> <span class="o">=</span> <span class="kc">False</span>
@@ -553,7 +551,6 @@ these setttings will not be able to be refit.</p>
     <span class="nb">tuple</span><span class="p">(</span><span class="n">inputs</span><span class="p">),</span>
     <span class="n">use_python_runtime</span><span class="o">=</span><span class="n">use_python_runtime</span><span class="p">,</span>
     <span class="n">enabled_precisions</span><span class="o">=</span><span class="n">enabled_precisions</span><span class="p">,</span>
-    <span class="n">debug</span><span class="o">=</span><span class="n">debug</span><span class="p">,</span>
     <span class="n">min_block_size</span><span class="o">=</span><span class="n">min_block_size</span><span class="p">,</span>
     <span class="n">torch_executed_ops</span><span class="o">=</span><span class="n">torch_executed_ops</span><span class="p">,</span>
     <span class="n">immutable_weights</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
@@ -586,6 +583,7 @@ function is used to update the weights of the compiled module with the new weigh
 <span class="p">)</span>
 
 <span class="c1"># Check the output</span>
+<span class="n">model2</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">&quot;cuda&quot;</span><span class="p">)</span>
 <span class="n">expected_outputs</span><span class="p">,</span> <span class="n">refitted_outputs</span> <span class="o">=</span> <span class="n">exp_program2</span><span class="o">.</span><span class="n">module</span><span class="p">()(</span><span class="o">*</span><span class="n">inputs</span><span class="p">),</span> <span class="n">new_trt_gm</span><span class="p">(</span><span class="o">*</span><span class="n">inputs</span><span class="p">)</span>
 <span class="k">for</span> <span class="n">expected_output</span><span class="p">,</span> <span class="n">refitted_output</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">expected_outputs</span><span class="p">,</span> <span class="n">refitted_outputs</span><span class="p">):</span>
     <span class="k">assert</span> <span class="n">torch</span><span class="o">.</span><span class="n">allclose</span><span class="p">(</span>

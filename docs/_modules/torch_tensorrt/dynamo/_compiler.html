@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt.dynamo._compiler &mdash; Torch-TensorRT v2.8.0.dev0+ee32da0 documentation</title>
+  <title>torch_tensorrt.dynamo._compiler &mdash; Torch-TensorRT v2.9.0.dev0+bb6598d documentation</title>
   
 
   
@@ -290,7 +290,7 @@
               
               
                 <div class="version">
-                  v2.8.0.dev0+ee32da0
+                  v2.9.0.dev0+bb6598d
                 </div>
               
             
@@ -321,7 +321,7 @@
               <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../../getting_started/installation.html">Installation</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../../getting_started/jetpack.html">Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../getting_started/jetpack.html">Torch-TensorRT in JetPack</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../getting_started/quick_start.html">Quick Start</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">User Guide</span></p>
@@ -373,9 +373,8 @@
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/torch_compile_resnet_example.html">Compiling ResNet with dynamic shapes using the <cite>torch.compile</cite> backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/torch_compile_transformers_example.html">Compiling BERT using the <cite>torch.compile</cite> backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/torch_compile_stable_diffusion.html">Compiling Stable Diffusion model using the <cite>torch.compile</cite> backend</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../tutorials/compile_hf_models.html">Compiling LLM models from Huggingface</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/torch_compile_gpt2.html">Compiling GPT2 using the Torch-TensorRT <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code> frontend</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/torch_export_gpt2.html">Compiling GPT2 using the dynamo backend</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/torch_export_llama2.html">Compiling Llama2 using the dynamo backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/torch_export_sam2.html">Compiling SAM2 using the dynamo backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/torch_export_flux_dev.html">Compiling FLUX.1-dev model using the Torch-TensorRT dynamo backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/notebooks.html">Legacy notebooks</a></li>
@@ -491,6 +490,7 @@
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">collections.abc</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">platform</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">warnings</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Collection</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Sequence</span><span class="p">,</span> <span class="n">Set</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">,</span> <span class="n">Union</span>
@@ -500,6 +500,7 @@
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch.fx.node</span><span class="w"> </span><span class="kn">import</span> <span class="n">Target</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt._Device</span><span class="w"> </span><span class="kn">import</span> <span class="n">Device</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt._enums</span><span class="w"> </span><span class="kn">import</span> <span class="n">EngineCapability</span><span class="p">,</span> <span class="n">dtype</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt._features</span><span class="w"> </span><span class="kn">import</span> <span class="n">needs_cross_compile</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt._Input</span><span class="w"> </span><span class="kn">import</span> <span class="n">Input</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo</span><span class="w"> </span><span class="kn">import</span> <span class="n">_defaults</span><span class="p">,</span> <span class="n">partitioning</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo._DryRunTracker</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
@@ -520,6 +521,8 @@
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.conversion._ConverterRegistry</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
     <span class="n">DYNAMO_CONVERTERS</span> <span class="k">as</span> <span class="n">CONVERTERS</span><span class="p">,</span>
 <span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.debug._DebuggerConfig</span><span class="w"> </span><span class="kn">import</span> <span class="n">DebuggerConfig</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.debug._supports_debugger</span><span class="w"> </span><span class="kn">import</span> <span class="n">fn_supports_debugger</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.lowering</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
     <span class="n">get_decompositions</span><span class="p">,</span>
     <span class="n">post_lowering</span><span class="p">,</span>
@@ -531,7 +534,6 @@
     <span class="n">get_output_metadata</span><span class="p">,</span>
     <span class="n">parse_graph_io</span><span class="p">,</span>
     <span class="n">prepare_inputs</span><span class="p">,</span>
-    <span class="n">set_log_level</span><span class="p">,</span>
     <span class="n">to_torch_device</span><span class="p">,</span>
     <span class="n">to_torch_tensorrt_device</span><span class="p">,</span>
 <span class="p">)</span>
@@ -539,7 +541,8 @@
 <span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
 
 
-<div class="viewcode-block" id="cross_compile_for_windows"><a class="viewcode-back" href="../../../py_api/dynamo.html#torch_tensorrt.dynamo.cross_compile_for_windows">[docs]</a><span class="k">def</span><span class="w"> </span><span class="nf">cross_compile_for_windows</span><span class="p">(</span>
+<span class="nd">@needs_cross_compile</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">cross_compile_for_windows</span><span class="p">(</span>
     <span class="n">exported_program</span><span class="p">:</span> <span class="n">ExportedProgram</span><span class="p">,</span>
     <span class="n">inputs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Sequence</span><span class="p">[</span><span class="n">Sequence</span><span class="p">[</span><span class="n">Any</span><span class="p">]]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="o">*</span><span class="p">,</span>
@@ -553,7 +556,6 @@
         <span class="n">Set</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">dtype</span><span class="p">]],</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">dtype</span><span class="p">]]</span>
     <span class="p">]</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">ENABLED_PRECISIONS</span><span class="p">,</span>
     <span class="n">engine_capability</span><span class="p">:</span> <span class="n">EngineCapability</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">ENGINE_CAPABILITY</span><span class="p">,</span>
-    <span class="n">debug</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">,</span>
     <span class="n">num_avg_timing_iters</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">NUM_AVG_TIMING_ITERS</span><span class="p">,</span>
     <span class="n">workspace_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">WORKSPACE_SIZE</span><span class="p">,</span>
     <span class="n">dla_sram_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">DLA_SRAM_SIZE</span><span class="p">,</span>
@@ -627,7 +629,6 @@
 <span class="sd">        assume_dynamic_shape_support (bool): Setting this to true enables the converters work for both dynamic and static shapes. Default: False</span>
 <span class="sd">        sparse_weights (bool): Enable sparsity for convolution and fully connected layers.</span>
 <span class="sd">        enabled_precision (Set(Union(torch.dtype, torch_tensorrt.dtype))): The set of datatypes that TensorRT can use when selecting kernels</span>
-<span class="sd">        debug (bool): Enable debuggable engine</span>
 <span class="sd">        capability (torch_tensorrt.EngineCapability): Restrict kernel selection to safe gpu kernels or safe dla kernels</span>
 <span class="sd">        num_avg_timing_iters (int): Number of averaging timing iterations used to select kernels</span>
 <span class="sd">        workspace_size (int): Maximum size of workspace given to TensorRT</span>
@@ -674,8 +675,12 @@
             <span class="sa">f</span><span class="s2">&quot;Cross compile for windows is only supported on x86-64 Linux architecture, current platform: </span><span class="si">{</span><span class="n">platform</span><span class="o">.</span><span class="n">system</span><span class="p">()</span><span class="si">=}</span><span class="s2">, </span><span class="si">{</span><span class="n">platform</span><span class="o">.</span><span class="n">architecture</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span><span class="si">=}</span><span class="s2">&quot;</span>
         <span class="p">)</span>
 
-    <span class="k">if</span> <span class="n">debug</span><span class="p">:</span>
-        <span class="n">set_log_level</span><span class="p">(</span><span class="n">logger</span><span class="o">.</span><span class="n">parent</span><span class="p">,</span> <span class="n">logging</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;debug&quot;</span><span class="p">,</span> <span class="kc">False</span><span class="p">):</span>
+        <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+            <span class="s2">&quot;`debug` is deprecated. Please use `with torch_tensorrt.dynamo.Debugger(...)` to wrap your compilation call to enable debugging functionality.&quot;</span><span class="p">,</span>
+            <span class="ne">DeprecationWarning</span><span class="p">,</span>
+            <span class="n">stacklevel</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+        <span class="p">)</span>
 
     <span class="k">if</span> <span class="s2">&quot;truncate_long_and_double&quot;</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">keys</span><span class="p">():</span>
         <span class="k">if</span> <span class="n">truncate_double</span> <span class="ow">is</span> <span class="ow">not</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">TRUNCATE_DOUBLE</span><span class="p">:</span>
@@ -744,7 +749,7 @@
             <span class="n">x</span> <span class="ow">in</span> <span class="n">enabled_precisions</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="p">{</span><span class="n">torch</span><span class="o">.</span><span class="n">float32</span><span class="p">,</span> <span class="n">dtype</span><span class="o">.</span><span class="n">f32</span><span class="p">}</span>
         <span class="p">):</span>
             <span class="k">raise</span> <span class="ne">AssertionError</span><span class="p">(</span>
-                <span class="sa">f</span><span class="s2">&quot;When use_explicit_typing is enabled, only torch.float32 is allowed in the enabled_precisions but found </span><span class="si">{</span><span class="n">enabled_precisions</span><span class="si">}</span><span class="s2">&quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;use_explicit_typing was set to True, however found that enabled_precisions was also specified (saw: </span><span class="si">{</span><span class="n">enabled_precisions</span><span class="si">}</span><span class="s2">, expected: </span><span class="si">{</span><span class="n">_defaults</span><span class="o">.</span><span class="n">ENABLED_PRECISIONS</span><span class="si">}</span><span class="s2">). enabled_precisions should not be used when use_explicit_typing=True&quot;</span>
             <span class="p">)</span>
 
     <span class="k">if</span> <span class="n">use_fp32_acc</span><span class="p">:</span>
@@ -786,7 +791,6 @@
         <span class="s2">&quot;enabled_precisions&quot;</span><span class="p">:</span> <span class="p">(</span>
             <span class="n">enabled_precisions</span> <span class="k">if</span> <span class="n">enabled_precisions</span> <span class="k">else</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">ENABLED_PRECISIONS</span>
         <span class="p">),</span>
-        <span class="s2">&quot;debug&quot;</span><span class="p">:</span> <span class="n">debug</span><span class="p">,</span>
         <span class="s2">&quot;device&quot;</span><span class="p">:</span> <span class="n">device</span><span class="p">,</span>
         <span class="s2">&quot;assume_dynamic_shape_support&quot;</span><span class="p">:</span> <span class="n">assume_dynamic_shape_support</span><span class="p">,</span>
         <span class="s2">&quot;workspace_size&quot;</span><span class="p">:</span> <span class="n">workspace_size</span><span class="p">,</span>
@@ -871,7 +875,7 @@
         <span class="n">trt_kwarg_inputs</span><span class="p">,</span>
         <span class="n">settings</span><span class="p">,</span>
     <span class="p">)</span>
-    <span class="k">return</span> <span class="n">trt_gm</span></div>
+    <span class="k">return</span> <span class="n">trt_gm</span>
 
 
 <div class="viewcode-block" id="compile"><a class="viewcode-back" href="../../../py_api/dynamo.html#torch_tensorrt.dynamo.compile">[docs]</a><span class="k">def</span><span class="w"> </span><span class="nf">compile</span><span class="p">(</span>
@@ -888,7 +892,6 @@
         <span class="n">Set</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">dtype</span><span class="p">]],</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">dtype</span><span class="p">]]</span>
     <span class="p">]</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">ENABLED_PRECISIONS</span><span class="p">,</span>
     <span class="n">engine_capability</span><span class="p">:</span> <span class="n">EngineCapability</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">ENGINE_CAPABILITY</span><span class="p">,</span>
-    <span class="n">debug</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">,</span>
     <span class="n">num_avg_timing_iters</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">NUM_AVG_TIMING_ITERS</span><span class="p">,</span>
     <span class="n">workspace_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">WORKSPACE_SIZE</span><span class="p">,</span>
     <span class="n">dla_sram_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">DLA_SRAM_SIZE</span><span class="p">,</span>
@@ -964,7 +967,6 @@
 <span class="sd">        assume_dynamic_shape_support (bool): Setting this to true enables the converters work for both dynamic and static shapes. Default: False</span>
 <span class="sd">        sparse_weights (bool): Enable sparsity for convolution and fully connected layers.</span>
 <span class="sd">        enabled_precision (Set(Union(torch.dtype, torch_tensorrt.dtype))): The set of datatypes that TensorRT can use when selecting kernels</span>
-<span class="sd">        debug (bool): Enable debuggable engine</span>
 <span class="sd">        capability (torch_tensorrt.EngineCapability): Restrict kernel selection to safe gpu kernels or safe dla kernels</span>
 <span class="sd">        num_avg_timing_iters (int): Number of averaging timing iterations used to select kernels</span>
 <span class="sd">        workspace_size (int): Maximum size of workspace given to TensorRT</span>
@@ -1007,8 +1009,13 @@
 <span class="sd">        torch.fx.GraphModule: Compiled FX Module, when run it will execute via TensorRT</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
-    <span class="k">if</span> <span class="n">debug</span><span class="p">:</span>
-        <span class="n">set_log_level</span><span class="p">(</span><span class="n">logger</span><span class="o">.</span><span class="n">parent</span><span class="p">,</span> <span class="n">logging</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;debug&quot;</span><span class="p">,</span> <span class="kc">False</span><span class="p">):</span>
+        <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+            <span class="s2">&quot;`debug` is deprecated. Please use `with torch_tensorrt.dynamo.Debugger(...)` to wrap your compilation call to enable debugging functionality&quot;</span><span class="p">,</span>
+            <span class="ne">DeprecationWarning</span><span class="p">,</span>
+            <span class="n">stacklevel</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+        <span class="p">)</span>
+
     <span class="k">if</span> <span class="s2">&quot;truncate_long_and_double&quot;</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">keys</span><span class="p">():</span>
         <span class="k">if</span> <span class="n">truncate_double</span> <span class="ow">is</span> <span class="ow">not</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">TRUNCATE_DOUBLE</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
@@ -1075,7 +1082,7 @@
             <span class="n">x</span> <span class="ow">in</span> <span class="n">enabled_precisions</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="p">{</span><span class="n">torch</span><span class="o">.</span><span class="n">float32</span><span class="p">,</span> <span class="n">dtype</span><span class="o">.</span><span class="n">f32</span><span class="p">}</span>
         <span class="p">):</span>
             <span class="k">raise</span> <span class="ne">AssertionError</span><span class="p">(</span>
-                <span class="sa">f</span><span class="s2">&quot;When use_explicit_typing is enabled, only torch.float32 is allowed in the enabled_precisions but found </span><span class="si">{</span><span class="n">enabled_precisions</span><span class="si">}</span><span class="s2">&quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;use_explicit_typing was set to True, however found that enabled_precisions was also specified (saw: </span><span class="si">{</span><span class="n">enabled_precisions</span><span class="si">}</span><span class="s2">, expected: </span><span class="si">{</span><span class="n">_defaults</span><span class="o">.</span><span class="n">ENABLED_PRECISIONS</span><span class="si">}</span><span class="s2">). enabled_precisions should not be used when use_explicit_typing=True&quot;</span>
             <span class="p">)</span>
 
     <span class="k">if</span> <span class="n">use_fp32_acc</span><span class="p">:</span>
@@ -1130,7 +1137,6 @@
         <span class="s2">&quot;enabled_precisions&quot;</span><span class="p">:</span> <span class="p">(</span>
             <span class="n">enabled_precisions</span> <span class="k">if</span> <span class="n">enabled_precisions</span> <span class="k">else</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">ENABLED_PRECISIONS</span>
         <span class="p">),</span>
-        <span class="s2">&quot;debug&quot;</span><span class="p">:</span> <span class="n">debug</span><span class="p">,</span>
         <span class="s2">&quot;device&quot;</span><span class="p">:</span> <span class="n">device</span><span class="p">,</span>
         <span class="s2">&quot;assume_dynamic_shape_support&quot;</span><span class="p">:</span> <span class="n">assume_dynamic_shape_support</span><span class="p">,</span>
         <span class="s2">&quot;workspace_size&quot;</span><span class="p">:</span> <span class="n">workspace_size</span><span class="p">,</span>
@@ -1180,6 +1186,7 @@
     <span class="p">)</span>
 
     <span class="n">gm</span> <span class="o">=</span> <span class="n">exported_program</span><span class="o">.</span><span class="n">module</span><span class="p">()</span>
+    <span class="c1"># Move the weights in the state_dict to CPU</span>
     <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Input graph: &quot;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="p">))</span>
 
     <span class="c1"># Apply lowering on the graph module</span>
@@ -1204,12 +1211,15 @@
     <span class="k">return</span> <span class="n">trt_gm</span></div>
 
 
+<span class="nd">@fn_supports_debugger</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">compile_module</span><span class="p">(</span>
     <span class="n">gm</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">,</span>
     <span class="n">sample_arg_inputs</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="n">Input</span><span class="p">],</span>
     <span class="n">sample_kwarg_inputs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">settings</span><span class="p">:</span> <span class="n">CompilationSettings</span> <span class="o">=</span> <span class="n">CompilationSettings</span><span class="p">(),</span>
     <span class="n">engine_cache</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">BaseEngineCache</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">_debugger_config</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">DebuggerConfig</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Compile a traced FX module</span>
 
@@ -1233,7 +1243,7 @@
 
     <span class="c1"># Check the number of supported operations in the graph</span>
     <span class="n">num_supported_ops</span><span class="p">,</span> <span class="n">total_ops</span> <span class="o">=</span> <span class="n">partitioning</span><span class="o">.</span><span class="n">get_graph_converter_support</span><span class="p">(</span>
-        <span class="n">gm</span><span class="p">,</span> <span class="n">settings</span><span class="o">.</span><span class="n">debug</span><span class="p">,</span> <span class="n">settings</span><span class="o">.</span><span class="n">torch_executed_ops</span>
+        <span class="n">gm</span><span class="p">,</span> <span class="n">settings</span><span class="o">.</span><span class="n">torch_executed_ops</span>
     <span class="p">)</span>
 
     <span class="n">dryrun_tracker</span><span class="o">.</span><span class="n">total_ops_in_graph</span> <span class="o">=</span> <span class="n">total_ops</span>
@@ -1277,6 +1287,28 @@
             <span class="s2">&quot;Some nodes do not have metadata (shape and dtype information). This could lead to problems sometimes if the graph has PyTorch and TensorRT segments.&quot;</span>
         <span class="p">)</span>
 
+    <span class="c1"># Store the original input spec for later use</span>
+    <span class="n">original_in_spec</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">gm</span><span class="p">,</span> <span class="s2">&quot;_in_spec&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+    <span class="n">original_out_spec</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">gm</span><span class="p">,</span> <span class="s2">&quot;_out_spec&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+
+    <span class="c1"># Function to preserve and restore module specs</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">preserve_module_specs</span><span class="p">(</span>
+        <span class="n">in_spec</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">out_spec</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">target_module</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Applies input and output specs to the target module.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            in_spec: The input spec to apply</span>
+<span class="sd">            out_spec: The output spec to apply</span>
+<span class="sd">            target_module: The module to apply specs to</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Apply specs to target module</span>
+        <span class="k">if</span> <span class="n">in_spec</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">target_module</span><span class="o">.</span><span class="n">_in_spec</span> <span class="o">=</span> <span class="n">in_spec</span>
+        <span class="k">if</span> <span class="n">out_spec</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">target_module</span><span class="o">.</span><span class="n">_out_spec</span> <span class="o">=</span> <span class="n">out_spec</span>
+
     <span class="c1"># Partition module into components that can be TRT-accelerated</span>
     <span class="n">fast_partitioner_failed</span> <span class="o">=</span> <span class="kc">False</span>
     <span class="c1"># If specified, try using the fast partitioner and fall back to the global one on failure</span>
@@ -1285,7 +1317,6 @@
             <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Partitioning the graph via the fast partitioner&quot;</span><span class="p">)</span>
             <span class="n">partitioned_module</span><span class="p">,</span> <span class="n">supported_ops</span> <span class="o">=</span> <span class="n">partitioning</span><span class="o">.</span><span class="n">fast_partition</span><span class="p">(</span>
                 <span class="n">gm</span><span class="p">,</span>
-                <span class="n">verbose</span><span class="o">=</span><span class="n">settings</span><span class="o">.</span><span class="n">debug</span><span class="p">,</span>
                 <span class="n">min_block_size</span><span class="o">=</span><span class="n">settings</span><span class="o">.</span><span class="n">min_block_size</span><span class="p">,</span>
                 <span class="n">torch_executed_ops</span><span class="o">=</span><span class="n">settings</span><span class="o">.</span><span class="n">torch_executed_ops</span><span class="p">,</span>
                 <span class="n">require_full_compilation</span><span class="o">=</span><span class="n">settings</span><span class="o">.</span><span class="n">require_full_compilation</span><span class="p">,</span>
@@ -1306,7 +1337,6 @@
         <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Partitioning the graph via the global partitioner&quot;</span><span class="p">)</span>
         <span class="n">partitioned_module</span><span class="p">,</span> <span class="n">supported_ops</span> <span class="o">=</span> <span class="n">partitioning</span><span class="o">.</span><span class="n">global_partition</span><span class="p">(</span>
             <span class="n">gm</span><span class="p">,</span>
-            <span class="n">verbose</span><span class="o">=</span><span class="n">settings</span><span class="o">.</span><span class="n">debug</span><span class="p">,</span>
             <span class="n">min_block_size</span><span class="o">=</span><span class="n">settings</span><span class="o">.</span><span class="n">min_block_size</span><span class="p">,</span>
             <span class="n">torch_executed_ops</span><span class="o">=</span><span class="n">settings</span><span class="o">.</span><span class="n">torch_executed_ops</span><span class="p">,</span>
             <span class="n">require_full_compilation</span><span class="o">=</span><span class="n">settings</span><span class="o">.</span><span class="n">require_full_compilation</span><span class="p">,</span>
@@ -1324,6 +1354,7 @@
             <span class="k">continue</span>
         <span class="n">submodule_node_dict</span><span class="p">[</span><span class="n">node</span><span class="o">.</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">node</span>
 
+    <span class="n">preserve_module_specs</span><span class="p">(</span><span class="n">original_in_spec</span><span class="p">,</span> <span class="n">original_out_spec</span><span class="p">,</span> <span class="n">partitioned_module</span><span class="p">)</span>
     <span class="c1"># Store TRT replicas of Torch subgraphs</span>
     <span class="n">trt_modules</span> <span class="o">=</span> <span class="p">{}</span>
     <span class="c1"># Iterate over all components that can be accelerated</span>
@@ -1401,7 +1432,7 @@
         <span class="n">parse_graph_io</span><span class="p">(</span><span class="n">submodule</span><span class="p">,</span> <span class="n">subgraph_data</span><span class="p">)</span>
         <span class="n">dryrun_tracker</span><span class="o">.</span><span class="n">tensorrt_graph_count</span> <span class="o">+=</span> <span class="mi">1</span>
         <span class="n">dryrun_tracker</span><span class="o">.</span><span class="n">per_subgraph_data</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">subgraph_data</span><span class="p">)</span>
-
+        <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">empty_cache</span><span class="p">()</span>
         <span class="c1"># Create TRT engines from submodule</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="n">settings</span><span class="o">.</span><span class="n">dryrun</span><span class="p">:</span>
             <span class="n">trt_module</span> <span class="o">=</span> <span class="n">convert_module</span><span class="p">(</span>
@@ -1413,6 +1444,41 @@
             <span class="p">)</span>
 
             <span class="n">trt_modules</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">trt_module</span>
+
+            <span class="k">if</span> <span class="n">_debugger_config</span><span class="p">:</span>
+
+                <span class="k">if</span> <span class="n">_debugger_config</span><span class="o">.</span><span class="n">save_engine_profile</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="n">settings</span><span class="o">.</span><span class="n">use_python_runtime</span><span class="p">:</span>
+                        <span class="k">if</span> <span class="n">_debugger_config</span><span class="o">.</span><span class="n">profile_format</span> <span class="o">!=</span> <span class="s2">&quot;cudagraph&quot;</span><span class="p">:</span>
+                            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                                <span class="s2">&quot;Profiling with TREX can only be enabled when using the C++ runtime. Python runtime profiling only support cudagraph visualization.&quot;</span>
+                            <span class="p">)</span>
+                        <span class="k">else</span><span class="p">:</span>
+                            <span class="n">trt_module</span><span class="o">.</span><span class="n">enable_profiling</span><span class="p">()</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="k">if</span> <span class="n">_debugger_config</span><span class="o">.</span><span class="n">profile_format</span> <span class="o">==</span> <span class="s2">&quot;cudagraph&quot;</span><span class="p">:</span>
+                            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                                <span class="s2">&quot;Profiling with Cudagraph can only be enabled when using the Python runtime. C++ runtime profiling only support TREX/Perfetto visualization.&quot;</span>
+                            <span class="p">)</span>
+                        <span class="k">else</span><span class="p">:</span>
+                            <span class="n">path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span>
+                                <span class="n">_debugger_config</span><span class="o">.</span><span class="n">logging_dir</span><span class="p">,</span>
+                                <span class="s2">&quot;engine_visualization_profile&quot;</span><span class="p">,</span>
+                            <span class="p">)</span>
+                            <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+                            <span class="n">trt_module</span><span class="o">.</span><span class="n">enable_profiling</span><span class="p">(</span>
+                                <span class="n">profiling_results_dir</span><span class="o">=</span><span class="n">path</span><span class="p">,</span>
+                                <span class="n">profile_format</span><span class="o">=</span><span class="n">_debugger_config</span><span class="o">.</span><span class="n">profile_format</span><span class="p">,</span>
+                            <span class="p">)</span>
+
+                <span class="k">if</span> <span class="n">_debugger_config</span><span class="o">.</span><span class="n">save_layer_info</span><span class="p">:</span>
+                    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span>
+                        <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span>
+                            <span class="n">_debugger_config</span><span class="o">.</span><span class="n">logging_dir</span><span class="p">,</span> <span class="s2">&quot;engine_layer_info.json&quot;</span>
+                        <span class="p">),</span>
+                        <span class="s2">&quot;w&quot;</span><span class="p">,</span>
+                    <span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+                        <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">trt_module</span><span class="o">.</span><span class="n">get_layer_info</span><span class="p">())</span>
 
     <span class="c1"># Parse the graph I/O and store it in dryrun tracker</span>
     <span class="n">parse_graph_io</span><span class="p">(</span><span class="n">gm</span><span class="p">,</span> <span class="n">dryrun_tracker</span><span class="p">)</span>
@@ -1438,10 +1504,9 @@
     <span class="o">*</span><span class="p">,</span>
     <span class="n">arg_inputs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Sequence</span><span class="p">[</span><span class="n">Sequence</span><span class="p">[</span><span class="n">Any</span><span class="p">]]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">kwarg_inputs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-    <span class="n">enabled_precisions</span><span class="p">:</span> <span class="p">(</span>
-        <span class="n">Set</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">dtype</span> <span class="o">|</span> <span class="n">dtype</span><span class="p">]</span> <span class="o">|</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">dtype</span> <span class="o">|</span> <span class="n">dtype</span><span class="p">]</span>
-    <span class="p">)</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">ENABLED_PRECISIONS</span><span class="p">,</span>
-    <span class="n">debug</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">,</span>
+    <span class="n">enabled_precisions</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span>
+        <span class="n">Set</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">dtype</span><span class="p">]],</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">dtype</span><span class="p">]]</span>
+    <span class="p">]</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">ENABLED_PRECISIONS</span><span class="p">,</span>
     <span class="n">assume_dynamic_shape_support</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">ASSUME_DYNAMIC_SHAPE_SUPPORT</span><span class="p">,</span>
     <span class="n">workspace_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">WORKSPACE_SIZE</span><span class="p">,</span>
     <span class="n">min_block_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">MIN_BLOCK_SIZE</span><span class="p">,</span>
@@ -1503,7 +1568,6 @@
 <span class="sd">                        torch.randn((1, 3, 224, 244)) # Use an example tensor and let torch_tensorrt infer settings</span>
 <span class="sd">                    ]</span>
 <span class="sd">        enabled_precisions (Optional[Set[torch.dtype | _enums.dtype]]): The set of datatypes that TensorRT can use</span>
-<span class="sd">        debug (bool): Whether to print out verbose debugging information</span>
 <span class="sd">        workspace_size (int): Workspace TRT is allowed to use for the module (0 is default)</span>
 <span class="sd">        min_block_size (int): Minimum number of operators per TRT-Engine Block</span>
 <span class="sd">        torch_executed_ops (Set[str]): Set of operations to run in Torch, regardless of converter coverage</span>
@@ -1543,8 +1607,12 @@
 <span class="sd">    Returns:</span>
 <span class="sd">        bytes: Serialized TensorRT engine, can either be saved to a file or deserialized via TensorRT APIs</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="k">if</span> <span class="n">debug</span><span class="p">:</span>
-        <span class="n">set_log_level</span><span class="p">(</span><span class="n">logger</span><span class="o">.</span><span class="n">parent</span><span class="p">,</span> <span class="n">logging</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;debug&quot;</span><span class="p">,</span> <span class="kc">False</span><span class="p">):</span>
+        <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+            <span class="s2">&quot;`debug` is deprecated. Please use `with torch_tensorrt.dynamo.Debugger(...)` to wrap your compilation call to enable debugging functionality.&quot;</span><span class="p">,</span>
+            <span class="ne">DeprecationWarning</span><span class="p">,</span>
+            <span class="n">stacklevel</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+        <span class="p">)</span>
 
     <span class="k">if</span> <span class="s2">&quot;truncate_long_and_double&quot;</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">keys</span><span class="p">():</span>
         <span class="k">if</span> <span class="n">truncate_double</span> <span class="ow">is</span> <span class="ow">not</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">TRUNCATE_DOUBLE</span><span class="p">:</span>
@@ -1628,7 +1696,6 @@
     <span class="n">compilation_options</span> <span class="o">=</span> <span class="p">{</span>
         <span class="s2">&quot;assume_dynamic_shape_support&quot;</span><span class="p">:</span> <span class="n">assume_dynamic_shape_support</span><span class="p">,</span>
         <span class="s2">&quot;enabled_precisions&quot;</span><span class="p">:</span> <span class="n">enabled_precisions</span><span class="p">,</span>
-        <span class="s2">&quot;debug&quot;</span><span class="p">:</span> <span class="n">debug</span><span class="p">,</span>
         <span class="s2">&quot;workspace_size&quot;</span><span class="p">:</span> <span class="n">workspace_size</span><span class="p">,</span>
         <span class="s2">&quot;min_block_size&quot;</span><span class="p">:</span> <span class="n">min_block_size</span><span class="p">,</span>
         <span class="s2">&quot;torch_executed_ops&quot;</span><span class="p">:</span> <span class="n">torch_executed_ops</span><span class="p">,</span>
@@ -1712,7 +1779,8 @@
     <span class="k">return</span> <span class="n">serialized_engine</span></div>
 
 
-<div class="viewcode-block" id="save_cross_compiled_exported_program"><a class="viewcode-back" href="../../../py_api/dynamo.html#torch_tensorrt.dynamo.save_cross_compiled_exported_program">[docs]</a><span class="k">def</span><span class="w"> </span><span class="nf">save_cross_compiled_exported_program</span><span class="p">(</span>
+<span class="nd">@needs_cross_compile</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">save_cross_compiled_exported_program</span><span class="p">(</span>
     <span class="n">gm</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">,</span>
     <span class="n">file_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
@@ -1730,7 +1798,7 @@
 
     <span class="n">exp_program</span> <span class="o">=</span> <span class="n">export</span><span class="p">(</span><span class="n">gm</span><span class="p">,</span> <span class="n">cross_compile_module</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
     <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">exp_program</span><span class="p">,</span> <span class="n">file_path</span><span class="p">)</span>
-    <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;successfully saved the module for windows at </span><span class="si">{</span><span class="n">file_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span></div>
+    <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;successfully saved the module for windows at </span><span class="si">{</span><span class="n">file_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 
 
 <div class="viewcode-block" id="load_cross_compiled_exported_program"><a class="viewcode-back" href="../../../py_api/dynamo.html#torch_tensorrt.dynamo.load_cross_compiled_exported_program">[docs]</a><span class="k">def</span><span class="w"> </span><span class="nf">load_cross_compiled_exported_program</span><span class="p">(</span><span class="n">file_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>

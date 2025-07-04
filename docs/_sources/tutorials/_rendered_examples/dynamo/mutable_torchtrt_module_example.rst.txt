@@ -35,7 +35,7 @@ In this tutorial, we are going to walk through
     3. Integration with Huggingface pipeline in LoRA use case
     4. Usage of dynamic shape with Mutable Torch TensorRT Module
 
-.. GENERATED FROM PYTHON SOURCE LINES 21-30
+.. GENERATED FROM PYTHON SOURCE LINES 21-31
 
 .. code-block:: python
 
@@ -43,23 +43,24 @@ In this tutorial, we are going to walk through
     import torch
     import torch_tensorrt as torch_trt
     import torchvision.models as models
+    from diffusers import DiffusionPipeline
 
     np.random.seed(5)
     torch.manual_seed(5)
     inputs = [torch.rand((1, 3, 224, 224)).to("cuda")]
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 31-33
+.. GENERATED FROM PYTHON SOURCE LINES 32-34
 
 Initialize the Mutable Torch TensorRT Module with settings.
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. GENERATED FROM PYTHON SOURCE LINES 33-44
+.. GENERATED FROM PYTHON SOURCE LINES 34-44
 
 .. code-block:: python
 
     settings = {
-        "use_python": False,
+        "use_python_runtime": False,
         "enabled_precisions": {torch.float32},
         "immutable_weights": False,
     }
@@ -68,7 +69,6 @@ Initialize the Mutable Torch TensorRT Module with settings.
     mutable_module = torch_trt.MutableTorchTensorRTModule(model, **settings)
     # You can use the mutable module just like the original pytorch module. The compilation happens while you first call the mutable module.
     mutable_module(*inputs)
-
 
 .. GENERATED FROM PYTHON SOURCE LINES 45-47
 
@@ -118,18 +118,16 @@ Saving Mutable Torch TensorRT Module
 Stable Diffusion with Huggingface
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. GENERATED FROM PYTHON SOURCE LINES 75-146
+.. GENERATED FROM PYTHON SOURCE LINES 75-144
 
 .. code-block:: python
 
 
-    from diffusers import DiffusionPipeline
 
     with torch.no_grad():
         settings = {
             "use_python_runtime": True,
             "enabled_precisions": {torch.float16},
-            "debug": True,
             "immutable_weights": False,
         }
 
@@ -156,7 +154,7 @@ Stable Diffusion with Huggingface
                 "text_embeds": {0: BATCH},
                 "time_ids": {0: BATCH},
             },
-            "return_dict": False,
+            "return_dict": None,
         }
         pipe.unet.set_expected_dynamic_shape_range(
             args_dynamic_shapes, kwargs_dynamic_shapes
@@ -194,7 +192,7 @@ Stable Diffusion with Huggingface
 
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 147-153
+.. GENERATED FROM PYTHON SOURCE LINES 145-151
 
 Use Mutable Torch TensorRT module with dynamic shape
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -203,7 +201,7 @@ and should not omit any entries (except None in the kwarg_inputs). If there is a
 If the dynamic shape is not required for an input, an empty dictionary should be given as the shape hint for that input.
 Note that you should exclude keyword arguments with value None as those will be filtered out.
 
-.. GENERATED FROM PYTHON SOURCE LINES 153-196
+.. GENERATED FROM PYTHON SOURCE LINES 151-194
 
 .. code-block:: python
 
@@ -238,7 +236,7 @@ Note that you should exclude keyword arguments with value None as those will be 
         },  # a's shape does not change so we give it an empty dict
     }
     # Export the model first with custom dynamic shape constraints
-    model = torch_trt.MutableTorchTensorRTModule(model, debug=True, min_block_size=1)
+    model = torch_trt.MutableTorchTensorRTModule(model, min_block_size=1)
     model.set_expected_dynamic_shape_range(args_dynamic_shapes, kwarg_dynamic_shapes)
     # Compile
     model(*inputs, **kwargs)
@@ -251,13 +249,13 @@ Note that you should exclude keyword arguments with value None as those will be 
     model(*inputs_2, **kwargs_2)
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 197-200
+.. GENERATED FROM PYTHON SOURCE LINES 195-198
 
 Use Mutable Torch TensorRT module with persistent cache
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Leveraging engine caching, we are able to shortcut the engine compilation and save much time.
 
-.. GENERATED FROM PYTHON SOURCE LINES 200-245
+.. GENERATED FROM PYTHON SOURCE LINES 198-242
 
 .. code-block:: python
 
@@ -276,7 +274,6 @@ Leveraging engine caching, we are able to shortcut the engine compilation and sa
         model,
         use_python_runtime=True,
         enabled_precisions={torch.float},
-        debug=True,
         min_block_size=1,
         immutable_weights=False,
         cache_built_engines=True,
