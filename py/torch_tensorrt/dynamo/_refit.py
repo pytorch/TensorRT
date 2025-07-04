@@ -42,7 +42,6 @@ from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (
 from torch_tensorrt.dynamo.utils import (
     CPU_DEVICE,
     check_module_output,
-    deallocate_module,
     get_model_device,
     get_torch_inputs,
     to_torch_device,
@@ -484,7 +483,6 @@ def refit_module_weights(
                     settings=settings,
                     weight_name_map=None,
                 )
-        deallocate_module(new_submodule)
 
         # clear EXCLUDE_WEIGHTS flag
         serialization_config = engine.create_serialization_config()
@@ -506,8 +504,6 @@ def refit_module_weights(
         del engine
         gc.collect()
         torch.cuda.empty_cache()
-
-    deallocate_module(new_partitioned_module)
 
     if verify_output and arg_inputs is not None:
         new_gm.to(to_torch_device(settings.device))
