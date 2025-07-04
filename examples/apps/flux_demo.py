@@ -13,7 +13,7 @@ from diffusers import FluxPipeline
 from diffusers.models.transformers.transformer_flux import FluxTransformer2DModel
 
 # Register SDPA as a standalone operator. Converter and lowering pass are defined in register_sdpa.py
-sys.path.append(os.path.join(os.path.dirname(__file__), "../dynamo"))
+sys.path.append(os.path.join(os.path.dirname(__file__), "../../tools/llm/torchtrt_ext"))
 from register_sdpa import *
 
 DEVICE = "cuda:0"
