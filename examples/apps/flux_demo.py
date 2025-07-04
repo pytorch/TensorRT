@@ -135,14 +135,16 @@ def compile_model(
     pipe.transformer = trt_gm
     seed = 42
     image = pipe(
-        ["Beach and Kids"],
+        [
+            "enchanted winter forest, soft diffuse light on a snow-filled day, serene nature scene, the forest is illuminated by the snow"
+        ],
         output_type="pil",
-        num_inference_steps=20,
+        num_inference_steps=30,
         num_images_per_prompt=batch_size,
         generator=torch.Generator("cuda").manual_seed(seed),
     ).images
     print(f"generated {len(image)} images")
-    image[0].save("beach_kids.png")
+    image[0].save("forest.png")
 
     torch.cuda.empty_cache()
 

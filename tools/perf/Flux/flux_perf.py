@@ -9,6 +9,24 @@ sys.path.append(os.path.join(os.path.dirname(__file__), "../../../examples/apps"
 from flux_demo import compile_model
 
 
+def profile(pipe, prompt, inference_step, batch_size=1):
+    print(f"Running torch profiler with {inference_step=} {batch_size=}")
+    with torch.profiler.profile(
+        activities=[torch.profiler.ProfilerActivity.CUDA],
+        record_shapes=True,
+        profile_memory=True,
+        with_stack=True,
+    ) as prof:
+        with torch.profiler.record_function("model_inference"):
+            pipe(
+                prompt,
+                output_type="pil",
+                num_inference_steps=inference_step,
+                num_images_per_prompt=batch_size,
+            ).images
+    print(prof.key_averages().table(sort_by="cuda_time_total", row_limit=100))
+
+
 def benchmark(pipe, prompt, inference_step, batch_size=1, iterations=1):
     print(f"Running warmup with {batch_size=} {inference_step=} iterations=10")
     # warmup
@@ -41,9 +59,6 @@ def benchmark(pipe, prompt, inference_step, batch_size=1, iterations=1):
         "Average Latency Per Step:",
         (end - start) / inference_step / iterations / batch_size,
     )
-
-    # run the perf tool
-    print(f"Running cudart perf tool with {inference_step=} {batch_size=}")
     return
 
 
@@ -52,6 +67,7 @@ def main(args):
     pipe, backbone, trt_gm = compile_model(args)
 
     benchmark(pipe, ["Test"], 20, batch_size=args.max_batch_size, iterations=3)
+    # profile(pipe, ["enchanted winter forest, soft diffuse light on a snow-filled day, serene nature scene, the forest is illuminated by the snow"], 20, batch_size=args.max_batch_size)
 
 
 if __name__ == "__main__":
