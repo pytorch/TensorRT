@@ -10,6 +10,7 @@ import torch
 import torch_tensorrt
 from accelerate.hooks import remove_hook_from_module
 from diffusers import FluxPipeline
+from diffusers.models.transformers.transformer_flux import FluxTransformer2DModel
 
 DEVICE = "cuda:0"
 
