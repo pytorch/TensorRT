@@ -1008,9 +1008,7 @@ def load_and_initialize_trtllm_plugin(plugin_lib_path: str) -> bool:
     except OSError as e_os_error:
         if "libmpi" in str(e_os_error):
             logger.warning(
-                f"Failed to load libnvinfer_plugin_tensorrt_llm.so from {plugin_lib_path}. "
-                f"The dependency libmpi.so is missing. "
-                f"Please install the packages libmpich-dev and libopenmpi-dev.",
+                f"Failed to load libnvinfer_plugin_tensorrt_llm.so from {plugin_lib_path}, got error {e_os_error} (hint: libmpi.so is a necessary dependency; ensure that OpenMPI or MPICH is installed on your system)",
                 exc_info=e_os_error,
             )
         else:
