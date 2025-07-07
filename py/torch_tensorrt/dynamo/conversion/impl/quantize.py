@@ -45,7 +45,6 @@ def quantize(
     Adds quantize and dequantize ops (QDQ) which quantize to INT8 or FP8 based
     on the output_type set and dequantizes them back.
     """
-    breakpoint()
     with unset_fake_temporarily():
         if isinstance(input_tensor, (torch.Tensor, TRTTensor)):
             if input_tensor.dtype not in (
