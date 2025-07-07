@@ -45,7 +45,7 @@ def quantize(
     Adds quantize and dequantize ops (QDQ) which quantize to INT8 or FP8 based
     on the output_type set and dequantizes them back.
     """
-
+    breakpoint()
     with unset_fake_temporarily():
         if isinstance(input_tensor, (torch.Tensor, TRTTensor)):
             if input_tensor.dtype not in (
@@ -117,8 +117,6 @@ def quantize(
 
         if not isinstance(input_tensor, TRTTensor):
             input_tensor = get_trt_tensor(ctx, input_tensor, name + "_quantize_input")
-
-        quantize_layer = ctx.net.add_quantize(input_tensor, scale, dtype)
 
         # Add Q node
         quantize_layer = ctx.net.add_quantize(input_tensor, scale, dtype)
