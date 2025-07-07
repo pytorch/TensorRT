@@ -55,12 +55,7 @@ class TestGatherNcclOpsConverter(DispatchTestCase):
         print("USE_TRTLLM_PLUGINS =", os.environ.get("USE_TRTLLM_PLUGINS"))
         cls.world_size = 1
         if not dist.is_initialized():
-            dist.init_process_group(
-                backend="nccl",
-                init_method="env://",
-                world_size=cls.world_size,
-                rank=0,  # or read from env
-            )
+            dist.init_process_group(backend="nccl")
         cls.group = dist.new_group(ranks=[0])
         cls.group_name = cls.group.group_name
 
