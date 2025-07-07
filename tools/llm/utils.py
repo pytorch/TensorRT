@@ -703,3 +703,199 @@ def time_generate_mm(
         timings.append(end_time - start_time)
 
     return timings
+
+
+def generate_mm_paligemma(
+    model,
+    pixel_values: torch.Tensor | None,
+    input_ids: torch.Tensor,
+    max_output_seq_length: int,
+    eos_token_id: int,
+    emb_layer: torch.nn.Embedding,
+):
+    """Greedy decode for Paligemma-style VLM.
+
+    Parameters
+    ----------
+    model : nn.Module
+        Must expose vision_tower, multi_modal_projector, language_model, image_token_index.
+    pixel_values : Tensor | None
+        Input image batch (B,C,H,W) or None.
+    input_ids : LongTensor  (B, N_prompt)
+        Text prompt token ids including [IMG] placeholder(s).
+    max_output_seq_length : int
+        Maximum tokens to generate **in addition to** the prompt.
+    eos_token_id : int
+        Stop generation when all sequences emit EOS.
+    emb_layer : nn.Embedding
+        Embedding layer for input_ids.
+    """
+
+    vit_embeds = None
+
+    if pixel_values is not None:
+        # --- Vision encoder timing ---
+        vis_s = torch.cuda.Event(enable_timing=True)
+        vis_e = torch.cuda.Event(enable_timing=True)
+        vis_s.record()
+        vit_out = model.vision_tower(pixel_values)
+        vis_e.record()
+        torch.cuda.synchronize()
+
+        vit_embeds = (
+            vit_out.last_hidden_state
+            if hasattr(vit_out, "last_hidden_state")
+            else vit_out
+        )
+
+        # Paligemma: vision_tower → multi_modal_projector
+        vit_embeds = model.multi_modal_projector(vit_embeds)
+        # Normalize by sqrt of hidden size
+        vit_embeds = vit_embeds / (model.config.text_config.hidden_size ** 0.5)
+
+    # 2) Text token embeddings
+    seq_tokens = input_ids.clone()
+    seq_embeds = emb_layer(seq_tokens)
+
+    if vit_embeds is not None:
+        B, N, C = seq_embeds.shape
+        flat_emb = seq_embeds.view(B * N, C)
+
+        mask = seq_tokens.view(B * N) == model.image_token_index
+        try:
+            flat_emb[mask] = vit_embeds.reshape(-1, C).to(flat_emb.dtype)[: mask.sum()]
+        except Exception:
+            # Fallback in unlikely size-mismatch cases
+            flat_emb[mask] = vit_embeds.reshape(-1, C)[: mask.sum()].to(flat_emb.dtype)
+        seq_embeds = flat_emb.view(B, N, C)
+
+    # ───────────────────────────────── Greedy loop ───────────────────────────────────────────────────
+    isl = seq_tokens.shape[1]
+    osl = max_output_seq_length - isl
+
+    generated = 0
+
+    while generated < osl:
+        cur_embeds = seq_embeds  # full seq first step or cache off
+        position_ids = (
+                torch.arange(cur_embeds.shape[1]).unsqueeze(0).to(cur_embeds.device)
+            )
+        with torch.no_grad():
+            logits = model.language_model(inputs_embeds=cur_embeds, position_ids=position_ids)
+            if hasattr(logits, "logits"):
+                logits = logits.logits
+
+        next_tok = torch.argmax(logits[:, -1, :], dim=-1)  # (B,)
+        # append token & embed
+        seq_tokens = torch.cat([seq_tokens, next_tok[:, None]], dim=-1)
+        seq_embeds = torch.cat([seq_embeds, emb_layer(next_tok)[:, None, :]], dim=1)
+
+        generated += 1
+        if (next_tok == eos_token_id).all():
+            break
+
+    return seq_tokens[:, input_ids.shape[1] :]
+
+
+@torch.inference_mode()
+def generate_mm_paligemma_with_static_cache(
+    model,  # Complete Paligemma VLM module
+    pixel_values: torch.Tensor | None,
+    input_ids: torch.Tensor,  # (B, N_prompt)
+    max_output_seq_length: int,
+    eos_token_id: int,
+    emb_layer: torch.nn.Embedding,
+    device: str = "cuda:0",
+) -> torch.LongTensor:  # (B, N_prompt + new)
+    """
+    Greedy Decoder for Paligemma VLM (using static KV-cache v1).
+    Basic structure is identical to LM version (generate_with_static_cache) but
+    * Input is `inputs_embeds`
+    * Vision tokens are sent together only in the first step
+    """
+
+    # ───────────────────── Vision encoding ─────────────────────
+    vit_embeds = None
+    if pixel_values is not None:
+        vit_latent = model.vision_tower(pixel_values)
+        vit_embeds = (
+            vit_latent.last_hidden_state
+            if hasattr(vit_latent, "last_hidden_state")
+            else vit_latent
+        )
+        
+        # Paligemma: vision_tower → multi_modal_projector
+        vit_embeds = model.multi_modal_projector(vit_embeds)
+        # Normalize by sqrt of hidden size
+        vit_embeds = vit_embeds / (model.config.text_config.hidden_size ** 0.5)
+
+    # ───────────────────── Text embedding & [IMG] replacement ─────────────
+    seq_tokens = input_ids.clone()  # (B, N_txt)
+    seq_embeds = emb_layer(seq_tokens)  # (B, N_txt, C)
+
+    if vit_embeds is not None:
+        B, N, C = seq_embeds.shape
+        flat = seq_embeds.view(B * N, C)
+        mask = seq_tokens.view(B * N) == model.image_token_index
+        flat[mask] = vit_embeds.reshape(-1, C).to(flat.dtype)[: mask.sum()]
+        seq_embeds = flat.view(B, N, C)
+
+    # ───────────────────── KV-cache initialization ─────────────────────
+    kv_cache = get_zeroed_static_cache_inputs(
+        model.language_model, device=device
+    )
+    start_idx = 0  # First token index
+    end_idx = seq_embeds.size(1)  # Prompt length
+    generated = 0
+    max_total_len = max_output_seq_length
+    output_tokens = seq_tokens.clone()
+
+    # ───────────────────── Greedy loop ───────────────────────
+    while output_tokens.size(1) < max_total_len:
+
+        # When using static cache:
+        # - First step: Use full prompt embedding
+        # - Subsequent steps: Use only new token embedding (KV cache remembers previous tokens)
+        cur_embeds = seq_embeds if generated == 0 else seq_embeds[:, -1:, :]
+
+        # position_ids: Same pattern as generate_with_static_cache
+        # - First step: Position of entire sequence
+        # - Subsequent steps: Position of current token only
+        if generated == 0:
+            position_ids = (
+                torch.arange(cur_embeds.shape[1]).unsqueeze(0).to(cur_embeds.device)
+            )
+        else:
+            position_ids = torch.tensor([[start_idx]], dtype=torch.int64).to(
+                cur_embeds.device
+            )
+
+        is_causal = True if cur_embeds.shape[1] > 1 else False
+        input_signature = (
+            cur_embeds,
+            position_ids,
+            *kv_cache,
+            start_idx,
+            end_idx,
+            is_causal,
+        )
+
+        logits_and_kv = model.language_model(*input_signature)
+        logits, kv_cache = logits_and_kv[0], logits_and_kv[1:]
+
+        next_tok = logits[:, -1, :].argmax(dim=-1)  # (B,)
+        output_tokens = torch.cat([output_tokens, next_tok[:, None]], dim=-1)
+
+        # Prepare for next step - Static cache only needs new token
+        next_embed = emb_layer(next_tok)[:, None, :]  # (B, 1, C)
+        seq_embeds = next_embed  # Next step uses only new token
+
+        generated += 1
+        start_idx = end_idx
+        end_idx += 1
+        is_causal = True  # Causal mask active from now on
+
+        if (next_tok == eos_token_id).all():
+            break
+
+    return output_tokens

@@ -24,6 +24,8 @@ from transformers import AutoModel, AutoProcessor
 from utils import (
     generate_mm,
     generate_mm_with_static_cache,
+    generate_mm_paligemma,
+    generate_mm_paligemma_with_static_cache,
     record_stats,
     time_generate_mm,
 )
@@ -73,12 +75,45 @@ def _load_eagle2(device: torch.device, torch_dtype: torch.dtype):
     return model, processor, emb_layer
 
 
+def _load_paligemma(device: torch.device, torch_dtype: torch.dtype):
+    """
+    Load Paligemma model and processor.
+
+    Returns
+    -------
+    tuple[torch.nn.Module, transformers.AutoProcessor, torch.nn.Embedding]
+        The model, its processor and the language-model input embedding layer.
+    """
+    from transformers import PaliGemmaForConditionalGeneration, PaliGemmaProcessor
+
+    model_id = "google/paligemma2-3b-pt-224"  # or other Paligemma variant
+    with torch.no_grad():
+        model = (
+            PaliGemmaForConditionalGeneration.from_pretrained(
+                model_id, trust_remote_code=True, torch_dtype=torch_dtype
+            )
+            .eval()
+            .to(device)
+        )
+
+    processor = PaliGemmaProcessor.from_pretrained(
+        model_id, trust_remote_code=True, use_fast=True
+    )
+    if hasattr(processor, "tokenizer"):
+        processor.tokenizer.padding_side = "left"
+
+    emb_layer = model.language_model.get_input_embeddings().to(torch_dtype).to(device)
+    return model, processor, emb_layer
+
+
 def _load_model(
     model_name: str, device: torch.device, torch_dtype: torch.dtype
 ) -> Tuple[torch.nn.Module, AutoProcessor, torch.nn.Embedding]:
     """Dispatch helper for supported VLMs."""
     if model_name.lower() == "eagle2":
         return _load_eagle2(device, torch_dtype)
+    elif model_name.lower() == "paligemma":
+        return _load_paligemma(device, torch_dtype)
     msg = f"Unsupported model: {model_name}"
     raise ValueError(msg)
 
@@ -98,7 +133,7 @@ class _LMNoCache(torch.nn.Module):
         self.lm = lm
 
     def forward(self, inputs_embeds, position_ids):
-        out = self.lm(inputs_embeds=inputs_embeds, position_ids=position_ids)
+        out = self.lm(inputs_embeds=inputs_embeds, position_ids=position_ids, use_cache=False)
         return out.logits if hasattr(out, "logits") else out
 
 
@@ -157,11 +192,66 @@ def _compile_eagle2_lm(
     return trt_mod
 
 
+def _compile_paligemma_lm(
+    language_model: torch.nn.Module,
+    input_embeds: torch.Tensor,
+    args: argparse.Namespace,
+) -> torch.nn.Module:
+    """
+    Compile Paligemma language model with Torch-TensorRT.
+
+    The function follows the same precision-specific flag logic used in
+    *run_llm.py* for consistency.
+    """
+    lm_wrap = _LMNoCache(language_model).to(DEVICE).eval()
+    max_seq_len = input_embeds.shape[1] + args.num_tokens
+
+    S = torch.export.Dim("seq", min=1, max=max_seq_len)
+    position_ids = torch.arange(input_embeds.shape[1]).unsqueeze(0).to(DEVICE)
+    dyn_shapes = {"inputs_embeds": {1: S}, "position_ids": {1: S}}
+
+    # Precision-specific flags --------------------------------------------------#
+    use_fp32_acc = False
+    use_explicit_typing = False
+    if args.precision == "FP16":
+        enabled_precisions = {torch.float32}
+        use_fp32_acc = True
+        use_explicit_typing = True
+    elif args.precision == "BF16":
+        enabled_precisions = {torch.bfloat16}
+    else:  # FP32
+        enabled_precisions = {torch.float32}
+
+    with torch.inference_mode():
+        exported = torch.export.export(
+            lm_wrap,
+            (input_embeds, position_ids),
+            dynamic_shapes=dyn_shapes,
+            strict=False,
+        )
+
+    with torch_tensorrt.logging.debug() if args.debug else nullcontext():
+        trt_mod = torch_tensorrt.dynamo.compile(
+            exported,
+            inputs=[input_embeds, position_ids],
+            enabled_precisions=enabled_precisions,
+            use_explicit_typing=use_explicit_typing,
+            use_fp32_acc=use_fp32_acc,
+            device=DEVICE,
+            disable_tf32=True,
+            use_python_runtime=True,
+            debug=args.debug,
+            offload_module_to_cpu=True,
+            min_block_size=args.min_block_size,
+        )
+    return trt_mod
+
+
 def compile_torchtrt(
     model: torch.nn.Module, args: argparse.Namespace
 ) -> torch.nn.Module:
     """
-    Front-end dispatcher mirroring *run_llm.py*’s `compile_torchtrt`.
+    Front-end dispatcher mirroring *run_llm.py*'s `compile_torchtrt`.
 
     Depending on the target VLM, delegates to the appropriate compile routine.
     """
@@ -180,6 +270,8 @@ def compile_torchtrt(
 
     if args.model.lower() == "eagle2":
         return _compile_eagle2_lm(model.language_model, example_embeds, args)
+    elif args.model.lower() == "paligemma":
+        return _compile_paligemma_lm(model.language_model, example_embeds, args)
 
     msg = f"Unsupported model for compilation: {args.model}"
     raise ValueError(msg)
@@ -207,7 +299,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Run VLM inference (PyTorch & TensorRT back-ends)"
     )
-    parser.add_argument("--model", default="eagle2", help="VLM model name")
+    parser.add_argument("--model", default="eagle2", choices=["eagle2", "paligemma"], help="VLM model name")
     parser.add_argument("--prompt", default="Describe this image.", help="Prompt text")
     parser.add_argument(
         "--precision",
@@ -262,25 +354,28 @@ if __name__ == "__main__":
     else:
         prompt_txt = args.prompt
 
-    messages = [
-        {
-            "role": "user",
-            "content": [
-                {"type": "image", "image": image},
-                {"type": "text", "text": prompt_txt},
-            ],
-        }
-    ]
+    # messages = [
+    #     {
+    #         "role": "user",
+    #         "content": [
+    #             {"type": "image", "image": image},
+    #             {"type": "text", "text": prompt_txt},
+    #         ],
+    #     }
+    # ]
 
-    txt = [
-        processor.apply_chat_template(
-            messages, tokenize=False, add_generation_prompt=True
-        )
-    ]
-    img_in, vid_in = processor.process_vision_info(messages)
-    inputs = processor(
-        text=txt, images=img_in, videos=vid_in, return_tensors="pt", padding=True
-    ).to(DEVICE)
+    # txt = [
+    #     processor.apply_chat_template(
+    #         messages, tokenize=False, add_generation_prompt=True
+    #     )
+    # ]
+    # img_in, vid_in = processor.process_vision_info(messages)
+    # inputs = processor(
+    #     text=txt, images=img_in, videos=vid_in, return_tensors="pt", padding=True
+    # ).to(DEVICE)
+
+    inputs = processor(text=prompt_txt, images=image, return_tensors="pt").to(DEVICE)
+    input_len = inputs["input_ids"].shape[-1]
 
     max_output_len = inputs["input_ids"].shape[1] + args.num_tokens
 
@@ -330,9 +425,15 @@ if __name__ == "__main__":
     emb_layer = emb_layer.to(DEVICE)
 
     if args.cache == "static_v1":
-        trt_generate = generate_mm_with_static_cache
+        if args.model.lower() == "eagle2":
+            trt_generate = generate_mm_with_static_cache
+        elif args.model.lower() == "paligemma":
+            trt_generate = generate_mm_paligemma_with_static_cache
     else:
-        trt_generate = generate_mm
+        if args.model.lower() == "eagle2":
+            trt_generate = generate_mm
+        elif args.model.lower() == "paligemma":
+            trt_generate = generate_mm_paligemma
 
     trt_gen_tokens = trt_generate(
         trt_model,
