@@ -812,6 +812,38 @@ class TestLowering(TestCase):
             f"Slice_scatter TRT outputs don't match with the original model.",
         )
 
+    def test_lowering_slice_scatter_dynamic_module(self):
+        class sliceScatter(torch.nn.Module):
+            def __init__(self, *args, **kwargs) -> None:
+                super().__init__(*args, **kwargs)
+
+            def forward(self, x, src):
+                y = torch.ops.aten.slice_scatter(x, src, 1, 6, None, 1)
+                return y
+
+        dim1 = torch.export.Dim("dim1", min=8, max=10)
+        dynamic_shapes = {
+            "x": [torch.export.Dim.STATIC, dim1],
+            "src": [torch.export.Dim.STATIC, None],
+        }
+        inputs = (torch.zeros(8, 8).cuda(), torch.ones(8, 2).cuda())
+        exported_program = torch.export.export(
+            sliceScatter(), tuple(inputs), dynamic_shapes=dynamic_shapes
+        )
+        fx_graph = exported_program.module()
+        inputs = [
+            torch_tensorrt.Input(
+                min_shape=[8, 8], opt_shape=[8, 10], max_shape=[8, 10]
+            ),
+            torch_tensorrt.Input(min_shape=[8, 2], opt_shape=[8, 2], max_shape=[8, 2]),
+        ]
+        torch._dynamo.reset()
+        trt_model = torch_tensorrt.dynamo.compile(exported_program, inputs)
+        inputs = (torch.zeros(8, 8).cuda(), torch.ones(8, 2).cuda())
+        torch.testing.assert_close(
+            trt_model(*inputs), fx_graph(*inputs), rtol=RTOL, atol=ATOL
+        )
+
     def test_lowering_select_scatter_dimZero_module(self):
         class selectScatter(torch.nn.Module):
             def __init__(self, *args, **kwargs) -> None:
