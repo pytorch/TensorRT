@@ -325,12 +325,6 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
             for i in inputs
         ]
 
-        for input_tensor in input_tensors:
-            if not isinstance(input_tensor, torch.Tensor):
-                raise ValueError(
-                    f"lan added Unsupported input type: {type(input_tensor)}"
-                )
-
         outputs: List[torch.Tensor] = torch.ops.tensorrt.execute_engine(
             list(input_tensors), self.engine
         )
