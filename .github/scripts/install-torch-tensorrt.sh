@@ -9,8 +9,8 @@ if [[ $(uname -m) == "aarch64" ]]; then
     install_cuda_aarch64
 fi
 
-# Install all the external dependencies required for Torch-TensorRT
-source .github/scripts/install-external-deps.sh
+# Install all the external dependencies required for testing Torch-TensorRT in CI
+source .github/scripts/install-test-deps.sh
 
 
 # Install Torch-TensorRT
