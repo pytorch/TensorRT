@@ -1,9 +1,6 @@
 #set -exou pipefail
 set -x
 
-TORCH=$(grep "^torch>" ${PWD}/py/requirements.txt)
-TORCHVISION=$(grep "^torchvision>" ${PWD}/tests/py/requirements.txt)
-INDEX_URL=https://download.pytorch.org/whl/${CHANNEL}/${CU_VERSION}
 PLATFORM=$(python -c "import sys; print(sys.platform)")
 
 if [[ $(uname -m) == "aarch64" ]]; then
@@ -12,14 +9,8 @@ if [[ $(uname -m) == "aarch64" ]]; then
     install_cuda_aarch64
 fi
 
-# Install all the dependencies required for Torch-TensorRT
-pip install --pre -r ${PWD}/tests/py/requirements.txt
-# dependencies in the tests/py/requirements.txt might install a different version of torch or torchvision
-# eg. timm will install the latest torchvision, however we want to use the torchvision from nightly
-# reinstall torch torchvisionto make sure we have the correct version
-pip uninstall -y torch torchvision
-pip install --force-reinstall --pre ${TORCHVISION} --index-url ${INDEX_URL}
-pip install --force-reinstall --pre ${TORCH} --index-url ${INDEX_URL}
+# Install all the external dependencies required for Torch-TensorRT
+source .github/scripts/install-external-deps.sh
 
 
 # Install Torch-TensorRT
