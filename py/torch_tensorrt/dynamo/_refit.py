@@ -22,6 +22,9 @@ from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
     DYNAMO_CONVERTERS as CONVERTERS,
 )
 from torch_tensorrt.dynamo.conversion._TRTInterpreter import TRTInterpreter
+from torch_tensorrt.dynamo.conversion.impl.normalization.ops import (
+    batch_norm_constant_folding,
+)
 from torch_tensorrt.dynamo.conversion.truncate_double import repair_double_inputs
 from torch_tensorrt.dynamo.lowering import (
     get_decompositions,
@@ -39,7 +42,6 @@ from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (
 from torch_tensorrt.dynamo.utils import (
     CPU_DEVICE,
     check_module_output,
-    deallocate_module,
     get_model_device,
     get_torch_inputs,
     to_torch_device,
@@ -78,8 +80,9 @@ def construct_refit_mapping(
         compilation_settings=settings,
     )
     interpreter._construct_trt_network_def()
+    weight_refit_map: dict[str, torch.Tensor] = interpreter.ctx.weight_refit_map
 
-    return interpreter.ctx.weight_refit_map
+    return weight_refit_map
 
 
 @needs_refit
@@ -90,7 +93,20 @@ def construct_refit_mapping_from_weight_name_map(
 ) -> dict[Any, Any]:
     engine_weight_map = {}
     for engine_weight_name, (sd_weight_name, np_weight_type) in weight_name_map.items():
-        if sd_weight_name not in state_dict:
+        # Add more constant folding converters here
+        if engine_weight_name.split(" ")[-1] in ["SCALE", "SHIFT"]:
+            # Batch Norm Layer
+            params = {}
+            for w in sd_weight_name:
+                params[w.split(".")[-1]] = state_dict[w].cuda()
+            # Batch norm constant folding
+
+            scale, shift = batch_norm_constant_folding(**params, eps=1e-7)
+            # Set scale to scale or shift to shift
+            engine_weight_map[engine_weight_name] = eval(
+                engine_weight_name.split(" ")[-1].lower()
+            )
+        elif sd_weight_name not in state_dict:
             # If weights is not in sd, we can leave it unchanged
             continue
         else:
@@ -178,10 +194,12 @@ def _refit_single_trt_engine_with_gm(
             for layer_name in weight_list:
                 if layer_name not in mapping:
                     raise AssertionError(f"{layer_name} is not found in weight mapping")
-                # Use Numpy to create weights
+                # Use Tensor to create weights
                 weight = mapping[layer_name]
                 trt_dtype = dtype._from(weight.dtype).to(trt.DataType)
-                trt_wt_tensor = trt.Weights(trt_dtype, weight.ctypes.data, weight.size)
+                trt_wt_tensor = trt.Weights(
+                    trt_dtype, weight.data_ptr(), torch.numel(weight)
+                )
                 refitter.set_named_weights(layer_name, trt_wt_tensor, trt_wt_location)
                 refitted.add(layer_name)
 
@@ -300,7 +318,7 @@ def refit_module_weights(
 
     # Check the number of supported operations in the graph
     num_supported_ops, total_ops = partitioning.get_graph_converter_support(
-        new_gm, settings.debug, settings.torch_executed_ops
+        new_gm, settings.torch_executed_ops
     )
 
     if num_supported_ops == 0 or (
@@ -363,7 +381,6 @@ def refit_module_weights(
 
     # Iterate over all components that can be accelerated
     # Generate the corresponding TRT Module for those
-    new_weight_module.module().to(CPU_DEVICE)
     for name, new_submodule in new_partitioned_module.named_children():
         # Refit each submodule
         # Extract engine from the submodule
@@ -466,7 +483,6 @@ def refit_module_weights(
                     settings=settings,
                     weight_name_map=None,
                 )
-        deallocate_module(new_submodule)
 
         # clear EXCLUDE_WEIGHTS flag
         serialization_config = engine.create_serialization_config()
@@ -488,8 +504,6 @@ def refit_module_weights(
         del engine
         gc.collect()
         torch.cuda.empty_cache()
-
-    deallocate_module(new_partitioned_module)
 
     if verify_output and arg_inputs is not None:
         new_gm.to(to_torch_device(settings.device))

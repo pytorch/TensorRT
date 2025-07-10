@@ -59,16 +59,13 @@ Imports and Model Definition
 Optional Input Arguments to `torch_tensorrt.compile`
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. GENERATED FROM PYTHON SOURCE LINES 31-48
+.. GENERATED FROM PYTHON SOURCE LINES 31-45
 
 .. code-block:: python
 
 
     # Enabled precision for TensorRT optimization
     enabled_precisions = {torch.float}
-
-    # Whether to print verbose logs
-    debug = True
 
     # Workspace size for TensorRT
     workspace_size = 20 << 30
@@ -81,12 +78,12 @@ Optional Input Arguments to `torch_tensorrt.compile`
     torch_executed_ops = {}
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 49-51
+.. GENERATED FROM PYTHON SOURCE LINES 46-48
 
 Compilation with `torch.compile`
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. GENERATED FROM PYTHON SOURCE LINES 51-70
+.. GENERATED FROM PYTHON SOURCE LINES 48-66
 
 .. code-block:: python
 
@@ -94,7 +91,6 @@ Compilation with `torch.compile`
     # Define backend compilation keyword arguments
     compilation_kwargs = {
         "enabled_precisions": enabled_precisions,
-        "debug": debug,
         "workspace_size": workspace_size,
         "min_block_size": min_block_size,
         "torch_executed_ops": torch_executed_ops,
@@ -110,17 +106,17 @@ Compilation with `torch.compile`
     optimized_model(*inputs)
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 71-73
+.. GENERATED FROM PYTHON SOURCE LINES 67-69
 
 Equivalently, we could have run the above via the convenience frontend, as so:
 `torch_tensorrt.compile(model, ir="torch_compile", inputs=inputs, **compilation_kwargs)`
 
-.. GENERATED FROM PYTHON SOURCE LINES 75-77
+.. GENERATED FROM PYTHON SOURCE LINES 71-73
 
 Inference
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. GENERATED FROM PYTHON SOURCE LINES 77-85
+.. GENERATED FROM PYTHON SOURCE LINES 73-81
 
 .. code-block:: python
 
@@ -133,7 +129,7 @@ Inference
     new_outputs = optimized_model(*new_inputs)
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 86-94
+.. GENERATED FROM PYTHON SOURCE LINES 82-90
 
 .. code-block:: python
 
@@ -146,12 +142,12 @@ Inference
     new_outputs = optimized_model(*new_inputs)
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 95-97
+.. GENERATED FROM PYTHON SOURCE LINES 91-93
 
 Cleanup
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. GENERATED FROM PYTHON SOURCE LINES 97-101
+.. GENERATED FROM PYTHON SOURCE LINES 93-97
 
 .. code-block:: python
 
@@ -160,7 +156,7 @@ Cleanup
     torch._dynamo.reset()
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 102-111
+.. GENERATED FROM PYTHON SOURCE LINES 98-107
 
 Cuda Driver Error Note
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

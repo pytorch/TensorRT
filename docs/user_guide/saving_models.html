@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Saving models compiled with Torch-TensorRT &mdash; Torch-TensorRT v2.8.0.dev0+ee32da0 documentation</title>
+  <title>Saving models compiled with Torch-TensorRT &mdash; Torch-TensorRT v2.9.0.dev0+48c07bc documentation</title>
   
 
   
@@ -293,7 +293,7 @@
               
               
                 <div class="version">
-                  v2.8.0.dev0+ee32da0
+                  v2.9.0.dev0+48c07bc
                 </div>
               
             
@@ -324,7 +324,7 @@
               <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../getting_started/installation.html">Installation</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../getting_started/jetpack.html">Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../getting_started/jetpack.html">Torch-TensorRT in JetPack</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../getting_started/quick_start.html">Quick Start</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">User Guide</span></p>
@@ -376,9 +376,8 @@
 <li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/torch_compile_resnet_example.html">Compiling ResNet with dynamic shapes using the <cite>torch.compile</cite> backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/torch_compile_transformers_example.html">Compiling BERT using the <cite>torch.compile</cite> backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/torch_compile_stable_diffusion.html">Compiling Stable Diffusion model using the <cite>torch.compile</cite> backend</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/compile_hf_models.html">Compiling LLM models from Huggingface</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/torch_compile_gpt2.html">Compiling GPT2 using the Torch-TensorRT <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code> frontend</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/torch_export_gpt2.html">Compiling GPT2 using the dynamo backend</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/torch_export_llama2.html">Compiling Llama2 using the dynamo backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/torch_export_sam2.html">Compiling SAM2 using the dynamo backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/torch_export_flux_dev.html">Compiling FLUX.1-dev model using the Torch-TensorRT dynamo backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../tutorials/notebooks.html">Legacy notebooks</a></li>
@@ -497,11 +496,12 @@
 <section id="dynamo-ir">
 <h2>Dynamo IR<a class="headerlink" href="#dynamo-ir" title="Permalink to this heading">¶</a></h2>
 <p>The output type of <cite>ir=dynamo</cite> compilation of Torch-TensorRT is <cite>torch.fx.GraphModule</cite> object by default.
-We can save this object in either <cite>TorchScript</cite> (<cite>torch.jit.ScriptModule</cite>) or <cite>ExportedProgram</cite> (<cite>torch.export.ExportedProgram</cite>) formats by
+We can save this object in either <cite>TorchScript</cite> (<cite>torch.jit.ScriptModule</cite>), <cite>ExportedProgram</cite> (<cite>torch.export.ExportedProgram</cite>) or <cite>PT2</cite> formats by
 specifying the <cite>output_format</cite> flag. Here are the options <cite>output_format</cite> will accept</p>
 <ul class="simple">
 <li><p><cite>exported_program</cite> : This is the default. We perform transformations on the graphmodule first and use <cite>torch.export.save</cite> to save the module.</p></li>
 <li><p><cite>torchscript</cite> : We trace the graphmodule via <cite>torch.jit.trace</cite> and save it via <cite>torch.jit.save</cite>.</p></li>
+<li><p><cite>PT2 Format</cite> : This is a next generation runtime for PyTorch models, allowing them to run in Python and in C++</p></li>
 </ul>
 <section id="a-exportedprogram">
 <h3>a) ExportedProgram<a class="headerlink" href="#a-exportedprogram" title="Permalink to this heading">¶</a></h3>
@@ -529,8 +529,8 @@ specifying the <cite>output_format</cite> flag. Here are the options <cite>outpu
 <span class="n">model</span> <span class="o">=</span> <span class="n">MyModel</span><span class="p">()</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
 <span class="n">inputs</span> <span class="o">=</span> <span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">((</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">))</span><span class="o">.</span><span class="n">cuda</span><span class="p">()]</span>
 <span class="c1"># trt_gm is a torch.fx.GraphModule object</span>
-<span class="n">trt_gm</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">ir</span><span class="o">=</span><span class="s2">&quot;dynamo&quot;</span><span class="p">,</span> <span class="n">inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">)</span>
-<span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">trt_gm</span><span class="p">,</span> <span class="s2">&quot;trt.ts&quot;</span><span class="p">,</span> <span class="n">output_format</span><span class="o">=</span><span class="s2">&quot;torchscript&quot;</span><span class="p">,</span> <span class="n">inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">)</span>
+<span class="n">trt_gm</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">ir</span><span class="o">=</span><span class="s2">&quot;dynamo&quot;</span><span class="p">,</span> <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">)</span>
+<span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">trt_gm</span><span class="p">,</span> <span class="s2">&quot;trt.ts&quot;</span><span class="p">,</span> <span class="n">output_format</span><span class="o">=</span><span class="s2">&quot;torchscript&quot;</span><span class="p">,</span> <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">)</span>
 
 <span class="c1"># Later, you can load it and run inference</span>
 <span class="n">model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s2">&quot;trt.ts&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
@@ -548,7 +548,7 @@ For <cite>ir=ts</cite>, this behavior stays the same in 2.X versions as well.</p
 
 <span class="n">model</span> <span class="o">=</span> <span class="n">MyModel</span><span class="p">()</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
 <span class="n">inputs</span> <span class="o">=</span> <span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">((</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">))</span><span class="o">.</span><span class="n">cuda</span><span class="p">()]</span>
-<span class="n">trt_ts</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">ir</span><span class="o">=</span><span class="s2">&quot;ts&quot;</span><span class="p">,</span> <span class="n">inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">)</span> <span class="c1"># Output is a ScriptModule object</span>
+<span class="n">trt_ts</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">ir</span><span class="o">=</span><span class="s2">&quot;ts&quot;</span><span class="p">,</span> <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">)</span> <span class="c1"># Output is a ScriptModule object</span>
 <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">trt_ts</span><span class="p">,</span> <span class="s2">&quot;trt_model.ts&quot;</span><span class="p">)</span>
 
 <span class="c1"># Later, you can load it and run inference</span>
@@ -571,6 +571,26 @@ Alternatively, we provide a light wrapper <cite>torch_tensorrt.load(file_path)</
 <span class="n">model</span><span class="p">(</span><span class="o">*</span><span class="n">inputs</span><span class="p">)</span>
 </pre></div>
 </div>
+<section id="b-pt2-format">
+<h3>b) PT2 Format<a class="headerlink" href="#b-pt2-format" title="Permalink to this heading">¶</a></h3>
+<p>PT2 is a new format that allows models to be run outside of Python in the future. It utilizes <a class="reference external" href="https://docs.pytorch.org/docs/main/torch.compiler_aot_inductor.html">AOTInductor</a>
+to generate kernels for components that will not be run in TensorRT.</p>
+<p>Here’s an example on how to save and load Torch-TensorRT Module using AOTInductor in Python</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch_tensorrt</span>
+
+<span class="n">model</span> <span class="o">=</span> <span class="n">MyModel</span><span class="p">()</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
+<span class="n">inputs</span> <span class="o">=</span> <span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">((</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">))</span><span class="o">.</span><span class="n">cuda</span><span class="p">()]</span>
+<span class="c1"># trt_ep is a torch.fx.GraphModule object</span>
+<span class="n">trt_gm</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">ir</span><span class="o">=</span><span class="s2">&quot;dynamo&quot;</span><span class="p">,</span> <span class="n">inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">)</span>
+<span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">trt_gm</span><span class="p">,</span> <span class="s2">&quot;trt.pt2&quot;</span><span class="p">,</span> <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">,</span> <span class="n">output_format</span><span class="o">=</span><span class="s2">&quot;aot_inductor&quot;</span><span class="p">,</span> <span class="n">retrace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+<span class="c1"># Later, you can load it and run inference</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">_inductor</span><span class="o">.</span><span class="n">aoti_load_package</span><span class="p">(</span><span class="s2">&quot;trt.pt2&quot;</span><span class="p">)</span>
+<span class="n">model</span><span class="p">(</span><span class="o">*</span><span class="n">inputs</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
 </section>
 </section>
 
@@ -624,7 +644,10 @@ Alternatively, we provide a light wrapper <cite>torch_tensorrt.load(file_path)</
 </ul>
 </li>
 <li><a class="reference internal" href="#torchscript-ir">Torchscript IR</a></li>
-<li><a class="reference internal" href="#loading-the-models">Loading the models</a></li>
+<li><a class="reference internal" href="#loading-the-models">Loading the models</a><ul>
+<li><a class="reference internal" href="#b-pt2-format">b) PT2 Format</a></li>
+</ul>
+</li>
 </ul>
 </li>
 </ul>

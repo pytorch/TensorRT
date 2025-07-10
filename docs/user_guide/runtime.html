@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Deploying Torch-TensorRT Programs &mdash; Torch-TensorRT v2.8.0.dev0+ee32da0 documentation</title>
+  <title>Deploying Torch-TensorRT Programs &mdash; Torch-TensorRT v2.9.0.dev0+48c07bc documentation</title>
   
 
   
@@ -293,7 +293,7 @@
               
               
                 <div class="version">
-                  v2.8.0.dev0+ee32da0
+                  v2.9.0.dev0+48c07bc
                 </div>
               
             
@@ -324,7 +324,7 @@
               <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../getting_started/installation.html">Installation</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../getting_started/jetpack.html">Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../getting_started/jetpack.html">Torch-TensorRT in JetPack</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../getting_started/quick_start.html">Quick Start</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">User Guide</span></p>
@@ -376,9 +376,8 @@
 <li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/torch_compile_resnet_example.html">Compiling ResNet with dynamic shapes using the <cite>torch.compile</cite> backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/torch_compile_transformers_example.html">Compiling BERT using the <cite>torch.compile</cite> backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/torch_compile_stable_diffusion.html">Compiling Stable Diffusion model using the <cite>torch.compile</cite> backend</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/compile_hf_models.html">Compiling LLM models from Huggingface</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/torch_compile_gpt2.html">Compiling GPT2 using the Torch-TensorRT <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code> frontend</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/torch_export_gpt2.html">Compiling GPT2 using the dynamo backend</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/torch_export_llama2.html">Compiling Llama2 using the dynamo backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/torch_export_sam2.html">Compiling SAM2 using the dynamo backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/torch_export_flux_dev.html">Compiling FLUX.1-dev model using the Torch-TensorRT dynamo backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../tutorials/notebooks.html">Legacy notebooks</a></li>
@@ -512,7 +511,7 @@ programs just as you would otherwise via PyTorch API.</p>
 <p class="admonition-title">Note</p>
 <p>If you are linking <code class="docutils literal notranslate"><span class="pre">libtorchtrt_runtime.so</span></code>, likely using the following flags will help <code class="docutils literal notranslate"><span class="pre">-Wl,--no-as-needed</span> <span class="pre">-ltorchtrt</span> <span class="pre">-Wl,--as-needed</span></code> as there’s no direct symbol dependency to anything in the Torch-TensorRT runtime for most Torch-TensorRT runtime applications</p>
 </div>
-<p>An example of how to use <code class="docutils literal notranslate"><span class="pre">libtorchtrt_runtime.so</span></code> can be found here: <a class="reference external" href="https://github.com/pytorch/TensorRT/tree/master/examples/torchtrt_runtime_example">https://github.com/pytorch/TensorRT/tree/master/examples/torchtrt_runtime_example</a></p>
+<p>An example of how to use <code class="docutils literal notranslate"><span class="pre">libtorchtrt_runtime.so</span></code> can be found here: <a class="reference external" href="https://github.com/pytorch/TensorRT/tree/master/examples/torchtrt_aoti_example">https://github.com/pytorch/TensorRT/tree/master/examples/torchtrt_aoti_example</a></p>
 </section>
 <section id="plugin-library">
 <h2>Plugin Library<a class="headerlink" href="#plugin-library" title="Permalink to this heading">¶</a></h2>
@@ -605,6 +604,116 @@ there by forcing any model which utilizes the converter to automatically use the
 </pre></div>
 </div>
 </section>
+<section id="deploying-torch-tensorrt-programs-without-python">
+<h2>Deploying Torch-TensorRT Programs without Python<a class="headerlink" href="#deploying-torch-tensorrt-programs-without-python" title="Permalink to this heading">¶</a></h2>
+<section id="aot-inductor">
+<h3>AOT-Inductor<a class="headerlink" href="#aot-inductor" title="Permalink to this heading">¶</a></h3>
+<p>AOTInductor is a specialized version of TorchInductor, designed to process exported PyTorch models, optimize them, and produce shared
+libraries as well as other relevant artifacts. These compiled artifacts are specifically crafted for deployment in non-Python environments,
+which are frequently employed for inference deployments on the server side.</p>
+<p>Torch-TensorRT is able to accelerate subgraphs within AOTInductor exports in the same way it does in Python.</p>
+<div class="highlight-py notranslate"><div class="highlight"><pre><span></span><span class="n">dynamo_model</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">ir</span><span class="o">=</span><span class="s2">&quot;dynamo&quot;</span><span class="p">,</span> <span class="n">arg_inputs</span><span class="o">=</span><span class="p">[</span><span class="o">...</span><span class="p">])</span>
+<span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">save</span><span class="p">(</span>
+    <span class="n">dynamo_model</span><span class="p">,</span>
+    <span class="n">file_path</span><span class="o">=</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">getcwd</span><span class="p">(),</span> <span class="s2">&quot;model.pt2&quot;</span><span class="p">),</span>
+    <span class="n">output_format</span><span class="o">=</span><span class="s2">&quot;aot_inductor&quot;</span><span class="p">,</span>
+    <span class="n">retrace</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">arg_inputs</span><span class="o">=</span><span class="p">[</span><span class="o">...</span><span class="p">],</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p>This artifact then can be loaded in a C++ application to be executed with out a Python dependency.</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;iostream&gt;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;vector&gt;</span>
+
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;torch/torch.h&quot;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;torch/csrc/inductor/aoti_package/model_package_loader.h&quot;</span>
+
+<span class="kt">int</span><span class="w"> </span><span class="nf">main</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">argc</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="o">*</span><span class="w"> </span><span class="n">argv</span><span class="p">[])</span><span class="w"> </span><span class="p">{</span>
+<span class="c1">// Check for correct number of command-line arguments</span>
+<span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="w"> </span><span class="n">trt_aoti_module_path</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;model.pt2&quot;</span><span class="p">;</span>
+
+<span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">argc</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">2</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">trt_aoti_module_path</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">argv</span><span class="p">[</span><span class="mi">1</span><span class="p">];</span>
+<span class="p">}</span>
+
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">trt_aoti_module_path</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
+
+<span class="w">    </span><span class="c1">// Get the path to the TRT AOTI model package from the command line</span>
+<span class="w">    </span><span class="n">c10</span><span class="o">::</span><span class="n">InferenceMode</span><span class="w"> </span><span class="n">mode</span><span class="p">;</span>
+
+<span class="w">    </span><span class="n">torch</span><span class="o">::</span><span class="n">inductor</span><span class="o">::</span><span class="n">AOTIModelPackageLoader</span><span class="w"> </span><span class="n">loader</span><span class="p">(</span><span class="n">trt_aoti_module_path</span><span class="p">);</span>
+<span class="w">    </span><span class="c1">// Assume running on CUDA</span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">torch</span><span class="o">::</span><span class="n">Tensor</span><span class="o">&gt;</span><span class="w"> </span><span class="n">inputs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="n">torch</span><span class="o">::</span><span class="n">randn</span><span class="p">({</span><span class="mi">8</span><span class="p">,</span><span class="w"> </span><span class="mi">10</span><span class="p">},</span><span class="w"> </span><span class="n">at</span><span class="o">::</span><span class="n">kCUDA</span><span class="p">)};</span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">torch</span><span class="o">::</span><span class="n">Tensor</span><span class="o">&gt;</span><span class="w"> </span><span class="n">outputs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">loader</span><span class="p">.</span><span class="n">run</span><span class="p">(</span><span class="n">inputs</span><span class="p">);</span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;Result from the first inference:&quot;</span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">outputs</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
+
+<span class="w">    </span><span class="c1">// The second inference uses a different batch size and it works because we</span>
+<span class="w">    </span><span class="c1">// specified that dimension as dynamic when compiling model.pt2.</span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;Result from the second inference:&quot;</span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
+<span class="w">    </span><span class="c1">// Assume running on CUDA</span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">loader</span><span class="p">.</span><span class="n">run</span><span class="p">({</span><span class="n">torch</span><span class="o">::</span><span class="n">randn</span><span class="p">({</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">10</span><span class="p">},</span><span class="w"> </span><span class="n">at</span><span class="o">::</span><span class="n">kCUDA</span><span class="p">)})</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
+
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>Note: Similar to Python, at runtime, no Torch-TensorRT APIs are used to operate the model. Therefore typically additional
+flags are needed to make sure that <code class="docutils literal notranslate"><span class="pre">libtorchtrt_runtime.so</span></code> gets optimized out (see above).</p>
+<p>See: <code class="docutils literal notranslate"><span class="pre">//examples/torchtrt_aoti_example</span></code> for a full end to end demo of this workflow</p>
+</section>
+<section id="torchscript">
+<h3>TorchScript<a class="headerlink" href="#torchscript" title="Permalink to this heading">¶</a></h3>
+<p>TorchScript is a legacy compiler stack for PyTorch that includes a Python-less interpreter for TorchScript programs.
+It has historically been used by Torch-TensorRT to execute models without Python. Even after the transition to TorchDynamo,
+the TorchScript interpreter can continue to be used to run PyTorch models with TensorRT engines outside of Python.</p>
+<div class="highlight-py notranslate"><div class="highlight"><pre><span></span><span class="n">dynamo_model</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">ir</span><span class="o">=</span><span class="s2">&quot;dynamo&quot;</span><span class="p">,</span> <span class="n">arg_inputs</span><span class="o">=</span><span class="p">[</span><span class="o">...</span><span class="p">])</span>
+<span class="n">ts_model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">trace</span><span class="p">(</span><span class="n">dynamo_model</span><span class="p">,</span> <span class="n">inputs</span><span class="o">=</span><span class="p">[</span><span class="o">...</span><span class="p">])</span>
+<span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">ts_model</span><span class="p">,</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">getcwd</span><span class="p">(),</span> <span class="s2">&quot;model.ts&quot;</span><span class="p">),)</span>
+</pre></div>
+</div>
+<p>This artifact then can be loaded in a C++ application to be executed with out a Python dependency.</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;fstream&gt;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;iostream&gt;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;memory&gt;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;sstream&gt;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;vector&gt;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;torch/script.h&quot;</span>
+
+<span class="kt">int</span><span class="w"> </span><span class="nf">main</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">argc</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="o">*</span><span class="w"> </span><span class="n">argv</span><span class="p">[])</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">argc</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="mi">2</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">std</span><span class="o">::</span><span class="n">cerr</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;usage: samplertapp &lt;path-to-pre-built-trt-ts module&gt;</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">;</span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="mi">-1</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="w"> </span><span class="n">trt_ts_module_path</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">argv</span><span class="p">[</span><span class="mi">1</span><span class="p">];</span>
+
+<span class="w">    </span><span class="n">torch</span><span class="o">::</span><span class="n">jit</span><span class="o">::</span><span class="n">Module</span><span class="w"> </span><span class="n">trt_ts_mod</span><span class="p">;</span>
+<span class="w">    </span><span class="k">try</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="c1">// Deserialize the ScriptModule from a file using torch::jit::load().</span>
+<span class="w">        </span><span class="n">trt_ts_mod</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">torch</span><span class="o">::</span><span class="n">jit</span><span class="o">::</span><span class="n">load</span><span class="p">(</span><span class="n">trt_ts_module_path</span><span class="p">);</span>
+<span class="w">    </span><span class="p">}</span><span class="w"> </span><span class="k">catch</span><span class="w"> </span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">c10</span><span class="o">::</span><span class="n">Error</span><span class="o">&amp;</span><span class="w"> </span><span class="n">e</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">std</span><span class="o">::</span><span class="n">cerr</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;error loading the model from : &quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">trt_ts_module_path</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="mi">-1</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;Running TRT engine&quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">torch</span><span class="o">::</span><span class="n">jit</span><span class="o">::</span><span class="n">IValue</span><span class="o">&gt;</span><span class="w"> </span><span class="n">trt_inputs_ivalues</span><span class="p">;</span>
+<span class="w">    </span><span class="n">trt_inputs_ivalues</span><span class="p">.</span><span class="n">push_back</span><span class="p">(</span><span class="n">at</span><span class="o">::</span><span class="n">randint</span><span class="p">(</span><span class="mi">-5</span><span class="p">,</span><span class="w"> </span><span class="mi">5</span><span class="p">,</span><span class="w"> </span><span class="p">{</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="mi">5</span><span class="p">,</span><span class="w"> </span><span class="mi">5</span><span class="p">},</span><span class="w"> </span><span class="p">{</span><span class="n">at</span><span class="o">::</span><span class="n">kCUDA</span><span class="p">}).</span><span class="n">to</span><span class="p">(</span><span class="n">torch</span><span class="o">::</span><span class="n">kFloat32</span><span class="p">));</span>
+<span class="w">    </span><span class="n">torch</span><span class="o">::</span><span class="n">jit</span><span class="o">::</span><span class="n">IValue</span><span class="w"> </span><span class="n">trt_results_ivalues</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">trt_ts_mod</span><span class="p">.</span><span class="n">forward</span><span class="p">(</span><span class="n">trt_inputs_ivalues</span><span class="p">);</span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;==================TRT outputs================&quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">trt_results_ivalues</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;=============================================&quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;TRT engine execution completed. &quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>Note: Similar to Python, at runtime, no Torch-TensorRT APIs are used to operate the model. Therefore typically additional
+flags are needed to make sure that <code class="docutils literal notranslate"><span class="pre">libtorchtrt_runtime.so</span></code> gets optimized out (see above).</p>
+<p>See: <code class="docutils literal notranslate"><span class="pre">//examples/torchtrt_runtime_example</span></code> for a full end to end demo of this workflow</p>
+</section>
+</section>
 </section>
 
 
@@ -657,6 +766,11 @@ there by forcing any model which utilizes the converter to automatically use the
 <li><a class="reference internal" href="#multi-device-safe-mode">Multi Device Safe Mode</a></li>
 <li><a class="reference internal" href="#cudagraphs-mode">Cudagraphs Mode</a></li>
 <li><a class="reference internal" href="#dynamic-output-allocation-mode">Dynamic Output Allocation Mode</a></li>
+<li><a class="reference internal" href="#deploying-torch-tensorrt-programs-without-python">Deploying Torch-TensorRT Programs without Python</a><ul>
+<li><a class="reference internal" href="#aot-inductor">AOT-Inductor</a></li>
+<li><a class="reference internal" href="#torchscript">TorchScript</a></li>
+</ul>
+</li>
 </ul>
 </li>
 </ul>

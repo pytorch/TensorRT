@@ -230,7 +230,7 @@ jobs:
         cd dynamo
         python -m pytest -ra -n 10 --junitxml=${RUNNER_TEST_RESULTS_DIR}/torch_compile_be_test_results.xml backend/
         python -m pytest -ra -n 4 --junitxml=${RUNNER_TEST_RESULTS_DIR}/torch_complete_be_e2e_test_results.xml --ir torch_compile models/test_models.py
-        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/torch_compile_dyn_models_export.xml --ir torch_compile models/test_dyn_models.py
+        ../../../packaging/vc_env_helper.bat python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/torch_compile_dyn_models_export.xml --ir torch_compile models/test_dyn_models.py
         popd
 
   tests-py-dynamo-core:
@@ -258,9 +258,9 @@ jobs:
         pushd .
         cd tests/py
         cd dynamo
-        python -m pytest -ra -n 4 --junitxml=${RUNNER_TEST_RESULTS_DIR}/tests_py_dynamo_core_runtime_test_results.xml --ignore runtime/test_002_cudagraphs_py.py --ignore runtime/test_002_cudagraphs_cpp.py runtime/
+        ../../../packaging/vc_env_helper.bat python -m pytest -ra -n 4 --junitxml=${RUNNER_TEST_RESULTS_DIR}/tests_py_dynamo_core_runtime_test_results.xml --ignore runtime/test_002_cudagraphs_py.py --ignore runtime/test_002_cudagraphs_cpp.py runtime/
         python -m pytest -ra -n 4 --junitxml=${RUNNER_TEST_RESULTS_DIR}/tests_py_dynamo_core_partitioning_test_results.xml partitioning/
-        python -m pytest -ra -n 4 --junitxml=${RUNNER_TEST_RESULTS_DIR}/tests_py_dynamo_core_lowering_test_results.xml lowering/
+        ../../../packaging/vc_env_helper.bat python -m pytest -ra -n 4 --junitxml=${RUNNER_TEST_RESULTS_DIR}/tests_py_dynamo_core_lowering_test_results.xml lowering/
         popd
 
   tests-py-dynamo-cudagraphs:

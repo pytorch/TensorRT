@@ -909,7 +909,6 @@ def type_cast(
     """
     This function helps to cast the input type to cast_type
     """
-    layer_i = network.add_identity(input)
-    layer_i.set_output_type(0, cast_type)
+    layer_i = network.add_cast(input, cast_type)
     set_layer_name(layer_i, target, f"{name}_dtype_change")
     return layer_i.get_output(0)

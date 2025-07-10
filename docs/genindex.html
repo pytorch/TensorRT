@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Index &mdash; Torch-TensorRT v2.8.0.dev0+ee32da0 documentation</title>
+  <title>Index &mdash; Torch-TensorRT v2.9.0.dev0+48c07bc documentation</title>
   
 
   
@@ -290,7 +290,7 @@
               
               
                 <div class="version">
-                  v2.8.0.dev0+ee32da0
+                  v2.9.0.dev0+48c07bc
                 </div>
               
             
@@ -321,7 +321,7 @@
               <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="getting_started/installation.html">Installation</a></li>
-<li class="toctree-l1"><a class="reference internal" href="getting_started/jetpack.html">Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="getting_started/jetpack.html">Torch-TensorRT in JetPack</a></li>
 <li class="toctree-l1"><a class="reference internal" href="getting_started/quick_start.html">Quick Start</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">User Guide</span></p>
@@ -373,9 +373,8 @@
 <li class="toctree-l1"><a class="reference internal" href="tutorials/_rendered_examples/dynamo/torch_compile_resnet_example.html">Compiling ResNet with dynamic shapes using the <cite>torch.compile</cite> backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="tutorials/_rendered_examples/dynamo/torch_compile_transformers_example.html">Compiling BERT using the <cite>torch.compile</cite> backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="tutorials/_rendered_examples/dynamo/torch_compile_stable_diffusion.html">Compiling Stable Diffusion model using the <cite>torch.compile</cite> backend</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tutorials/compile_hf_models.html">Compiling LLM models from Huggingface</a></li>
 <li class="toctree-l1"><a class="reference internal" href="tutorials/_rendered_examples/dynamo/torch_compile_gpt2.html">Compiling GPT2 using the Torch-TensorRT <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code> frontend</a></li>
-<li class="toctree-l1"><a class="reference internal" href="tutorials/_rendered_examples/dynamo/torch_export_gpt2.html">Compiling GPT2 using the dynamo backend</a></li>
-<li class="toctree-l1"><a class="reference internal" href="tutorials/_rendered_examples/dynamo/torch_export_llama2.html">Compiling Llama2 using the dynamo backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="tutorials/_rendered_examples/dynamo/torch_export_sam2.html">Compiling SAM2 using the dynamo backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="tutorials/_rendered_examples/dynamo/torch_export_flux_dev.html">Compiling FLUX.1-dev model using the Torch-TensorRT dynamo backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="tutorials/notebooks.html">Legacy notebooks</a></li>
@@ -672,6 +671,8 @@
 </li>
       <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.dtype.f32">f32 (torch_tensorrt.dtype attribute)</a>
 </li>
+      <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.dtype.f4">f4 (torch_tensorrt.dtype attribute)</a>
+</li>
       <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.dtype.f64">f64 (torch_tensorrt.dtype attribute)</a>
 </li>
       <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.dtype.f8">f8 (torch_tensorrt.dtype attribute)</a>
@@ -853,13 +854,15 @@
 </li>
       <li><a href="py_api/runtime.html#torch_tensorrt.runtime.set_cudagraphs_mode">set_cudagraphs_mode() (in module torch_tensorrt.runtime)</a>
 </li>
-  </ul></td>
-  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.MutableTorchTensorRTModule.set_expected_dynamic_shape_range">set_expected_dynamic_shape_range() (torch_tensorrt.MutableTorchTensorRTModule method)</a>
 </li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="py_api/runtime.html#torch_tensorrt.runtime.TorchTensorRTModule.set_extra_state">set_extra_state() (torch_tensorrt.runtime.TorchTensorRTModule method)</a>
 </li>
       <li><a href="py_api/runtime.html#torch_tensorrt.runtime.set_multi_device_safe_mode">set_multi_device_safe_mode() (in module torch_tensorrt.runtime)</a>
+</li>
+      <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.MutableTorchTensorRTModule.set_weight_streaming_ctx">set_weight_streaming_ctx() (torch_tensorrt.MutableTorchTensorRTModule method)</a>
 </li>
       <li><a href="py_api/torch_tensorrt.html#torch_tensorrt.EngineCapability.STANDARD">STANDARD (torch_tensorrt.EngineCapability attribute)</a>
 </li>

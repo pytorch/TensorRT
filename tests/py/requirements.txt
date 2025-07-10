@@ -7,7 +7,7 @@ parameterized>=0.2.0
 pytest>=8.2.1
 pytest-xdist>=3.6.1
 pyyaml
-transformers==4.49.0
+transformers==4.51.0
 nvidia-modelopt[all]; python_version >'3.9' and python_version <'3.13'
 --extra-index-url https://pypi.nvidia.com
 # flashinfer-python is not supported for python version 3.13 or higher

@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt.dynamo._settings &mdash; Torch-TensorRT v2.8.0.dev0+ee32da0 documentation</title>
+  <title>torch_tensorrt.dynamo._settings &mdash; Torch-TensorRT v2.9.0.dev0+48c07bc documentation</title>
   
 
   
@@ -290,7 +290,7 @@
               
               
                 <div class="version">
-                  v2.8.0.dev0+ee32da0
+                  v2.9.0.dev0+48c07bc
                 </div>
               
             
@@ -321,7 +321,7 @@
               <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../../getting_started/installation.html">Installation</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../../getting_started/jetpack.html">Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../getting_started/jetpack.html">Torch-TensorRT in JetPack</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../getting_started/quick_start.html">Quick Start</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">User Guide</span></p>
@@ -373,9 +373,8 @@
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/torch_compile_resnet_example.html">Compiling ResNet with dynamic shapes using the <cite>torch.compile</cite> backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/torch_compile_transformers_example.html">Compiling BERT using the <cite>torch.compile</cite> backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/torch_compile_stable_diffusion.html">Compiling Stable Diffusion model using the <cite>torch.compile</cite> backend</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../tutorials/compile_hf_models.html">Compiling LLM models from Huggingface</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/torch_compile_gpt2.html">Compiling GPT2 using the Torch-TensorRT <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code> frontend</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/torch_export_gpt2.html">Compiling GPT2 using the dynamo backend</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/torch_export_llama2.html">Compiling Llama2 using the dynamo backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/torch_export_sam2.html">Compiling SAM2 using the dynamo backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/torch_export_flux_dev.html">Compiling FLUX.1-dev model using the Torch-TensorRT dynamo backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/notebooks.html">Legacy notebooks</a></li>
@@ -488,7 +487,7 @@
               
   <h1>Source code for torch_tensorrt.dynamo._settings</h1><div class="highlight"><pre>
 <span></span><span class="kn">from</span><span class="w"> </span><span class="nn">dataclasses</span><span class="w"> </span><span class="kn">import</span> <span class="n">dataclass</span><span class="p">,</span> <span class="n">field</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Collection</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Set</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">,</span> <span class="n">Union</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Collection</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Set</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">,</span> <span class="n">Union</span>
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch.fx.node</span><span class="w"> </span><span class="kn">import</span> <span class="n">Target</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt._Device</span><span class="w"> </span><span class="kn">import</span> <span class="n">Device</span>
@@ -496,7 +495,6 @@
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo._defaults</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
     <span class="n">ASSUME_DYNAMIC_SHAPE_SUPPORT</span><span class="p">,</span>
     <span class="n">CACHE_BUILT_ENGINES</span><span class="p">,</span>
-    <span class="n">DEBUG</span><span class="p">,</span>
     <span class="n">DISABLE_TF32</span><span class="p">,</span>
     <span class="n">DLA_GLOBAL_DRAM_SIZE</span><span class="p">,</span>
     <span class="n">DLA_LOCAL_DRAM_SIZE</span><span class="p">,</span>
@@ -590,7 +588,6 @@
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">enabled_precisions</span><span class="p">:</span> <span class="n">Set</span><span class="p">[</span><span class="n">dtype</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="k">lambda</span><span class="p">:</span> <span class="n">ENABLED_PRECISIONS</span><span class="p">)</span>
-    <span class="n">debug</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">DEBUG</span>
     <span class="n">workspace_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">WORKSPACE_SIZE</span>
     <span class="n">min_block_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">MIN_BLOCK_SIZE</span>
     <span class="n">torch_executed_ops</span><span class="p">:</span> <span class="n">Collection</span><span class="p">[</span><span class="n">Target</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">set</span><span class="p">)</span>
@@ -630,7 +627,22 @@
     <span class="n">tiling_optimization_level</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">TILING_OPTIMIZATION_LEVEL</span>
     <span class="n">l2_limit_for_tiling</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">L2_LIMIT_FOR_TILING</span>
     <span class="n">use_distributed_mode_trace</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">USE_DISTRIBUTED_MODE_TRACE</span>
-    <span class="n">offload_module_to_cpu</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">OFFLOAD_MODULE_TO_CPU</span></div>
+    <span class="n">offload_module_to_cpu</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">OFFLOAD_MODULE_TO_CPU</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">__getstate__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.conversion._ConverterRegistry</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+            <span class="n">ConverterRegistry</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="n">state</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="vm">__dict__</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+        <span class="n">state</span><span class="p">[</span><span class="s2">&quot;torch_executed_ops&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="n">op</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">op</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="k">else</span> <span class="n">ConverterRegistry</span><span class="o">.</span><span class="n">qualified_name_or_str</span><span class="p">(</span><span class="n">op</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">op</span> <span class="ow">in</span> <span class="n">state</span><span class="p">[</span><span class="s2">&quot;torch_executed_ops&quot;</span><span class="p">]</span>
+        <span class="p">}</span>
+        <span class="k">return</span> <span class="n">state</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">__setstate__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">state</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="vm">__dict__</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">state</span><span class="p">)</span></div>
 
 
 <span class="n">_SETTINGS_TO_BE_ENGINE_INVARIANT</span> <span class="o">=</span> <span class="p">(</span>

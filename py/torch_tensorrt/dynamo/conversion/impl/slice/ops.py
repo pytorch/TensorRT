@@ -5,6 +5,7 @@ from typing import Optional, Sequence
 import numpy as np
 import tensorrt as trt
 from torch.fx.node import Target
+
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion import impl
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
@@ -13,6 +14,9 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     flatten_dims,
     get_positive_dim,
     get_trt_tensor,
+    has_dynamic_shape,
+    prepend_ones,
+    set_layer_name,
 )
 from torch_tensorrt.dynamo.conversion.impl.cat import cat
 from torch_tensorrt.dynamo.conversion.impl.elementwise import floor_divide
@@ -23,11 +27,6 @@ from torch_tensorrt.dynamo.conversion.impl.shape import get_shape_with_dynamic_s
 from torch_tensorrt.dynamo.conversion.impl.shape import shape as get_shape
 from torch_tensorrt.dynamo.conversion.impl.slice.base import slice
 from torch_tensorrt.dynamo.utils import DYNAMIC_DIM
-from torch_tensorrt.fx.converters.converter_utils import (
-    has_dynamic_shape,
-    prepend_ones,
-    set_layer_name,
-)
 from torch_tensorrt.fx.types import Shape, TRTTensor
 
 
@@ -230,7 +229,7 @@ def expand(
     # If the rank of the input tensor is less than the shape's rank, pad with ones
     if initial_tensor_rank < shape_rank:
         input_t = prepend_ones(
-            ctx.net,
+            ctx,
             input_t,
             name + "_expand_broadcast",
             shape_rank - initial_tensor_rank,

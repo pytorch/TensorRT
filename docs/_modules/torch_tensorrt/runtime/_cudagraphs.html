@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt.runtime._cudagraphs &mdash; Torch-TensorRT v2.8.0.dev0+ee32da0 documentation</title>
+  <title>torch_tensorrt.runtime._cudagraphs &mdash; Torch-TensorRT v2.9.0.dev0+48c07bc documentation</title>
   
 
   
@@ -290,7 +290,7 @@
               
               
                 <div class="version">
-                  v2.8.0.dev0+ee32da0
+                  v2.9.0.dev0+48c07bc
                 </div>
               
             
@@ -321,7 +321,7 @@
               <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../../getting_started/installation.html">Installation</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../../getting_started/jetpack.html">Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../getting_started/jetpack.html">Torch-TensorRT in JetPack</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../getting_started/quick_start.html">Quick Start</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">User Guide</span></p>
@@ -373,9 +373,8 @@
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/torch_compile_resnet_example.html">Compiling ResNet with dynamic shapes using the <cite>torch.compile</cite> backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/torch_compile_transformers_example.html">Compiling BERT using the <cite>torch.compile</cite> backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/torch_compile_stable_diffusion.html">Compiling Stable Diffusion model using the <cite>torch.compile</cite> backend</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../tutorials/compile_hf_models.html">Compiling LLM models from Huggingface</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/torch_compile_gpt2.html">Compiling GPT2 using the Torch-TensorRT <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code> frontend</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/torch_export_gpt2.html">Compiling GPT2 using the dynamo backend</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/torch_export_llama2.html">Compiling Llama2 using the dynamo backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/torch_export_sam2.html">Compiling SAM2 using the dynamo backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/torch_export_flux_dev.html">Compiling FLUX.1-dev model using the Torch-TensorRT dynamo backend</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/notebooks.html">Legacy notebooks</a></li>
@@ -558,48 +557,16 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">old_mode</span> <span class="o">=</span> <span class="n">_PY_RT_CUDAGRAPHS</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">compiled_module</span> <span class="o">=</span> <span class="n">compiled_module</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">cudagraphs_module</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">CudaGraphsTorchTensorRTModule</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">old_module</span> <span class="o">=</span> <span class="kc">None</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="fm">__enter__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">:</span>
-        <span class="k">global</span> <span class="n">_PY_RT_CUDAGRAPHS</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__enter__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Union</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">]:</span>
 
-        <span class="n">num_torch_module</span> <span class="o">=</span> <span class="mi">0</span>
-        <span class="n">num_trt_module</span> <span class="o">=</span> <span class="mi">0</span>
-        <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">module</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">compiled_module</span><span class="o">.</span><span class="n">named_children</span><span class="p">():</span>
-            <span class="c1"># need to disable cudagraphs if any model requires output allocator</span>
-            <span class="k">if</span> <span class="p">(</span>
-                <span class="nb">hasattr</span><span class="p">(</span><span class="n">module</span><span class="p">,</span> <span class="s2">&quot;requires_output_allocator&quot;</span><span class="p">)</span>
-                <span class="ow">and</span> <span class="n">module</span><span class="o">.</span><span class="n">requires_output_allocator</span>
-            <span class="p">):</span>
-                <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
-                    <span class="s2">&quot;The model contains submodules that require a dynamic output allocator at runtime, which is incompatible with CUDA Graphs. Please disable CUDA Graphs.&quot;</span>
-                <span class="p">)</span>
-            <span class="k">if</span> <span class="s2">&quot;_run_on_acc&quot;</span> <span class="ow">in</span> <span class="n">name</span><span class="p">:</span>
-                <span class="n">num_trt_module</span> <span class="o">+=</span> <span class="mi">1</span>
-            <span class="k">elif</span> <span class="s2">&quot;_run_on_gpu&quot;</span> <span class="ow">in</span> <span class="n">name</span><span class="p">:</span>
-                <span class="n">num_torch_module</span> <span class="o">+=</span> <span class="mi">1</span>
-
-        <span class="k">if</span> <span class="n">num_torch_module</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
-            <span class="c1"># Set whole cudagraphs mode and returns wrapped module</span>
-            <span class="n">_PY_RT_CUDAGRAPHS</span> <span class="o">=</span> <span class="n">CudaGraphsMode</span><span class="o">.</span><span class="n">WHOLE_GRAPH_CUDAGRAPHS</span>
-            <span class="c1"># Set new mode for C++</span>
-            <span class="k">if</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">ENABLED_FEATURES</span><span class="o">.</span><span class="n">torch_tensorrt_runtime</span><span class="p">:</span>
-                <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">set_cudagraphs_mode</span><span class="p">(</span><span class="n">_PY_RT_CUDAGRAPHS</span><span class="p">)</span>
-
-            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
-                <span class="s2">&quot;Found pytorch subgraphs in module, wrapping module in CudaGraphsTorchTensorRTModule&quot;</span>
-            <span class="p">)</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">cudagraphs_module</span> <span class="o">=</span> <span class="n">CudaGraphsTorchTensorRTModule</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">compiled_module</span><span class="p">)</span>
-            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">cudagraphs_module</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="k">if</span> <span class="n">num_trt_module</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
-                <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;No graph breaks detected, using runtime cudagraphs mode&quot;</span><span class="p">)</span>
-            <span class="k">else</span><span class="p">:</span>
-                <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
-                    <span class="s2">&quot;Please consider dynamo if there is graph breaks. Using runtime cudagraphs mode&quot;</span>
-                <span class="p">)</span>
-            <span class="c1"># Enable cudagraphs for TRT submodule</span>
-            <span class="n">set_cudagraphs_mode</span><span class="p">(</span><span class="kc">True</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">compiled_module</span><span class="p">,</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">MutableTorchTensorRTModule</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">old_module</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">compiled_module</span><span class="o">.</span><span class="n">gm</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">compiled_module</span><span class="o">.</span><span class="n">gm</span> <span class="o">=</span> <span class="n">get_cuda_graph_module</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">compiled_module</span><span class="o">.</span><span class="n">gm</span><span class="p">)</span>
             <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">compiled_module</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">get_cuda_graph_module</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">compiled_module</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__exit__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="c1"># Set cudagraphs back to old mode</span>
@@ -607,6 +574,52 @@
         <span class="c1"># __del__ is not entirely predictable, so we reset cudagraph here</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">cudagraphs_module</span><span class="p">:</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">cudagraphs_module</span><span class="o">.</span><span class="n">_reset_captured_graph</span><span class="p">()</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">old_module</span><span class="p">:</span>  <span class="c1"># MutableTorchTRTModule</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">compiled_module</span><span class="o">.</span><span class="n">gm</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">old_module</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">get_cuda_graph_module</span><span class="p">(</span>
+    <span class="n">compiled_module</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Union</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">]:</span>
+    <span class="k">global</span> <span class="n">_PY_RT_CUDAGRAPHS</span>
+
+    <span class="n">num_torch_module</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">num_trt_module</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">module</span> <span class="ow">in</span> <span class="n">compiled_module</span><span class="o">.</span><span class="n">named_children</span><span class="p">():</span>
+        <span class="c1"># need to disable cudagraphs if any model requires output allocator</span>
+        <span class="k">if</span> <span class="p">(</span>
+            <span class="nb">hasattr</span><span class="p">(</span><span class="n">module</span><span class="p">,</span> <span class="s2">&quot;requires_output_allocator&quot;</span><span class="p">)</span>
+            <span class="ow">and</span> <span class="n">module</span><span class="o">.</span><span class="n">requires_output_allocator</span>
+        <span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
+                <span class="s2">&quot;The model contains submodules that require a dynamic output allocator at runtime, which is incompatible with CUDA Graphs. Please disable CUDA Graphs.&quot;</span>
+            <span class="p">)</span>
+        <span class="k">if</span> <span class="s2">&quot;_run_on_acc&quot;</span> <span class="ow">in</span> <span class="n">name</span><span class="p">:</span>
+            <span class="n">num_trt_module</span> <span class="o">+=</span> <span class="mi">1</span>
+        <span class="k">elif</span> <span class="s2">&quot;_run_on_gpu&quot;</span> <span class="ow">in</span> <span class="n">name</span><span class="p">:</span>
+            <span class="n">num_torch_module</span> <span class="o">+=</span> <span class="mi">1</span>
+
+    <span class="k">if</span> <span class="n">num_torch_module</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="c1"># Set whole cudagraphs mode and returns wrapped module</span>
+        <span class="n">_PY_RT_CUDAGRAPHS</span> <span class="o">=</span> <span class="n">CudaGraphsMode</span><span class="o">.</span><span class="n">WHOLE_GRAPH_CUDAGRAPHS</span>
+        <span class="c1"># Set new mode for C++</span>
+        <span class="k">if</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">ENABLED_FEATURES</span><span class="o">.</span><span class="n">torch_tensorrt_runtime</span><span class="p">:</span>
+            <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">set_cudagraphs_mode</span><span class="p">(</span><span class="n">_PY_RT_CUDAGRAPHS</span><span class="p">)</span>
+
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+            <span class="s2">&quot;Found pytorch subgraphs in module, wrapping module in CudaGraphsTorchTensorRTModule&quot;</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">CudaGraphsTorchTensorRTModule</span><span class="p">(</span><span class="n">compiled_module</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">num_trt_module</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;No graph breaks detected, using runtime cudagraphs mode&quot;</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                <span class="s2">&quot;Please consider dynamo if there is graph breaks. Using runtime cudagraphs mode&quot;</span>
+            <span class="p">)</span>
+        <span class="c1"># Enable cudagraphs for TRT submodule</span>
+        <span class="n">set_cudagraphs_mode</span><span class="p">(</span><span class="kc">True</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">compiled_module</span>
 
 
 <div class="viewcode-block" id="enable_cudagraphs"><a class="viewcode-back" href="../../../py_api/runtime.html#torch_tensorrt.runtime.enable_cudagraphs">[docs]</a><span class="k">def</span><span class="w"> </span><span class="nf">enable_cudagraphs</span><span class="p">(</span>

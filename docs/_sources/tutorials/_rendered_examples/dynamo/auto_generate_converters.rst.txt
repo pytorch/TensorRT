@@ -213,7 +213,7 @@ Now we can use our custom operator in a model and compile it with Torch-TensorRT
 We can see that the custom operator is used as one of the operations in the forward pass of the model.
 The process of compiling the model at this point is identical to standard Torch-TensorRT usage.
 
-.. GENERATED FROM PYTHON SOURCE LINES 161-185
+.. GENERATED FROM PYTHON SOURCE LINES 161-183
 
 .. code-block:: python
 
@@ -233,9 +233,7 @@ The process of compiling the model at this point is identical to standard Torch-
     n = torch.full((64, 64), 3, device="cuda", dtype=torch.float)
 
     with torch_tensorrt.logging.errors():
-        model_trt = torch_tensorrt.compile(
-            my_model, inputs=[m, n], debug=True, min_block_size=1
-        )
+        model_trt = torch_tensorrt.compile(my_model, inputs=[m, n], min_block_size=1)
         for i in range(300):
             res = model_trt(m, n)
             assert torch.allclose(res, my_model(m, n))

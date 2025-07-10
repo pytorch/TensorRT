@@ -23,7 +23,10 @@ def getitem_validator(getitem_node: Node, settings: CompilationSettings = None) 
     from torch_tensorrt.dynamo.conversion._ConverterRegistry import DYNAMO_CONVERTERS
 
     # Getitem nodes can only be converted if their parent node also can
-    return getitem_node.args[0] in DYNAMO_CONVERTERS
+    return (
+        getitem_node.args[0] in DYNAMO_CONVERTERS
+        or getitem_node.args[0].op == "get_attr"
+    )
 
 
 # TODO: Subsequent evaluators should be registered here with their own validators
@@ -43,7 +46,10 @@ def generic_evaluator(
     _LOGGER.debug(
         f"Evaluating {ConverterRegistry.qualified_name_or_str(target)} on object with name: {name}"
     )
-    return target(*args)
+    from torch._subclasses.fake_tensor import unset_fake_temporarily
+
+    with unset_fake_temporarily():
+        return target(*args)
 
 
 def rand_validator(rand_node: Node, settings: CompilationSettings = None) -> bool:

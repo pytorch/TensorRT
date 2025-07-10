@@ -150,23 +150,6 @@ Model Zoo
 
 .. raw:: html
 
-    <div class="sphx-glr-thumbcontainer" tooltip="CUDA Graphs allow multiple GPU operations to be launched through a single CPU operation, reduci...">
-
-.. only:: html
-
-  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_torch_export_cudagraphs_thumb.png
-    :alt:
-
-  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_torch_export_cudagraphs.py`
-
-.. raw:: html
-
-      <div class="sphx-glr-thumbnail-title">Torch Export with Cudagraphs</div>
-    </div>
-
-
-.. raw:: html
-
     <div class="sphx-glr-thumbcontainer" tooltip="Small caching example on BERT.">
 
 .. only:: html
@@ -179,6 +162,23 @@ Model Zoo
 .. raw:: html
 
       <div class="sphx-glr-thumbnail-title">Engine Caching (BERT)</div>
+    </div>
+
+
+.. raw:: html
+
+    <div class="sphx-glr-thumbcontainer" tooltip="CUDA Graphs allow multiple GPU operations to be launched through a single CPU operation, reduci...">
+
+.. only:: html
+
+  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_torch_export_cudagraphs_thumb.png
+    :alt:
+
+  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_torch_export_cudagraphs.py`
+
+.. raw:: html
+
+      <div class="sphx-glr-thumbnail-title">Torch Export with Cudagraphs</div>
     </div>
 
 
@@ -235,40 +235,6 @@ Model Zoo
 
 .. raw:: html
 
-    <div class="sphx-glr-thumbcontainer" tooltip="This script illustrates Torch-TensorRT workflow with dynamo backend on popular GPT2 model.">
-
-.. only:: html
-
-  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_torch_export_gpt2_thumb.png
-    :alt:
-
-  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_torch_export_gpt2.py`
-
-.. raw:: html
-
-      <div class="sphx-glr-thumbnail-title">Compiling GPT2 using the dynamo backend</div>
-    </div>
-
-
-.. raw:: html
-
-    <div class="sphx-glr-thumbcontainer" tooltip="This script illustrates Torch-TensorRT workflow with dynamo backend on popular Llama2 model.">
-
-.. only:: html
-
-  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_torch_export_llama2_thumb.png
-    :alt:
-
-  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_torch_export_llama2.py`
-
-.. raw:: html
-
-      <div class="sphx-glr-thumbnail-title">Compiling Llama2 using the dynamo backend</div>
-    </div>
-
-
-.. raw:: html
-
     <div class="sphx-glr-thumbcontainer" tooltip="We are going to demonstrate how to automatically generate a converter for a custom kernel using...">
 
 .. only:: html
@@ -320,18 +286,35 @@ Model Zoo
 
 .. raw:: html
 
-    <div class="sphx-glr-thumbcontainer" tooltip="Weight streaming in TensorRT is a powerful feature designed to overcome GPU memory limitations ...">
+    <div class="sphx-glr-thumbcontainer" tooltip="In some cases there isn&#x27;t a great way to do either of these, perhaps because the operator is a ...">
 
 .. only:: html
 
-  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_weight_streaming_example_thumb.png
+  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_aot_plugin_thumb.png
     :alt:
 
-  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_weight_streaming_example.py`
+  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_aot_plugin.py`
 
 .. raw:: html
 
-      <div class="sphx-glr-thumbnail-title">Weight Streaming</div>
+      <div class="sphx-glr-thumbnail-title">Torch-TensorRT supports falling back to PyTorch implementations of operations in the case that Torch-TensorRT</div>
+    </div>
+
+
+.. raw:: html
+
+    <div class="sphx-glr-thumbcontainer" tooltip="Basic example on how to use the hierarchical adjacency partitioner function and manually compil...">
+
+.. only:: html
+
+  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_hierarchical_partitioner_example_thumb.png
+    :alt:
+
+  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_hierarchical_partitioner_example.py`
+
+.. raw:: html
+
+      <div class="sphx-glr-thumbnail-title">Hierarchical Partitioner Example</div>
     </div>
 
 
@@ -349,6 +332,23 @@ Model Zoo
 .. raw:: html
 
       <div class="sphx-glr-thumbnail-title">Mutable Torch TensorRT Module</div>
+    </div>
+
+
+.. raw:: html
+
+    <div class="sphx-glr-thumbcontainer" tooltip="Weight streaming in TensorRT is a powerful feature designed to overcome GPU memory limitations ...">
+
+.. only:: html
+
+  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_weight_streaming_example_thumb.png
+    :alt:
+
+  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_weight_streaming_example.py`
+
+.. raw:: html
+
+      <div class="sphx-glr-thumbnail-title">Weight Streaming</div>
     </div>
 
 

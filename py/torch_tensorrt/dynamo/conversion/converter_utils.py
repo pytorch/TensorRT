@@ -19,10 +19,11 @@ from typing import (
 import numpy as np
 import tensorrt as trt
 import torch
-import torch_tensorrt.dynamo.conversion.impl as impl
 from torch.fx.experimental.proxy_tensor import unset_fake_temporarily
 from torch.fx.node import Argument, Target
 from torch.fx.passes.shape_prop import TensorMetadata
+
+import torch_tensorrt.dynamo.conversion.impl as impl
 from torch_tensorrt import _enums
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo._SourceIR import SourceIR
@@ -152,9 +153,9 @@ def cast_trt_tensor(
 ) -> TRTTensor:
     """Given a TRT Tensor, convert that Tensor to the specified dtype
 
-    Adds an Identity layer to the network which performs the conversion
-    if the input's dtype is different from the cast type. Otherwise returns
-    input unchanged
+    Adds a Cast layer to the network to convert the input tensor to the specified dtype.
+    If the input tensor already has the desired dtype, it is returned unchanged.
+    Otherwise, a Cast layer is added to perform the conversion
 
     Args:
         ctx (ConversionContext): A ConversionContext containing the TensorRT network
@@ -335,8 +336,8 @@ def to_trt_weights(
     ctx: ConversionContext,
     value: torch.Tensor,
     name: str,
-    layer_type_name: Literal["CONVOLUTION", "DECONVOLUTION", "CONSTANT"],
-    weight_type_name: Literal["KERNEL", "BIAS", "CONSTANT"],
+    layer_type_name: Literal["CONVOLUTION", "DECONVOLUTION", "CONSTANT", "SCALE"],
+    weight_type_name: Literal["KERNEL", "BIAS", "CONSTANT", "SCALE", "SHIFT", "POWER"],
     target: Optional[Union[Target, str]] = None,
     source_ir: Optional[SourceIR] = None,
     target_quantized_type: Optional[trt.DataType] = None,
@@ -362,8 +363,8 @@ def to_trt_weights(
         )
 
     # Weight Recording
-    supported_layer_types = ["CONVOLUTION", "DECONVOLUTION", "CONSTANT"]
-    supported_weight_types = ["KERNEL", "BIAS", "CONSTANT"]
+    supported_layer_types = ["CONVOLUTION", "DECONVOLUTION", "CONSTANT", "SCALE"]
+    supported_weight_types = ["KERNEL", "BIAS", "CONSTANT", "SCALE", "SHIFT", "POWER"]
     assert (
         layer_type_name in supported_layer_types
     ), f"Encountered unsupported layer type: {layer_type_name}. Supported types are: {supported_layer_types}. Manually calling to_trt_weights with a custom layer type is not intended for general use."
