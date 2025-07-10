@@ -67,7 +67,7 @@ void RegisterTRTCompileSpec() {
           .def("_set_precisions", &torch_tensorrt::pyapi::CompileSpec::setPrecisions)
           .def("_set_device", &torch_tensorrt::pyapi::CompileSpec::setDeviceIntrusive)
           .def("_set_torch_fallback", &torch_tensorrt::pyapi::CompileSpec::setTorchFallbackIntrusive)
-          .def("_set_ptq_calibrator", &torch_tensorrt::pyapi::CompileSpec::setPTQCalibratorViaHandle)
+          // .def("_set_ptq_calibrator", &torch_tensorrt::pyapi::CompileSpec::setPTQCalibratorViaHandle)
           .def("__str__", &torch_tensorrt::pyapi::CompileSpec::stringify);
 
   ADD_FIELD_GET_SET_REGISTRATION(TRTCompileSpecTSRegistration, torch_tensorrt::pyapi::CompileSpec, sparse_weights);

@@ -31,8 +31,8 @@ std::ostream& operator<<(std::ostream& os, const BuilderSettings& s) {
     if (s.device.device_type == nvinfer1::DeviceType::kDLA) {
     os << "\n    DLACore: " << s.device.dla_core;
     }
-    os << "\n    Engine Capability: " << s.capability                                      \
-       << "\n    Calibrator Created: " << (s.calibrator != nullptr);
+    os << "\n    Engine Capability: " << s.capability;
+      //  << "\n    Calibrator Created: " << (s.calibrator != nullptr);
     return os;
 }
 // clang-format on
@@ -67,12 +67,14 @@ ConversionCtx::ConversionCtx(BuilderSettings build_settings)
         TORCHTRT_CHECK(
             builder->platformHasFastInt8(), "Requested inference in INT8 but platform does not support INT8");
         cfg->setFlag(nvinfer1::BuilderFlag::kINT8);
-        if (!settings.calibrator) {
-          LOG_INFO(
-              "Int8 precision has been enabled but no calibrator provided. This assumes the network has Q/DQ nodes obtained from Quantization aware training. For more details, refer to https://docs.nvidia.com/deeplearning/tensorrt/developer-guide/index.html#work-with-qat-networks");
-        } else {
-          cfg->setInt8Calibrator(settings.calibrator);
-        }
+        // if (!settings.calibrator) {
+        //   LOG_INFO(
+        //       "Int8 precision has been enabled but no calibrator provided. This assumes the network has Q/DQ nodes
+        //       obtained from Quantization aware training. For more details, refer to
+        //       https://docs.nvidia.com/deeplearning/tensorrt/developer-guide/index.html#work-with-qat-networks");
+        // } else {
+        //   cfg->setInt8Calibrator(settings.calibrator);
+        // }
         break;
       case nvinfer1::DataType::kFLOAT:
         break;
@@ -89,7 +91,7 @@ ConversionCtx::ConversionCtx(BuilderSettings build_settings)
   if (settings.disable_tf32) {
     cfg->clearFlag(nvinfer1::BuilderFlag::kTF32);
   }
-#if NV_TENSORRT_MAJOR > 7
+#if !defined(TRT_MAJOR_RTX) && (NV_TENSORRT_MAJOR > 7)
   if (settings.sparse_weights) {
     cfg->setFlag(nvinfer1::BuilderFlag::kSPARSE_WEIGHTS);
   }
@@ -163,7 +165,7 @@ void ConversionCtx::RecordNewITensor(const torch::jit::Value* value, nvinfer1::I
 }
 
 std::string ConversionCtx::SerializeEngine() {
-#if NV_TENSORRT_MAJOR > 7
+#if !defined(TRT_MAJOR_RTX) && (NV_TENSORRT_MAJOR > 7)
   auto serialized_network = make_trt(builder->buildSerializedNetwork(*net, *cfg));
   if (!serialized_network) {
     TORCHTRT_THROW_ERROR("Building serialized network failed in TensorRT");

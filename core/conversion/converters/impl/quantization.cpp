@@ -9,7 +9,7 @@ namespace converters {
 namespace impl {
 namespace {
 
-#if NV_TENSORRT_MAJOR > 7
+#if !defined(TRT_MAJOR_RTX) && (NV_TENSORRT_MAJOR > 7)
 // clang-format off
 
 bool add_qdq(ConversionCtx *ctx, const torch::jit::Node* n, nvinfer1::ITensor* input, nvinfer1::ITensor* scale, std::string& opName) {

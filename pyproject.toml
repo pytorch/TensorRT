@@ -84,6 +84,10 @@ dependencies = [
 dynamic = ["version"]
 
 [dependency-groups]
+rtx = [
+    "tensorrt_rtx",
+]
+
 dev = [
     "pre-commit>=2.20.0",
     "black>=22.6.0",
