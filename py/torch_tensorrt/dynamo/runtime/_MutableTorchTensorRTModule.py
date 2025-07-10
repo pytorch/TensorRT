@@ -3,7 +3,7 @@ import logging
 import warnings
 from copy import deepcopy
 from enum import Enum, auto
-from typing import Any, Dict, Iterator, Optional, Set, Union
+from typing import Any, Dict, Iterator, Optional, Set, Tuple, Union
 
 import numpy as np
 import torch
@@ -70,7 +70,9 @@ class MutableTorchTensorRTModule(object):
         strict: bool = True,
         prefer_deferred_runtime_asserts_over_guards: bool = False,
         weight_streaming_budget: Optional[int] = None,
-        enabled_precisions: Optional[Set[Union[torch.dtype, dtype]]] = None,
+        enabled_precisions: Union[
+            Set[Union[torch.dtype, dtype]], Tuple[Union[torch.dtype, dtype]]
+        ] = _defaults.ENABLED_PRECISIONS,
         **kwargs: Any,
     ) -> None:
         """
@@ -127,6 +129,10 @@ class MutableTorchTensorRTModule(object):
         self.refit_state = RefitState()
         self.pytorch_model = _make_refit_change_trigger(pytorch_model, self.refit_state)
         self.original_model = pytorch_model
+        if pytorch_model.training:
+            logger.warning(
+                "The model may be in training mode, which may affect the performance of the compiled model!"
+            )
         # Process settings
         self.gm: Any = None
         self.exp_program: Any = None
@@ -162,8 +168,6 @@ class MutableTorchTensorRTModule(object):
                     "Weight stremaing budget is not set. Using auto weight streaming budget"
                 )
         self.enabled_precisions = enabled_precisions
-        if self.enabled_precisions is None:
-            self.enabled_precisions = _defaults.ENABLED_PRECISIONS
 
         cls = self.__class__
         self.__class__ = type(
