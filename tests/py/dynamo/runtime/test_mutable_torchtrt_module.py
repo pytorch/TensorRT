@@ -313,7 +313,7 @@ def test_resnet18_modify_attribute():
         "immutable_weights": False,
     }
 
-    model = models.resnet18(pretrained=True).eval().to("cuda")
+    model = models.resnet18(pretrained=False).eval().to("cuda")
     mutable_module = torch_trt.MutableTorchTensorRTModule(model, **compile_spec)
     mutable_module(*inputs)
 
