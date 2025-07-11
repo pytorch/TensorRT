@@ -43,10 +43,9 @@ import logging
 import torch
 
 try:
-    import tensorrt  # noqa: F401
-
     from . import trt_alias  # noqa: F401
-
+ 
+    import tensorrt  # noqa: F401
     print(f"You are using {tensorrt.__name__=} {tensorrt.__version__=}")
 except ImportError:
     tensorrt_version = _parse_semver(__tensorrt_version__)

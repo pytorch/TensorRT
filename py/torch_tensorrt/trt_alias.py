@@ -86,7 +86,7 @@ def alias_tensorrt() -> None:
             raise RuntimeError("TensorRT package not found")
 
     proxy = TensorRTProxyModule(target)
-    proxy._package_name = "tensorrt" if use_rtx else "tensorrt_rtx"
+    proxy._package_name = "tensorrt_rtx" if use_rtx else "tensorrt"
 
     sys.modules["tensorrt"] = proxy
 

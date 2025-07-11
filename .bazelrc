@@ -38,6 +38,9 @@ build:cxx11_abi --define=abi=cxx11_abi
 
 build:jetpack --//toolchains/dep_collection:compute_libs=jetpack
 
+build:rtx_x86_64 --cxxopt="-std=c++17" --cxxopt="-fdiagnostics-color=always"
+build:rtx_win --cxxopt="/GS-" --cxxopt="/std:c++17" --cxxopt="/permissive-" --cxxopt="/wd4244" --cxxopt="/wd4267" --cxxopt="/wd4819" --features=windows_export_all_symbols
+
 build:ci_testing --define=torchtrt_src=prebuilt --cxxopt="-DDISABLE_TEST_IN_CI" --action_env "NVIDIA_TF32_OVERRIDE=0"
 build:use_precompiled_torchtrt --define=torchtrt_src=prebuilt
 

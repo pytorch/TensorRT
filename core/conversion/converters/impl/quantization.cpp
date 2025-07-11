@@ -9,15 +9,14 @@ namespace converters {
 namespace impl {
 namespace {
 
-#if !defined(TRT_MAJOR_RTX) && (NV_TENSORRT_MAJOR > 7)
+#if defined(TRT_MAJOR_RTX) || (NV_TENSORRT_MAJOR > 7)
 // clang-format off
 
 bool add_qdq(ConversionCtx *ctx, const torch::jit::Node* n, nvinfer1::ITensor* input, nvinfer1::ITensor* scale, std::string& opName) {
-  nvinfer1::IQuantizeLayer* quantize_layer = ctx->net->addQuantize(*input, *scale);
+  nvinfer1::IQuantizeLayer* quantize_layer = ctx->net->addQuantize(*input, *scale, nvinfer1::DataType::kINT8);
   TORCHTRT_CHECK(quantize_layer, "Unable to create QuantizeLayer from node: " << *n);
   quantize_layer->setAxis(0);
-
-  nvinfer1::IDequantizeLayer* dequantize_layer = ctx->net->addDequantize(*quantize_layer->getOutput(0), *scale);
+  nvinfer1::IDequantizeLayer* dequantize_layer = ctx->net->addDequantize(*quantize_layer->getOutput(0), *scale, input->getType());
   TORCHTRT_CHECK(dequantize_layer, "Unable to create DequantizeLayer from node: " << *n);
   dequantize_layer->setAxis(0);
 
@@ -54,12 +53,12 @@ auto quantization_registrations TORCHTRT_UNUSED = RegisterNodeConversionPatterns
               auto scale = args[1].ITensorOrFreeze(ctx);
               int64_t axis = args[3].unwrapToScalar().to<int64_t>();
               // Add and configure a QuantizeLayer.
-              nvinfer1::IQuantizeLayer* quantize_layer = ctx->net->addQuantize(*input, *scale);
+              nvinfer1::IQuantizeLayer* quantize_layer = ctx->net->addQuantize(*input, *scale, nvinfer1::DataType::kINT8);
               // Set a channel axis which represents output channels
               quantize_layer->setAxis(axis);
 
               // Add and configure a DequantizeLayer.
-              nvinfer1::IDequantizeLayer* dequantize_layer = ctx->net->addDequantize(*quantize_layer->getOutput(0), *scale);
+              nvinfer1::IDequantizeLayer* dequantize_layer = ctx->net->addDequantize(*quantize_layer->getOutput(0), *scale, input->getType());
               dequantize_layer->setAxis(axis);
               auto qdq_out = ctx->AssociateValueAndTensor(n->outputs()[0], dequantize_layer->getOutput(0));
 

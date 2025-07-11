@@ -11,6 +11,21 @@ config_setting(
 )
 
 config_setting(
+    name = "rtx_x86_64",
+    constraint_values = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:linux",
+    ],
+)
+
+config_setting(
+    name = "rtx_win",
+    constraint_values = [
+        "@platforms//os:windows",
+    ],
+)
+
+config_setting(
     name = "sbsa",
     constraint_values = [
         "@platforms//cpu:aarch64",
@@ -37,18 +52,27 @@ config_setting(
     ],
 )
 
+
 cc_library(
     name = "torch_tensorrt_plugins",
-    srcs = [
-        "impl/interpolate_plugin.cpp",
-        "impl/normalize_plugin.cpp",
-        "register_plugins.cpp",
-    ],
-    hdrs = [
-        "impl/interpolate_plugin.h",
-        "impl/normalize_plugin.h",
-        "plugins.h",
-    ],
+    srcs = select({
+        ":rtx_x86_64": [],
+        ":rtx_win": [],
+        "//conditions:default": [
+            "impl/interpolate_plugin.cpp",
+            "impl/normalize_plugin.cpp",
+            "register_plugins.cpp",
+        ],
+    }),
+    hdrs = select({
+        ":rtx_x86_64": [],
+        ":rtx_win": [],
+        "//conditions:default": [
+            "impl/interpolate_plugin.h",
+            "impl/normalize_plugin.h",
+            "plugins.h",
+        ],
+    }),
     copts = [
         "-pthread",
     ],
@@ -58,6 +82,8 @@ cc_library(
     deps = [
         "//core/util:prelude",
     ] + select({
+        ":rtx_x86_64": [],
+        ":rtx_win": [],
         ":windows": [
             "@tensorrt_win//:nvinfer",
             "@tensorrt_win//:nvinferplugin",
@@ -75,6 +101,8 @@ cc_library(
             "@tensorrt//:nvinferplugin",
         ],
     }) + select({
+        ":rtx_x86_64": [],
+        ":rtx_win": [],
         ":windows": ["@libtorch_win//:libtorch"],
         ":use_torch_whl": ["@torch_whl//:libtorch"],
         ":jetpack": ["@torch_l4t//:libtorch"],

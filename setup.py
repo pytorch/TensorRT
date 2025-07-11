@@ -222,9 +222,15 @@ def build_libtorchtrt_cxx11_abi(
         cmd.append("--config=python")
 
     if IS_WINDOWS:
-        cmd.append("--config=windows")
+        if USE_RTX:
+            cmd.append("--config=rtx_win")
+        else:
+            cmd.append("--config=windows")
     else:
-        cmd.append("--config=linux")
+        if USE_RTX:
+            cmd.append("--config=rtx_x86_64")
+        else:
+            cmd.append("--config=linux")
 
     if IS_JETPACK:
         cmd.append("--config=jetpack")
@@ -541,14 +547,24 @@ if not (PY_ONLY or NO_TS):
         else:
             tensorrt_linux_external_dir = tensorrt_x86_64_external_dir
 
-    tensorrt_windows_external_dir = (
-        lambda: subprocess.check_output(
-            [BAZEL_EXE, "query", "@tensorrt_win//:nvinfer", "--output", "location"]
+    if USE_RTX:
+        tensorrt_windows_external_dir = (
+            lambda: subprocess.check_output(
+                [BAZEL_EXE, "query", "@tensorrt_rtx_win//:nvinfer", "--output", "location"]
+            )
+            .decode("ascii")
+            .strip()
+            .split("/BUILD.bazel")[0]
         )
-        .decode("ascii")
-        .strip()
-        .split("/BUILD.bazel")[0]
-    )
+    else:
+        tensorrt_windows_external_dir = (
+            lambda: subprocess.check_output(
+                [BAZEL_EXE, "query", "@tensorrt_win//:nvinfer", "--output", "location"]
+            )
+            .decode("ascii")
+            .strip()
+            .split("/BUILD.bazel")[0]
+        )
 
     ext_modules += [
         CUDAExtension(

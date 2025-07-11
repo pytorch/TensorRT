@@ -9,7 +9,20 @@ config_setting(
         "//toolchains/dep_src:torch": "whl"
     },
 )
+config_setting(
+    name = "rtx_x86_64",
+    constraint_values = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:linux",
+    ],
+)
 
+config_setting(
+    name = "rtx_win",
+    constraint_values = [
+        "@platforms//os:windows",
+    ],
+)
 config_setting(
     name = "sbsa",
     constraint_values = [
@@ -53,6 +66,8 @@ cc_library(
         "//core/lowering/passes",
         "//core/util:prelude",
     ] + select({
+        ":rtx_x86_64": ["@tensorrt_rtx//:nvinfer"],
+        ":rtx_win": ["@tensorrt_rtx_win//:nvinfer"],
         ":windows": ["@tensorrt_win//:nvinfer"],
         ":sbsa": ["@tensorrt_sbsa//:nvinfer"],
         ":jetpack": ["@tensorrt_l4t//:nvinfer"],

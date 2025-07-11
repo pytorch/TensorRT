@@ -23,7 +23,9 @@
 #include "torch/torch.h"
 
 #include "torch_tensorrt/logging.h"
+#ifndef TRT_MAJOR_RTX
 #include "torch_tensorrt/ptq.h"
+#endif
 #include "torch_tensorrt/torch_tensorrt.h"
 
 namespace torchtrtc {
