@@ -43,10 +43,10 @@ import logging
 import torch
 
 try:
+    # note: trt_alias must be imported before any import tensorrt
     from . import trt_alias  # noqa: F401
- 
-    import tensorrt  # noqa: F401
-    print(f"You are using {tensorrt.__name__=} {tensorrt.__version__=}")
+
+    print(f"You are using {trt_alias.tensorrt_package_name=} ")
 except ImportError:
     tensorrt_version = _parse_semver(__tensorrt_version__)
     tensorrt_rtx_version = _parse_semver(__tensorrt_rtx_version__)
@@ -80,8 +80,9 @@ except ImportError:
             ],
         },
     }
+
     if sys.platform.startswith("win"):
-        WIN_LIBS = trt_lib[tensorrt.__name__]["win"]
+        WIN_LIBS = trt_lib[trt_alias.tensorrt_package_name]["win"]
         WIN_PATHS = os.environ["PATH"].split(os.path.pathsep)
         for lib in WIN_LIBS:
             ctypes.CDLL(_find_lib(lib, WIN_PATHS))
@@ -100,7 +101,7 @@ except ImportError:
             ]
         elif platform.uname().processor == "aarch64":
             LINUX_PATHS += ["/usr/lib/aarch64-linux-gnu"]
-        LINUX_LIBS = trt_lib[tensorrt.__name__]["linux"]
+        LINUX_LIBS = trt_lib[trt_alias.tensorrt_package_name]["linux"]
         for lib in LINUX_LIBS:
             ctypes.CDLL(_find_lib(lib, LINUX_PATHS))
 

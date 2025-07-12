@@ -59,29 +59,27 @@ ConversionCtx::ConversionCtx(BuilderSettings build_settings)
   for (auto p = settings.enabled_precisions.begin(); p != settings.enabled_precisions.end(); ++p) {
     switch (*p) {
       case nvinfer1::DataType::kHALF:
-        // tensorrt_rtx is strong typed, cannot set fp16 by builder config, only do this for tensorrt build
-        #ifndef TRT_MAJOR_RTX
+// tensorrt_rtx is strong typed, cannot set fp16 by builder config, only do this for tensorrt build
+#ifndef TRT_MAJOR_RTX
         TORCHTRT_CHECK(
             builder->platformHasFastFp16(), "Requested inference in FP16 but platform does not support FP16");
         cfg->setFlag(nvinfer1::BuilderFlag::kFP16);
         break;
-        #endif
+#endif
       case nvinfer1::DataType::kINT8:
-        // tensorrt_rtx is strong typed, cannot set int8 by builder config, only do this for tensorrt build
-        #ifndef TRT_MAJOR_RTX
+// tensorrt_rtx is strong typed, cannot set int8 by builder config, only do this for tensorrt build
+#ifndef TRT_MAJOR_RTX
         TORCHTRT_CHECK(
             builder->platformHasFastInt8(), "Requested inference in INT8 but platform does not support INT8");
         cfg->setFlag(nvinfer1::BuilderFlag::kINT8);
         if (!settings.calibrator) {
           LOG_INFO(
-              "Int8 precision has been enabled but no calibrator provided. This assumes the network has Q/DQ nodes
-              obtained from Quantization aware training. For more details, refer to
-              https://docs.nvidia.com/deeplearning/tensorrt/developer-guide/index.html#work-with-qat-networks");
+              "Int8 precision has been enabled but no calibrator provided. This assumes the network has Q/DQ nodes obtained from Quantization aware training. For more details, refer to https://docs.nvidia.com/deeplearning/tensorrt/developer-guide/index.html#work-with-qat-networks");
         } else {
           cfg->setInt8Calibrator(settings.calibrator);
         }
         break;
-        #endif
+#endif
       case nvinfer1::DataType::kFLOAT:
         break;
       case nvinfer1::DataType::kINT32:

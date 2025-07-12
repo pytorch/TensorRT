@@ -550,7 +550,13 @@ if not (PY_ONLY or NO_TS):
     if USE_RTX:
         tensorrt_windows_external_dir = (
             lambda: subprocess.check_output(
-                [BAZEL_EXE, "query", "@tensorrt_rtx_win//:nvinfer", "--output", "location"]
+                [
+                    BAZEL_EXE,
+                    "query",
+                    "@tensorrt_rtx_win//:nvinfer",
+                    "--output",
+                    "location",
+                ]
             )
             .decode("ascii")
             .strip()

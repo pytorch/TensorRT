@@ -336,8 +336,12 @@ int main(int argc, char** argv) {
   if (calibration_cache_file) {
     calibration_cache_file_path = torchtrtc::fileio::resolve_path(args::get(calibration_cache_file));
   }
-
-  // auto calibrator = torchtrt::ptq::make_int8_cache_calibrator(calibration_cache_file_path);
+#ifndef TRT_MAJOR_RTX
+  auto calibrator = torchtrt::ptq::make_int8_cache_calibrator(calibration_cache_file_path);
+#else
+  // rtx build has no calibrator
+  auto calibrator = nullptr;
+#endif
 
   compile_settings.require_full_compilation = require_full_compilation;
 
@@ -369,13 +373,13 @@ int main(int argc, char** argv) {
         compile_settings.enabled_precisions.insert(torch::kF16);
       } else if (dtype == torchtrt::DataType::kChar) {
         compile_settings.enabled_precisions.insert(torch::kI8);
-        // if (calibration_cache_file) {
-        //   compile_settings.ptq_calibrator = calibrator;
-        // } else {
-        //   torchtrt::logging::log(
-        //       torchtrt::logging::Level::kINFO,
-        //       "Int8 precision has been enabled but no calibrator provided. This assumes the network has Q/DQ nodes obtained from Quantization aware training. For more details, refer to https://docs.nvidia.com/deeplearning/tensorrt/developer-guide/index.html#work-with-qat-networks");
-        // }
+        if (calibration_cache_file) {
+          // compile_settings.ptq_calibrator = calibrator;
+        } else {
+          torchtrt::logging::log(
+              torchtrt::logging::Level::kINFO,
+              "Int8 precision has been enabled but no calibrator provided. This assumes the network has Q/DQ nodes obtained from Quantization aware training. For more details, refer to https://docs.nvidia.com/deeplearning/tensorrt/developer-guide/index.html#work-with-qat-networks");
+        }
       } else {
         std::stringstream ss;
         ss << "Invalid precision given for enabled kernel precision, options are [ float | float32 | f32 | fp32 | half | float16 | f16 | fp16 | char | int8 | i8 ], found: ";

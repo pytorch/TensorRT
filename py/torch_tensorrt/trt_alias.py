@@ -5,6 +5,9 @@ import sys
 from types import ModuleType
 from typing import Any
 
+tensorrt_package_name = ""
+tensorrt_package_imported = False
+
 
 def is_rtx_gpu() -> bool:
     try:
@@ -58,6 +61,11 @@ class TensorRTProxyModule(ModuleType):
 
 
 def alias_tensorrt() -> None:
+    global tensorrt_package_imported
+    # tensorrt package has been imported, no need to alias again
+    if tensorrt_package_imported:
+        return
+
     # Determine package name with env override support for easy testing with tensorrt or tensorrt_rtx
     # eg: FORCE_TENSORRT_RTX=1 python test.py
     # eg: FORCE_TENSORRT_STD=1 python test.py
@@ -69,25 +77,17 @@ def alias_tensorrt() -> None:
     else:
         use_rtx = is_rtx_gpu()
 
+    global tensorrt_package_name
+    tensorrt_package_name = "tensorrt_rtx" if use_rtx else "tensorrt"
     # Import the appropriate package
     try:
-        if use_rtx:
-            target = importlib.import_module("tensorrt_rtx")
-        else:
-            target = importlib.import_module("tensorrt")
+        target = importlib.import_module(tensorrt_package_name)
     except ImportError:
         # Fallback to standard tensorrt if RTX version not available
-        print(f"import error when {use_rtx=}, fallback to standard tensorrt")
-        try:
-            target = importlib.import_module("tensorrt")
-            # since we are using the standard tensorrt, we need to set the use_rtx to True
-            use_rtx = True
-        except ImportError:
-            raise RuntimeError("TensorRT package not found")
+        print(f"import error when try to import {tensorrt_package_name=}")
 
     proxy = TensorRTProxyModule(target)
-    proxy._package_name = "tensorrt_rtx" if use_rtx else "tensorrt"
-
+    proxy._package_name = tensorrt_package_name
     sys.modules["tensorrt"] = proxy
 
 
