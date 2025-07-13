@@ -374,7 +374,9 @@ int main(int argc, char** argv) {
       } else if (dtype == torchtrt::DataType::kChar) {
         compile_settings.enabled_precisions.insert(torch::kI8);
         if (calibration_cache_file) {
-          // compile_settings.ptq_calibrator = calibrator;
+#ifndef TRT_MAJOR_RTX
+          compile_settings.ptq_calibrator = calibrator;
+#endif
         } else {
           torchtrt::logging::log(
               torchtrt::logging::Level::kINFO,
