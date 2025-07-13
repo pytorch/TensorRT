@@ -1,4 +1,4 @@
-name: Build Linux Wheels For aarch64
+name: Build Linux Wheels
 
 on:
   workflow_call:
@@ -88,11 +88,6 @@ on:
         required: false
         default: "python -m build --wheel"
         type: string
-      is-jetpack:
-        description: Set to true if the build is for jetpack
-        required: false
-        default: false
-        type: boolean
       pip-install-torch-extra-args:
         # NOTE: Why does this exist?
         # Well setuptools / python packaging doesn't actually allow you to specify dependencies
@@ -110,10 +105,21 @@ on:
         description: 'Timeout for the job (in minutes)'
         default: 120
         type: number
+      use-rtx:
+        description: "Use RTX TensorRT"
+        default: false
+        type: boolean
+        required: false
+      is-jetpack:
+        description: Set to true if the build is for jetpack
+        required: false
+        default: false
+        type: boolean
     secrets:
       PYPI_API_TOKEN:
         description: An optional token to upload to pypi
         required: false
+
 
 permissions:
   id-token: write
@@ -154,7 +160,7 @@ jobs:
           fi
           echo "::endgroup::"
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           # Support the use case where we need to checkout someone's fork
           repository: ${{ inputs.test-infra-repository }}
@@ -205,11 +211,12 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
           cuda-version: ${{ env.CU_VERSION }}
           arch: ${{ env.ARCH }}
+
       - name: Combine Env Var and Build Env Files
         if: ${{ inputs.env-var-script != '' }}
         working-directory: ${{ inputs.repository }}
         run: |
-          set -x
+          set -euxo pipefail
           cat "${{ inputs.env-var-script }}" >> "${BUILD_ENV_FILE}"
       - name: Add XPU Env Vars in Build Env File
         if: ${{ matrix.gpu_arch_type == 'xpu' }}
@@ -251,7 +258,6 @@ jobs:
         working-directory: ${{ inputs.repository }}
         shell: bash -l {0}
         run: |
-          #set -euxo pipefail
           set -x
           source "${BUILD_ENV_FILE}"
           export PYTORCH_VERSION="$(${CONDA_RUN} pip show torch | grep ^Version: | sed 's/Version: *//' | sed 's/+.\+//')"
@@ -261,28 +267,37 @@ jobs:
             BUILD_VERSION="${BUILD_VERSION}+${CU_VERSION}"
           fi
           echo "BUILD_VERSION=$BUILD_VERSION"
-          if [[ ${{ inputs.is-jetpack }} == false ]]; then
-            ${CONDA_RUN} python setup.py bdist_wheel
+          echo "USE_RTX=$USE_RTX"
+          echo "LD_LIBRARY_PATH=$LD_LIBRARY_PATH"
+          if [[ ${{ inputs.use-rtx }} == true ]]; then
+            echo "Building tensorrt-rtx wheel"
+            ${CONDA_RUN} python setup.py bdist_wheel --use-rtx
           else
-            ${CONDA_RUN} python setup.py bdist_wheel --jetpack --plat-name=linux_tegra_aarch64
+            if [[ ${{ inputs.is-jetpack }} == true ]]; then
+              echo "Building tensorrt wheel for jetpack"
+              ${CONDA_RUN} python setup.py bdist_wheel --jetpack --plat-name=linux_tegra_aarch64
+            else
+              echo "Building standard tensorrt wheel"
+              ${CONDA_RUN} python setup.py bdist_wheel
+            fi
           fi
       - name: Repair Manylinux_2_28 Wheel
         shell: bash -l {0}
         env:
           PACKAGE_NAME: ${{ inputs.package-name }}
           SMOKE_TEST_SCRIPT: ${{ inputs.smoke-test-script }}
+        if: ${{ inputs.architecture == 'x86_64' }}
         run: |
           set -euxo pipefail
           source "${BUILD_ENV_FILE}"
-          # for pkg in ${{ inputs.repository }}/dist/*-linux_*.whl; do
-          #   # if the glob didn't match anything
-          #   if [[ ! -e $pkg ]]; then
-          #       continue
-          #   fi
-          #   abs_pkg=$(realpath $pkg)
-          #   ./test-infra/.github/scripts/repair_manylinux_2_28.sh $abs_pkg
-          # done
-          echo "Repair Manylinux_2_28 Wheel is not supported for aarch64"
+          for pkg in ${{ inputs.repository }}/dist/*-linux_*.whl; do
+            # if the glob didn't match anything
+            if [[ ! -e $pkg ]]; then
+                continue
+            fi
+            abs_pkg=$(realpath $pkg)
+            ./test-infra/.github/scripts/repair_manylinux_2_28.sh $abs_pkg
+          done
       - name: Run Post-Script
         if: ${{ inputs.post-script != '' }}
         uses: ./test-infra/.github/actions/run-script-with-cache
@@ -291,7 +306,6 @@ jobs:
           script: ${{ inputs.post-script }}
       - name: Smoke Test
         shell: bash -l {0}
-        if: ${{ inputs.is-jetpack == false }}
         env:
           PACKAGE_NAME: ${{ inputs.package-name }}
           SMOKE_TEST_SCRIPT: ${{ inputs.smoke-test-script }}
@@ -328,16 +342,15 @@ jobs:
 
       - name: Upload wheel to GitHub
         continue-on-error: true
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: ${{ env.ARTIFACT_NAME }}
           path: ${{ inputs.repository }}/dist/
 
   upload:
     needs: build
-    uses: pytorch/test-infra/.github/workflows/_binary_upload.yml@main
-    # for jetpack builds, only upload to pytorch index for nightly builds
-    if: ${{ inputs.is-jetpack == false || (github.event_name == 'push' && startsWith(github.event.ref, 'refs/heads/nightly')) }}
+    uses: ./.github/workflows/_binary_upload.yml
+    if: always()
     with:
       repository: ${{ inputs.repository }}
       ref: ${{ inputs.ref }}

@@ -53,6 +53,11 @@ on:
         description: 'Name to give artifacts uploaded from ${RUNNER_ARTIFACT_DIR}'
         default: ''
         type: string
+      use-rtx:
+        description: "Use RTX TensorRT"
+        default: false
+        type: boolean
+        required: false
 
 jobs:
   test:
@@ -135,6 +140,7 @@ jobs:
         working-directory: ${{ inputs.repository }}
         env:
           ALL_SECRETS: ${{ toJSON(secrets) }}
+          USE_RTX: ${{ inputs.use-rtx }}
         run: |
           set -euxo pipefail
           # shellcheck disable=SC2086
