@@ -29,10 +29,16 @@ if [[ ${USE_RTX} == true ]]; then
     if [[ ${PLATFORM} == win32 ]]; then
         curl -L http://cuda-repo/release-candidates/Libraries/TensorRT/v10.12/10.12.0.35-51f47a12/12.9-r575/Windows10-x64-winjit/zip/TensorRT-RTX-1.0.0.21.Windows.win10.cuda-12.9.zip -o TensorRT-RTX-1.0.0.21.Windows.win10.cuda-12.9.zip
         unzip TensorRT-RTX-1.0.0.21.Windows.win10.cuda-12.9.zip
+        rtx_lib_dir=${PWD}/TensorRT-RTX-1.0.0.21/lib
+        export LD_LIBRARY_PATH=${rtx_lib_dir}:$LD_LIBRARY_PATH
+        echo "LD_LIBRARY_PATH: $LD_LIBRARY_PATH"
         pip install TensorRT-RTX-1.0.0.21/python/tensorrt_rtx-1.0.0.21-${CPYTHON_TAG}-none-win_amd64.whl
     else
         curl -L http://cuda-repo/release-candidates/Libraries/TensorRT/v10.12/10.12.0.35-51f47a12/12.9-r575/Linux-x64-manylinux_2_28-winjit/tar/TensorRT-RTX-1.0.0.21.Linux.x86_64-gnu.cuda-12.9.tar.gz -o TensorRT-RTX-1.0.0.21.Linux.x86_64-gnu.cuda-12.9.tar.gz
         tar -xzf TensorRT-RTX-1.0.0.21.Linux.x86_64-gnu.cuda-12.9.tar.gz
+        rtx_lib_dir=${PWD}/TensorRT-RTX-1.0.0.21/lib
+        export LD_LIBRARY_PATH=${rtx_lib_dir}:$LD_LIBRARY_PATH
+        echo "LD_LIBRARY_PATH: $LD_LIBRARY_PATH"
         pip install TensorRT-RTX-1.0.0.21/python/tensorrt_rtx-1.0.0.21-${CPYTHON_TAG}-none-linux_x86_64.whl
     fi
 else
@@ -45,6 +51,12 @@ if [[ ${PLATFORM} == win32 ]]; then
     pip install ${RUNNER_ARTIFACT_DIR}/torch_tensorrt*.whl
 else
     pip install /opt/torch-tensorrt-builds/torch_tensorrt*.whl
+fi
+
+if [[ ${USE_RTX} == true ]]; then
+    # currently tensorrt is installed automatically by install torch-tensorrt since it is a dependency of torch-tensorrt in pyproject.toml
+    # so we need to uninstall it to avoid conflict
+    pip uninstall -y tensorrt tensorrt_cu12 tensorrt_cu12_bindings tensorrt_cu12_libs
 fi
 
 echo -e "Running test script";

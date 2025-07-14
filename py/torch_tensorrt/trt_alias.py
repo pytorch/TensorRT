@@ -81,14 +81,20 @@ def alias_tensorrt() -> None:
     tensorrt_package_name = "tensorrt_rtx" if use_rtx else "tensorrt"
     # Import the appropriate package
     try:
-        target = importlib.import_module(tensorrt_package_name)
-    except ImportError:
+        target_module = importlib.import_module(tensorrt_package_name)
+        proxy = TensorRTProxyModule(target_module)
+        proxy._package_name = tensorrt_package_name
+        sys.modules["tensorrt"] = proxy
+        tensorrt_package_imported = True
+    except ImportError as e:
         # Fallback to standard tensorrt if RTX version not available
-        print(f"import error when try to import {tensorrt_package_name=}")
-
-    proxy = TensorRTProxyModule(target)
-    proxy._package_name = tensorrt_package_name
-    sys.modules["tensorrt"] = proxy
+        print(f"import error when try to import {tensorrt_package_name=} got error {e}")
+        print(
+            f"make sure tensorrt lib is in the LD_LIBRARY_PATH: {os.environ.get('LD_LIBRARY_PATH')}"
+        )
+        raise Exception(
+            f"import error when try to import {tensorrt_package_name=} got error {e}"
+        )
 
 
 alias_tensorrt()
