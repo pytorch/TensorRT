@@ -366,5 +366,5 @@ jobs:
       PYPI_API_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}-${{inputs.use-rtx}}-${{inputs.is-jetpack}}-${{ inputs.repository }}-${{ github.event_name == 'workflow_dispatch' }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}-${{inputs.use-rtx}}-${{inputs.architecture}}-${{inputs.is-jetpack}}-${{ inputs.repository }}-${{ github.event_name == 'workflow_dispatch' }}
   cancel-in-progress: true

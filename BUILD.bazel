@@ -1,11 +1,4 @@
-load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
 load("@rules_pkg//:pkg.bzl", "pkg_tar")
-
-bool_flag(
-    name = "use_rtx",
-    build_setting_default = False,
-    visibility = ["//visibility:public"],
-)
 
 config_setting(
     name = "windows",
@@ -19,7 +12,9 @@ config_setting(
     constraint_values = [
         "@platforms//os:windows",
     ],
-    flag_values = {":use_rtx": "true"},
+    flag_values = {
+        "//toolchains/dep_collection:compute_libs": "rtx",
+    },
 )
 
 pkg_tar(
