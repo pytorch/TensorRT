@@ -1,13 +1,6 @@
 name: Build and test Linux x86_64 wheels
 
 on:
-  workflow_call:
-    inputs:
-      use-rtx:
-        description: "Use RTX TensorRT"
-        default: false
-        type: boolean
-        required: false
   pull_request:
   push:
     branches:
@@ -19,6 +12,12 @@ on:
       # Release candidate tags look like: v1.11.0-rc1
       - v[0-9]+.[0-9]+.[0-9]+-rc[0-9]+
   workflow_dispatch:
+    inputs:
+      use-rtx:
+        description: "Use RTX TensorRT"
+        default: false
+        type: boolean
+        required: true
 
 jobs:
   generate-matrix:
@@ -82,7 +81,7 @@ jobs:
       smoke-test-script: ${{ matrix.smoke-test-script }}
       trigger-event: ${{ github.event_name }}
       architecture: "x86_64"
-      use-rtx: ${{ inputs.use-rtx }}
+      use-rtx: ${{ github.event.inputs.use-rtx }}
 
   tests-py-torchscript-fe:
     name: Test torchscript frontend [Python]
@@ -347,5 +346,5 @@ jobs:
         popd
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref_name }}-${{ inputs.use-rtx }}-${{ inputs.repository }}-${{ github.event_name == 'workflow_dispatch' }}-${{ inputs.job-name }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref_name }}-${{ github.event.inputs.use-rtx }}-${{ inputs.repository }}-${{ github.event_name == 'workflow_dispatch' }}-${{ inputs.job-name }}
   cancel-in-progress: true
