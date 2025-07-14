@@ -57,10 +57,13 @@ if __name__ == "__main__":
             truncate_double=True,
             device=device,
             disable_tf32=True,
-            use_explicit_typing=True,
-            use_fp32_acc=True,
+            use_explicit_typing = False,
+            use_fp32_acc = False,
+            use_python_runtime=True,
+            # offload_module_to_cpu=True,
+            min_block_size= 1,
         )
-
+            
     ####################################################################
     # 3) Torch-TensorRT compile: Multi-Modal Projector
     ####################################################################
@@ -99,8 +102,11 @@ if __name__ == "__main__":
             truncate_double=True,
             device=device,
             disable_tf32=True,
-            use_explicit_typing=True,
-            use_fp32_acc=True,
+            use_explicit_typing = False,
+            use_fp32_acc = False,
+            use_python_runtime=True,
+            # offload_module_to_cpu=True,
+            min_block_size= 1,
         )
 
     ####################################################################
@@ -177,8 +183,11 @@ if __name__ == "__main__":
             truncate_double=True,
             device=device,
             disable_tf32=True,
-            use_explicit_typing=True,
-            use_fp32_acc=True,
+            use_explicit_typing = False,
+            use_fp32_acc = False,
+            use_python_runtime=True,
+            # offload_module_to_cpu=True,
+            min_block_size= 1,
         )
 
     ####################################################################

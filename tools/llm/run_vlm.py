@@ -59,7 +59,7 @@ def _load_eagle2(device: torch.device, torch_dtype: torch.dtype):
     with torch.no_grad():
         model = (
             AutoModel.from_pretrained(
-                model_id, trust_remote_code=True, torch_dtype=torch_dtype
+                model_id, trust_remote_code=True, torch_dtype=torch_dtype, attn_implementation="sdpa"
             )
             .eval()
             .to(device)
@@ -75,7 +75,7 @@ def _load_eagle2(device: torch.device, torch_dtype: torch.dtype):
     return model, processor, emb_layer
 
 
-def _load_paligemma(device: torch.device, torch_dtype: torch.dtype):
+def _load_paligemma(device, torch_dtype: torch.dtype):
     """
     Load Paligemma model and processor.
 
@@ -84,30 +84,30 @@ def _load_paligemma(device: torch.device, torch_dtype: torch.dtype):
     tuple[torch.nn.Module, transformers.AutoProcessor, torch.nn.Embedding]
         The model, its processor and the language-model input embedding layer.
     """
-    from transformers import PaliGemmaForConditionalGeneration, PaliGemmaProcessor
+    from transformers.models.paligemma import PaliGemmaForConditionalGeneration, PaliGemmaProcessor
 
     model_id = "google/paligemma2-3b-pt-224"  # or other Paligemma variant
     with torch.no_grad():
         model = (
             PaliGemmaForConditionalGeneration.from_pretrained(
-                model_id, trust_remote_code=True, torch_dtype=torch_dtype
+                model_id, torch_dtype=torch_dtype # trust_remote_code=True, torch_dtype=torch_dtype
             )
             .eval()
             .to(device)
         )
-
-    processor = PaliGemmaProcessor.from_pretrained(
-        model_id, trust_remote_code=True, use_fast=True
-    )
-    if hasattr(processor, "tokenizer"):
-        processor.tokenizer.padding_side = "left"
+    processor = PaliGemmaProcessor.from_pretrained("google/paligemma2-3b-mix-224")
+    # processor = PaliGemmaProcessor.from_pretrained(
+    #     model_id, trust_remote_code=True, use_fast=True
+    # )
+    # if hasattr(processor, "tokenizer"):
+    #     processor.tokenizer.padding_side = "left"
 
     emb_layer = model.language_model.get_input_embeddings().to(torch_dtype).to(device)
     return model, processor, emb_layer
 
 
 def _load_model(
-    model_name: str, device: torch.device, torch_dtype: torch.dtype
+    model_name, device, torch_dtype: torch.dtype
 ) -> Tuple[torch.nn.Module, AutoProcessor, torch.nn.Embedding]:
     """Dispatch helper for supported VLMs."""
     if model_name.lower() == "eagle2":
@@ -133,7 +133,7 @@ class _LMNoCache(torch.nn.Module):
         self.lm = lm
 
     def forward(self, inputs_embeds, position_ids):
-        out = self.lm(inputs_embeds=inputs_embeds, position_ids=position_ids, use_cache=False)
+        out = self.lm(inputs_embeds=inputs_embeds, position_ids=position_ids)
         return out.logits if hasattr(out, "logits") else out
 
 
@@ -300,7 +300,7 @@ if __name__ == "__main__":
         description="Run VLM inference (PyTorch & TensorRT back-ends)"
     )
     parser.add_argument("--model", default="eagle2", choices=["eagle2", "paligemma"], help="VLM model name")
-    parser.add_argument("--prompt", default="Describe this image.", help="Prompt text")
+    parser.add_argument("--prompt", default="", help="Prompt text")
     parser.add_argument(
         "--precision",
         default="FP16",
@@ -345,7 +345,8 @@ if __name__ == "__main__":
     # -------------------------------------------------------------------------#
     # 2. Input construction (image + text prompt)
     # -------------------------------------------------------------------------#
-    url = "https://cdn.pixabay.com/photo/2019/08/08/23/33/car-4393990_1280.jpg"
+    # url = "https://cdn.pixabay.com/photo/2019/08/08/23/33/car-4393990_1280.jpg"
+    url = "https://huggingface.co/datasets/huggingface/documentation-images/resolve/main/transformers/tasks/car.jpg"
     image = Image.open(requests.get(url, stream=True).raw)
 
     if args.benchmark:
@@ -378,13 +379,22 @@ if __name__ == "__main__":
     input_len = inputs["input_ids"].shape[-1]
 
     max_output_len = inputs["input_ids"].shape[1] + args.num_tokens
+    pyt_generation = model.generate(
+        **inputs, max_new_tokens=100, do_sample=False
+    ) 
+    Original_pyt_gen_tokens = pyt_generation[0][input_len:]
+    Original_pyt_decoded = processor.decode(Original_pyt_gen_tokens, skip_special_tokens=True)
+    print("=============================")
+    print("Original Torch Model generated text:")
+    print(Original_pyt_decoded)
+    print("=============================")
 
     # -------------------------------------------------------------------------#
     # 3. Optional: PyTorch baseline
     # -------------------------------------------------------------------------#
     pyt_gen_tokens = pyt_timings = pyt_stats = None
     if args.enable_pytorch_run:
-        pyt_gen_tokens = generate_mm(
+        pyt_gen_tokens = generate_mm_paligemma(
             model,
             inputs["pixel_values"],
             inputs["input_ids"],
@@ -392,9 +402,10 @@ if __name__ == "__main__":
             processor.tokenizer.eos_token_id,
             emb_layer,
         )
+        print_outputs("PyTorch", pyt_gen_tokens, processor.tokenizer)
         if args.benchmark:
             pyt_timings = time_generate_mm(
-                generate_mm,
+                generate_mm_paligemma,
                 model,
                 inputs["pixel_values"].clone(),
                 inputs["input_ids"].clone(),

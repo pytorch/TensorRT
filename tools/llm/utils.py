@@ -713,88 +713,66 @@ def generate_mm_paligemma(
     eos_token_id: int,
     emb_layer: torch.nn.Embedding,
 ):
-    """Greedy decode for Paligemma-style VLM.
-
-    Parameters
-    ----------
-    model : nn.Module
-        Must expose vision_tower, multi_modal_projector, language_model, image_token_index.
-    pixel_values : Tensor | None
-        Input image batch (B,C,H,W) or None.
-    input_ids : LongTensor  (B, N_prompt)
-        Text prompt token ids including [IMG] placeholder(s).
-    max_output_seq_length : int
-        Maximum tokens to generate **in addition to** the prompt.
-    eos_token_id : int
-        Stop generation when all sequences emit EOS.
-    emb_layer : nn.Embedding
-        Embedding layer for input_ids.
-    """
-
     vit_embeds = None
-
     if pixel_values is not None:
-        # --- Vision encoder timing ---
-        vis_s = torch.cuda.Event(enable_timing=True)
-        vis_e = torch.cuda.Event(enable_timing=True)
-        vis_s.record()
         vit_out = model.vision_tower(pixel_values)
-        vis_e.record()
-        torch.cuda.synchronize()
-
-        vit_embeds = (
-            vit_out.last_hidden_state
-            if hasattr(vit_out, "last_hidden_state")
-            else vit_out
-        )
-
-        # Paligemma: vision_tower → multi_modal_projector
-        vit_embeds = model.multi_modal_projector(vit_embeds)
-        # Normalize by sqrt of hidden size
+        vit_embeds = model.multi_modal_projector(vit_out.last_hidden_state)
         vit_embeds = vit_embeds / (model.config.text_config.hidden_size ** 0.5)
 
-    # 2) Text token embeddings
-    seq_tokens = input_ids.clone()
-    seq_embeds = emb_layer(seq_tokens)
+    seq_tokens = input_ids.clone()                                # (B, S)
+    seq_embeds = emb_layer(seq_tokens)                            # (B, S, C)
 
+    # 이미지 토큰 교체
     if vit_embeds is not None:
         B, N, C = seq_embeds.shape
-        flat_emb = seq_embeds.view(B * N, C)
+        flat = seq_embeds.view(B * N, C)
+        mask = seq_tokens.view(B * N) == model.config.image_token_index
+        flat[mask] = vit_embeds.reshape(-1, C).to(flat.dtype)[: mask.sum()]
+        seq_embeds = flat.view(B, N, C)
 
-        mask = seq_tokens.view(B * N) == model.image_token_index
-        try:
-            flat_emb[mask] = vit_embeds.reshape(-1, C).to(flat_emb.dtype)[: mask.sum()]
-        except Exception:
-            # Fallback in unlikely size-mismatch cases
-            flat_emb[mask] = vit_embeds.reshape(-1, C)[: mask.sum()].to(flat_emb.dtype)
-        seq_embeds = flat_emb.view(B, N, C)
-
-    # ───────────────────────────────── Greedy loop ───────────────────────────────────────────────────
-    isl = seq_tokens.shape[1]
-    osl = max_output_seq_length - isl
+    # ---- 초기 position / cache_position ----
+    B = seq_tokens.size(0)
+    cache_position = torch.arange(seq_tokens.size(1), device=seq_tokens.device)
+    position_ids   = cache_position.unsqueeze(0) + 1              # 1-indexed
 
     generated = 0
+    while generated < max_output_seq_length:
+        cur_seq_len = seq_embeds.size(1)
 
-    while generated < osl:
-        cur_embeds = seq_embeds  # full seq first step or cache off
-        position_ids = (
-                torch.arange(cur_embeds.shape[1]).unsqueeze(0).to(cur_embeds.device)
-            )
+        # === PALIGEMMA 방식의 4D causal mask ===
+        causal_mask = model.model._update_causal_mask(
+            attention_mask=None,               # 2-D pad mask 없음
+            token_type_ids=None,
+            past_key_values=None,
+            cache_position=cache_position,
+            input_tensor=seq_embeds,
+            is_training=False,
+        )                                       # (B,1,S,S)  float16, 0 / -65504
+
         with torch.no_grad():
-            logits = model.language_model(inputs_embeds=cur_embeds, position_ids=position_ids)
-            if hasattr(logits, "logits"):
-                logits = logits.logits
+            out = model.language_model(
+                inputs_embeds=seq_embeds,
+                position_ids=position_ids,
+                attention_mask=causal_mask,
+                use_cache=False,                # full-seq 재계산
+            )
+            # logits = out.logits if hasattr(out, "logits") else out
+            logits = out.last_hidden_state if hasattr(out, "last_hidden_state") else out
 
-        next_tok = torch.argmax(logits[:, -1, :], dim=-1)  # (B,)
-        # append token & embed
-        seq_tokens = torch.cat([seq_tokens, next_tok[:, None]], dim=-1)
+        next_tok = torch.argmax(logits[:, -1, :], dim=-1)         # (B,)
+        seq_tokens = torch.cat([seq_tokens, next_tok[:, None]], dim=1)
         seq_embeds = torch.cat([seq_embeds, emb_layer(next_tok)[:, None, :]], dim=1)
+
+        # position / cache_position 업데이트
+        position_ids   = torch.cat([position_ids, position_ids[:, -1:] + 1], dim=1)
+        cache_position = torch.arange(seq_tokens.size(1), device=seq_tokens.device)
 
         generated += 1
         if (next_tok == eos_token_id).all():
             break
 
-    return seq_tokens[:, input_ids.shape[1] :]
+    return seq_tokens
+
 
 
 @torch.inference_mode()

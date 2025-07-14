@@ -25,9 +25,9 @@ class TextModelWrapper(nn.Module):
         super().__init__()
         self.text_model = text_model
 
-    def forward(self, input_ids, attention_mask=None):
+    def forward(self, input_ids):
         out = self.text_model(
-            input_ids=input_ids, attention_mask=attention_mask, use_cache=False
+            input_ids=input_ids, use_cache=False
         )
         return out.last_hidden_state  # shape: (bs, seq, hidden)
 
@@ -37,7 +37,7 @@ class TextModelWrapper(nn.Module):
 # ----------------------------------------------------------------------
 def main(args):
     # 1) Load model -------------------------------------------------------
-
+    torch.manual_seed(42)
     model_name = "Qwen/Qwen2.5-VL-3B-Instruct"
     # default: Load the model on the available device(s)
     full_model = Qwen2_5_VLForConditionalGeneration.from_pretrained(
@@ -61,12 +61,12 @@ def main(args):
     # 2) dummu input 
     B, S = args.batch_size, args.seq_len
     input_ids = torch.randint(0, vocab_size, (B, S), device=DEVICE)
-    attention_mask = torch.ones_like(input_ids).to(DEVICE)
+    # attention_mask = torch.ones_like(input_ids).to(DEVICE)
 
     # 3) PyTorch output
     with torch.inference_mode():
         pyt_logits = text_model(
-            input_ids=input_ids, attention_mask=attention_mask, use_cache=False
+            input_ids=input_ids, use_cache=False
         ).last_hidden_state
 
     # 4) Torch-TensorRT 컴파일 ------------------------------------------
@@ -90,17 +90,17 @@ def main(args):
     _seq = torch.export.Dim('_seq', min=1, max=272)
     seq = 8*_seq
     S_dyn = seq
-    dyn_shapes = {"input_ids": {1: S_dyn}, "attention_mask": {1: S_dyn}}
+    dyn_shapes = {"input_ids": {1: S_dyn}}
 
     with torch.inference_mode():
         export_mod = torch.export.export(
-            wrapper, (input_ids, attention_mask), dynamic_shapes=dyn_shapes, strict=False
+            wrapper, (input_ids,), dynamic_shapes=dyn_shapes, strict=False
         )
 
     with torch_tensorrt.logging.debug() if args.debug else nullcontext():
         trt_mod = torch_tensorrt.dynamo.compile(
             export_mod,
-            inputs=[input_ids, attention_mask],
+            inputs=[input_ids],
             enabled_precisions=enabled_precisions,
             use_fp32_acc=use_fp32_acc,
             use_explicit_typing=use_explicit_typing,
@@ -110,7 +110,7 @@ def main(args):
 
     # 5) TensorRT 출력 ---------------------------------------------------
     with torch.inference_mode():
-        trt_logits = trt_mod(input_ids, attention_mask)
+        trt_logits = trt_mod(input_ids)
 
     # 6) 비교 ------------------------------------------------------------
     diff = (pyt_logits - trt_logits).abs().mean()
