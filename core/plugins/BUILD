@@ -6,7 +6,7 @@ package(default_visibility = ["//visibility:public"])
 config_setting(
     name = "use_torch_whl",
     flag_values = {
-        "//toolchains/dep_src:torch": "whl"
+        "//toolchains/dep_src:torch": "whl",
     },
 )
 
@@ -16,6 +16,9 @@ config_setting(
         "@platforms//cpu:x86_64",
         "@platforms//os:linux",
     ],
+    flag_values = {
+        "//toolchains/dep_collection:compute_libs": "rtx",
+    },
 )
 
 config_setting(
@@ -23,6 +26,9 @@ config_setting(
     constraint_values = [
         "@platforms//os:windows",
     ],
+    flag_values = {
+        "//toolchains/dep_collection:compute_libs": "rtx",
+    },
 )
 
 config_setting(
@@ -31,7 +37,7 @@ config_setting(
         "@platforms//cpu:aarch64",
     ],
     flag_values = {
-        "//toolchains/dep_collection:compute_libs": "default"
+        "//toolchains/dep_collection:compute_libs": "default",
     },
 )
 
@@ -41,7 +47,7 @@ config_setting(
         "@platforms//cpu:aarch64",
     ],
     flag_values = {
-        "//toolchains/dep_collection:compute_libs": "jetpack"
+        "//toolchains/dep_collection:compute_libs": "jetpack",
     },
 )
 
@@ -52,12 +58,11 @@ config_setting(
     ],
 )
 
-
 cc_library(
     name = "torch_tensorrt_plugins",
     srcs = select({
-        ":rtx_x86_64": [],
         ":rtx_win": [],
+        ":rtx_x86_64": [],
         "//conditions:default": [
             "impl/interpolate_plugin.cpp",
             "impl/normalize_plugin.cpp",
@@ -65,8 +70,8 @@ cc_library(
         ],
     }),
     hdrs = select({
-        ":rtx_x86_64": [],
         ":rtx_win": [],
+        ":rtx_x86_64": [],
         "//conditions:default": [
             "impl/interpolate_plugin.h",
             "impl/normalize_plugin.h",
@@ -82,30 +87,29 @@ cc_library(
     deps = [
         "//core/util:prelude",
     ] + select({
-        ":rtx_x86_64": [],
-        ":rtx_win": [],
-        ":windows": [
-            "@tensorrt_win//:nvinfer",
-            "@tensorrt_win//:nvinferplugin",
+        ":jetpack": [
+            "@tensorrt_l4t//:nvinfer",
+            "@tensorrt_l4t//:nvinferplugin",
         ],
+        ":rtx_win": [],
+        ":rtx_x86_64": [],
         ":sbsa": [
             "@tensorrt_sbsa//:nvinfer",
             "@tensorrt_sbsa//:nvinferplugin",
         ],
-        ":jetpack": [
-            "@tensorrt_l4t//:nvinfer",
-            "@tensorrt_l4t//:nvinferplugin",
+        ":windows": [
+            "@tensorrt_win//:nvinfer",
+            "@tensorrt_win//:nvinferplugin",
         ],
         "//conditions:default": [
             "@tensorrt//:nvinfer",
             "@tensorrt//:nvinferplugin",
         ],
     }) + select({
-        ":rtx_x86_64": [],
-        ":rtx_win": [],
-        ":windows": ["@libtorch_win//:libtorch"],
-        ":use_torch_whl": ["@torch_whl//:libtorch"],
         ":jetpack": ["@torch_l4t//:libtorch"],
+        ":rtx_win": ["@libtorch_win//:libtorch"],
+        ":use_torch_whl": ["@torch_whl//:libtorch"],
+        ":windows": ["@libtorch_win//:libtorch"],
         "//conditions:default": ["@libtorch"],
     }),
     alwayslink = True,

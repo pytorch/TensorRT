@@ -222,15 +222,13 @@ def build_libtorchtrt_cxx11_abi(
         cmd.append("--config=python")
 
     if IS_WINDOWS:
-        if USE_RTX:
-            cmd.append("--config=rtx_win")
-        else:
-            cmd.append("--config=windows")
+        cmd.append("--config=windows")
     else:
-        if USE_RTX:
-            cmd.append("--config=rtx_x86_64")
-        else:
-            cmd.append("--config=linux")
+        cmd.append("--config=linux")
+
+    if USE_RTX:
+        cmd.append("--config=rtx")
+        print("TensorRT RTX build")
 
     if IS_JETPACK:
         cmd.append("--config=jetpack")

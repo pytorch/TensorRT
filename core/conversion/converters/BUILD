@@ -16,6 +16,9 @@ config_setting(
         "@platforms//cpu:x86_64",
         "@platforms//os:linux",
     ],
+    flag_values = {
+        "//toolchains/dep_collection:compute_libs": "rtx",
+    },
 )
 
 config_setting(
@@ -23,6 +26,9 @@ config_setting(
     constraint_values = [
         "@platforms//os:windows",
     ],
+    flag_values = {
+        "//toolchains/dep_collection:compute_libs": "rtx",
+    },
 )
 
 config_setting(
@@ -72,6 +78,7 @@ cc_library(
         "//conditions:default": ["@tensorrt//:nvinfer"],
     }) + select({
         ":jetpack": ["@torch_l4t//:libtorch"],
+        ":rtx_win": ["@libtorch_win//:libtorch"],
         ":use_torch_whl": ["@torch_whl//:libtorch"],
         ":windows": ["@libtorch_win//:libtorch"],
         "//conditions:default": ["@libtorch"],
@@ -100,6 +107,7 @@ cc_library(
         "//conditions:default": ["@tensorrt//:nvinfer"],
     }) + select({
         ":jetpack": ["@torch_l4t//:libtorch"],
+        ":rtx_win": ["@libtorch_win//:libtorch"],
         ":use_torch_whl": ["@torch_whl//:libtorch"],
         ":windows": ["@libtorch_win//:libtorch"],
         "//conditions:default": ["@libtorch"],
@@ -171,6 +179,7 @@ cc_library(
         "//conditions:default": ["@tensorrt//:nvinfer"],
     }) + select({
         ":jetpack": ["@torch_l4t//:libtorch"],
+        ":rtx_win": ["@libtorch_win//:libtorch"],
         ":use_torch_whl": ["@torch_whl//:libtorch"],
         ":windows": ["@libtorch_win//:libtorch"],
         "//conditions:default": ["@libtorch"],

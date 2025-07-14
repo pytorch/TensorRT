@@ -8,6 +8,7 @@ config_setting(
         "@platforms//cpu:x86_64",
         "@platforms//os:linux",
     ],
+    flag_values = {"@//toolchains/dep_collection:compute_libs": "rtx"},
 )
 
 config_setting(
@@ -15,6 +16,7 @@ config_setting(
     constraint_values = [
         "@platforms//os:windows",
     ],
+    flag_values = {"@//toolchains/dep_collection:compute_libs": "rtx"},
 )
 
 cc_library(

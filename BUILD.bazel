@@ -1,10 +1,25 @@
+load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
 load("@rules_pkg//:pkg.bzl", "pkg_tar")
+
+bool_flag(
+    name = "use_rtx",
+    build_setting_default = False,
+    visibility = ["//visibility:public"],
+)
 
 config_setting(
     name = "windows",
     constraint_values = [
         "@platforms//os:windows",
     ],
+)
+
+config_setting(
+    name = "rtx_win",
+    constraint_values = [
+        "@platforms//os:windows",
+    ],
+    flag_values = {":use_rtx": "true"},
 )
 
 pkg_tar(
@@ -52,6 +67,7 @@ pkg_tar(
 pkg_tar(
     name = "lib",
     srcs = select({
+        ":rtx_win": ["//cpp/lib:torchtrt.dll"],
         ":windows": ["//cpp/lib:torchtrt.dll"],
         "//conditions:default": [
             "//cpp/lib:libtorchtrt.so",
@@ -66,6 +82,7 @@ pkg_tar(
 pkg_tar(
     name = "lib_rt",
     srcs = select({
+        ":rtx_win": ["//cpp/lib:torchtrt_runtime.dll"],
         ":windows": ["//cpp/lib:torchtrt_runtime.dll"],
         "//conditions:default": [
             "//cpp/lib:libtorchtrt_runtime.so",
@@ -98,6 +115,7 @@ pkg_tar(
         ":include_core",
         ":lib",
     ] + select({
+        ":rtx_win": [],
         ":windows": [],
         "//conditions:default": [":bin"],
     }),
