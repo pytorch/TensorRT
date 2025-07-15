@@ -18,82 +18,136 @@ namespace py = pybind11;
 namespace torch_tensorrt {
 namespace pyapi {
 
-// template <typename Derived>
-// CalibrationAlgo
+#ifndef TRT_MAJOR_RTX
+template <typename Derived>
+class pyCalibratorTrampoline : public Derived {
+ public:
+  using Derived::Derived; // Inherit constructors
 
-// class pyIInt8Calibrator : public pyCalibratorTrampoline<nvinfer1::IInt8Calibrator> {
-//  public:
-//   using Derived = pyCalibratorTrampoline<nvinfer1::IInt8Calibrator>;
-//   using Derived::Derived;
+  int getBatchSize() const noexcept override {
+    try {
+      PYBIND11_OVERLOAD_PURE_NAME(int, Derived, "get_batch_size", getBatchSize);
+    } catch (std::exception const& e) {
+      LOG_ERROR("Exception caught in get_batch_size" + std::string(e.what()));
+    } catch (...) {
+      LOG_ERROR("Exception caught in get_batch_size");
+    }
+    return -1;
+  }
 
-//   nvinfer1::InterfaceInfo getInterfaceInfo() const noexcept override {
-//     return nvinfer1::InterfaceInfo{"PYTHON CALIBRATOR", 1, 0};
-//   }
+  bool getBatch(void* bindings[], const char* names[], int nbBindings) noexcept override {
+    py::gil_scoped_acquire gil{};
 
-//   nvinfer1::CalibrationAlgoType getAlgorithm() noexcept override {
-//     try {
-//       PYBIND11_OVERLOAD_PURE_NAME(
-//           nvinfer1::CalibrationAlgoType, nvinfer1::IInt8Calibrator, "get_algorithm", getAlgorithm);
-//     } catch (std::exception const& e) {
-//       LOG_ERROR("Exception caught in get_algorithm: " + std::string(e.what()));
-//     } catch (...) {
-//       LOG_ERROR("Exception caught in get_algorithm");
-//     }
-//     return {};
-//   }
-// };
+    py::function pyGetBatch = torch_tensorrt::pyapi::util::getOverload(static_cast<Derived*>(this), "get_batch");
+    std::vector<const char*> namesVec(names, names + nbBindings);
+    py::object result = pyGetBatch(namesVec);
+    // Copy over into the other data structure.
+    if (!result.is_none() && result.cast<std::vector<size_t>>().size() != 0) {
+      std::memcpy(bindings, result.cast<std::vector<size_t>>().data(), nbBindings * sizeof(void*));
+      return true;
+    }
+    return false;
+  }
 
-// class pyIInt8LegacyCalibrator : public pyCalibratorTrampoline<nvinfer1::IInt8LegacyCalibrator> {
-//  public:
-//   using Derived = pyCalibratorTrampoline<nvinfer1::IInt8LegacyCalibrator>;
-//   using Derived::Derived;
+  const void* readCalibrationCache(std::size_t& length) noexcept override {
+    py::gil_scoped_acquire gil{};
 
-//   double getQuantile() const noexcept override {
-//     try {
-//       PYBIND11_OVERLOAD_PURE_NAME(double, nvinfer1::IInt8LegacyCalibrator, "get_quantile", getQuantile);
-//     } catch (std::exception const& e) {
-//       LOG_ERROR("Exception caught in get_quantile: " + std::string(e.what()));
-//     } catch (...) {
-//       LOG_ERROR("Exception caught in get_quantile");
-//     }
-//     return -1.0;
-//   }
+    py::function pyReadCalibrationCache =
+        torch_tensorrt::pyapi::util::getOverload(static_cast<Derived*>(this), "read_calibration_cache");
+    py::buffer cache = pyReadCalibrationCache();
+    if (!cache.is_none()) {
+      py::buffer_info info = cache.request();
+      length = info.size * info.itemsize;
+      return info.ptr;
+    }
+    return nullptr;
+  }
 
-//   double getRegressionCutoff() const noexcept override {
-//     try {
-//       PYBIND11_OVERLOAD_PURE_NAME(
-//           double, nvinfer1::IInt8LegacyCalibrator, "get_regression_cutoff", getRegressionCutoff);
-//     } catch (std::exception const& e) {
-//       LOG_ERROR("Exception caught in get_regression_cutoff: " + std::string(e.what()));
-//     } catch (...) {
-//       LOG_ERROR("Exception caught in get_regression_cutoff");
-//     }
-//     return -1.0;
-//   }
+  void writeCalibrationCache(const void* ptr, std::size_t length) noexcept override {
+    py::gil_scoped_acquire gil{};
 
-//   const void* readHistogramCache(std::size_t& length) noexcept override {
-//     try {
-//       PYBIND11_OVERLOAD_PURE_NAME(
-//           const char*, nvinfer1::IInt8LegacyCalibrator, "read_histogram_cache", readHistogramCache, length);
-//     } catch (std::exception const& e) {
-//       LOG_ERROR("Exception caught in read_histogram_cache" + std::string(e.what()));
-//     } catch (...) {
-//       LOG_ERROR("Exception caught in read_histogram_cache");
-//     }
-//     return {};
-//   }
+    py::function pyWriteCalibrationCache =
+        torch_tensorrt::pyapi::util::getOverload(static_cast<Derived*>(this), "write_calibration_cache");
 
-//   void writeHistogramCache(const void* ptr, std::size_t length) noexcept override {
-//     try {
-//       PYBIND11_OVERLOAD_PURE_NAME(
-//           void, nvinfer1::IInt8LegacyCalibrator, "write_histogram_cache", writeHistogramCache, ptr, length);
-//     } catch (std::exception const& e) {
-//       LOG_ERROR("Exception caught in write_histogram_cache" + std::string(e.what()));
-//     } catch (...) {
-//       LOG_ERROR("Exception caught in write_histogram_cache");
-//     }
-//   }
-// };
+    py::memoryview cache{py::memoryview::from_buffer(static_cast<const uint8_t*>(ptr), {length}, {sizeof(uint8_t)})};
+    pyWriteCalibrationCache(cache);
+  }
+};
+
+class pyIInt8Calibrator : public pyCalibratorTrampoline<nvinfer1::IInt8Calibrator> {
+ public:
+  using Derived = pyCalibratorTrampoline<nvinfer1::IInt8Calibrator>;
+  using Derived::Derived;
+
+  nvinfer1::InterfaceInfo getInterfaceInfo() const noexcept override {
+    return nvinfer1::InterfaceInfo{"PYTHON CALIBRATOR", 1, 0};
+  }
+
+  nvinfer1::CalibrationAlgoType getAlgorithm() noexcept override {
+    try {
+      PYBIND11_OVERLOAD_PURE_NAME(
+          nvinfer1::CalibrationAlgoType, nvinfer1::IInt8Calibrator, "get_algorithm", getAlgorithm);
+    } catch (std::exception const& e) {
+      LOG_ERROR("Exception caught in get_algorithm: " + std::string(e.what()));
+    } catch (...) {
+      LOG_ERROR("Exception caught in get_algorithm");
+    }
+    return {};
+  }
+};
+
+class pyIInt8LegacyCalibrator : public pyCalibratorTrampoline<nvinfer1::IInt8LegacyCalibrator> {
+ public:
+  using Derived = pyCalibratorTrampoline<nvinfer1::IInt8LegacyCalibrator>;
+  using Derived::Derived;
+
+  double getQuantile() const noexcept override {
+    try {
+      PYBIND11_OVERLOAD_PURE_NAME(double, nvinfer1::IInt8LegacyCalibrator, "get_quantile", getQuantile);
+    } catch (std::exception const& e) {
+      LOG_ERROR("Exception caught in get_quantile: " + std::string(e.what()));
+    } catch (...) {
+      LOG_ERROR("Exception caught in get_quantile");
+    }
+    return -1.0;
+  }
+
+  double getRegressionCutoff() const noexcept override {
+    try {
+      PYBIND11_OVERLOAD_PURE_NAME(
+          double, nvinfer1::IInt8LegacyCalibrator, "get_regression_cutoff", getRegressionCutoff);
+    } catch (std::exception const& e) {
+      LOG_ERROR("Exception caught in get_regression_cutoff: " + std::string(e.what()));
+    } catch (...) {
+      LOG_ERROR("Exception caught in get_regression_cutoff");
+    }
+    return -1.0;
+  }
+
+  const void* readHistogramCache(std::size_t& length) noexcept override {
+    try {
+      PYBIND11_OVERLOAD_PURE_NAME(
+          const char*, nvinfer1::IInt8LegacyCalibrator, "read_histogram_cache", readHistogramCache, length);
+    } catch (std::exception const& e) {
+      LOG_ERROR("Exception caught in read_histogram_cache" + std::string(e.what()));
+    } catch (...) {
+      LOG_ERROR("Exception caught in read_histogram_cache");
+    }
+    return {};
+  }
+
+  void writeHistogramCache(const void* ptr, std::size_t length) noexcept override {
+    try {
+      PYBIND11_OVERLOAD_PURE_NAME(
+          void, nvinfer1::IInt8LegacyCalibrator, "write_histogram_cache", writeHistogramCache, ptr, length);
+    } catch (std::exception const& e) {
+      LOG_ERROR("Exception caught in write_histogram_cache" + std::string(e.what()));
+    } catch (...) {
+      LOG_ERROR("Exception caught in write_histogram_cache");
+    }
+  }
+};
+#endif
 
 void set_device(const int device_id) {
   core::set_device(device_id);
@@ -223,50 +277,52 @@ PYBIND11_MODULE(_C, m) {
       .value("channels_last", TensorFormat::kChannelsLast, "Channels last memory layout (NHWC)")
       .export_values();
 
-  // py::enum_<nvinfer1::CalibrationAlgoType>(m, "CalibrationAlgo", py::module_local(), "Type of calibration algorithm")
-  //     .value("LEGACY_CALIBRATION", nvinfer1::CalibrationAlgoType::kLEGACY_CALIBRATION)
-  //     .value("ENTROPY_CALIBRATION", nvinfer1::CalibrationAlgoType::kENTROPY_CALIBRATION)
-  //     .value("ENTROPY_CALIBRATION_2", nvinfer1::CalibrationAlgoType::kENTROPY_CALIBRATION_2)
-  //     .value("MINMAX_CALIBRATION", nvinfer1::CalibrationAlgoType::kMINMAX_CALIBRATION);
+#ifndef TRT_MAJOR_RTX
+  py::enum_<nvinfer1::CalibrationAlgoType>(m, "CalibrationAlgo", py::module_local(), "Type of calibration algorithm")
+      .value("LEGACY_CALIBRATION", nvinfer1::CalibrationAlgoType::kLEGACY_CALIBRATION)
+      .value("ENTROPY_CALIBRATION", nvinfer1::CalibrationAlgoType::kENTROPY_CALIBRATION)
+      .value("ENTROPY_CALIBRATION_2", nvinfer1::CalibrationAlgoType::kENTROPY_CALIBRATION_2)
+      .value("MINMAX_CALIBRATION", nvinfer1::CalibrationAlgoType::kMINMAX_CALIBRATION);
 
-  // py::class_<nvinfer1::IInt8Calibrator, pyIInt8Calibrator>(
-  //     m, "IInt8Calibrator", py::module_local(), "Int8 Calibrator base class")
-  //     .def(py::init_alias<>()) // Always initialize trampoline class.
-  //     .def("get_batch_size", &nvinfer1::IInt8Calibrator::getBatchSize, "Get batch size")
-  //     .def("get_algorithm", &nvinfer1::IInt8Calibrator::getAlgorithm, "Get algorithm");
+  py::class_<nvinfer1::IInt8Calibrator, pyIInt8Calibrator>(
+      m, "IInt8Calibrator", py::module_local(), "Int8 Calibrator base class")
+      .def(py::init_alias<>()) // Always initialize trampoline class.
+      .def("get_batch_size", &nvinfer1::IInt8Calibrator::getBatchSize, "Get batch size")
+      .def("get_algorithm", &nvinfer1::IInt8Calibrator::getAlgorithm, "Get algorithm");
 
-  // py::class_<nvinfer1::IInt8LegacyCalibrator, nvinfer1::IInt8Calibrator, pyIInt8LegacyCalibrator>(
-  //     m, "IInt8LegacyCalibrator", py::module_local(), "Int8 Legacy Calibrator class")
-  //     .def(py::init_alias<>()) // Always initialize trampoline class.
-  //     .def("get_batch_size", &nvinfer1::IInt8LegacyCalibrator::getBatchSize, "Get batch size")
-  //     .def("get_algorithm", &nvinfer1::IInt8LegacyCalibrator::getAlgorithm, "Get algorithm");
+  py::class_<nvinfer1::IInt8LegacyCalibrator, nvinfer1::IInt8Calibrator, pyIInt8LegacyCalibrator>(
+      m, "IInt8LegacyCalibrator", py::module_local(), "Int8 Legacy Calibrator class")
+      .def(py::init_alias<>()) // Always initialize trampoline class.
+      .def("get_batch_size", &nvinfer1::IInt8LegacyCalibrator::getBatchSize, "Get batch size")
+      .def("get_algorithm", &nvinfer1::IInt8LegacyCalibrator::getAlgorithm, "Get algorithm");
 
-  // py::class_<
-  //     nvinfer1::IInt8EntropyCalibrator,
-  //     nvinfer1::IInt8Calibrator,
-  //     pyCalibratorTrampoline<nvinfer1::IInt8EntropyCalibrator>>(
-  //     m, "IInt8EntropyCalibrator", py::module_local(), "Int8 Entropy Calibrator class")
-  //     .def(py::init_alias<>()) // Always initialize trampoline class.
-  //     .def("get_batch_size", &nvinfer1::IInt8EntropyCalibrator::getBatchSize, "Get batch size")
-  //     .def("get_algorithm", &nvinfer1::IInt8EntropyCalibrator::getAlgorithm, "Get algorithm");
+  py::class_<
+      nvinfer1::IInt8EntropyCalibrator,
+      nvinfer1::IInt8Calibrator,
+      pyCalibratorTrampoline<nvinfer1::IInt8EntropyCalibrator>>(
+      m, "IInt8EntropyCalibrator", py::module_local(), "Int8 Entropy Calibrator class")
+      .def(py::init_alias<>()) // Always initialize trampoline class.
+      .def("get_batch_size", &nvinfer1::IInt8EntropyCalibrator::getBatchSize, "Get batch size")
+      .def("get_algorithm", &nvinfer1::IInt8EntropyCalibrator::getAlgorithm, "Get algorithm");
 
-  // py::class_<
-  //     nvinfer1::IInt8EntropyCalibrator2,
-  //     nvinfer1::IInt8Calibrator,
-  //     pyCalibratorTrampoline<nvinfer1::IInt8EntropyCalibrator2>>(
-  //     m, "IInt8EntropyCalibrator2", py::module_local(), "Int8 Entropy Calibrator2 class")
-  //     .def(py::init_alias<>()) // Always initialize trampoline class.
-  //     .def("get_batch_size", &nvinfer1::IInt8EntropyCalibrator2::getBatchSize, "Get batch size")
-  //     .def("get_algorithm", &nvinfer1::IInt8EntropyCalibrator2::getAlgorithm, "Get algorithm");
+  py::class_<
+      nvinfer1::IInt8EntropyCalibrator2,
+      nvinfer1::IInt8Calibrator,
+      pyCalibratorTrampoline<nvinfer1::IInt8EntropyCalibrator2>>(
+      m, "IInt8EntropyCalibrator2", py::module_local(), "Int8 Entropy Calibrator2 class")
+      .def(py::init_alias<>()) // Always initialize trampoline class.
+      .def("get_batch_size", &nvinfer1::IInt8EntropyCalibrator2::getBatchSize, "Get batch size")
+      .def("get_algorithm", &nvinfer1::IInt8EntropyCalibrator2::getAlgorithm, "Get algorithm");
 
-  // py::class_<
-  //     nvinfer1::IInt8MinMaxCalibrator,
-  //     nvinfer1::IInt8Calibrator,
-  //     pyCalibratorTrampoline<nvinfer1::IInt8MinMaxCalibrator>>(
-  //     m, "IInt8MinMaxCalibrator", py::module_local(), "Int8 MinMax Calibrator class")
-  //     .def(py::init_alias<>()) // Always initialize trampoline class.
-  //     .def("get_batch_size", &nvinfer1::IInt8MinMaxCalibrator::getBatchSize, "Get batch size")
-  //     .def("get_algorithm", &nvinfer1::IInt8MinMaxCalibrator::getAlgorithm, "Get algorithm");
+  py::class_<
+      nvinfer1::IInt8MinMaxCalibrator,
+      nvinfer1::IInt8Calibrator,
+      pyCalibratorTrampoline<nvinfer1::IInt8MinMaxCalibrator>>(
+      m, "IInt8MinMaxCalibrator", py::module_local(), "Int8 MinMax Calibrator class")
+      .def(py::init_alias<>()) // Always initialize trampoline class.
+      .def("get_batch_size", &nvinfer1::IInt8MinMaxCalibrator::getBatchSize, "Get batch size")
+      .def("get_algorithm", &nvinfer1::IInt8MinMaxCalibrator::getAlgorithm, "Get algorithm");
+#endif
 
   py::class_<Device>(m, "Device")
       .def(py::init<>())
@@ -310,8 +366,9 @@ PYBIND11_MODULE(_C, m) {
   py::class_<CompileSpec>(ts_sub_mod, "CompileSpec")
       .def(py::init<>())
       .def("__str__", &torch_tensorrt::pyapi::CompileSpec::stringify)
-      //.def("_get_calibrator_handle", &CompileSpec::getPTQCalibratorHandle, "[Internal] gets a handle from a
-      // calibrator")
+#ifndef TRT_MAJOR_RTX
+      .def("_get_calibrator_handle", &CompileSpec::getPTQCalibratorHandle, "[Internal] gets a handle from a calibrator")
+#endif
       .def_readwrite("inputs", &CompileSpec::inputs)
       .def_readwrite("input_signature", &CompileSpec::input_signature)
       .def_readwrite("enabled_precisions", &CompileSpec::enabled_precisions)

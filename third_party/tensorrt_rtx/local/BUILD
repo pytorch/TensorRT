@@ -3,66 +3,55 @@ load("@rules_cc//cc:defs.bzl", "cc_import", "cc_library")
 package(default_visibility = ["//visibility:public"])
 
 config_setting(
-    name = "windows",
+    name = "rtx_win",
     constraint_values = [
         "@platforms//os:windows",
     ],
+    flag_values = {"@//toolchains/dep_collection:compute_libs": "rtx"},
 )
 
 config_setting(
-    name = "ci_rhel_x86_64_linux",
+    name = "rtx_x86_64",
     constraint_values = [
         "@platforms//cpu:x86_64",
         "@platforms//os:linux",
         "@//toolchains/distro:ci_rhel",
     ],
+    flag_values = {"@//toolchains/dep_collection:compute_libs": "rtx"},
 )
 
 cc_library(
     name = "nvinfer_headers",
     hdrs = select({
-        ":ci_rhel_x86_64_linux": glob(
+        ":rtx_win": glob(
             [
                 "include/NvInfer*.h",
             ],
             allow_empty = True,
-            exclude = [
-                "include/NvInferPlugin.h",
-                "include/NvInferPluginUtils.h",
-            ],
+            # exclude = [
+            #     "include/NvInferPlugin.h",
+            #     "include/NvInferPluginUtils.h",
+            # ],
         ),
-        ":windows": glob(
+        ":rtx_x86_64": glob(
             [
                 "include/NvInfer*.h",
             ],
             allow_empty = True,
-            exclude = [
-                "include/NvInferPlugin.h",
-                "include/NvInferPluginUtils.h",
-            ],
-        ),
-        "//conditions:default": glob(
-            [
-                "include/x86_64-linux-gnu/NvInfer*.h",
-            ],
-            exclude = [
-                "include/x86_64-linux-gnu/NvInferPlugin.h",
-                "include/x86_64-linux-gnu/NvInferPluginUtils.h",
-            ],
+            # exclude = [
+            #     "include/NvInferPlugin.h",
+            #     "include/NvInferPluginUtils.h",
+            # ],
         ),
     }),
-    includes = select({
-        ":ci_rhel_x86_64_linux": ["include/"],
-        ":windows": ["include/"],
-        "//conditions:default": ["include/x86_64-linux-gnu/"],
-    }),
+    includes = ["include/"],
     visibility = ["//visibility:private"],
 )
 
 cc_import(
     name = "nvinfer_static_lib",
     static_library = select({
-        ":windows": "lib/tensorrt_rtx_1_0.lib",
+        ":rtx_win": "lib/tensorrt_rtx_1_0.lib",
     }),
     visibility = ["//visibility:private"],
 )
@@ -70,9 +59,8 @@ cc_import(
 cc_import(
     name = "nvinfer_lib",
     shared_library = select({
-        ":ci_rhel_x86_64_linux": "lib64/libtensorrt_rtx.so",
-        ":windows": "lib/tensorrt_rtx_1_0.dll",
-        "//conditions:default": "lib/x86_64-linux-gnu/libtensorrt_rtx.so",
+        ":rtx_win": "lib/tensorrt_rtx_1_0.dll",
+        ":rtx_x86_64": "lib/libtensorrt_rtx.so",
     }),
     visibility = ["//visibility:private"],
 )
@@ -84,7 +72,7 @@ cc_library(
         "nvinfer_headers",
         "nvinfer_lib",
     ] + select({
-        ":windows": [
+        ":rtx_win": [
             "nvinfer_static_lib",
             "@cuda_win//:cudart",
         ],
