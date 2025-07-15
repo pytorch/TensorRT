@@ -618,6 +618,7 @@ if not (PY_ONLY or NO_TS):
                     f'/DPYBIND11_BUILD_ABI=\\"{torch._C._PYBIND11_BUILD_ABI}\\"',
                     "/GS-",
                     "/permissive-",
+                    "/utf-8",
                 ]
                 if IS_WINDOWS
                 else [
