@@ -15,7 +15,6 @@ config_setting(
     constraint_values = [
         "@platforms//cpu:x86_64",
         "@platforms//os:linux",
-        "@//toolchains/distro:ci_rhel",
     ],
     flag_values = {"@//toolchains/dep_collection:compute_libs": "rtx"},
 )
