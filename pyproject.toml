@@ -128,11 +128,11 @@ index-strategy = "unsafe-best-match"
 [tool.uv.sources]
 torch = [
     { index = "pytorch-nightly-cu129", marker = "platform_machine != 'aarch64' or (platform_machine == 'aarch64' and 'tegra' not in platform_release)" },
-    { index = "jetson-containers", marker = "platform_machine == 'aarch64' and 'tegra' in platform_release" },
+   # { index = "jetson-containers", marker = "platform_machine == 'aarch64' and 'tegra' in platform_release" },
 ]
 torchvision = [
     { index = "pytorch-nightly-cu129", marker = "platform_machine != 'aarch64' or (platform_machine == 'aarch64' and 'tegra' not in platform_release)" },
-    { index = "jetson-containers", marker = "platform_machine == 'aarch64' and 'tegra' in platform_release" },
+   # { index = "jetson-containers", marker = "platform_machine == 'aarch64' and 'tegra' in platform_release" },
 ]
 
 [[tool.uv.index]]
@@ -140,10 +140,10 @@ name = "pytorch-nightly-cu129"
 url = "https://download.pytorch.org/whl/nightly/cu129"
 explicit = false
 
-[[tool.uv.index]]
-name = "jetson-containers"
-url = "https://pypi.jetson-ai-lab.dev/jp6/cu126/+simple"
-explicit = false
+# [[tool.uv.index]]
+# name = "jetson-containers"
+# url = "https://pypi.jetson-ai-lab.dev/jp6/cu126/+simple"
+# explicit = false
 
 [[tool.uv.index]]
 name = "nvidia"
