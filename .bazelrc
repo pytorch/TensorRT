@@ -27,7 +27,7 @@ build:linux --cxxopt="-std=c++17"
 build:linux --cxxopt="-fdiagnostics-color=always"
 
 build:windows --cxxopt="/GS-" --cxxopt="/std:c++17" --cxxopt="/permissive-"
-build:windows --cxxopt="/wd4244" --cxxopt="/wd4267" --cxxopt="/wd4819" 
+build:windows --cxxopt="/wd4244" --cxxopt="/wd4267" --cxxopt="/wd4819"
 build:windows --cxxopt="/utf-8"
 build:windows --features=windows_export_all_symbols
 
