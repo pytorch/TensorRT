@@ -34,7 +34,7 @@ from utils import (
 # -----------------------------------------------------------------------------#
 # Global configuration
 # -----------------------------------------------------------------------------#
-DEVICE = torch.device("cuda:1")
+DEVICE = torch.device("cuda:0")
 
 # Register SDPA as a standalone operator.  Converter & lowering pass are defined
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
@@ -155,8 +155,13 @@ class _LMNoCache(torch.nn.Module):
         self.lm = lm
 
     def forward(self, inputs_embeds, position_ids):
-        out = self.lm(inputs_embeds=inputs_embeds, position_ids=position_ids)
-        return out.logits if hasattr(out, "logits") else out
+        out = self.lm(
+            inputs_embeds=inputs_embeds, position_ids=position_ids # , use_cache=False
+        )
+        if hasattr(out, "logits"):
+            return out.logits
+        # For Qwen2.5-VL text model, the output is BaseModelOutputWithPast
+        return out.last_hidden_state
 
 
 def _compile_eagle2_lm(
@@ -214,25 +219,27 @@ def _compile_eagle2_lm(
     return trt_mod
 
 
-def _compile_paligemma_lm(
+def _compile_qwen2_5_vl_lm(
     language_model: torch.nn.Module,
     input_embeds: torch.Tensor,
     args: argparse.Namespace,
 ) -> torch.nn.Module:
     """
-    Compile Paligemma language model with Torch-TensorRT.
-
-    The function follows the same precision-specific flag logic used in
-    *run_llm.py* for consistency.
+    Compile Qwen-2.5-VL language model (no KV-cache) with Torch-TensorRT.
+    The logic mirrors the Eagle2 / Paligemma compile helpers.
     """
     lm_wrap = _LMNoCache(language_model).to(DEVICE).eval()
+
     max_seq_len = input_embeds.shape[1] + args.num_tokens
+    _seq = torch.export.Dim('_seq', min=1, max=512)
+    seq = 8*_seq
+    # S = torch.export.Dim("seq", min=1, max=max_seq_len)
+    # S = torch.export.Dim("seq", min=1, max=1024)
 
-    S = torch.export.Dim("seq", min=1, max=max_seq_len)
-    position_ids = torch.arange(input_embeds.shape[1]).unsqueeze(0).to(DEVICE)
-    dyn_shapes = {"inputs_embeds": {1: S}, "position_ids": {1: S}}
+    B, S = args.batch_size, args.num_tokens
+    position_ids = torch.arange(S, device=DEVICE, dtype=torch.long).unsqueeze(0).expand(B, S)
+    dyn_shapes = {"inputs_embeds": {1: seq}, "position_ids": {1: seq}}
 
-    # Precision-specific flags --------------------------------------------------#
     use_fp32_acc = False
     use_explicit_typing = False
     if args.precision == "FP16":
@@ -266,6 +273,7 @@ def _compile_paligemma_lm(
             offload_module_to_cpu=True,
             min_block_size=args.min_block_size,
         )
+
     return trt_mod
 
 
@@ -282,26 +290,21 @@ def compile_torchtrt(
         "BF16": torch.bfloat16,
     }.get(args.precision, torch.float32)
 
+    lm_model = model.model if args.model.lower() == "qwen2_5_vl" else model.language_model
+    
+    B, S = args.batch_size, args.num_tokens
+
     example_embeds = torch.randn(
-        1,
-        2560,
-        model.language_model.config.hidden_size,
-        dtype=torch_dtype,
-        device=DEVICE,
+        B, S, lm_model.config.hidden_size, dtype=torch_dtype, device=DEVICE,
     )
 
     if args.model.lower() == "eagle2":
-        return _compile_eagle2_lm(model.language_model, example_embeds, args)
-    elif args.model.lower() == "paligemma":
-        return _compile_paligemma_lm(model.language_model, example_embeds, args)
+        return _compile_eagle2_lm(lm_model, example_embeds, args)
+    elif args.model.lower() == "qwen2_5_vl":
+        return _compile_qwen2_5_vl_lm(lm_model, example_embeds, args)
 
     msg = f"Unsupported model for compilation: {args.model}"
     raise ValueError(msg)
-
-
-# -----------------------------------------------------------------------------#
-# Utility helpers
-# -----------------------------------------------------------------------------#
 
 
 def print_outputs(backend_name: str, gen_tokens: torch.Tensor, tokenizer):
@@ -314,9 +317,6 @@ def print_outputs(backend_name: str, gen_tokens: torch.Tensor, tokenizer):
     print("===================================")
 
 
-# -----------------------------------------------------------------------------#
-# Main driver
-# -----------------------------------------------------------------------------#
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Run VLM inference (PyTorch & TensorRT back-ends)"
@@ -354,9 +354,6 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    # -------------------------------------------------------------------------#
-    # 1. Model / processor / embeddings
-    # -------------------------------------------------------------------------#
     dtype = {
         "FP16": torch.float16,
         "BF16": torch.bfloat16,
@@ -407,7 +404,6 @@ if __name__ == "__main__":
     # Inference: Generation of the output
     max_output_len = inputs["input_ids"].shape[1] + args.num_tokens
 
-    # comment out for CUDA out of memory error
     generated_ids = model.generate(**inputs, max_new_tokens=128)
     generated_ids_trimmed = [
         out_ids[len(in_ids) :] for in_ids, out_ids in zip(inputs.input_ids, generated_ids)
@@ -420,25 +416,6 @@ if __name__ == "__main__":
     print(output_text)      
     print("=============================")
 
-
-    # # img_in, vid_in = processor.process_vision_info(messages)
-    # # inputs = processor(
-    # #     text=txt, images=img_in, videos=vid_in, return_tensors="pt", padding=True
-    # # ).to(DEVICE)
-
-    # # inputs = processor(text=prompt_txt, images=image, return_tensors="pt").to(DEVICE)
-    # input_len = inputs["input_ids"].shape[-1]
-
-    # max_output_len = inputs["input_ids"].shape[1] + args.num_tokens
-    # pyt_generation = model.generate(
-    #     **inputs, max_new_tokens=100, do_sample=False
-    # ) 
-    # Original_pyt_gen_tokens = pyt_generation[0][input_len:]
-    # Original_pyt_decoded = processor.decode(Original_pyt_gen_tokens, skip_special_tokens=True)
-    # print("=============================")
-    # print("Original Torch Model generated text:")
-    # print(Original_pyt_decoded)
-    # print("=============================")
 
     # -------------------------------------------------------------------------#
     # 3. Optional: PyTorch baseline
@@ -454,14 +431,7 @@ if __name__ == "__main__":
             processor.tokenizer.eos_token_id,
             emb_layer,
         )
-        # pyt_gen_tokens = generate_mm_paligemma(
-        #     model,
-        #     inputs["pixel_values"],
-        #     inputs["input_ids"],
-        #     max_output_len,
-        #     processor.tokenizer.eos_token_id,
-        #     emb_layer,
-        # )
+
         print_outputs("Ouput tokens form custom generated function", pyt_gen_tokens, processor.tokenizer)
         if args.benchmark:
             pyt_timings = time_generate_mm(
@@ -484,37 +454,50 @@ if __name__ == "__main__":
 
     # Register static cache lowering passes if requested
     if args.cache == "static_v1":
-        import static_cache_v1  # noqa: F401
+        import static_cache_v1  
 
-    # -------------------------------------------------------------------------#
-    # 4. Torch-TensorRT compile & run
-    # -------------------------------------------------------------------------#
     trt_lm = compile_torchtrt(model, args)
     trt_model = copy.deepcopy(model)
-    trt_model.language_model = trt_lm
+    del model
+    trt_model.model = trt_lm
 
     emb_layer = emb_layer.to(DEVICE)
+    trt_model.lm_head = trt_model.lm_head.to(DEVICE)
 
-    if args.cache == "static_v1":
-        if args.model.lower() == "eagle2":
-            trt_generate = generate_mm_with_static_cache
-        elif args.model.lower() == "paligemma":
-            trt_generate = generate_mm_paligemma_with_static_cache
-    else:
-        if args.model.lower() == "eagle2":
-            trt_generate = generate_mm
-        elif args.model.lower() == "paligemma":
-            trt_generate = generate_mm_paligemma
+    ####### Testing #######
+    trt_gen_tokens = generate_mm_qwen2_5_vl(
+                trt_model,
+                inputs["pixel_values"],
+                inputs["input_ids"],
+                inputs["image_grid_thw"],
+                max_output_len,
+                processor.tokenizer.eos_token_id,
+                emb_layer,
+            )
 
-    trt_gen_tokens = trt_generate(
-        trt_model,
-        inputs["pixel_values"],
-        inputs["input_ids"],
-        max_output_len,
-        processor.tokenizer.eos_token_id,
-        emb_layer,
-        DEVICE if args.cache == "static_v1" else None,  # device arg only for static_v1
-    )
+    ####### Testing #######
+    # if args.cache == "static_v1":
+    #     if args.model.lower() == "eagle2":
+    #         trt_generate = generate_mm_with_static_cache
+    #     elif args.model.lower() == "paligemma":
+    #         trt_generate = generate_mm_paligemma_with_static_cache
+    # else:
+    #     if args.model.lower() == "eagle2":
+    #         trt_generate = generate_mm
+    #     elif args.model.lower() == "paligemma":
+    #         trt_generate = generate_mm_paligemma
+    #     elif args.model.lower() == "qwen2_5_vl":
+    #         trt_generate = generate_mm_qwen2_5_vl
+
+    # trt_gen_tokens = trt_generate(
+    #     trt_model,
+    #     inputs["pixel_values"],
+    #     inputs["input_ids"],
+    #     max_output_len,
+    #     processor.tokenizer.eos_token_id,
+    #     emb_layer,
+    #     DEVICE if args.cache == "static_v1" else None,  # device arg only for static_v1
+    # )
 
     if args.benchmark:
         trt_timings = time_generate_mm(

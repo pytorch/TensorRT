@@ -11,23 +11,23 @@ DEVICE = "cuda:0"
 # ----------------------------------------------------------------------
 # SDPA register
 # ----------------------------------------------------------------------
-from torchtrt_ext import register_sdpa  # noqa: F401
+from torchtrt_ext import register_sdpa
 
 # ----------------------------------------------------------------------
 # TextModel Wrapper
 # ----------------------------------------------------------------------
 class TextModelWrapper(nn.Module):
     """
-    Qwen2_5_VLTextModel 의 forward 중 input_ids / attention_mask 두 인자만
+    Qwen2_5_VLTextModel 의 forward 중 inputs_embeds, position_ids 두 인자만
     받아 last_hidden_state 만 반환하도록 얇게 감싼 래퍼.
     """
     def __init__(self, text_model):
         super().__init__()
         self.text_model = text_model
 
-    def forward(self, input_ids):
+    def forward(self, inputs_embeds, position_ids):
         out = self.text_model(
-            input_ids=input_ids, use_cache=False
+            inputs_embeds=inputs_embeds, position_ids=position_ids
         )
         return out.last_hidden_state  # shape: (bs, seq, hidden)
 
@@ -37,11 +37,13 @@ class TextModelWrapper(nn.Module):
 # ----------------------------------------------------------------------
 def main(args):
     # 1) Load model -------------------------------------------------------
+    torch_dtype = torch.float16 if args.precision == "FP16" else torch.bfloat16 if args.precision == "BF16" else torch.float32
+
     torch.manual_seed(42)
     model_name = "Qwen/Qwen2.5-VL-3B-Instruct"
     # default: Load the model on the available device(s)
     full_model = Qwen2_5_VLForConditionalGeneration.from_pretrained(
-        model_name, torch_dtype=torch.float16, device_map=DEVICE
+        model_name, torch_dtype=torch_dtype, device_map=DEVICE
     )
 
     # We recommend enabling flash_attention_2 for better acceleration and memory saving, especially in multi-image and video scenarios.
@@ -54,19 +56,20 @@ def main(args):
 
     # default processer
     processor = AutoProcessor.from_pretrained(model_name)
-    text_model = full_model.model # .language_model  # From transformers==4.54.0dev, refactorized by language model Qwen2_5_VLTextModel
+    text_model = full_model.model.eval() # .language_model  # From transformers==4.54.0dev, refactorized by language model Qwen2_5_VLTextModel
     hidden_size = text_model.config.hidden_size
     vocab_size = text_model.config.vocab_size
 
     # 2) dummu input 
     B, S = args.batch_size, args.seq_len
-    input_ids = torch.randint(0, vocab_size, (B, S), device=DEVICE)
+    inputs_embeds = torch.randn(B, S, hidden_size, device=DEVICE, dtype=torch_dtype)
+    position_ids = torch.arange(S, device=DEVICE).unsqueeze(0).expand(B, S)
     # attention_mask = torch.ones_like(input_ids).to(DEVICE)
 
     # 3) PyTorch output
     with torch.inference_mode():
         pyt_logits = text_model(
-            input_ids=input_ids, use_cache=False
+            inputs_embeds=inputs_embeds, position_ids=position_ids
         ).last_hidden_state
 
     # 4) Torch-TensorRT 컴파일 ------------------------------------------
@@ -89,28 +92,30 @@ def main(args):
     # S_dyn = torch.export.Dim("seq", min=1, max=args.seq_len_max)
     _seq = torch.export.Dim('_seq', min=1, max=272)
     seq = 8*_seq
-    S_dyn = seq
-    dyn_shapes = {"input_ids": {1: S_dyn}}
+    dyn_shapes = {"inputs_embeds": {1: seq}, "position_ids": {1: seq}}
 
     with torch.inference_mode():
         export_mod = torch.export.export(
-            wrapper, (input_ids,), dynamic_shapes=dyn_shapes, strict=False
+            wrapper, (inputs_embeds, position_ids), dynamic_shapes=dyn_shapes, strict=False
         )
 
     with torch_tensorrt.logging.debug() if args.debug else nullcontext():
         trt_mod = torch_tensorrt.dynamo.compile(
             export_mod,
-            inputs=[input_ids],
+            inputs=[inputs_embeds, position_ids],
             enabled_precisions=enabled_precisions,
             use_fp32_acc=use_fp32_acc,
             use_explicit_typing=use_explicit_typing,
             disable_tf32=True,
+            use_python_runtime=True,
             debug=args.debug,
+            offload_module_to_cpu=True,
+            min_block_size=1,
         )
 
     # 5) TensorRT 출력 ---------------------------------------------------
     with torch.inference_mode():
-        trt_logits = trt_mod(input_ids)
+        trt_logits = trt_mod(inputs_embeds, position_ids)
 
     # 6) 비교 ------------------------------------------------------------
     diff = (pyt_logits - trt_logits).abs().mean()

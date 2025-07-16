@@ -394,29 +394,25 @@ def generate_mm_qwen2_5_vl(
         )
 
     # 4. 캐시 위치 초기화
-    cache_position = torch.arange(seq_tokens.size(1), device=seq_tokens.device)
+    # cache_position = torch.arange(seq_tokens.size(1), device=seq_tokens.device)
 
     # 5. 그리디 생성 루프
     generated = 0
     while generated < max_output_seq_length:
-        # 5.1. Causal 마스크 계산
-        causal_mask = model.model._update_causal_mask(
-            attention_mask=None,
-            input_tensor=seq_embeds,
-            cache_position=cache_position,
-            past_key_values=None,
-            output_attentions=False,
-        )
+        # 5.1. position_ids 계산
+        position_ids = torch.arange(
+            0, seq_tokens.size(1), dtype=torch.long, device=seq_tokens.device
+        ).unsqueeze(0).expand(seq_embeds.size(0), seq_embeds.size(1))
 
         # 5.2. 언어 모델 호출
         with torch.no_grad():
             outputs = model.model(
                 inputs_embeds=seq_embeds,
-                attention_mask=causal_mask,
-                cache_position=cache_position,
-                use_cache=False,
+                position_ids=position_ids,
             )
-            hidden_states = outputs.last_hidden_state  # (B, S, C)
+            # For TRT-compiled module, outputs is the hidden_state tensor directly
+            # For regular torch module, it's an object with .last_hidden_state
+            hidden_states = outputs if isinstance(outputs, torch.Tensor) else outputs.last_hidden_state
 
         # 5.3. 마지막 토큰에 대한 로짓 계산
         logits = model.lm_head(hidden_states[:, -1, :])  # (B, vocab_size)
@@ -430,7 +426,7 @@ def generate_mm_qwen2_5_vl(
         seq_embeds = torch.cat([seq_embeds, next_emb], dim=1)
 
         # 5.6. 캐시 위치 업데이트
-        cache_position = torch.arange(seq_tokens.size(1), device=seq_tokens.device)
+        # cache_position = torch.arange(seq_tokens.size(1), device=seq_tokens.device)
 
         generated += 1
         if (next_tok == eos_token_id).all():
