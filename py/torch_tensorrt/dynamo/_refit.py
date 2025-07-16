@@ -42,7 +42,6 @@ from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (
 from torch_tensorrt.dynamo.utils import (
     CPU_DEVICE,
     check_module_output,
-    deallocate_module,
     get_model_device,
     get_torch_inputs,
     to_torch_device,
@@ -102,7 +101,7 @@ def construct_refit_mapping_from_weight_name_map(
                 params[w.split(".")[-1]] = state_dict[w].cuda()
             # Batch norm constant folding
 
-            scale, shift = batch_norm_constant_folding(**params, eps=1e-7)
+            scale, shift = batch_norm_constant_folding(**params, eps=1e-5)
             # Set scale to scale or shift to shift
             engine_weight_map[engine_weight_name] = eval(
                 engine_weight_name.split(" ")[-1].lower()
@@ -484,7 +483,6 @@ def refit_module_weights(
                     settings=settings,
                     weight_name_map=None,
                 )
-        deallocate_module(new_submodule)
 
         # clear EXCLUDE_WEIGHTS flag
         serialization_config = engine.create_serialization_config()
@@ -506,8 +504,6 @@ def refit_module_weights(
         del engine
         gc.collect()
         torch.cuda.empty_cache()
-
-    deallocate_module(new_partitioned_module)
 
     if verify_output and arg_inputs is not None:
         new_gm.to(to_torch_device(settings.device))

@@ -1,16 +1,17 @@
 name: Build and test Linux aarch64 wheels for Jetpack
 
 on:
-  pull_request:
-  push:
-    branches:
-      - main
-      - nightly
-      - release/*
-    tags:
-      # NOTE: Binary build pipelines should only get triggered on release candidate builds
-      # Release candidate tags look like: v1.11.0-rc1
-      - v[0-9]+.[0-9]+.[0-9]+-rc[0-9]+
+  # TODO: Uncomment this when we have a stable release
+  # pull_request:
+  # push:
+  #   branches:
+  #     - main
+  #     - nightly
+  #     - release/*
+  #   tags:
+  #     # NOTE: Binary build pipelines should only get triggered on release candidate builds
+  #     # Release candidate tags look like: v1.11.0-rc1
+  #     - v[0-9]+.[0-9]+.[0-9]+-rc[0-9]+
   workflow_dispatch:
 
 jobs:

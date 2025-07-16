@@ -10,7 +10,6 @@ import torch._dynamo as td
 from torch._dynamo.backends.common import aot_autograd
 from torch._dynamo.utils import detect_fake_mode
 from torch._functorch.aot_autograd import aot_export_joint_simple
-from torch.distributed.tensor import DTensor
 from torch_tensorrt.dynamo import CompilationSettings
 from torch_tensorrt.dynamo._compiler import compile_module
 from torch_tensorrt.dynamo.lowering import (
@@ -89,6 +88,11 @@ def aot_torch_tensorrt_aten_backend(
             logger.warning(
                 "It is recommended to run the model with use_distributed_mode_trace = True since there are distributed tensors in the input which is not supported in aot_export_joint_simple"
             )
+
+    if settings.offload_module_to_cpu:
+        logger.warning(
+            "The offload_module_to_cpu option is set, but it is being ignored since the torch_compile backend does not support this feature"
+        )
     return _pretraced_backend(gm, sample_inputs, settings, engine_cache)
 
 
