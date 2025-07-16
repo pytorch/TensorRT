@@ -338,6 +338,106 @@ def generate_mm(
 
     return seq_tokens[:, input_ids.shape[1] :]
 
+def generate_mm_qwen2_5_vl(
+    model,
+    pixel_values: torch.Tensor | None,
+    input_ids: torch.Tensor,
+    image_grid_thw: torch.Tensor,
+    max_output_seq_length: int,
+    eos_token_id: int,
+    emb_layer: torch.nn.Embedding,
+):
+    """
+    Qwen2_5_VLForConditionalGeneration 모델에 대한 사용자 정의 생성 함수.
+    캐싱 없이 그리디 디코딩을 수행하며, input_ids 대신 inputs_embeds를 사용합니다.
+
+    Parameters
+    ----------
+    model : Qwen2_5_VLForConditionalGeneration
+        Qwen2_5_VLForConditionalGeneration 모델 인스턴스.
+    pixel_values : torch.Tensor | None
+        입력 이미지 배치 (B, C, H, W) 또는 None.
+    input_ids : torch.LongTensor (B, N_prompt)
+        [IMG] 플레이스홀더를 포함한 텍스트 프롬프트 토큰 ID.
+    max_output_seq_length : int
+        프롬프트에 추가로 생성할 최대 토큰 수.
+    eos_token_id : int
+        모든 시퀀스가 EOS 토큰을 생성하면 생성을 중단.
+    emb_layer : torch.nn.Embedding
+        input_ids에 대한 임베딩 레이어 (model.model.embed_tokens).
+
+    Returns
+    -------
+    torch.LongTensor
+        생성된 토큰 시퀀스 (프롬프트 이후 부분만).
+    """
+    # 1. 이미지 임베딩 계산 (pixel_values가 제공된 경우)
+    image_embeds = None
+    if pixel_values is not None:
+        image_embeds = model.visual(pixel_values, image_grid_thw)  # grid_thw는 선택적이므로 기본값 사용
+
+    # 2. 초기 시퀀스 임베딩 생성
+    seq_tokens = input_ids.clone()  # (B, S)
+    seq_embeds = emb_layer(seq_tokens)  # (B, S, C)
+
+    # 3. 이미지 토큰 위치에 이미지 임베딩 삽입
+    if image_embeds is not None:
+        mask = (seq_tokens == model.config.image_token_id)  # (B, S)
+        num_image_tokens = mask.sum().item()
+        if num_image_tokens != image_embeds.shape[0]:
+            raise ValueError(
+                f"이미지 토큰 수({num_image_tokens})와 이미지 임베딩 수({image_embeds.shape[0]})가 일치하지 않습니다."
+            )
+        mask_expanded = mask.unsqueeze(-1).expand_as(seq_embeds)  # (B, S, C)
+        seq_embeds = seq_embeds.masked_scatter(
+            mask_expanded, image_embeds.to(seq_embeds.dtype)
+        )
+
+    # 4. 캐시 위치 초기화
+    cache_position = torch.arange(seq_tokens.size(1), device=seq_tokens.device)
+
+    # 5. 그리디 생성 루프
+    generated = 0
+    while generated < max_output_seq_length:
+        # 5.1. Causal 마스크 계산
+        causal_mask = model.model._update_causal_mask(
+            attention_mask=None,
+            input_tensor=seq_embeds,
+            cache_position=cache_position,
+            past_key_values=None,
+            output_attentions=False,
+        )
+
+        # 5.2. 언어 모델 호출
+        with torch.no_grad():
+            outputs = model.model(
+                inputs_embeds=seq_embeds,
+                attention_mask=causal_mask,
+                cache_position=cache_position,
+                use_cache=False,
+            )
+            hidden_states = outputs.last_hidden_state  # (B, S, C)
+
+        # 5.3. 마지막 토큰에 대한 로짓 계산
+        logits = model.lm_head(hidden_states[:, -1, :])  # (B, vocab_size)
+
+        # 5.4. 다음 토큰 선택 (그리디 디코딩)
+        next_tok = torch.argmax(logits, dim=-1)  # (B,)
+
+        # 5.5. 시퀀스에 토큰 및 임베딩 추가
+        seq_tokens = torch.cat([seq_tokens, next_tok[:, None]], dim=1)
+        next_emb = emb_layer(next_tok)[:, None, :]  # (B, 1, C)
+        seq_embeds = torch.cat([seq_embeds, next_emb], dim=1)
+
+        # 5.6. 캐시 위치 업데이트
+        cache_position = torch.arange(seq_tokens.size(1), device=seq_tokens.device)
+
+        generated += 1
+        if (next_tok == eos_token_id).all():
+            break
+
+    # 6. 생성된 토큰 반환 (프롬프트 이후 부분만)
+    return seq_tokens[:, input_ids.shape[1]:]
 
 @torch.inference_mode()
 def generate_mm_with_static_cache(

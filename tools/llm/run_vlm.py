@@ -28,12 +28,13 @@ from utils import (
     generate_mm_paligemma_with_static_cache,
     record_stats,
     time_generate_mm,
+    generate_mm_qwen2_5_vl,
 )
 
 # -----------------------------------------------------------------------------#
 # Global configuration
 # -----------------------------------------------------------------------------#
-DEVICE = torch.device("cuda:0")
+DEVICE = torch.device("cuda:1")
 
 # Register SDPA as a standalone operator.  Converter & lowering pass are defined
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
@@ -106,6 +107,25 @@ def _load_paligemma(device, torch_dtype: torch.dtype):
     return model, processor, emb_layer
 
 
+def _load_qwen2_5_vl(device, torch_dtype: torch.dtype):
+    """
+    Load Qwen2_5_VL model and processor.
+    """
+    from transformers import Qwen2_5_VLForConditionalGeneration, AutoTokenizer, AutoProcessor
+    from qwen_vl_utils import process_vision_info
+
+    model_id = "Qwen/Qwen2.5-VL-3B-Instruct"
+    # Use the same loading approach as qwen2_5_vl.py
+    model = Qwen2_5_VLForConditionalGeneration.from_pretrained(
+        model_id, torch_dtype=torch_dtype, device_map=device
+        # model_id, torch_dtype=torch_dtype, device_map="cuda:0"
+    ).eval()
+
+    processor = AutoProcessor.from_pretrained(model_id)
+    
+    emb_layer = model.model.get_input_embeddings().to(torch_dtype).to(device)
+    return model, processor, emb_layer
+
 def _load_model(
     model_name, device, torch_dtype: torch.dtype
 ) -> Tuple[torch.nn.Module, AutoProcessor, torch.nn.Embedding]:
@@ -114,6 +134,8 @@ def _load_model(
         return _load_eagle2(device, torch_dtype)
     elif model_name.lower() == "paligemma":
         return _load_paligemma(device, torch_dtype)
+    elif model_name.lower() == "qwen2_5_vl":
+        return _load_qwen2_5_vl(device, torch_dtype)
     msg = f"Unsupported model: {model_name}"
     raise ValueError(msg)
 
@@ -299,11 +321,11 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Run VLM inference (PyTorch & TensorRT back-ends)"
     )
-    parser.add_argument("--model", default="eagle2", choices=["eagle2", "paligemma"], help="VLM model name")
+    parser.add_argument("--model", default="qwen2_5_vl", choices=["eagle2", "paligemma", "qwen2_5_vl"], help="VLM model name")
     parser.add_argument("--prompt", default="", help="Prompt text")
     parser.add_argument(
         "--precision",
-        default="FP16",
+        default="BF16",
         choices=["FP16", "BF16", "FP32"],
         help="Computation precision",
     )
@@ -347,6 +369,7 @@ if __name__ == "__main__":
     # -------------------------------------------------------------------------#
     # url = "https://cdn.pixabay.com/photo/2019/08/08/23/33/car-4393990_1280.jpg"
     url = "https://huggingface.co/datasets/huggingface/documentation-images/resolve/main/transformers/tasks/car.jpg"
+    # url = "https://qianwen-res.oss-cn-beijing.aliyuncs.com/Qwen-VL/assets/demo.jpeg"
     image = Image.open(requests.get(url, stream=True).raw)
 
     if args.benchmark:
@@ -355,54 +378,91 @@ if __name__ == "__main__":
     else:
         prompt_txt = args.prompt
 
-    # messages = [
-    #     {
-    #         "role": "user",
-    #         "content": [
-    #             {"type": "image", "image": image},
-    #             {"type": "text", "text": prompt_txt},
-    #         ],
-    #     }
-    # ]
+    messages = [
+        {
+            "role": "user",
+            "content": [
+                {"type": "image", "image": image},
+                {"type": "text", "text": prompt_txt},
+            ],
+        }
+    ]
 
-    # txt = [
-    #     processor.apply_chat_template(
-    #         messages, tokenize=False, add_generation_prompt=True
-    #     )
-    # ]
-    # img_in, vid_in = processor.process_vision_info(messages)
-    # inputs = processor(
-    #     text=txt, images=img_in, videos=vid_in, return_tensors="pt", padding=True
-    # ).to(DEVICE)
+    txt = [
+        processor.apply_chat_template(
+            messages, tokenize=False, add_generation_prompt=True
+        )
+    ]
+    from qwen_vl_utils import process_vision_info
+    image_inputs, video_inputs = process_vision_info(messages)
 
-    inputs = processor(text=prompt_txt, images=image, return_tensors="pt").to(DEVICE)
-    input_len = inputs["input_ids"].shape[-1]
-
+    inputs = processor(
+        text=txt,
+        images=image_inputs,
+        videos=video_inputs,
+        padding=True,
+        return_tensors="pt",
+    )
+    inputs = inputs.to(DEVICE)
+    # Inference: Generation of the output
     max_output_len = inputs["input_ids"].shape[1] + args.num_tokens
-    pyt_generation = model.generate(
-        **inputs, max_new_tokens=100, do_sample=False
-    ) 
-    Original_pyt_gen_tokens = pyt_generation[0][input_len:]
-    Original_pyt_decoded = processor.decode(Original_pyt_gen_tokens, skip_special_tokens=True)
+
+    # comment out for CUDA out of memory error
+    generated_ids = model.generate(**inputs, max_new_tokens=128)
+    generated_ids_trimmed = [
+        out_ids[len(in_ids) :] for in_ids, out_ids in zip(inputs.input_ids, generated_ids)
+    ]
+    output_text = processor.batch_decode(
+        generated_ids_trimmed, skip_special_tokens=True, clean_up_tokenization_spaces=False
+    )
     print("=============================")
     print("Original Torch Model generated text:")
-    print(Original_pyt_decoded)
+    print(output_text)      
     print("=============================")
+
+
+    # # img_in, vid_in = processor.process_vision_info(messages)
+    # # inputs = processor(
+    # #     text=txt, images=img_in, videos=vid_in, return_tensors="pt", padding=True
+    # # ).to(DEVICE)
+
+    # # inputs = processor(text=prompt_txt, images=image, return_tensors="pt").to(DEVICE)
+    # input_len = inputs["input_ids"].shape[-1]
+
+    # max_output_len = inputs["input_ids"].shape[1] + args.num_tokens
+    # pyt_generation = model.generate(
+    #     **inputs, max_new_tokens=100, do_sample=False
+    # ) 
+    # Original_pyt_gen_tokens = pyt_generation[0][input_len:]
+    # Original_pyt_decoded = processor.decode(Original_pyt_gen_tokens, skip_special_tokens=True)
+    # print("=============================")
+    # print("Original Torch Model generated text:")
+    # print(Original_pyt_decoded)
+    # print("=============================")
 
     # -------------------------------------------------------------------------#
     # 3. Optional: PyTorch baseline
     # -------------------------------------------------------------------------#
     pyt_gen_tokens = pyt_timings = pyt_stats = None
     if args.enable_pytorch_run:
-        pyt_gen_tokens = generate_mm_paligemma(
+        pyt_gen_tokens = generate_mm_qwen2_5_vl(
             model,
             inputs["pixel_values"],
             inputs["input_ids"],
+            inputs["image_grid_thw"],
             max_output_len,
             processor.tokenizer.eos_token_id,
             emb_layer,
         )
-        print_outputs("PyTorch", pyt_gen_tokens, processor.tokenizer)
+        # pyt_gen_tokens = generate_mm_paligemma(
+        #     model,
+        #     inputs["pixel_values"],
+        #     inputs["input_ids"],
+        #     max_output_len,
+        #     processor.tokenizer.eos_token_id,
+        #     emb_layer,
+        # )
+        print_outputs("Ouput tokens form custom generated function", pyt_gen_tokens, processor.tokenizer)
         if args.benchmark:
             pyt_timings = time_generate_mm(
                 generate_mm_paligemma,
