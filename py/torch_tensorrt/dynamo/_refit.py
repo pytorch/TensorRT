@@ -101,7 +101,7 @@ def construct_refit_mapping_from_weight_name_map(
                 params[w.split(".")[-1]] = state_dict[w].cuda()
             # Batch norm constant folding
 
-            scale, shift = batch_norm_constant_folding(**params, eps=1e-7)
+            scale, shift = batch_norm_constant_folding(**params, eps=1e-5)
             # Set scale to scale or shift to shift
             engine_weight_map[engine_weight_name] = eval(
                 engine_weight_name.split(" ")[-1].lower()
