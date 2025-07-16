@@ -42,7 +42,6 @@ import logging
 
 import torch
 
-breakpoint()
 try:
     # note: trt_alias must be imported before any import tensorrt
     from . import trt_alias  # noqa: F401
