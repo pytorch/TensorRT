@@ -23,6 +23,11 @@ python flux_demo.py
 
 ### Using Different Precision Modes
 
+- FP4 mode:
+```bash
+python flux_demo.py --dtype fp4
+```
+
 - FP8 mode:
 ```bash
 python flux_demo.py --dtype fp8
