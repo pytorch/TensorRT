@@ -351,8 +351,8 @@ py_version = 311
 skip = ["py/torch_tensorrt/fx"]
 
 [tool.black]
-#line-length = 120
-target-version = ["py38", "py39", "py310", "py311", "py312"]
+line-length = 88
+target-version = ['py38']
 force-exclude = """
 elu_converter/setup.py
 """

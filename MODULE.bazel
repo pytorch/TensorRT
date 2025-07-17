@@ -37,7 +37,7 @@ new_local_repository = use_repo_rule("@bazel_tools//tools/build_defs/repo:local.
 new_local_repository(
     name = "cuda",
     build_file = "@//third_party/cuda:BUILD",
-    path = "/usr/local/cuda-12.9/",
+    path = "/usr/local/cuda-12.8/",
 )
 
 # for Jetson

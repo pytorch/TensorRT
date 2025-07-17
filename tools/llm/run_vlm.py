@@ -540,3 +540,26 @@ if __name__ == "__main__":
         print("=====================\n")
         print("========= TensorRT PERFORMANCE =========\n")
         print(trt_stats)
+
+# FP16
+# ========= PyTorch =========
+# PyTorch model generated text:  The image shows a vintage Volkswagen Beetle parked on a street. The car is painted in a light blue color with a white roof. The Beetle is positioned in front of a yellow wall with a wooden door and a window. The car's design and color scheme are reminiscent of the classic Volkswagen Beetle, which was popular in the mid-20th century. The setting appears to be in a residential area with a simple, rustic background.
+# ===================================
+# ========= TensorRT =========
+# TensorRT model generated text:  The image shows a vintage Volkswagen Beetle parked on a street. The car is painted in a light blue color with a white roof. The Beetle is positioned in front of a yellow wall with a wooden door and a window. The car's design and color scheme are reminiscent of the classic Volkswagen Beetle, which was popular in the mid-20th century. The setting appears to be in a residential area with a simple, rustic background.
+
+# BF16
+# =============================
+# Original Torch Model generated text:
+# ['The image shows a vintage Volkswagen Beetle parked on a street. The car is painted in a light blue color and has a classic design with rounded edges and a small rear window. The background features a yellow wall with wooden doors, suggesting an urban or suburban setting. The overall scene has a nostalgic feel, reminiscent of mid-20th-century automotive design.']
+# =============================
+# ========= Ouput tokens form custom generated function =========
+# Ouput tokens form custom generated function model generated text:  The image shows a vintage Volkswagen Beetle parked on a street. The car is painted in a light blue color and is positioned in front of a yellow wall with a wooden door. The car's design and color scheme are reminiscent of the classic Volkswagen Beetle, which was popular in the mid-20th century. The setting appears to be in a residential area, possibly in a country with a warm climate, given the bright colors and the style of the building.
+# ===================================
+# ========= PyTorch =========
+# PyTorch model generated text:  The image shows a vintage Volkswagen Beetle parked on a street. The car is painted in a light blue color and is positioned in front of a yellow wall with a wooden door. The car's design and color scheme are reminiscent of the classic Volkswagen Beetle, which was popular in the mid-20th century. The setting appears to be in a residential area, possibly in a country with a warm climate, given the bright colors and the style of the building.
+# ===================================
+# ========= TensorRT =========
+# TensorRT model generated text:  The image shows a vintage Volkswagen Beetle parked on a street. The car is painted in a light blue color and is positioned in front of a yellow wall with a wooden door. The Beetle is a classic model known for its distinctive rounded shape and iconic design. The setting appears to be in a residential area with a simple, rustic background.
+# ===================================
+# PyTorch and TensorRT outputs match: False
