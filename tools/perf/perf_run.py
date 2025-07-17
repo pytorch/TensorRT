@@ -282,7 +282,7 @@ def run_dynamo(model, input_tensors, params, precision, batch_size):
         cache_built_engines=params.get("cache_built_engines", False),
         reuse_cached_engines=params.get("reuse_cached_engines", False),
         use_python_runtime=params.get("use_python_runtime", False),
-        optimization_level=params.get("optimization_level", 5),
+        optimization_level=params.get("optimization_level", 3),
     )
     end_compile = timeit.default_timer()
     compile_time_s = end_compile - start_compile
@@ -441,21 +441,26 @@ def run_tensorrt(
     if params["is_trt_engine"]:
         serialized_engine = model
     else:
-        # Export an ONNX model and convert to TRT
-        torch.onnx.export(model.eval().cuda(), tuple(input_tensors), "./tmp.onnx")
+        if params["onnx"]:
+            onnx_path = params["onnx"]
+        else:
+            # Export an ONNX model and convert to TRT
+            onnx_path = "./onnx-trt.onnx"
+            exp_program = torch.export.export(model.eval().cuda(), tuple(input_tensors))
+            torch.onnx.export(exp_program, tuple(input_tensors), onnx_path)
         builder = trt.Builder(logger)
         network = builder.create_network(
             1 << int(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH)
         )
         parser = trt.OnnxParser(network, logger)
-        success = parser.parse_from_file("./tmp.onnx")
+        success = parser.parse_from_file(onnx_path)
         if not success:
             raise ValueError("ONNX conversion failed")
 
         config = builder.create_builder_config()
         if precision == "fp16":
             config.set_flag(trt.BuilderFlag.FP16)
-        config.builder_optimization_level = params.get("optimization_level", 5)
+        config.builder_optimization_level = params.get("optimization_level", 3)
         start_compile = timeit.default_timer()
         serialized_engine = builder.build_serialized_network(network, config)
         end_compile = timeit.default_timer()
@@ -561,7 +566,7 @@ def run(
                 print("int8 precision expects calibration cache file for inference")
                 return False
 
-        if (model is None) and (backend in ("tensorrt", "ts_trt", "all")):
+        if (model is None) and (backend in ("ts_trt", "all")):
             warnings.warn(
                 f"Requested backend {backend} without specifying a TorchScript Model, "
                 + "skipping this backend"
@@ -585,7 +590,7 @@ def run(
                 batch_size,
             )
             run_tensorrt(
-                model,
+                model_torch,
                 input_tensors,
                 params,
                 precision,
@@ -606,7 +611,7 @@ def run(
             )
         elif backend == "tensorrt":
             run_tensorrt(
-                model,
+                model_torch,
                 input_tensors,
                 params,
                 precision,
@@ -640,6 +645,12 @@ if __name__ == "__main__":
         type=str,
         default="",
         help="Name of torch model file",
+    )
+    arg_parser.add_argument(
+        "--onnx",
+        type=str,
+        default="",
+        help="ONNX model file which helps bypass the step of exporting ONNX from torchscript model. If this argument is provided, the ONNX will be directly converted to TRT engine",
     )
     arg_parser.add_argument(
         "--inputs",
@@ -683,7 +694,7 @@ if __name__ == "__main__":
     arg_parser.add_argument(
         "--optimization_level",
         type=int,
-        default=5,
+        default=3,
         help="Builder optimization level for TensorRT",
     )
     arg_parser.add_argument(
@@ -767,7 +778,9 @@ if __name__ == "__main__":
         )
 
     backends = parse_backends(params["backends"])
-    if ("dynamo" in backends or "torch_compile" in backends) and (model_torch is None):
+    if any(
+        backend in ["dynamo", "torch_compile", "tensorrt"] for backend in backends
+    ) and (model_torch is None):
         raise ValueError(
             "No Pytorch model (nn.Module) is provided for torchdynamo compilation. Please provide a pytorch model using --model_torch argument"
         )
