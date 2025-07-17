@@ -40,13 +40,15 @@ def _find_lib(name: str, paths: List[str]) -> str:
 
 import logging
 
+_LOGGER = logging.getLogger(__name__)
+
 import torch
 
 try:
     # note: trt_alias must be imported before any import tensorrt
     from . import trt_alias  # noqa: F401
 
-    print(f"You are using {trt_alias.tensorrt_package_name=} ")
+    _LOGGER.info(f"You are using {trt_alias.tensorrt_package_name=} ")
 except ImportError:
     tensorrt_version = _parse_semver(__tensorrt_version__)
     tensorrt_rtx_version = _parse_semver(__tensorrt_rtx_version__)
@@ -135,7 +137,6 @@ def _register_with_torch() -> None:
 # note: trt_alias must be imported before enabled features, because enabled features will check tensorrt.plugin availability
 from torch_tensorrt._features import ENABLED_FEATURES, _enabled_features_str
 
-_LOGGER = logging.getLogger(__name__)
 _LOGGER.debug(_enabled_features_str())
 
 

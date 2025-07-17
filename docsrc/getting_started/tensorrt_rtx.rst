@@ -15,6 +15,15 @@ TensorRT for RTX is a drop-in replacement for NVIDIA TensorRT in applications ta
 For detailed information about TensorRT-RTX, refer to:
 * `TensorRT-RTX Documentation <https://docs.nvidia.com/deeplearning/tensorrt-rtx/latest/index.html>`_
 
+Currenlty, Torch-TensorRT only supports TensorRT-RTX for the experiment purpose.
+Torch-TensorRT by default uses TensorRT during the build and run.
+
+In order to use TensorRT-RTX, you need to build the wheel with ``--use-rtx`` flag.
+And then set the ``FORCE_TENSORRT_RTX=1`` environment variable during run.
+
+
+
+
 Prerequisites
 *************
 
@@ -42,22 +51,15 @@ Build Torch-TensorRT with TensorRT-RTX
 
     # make sure the tensorrt_rtx.so file is linked to the tensorrt_rtx.so file in the TensorRT-RTX installation directory
     trt_install_path=$(python -m pip show torch-tensorrt | grep "Location" | awk '{print $2}')/torch_tensorrt
-    # currently we still do static linking so that it does not change any behavior for the standard TensorRT
-    # in future we can do dynamic linking to automatically switch to TensorRT-RTX when user is using RTX GPU
+
     # check if the libtensorrt_rtx.so.1 is linked
     ldd $trt_install_path/lib/libtorchtrt.so
-    
-
-    # double check to make sure the installed torch-tensorrt wheel is using TensorRT-RTX
-    python -c "import torch_tensorrt; print(torch_tensorrt.trt_alias.tensorrt_package_name)"
-
 
 
 Quick Start
 ===========
 
 .. code-block:: py
-    # currently we still use Standard TensorRT by default
-    # if you want to use TensorRT-RTX, you need to set the FORCE_TENSORRT_RTX=1
+    # you have to set FORCE_TENSORRT_RTX=1 to use TensorRT-RTX
     FORCE_TENSORRT_RTX=1 python examples/dynamo/torch_compile_resnet_example.py
 

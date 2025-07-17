@@ -9,17 +9,8 @@ tensorrt_package_name = ""
 tensorrt_package_imported = False
 
 
-def is_rtx_gpu() -> bool:
-    try:
-        import torch
-
-        return "RTX" in torch.cuda.get_device_name(0)
-    except ImportError:
-        # fallback to tensorrt
-        return False
-
-
-# TensorRTProxyModule is a proxy module that allows us to use the tensorrt_rtx package if rtx gpu is detected
+# TensorRTProxyModule is a proxy module that allows us to register the tensorrt or tensorrt-rtx package
+# since tensorrt-rtx is the drop-in replacement for tensorrt, we can use the same interface to use tensorrt-rtx
 class TensorRTProxyModule(ModuleType):
     def __init__(self, target_module: ModuleType) -> None:
         spec = importlib.util.spec_from_loader("tensorrt", loader=None)
@@ -66,16 +57,13 @@ def alias_tensorrt() -> None:
     if tensorrt_package_imported:
         return
 
-    # Determine package name with env override support for easy testing with tensorrt or tensorrt_rtx
+    # in order not to break or change the existing behavior, we only build and run with tensorrt by default, tensorrt-rtx is for experiment only
+    # if we want to test with tensorrt-rtx, we have to build the wheel with --use-rtx and test with FORCE_TENSORRT_RTX=1
     # eg: FORCE_TENSORRT_RTX=1 python test.py
-    # eg: FORCE_TENSORRT_STD=1 python test.py
+    # in future, we can do dynamic linking either to tensorrt or tensorrt-rtx based on the gpu type
     use_rtx = False
     if os.environ.get("FORCE_TENSORRT_RTX", "0") == "1":
         use_rtx = True
-    elif os.environ.get("FORCE_TENSORRT_STD", "0") == "1":
-        use_rtx = False
-    else:
-        use_rtx = is_rtx_gpu()
 
     global tensorrt_package_name
     tensorrt_package_name = "tensorrt_rtx" if use_rtx else "tensorrt"
