@@ -317,9 +317,7 @@ def test_resnet18_modify_attribute():
     mutable_module = torch_trt.MutableTorchTensorRTModule(model, **compile_spec)
     mutable_module(*inputs)
 
-    mutable_module.conv1.weight = nn.Parameter(
-        torch.rand_like(mutable_module.conv1.weight)
-    )
+    mutable_module.fc.weight = nn.Parameter(torch.rand_like(mutable_module.fc.weight))
     assertions.assertEqual(
         mutable_module.refit_state.get_state(),
         RefitFlag.UNKNOWN,
