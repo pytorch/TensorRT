@@ -12,6 +12,7 @@ from torch_tensorrt.dynamo.conversion.impl import (
     embedding,
     full,
     grid,
+    linear,
     matmul,
     nccl_ops,
     normalization,
