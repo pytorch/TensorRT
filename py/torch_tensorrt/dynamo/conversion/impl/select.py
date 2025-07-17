@@ -19,7 +19,6 @@ from torch_tensorrt.dynamo.conversion.impl.elementwise import convert_binary_ele
 from torch_tensorrt.dynamo.conversion.impl.shape import shape as get_shape
 from torch_tensorrt.dynamo.utils import DYNAMIC_DIM
 from torch_tensorrt.fx.converters.converter_utils import (
-    has_dynamic_shape,
     set_layer_name,
 )
 from torch_tensorrt.fx.types import TRTTensor
@@ -55,6 +54,8 @@ def select(
 
 def is_boolean_tensor(tensor: Union[TRTTensor, np.ndarray, torch.Tensor]) -> bool:
     if isinstance(tensor, (TRTTensor)):
+        if getattr(tensor, "meta", None) is None:
+            return tensor.dtype == torch.bool
         val = tensor.meta.get("val")
         if val is not None and val.dtype is torch.bool:
             return True

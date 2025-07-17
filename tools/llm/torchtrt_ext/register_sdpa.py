@@ -86,11 +86,6 @@ def replace_variants_of_sdpa(
                         f"Unexpected number of arguments for {node.target} in the graph"
                     )
 
-            logger.warning(
-                f"This current version of SDPA converter only supports attn_mask = None, dropout_p = 0.0 and is_causal = True configuration. This could cause issues with accuracy for models with different configurations."
-            )
-            # TODO: lan to figure out why the attn_mask passed in from transformers is not working
-            # modified_input_args = (query, key, value, None, dropout_p, True)
             modified_input_args = (query, key, value, attn_mask, dropout_p, is_causal)
             # Create a new node with torch.nn.functional.scaled_dot_product_attention
             # The input args is (query, key, value, is_causal). kwargs has scale
