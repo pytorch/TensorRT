@@ -185,6 +185,64 @@ def compile_torchtrt(
     raise ValueError(msg)
 
 
+def _compile_eagle2_vision(
+    vision_model: torch.nn.Module,
+    example_pixel_values: torch.Tensor,
+    args: argparse.Namespace,
+) -> torch.nn.Module:
+    """
+    Compile Eagle2 vision model with Torch-TensorRT.
+    """
+    # Set precision-specific flags
+    use_fp32_acc = False
+    use_explicit_typing = False
+    if args.precision == "FP16":
+        enabled_precisions = {torch.float32}
+        use_fp32_acc = True
+        use_explicit_typing = True
+    elif args.precision == "BF16":
+        enabled_precisions = {torch.bfloat16}
+    else:  # FP32
+        enabled_precisions = {torch.float32}
+
+    with torch.inference_mode():
+        exported = torch.export.export(
+            vision_model,
+            (example_pixel_values,),
+            strict=False,
+        )
+
+    with torch_tensorrt.logging.debug() if args.debug else nullcontext():
+        trt_mod = torch_tensorrt.dynamo.compile(
+            exported,
+            inputs=[example_pixel_values],
+            enabled_precisions=enabled_precisions,
+            use_explicit_typing=use_explicit_typing,
+            use_fp32_acc=use_fp32_acc,
+            device=DEVICE,
+            disable_tf32=True,
+            use_python_runtime=True,
+            debug=args.debug,
+            offload_module_to_cpu=True,
+            min_block_size=args.min_block_size,
+        )
+    return trt_mod
+
+
+def compile_vision_torchtrt(
+    model: torch.nn.Module,
+    args: argparse.Namespace,
+    example_pixel_values: torch.Tensor,
+) -> torch.nn.Module:
+    """
+    Dispatcher function for vision model compilation.
+    """
+    if args.model.lower() == "eagle2":
+        return _compile_eagle2_vision(model.vision_model, example_pixel_values, args)
+    else:
+        raise ValueError(f"Unsupported model: {args.model}")
+
+
 # -----------------------------------------------------------------------------#
 # Utility helpers
 # -----------------------------------------------------------------------------#
@@ -297,6 +355,7 @@ if __name__ == "__main__":
             processor.tokenizer.eos_token_id,
             emb_layer,
         )
+        print_outputs("PyTorch", pyt_gen_tokens, processor.tokenizer)
         if args.benchmark:
             pyt_timings = time_generate_mm(
                 generate_mm,
@@ -316,15 +375,26 @@ if __name__ == "__main__":
                 compile_time_s=None,
             )
 
-    # Register static cache lowering passes if requested
-    if args.cache == "static_v1":
-        import static_cache_v1  # noqa: F401
-
     # -------------------------------------------------------------------------#
     # 4. Torch-TensorRT compile & run
     # -------------------------------------------------------------------------#
-    trt_lm = compile_torchtrt(model, args)
+
     trt_model = copy.deepcopy(model)
+    # 4.1. Vision model compilation
+    # --- Add vision model compilation --- #
+    example_pixel_values = inputs["pixel_values"]
+    trt_vision = compile_vision_torchtrt(model, args, example_pixel_values)
+    trt_model.vision_model = trt_vision
+
+    # -------------------------------------------------------------------------#
+    # 4.2. Language model compilation
+    # -------------------------------------------------------------------------#
+    # Register static cache lowering passes if requested
+    # Cache is not applied to vision model.
+    if args.cache == "static_v1":
+        import static_cache_v1  # noqa: F401
+
+    trt_lm = compile_torchtrt(model, args)
     trt_model.language_model = trt_lm
 
     emb_layer = emb_layer.to(DEVICE)
