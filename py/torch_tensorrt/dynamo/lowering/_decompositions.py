@@ -202,34 +202,29 @@ def slice_scatter_decomposition(
     start = get_positive_dim(start, input_tensor.shape[dim])
     if end is None:  # Ensure end is int
         end = dim_size
-    end = get_positive_dim(end, input_tensor.shape[dim])
+    end = (
+        get_positive_dim(end, input_tensor.shape[dim]) if isinstance(end, int) else end
+    )
     if step is None:
         step = 1
 
-    src_dim = src_tensor.shape
     # step == 0 is not a valid torch case
-    # also src_dim should be equal to slice dimension
-
     if start == 0 and end == dim_size and step == 1:
         return src_tensor
 
     # Ensure start, end, and step are all integers
-    assert isinstance(start, int), "start must be an integer"
-    assert isinstance(end, int), "end must be an integer"
-    assert isinstance(step, int), "step must be an integer"
+    assert isinstance(start, (int, torch.SymInt)), "start must be an int or SymInt"
+    assert isinstance(end, (int, torch.SymInt)), "end must be an int or SymInt"
+    assert isinstance(step, (int, torch.SymInt)), "step must be an int or SymInt"
 
-    cat_tensors = []
-    index_tensor_shape = []
-    for i, src_each_dim in enumerate(list(src_dim)):
-        if i != dim:
-            index_tensor_shape.append(src_each_dim)
-    for index in range(start, end, step):
-        cat_tensors.append(index * torch.ones(index_tensor_shape, dtype=torch.int64))
-    index_tensor = torch.stack(cat_tensors, dim)
-    index_tensor = index_tensor.to(device_input_tensor)
-    index_tensor_64 = index_tensor.to(torch.int64)
-    output_tensor = torch.scatter(input_tensor, dim, index_tensor_64, src_tensor)
-    return output_tensor
+    indices = torch.arange(
+        start, end, step, device=device_input_tensor, dtype=torch.int64
+    )
+    index_tensor = indices.view(
+        [-1 if i == dim else 1 for i in range(input_tensor.dim())]
+    )
+    index_tensor = index_tensor.expand_as(src_tensor)
+    return torch.scatter(input_tensor, dim, index_tensor, src_tensor)
 
 
 @register_torch_trt_decomposition(
