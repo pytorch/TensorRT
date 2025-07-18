@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt.dynamo.runtime._MutableTorchTensorRTModule &mdash; Torch-TensorRT v2.9.0.dev0+e788be5 documentation</title>
+  <title>torch_tensorrt.dynamo.runtime._MutableTorchTensorRTModule &mdash; Torch-TensorRT v2.9.0.dev0+63052a5 documentation</title>
   
 
   
@@ -290,7 +290,7 @@
               
               
                 <div class="version">
-                  v2.9.0.dev0+e788be5
+                  v2.9.0.dev0+63052a5
                 </div>
               
             
@@ -822,7 +822,7 @@
         <span class="c1"># Check if any quantization precision is enabled</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">enabled_precisions</span> <span class="ow">and</span> <span class="nb">any</span><span class="p">(</span>
             <span class="n">precision</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">enabled_precisions</span>
-            <span class="k">for</span> <span class="n">precision</span> <span class="ow">in</span> <span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">float8_e4m3fn</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">int8</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">precision</span> <span class="ow">in</span> <span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">float8_e4m3fn</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">int8</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">float4_e2m1fn_x2</span><span class="p">)</span>
         <span class="p">):</span>
             <span class="k">try</span><span class="p">:</span>
                 <span class="kn">from</span><span class="w"> </span><span class="nn">modelopt.torch.quantization.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">export_torch_mode</span>
