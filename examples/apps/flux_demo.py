@@ -21,14 +21,6 @@ def compile_model(
     FluxPipeline, FluxTransformer2DModel, torch_tensorrt.MutableTorchTensorRTModule
 ]:
     use_explicit_typing = False
-    if args.use_sdpa:
-        # currently use sdpa is not working correctly with flux model, so we don't use it
-        # Register SDPA as a standalone operator. Converter and lowering pass are defined in register_sdpa.py
-        sys.path.append(
-            os.path.join(os.path.dirname(__file__), "../../tools/llm/torchtrt_ext")
-        )
-        import register_sdpa
-
     if args.dtype == "fp4":
         use_explicit_typing = True
         enabled_precisions = {torch.float4_e2m1fn_x2}
@@ -261,12 +253,6 @@ def main(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Run Flux quantization with different dtypes"
-    )
-    parser.add_argument(
-        "--use_sdpa",
-        action="store_true",
-        help="Use sdpa",
-        default=False,
     )
     parser.add_argument(
         "--dtype",

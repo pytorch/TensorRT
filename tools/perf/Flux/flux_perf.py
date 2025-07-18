@@ -56,12 +56,6 @@ if __name__ == "__main__":
         description="Run Flux quantization with different dtypes"
     )
     parser.add_argument(
-        "--use_sdpa",
-        action="store_true",
-        help="Use sdpa",
-        default=False,
-    )
-    parser.add_argument(
         "--dtype",
         choices=["fp4", "fp8", "int8", "fp16"],
         default="fp16",
