@@ -412,6 +412,7 @@ class DispatchTestCase(TRTTestCase):
         propagate_shapes=False,
         int32_reqd=False,
         immutable_weights=True,
+        use_explicit_typing=False,
     ):
         # TODO: lan to remove this and set use_dynamo_traccer to True by default
         # once all the converter test files are moved to use_dynamo_tracer
@@ -422,6 +423,7 @@ class DispatchTestCase(TRTTestCase):
             enabled_precisions={dtype._from(precision)},
             truncate_double=True,
             immutable_weights=immutable_weights,
+            use_explicit_typing=use_explicit_typing,
         )
 
         mod = self.generate_graph(
