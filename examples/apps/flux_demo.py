@@ -24,7 +24,9 @@ def compile_model(
     if args.use_sdpa:
         # currently use sdpa is not working correctly with flux model, so we don't use it
         # Register SDPA as a standalone operator. Converter and lowering pass are defined in register_sdpa.py
-        sys.path.append(os.path.join(os.path.dirname(__file__), "../dynamo"))
+        sys.path.append(
+            os.path.join(os.path.dirname(__file__), "../../tools/llm/torchtrt_ext")
+        )
         import register_sdpa
 
     if args.dtype == "fp4":
@@ -144,7 +146,7 @@ def compile_model(
         generator=torch.Generator("cuda").manual_seed(seed),
     ).images
     print(f"generated {len(image)} images")
-    image[0].save("forest.png")
+    image[0].save("/tmpforest.png")
 
     torch.cuda.empty_cache()
 
