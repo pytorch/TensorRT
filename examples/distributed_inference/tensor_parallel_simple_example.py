@@ -1,3 +1,24 @@
+"""
+.. _tensor_parallel_simple_example:
+
+Torch Parallel Distributed example for simple model
+=========================================
+
+Below example shows how to use Torch-TensorRT backend for distributed inference with tensor parallelism.
+
+This example demonstrates:
+    - Setting up distributed environment for tensor parallelism
+    - Model sharding across multiple GPUs
+    - Compilation with Torch-TensorRT
+    - Distributed inference execution
+
+Usage
+-----
+.. code-block:: bash
+
+    mpirun -n 2 --allow-run-as-root python tensor_parallel_simple_example.py
+"""
+
 import time
 
 import tensorrt as trt
@@ -5,7 +26,10 @@ import torch
 import torch.distributed as dist
 import torch.nn as nn
 import torch_tensorrt
-from tensor_parallel_initialize_dist import initialize_distributed_env
+from tensor_parallel_initialize_dist import (
+    cleanup_distributed_env,
+    initialize_distributed_env,
+)
 from torch.distributed._tensor import Shard
 from torch.distributed.tensor.parallel import (
     ColwiseParallel,
@@ -18,7 +42,7 @@ device_mesh, _world_size, _rank, logger = initialize_distributed_env(
 )
 
 """
-This example copies some code from https://github.com/pytorch/examples/blob/main/distributed/tensor_parallelism/tensor_parallel_example.py
+This example takes some code from https://github.com/pytorch/examples/blob/main/distributed/tensor_parallelism/tensor_parallel_example.py
 """
 
 
@@ -79,23 +103,15 @@ tp_model = torch.compile(
     dynamic=None,
 )
 
-try:
-    for i in range(10):
-        # For TP, input needs to be same across all TP ranks.
-        # Setting the random seed is to mimic the behavior of dataloader.
-        torch.manual_seed(i)
-        inp = torch.rand(20, 10, device="cuda")
-        start = time.time()
-        output = tp_model(inp)
-        end = time.time()
-        if i == 0:
-            logger.info(f"Compilation time is {end-start}")
-            assert (
-                python_result - output
-            ).std() < 0.01, "Compilation result is not correct."
-        elif _rank == 0:
-            logger.info(f"Inference time is {end-start}")
-finally:
-    # This cleans up the distributed process group
-    if dist.is_initialized():
-        dist.destroy_process_group()
+# For TP, input needs to be same across all TP ranks.
+# Setting the random seed is to mimic the behavior of dataloader.
+torch.manual_seed(0)
+inp = torch.rand(20, 10, device="cuda")
+start = time.time()
+output = tp_model(inp)
+end = time.time()
+logger.info(f"Compilation time is {end - start}")
+assert (python_result - output).std() < 0.01, "Result is not correct."
+
+# This cleans up the distributed process group
+cleanup_distributed_env()
