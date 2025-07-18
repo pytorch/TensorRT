@@ -334,7 +334,7 @@ class MutableTorchTensorRTModule(object):
         # Check if any quantization precision is enabled
         if self.enabled_precisions and any(
             precision in self.enabled_precisions
-            for precision in (torch.float8_e4m3fn, torch.int8)
+            for precision in (torch.float8_e4m3fn, torch.int8, torch.float4_e2m1fn_x2)
         ):
             try:
                 from modelopt.torch.quantization.utils import export_torch_mode
