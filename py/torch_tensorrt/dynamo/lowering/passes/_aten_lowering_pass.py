@@ -10,7 +10,6 @@ from .complex_graph_rewrite import complex_graph_detection
 from .constant_folding import constant_fold
 from .fuse_distributed_ops import fuse_distributed_ops
 from .fuse_prims_broadcast import fuse_prims_broadcast
-from .lower_linear import lower_linear
 from .pass_manager import DynamoPassManager
 from .remove_assert_nodes import remove_assert_nodes
 from .remove_detach import remove_detach
@@ -29,7 +28,6 @@ post_lowering_pass_list = [
     accumulate_fp32_matmul,
     remove_num_users_is_0_nodes,
     complex_graph_detection,
-    lower_linear,
 ]
 
 pre_lowering_pass_list = [
