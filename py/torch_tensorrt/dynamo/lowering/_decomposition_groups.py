@@ -116,8 +116,6 @@ torch_enabled_decompositions: Set[Union[OpOverload, OpOverloadPacket]] = {
     aten.select_scatter,
     aten.sgn,
     aten.sigmoid_backward,
-    aten.silu,
-    aten.silu_,
     aten.silu_backward,
     aten.sinc,
     aten.slice_backward,
