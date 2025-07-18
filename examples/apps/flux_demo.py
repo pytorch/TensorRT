@@ -138,7 +138,7 @@ def compile_model(
         generator=torch.Generator("cuda").manual_seed(seed),
     ).images
     print(f"generated {len(image)} images")
-    image[0].save("/tmpforest.png")
+    image[0].save("/tmp/forest.png")
 
     torch.cuda.empty_cache()
 
