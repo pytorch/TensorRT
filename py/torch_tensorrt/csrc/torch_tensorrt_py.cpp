@@ -18,6 +18,7 @@ namespace py = pybind11;
 namespace torch_tensorrt {
 namespace pyapi {
 
+#ifndef TRT_MAJOR_RTX
 template <typename Derived>
 class pyCalibratorTrampoline : public Derived {
  public:
@@ -146,6 +147,7 @@ class pyIInt8LegacyCalibrator : public pyCalibratorTrampoline<nvinfer1::IInt8Leg
     }
   }
 };
+#endif
 
 void set_device(const int device_id) {
   core::set_device(device_id);
@@ -275,6 +277,7 @@ PYBIND11_MODULE(_C, m) {
       .value("channels_last", TensorFormat::kChannelsLast, "Channels last memory layout (NHWC)")
       .export_values();
 
+#ifndef TRT_MAJOR_RTX
   py::enum_<nvinfer1::CalibrationAlgoType>(m, "CalibrationAlgo", py::module_local(), "Type of calibration algorithm")
       .value("LEGACY_CALIBRATION", nvinfer1::CalibrationAlgoType::kLEGACY_CALIBRATION)
       .value("ENTROPY_CALIBRATION", nvinfer1::CalibrationAlgoType::kENTROPY_CALIBRATION)
@@ -319,6 +322,7 @@ PYBIND11_MODULE(_C, m) {
       .def(py::init_alias<>()) // Always initialize trampoline class.
       .def("get_batch_size", &nvinfer1::IInt8MinMaxCalibrator::getBatchSize, "Get batch size")
       .def("get_algorithm", &nvinfer1::IInt8MinMaxCalibrator::getAlgorithm, "Get algorithm");
+#endif
 
   py::class_<Device>(m, "Device")
       .def(py::init<>())
@@ -362,11 +366,13 @@ PYBIND11_MODULE(_C, m) {
   py::class_<CompileSpec>(ts_sub_mod, "CompileSpec")
       .def(py::init<>())
       .def("__str__", &torch_tensorrt::pyapi::CompileSpec::stringify)
+#ifndef TRT_MAJOR_RTX
       .def("_get_calibrator_handle", &CompileSpec::getPTQCalibratorHandle, "[Internal] gets a handle from a calibrator")
+#endif
       .def_readwrite("inputs", &CompileSpec::inputs)
       .def_readwrite("input_signature", &CompileSpec::input_signature)
       .def_readwrite("enabled_precisions", &CompileSpec::enabled_precisions)
-      .def_readwrite("ptq_calibrator", &CompileSpec::ptq_calibrator)
+      // .def_readwrite("ptq_calibrator", &CompileSpec::ptq_calibrator)
       .def_readwrite("refit", &CompileSpec::refit)
       .def_readwrite("sparse_weights", &CompileSpec::sparse_weights)
       .def_readwrite("disable_tf32", &CompileSpec::disable_tf32)

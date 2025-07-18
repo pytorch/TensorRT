@@ -90,11 +90,13 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         self.builder = trt.Builder(self.logger)
         self._debugger_config = _debugger_config
         flag = 0
-        if compilation_settings.use_explicit_typing:
-            STRONGLY_TYPED = 1 << (int)(
-                trt.NetworkDefinitionCreationFlag.STRONGLY_TYPED
-            )
-            flag |= STRONGLY_TYPED
+        # rtx build, strongly typed is enabled by default, can not set it by builder config
+        if trt._package_name == "tensorrt":
+            if compilation_settings.use_explicit_typing:
+                STRONGLY_TYPED = 1 << (int)(
+                    trt.NetworkDefinitionCreationFlag.STRONGLY_TYPED
+                )
+                flag |= STRONGLY_TYPED
 
         self.ctx = ConversionContext(
             self.builder.create_network(flag), compilation_settings
@@ -277,18 +279,19 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                 trt.MemoryPoolType.DLA_GLOBAL_DRAM,
                 self.compilation_settings.dla_global_dram_size,
             )
+        # rtx build, strongly typed is enabled by default, cannot select precision by builder_config
+        if trt._package_name == "tensorrt":
+            if dtype.float16 in self.compilation_settings.enabled_precisions:
+                builder_config.set_flag(trt.BuilderFlag.FP16)
 
-        if dtype.float16 in self.compilation_settings.enabled_precisions:
-            builder_config.set_flag(trt.BuilderFlag.FP16)
+            if dtype.int8 in self.compilation_settings.enabled_precisions:
+                builder_config.set_flag(trt.BuilderFlag.INT8)
 
-        if dtype.int8 in self.compilation_settings.enabled_precisions:
-            builder_config.set_flag(trt.BuilderFlag.INT8)
+            if dtype.fp8 in self.compilation_settings.enabled_precisions:
+                builder_config.set_flag(trt.BuilderFlag.FP8)
 
-        if dtype.fp8 in self.compilation_settings.enabled_precisions:
-            builder_config.set_flag(trt.BuilderFlag.FP8)
-
-        if dtype.bfloat16 in self.compilation_settings.enabled_precisions:
-            builder_config.set_flag(trt.BuilderFlag.BF16)
+            if dtype.bfloat16 in self.compilation_settings.enabled_precisions:
+                builder_config.set_flag(trt.BuilderFlag.BF16)
 
         if self.compilation_settings.sparse_weights:
             builder_config.set_flag(trt.BuilderFlag.SPARSE_WEIGHTS)

@@ -1,4 +1,4 @@
-name: Build and test Linux aarch64 wheels
+name: Build and test Linux x86_64 wheels(RTX)
 
 on:
   pull_request:
@@ -18,7 +18,7 @@ jobs:
     uses: pytorch/test-infra/.github/workflows/generate_binary_build_matrix.yml@main
     with:
       package-type: wheel
-      os: linux-aarch64
+      os: linux
       test-infra-repository: pytorch/test-infra
       test-infra-ref: main
       with-rocm: false
@@ -27,19 +27,17 @@ jobs:
   filter-matrix:
     needs: [generate-matrix]
     outputs:
-      matrix: ${{ steps.filter.outputs.matrix }}
+      matrix: ${{ steps.generate.outputs.matrix }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: '3.11'
       - uses: actions/checkout@v4
         with:
           repository: pytorch/tensorrt
-      - name: Filter matrix
-        id: filter
-        env:
-          LIMIT_PR_BUILDS: ${{ github.event_name == 'pull_request' && !contains( github.event.pull_request.labels.*.name, 'ciflow/binaries/all') }}
+      - name: Generate matrix
+        id: generate
         run: |
           set -eou pipefail
           MATRIX_BLOB=${{ toJSON(needs.generate-matrix.outputs.matrix) }}
@@ -62,7 +60,7 @@ jobs:
             post-script: packaging/post_build_script.sh
             smoke-test-script: packaging/smoke_test_script.sh
             package-name: torch_tensorrt
-    name: Build torch-tensorrt whl package for aarch64
+    name: Build torch-tensorrt whl package for x86_64
     uses: ./.github/workflows/build_wheels_linux.yml
     with:
       repository: ${{ matrix.repository }}
@@ -76,12 +74,12 @@ jobs:
       package-name: ${{ matrix.package-name }}
       smoke-test-script: ${{ matrix.smoke-test-script }}
       trigger-event: ${{ github.event_name }}
-      architecture: "aarch64"
+      architecture: "x86_64"
+      use-rtx: true
 
   tests-py-torchscript-fe:
     name: Test torchscript frontend [Python]
     needs: [filter-matrix, build]
-    if: false
     strategy:
       fail-fast: false
       matrix:
@@ -100,7 +98,6 @@ jobs:
       test-infra-ref: main
       build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
       pre-script: ${{ matrix.pre-script }}
-      architecture: "aarch64"
       script: |
         set -euo pipefail
         export USE_HOST_DEPS=1
@@ -120,7 +117,6 @@ jobs:
   tests-py-dynamo-converters:
     name: Test dynamo converters [Python]
     needs: [filter-matrix, build]
-    if: false
     strategy:
       fail-fast: false
       matrix:
@@ -139,23 +135,21 @@ jobs:
       test-infra-ref: main
       build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
       pre-script: ${{ matrix.pre-script }}
-      architecture: "aarch64"
       script: |
         set -euo pipefail
         export USE_HOST_DEPS=1
         export CI_BUILD=1
         pushd .
-        cd tests/py
-        cd dynamo
+        cd tests/py/dynamo
         python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/dynamo_converters_test_results.xml -n 4 conversion/
         python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/dynamo_converters_test_results.xml automatic_plugin/test_automatic_plugin.py
         python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/dynamo_converters_test_results.xml automatic_plugin/test_automatic_plugin_with_attrs.py
+        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/dynamo_converters_test_results.xml automatic_plugin/test_flashinfer_rmsnorm.py
         popd
 
   tests-py-dynamo-fe:
     name: Test dynamo frontend [Python]
     needs: [filter-matrix, build]
-    if: false
     strategy:
       fail-fast: false
       matrix:
@@ -174,7 +168,6 @@ jobs:
       test-infra-ref: main
       build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
       pre-script: ${{ matrix.pre-script }}
-      architecture: "aarch64"
       script: |
         set -euo pipefail
         export USE_HOST_DEPS=1
@@ -188,7 +181,6 @@ jobs:
   tests-py-dynamo-serde:
     name: Test dynamo export serde [Python]
     needs: [filter-matrix, build]
-    if: false
     strategy:
       fail-fast: false
       matrix:
@@ -207,7 +199,6 @@ jobs:
       test-infra-ref: main
       build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
       pre-script: ${{ matrix.pre-script }}
-      architecture: "aarch64"
       script: |
         set -euo pipefail
         export USE_HOST_DEPS=1
@@ -222,7 +213,6 @@ jobs:
   tests-py-torch-compile-be:
     name: Test torch compile backend [Python]
     needs: [filter-matrix, build]
-    if: false
     strategy:
       fail-fast: false
       matrix:
@@ -241,7 +231,6 @@ jobs:
       test-infra-ref: main
       build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
       pre-script: ${{ matrix.pre-script }}
-      architecture: "aarch64"
       script: |
         set -euo pipefail
         export USE_HOST_DEPS=1
@@ -257,7 +246,6 @@ jobs:
   tests-py-dynamo-core:
     name: Test dynamo core [Python]
     needs: [filter-matrix, build]
-    if: false
     strategy:
       fail-fast: false
       matrix:
@@ -276,7 +264,6 @@ jobs:
       test-infra-ref: main
       build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
       pre-script: ${{ matrix.pre-script }}
-      architecture: "aarch64"
       script: |
         set -euo pipefail
         export USE_HOST_DEPS=1
@@ -292,7 +279,6 @@ jobs:
   tests-py-dynamo-cudagraphs:
     name: Test dynamo cudagraphs [Python]
     needs: [filter-matrix, build]
-    if: false
     strategy:
       fail-fast: false
       matrix:
@@ -311,7 +297,6 @@ jobs:
       test-infra-ref: main
       build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
       pre-script: ${{ matrix.pre-script }}
-      architecture: "aarch64"
       script: |
         set -euo pipefail
         export USE_HOST_DEPS=1
@@ -327,7 +312,6 @@ jobs:
   tests-py-core:
     name: Test core [Python]
     needs: [filter-matrix, build]
-    if: false
     strategy:
       fail-fast: false
       matrix:
@@ -346,7 +330,6 @@ jobs:
       test-infra-ref: main
       build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
       pre-script: ${{ matrix.pre-script }}
-      architecture: "aarch64"
       script: |
         set -euo pipefail
         export USE_HOST_DEPS=1
@@ -357,5 +340,5 @@ jobs:
         popd
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref_name }}-${{ inputs.repository }}-${{ github.event_name == 'workflow_dispatch' }}-${{ inputs.job-name }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref_name }}-tensorrt-rtx-${{ inputs.repository }}-${{ github.event_name == 'workflow_dispatch' }}-${{ inputs.job-name }}
   cancel-in-progress: true

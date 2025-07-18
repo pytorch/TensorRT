@@ -21,12 +21,22 @@ pip uninstall -y torch torchvision
 pip install --force-reinstall --pre ${TORCHVISION} --index-url ${INDEX_URL}
 pip install --force-reinstall --pre ${TORCH} --index-url ${INDEX_URL}
 
+if [[ ${USE_RTX} == true ]]; then
+    source .github/scripts/install-tensorrt-rtx.sh
+    install_tensorrt_rtx
+fi
 
 # Install Torch-TensorRT
 if [[ ${PLATFORM} == win32 ]]; then
     pip install ${RUNNER_ARTIFACT_DIR}/torch_tensorrt*.whl
 else
     pip install /opt/torch-tensorrt-builds/torch_tensorrt*.whl
+fi
+
+if [[ ${USE_RTX} == true ]]; then
+    # currently tensorrt is installed automatically by install torch-tensorrt since it is a dependency of torch-tensorrt in pyproject.toml
+    # so we need to uninstall it to avoid conflict
+    pip uninstall -y tensorrt tensorrt_cu12 tensorrt_cu12_bindings tensorrt_cu12_libs
 fi
 
 echo -e "Running test script";
