@@ -444,10 +444,8 @@ def run_tensorrt(
         if params["onnx"]:
             onnx_path = params["onnx"]
         else:
-            # Export an ONNX model and convert to TRT
             onnx_path = "./onnx-trt.onnx"
-            exp_program = torch.export.export(model.eval().cuda(), tuple(input_tensors))
-            torch.onnx.export(exp_program, tuple(input_tensors), onnx_path)
+            torch.onnx.export(model, tuple(input_tensors), onnx_path, dynamo=True)
         builder = trt.Builder(logger)
         network = builder.create_network(
             1 << int(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH)
@@ -472,6 +470,7 @@ def run_tensorrt(
     print("Running TensorRT for precision: ", precision, " batch_size : ", batch_size)
     iters = params.get("iterations", 20)
 
+    start_time = timeit.default_timer()
     # Get I/O tensor information using TensorRT 10 API
     input_names = []
     output_names = []
@@ -526,7 +525,6 @@ def run_tensorrt(
 
         # Performance measurement
         for i in range(iters):
-            start_time = timeit.default_timer()
             # Wait for current stream to finish
             dedicated_stream.wait_stream(current_stream)
             context.execute_async_v3(dedicated_stream.cuda_stream)
@@ -534,8 +532,8 @@ def run_tensorrt(
             current_stream.wait_stream(dedicated_stream)
             torch.cuda.synchronize()
             end_time = timeit.default_timer()
-            meas_time = end_time - start_time
-            timings.append(meas_time)
+            infer_time = end_time - start_time
+            timings.append(infer_time)
 
     recordStats("TensorRT", timings, precision, batch_size, compile_time_s)
 
