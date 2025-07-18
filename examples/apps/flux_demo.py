@@ -12,10 +12,6 @@ from accelerate.hooks import remove_hook_from_module
 from diffusers import FluxPipeline
 from diffusers.models.transformers.transformer_flux import FluxTransformer2DModel
 
-# Register SDPA as a standalone operator. Converter and lowering pass are defined in register_sdpa.py
-sys.path.append(os.path.join(os.path.dirname(__file__), "../dynamo"))
-from register_sdpa import *
-
 DEVICE = "cuda:0"
 
 
@@ -24,8 +20,17 @@ def compile_model(
 ) -> tuple[
     FluxPipeline, FluxTransformer2DModel, torch_tensorrt.MutableTorchTensorRTModule
 ]:
+    use_explicit_typing = False
+    if args.dtype == "fp4":
+        use_explicit_typing = True
+        enabled_precisions = {torch.float4_e2m1fn_x2}
+        ptq_config = mtq.NVFP4_DEFAULT_CFG
+        if args.fp4_mha:
+            from modelopt.core.torch.quantization.config import NVFP4_FP8_MHA_CONFIG
 
-    if args.dtype == "fp8":
+            ptq_config = NVFP4_FP8_MHA_CONFIG
+
+    elif args.dtype == "fp8":
         enabled_precisions = {torch.float8_e4m3fn, torch.float16}
         ptq_config = mtq.FP8_DEFAULT_CFG
 
@@ -107,26 +112,33 @@ def compile_model(
         "enabled_precisions": enabled_precisions,
         "truncate_double": True,
         "min_block_size": 1,
-        "use_python_runtime": True,
+        "use_python_runtime": False,
         "immutable_weights": False,
-        "offload_module_to_cpu": True,
+        "offload_module_to_cpu": args.low_vram_mode,
+        "use_explicit_typing": use_explicit_typing,
     }
     if args.low_vram_mode:
         pipe.remove_all_hooks()
         pipe.enable_sequential_cpu_offload()
         remove_hook_from_module(pipe.transformer, recurse=True)
         pipe.transformer.to(DEVICE)
+
     trt_gm = torch_tensorrt.MutableTorchTensorRTModule(backbone, **settings)
     if dynamic_shapes:
         trt_gm.set_expected_dynamic_shape_range((), dynamic_shapes)
     pipe.transformer = trt_gm
-
+    seed = 42
     image = pipe(
-        "Test",
+        [
+            "enchanted winter forest, soft diffuse light on a snow-filled day, serene nature scene, the forest is illuminated by the snow"
+        ],
         output_type="pil",
-        num_inference_steps=2,
+        num_inference_steps=30,
         num_images_per_prompt=batch_size,
+        generator=torch.Generator("cuda").manual_seed(seed),
     ).images
+    print(f"generated {len(image)} images")
+    image[0].save("/tmp/forest.png")
 
     torch.cuda.empty_cache()
 
@@ -242,12 +254,16 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Run Flux quantization with different dtypes"
     )
-
     parser.add_argument(
         "--dtype",
-        choices=["fp8", "int8", "fp16"],
+        choices=["fp4", "fp8", "int8", "fp16"],
         default="fp16",
-        help="Select the data type to use (fp8 or int8 or fp16)",
+        help="Select the data type to use (fp4 or fp8 or int8 or fp16)",
+    )
+    parser.add_argument(
+        "--fp4_mha",
+        action="store_true",
+        help="Use NVFP4_FP8_MHA_CONFIG config instead of NVFP4_DEFAULT_CFG",
     )
     parser.add_argument(
         "--low_vram_mode",
