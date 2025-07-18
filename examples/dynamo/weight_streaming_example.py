@@ -32,7 +32,43 @@ import numpy as np
 import torch
 import torch_tensorrt
 from transformers import AutoModelForCausalLM
-from utils import export_llm
+
+
+def export_llm(model, inputs, min_seq_len=1, max_seq_len=16):
+    """
+    Exports the LLM model into an ExportedProgram with dynamic shapes.
+    In the case of guard failures due to some PyTorch kernel implements, we also
+    try to re-export the graph by expressing them as runtime assert nodes
+    """
+    with torch.no_grad():
+        # max=1024 has contraint violation error. https://github.com/pytorch/pytorch/issues/125604
+        seq_len = torch.export.Dim("seq_len", min=min_seq_len, max=max_seq_len)
+        position_ids = torch.arange(inputs.shape[1]).unsqueeze(0).to(inputs.device)
+        try:
+            print("Trying to export the model using torch.export.export()..")
+            # strict=False only enables aotautograd tracing and excludes dynamo.
+            ep = torch.export.export(
+                model,
+                args=(inputs,),
+                kwargs={"position_ids": position_ids},
+                dynamic_shapes=({1: seq_len}, {1: seq_len}),
+                strict=False,
+            )
+        except:
+            print(
+                "Trying torch.export._trace._export to trace the graph since torch.export.export() failed"
+            )
+            # This API is used to express the constraint violation guards as asserts in the graph.
+            ep = torch.export._trace._export(
+                model,
+                args=(inputs,),
+                kwargs={"position_ids": position_ids},
+                dynamic_shapes=({1: seq_len}, {1: seq_len}),
+                strict=False,
+                allow_complex_guards_as_runtime_asserts=True,
+            )
+
+    return ep
 
 
 def time_generate(model, inputs, output_seq_length, iterations=10):
