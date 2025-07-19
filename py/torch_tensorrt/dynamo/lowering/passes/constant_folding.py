@@ -103,10 +103,14 @@ class _TorchTensorRTConstantFolder(ConstantFolder):  # type: ignore[misc]
         self.quantization_ops: Set[torch._ops.OpOverload] = set()
         try:
             # modelopt import ensures torch.ops.tensorrt.quantize_op.default is registered
-            import modelopt.torch.quantization as mtq
+            import modelopt.torch.quantization as mtq  # noqa: F401
 
             assert torch.ops.tensorrt.quantize_op.default
+            assert torch.ops.tensorrt.dynamic_block_quantize_op.default
             self.quantization_ops.add(torch.ops.tensorrt.quantize_op.default)
+            self.quantization_ops.add(
+                torch.ops.tensorrt.dynamic_block_quantize_op.default
+            )
         except Exception as e:
             pass
 
