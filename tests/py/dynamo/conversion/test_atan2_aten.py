@@ -180,7 +180,7 @@ class TestAtan2Converter(DispatchTestCase):
             ),
         ]
         self.run_test_with_dynamic_shape(
-            atan2(), input_specs, output_dtypes=[output_type]
+            atan2(), input_specs, output_dtypes=[output_type], enable_passes=True,
         )
 
 
@@ -268,6 +268,7 @@ class TestAtan2OutConverter(DispatchTestCase):
             input_specs,
             output_dtypes=[output_type],
             use_dynamo_tracer=False,
+            enable_passes=True,
         )
 
 
