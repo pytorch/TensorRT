@@ -84,10 +84,9 @@ http_archive(
 http_archive(
     name = "tensorrt_rtx",
     build_file = "@//third_party/tensorrt_rtx/archive:BUILD",
-    sha256 = "b1222e08f9d473f0bcc06c6a76bf2b1327a106dcee671415c4c46833a105a425",
     strip_prefix = "TensorRT-RTX-1.0.0.21",
     urls = [
-        "http://cuda-repo/release-candidates/Libraries/TensorRT/v10.12/10.12.0.35-51f47a12/12.9-r575/Linux-x64-manylinux_2_28-winjit/tar/TensorRT-RTX-1.0.0.21.Linux.x86_64-gnu.cuda-12.9.tar.gz",
+        "https://developer.nvidia.com/downloads/trt/rtx_sdk/secure/1.0/TensorRT-RTX-1.0.0.21.Linux.x86_64-gnu.cuda-12.9.tar.gz",
     ],
 )
 
@@ -121,10 +120,9 @@ http_archive(
 http_archive(
     name = "tensorrt_rtx_win",
     build_file = "@//third_party/tensorrt_rtx/archive:BUILD",
-    sha256 = "49cf1247ada75faa8d538257b763b1c12b9bbb97fcd7765654c55b3ad16bd680",
     strip_prefix = "TensorRT-RTX-1.0.0.21",
     urls = [
-        "http://cuda-repo/release-candidates/Libraries/TensorRT/v10.12/10.12.0.35-51f47a12/12.9-r575/Windows10-x64-winjit/zip/TensorRT-RTX-1.0.0.21.Windows.win10.cuda-12.9.zip",
+        "https://developer.nvidia.com/downloads/trt/rtx_sdk/secure/1.0/TensorRT-RTX-1.0.0.21.Windows.win10.cuda-12.9.zip",
     ],
 )
 

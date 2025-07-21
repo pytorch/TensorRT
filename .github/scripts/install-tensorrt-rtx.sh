@@ -14,14 +14,14 @@ install_tensorrt_rtx() {
         # python version is like 3.11, we need to convert it to cp311
         CPYTHON_TAG="cp${PYTHON_VERSION//./}"
         if [[ ${PLATFORM} == win32 ]]; then
-            curl -L http://cuda-repo/release-candidates/Libraries/TensorRT/v10.12/10.12.0.35-51f47a12/12.9-r575/Windows10-x64-winjit/zip/TensorRT-RTX-1.0.0.21.Windows.win10.cuda-12.9.zip -o TensorRT-RTX-1.0.0.21.Windows.win10.cuda-12.9.zip
+            curl -L https://developer.nvidia.com/downloads/trt/rtx_sdk/secure/1.0/TensorRT-RTX-1.0.0.21.Windows.win10.cuda-12.9.zip -o TensorRT-RTX-1.0.0.21.Windows.win10.cuda-12.9.zip
             unzip TensorRT-RTX-1.0.0.21.Windows.win10.cuda-12.9.zip
             rtx_lib_dir=${PWD}/TensorRT-RTX-1.0.0.21/lib
             export LD_LIBRARY_PATH=${rtx_lib_dir}:$LD_LIBRARY_PATH
             echo "LD_LIBRARY_PATH: $LD_LIBRARY_PATH"
             pip install TensorRT-RTX-1.0.0.21/python/tensorrt_rtx-1.0.0.21-${CPYTHON_TAG}-none-win_amd64.whl
         else
-            curl -L http://cuda-repo/release-candidates/Libraries/TensorRT/v10.12/10.12.0.35-51f47a12/12.9-r575/Linux-x64-manylinux_2_28-winjit/tar/TensorRT-RTX-1.0.0.21.Linux.x86_64-gnu.cuda-12.9.tar.gz -o TensorRT-RTX-1.0.0.21.Linux.x86_64-gnu.cuda-12.9.tar.gz
+            curl -L https://developer.nvidia.com/downloads/trt/rtx_sdk/secure/1.0/TensorRT-RTX-1.0.0.21.Linux.x86_64-gnu.cuda-12.9.tar.gz -o TensorRT-RTX-1.0.0.21.Linux.x86_64-gnu.cuda-12.9.tar.gz
             tar -xzf TensorRT-RTX-1.0.0.21.Linux.x86_64-gnu.cuda-12.9.tar.gz
             rtx_lib_dir=${PWD}/TensorRT-RTX-1.0.0.21/lib
             export LD_LIBRARY_PATH=${rtx_lib_dir}:$LD_LIBRARY_PATH

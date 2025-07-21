@@ -127,10 +127,6 @@ if (use_rtx_env_var := os.environ.get("FORCE_TENSORRT_RTX")) is not None:
     if use_rtx_env_var == "1":
         USE_RTX = True
 
-if (use_rtx_env_var := os.environ.get("FORCE_TENSORRT_STD")) is not None:
-    if use_rtx_env_var == "1":
-        USE_RTX = False
-
 if (release_env_var := os.environ.get("RELEASE")) is not None:
     if release_env_var == "1":
         RELEASE = True

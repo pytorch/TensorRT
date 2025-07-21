@@ -103,6 +103,7 @@ jobs:
         export USE_HOST_DEPS=1
         export CI_BUILD=1
         export LD_LIBRARY_PATH=/usr/lib64:$LD_LIBRARY_PATH
+        export FORCE_TENSORRT_RTX=1
         pushd .
         cd tests/modules
         python hub.py
@@ -141,6 +142,7 @@ jobs:
         export CI_BUILD=1
         pushd .
         cd tests/py/dynamo
+        export FORCE_TENSORRT_RTX=1
         python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/dynamo_converters_test_results.xml -n 4 conversion/
         python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/dynamo_converters_test_results.xml automatic_plugin/test_automatic_plugin.py
         python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/dynamo_converters_test_results.xml automatic_plugin/test_automatic_plugin_with_attrs.py
@@ -172,6 +174,7 @@ jobs:
         set -euo pipefail
         export USE_HOST_DEPS=1
         export CI_BUILD=1
+        export FORCE_TENSORRT_RTX=1
         pushd .
         cd tests/py
         cd dynamo
@@ -203,6 +206,7 @@ jobs:
         set -euo pipefail
         export USE_HOST_DEPS=1
         export CI_BUILD=1
+        export FORCE_TENSORRT_RTX=1
         pushd .
         cd tests/py
         cd dynamo
@@ -235,6 +239,7 @@ jobs:
         set -euo pipefail
         export USE_HOST_DEPS=1
         export CI_BUILD=1
+        export FORCE_TENSORRT_RTX=1
         pushd .
         cd tests/py
         cd dynamo
@@ -268,6 +273,7 @@ jobs:
         set -euo pipefail
         export USE_HOST_DEPS=1
         export CI_BUILD=1
+        export FORCE_TENSORRT_RTX=1
         pushd .
         cd tests/py
         cd dynamo
@@ -301,6 +307,7 @@ jobs:
         set -euo pipefail
         export USE_HOST_DEPS=1
         export CI_BUILD=1
+        export FORCE_TENSORRT_RTX=1
         pushd .
         cd tests/py
         cd dynamo
@@ -334,6 +341,7 @@ jobs:
         set -euo pipefail
         export USE_HOST_DEPS=1
         export CI_BUILD=1
+        export FORCE_TENSORRT_RTX=1
         pushd .
         cd tests/py/core
         python -m pytest -ra -n 4 --junitxml=${RUNNER_TEST_RESULTS_DIR}/tests_py_core_test_results.xml .
