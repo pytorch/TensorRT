@@ -8,8 +8,6 @@ from typing import Dict, List
 import torch
 from torch_tensorrt._version import (  # noqa: F401
     __cuda_version__,
-    __tensorrt_rtx_version__,
-    __tensorrt_version__,
     __version__,
 )
 
@@ -20,92 +18,28 @@ if sys.version_info < (3,):
         "Python 2 has reached end-of-life and is not supported by Torch-TensorRT"
     )
 
-
-def _parse_semver(version: str) -> Dict[str, str]:
-    split = version.split(".")
-    if len(split) < 3:
-        split.append("")
-
-    return {"major": split[0], "minor": split[1], "patch": split[2]}
-
-
-def _find_lib(name: str, paths: List[str]) -> str:
-    for path in paths:
-        libpath = os.path.join(path, name)
-        if os.path.isfile(libpath):
-            return libpath
-
-    raise FileNotFoundError(f"Could not find {name}\n  Search paths: {paths}")
-
-
 import logging
 
 _LOGGER = logging.getLogger(__name__)
 
 import torch
 
+tensorrt_package_name = ""
+
 try:
     # note: trt_alias must be imported before any import tensorrt
+
     from . import trt_alias  # noqa: F401
 
-    _LOGGER.info(f"You are using {trt_alias.tensorrt_package_name=} ")
-except ImportError:
-    tensorrt_version = _parse_semver(__tensorrt_version__)
-    tensorrt_rtx_version = _parse_semver(__tensorrt_rtx_version__)
+    tensorrt_package_name = trt_alias.package_name
+    _LOGGER.info(f"You are using {trt_alias.package_name=} ")
 
-    TENSORRT_MAJOR = tensorrt_version["major"]
-    TENSORRT_MINOR = tensorrt_version["minor"]
-    TENSORRT_RTX_MAJOR = tensorrt_rtx_version["major"]
-    TENSORRT_RTX_MINOR = tensorrt_rtx_version["minor"]
-
-    trt_lib = {
-        "tensorrt_rtx": {
-            "win": [
-                f"tensorrt_rtx_{TENSORRT_RTX_MAJOR}_{TENSORRT_RTX_MINOR}.dll",
-                # TODO: lan to verify, comment out for now, as torch-tensorrt don't require onnx parser
-                # f"tensorrt_onnxparser_rtx_{TENSORRT_RTX_MAJOR}_{TENSORRT_RTX_MINOR}.dll",
-            ],
-            "linux": [
-                f"libtensorrt_rtx.so.{TENSORRT_RTX_MAJOR}",
-                # TODO: lan to verify, comment out for now, as torch-tensorrt don't require onnx parser
-                # f"libtensorrt_onnxparser_rtx.so.{TENSORRT_RTX_MAJOR}",
-            ],
-        },
-        "tensorrt": {
-            "win": [
-                f"nvinfer_{TENSORRT_MAJOR}.dll",
-                f"nvinfer_plugin_{TENSORRT_MAJOR}.dll",
-            ],
-            "linux": [
-                f"libnvinfer.so.{TENSORRT_MAJOR}",
-                f"libnvinfer_plugin.so.{TENSORRT_MAJOR}",
-            ],
-        },
-    }
-
-    if sys.platform.startswith("win"):
-        WIN_LIBS = trt_lib[trt_alias.tensorrt_package_name]["win"]
-        WIN_PATHS = os.environ["PATH"].split(os.path.pathsep)
-        for lib in WIN_LIBS:
-            ctypes.CDLL(_find_lib(lib, WIN_PATHS))
-
-    elif sys.platform.startswith("linux"):
-        LINUX_PATHS = [
-            f"/usr/local/cuda-{__cuda_version__}/lib64",
-            "/usr/lib",
-            "/usr/lib64",
-        ]
-        if "LD_LIBRARY_PATH" in os.environ:
-            LINUX_PATHS += os.environ["LD_LIBRARY_PATH"].split(os.path.pathsep)
-        if platform.uname().processor == "x86_64":
-            LINUX_PATHS += [
-                "/usr/lib/x86_64-linux-gnu",
-            ]
-        elif platform.uname().processor == "aarch64":
-            LINUX_PATHS += ["/usr/lib/aarch64-linux-gnu"]
-        LINUX_LIBS = trt_lib[trt_alias.tensorrt_package_name]["linux"]
-        for lib in LINUX_LIBS:
-            ctypes.CDLL(_find_lib(lib, LINUX_PATHS))
+except Exception as e:
+    print(f"import error when try to import trt_alias, got error {e}")
+    print(
+        f"make sure tensorrt lib is in the LD_LIBRARY_PATH: {os.environ.get('LD_LIBRARY_PATH')}"
+    )
+    raise Exception(f"import error when try to import trt_alias, got error {e}")
 
 
 def _register_with_torch() -> None:

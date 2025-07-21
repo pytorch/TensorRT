@@ -1,12 +1,31 @@
+import ctypes
 import importlib
 import importlib.util
 import os
+import platform
 import sys
 from types import ModuleType
-from typing import Any
+from typing import Any, Dict, List
 
-tensorrt_package_name = ""
-tensorrt_package_imported = False
+package_imported = False
+package_name = ""
+
+
+def _parse_semver(version: str) -> Dict[str, str]:
+    split = version.split(".")
+    if len(split) < 3:
+        split.append("")
+
+    return {"major": split[0], "minor": split[1], "patch": split[2]}
+
+
+def _find_lib(name: str, paths: List[str]) -> str:
+    for path in paths:
+        libpath = os.path.join(path, name)
+        if os.path.isfile(libpath):
+            return libpath
+
+    raise FileNotFoundError(f"Could not find {name}\n  Search paths: {paths}")
 
 
 # TensorRTProxyModule is a proxy module that allows us to register the tensorrt or tensorrt-rtx package
@@ -52,9 +71,10 @@ class TensorRTProxyModule(ModuleType):
 
 
 def alias_tensorrt() -> None:
-    global tensorrt_package_imported
+    global package_imported
+    global package_name
     # tensorrt package has been imported, no need to alias again
-    if tensorrt_package_imported:
+    if package_imported:
         return
 
     # in order not to break or change the existing behavior, we only build and run with tensorrt by default, tensorrt-rtx is for experiment only
@@ -64,25 +84,76 @@ def alias_tensorrt() -> None:
     use_rtx = False
     if os.environ.get("FORCE_TENSORRT_RTX", "0") == "1":
         use_rtx = True
-
-    global tensorrt_package_name
-    tensorrt_package_name = "tensorrt_rtx" if use_rtx else "tensorrt"
+    package_name = "tensorrt_rtx" if use_rtx else "tensorrt"
     # Import the appropriate package
     try:
-        target_module = importlib.import_module(tensorrt_package_name)
+        target_module = importlib.import_module(package_name)
         proxy = TensorRTProxyModule(target_module)
-        proxy._package_name = tensorrt_package_name
+        proxy._package_name = package_name
         sys.modules["tensorrt"] = proxy
-        tensorrt_package_imported = True
+        package_imported = True
     except ImportError as e:
         # Fallback to standard tensorrt if RTX version not available
-        print(f"import error when try to import {tensorrt_package_name=} got error {e}")
+        print(f"import error when try to import {package_name=} got error {e}")
         print(
             f"make sure tensorrt lib is in the LD_LIBRARY_PATH: {os.environ.get('LD_LIBRARY_PATH')}"
         )
-        raise Exception(
-            f"import error when try to import {tensorrt_package_name=} got error {e}"
-        )
+        if use_rtx:
+            from torch_tensorrt import __tensorrt_rtx_version__
+
+            tensorrt_version = _parse_semver(__tensorrt_rtx_version__)
+            tensorrt_major = tensorrt_version["major"]
+            tensorrt_minor = tensorrt_version["minor"]
+            tensorrt_lib = {
+                "win": [
+                    f"tensorrt_rtx_{tensorrt_major}_{tensorrt_minor}.dll",
+                ],
+                "linux": [
+                    f"libtensorrt_rtx.so.{tensorrt_major}",
+                ],
+            }
+        else:
+            from torch_tensorrt import __tensorrt_version__
+
+            tensorrt_version = _parse_semver(__tensorrt_version__)
+            tensorrt_major = tensorrt_version["major"]
+            tensorrt_minor = tensorrt_version["minor"]
+            tensorrt_lib = {
+                "win": [
+                    f"nvinfer_{tensorrt_major}.dll",
+                    f"nvinfer_plugin_{tensorrt_major}.dll",
+                ],
+                "linux": [
+                    f"libnvinfer.so.{tensorrt_major}",
+                    f"libnvinfer_plugin.so.{tensorrt_major}",
+                ],
+            }
+
+        from torch_tensorrt import __cuda_version__
+
+        if sys.platform.startswith("win"):
+            WIN_LIBS = tensorrt_lib["win"]
+            WIN_PATHS = os.environ["PATH"].split(os.path.pathsep)
+            for lib in WIN_LIBS:
+                ctypes.CDLL(_find_lib(lib, WIN_PATHS))
+
+        elif sys.platform.startswith("linux"):
+            LINUX_PATHS = [
+                f"/usr/local/cuda-{__cuda_version__}/lib64",
+                "/usr/lib",
+                "/usr/lib64",
+            ]
+            if "LD_LIBRARY_PATH" in os.environ:
+                LINUX_PATHS += os.environ["LD_LIBRARY_PATH"].split(os.path.pathsep)
+            if platform.uname().processor == "x86_64":
+                LINUX_PATHS += [
+                    "/usr/lib/x86_64-linux-gnu",
+                ]
+            elif platform.uname().processor == "aarch64":
+                LINUX_PATHS += ["/usr/lib/aarch64-linux-gnu"]
+            LINUX_LIBS = tensorrt_lib["linux"]
+            for lib in LINUX_LIBS:
+                ctypes.CDLL(_find_lib(lib, LINUX_PATHS))
 
 
 alias_tensorrt()
