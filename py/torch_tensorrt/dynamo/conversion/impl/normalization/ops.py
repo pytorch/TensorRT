@@ -1,5 +1,4 @@
 import logging
-import os
 from typing import List, Optional, Sequence, Tuple, Union
 
 import numpy as np
@@ -51,7 +50,8 @@ def batch_norm(
     # We perform constant folding for batch norm when the weight, bias, running_mean, and running_var are all tensors.
     # Batch norm operation can be fused into a single layer, which is more efficient than the original implementation.
     # In this way, the batch norm layer will be fused with the Convolution layer and get a performance boost.
-    if os.environ.get("DISABLE_BATCH_NORM_CONSTANT_FOLDING", "0") == "1" or any(
+    # TODO: lanl: to remove this once we have solved the batchnorm constant folding issue in RTX
+    if trt._package_name == "tensorrt_rtx" or any(
         [
             isinstance(weight, trt.ITensor),
             isinstance(bias, trt.ITensor),

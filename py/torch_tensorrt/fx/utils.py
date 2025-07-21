@@ -60,7 +60,7 @@ DataTypeEquivalence: Dict[
     },
 }
 
-if trt.__version__ >= "7.0":
+if trt._package_name == "tensorrt_rtx" or trt.__version__ >= "7.0":
     DataTypeEquivalence[trt.bool] = {
         Frameworks.NUMPY: np.bool_,
         Frameworks.TORCH: torch.bool,
@@ -105,7 +105,11 @@ def unified_dtype_converter(
     trt_major_version = int(trt.__version__.split(".")[0])
     if dtype in (np.int8, torch.int8, trt.int8):
         return DataTypeEquivalence[trt.int8][to]
-    elif trt_major_version >= 7 and dtype in (np.bool_, torch.bool, trt.bool):
+    elif (trt._package_name == "tensorrt_rtx" or trt_major_version >= 7) and dtype in (
+        np.bool_,
+        torch.bool,
+        trt.bool,
+    ):
         return DataTypeEquivalence[trt.bool][to]
     elif dtype in (np.int32, torch.int32, trt.int32):
         return DataTypeEquivalence[trt.int32][to]

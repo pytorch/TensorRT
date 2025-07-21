@@ -219,14 +219,18 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                 trt.MemoryPoolType.WORKSPACE, self.compilation_settings.workspace_size
             )
 
-        if version.parse(trt.__version__) >= version.parse("8.2"):
+        if trt._package_name == "tensorrt_rtx" or version.parse(
+            trt.__version__
+        ) >= version.parse("8.2"):
             builder_config.profiling_verbosity = (
                 trt.ProfilingVerbosity.DETAILED
                 if self._debugger_config and self._debugger_config.save_engine_profile
                 else trt.ProfilingVerbosity.LAYER_NAMES_ONLY
             )
 
-        if version.parse(trt.__version__) >= version.parse("8.6"):
+        if trt._package_name == "tensorrt_rtx" or version.parse(
+            trt.__version__
+        ) >= version.parse("8.6"):
             if self.compilation_settings.max_aux_streams is not None:
                 _LOGGER.info(
                     f"Setting max aux streams to {self.compilation_settings.max_aux_streams}"
@@ -339,7 +343,9 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         if self.compilation_settings.enable_weight_streaming:
             builder_config.set_flag(trt.BuilderFlag.WEIGHT_STREAMING)
 
-        if version.parse(trt.__version__) >= version.parse("10.8"):
+        if trt._package_name == "tensorrt_rtx" or version.parse(
+            trt.__version__
+        ) >= version.parse("10.8"):
             TilingOptimizationLevel = {
                 "none": trt.TilingOptimizationLevel.NONE,
                 "fast": trt.TilingOptimizationLevel.FAST,

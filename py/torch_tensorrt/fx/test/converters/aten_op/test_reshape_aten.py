@@ -15,7 +15,7 @@ class TestReshapeConverter(DispatchTestCase):
         ]
     )
     @unittest.skipIf(
-        trt.__version__ < "8.5",
+        trt._package_name == "tensorrt" and trt.__version__ < "8.5",
         "Shape tensor supported well in TensorRT 8.5 and later",
     )
     def test_reshape(self, target_shape):
@@ -42,7 +42,7 @@ class TestReshapeConverter(DispatchTestCase):
         ]
     )
     @unittest.skipIf(
-        trt.__version__ < "8.5",
+        trt._package_name == "tensorrt" and trt.__version__ < "8.5",
         "Shape tensor supported well in TensorRT 8.5 and later",
     )
     def test_reshape_with_dynamic_shape(self, target_shape):
@@ -68,7 +68,7 @@ class TestReshapeConverter(DispatchTestCase):
         )
 
     @unittest.skipIf(
-        trt.__version__ < "8.5",
+        trt._package_name == "tensorrt" and trt.__version__ < "8.5",
         "Shape tensor supported well in TensorRT 8.5 and later",
     )
     def test_reshape_with_dynamic_shape_size(self):

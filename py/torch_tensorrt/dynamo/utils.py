@@ -76,7 +76,7 @@ DataTypeEquivalence: Dict[
     },
 }
 
-if trt.__version__ >= "7.0":
+if trt._package_name == "tensorrt_rtx" or trt.__version__ >= "7.0":
     DataTypeEquivalence[trt.bool] = {
         Frameworks.NUMPY: np.bool_,
         Frameworks.TORCH: torch.bool,

@@ -5,6 +5,7 @@ import unittest
 from importlib import metadata
 
 import pytest
+import tensorrt as trt
 import torch
 import torch_tensorrt as torchtrt
 from torch_tensorrt.dynamo.utils import COSINE_THRESHOLD, cosine_similarity
@@ -410,6 +411,10 @@ def test_base_int8(ir):
     model = SimpleNetwork().eval().cuda()
 
     quant_cfg = mtq.INT8_DEFAULT_CFG
+    # RTX does not support INT8 default quantization(weights+activations), only support INT8 weights only quantization
+    if trt._package_name == "tensorrt_rtx":
+        breakpoint()
+        quant_cfg["quant_cfg"]["*input_quantizer"] = {"enable": False}
     mtq.quantize(model, quant_cfg, forward_loop=calibrate_loop)
     # model has INT8 qdq nodes at this point
     output_pyt = model(input_tensor)
@@ -462,6 +467,9 @@ def test_base_int8_dynamic_shape(ir):
     model = SimpleNetwork().eval().cuda()
 
     quant_cfg = mtq.INT8_DEFAULT_CFG
+    # RTX does not support INT8 default quantization(weights+activations), only support INT8 weights only quantization
+    if trt._package_name == "tensorrt_rtx":
+        quant_cfg["quant_cfg"]["*input_quantizer"] = {"enable": False}
     mtq.quantize(model, quant_cfg, forward_loop=calibrate_loop)
 
     # model has INT8 qdq nodes at this point

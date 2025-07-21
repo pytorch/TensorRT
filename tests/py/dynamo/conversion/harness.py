@@ -246,6 +246,7 @@ class TRTTestCase(TestCase):
                         ref = torch.tensor([ref])
                 ref = ref.cpu()  # to_dtype test has cases with gpu output
                 # TODO: lanl: remove this once we have a clear plan for strong type support in RTX
+                import os
                 if os.environ.get("FORCE_TENSORRT_RTX", "0") == "1":
                     check_dtype = False
                 torch.testing.assert_close(
