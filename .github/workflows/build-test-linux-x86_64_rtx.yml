@@ -98,6 +98,7 @@ jobs:
       test-infra-ref: main
       build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
       pre-script: ${{ matrix.pre-script }}
+      use-rtx: true
       script: |
         set -euo pipefail
         export USE_HOST_DEPS=1
@@ -136,6 +137,7 @@ jobs:
       test-infra-ref: main
       build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
       pre-script: ${{ matrix.pre-script }}
+      use-rtx: true
       script: |
         set -euo pipefail
         export USE_HOST_DEPS=1
@@ -170,6 +172,7 @@ jobs:
       test-infra-ref: main
       build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
       pre-script: ${{ matrix.pre-script }}
+      use-rtx: true
       script: |
         set -euo pipefail
         export USE_HOST_DEPS=1
@@ -202,6 +205,7 @@ jobs:
       test-infra-ref: main
       build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
       pre-script: ${{ matrix.pre-script }}
+      use-rtx: true
       script: |
         set -euo pipefail
         export USE_HOST_DEPS=1
@@ -235,6 +239,7 @@ jobs:
       test-infra-ref: main
       build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
       pre-script: ${{ matrix.pre-script }}
+      use-rtx: true
       script: |
         set -euo pipefail
         export USE_HOST_DEPS=1
@@ -269,6 +274,7 @@ jobs:
       test-infra-ref: main
       build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
       pre-script: ${{ matrix.pre-script }}
+      use-rtx: true
       script: |
         set -euo pipefail
         export USE_HOST_DEPS=1
@@ -303,6 +309,7 @@ jobs:
       test-infra-ref: main
       build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
       pre-script: ${{ matrix.pre-script }}
+      use-rtx: true
       script: |
         set -euo pipefail
         export USE_HOST_DEPS=1
@@ -337,6 +344,7 @@ jobs:
       test-infra-ref: main
       build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
       pre-script: ${{ matrix.pre-script }}
+      use-rtx: true
       script: |
         set -euo pipefail
         export USE_HOST_DEPS=1
