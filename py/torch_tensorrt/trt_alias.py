@@ -99,7 +99,7 @@ def alias_tensorrt() -> None:
             f"make sure tensorrt lib is in the LD_LIBRARY_PATH: {os.environ.get('LD_LIBRARY_PATH')}"
         )
         if use_rtx:
-            from torch_tensorrt import __tensorrt_rtx_version__
+            from torch_tensorrt._version import __tensorrt_rtx_version__
 
             tensorrt_version = _parse_semver(__tensorrt_rtx_version__)
             tensorrt_major = tensorrt_version["major"]
@@ -113,7 +113,7 @@ def alias_tensorrt() -> None:
                 ],
             }
         else:
-            from torch_tensorrt import __tensorrt_version__
+            from torch_tensorrt._version import __tensorrt_version__
 
             tensorrt_version = _parse_semver(__tensorrt_version__)
             tensorrt_major = tensorrt_version["major"]
