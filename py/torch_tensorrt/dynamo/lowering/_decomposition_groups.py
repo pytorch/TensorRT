@@ -172,6 +172,7 @@ torch_disabled_decompositions: Set[Union[OpOverload, OpOverloadPacket]] = {
     aten.upsample_trilinear3d.vec,
     aten.upsample_bicubic2d.vec,
     aten.linear.default,
+    aten.matmul.default,
 }
 
 
