@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 from contextlib import nullcontext
-from tempfile import tempdir
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import tensorrt as trt
@@ -539,7 +538,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
 
                                 with tempfile.TemporaryDirectory() as tmpdir:
                                     self.cudagraph.debug_dump(
-                                        f"{tempdir}/{self.name}_cudagraph.dot"
+                                        f"{tmpdir}/{self.name}_cudagraph.dot"
                                     )
 
                         self.cudagraph.replay()  # type: ignore

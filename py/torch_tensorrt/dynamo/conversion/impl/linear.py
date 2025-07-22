@@ -40,11 +40,7 @@ def linear(
         ctx,
         target,
         source_ir,
-<<<<<<< HEAD
         f"{name}_matrix_multiply",
-=======
-        name,
->>>>>>> 785c25a2f (revert linear converter)
         input,
         weight,
         input_matrix_op=trt.MatrixOperation.NONE,
@@ -53,12 +49,8 @@ def linear(
 
     if bias is not None:
         # add bias
-<<<<<<< HEAD
         out = impl.elementwise.add(
             ctx, target, source_ir, f"{name}_add_bias", out, bias
         )
-=======
-        out = impl.elementwise.add(ctx, target, source_ir, name, out, bias)
->>>>>>> 785c25a2f (revert linear converter)
 
     return out

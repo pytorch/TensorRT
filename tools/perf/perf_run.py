@@ -474,9 +474,7 @@ def run_tensorrt(
     # Get I/O tensor information using TensorRT 10 API
     input_names = []
     output_names = []
-    input_dtypes = []
     output_dtypes = []
-    input_shapes = []
     output_shapes = []
 
     for i in range(engine.num_io_tensors):
@@ -487,8 +485,6 @@ def run_tensorrt(
 
         if tensor_mode == trt.TensorIOMode.INPUT:
             input_names.append(tensor_name)
-            input_dtypes.append(torch_dtype_from_trt(tensor_dtype))
-            input_shapes.append(tuple(tensor_shape))
         else:  # trt.TensorIOMode.OUTPUT
             output_names.append(tensor_name)
             output_dtypes.append(torch_dtype_from_trt(tensor_dtype))
@@ -514,6 +510,8 @@ def run_tensorrt(
         dedicated_stream = torch.cuda.Stream()
         current_stream = torch.cuda.current_stream()
 
+        setup_time = timeit.default_timer()
+
         # Warm up
         for i in range(WARMUP_ITER):
             # Wait for current stream to finish
@@ -523,6 +521,7 @@ def run_tensorrt(
             current_stream.wait_stream(dedicated_stream)
             torch.cuda.synchronize()
 
+        infer_start_time = timeit.default_timer()
         # Performance measurement
         for i in range(iters):
             # Wait for current stream to finish
@@ -531,9 +530,12 @@ def run_tensorrt(
             # Wait for TensorRT stream to finish
             current_stream.wait_stream(dedicated_stream)
             torch.cuda.synchronize()
-            end_time = timeit.default_timer()
-            infer_time = end_time - start_time
-            timings.append(infer_time)
+
+        end_time = timeit.default_timer()
+
+    # to compare against torch-trt dynamo apples to apples
+    infer_time = (end_time - infer_start_time + setup_time - start_time) / iters
+    timings.append(infer_time)
 
     recordStats("TensorRT", timings, precision, batch_size, compile_time_s)
 
