@@ -531,7 +531,7 @@ def aten_ops_gelu(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.matmul, supports_dynamic_shapes=True)
+@dynamo_tensorrt_converter(torch.ops.aten.matmul.default, supports_dynamic_shapes=True)
 @dynamo_tensorrt_converter(torch.ops.aten.dot.default, supports_dynamic_shapes=True)
 @dynamo_tensorrt_converter(torch.ops.aten.mm.default, supports_dynamic_shapes=True)
 @dynamo_tensorrt_converter(torch.ops.aten.mv.default, supports_dynamic_shapes=True)
