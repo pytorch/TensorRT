@@ -3572,6 +3572,10 @@ def aten_ops_nonzero(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    import tensorrt as trt
+
+    if trt._package_name == "tensorrt_rtx":
+        raise NotImplementedError("Nonzero is not supported for tensorrt_rtx")
     return impl.unary.nonzero(
         ctx,
         target,

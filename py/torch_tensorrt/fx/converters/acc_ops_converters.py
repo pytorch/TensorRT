@@ -207,7 +207,9 @@ def acc_ops_conv_transposend(
     return layer.get_output(0)
 
 
-@tensorrt_converter(acc_ops.pad, enabled=trt.__version__ < "8.2")
+@tensorrt_converter(
+    acc_ops.pad, enabled=(trt._package_name == "tensorrt" and trt.__version__ < "8.2")
+)
 def acc_ops_pad_with_padding_layer(
     network: TRTNetwork,
     target: Target,
@@ -257,7 +259,10 @@ def acc_ops_pad_with_padding_layer(
     return layer.get_output(0)
 
 
-@tensorrt_converter(acc_ops.pad, enabled=trt.__version__ >= "8.2")
+@tensorrt_converter(
+    acc_ops.pad,
+    enabled=(trt._package_name == "tensorrt_rtx" or trt.__version__ >= "8.2"),
+)
 def acc_ops_pad_with_slice_layer(
     network: TRTNetwork,
     target: Target,
@@ -880,7 +885,9 @@ def acc_ops_sign(
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     input_val = kwargs["input"]
 
-    if trt.__version__ >= "8.2" and not network.has_implicit_batch_dimension:
+    if (
+        trt._package_name == "tensorrt_rtx" or trt.__version__ >= "8.2"
+    ) and not network.has_implicit_batch_dimension:
         input_val = kwargs["input"]
         operation_type = trt.UnaryOperation.SIGN
         return add_unary_layer(network, input_val, operation_type, target, name)

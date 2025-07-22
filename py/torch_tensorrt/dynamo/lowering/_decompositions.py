@@ -9,7 +9,6 @@ from torch._export.utils import (
     _get_decomp_for_cia,
 )
 from torch._ops import OpOverload
-
 from torch_tensorrt.dynamo._defaults import default_device
 from torch_tensorrt.dynamo.conversion.converter_utils import get_positive_dim
 from torch_tensorrt.dynamo.utils import to_torch_device
@@ -423,8 +422,8 @@ def instance_norm_decomposition(
 
 @register_torch_trt_decomposition(
     torch.ops.aten.full_like, registry=TORCH_TRT_DECOMPOSITIONS
-)  # type: ignore
-def full_like_decomposition(*args, **kwargs) -> torch.Tensor:
+)
+def full_like_decomposition(*args, **kwargs) -> torch.Tensor:  # type: ignore
     input = args[0]
     shape = args[0].shape
     fill_value = args[1]
@@ -455,7 +454,6 @@ def scaled_dot_product_attention_decomposition(
     L, S = query.size(-2), key.size(-2)
     device = query.device
     attn_bias = torch.zeros(L, S, dtype=query.dtype, device=device)
-
     if is_causal:
         assert attn_mask is None, "attn_mask must be None when is_causal=True"
         temp_mask = torch.ones(L, S, dtype=torch.bool, device=device).tril(diagonal=0)
@@ -474,7 +472,9 @@ def scaled_dot_product_attention_decomposition(
     attn_weight = query @ key.transpose(-2, -1)
 
     if scale is None:
-        scale = torch.sqrt(torch.scalar_tensor(query.size(-1), dtype=torch.int))
+        scale = torch.sqrt(torch.scalar_tensor(query.size(-1), dtype=torch.int)).to(
+            query.dtype
+        )
         attn_weight = attn_weight / scale
     else:
         attn_weight = attn_weight * scale
