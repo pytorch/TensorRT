@@ -46,7 +46,7 @@ platform_str = str(Platform.current_platform()).lower()
 
 class TestGatherNcclOpsConverter(DispatchTestCase):
     @unittest.skipIf(
-        "win" or "aarch64" in platform_str,
+        "win" in platform_str or "aarch64" in platform_str,
         "Skipped on Windows and Jetson: NCCL backend is not supported.",
     )
     @classmethod
