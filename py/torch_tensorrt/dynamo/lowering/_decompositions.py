@@ -491,6 +491,7 @@ def scaled_dot_product_attention_decomposition(
         attn_weight = attn_weight * scale
 
     if is_causal or attn_mask is not None:
+        # We only add attn_bias when we have to, otherwise this will have a negative impact on the performance even it's 0.
         attn_weight = attn_weight + attn_bias
 
     attn_weight = torch.softmax(attn_weight, dim=-1)
