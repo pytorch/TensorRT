@@ -77,9 +77,6 @@ dir_path = os.path.join(str(get_root_dir()), "py")
 
 IS_AARCH64 = platform.uname().processor == "aarch64"
 IS_JETPACK = True if "tegra" in platform.uname().release else False
-print(f"platform.uname().release: {platform.uname().release}")
-print(f"IS_AARCH64: {IS_AARCH64}")
-print(f"IS_JETPACK: {IS_JETPACK}")
 
 PY_ONLY = False
 NO_TS = False
