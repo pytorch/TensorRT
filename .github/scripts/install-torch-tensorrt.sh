@@ -12,6 +12,12 @@ if [[ $(uname -m) == "aarch64" ]]; then
     install_cuda_aarch64
 fi
 
+if [[ "$(uname -s)" == "Linux" && "$(uname -m)" == "x86_64" ]]; then
+    # install MPI for Linux x86_64
+    source .github/scripts/install-mpi-linux-x86.sh
+    install_mpi_linux_x86
+fi
+
 # Install all the dependencies required for Torch-TensorRT
 pip install --pre -r ${PWD}/tests/py/requirements.txt
 # dependencies in the tests/py/requirements.txt might install a different version of torch or torchvision
