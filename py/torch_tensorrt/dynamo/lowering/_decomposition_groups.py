@@ -105,6 +105,7 @@ torch_enabled_decompositions: Set[Union[OpOverload, OpOverloadPacket]] = {
     aten.norm,
     aten.ones,
     aten.ones_like,
+    aten._prelu_kernel,
     aten._prelu_kernel_backward,
     aten._reshape_alias,
     aten.rad2deg,
