@@ -548,9 +548,9 @@ def pow(
     lhs_dtype = None
     rhs_dtype = None
     if isinstance(lhs_val, int):
-        lhs_dtype = torch.int32
+        lhs_dtype = torch.int64
     if isinstance(rhs_val, int):
-        rhs_dtype = torch.int32
+        rhs_dtype = torch.int64
     # POW operation supports only float32 and int8 inputs
     lhs_val = get_trt_tensor(ctx, lhs_val, name + "_lhs_val", lhs_dtype)
     rhs_val = get_trt_tensor(ctx, rhs_val, name + "_rhs_val", rhs_dtype)
