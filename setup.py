@@ -613,8 +613,6 @@ if not (PY_ONLY or NO_TS):
     package_data.update(
         {
             "torch_tensorrt": [
-                "BUILD",
-                "WORKSPACE",
                 "include/torch_tensorrt/*.h",
                 "include/torch_tensorrt/core/*.h",
                 "include/torch_tensorrt/core/conversion/*.h",
@@ -644,8 +642,6 @@ elif NO_TS:
     package_data.update(
         {
             "torch_tensorrt": [
-                "BUILD",
-                "WORKSPACE",
                 "include/torch_tensorrt/*.h",
                 "include/torch_tensorrt/core/*.h",
                 "include/torch_tensorrt/core/runtime/*.h",
