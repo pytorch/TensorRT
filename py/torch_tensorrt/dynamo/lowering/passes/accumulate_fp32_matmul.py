@@ -10,6 +10,18 @@ logger = logging.getLogger(__name__)
 
 
 def split_addmm_nodes(gm: torch.fx.GraphModule) -> torch.fx.GraphModule:
+    """
+    Splits all `torch.ops.aten.addmm.default` nodes in the FX graph into separate
+    `add` and `mm` nodes. This is useful for passes that want to insert additional
+    logic (such as FP32 accumulation) specifically around the matrix multiplication
+    operation, rather than the fused addmm.
+
+    Args:
+        gm (torch.fx.GraphModule): The FX graph module to transform.
+
+    Returns:
+        torch.fx.GraphModule: The modified FX graph module with addmm nodes split.
+    """
     target = torch.ops.aten.addmm.default
     addmm_nodes = [node for node in gm.graph.nodes if node.target == target]
     for addmm_node in addmm_nodes:
@@ -52,6 +64,7 @@ def accumulate_fp32_matmul(
         matmul_targets = [
             torch.ops.aten.mm.default,
             torch.ops.aten.bmm.default,
+            torch.ops.aten.matmul.default,
         ]
 
         # Split torch.addmm nodes into add + mm and only add cast nodes around mm nodes
