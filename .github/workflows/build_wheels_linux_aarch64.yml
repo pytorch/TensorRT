@@ -264,7 +264,7 @@ jobs:
           if [[ ${{ inputs.is-jetpack }} == false ]]; then
             ${CONDA_RUN} python setup.py bdist_wheel
           else
-            ${CONDA_RUN} python setup.py bdist_wheel --jetpack --plat-name=linux_tegra_aarch64
+            ${CONDA_RUN} python setup.py bdist_wheel --jetpack
           fi
       - name: Repair Manylinux_2_28 Wheel
         shell: bash -l {0}
@@ -336,8 +336,8 @@ jobs:
   upload:
     needs: build
     uses: pytorch/test-infra/.github/workflows/_binary_upload.yml@main
-    # for jetpack builds, only upload to pytorch index for nightly builds
-    if: ${{ inputs.is-jetpack == false || (github.event_name == 'push' && startsWith(github.event.ref, 'refs/heads/nightly')) }}
+    # for jetpack builds, do not upload to pytorch nightly index, only upload to https://pypi.jetson-ai-lab.io/ manually for each release
+    if: ${{ inputs.is-jetpack == false }}
     with:
       repository: ${{ inputs.repository }}
       ref: ${{ inputs.ref }}
