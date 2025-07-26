@@ -303,17 +303,13 @@ def native_group_norm(
         C == input.shape[1]
     ), f"num_channels ({C}) must be equal to number of channels in input ({input.shape[1]})"
 
-    weight_one = get_trt_tensor(ctx, 1.0, f"{name}_weight_one", input.dtype)
-    bias_zero = get_trt_tensor(ctx, 0.0, f"{name}_bias_zero", input.dtype)
-
     shape = [1, group] + [1] * (rank - 2)
 
-    weight_one = impl.slice.expand(
-        ctx, target, source_ir, f"{name}_expand_weight_one", weight_one, shape
-    )
-    bias_zero = impl.slice.expand(
-        ctx, target, source_ir, f"{name}_expand_bias_zero", bias_zero, shape
-    )
+    weight_torch = torch.ones(shape)
+    bias_torch = torch.zeros(shape)
+
+    weight_one = get_trt_tensor(ctx, weight_torch, f"{name}_weight_one", input.dtype)
+    bias_zero = get_trt_tensor(ctx, bias_torch, f"{name}_bias_zero", input.dtype)
 
     axes = get_axes_for_reduce_op(list(range(1 if group == 1 else 2, rank)))
 
