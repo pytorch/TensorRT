@@ -1094,7 +1094,7 @@ def aten_ops_clone_copy_dtype(
         name,
         args[0],
         kwargs.get("dtype", args[0].dtype),
-        force_layer=True,
+        force_layer=False,
     )
 
 
