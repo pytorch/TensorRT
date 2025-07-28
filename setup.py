@@ -79,8 +79,7 @@ load_dep_info()
 dir_path = os.path.join(str(get_root_dir()), "py")
 
 IS_AARCH64 = platform.uname().processor == "aarch64"
-# we do not auto detect if it is a tegra platform to enable JETPACK build
-# since we have thor using sbsa build, we need to check if the build has --jetpack flag
+
 IS_JETPACK = False
 
 PY_ONLY = False

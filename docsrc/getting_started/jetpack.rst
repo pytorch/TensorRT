@@ -61,8 +61,6 @@ System Preparation
       sudo cp -a libcusparse_lt-linux-sbsa-0.5.2.1-archive/lib/* /usr/local/cuda/lib64/
 
 Building Torch-TensorRT
-
-Since now Thor is using the SBSA build, we only build the jetpack wheel for Orin.
 ***********************
 
 Build Environment Setup
