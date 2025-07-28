@@ -25,6 +25,7 @@ BENCHMARK_MODEL_NAMES = {
     "apple/DCLM-7B",
     "mistralai/Mistral-7B-Instruct-v0.3",
     "microsoft/Phi-3-mini-4k-instruct",
+    "monai/unet",
 }
 
 
@@ -106,6 +107,11 @@ class ModelStorage:
             hf_artifact = AutoModel.from_pretrained("apple/DCLM-7B")
             return {
                 "model": hf_artifact["model"],
+                "path": "pytorch",
+            }
+        elif name == "monai/unet":
+            return {
+                "model": cm.UNet(),
                 "path": "pytorch",
             }
         else:
