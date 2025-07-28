@@ -24,6 +24,7 @@ from torch.fx.experimental.proxy_tensor import unset_fake_temporarily
 from torch.fx.node import Argument, Target
 from torch.fx.passes.shape_prop import TensorMetadata
 from torch_tensorrt import _enums
+from torch_tensorrt._utils import is_tensorrt_version_supported
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
@@ -447,11 +448,7 @@ def create_constant(
         if torch_value is not None:
 
             if torch_value.dtype == torch.uint8:
-                from importlib import metadata
-
-                from packaging.version import Version
-
-                if Version(metadata.version("tensorrt")) >= Version("10.8.0"):
+                if is_tensorrt_version_supported("10.8.0"):
                     if (
                         target_quantized_type is None
                         or target_quantized_type != trt.DataType.FP4
@@ -478,7 +475,7 @@ def create_constant(
                     return constant.get_output(0)
                 else:
                     raise ValueError(
-                        f"Currently FP4 is not supported in TensorRT {metadata.version('tensorrt')}"
+                        "Currently FP4 is only supported in TensorRT 10.8.0 and above"
                     )
 
             # Record the weight in ctx for refit and cpu memory reference

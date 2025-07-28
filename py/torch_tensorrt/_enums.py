@@ -2,15 +2,13 @@ from __future__ import annotations
 
 import logging
 from enum import Enum, auto
-from importlib import metadata
 from typing import Any, Optional, Type, Union
 
 import numpy as np
 import tensorrt as trt
 import torch
 from torch_tensorrt._features import ENABLED_FEATURES, needs_torch_tensorrt_runtime
-
-from packaging.version import Version
+from torch_tensorrt._utils import is_tensorrt_version_supported
 
 
 class dtype(Enum):
@@ -215,7 +213,7 @@ class dtype(Enum):
             elif t == trt.DataType.BF16:
                 return dtype.bf16
             else:
-                if Version(metadata.version("tensorrt")) >= Version("10.8.0"):
+                if is_tensorrt_version_supported("10.8.0"):
                     if t == trt.DataType.FP4:
                         return dtype.fp4
                 raise TypeError(
@@ -416,7 +414,7 @@ class dtype(Enum):
             elif use_default:
                 return trt.DataType.FLOAT
             else:
-                if Version(metadata.version("tensorrt")) >= Version("10.8.0"):
+                if is_tensorrt_version_supported("10.8.0"):
                     if self == dtype.f4:
                         return trt.DataType.FP4
                 raise TypeError("Unsupported tensorrt dtype")

@@ -1,4 +1,3 @@
-from importlib import metadata
 from typing import Optional, Union
 
 import numpy as np
@@ -6,6 +5,7 @@ import tensorrt as trt
 import torch
 from torch.fx.experimental.proxy_tensor import unset_fake_temporarily
 from torch.fx.node import Target
+from torch_tensorrt._utils import is_tensorrt_version_supported
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
 from torch_tensorrt.dynamo.conversion.converter_utils import (
@@ -14,9 +14,7 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
 from torch_tensorrt.fx.converters.converter_utils import set_layer_name
 from torch_tensorrt.fx.types import TRTTensor
 
-from packaging.version import Version
-
-if Version(metadata.version("tensorrt")) >= Version("10.8.0"):
+if is_tensorrt_version_supported("10.8.0"):
 
     def quantize(
         ctx: ConversionContext,
