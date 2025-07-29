@@ -11,6 +11,7 @@ from torch_tensorrt.dynamo._defaults import (
     DLA_GLOBAL_DRAM_SIZE,
     DLA_LOCAL_DRAM_SIZE,
     DLA_SRAM_SIZE,
+    DYNAMICALLY_ALLOCATE_RESOURCES,
     DRYRUN,
     ENABLE_CROSS_COMPILE_FOR_WINDOWS,
     ENABLE_EXPERIMENTAL_DECOMPOSITIONS,
@@ -97,6 +98,8 @@ class CompilationSettings:
         tiling_optimization_level (str): The optimization level of tiling strategies. A higher level allows TensorRT to spend more time searching for better tiling strategy. We currently support ["none", "fast", "moderate", "full"].
         l2_limit_for_tiling (int): The target L2 cache usage limit (in bytes) for tiling optimization (default is -1 which means no limit).
         use_distributed_mode_trace (bool):  Using aot_autograd to trace the graph. This is enabled when DTensors or distributed tensors are present in distributed model
+        offload_to_cpu (bool): Offload the model to CPU to reduce memory footprint during compilation
+        dynamically_allocate_resources (bool): Dynamically allocate resources for TensorRT engines
     """
 
     enabled_precisions: Set[dtype] = field(default_factory=lambda: ENABLED_PRECISIONS)
@@ -140,6 +143,7 @@ class CompilationSettings:
     l2_limit_for_tiling: int = L2_LIMIT_FOR_TILING
     use_distributed_mode_trace: bool = USE_DISTRIBUTED_MODE_TRACE
     offload_module_to_cpu: bool = OFFLOAD_MODULE_TO_CPU
+    dynamically_allocate_resources: bool = DYNAMICALLY_ALLOCATE_RESOURCES
 
     def __getstate__(self) -> dict[str, Any]:
         from torch_tensorrt.dynamo.conversion._ConverterRegistry import (

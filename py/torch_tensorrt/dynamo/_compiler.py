@@ -103,6 +103,7 @@ def cross_compile_for_windows(
     tiling_optimization_level: str = _defaults.TILING_OPTIMIZATION_LEVEL,
     l2_limit_for_tiling: int = _defaults.L2_LIMIT_FOR_TILING,
     offload_module_to_cpu: bool = _defaults.OFFLOAD_MODULE_TO_CPU,
+    dynamically_allocate_resources: bool = _defaults.DYNAMICALLY_ALLOCATE_RESOURCES,
     **kwargs: Any,
 ) -> torch.fx.GraphModule:
     """Compile an ExportedProgram module using TensorRT in Linux for Inference in Windows
@@ -177,6 +178,7 @@ def cross_compile_for_windows(
         enable_weight_streaming (bool): Enable weight streaming.
         tiling_optimization_level (str): The optimization level of tiling strategies. A higher level allows TensorRT to spend more time searching for better tiling strategy. We currently support ["none", "fast", "moderate", "full"].
         l2_limit_for_tiling (int): The target L2 cache usage limit (in bytes) for tiling optimization (default is -1 which means no limit).
+        dynamically_allocate_resources (bool): Dynamically allocate resources during engine execution.
         **kwargs: Any,
     Returns:
         torch.fx.GraphModule: Compiled FX Module, when run it will execute via TensorRT
@@ -340,6 +342,7 @@ def cross_compile_for_windows(
         "enable_weight_streaming": enable_weight_streaming,
         "tiling_optimization_level": tiling_optimization_level,
         "l2_limit_for_tiling": l2_limit_for_tiling,
+        "dynamically_allocate_resources": dynamically_allocate_resources,
     }
 
     # disable the following settings is not supported for cross compilation for windows feature
@@ -440,6 +443,7 @@ def compile(
     tiling_optimization_level: str = _defaults.TILING_OPTIMIZATION_LEVEL,
     l2_limit_for_tiling: int = _defaults.L2_LIMIT_FOR_TILING,
     offload_module_to_cpu: bool = _defaults.OFFLOAD_MODULE_TO_CPU,
+    dynamically_allocate_resources: bool = _defaults.DYNAMICALLY_ALLOCATE_RESOURCES,
     **kwargs: Any,
 ) -> torch.fx.GraphModule:
     """Compile an ExportedProgram module for NVIDIA GPUs using TensorRT
@@ -517,6 +521,7 @@ def compile(
         tiling_optimization_level (str): The optimization level of tiling strategies. A higher level allows TensorRT to spend more time searching for better tiling strategy. We currently support ["none", "fast", "moderate", "full"].
         l2_limit_for_tiling (int): The target L2 cache usage limit (in bytes) for tiling optimization (default is -1 which means no limit).
         offload_module_to_cpu (bool): Offload the module to CPU. This is useful when we need to minimize GPU memory usage.
+        dynamically_allocate_resources (bool): Dynamically allocate resources during engine execution.
         **kwargs: Any,
     Returns:
         torch.fx.GraphModule: Compiled FX Module, when run it will execute via TensorRT
@@ -690,6 +695,7 @@ def compile(
         "tiling_optimization_level": tiling_optimization_level,
         "l2_limit_for_tiling": l2_limit_for_tiling,
         "offload_module_to_cpu": offload_module_to_cpu,
+        "dynamically_allocate_resources": dynamically_allocate_resources,
     }
 
     settings = CompilationSettings(**compilation_options)

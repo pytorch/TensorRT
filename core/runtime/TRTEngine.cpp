@@ -62,7 +62,7 @@ TRTEngine::TRTEngine(
     bool hardware_compatible,
     bool requires_output_allocator,
     const std::string& serialized_metadata,
-    const ResourceAllocationStrategy& resource_allocation_strategy)
+    const ResourceAllocationStrategy resource_allocation_strategy)
     : TRTEngine(
           "deserialized_trt",
           serialized_engine,
@@ -86,7 +86,7 @@ TRTEngine::TRTEngine(std::vector<std::string> serialized_info)
           static_cast<bool>(std::stoi(serialized_info[HW_COMPATIBLE_IDX])),
           static_cast<bool>(std::stoi(serialized_info[REQUIRES_OUTPUT_ALLOCATOR_IDX])),
           serialized_info[SERIALIZED_METADATA_IDX],
-          resource_allocation_strategy_from_string(serialized_info[RESOURCE_ALLOCATION_STRATEGY_IDX])) {}
+          (static_cast<bool>(std::stoi(serialized_info[RESOURCE_ALLOCATION_STRATEGY_IDX])) ? ResourceAllocationStrategy::kDynamic : ResourceAllocationStrategy::kStatic)) {}
 
 TRTEngine::TRTEngine(
     const std::string& mod_name,
@@ -98,7 +98,7 @@ TRTEngine::TRTEngine(
     bool hardware_compatible,
     bool requires_output_allocator,
     const std::string& serialized_metadata,
-    const ResourceAllocationStrategy& resource_allocation_strategy) {
+    const ResourceAllocationStrategy resource_allocation_strategy) {
   TORCHTRT_CHECK(
       is_supported_on_current_platform(target_platform),
       "This engine was not built to run on this platform (built for: " << target_platform << ", current platform: "
@@ -128,9 +128,11 @@ TRTEngine::TRTEngine(
     cuda_engine->setWeightStreamingBudgetV2(budget_bytes);
   }
 
+  this->resource_allocation_strategy = resource_allocation_strategy;
+  LOG_DEBUG("Resource allocation strategy: " << (this->resource_allocation_strategy == ResourceAllocationStrategy::kDynamic ? "Dynamic" : "Static"));
   if (this->resource_allocation_strategy == ResourceAllocationStrategy::kDynamic) {
     this->exec_ctx =
-        make_trt(cuda_engine->createExecutionContext(nvinfer1::ExecutionContextAllocationStrategy::kON_PROFILE_CHANGE));
+        make_trt(cuda_engine->createExecutionContext(nvinfer1::ExecutionContextAllocationStrategy::kUSER_MANAGED));
   } else {
     this->exec_ctx = make_trt(cuda_engine->createExecutionContext());
   }
@@ -402,6 +404,7 @@ std::string TRTEngine::to_str() const {
   ss << "  Device: " << device_info << std::endl;
   ss << "  Hardware Compatibility: " << (hardware_compatible ? "Enabled" : "Disabled") << std::endl;
   ss << "  Target Platform: " << target_platform << std::endl;
+  ss << "  Resource Allocation Strategy: " << (resource_allocation_strategy == ResourceAllocationStrategy::kDynamic ? "Dynamic" : "Static") << std::endl;
   // clang-format on
   return ss.str();
 }
@@ -469,8 +472,7 @@ std::vector<std::string> TRTEngine::serialize() {
   serialized_info[REQUIRES_OUTPUT_ALLOCATOR_IDX] = this->requires_output_allocator ? "1" : "0";
   serialized_info[SERIALIZED_METADATA_IDX] = this->serialized_metadata;
   serialized_info[TARGET_PLATFORM_IDX] = this->target_platform.serialize();
-  serialized_info[RESOURCE_ALLOCATION_STRATEGY_IDX] =
-      resource_allocation_strategy_to_string(this->resource_allocation_strategy);
+  serialized_info[RESOURCE_ALLOCATION_STRATEGY_IDX] = this->resource_allocation_strategy == ResourceAllocationStrategy::kDynamic ? "1" : "0";
 
   return serialized_info;
 }
@@ -483,11 +485,12 @@ void TRTEngine::set_resource_allocation_strategy(TRTEngine::ResourceAllocationSt
   if (new_strategy != this->resource_allocation_strategy) {
     this->resource_allocation_strategy = new_strategy;
     if (this->resource_allocation_strategy == TRTEngine::ResourceAllocationStrategy::kDynamic) {
-      std::cout << "Setting resource allocation strategy to dynamic" << std::endl;
-      this->exec_ctx = make_trt(cuda_engine->createExecutionContext());
+      LOG_DEBUG("Setting resource allocation strategy to dynamic");
+      this->exec_ctx = make_trt(cuda_engine->createExecutionContext(nvinfer1::ExecutionContextAllocationStrategy::kUSER_MANAGED));
     } else {
+      LOG_DEBUG("Setting resource allocation strategy to static");
       this->exec_ctx = make_trt(
-          cuda_engine->createExecutionContext(nvinfer1::ExecutionContextAllocationStrategy::kON_PROFILE_CHANGE));
+          cuda_engine->createExecutionContext());
     }
   }
 }

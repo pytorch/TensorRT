@@ -22,21 +22,6 @@ std::string serialize_bindings(const std::vector<std::string>& bindings) {
   return serialized_binding_info;
 }
 
-std::string resource_allocation_strategy_to_string(TRTEngine::ResourceAllocationStrategy strategy) {
-  if (strategy == TRTEngine::ResourceAllocationStrategy::kDynamic) {
-    return std::string("kDynamic");
-  } else {
-    return std::string("kStatic");
-  }
-}
-
-TRTEngine::ResourceAllocationStrategy resource_allocation_strategy_from_string(const std::string& str) {
-  if (str == "kDynamic")
-    return TRTEngine::ResourceAllocationStrategy::kDynamic;
-  else
-    return TRTEngine::ResourceAllocationStrategy::kStatic;
-}
-
 static const std::string sym_table = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"; //=
 std::string base64_encode(const std::string& in) {
   std::string out;
@@ -106,7 +91,7 @@ static auto TORCHTRT_UNUSED TRTEngineTSRegistrtion =
         .def("infer_outputs", &TRTEngine::infer_outputs)
         .def("reset_captured_graph", &TRTEngine::reset_captured_graph)
         .def(
-            "_use_dynamically_allocated_resources",
+            "use_dynamically_allocated_resources",
             [](const c10::intrusive_ptr<TRTEngine>& self, bool dynamic) -> void {
               self->set_resource_allocation_strategy(
                   dynamic ? TRTEngine::ResourceAllocationStrategy::kDynamic
@@ -124,6 +109,7 @@ static auto TORCHTRT_UNUSED TRTEngineTSRegistrtion =
             [](const c10::intrusive_ptr<TRTEngine>& self) -> std::vector<std::string> { return self->serialize(); },
             [](std::vector<std::string> serialized_info) -> c10::intrusive_ptr<TRTEngine> {
               serialized_info[ENGINE_IDX] = base64_decode(serialized_info[ENGINE_IDX]);
+              LOG_DEBUG("Deserialized resource allocation strategy: " << (static_cast<bool>(std::stoi(serialized_info[RESOURCE_ALLOCATION_STRATEGY_IDX])) ? "Dynamic" : "Static"));
               TRTEngine::verify_serialization_fmt(serialized_info);
               return c10::make_intrusive<TRTEngine>(serialized_info);
             });
