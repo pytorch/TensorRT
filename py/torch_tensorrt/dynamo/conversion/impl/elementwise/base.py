@@ -2,7 +2,6 @@ import operator
 import warnings
 from typing import Any, Callable, Optional, Union
 
-import numpy as np
 import tensorrt as trt
 import torch
 from torch.fx.node import Target
@@ -102,6 +101,14 @@ def convert_binary_elementwise(
     if isinstance(rhs_val, TRTTensor):
         rhs_dtype = rhs_val.dtype
         is_rhs_trt_tensor = True
+
+    # Handle scalar tensor type promotion for elementwise operations
+    # When one operand is a scalar tensor (0-dimensional), promote its dtype to match the other operand
+    # This ensures consistent type handling in Torch elementwise operations
+    if isinstance(lhs_val, torch.Tensor) and len(lhs_val.shape) == 0:
+        lhs_dtype = rhs_dtype
+    if isinstance(rhs_val, torch.Tensor) and len(rhs_val.shape) == 0:
+        rhs_dtype = lhs_dtype
 
     if not is_lhs_trt_tensor and not is_rhs_trt_tensor:
         warnings.warn(
