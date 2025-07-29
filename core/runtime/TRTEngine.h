@@ -100,7 +100,7 @@ class DynamicOutputAllocator : public nvinfer1::IOutputAllocator {
 
 struct TRTEngine : torch::CustomClassHolder {
   // Resource Allocation Strategy
-  enum ResourceAllocationStrategy { kStatic, kDynamic };
+  typedef enum { kStatic = 0, kDynamic } ResourceAllocationStrategy;
   // Each engine needs it's own runtime object
   std::shared_ptr<nvinfer1::IRuntime> rt;
   std::shared_ptr<nvinfer1::ICudaEngine> cuda_engine;
@@ -133,7 +133,7 @@ struct TRTEngine : torch::CustomClassHolder {
       bool hardware_compatible = false,
       bool requires_output_allocator = false,
       const std::string& serialized_metadata = "",
-      const TRTEngine::ResourceAllocationStrategy& resource_allocation_strategy =
+      const TRTEngine::ResourceAllocationStrategy resource_allocation_strategy =
           TRTEngine::ResourceAllocationStrategy::kStatic);
 
   TRTEngine(std::vector<std::string> serialized_info);
@@ -148,7 +148,7 @@ struct TRTEngine : torch::CustomClassHolder {
       bool hardware_compatible = false,
       bool requires_output_allocator = false,
       const std::string& serialized_metadata = "",
-      const TRTEngine::ResourceAllocationStrategy& resource_allocation_strategy =
+      const TRTEngine::ResourceAllocationStrategy resource_allocation_strategy =
           TRTEngine::ResourceAllocationStrategy::kStatic);
 
   TRTEngine& operator=(const TRTEngine& other);

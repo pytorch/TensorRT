@@ -142,7 +142,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         self.serialized_engine = serialized_engine
         self.engine = None
         self.requires_output_allocator = requires_output_allocator
-        self.resource_allocation_strategy = 0  # Default to static allocation TODO: Make this configurable with the context manager
+        self.dynamically_allocate_resources = settings.dynamically_allocate_resources
 
         if (
             serialized_engine
@@ -193,9 +193,11 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         engine_info[REQUIRES_OUTPUT_ALLOCATOR_IDX] = str(
             int(self.requires_output_allocator)
         )
+        print(f"PROVIDED RESOURCE ALLOCATION STRATEGY: {self.dynamically_allocate_resources}")
         engine_info[RESOURCE_ALLOCATION_STRATEGY_IDX] = str(
-            int(self.resource_allocation_strategy)
+            int(self.dynamically_allocate_resources)
         )
+        print(engine_info[RESOURCE_ALLOCATION_STRATEGY_IDX])
 
         return engine_info
 
@@ -224,8 +226,9 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
     def _reset_captured_graph(self) -> None:
         self.engine.reset_captured_graph()
 
-    def use_dynamically_allocated_resources(self, dynamic: bool = False) -> None:
-        self.engine._use_dynamically_allocated_resources(dynamic)
+    def use_dynamically_allocated_resources(self, dynamically_allocate_resources: bool = False) -> None:
+        self.dynamically_allocate_resources = dynamically_allocate_resources
+        self.engine.use_dynamically_allocated_resources(self.dynamically_allocate_resources)
 
     def setup_engine(self) -> None:
         """
