@@ -3,7 +3,7 @@ from torch_tensorrt.dynamo.runtime._PythonTorchTensorRTModule import (  # noqa: 
     PythonTorchTensorRTModule,
 )
 from torch_tensorrt.dynamo.runtime._ResourceAllocator import (  # noqa: F401
-    ResourceAllocatorContext,
+    ResourceAllocationStrategy,
 )
 from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (  # noqa: F401
     TorchTensorRTModule,
