@@ -29,7 +29,8 @@ using FlattenedState = std::tuple<
     std::tuple<std::string, std::string>, // HW compatibility
     std::tuple<std::string, std::string>, // requires_output_allocator
     std::tuple<std::string, std::string>, // serialized metadata
-    std::tuple<std::string, std::string>>; // Platform
+    std::tuple<std::string, std::string>, // Platform
+    std::tuple<std::string, std::string>>; // Resource Allocation Strategy
 
 struct TorchTRTRuntimeStates {
   // Indicates whether CUDAGraphs were enabled in the previous execute_engine
@@ -98,6 +99,8 @@ class DynamicOutputAllocator : public nvinfer1::IOutputAllocator {
 };
 
 struct TRTEngine : torch::CustomClassHolder {
+  // Resource Allocation Strategy
+  enum ResourceAllocationStrategy { kStatic, kDynamic };
   // Each engine needs it's own runtime object
   std::shared_ptr<nvinfer1::IRuntime> rt;
   std::shared_ptr<nvinfer1::ICudaEngine> cuda_engine;
@@ -129,7 +132,9 @@ struct TRTEngine : torch::CustomClassHolder {
       const Platform& target_platform = get_current_platform(),
       bool hardware_compatible = false,
       bool requires_output_allocator = false,
-      const std::string& serialized_metadata = "");
+      const std::string& serialized_metadata = "",
+      const TRTEngine::ResourceAllocationStrategy& resource_allocation_strategy =
+          TRTEngine::ResourceAllocationStrategy::kStatic);
 
   TRTEngine(std::vector<std::string> serialized_info);
 
@@ -142,7 +147,9 @@ struct TRTEngine : torch::CustomClassHolder {
       const Platform& target_platform = get_current_platform(),
       bool hardware_compatible = false,
       bool requires_output_allocator = false,
-      const std::string& serialized_metadata = "");
+      const std::string& serialized_metadata = "",
+      const TRTEngine::ResourceAllocationStrategy& resource_allocation_strategy =
+          TRTEngine::ResourceAllocationStrategy::kStatic);
 
   TRTEngine& operator=(const TRTEngine& other);
   std::string to_str() const;
@@ -203,6 +210,9 @@ struct TRTEngine : torch::CustomClassHolder {
   std::string cuda_graph_debug_path;
   std::mutex mu;
   std::unique_ptr<TRTEngineProfiler> trt_engine_profiler;
+  ResourceAllocationStrategy resource_allocation_strategy = kStatic;
+  void set_resource_allocation_strategy(ResourceAllocationStrategy new_strategy);
+  ResourceAllocationStrategy get_resource_allocation_strategy();
 };
 
 } // namespace runtime

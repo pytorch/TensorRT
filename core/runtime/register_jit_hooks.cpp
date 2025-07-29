@@ -22,6 +22,21 @@ std::string serialize_bindings(const std::vector<std::string>& bindings) {
   return serialized_binding_info;
 }
 
+std::string resource_allocation_strategy_to_string(TRTEngine::ResourceAllocationStrategy strategy) {
+  if (strategy == TRTEngine::ResourceAllocationStrategy::kDynamic) {
+    return std::string("kDynamic");
+  } else {
+    return std::string("kStatic");
+  }
+}
+
+TRTEngine::ResourceAllocationStrategy resource_allocation_strategy_from_string(const std::string& str) {
+  if (str == "kDynamic")
+    return TRTEngine::ResourceAllocationStrategy::kDynamic;
+  else
+    return TRTEngine::ResourceAllocationStrategy::kStatic;
+}
+
 static const std::string sym_table = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"; //=
 std::string base64_encode(const std::string& in) {
   std::string out;
@@ -92,6 +107,13 @@ static auto TORCHTRT_UNUSED TRTEngineTSRegistrtion =
         .def("reset_captured_graph", &TRTEngine::reset_captured_graph)
         .def("set_output_tensors_as_unowned", &TRTEngine::set_output_tensors_as_unowned)
         .def("are_output_tensors_unowned", &TRTEngine::are_output_tensors_unowned)
+        .def(
+            "_use_dynamically_allocated_resources",
+            [](const c10::intrusive_ptr<TRTEngine>& self, bool dynamic) -> void {
+              self->set_resource_allocation_strategy(
+                  dynamic ? TRTEngine::ResourceAllocationStrategy::kDynamic
+                          : TRTEngine::ResourceAllocationStrategy::kStatic);
+            })
         .def_readwrite("use_pre_allocated_outputs", &TRTEngine::use_pre_allocated_outputs)
         .def_readwrite("use_output_allocator_outputs", &TRTEngine::use_output_allocator_outputs)
         .def_property(
@@ -137,6 +159,7 @@ TORCH_LIBRARY(tensorrt, m) {
   m.def("TARGET_PLATFORM_IDX", []() -> int64_t { return TARGET_PLATFORM_IDX; });
   m.def("REQUIRES_OUTPUT_ALLOCATOR_IDX", []() -> int64_t { return REQUIRES_OUTPUT_ALLOCATOR_IDX; });
   m.def("SERIALIZATION_LEN", []() -> int64_t { return SERIALIZATION_LEN; });
+  m.def("RESOURCE_ALLOCATION_STRATEGY_IDX", []() -> int64_t { return RESOURCE_ALLOCATION_STRATEGY_IDX; });
   m.def("_platform_linux_x86_64", []() -> std::string {
     auto it = get_platform_name_map().find(Platform::PlatformEnum::kLINUX_X86_64);
     return it->second;
