@@ -102,13 +102,13 @@ def convert_binary_elementwise(
         rhs_dtype = rhs_val.dtype
         is_rhs_trt_tensor = True
 
-    # Convert 0-dimensional tensors (scalars) to Python scalars
-    # This ensures proper dtype promotion: scalar operands adopt the tensor's dtype
-    # following PyTorch's type promotion rules for arithmetic operations
+    # Handle scalar tensor type promotion for elementwise operations
+    # When one operand is a scalar tensor (0-dimensional), promote its dtype to match the other operand
+    # This ensures consistent type handling in Torch elementwise operations
     if isinstance(lhs_val, torch.Tensor) and len(lhs_val.shape) == 0:
-        lhs_val = lhs_val.item()
+        lhs_dtype = rhs_dtype
     if isinstance(rhs_val, torch.Tensor) and len(rhs_val.shape) == 0:
-        rhs_val = rhs_val.item()
+        rhs_dtype = lhs_dtype
 
     if not is_lhs_trt_tensor and not is_rhs_trt_tensor:
         warnings.warn(
