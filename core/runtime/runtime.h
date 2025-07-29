@@ -38,12 +38,16 @@ typedef enum {
   SERIALIZED_METADATA_IDX,
   TARGET_PLATFORM_IDX,
   REQUIRES_OUTPUT_ALLOCATOR_IDX,
+  RESOURCE_ALLOCATION_STRATEGY_IDX,
   SERIALIZATION_LEN, // NEVER USED FOR DATA, USED TO DETERMINE LENGTH OF SERIALIZED INFO
 } SerializedInfoIndex;
 
 std::string base64_encode(const std::string& in);
 std::string base64_decode(const std::string& in);
 std::string serialize_bindings(const std::vector<std::string>& bindings);
+
+std::string resource_allocation_strategy_to_string(TRTEngine::ResourceAllocationStrategy strategy);
+TRTEngine::ResourceAllocationStrategy resource_allocation_strategy_from_string(const std::string& str);
 
 c10::optional<RTDevice> get_most_compatible_device(
     const RTDevice& target_device,
