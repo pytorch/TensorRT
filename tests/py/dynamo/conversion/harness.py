@@ -1,10 +1,13 @@
 # type: ignore
 
 import logging
+import os
+import tempfile
 import time
 import unittest
 from typing import Any, Callable, List, Optional, Sequence, Tuple
 
+import tensorrt as trt
 import torch
 import torch_tensorrt
 from torch.fx.experimental.proxy_tensor import unset_fake_temporarily
@@ -30,6 +33,7 @@ from torch_tensorrt.dynamo.runtime import PythonTorchTensorRTModule
 from torch_tensorrt.dynamo.utils import ATOL, RTOL, get_model_device, get_torch_inputs
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
+logger = trt.Logger(trt.Logger.WARNING)
 
 
 # this method is only used in our converter test to infer the module output dtypes via dummy inference
@@ -202,6 +206,43 @@ class TRTTestCase(TestCase):
             interpreter_result = interpreter.run()
             sec = time.perf_counter() - start
             _LOGGER.info(f"Interpreter run time(s): {sec}")
+
+            mod = mod.cuda()
+
+            # Dynamo-TRT network
+            dynamo_network_layer_count_dict: dict[str, int] = {}
+            dynamo_network = interpreter.ctx.net
+            for i in range(dynamo_network.num_layers):
+                layer = dynamo_network.get_layer(i)
+                dynamo_network_layer_count_dict[str(layer.type)] = (
+                    dynamo_network_layer_count_dict.get(str(layer.type), 0) + 1
+                )
+
+            # ONNX-TRT network
+            expected_network_layer_count_dict: dict[str, int] = {}
+            with tempfile.TemporaryDirectory() as tmpdir:
+                onnx_path = os.path.join(tmpdir, "harness_onnx-trt.onnx")
+                torch.onnx.export(mod, tuple(cuda_inputs), onnx_path, dynamo=True)
+                builder = trt.Builder(logger)
+                onnx_network = builder.create_network(
+                    1 << int(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH)
+                )
+                parser = trt.OnnxParser(onnx_network, logger)
+                success = parser.parse_from_file(onnx_path)
+                if not success:
+                    raise ValueError("ONNX conversion failed")
+
+            # compare
+            for i in range(onnx_network.num_layers):
+                layer = onnx_network.get_layer(i)
+                expected_network_layer_count_dict[str(layer.type)] = (
+                    expected_network_layer_count_dict.get(str(layer.type), 0) + 1
+                )
+
+            assert (
+                dynamo_network_layer_count_dict == expected_network_layer_count_dict
+            ), f"Torch-TRT's INetwork has {dynamo_network.num_layers} layers: {dynamo_network_layer_count_dict}, but the expected INetwork has {onnx_network.num_layers} layers: {expected_network_layer_count_dict}."
+
             trt_mod = rt_cls(
                 serialized_engine=interpreter_result.serialized_engine,
                 input_binding_names=list(interpreter_result.input_names),
@@ -209,7 +250,6 @@ class TRTTestCase(TestCase):
                 name="test_engine",
                 requires_output_allocator=interpreter_result.requires_output_allocator,
             )
-            mod = mod.cuda()
             if pyt_inputs is not None:
                 pyt_inputs_cuda = [
                     i.cuda() if isinstance(i, torch.Tensor) else i for i in pyt_inputs
