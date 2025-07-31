@@ -414,7 +414,11 @@ def index_dtype_validator(
     for ind in index:
         if ind is not None:
             val = ind.meta.get("val")
-            if val is not None and val.dtype not in (torch.int32, torch.int64):
+            if val is not None and val.dtype not in (
+                torch.int32,
+                torch.int64,
+                torch.bool,
+            ):
                 return False
     return True
 
