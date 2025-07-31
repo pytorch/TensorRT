@@ -368,7 +368,8 @@ class MutableTorchTensorRTModule(object):
             enabled_precisions=self.enabled_precisions,
             **self.additional_settings,
         )
-        deallocate_module(self.original_model, delete_module=False)
+        if self.additional_settings.get("offload_module_to_cpu", False):
+            deallocate_module(self.original_model, delete_module=False)
         if self.enable_weight_streaming:
             self.set_weight_streaming_ctx(self.weight_streaming_budget)
 
