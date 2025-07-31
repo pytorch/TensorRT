@@ -363,6 +363,7 @@ jobs:
         export USE_HOST_DEPS=1
         export CI_BUILD=1
         export USE_TRTLLM_PLUGINS=1
+        dnf install -y mpich mpich-devel openmpi openmpi-devel
         pushd .
         cd tests/py
         cd dynamo
