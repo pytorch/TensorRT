@@ -878,18 +878,21 @@ def is_platform_supported_for_trtllm(platform: str) -> bool:
     Note:
         TensorRT-LLM plugins for NCCL backend are not supported on:
         - Windows platforms
-        - Jetson devices (aarch64 architecture)
+        - Orin, Xavier, or Tegra devices (aarch64 architecture)
+
     """
     if "windows" in platform:
         logger.info(
             "TensorRT-LLM plugins for NCCL backend are not supported on Windows"
         )
         return False
-    if "aarch64" in platform:
+    if torch.cuda.is_available():
+        device_name = torch.cuda.get_device_name().lower()
+        if any(keyword in device_name for keyword in ["orin", "xavier", "tegra"]):
+            return False
         logger.info(
-            "TensorRT-LLM plugins for NCCL backend are not supported on Jetson devices (aarch64)"
+            "TensorRT-LLM plugins for NCCL backend are not supported on Jetson devices"
         )
-        return False
     return True
 
 
