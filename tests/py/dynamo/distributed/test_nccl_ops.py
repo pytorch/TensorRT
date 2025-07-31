@@ -9,6 +9,7 @@ from distributed_utils import set_environment_variables_pytest
 from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
 from torch_tensorrt._enums import Platform
+from torch_tensorrt.dynamo.utils import is_platform_supported_for_trtllm
 
 
 class DistributedGatherModel(nn.Module):
@@ -44,10 +45,10 @@ class DistributedReduceScatterModel(nn.Module):
 platform_str = str(Platform.current_platform()).lower()
 
 
-class TestGatherNcclOpsConverter(DispatchTestCase):
+class TestNcclOpsConverter(DispatchTestCase):
     @unittest.skipIf(
-        "win" in platform_str or "aarch64" in platform_str,
-        "Skipped on Windows and Jetson: NCCL backend is not supported.",
+        not is_platform_supported_for_trtllm(platform_str),
+        "Skipped on Windows, Jetson: NCCL backend is not supported.",
     )
     @classmethod
     def setUpClass(cls):
