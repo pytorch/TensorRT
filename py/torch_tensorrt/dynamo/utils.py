@@ -856,7 +856,7 @@ def is_platform_supported_for_trtllm(platform: str) -> bool:
         return False
     if "aarch64" in platform:
         logger.info(
-            "TensorRT-LLM plugins for NCCL backend are not supported on Jetson devices (aarch64)"
+            "TensorRT-LLM plugins for NCCL backend are not supported on Jetson devices or SBSA (aarch64)"
         )
         return False
     return True

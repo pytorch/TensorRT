@@ -44,10 +44,10 @@ class DistributedReduceScatterModel(nn.Module):
 platform_str = str(Platform.current_platform()).lower()
 
 
-class TestGatherNcclOpsConverter(DispatchTestCase):
+class TestNcclOpsConverter(DispatchTestCase):
     @unittest.skipIf(
         "win" in platform_str or "aarch64" in platform_str,
-        "Skipped on Windows and Jetson: NCCL backend is not supported.",
+        "Skipped on Windows, Jetson, SBSA: NCCL backend is not supported.",
     )
     @classmethod
     def setUpClass(cls):
