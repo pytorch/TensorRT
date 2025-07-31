@@ -7,6 +7,7 @@ This directory provides utilities and scripts for compiling, optimizing, and ben
 - **Model Support:** Works with popular LLMs such as Llama-3, Qwen2.5, etc.
 - **VLM Support:** Supports Visual Language Models like Qwen2.5-VL and Eagle2.
 - **Precision Modes:** Supports FP16, BF16, and FP32.
+- **Quantization:** Supports FP8 and NVFP4 quantization formats for reduced memory usage and improved inference speed.
 - **KV Cache:** Supports static and dynamic KV cache for efficient autoregressive decoding.
 - **Benchmarking:** Measures and compares throughput and latency for PyTorch and TensorRT backends.
 - **Custom Attention:** Registers and converts custom scaled dot-product attention (SDPA) for compatibility with TensorRT.
@@ -54,10 +55,38 @@ python run_vlm.py --model nvidia/Eagle2-2B --precision FP16 --num_tokens 128 --c
 - `--prompt`: Input prompt for generation.
 - `--image_path`: (Optional) Path to input image file for VLM models. If not provided, will use a sample image.
 - `--precision`: Precision mode (`FP16`, `FP32`).
+- `--qformat`: Quantization format (`fp8`, `nvfp4`) to apply.
+- `--pre_quantized`: Flag to use pre-quantized models from HuggingFace.
 - `--num_tokens`: Number of output tokens to generate.
 - `--cache`: KV cache type (`static_v1`, `static_v2`, or empty for no KV caching).
 - `--benchmark`: Enable benchmarking mode.
 - `--enable_pytorch_run`: Also run and compare PyTorch baseline.
+
+### Quantization
+
+Torch-TensorRT supports quantization to reduce model memory footprint and improve inference performance:
+
+#### Using Pre-quantized Models
+
+To use pre-quantized models from HuggingFace:
+
+```bash
+python run_llm.py --model nvidia/Llama-3.1-8B-Instruct-FP8 --pre_quantized --prompt "What is parallel programming?" --precision FP16 --num_tokens 128
+```
+
+#### Applying quantization by ModelOpt
+
+Apply fp8 quantization from HuggingFace:
+
+```bash
+python run_llm.py --model meta-llama/Llama-3.1-8B --qformat fp8 --prompt "What is parallel programming?" --precision FP16 --num_tokens 128
+```
+
+#### Quantization Requirements
+
+- **ModelOpt Library**: Required for quantization operations
+- **FP8**: Supported on Hopper and Blackwell-generation GPUs.
+- **NVFP4**: Supported on Blackwell-generation GPUs.
 
 ### Caching Strategies
 

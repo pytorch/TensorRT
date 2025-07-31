@@ -9,6 +9,7 @@ This script illustrates Torch-TensorRT workflow with dynamo backend on popular L
 
 import argparse
 import copy
+import json
 import os
 import timeit
 from contextlib import nullcontext
@@ -54,12 +55,15 @@ def get_model(args):
                 args.model,
                 use_cache=False,
                 attn_implementation="sdpa",
+                ignore_mismatched_sizes=True,
             )
             .eval()
             .cuda()
         )
         # register SDPA variant for the model
         register_sdpa.enable_sdpa_converter(args.model, model.config)
+    if args.pre_quantized:
+        model = convert_linear_to_tensorrt_quantized(model, args.model).cuda()
 
     if args.precision == "FP16":
         model = model.to(torch.float16)
@@ -93,7 +97,8 @@ def compile_torchtrt(model, input_ids, args):
             for optimized inference
     """
     max_seq_len = input_ids.shape[1] + args.num_tokens
-    ep = export_llm(model, input_ids, max_seq_len=max_seq_len)
+    with export_torch_mode() if args.qformat or args.pre_quantized else nullcontext():
+        ep = export_llm(model, input_ids, max_seq_len=max_seq_len)
     position_ids = torch.arange(input_ids.shape[1]).unsqueeze(0).to(DEVICE)
     # Set precision specific flags
     use_fp32_acc = False
@@ -236,13 +241,36 @@ if __name__ == "__main__":
     arg_parser.add_argument(
         "--benchmark", action="store_true", help="Enable benchmark (default: False)"
     )
-
+    arg_parser.add_argument(
+        "--qformat",
+        help=("Apply quantization format. Options: fp8, nvfp4 (default: None)"),
+        default=None,
+    )
+    arg_parser.add_argument(
+        "--pre_quantized",
+        action="store_true",
+        help="Use pre-quantized hf model weights (default: False)",
+    )
     args = arg_parser.parse_args()
+
+    if args.qformat and args.pre_quantized:
+        print("Error: --qformat and --pre_quantized cannot be used together")
+        exit()
+
+    if args.qformat or args.pre_quantized:
+        from modelopt.torch.quantization.utils import export_torch_mode
+        from quantize_utils import (
+            convert_linear_to_tensorrt_quantized,
+            quantize_model,
+        )
+
     with torch.inference_mode():
         model = get_model(args)
 
         tokenizer = AutoTokenizer.from_pretrained(args.tokenizer or args.model)
-
+        # Set pad token
+        if tokenizer.pad_token is None:
+            tokenizer.pad_token = tokenizer.eos_token
         # Prepare input for benchmarking or evaluation
         if args.benchmark:
             input_ids = torch.randint(
@@ -260,6 +288,8 @@ if __name__ == "__main__":
         pyt_timings = None
         pyt_stats = None
 
+        if args.qformat != None:
+            model = quantize_model(model, args, tokenizer)
         if args.enable_pytorch_run:
             pyt_gen_tokens = generate(
                 model, input_ids.clone(), MAX_OUTPUT_SEQ_LENGTH, tokenizer.eos_token_id
