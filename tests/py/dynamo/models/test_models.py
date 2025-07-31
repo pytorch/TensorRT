@@ -136,28 +136,31 @@ def test_resnet18_torch_exec_ops(ir):
     not importlib.util.find_spec("torchvision"),
     "torchvision is not installed",
 )
-def test_mobilenet_v2(ir):
-    model = models.mobilenet_v2(pretrained=True).eval().to("cuda")
-    input = torch.randn((1, 3, 224, 224)).to("cuda")
+@pytest.mark.parametrize("dtype", [torch.float16, torch.bfloat16, torch.float32])
+def test_mobilenet_v2(ir, dtype):
+    model = models.mobilenet_v2(pretrained=True).eval().to("cuda").to(dtype)
+    input = torch.randn((1, 3, 224, 224)).to("cuda").to(dtype)
 
     compile_spec = {
         "inputs": [
-            torchtrt.Input(
-                input.shape, dtype=torch.float, format=torch.contiguous_format
-            )
+            torchtrt.Input(input.shape, dtype=dtype, format=torch.contiguous_format)
         ],
         "device": torchtrt.Device("cuda:0"),
-        "enabled_precisions": {torch.float},
         "ir": ir,
         "pass_through_build_failures": True,
         "optimization_level": 1,
         "min_block_size": 10,
         "cache_built_engines": False,
         "reuse_cached_engines": False,
+        "use_explicit_typing": True,
     }
 
     trt_mod = torchtrt.compile(model, **compile_spec)
-    cos_sim = cosine_similarity(model(input), trt_mod(input))
+    pyt_output = model(input)
+    trt_output = trt_mod(input)
+    assert pyt_output.dtype == trt_output.dtype
+    assert pyt_output.dtype == dtype
+    cos_sim = cosine_similarity(pyt_output, trt_output)
     assertions.assertTrue(
         cos_sim > COSINE_THRESHOLD,
         msg=f"Mobilenet v2 TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
@@ -172,28 +175,36 @@ def test_mobilenet_v2(ir):
     not importlib.util.find_spec("timm") or not importlib.util.find_spec("torchvision"),
     "timm or torchvision not installed",
 )
-def test_efficientnet_b0(ir):
-    model = timm.create_model("efficientnet_b0", pretrained=True).eval().to("cuda")
-    input = torch.randn((1, 3, 224, 224)).to("cuda")
+@pytest.mark.parametrize("dtype", [torch.float16, torch.bfloat16, torch.float32])
+def test_efficientnet_b0(ir, dtype):
+    model = (
+        timm.create_model("efficientnet_b0", pretrained=True)
+        .eval()
+        .to("cuda")
+        .to(dtype)
+    )
+    input = torch.randn((1, 3, 224, 224)).to("cuda").to(dtype)
 
     compile_spec = {
         "inputs": [
-            torchtrt.Input(
-                input.shape, dtype=torch.float, format=torch.contiguous_format
-            )
+            torchtrt.Input(input.shape, dtype=dtype, format=torch.contiguous_format)
         ],
         "device": torchtrt.Device("cuda:0"),
-        "enabled_precisions": {torch.float},
         "ir": ir,
         "pass_through_build_failures": True,
         "optimization_level": 1,
         "min_block_size": 10,
         "cache_built_engines": False,
         "reuse_cached_engines": False,
+        "use_explicit_typing": True,
     }
 
     trt_mod = torchtrt.compile(model, **compile_spec)
-    cos_sim = cosine_similarity(model(input), trt_mod(input))
+    pyt_output = model(input)
+    trt_output = trt_mod(input)
+    assert pyt_output.dtype == trt_output.dtype
+    assert pyt_output.dtype == dtype
+    cos_sim = cosine_similarity(pyt_output, trt_output)
     assertions.assertTrue(
         cos_sim > COSINE_THRESHOLD,
         msg=f"EfficientNet-B0 TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
@@ -208,10 +219,11 @@ def test_efficientnet_b0(ir):
     not importlib.util.find_spec("transformers"),
     "transformers is required to run this test",
 )
-def test_bert_base_uncased(ir):
+@pytest.mark.parametrize("dtype", [torch.float16, torch.bfloat16, torch.float32])
+def test_bert_base_uncased_lan(ir, dtype):
     from transformers import BertModel
 
-    model = BertModel.from_pretrained("bert-base-uncased").cuda().eval()
+    model = BertModel.from_pretrained("bert-base-uncased").cuda().eval().to(dtype)
     input = torch.randint(0, 2, (1, 14), dtype=torch.int32).to("cuda")
     input2 = torch.randint(0, 2, (1, 14), dtype=torch.int32).to("cuda")
 
@@ -229,7 +241,6 @@ def test_bert_base_uncased(ir):
             ),
         ],
         "device": torchtrt.Device("cuda:0"),
-        "enabled_precisions": {torch.float},
         "truncate_double": True,
         "ir": ir,
         "pass_through_build_failures": True,
@@ -237,6 +248,7 @@ def test_bert_base_uncased(ir):
         "min_block_size": 15,
         "cache_built_engines": False,
         "reuse_cached_engines": False,
+        "use_explicit_typing": True,
     }
     trt_mod = torchtrt.compile(model, **compile_spec)
 
@@ -244,6 +256,8 @@ def test_bert_base_uncased(ir):
     trt_model_outputs = trt_mod(input, input2)
     for key in model_outputs.keys():
         out, trt_out = model_outputs[key], trt_model_outputs[key]
+        assert out.dtype == trt_out.dtype
+        assert out.dtype == dtype
         cos_sim = cosine_similarity(out, trt_out)
         assertions.assertTrue(
             cos_sim > COSINE_THRESHOLD,

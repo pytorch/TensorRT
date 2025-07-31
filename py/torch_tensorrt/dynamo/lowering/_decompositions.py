@@ -483,7 +483,9 @@ def scaled_dot_product_attention_decomposition(
     attn_weight = query @ key.transpose(-2, -1)
 
     if scale is None:
-        scale = torch.sqrt(torch.scalar_tensor(query.size(-1), dtype=torch.int))
+        scale = torch.sqrt(torch.scalar_tensor(query.size(-1), dtype=torch.int)).to(
+            query.dtype
+        )
         attn_weight = attn_weight / scale
     else:
         attn_weight = attn_weight * scale
