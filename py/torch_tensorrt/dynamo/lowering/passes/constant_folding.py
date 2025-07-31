@@ -36,8 +36,6 @@ def constant_fold(
     # The constants are created on CPU to save GPU memory for TensorRT compilation.
     # For TRT INetwork construction the constants are moved to CPU in get_attr call.
     for node, constant in cf.node_replacements.items():
-        if node.target == torch.ops.aten.embedding.default:
-            continue
         replace_node_with_constant(
             gm, node, torch.nn.Parameter(constant, requires_grad=False)
         )
