@@ -168,7 +168,31 @@ class TestIndexDynamicConstantConverter(DispatchTestCase):
                 dtype=torch.float32,
             ),
         ]
-        self.run_test_with_dynamic_shape(TestModule(), input_specs)
+        self.run_test_with_dynamic_shape(
+            TestModule(), input_specs, use_dynamo_tracer=True
+        )
+
+
+class TestIndexDynamicInputNonDynamicIndexConverter(DispatchTestCase):
+    def test_index_input_non_dynamic_index_dynamic(self):
+        class TestIndexWithRuntimeIndex(torch.nn.Module):
+            def forward(self, x):
+                mask = x > 0
+                idx = torch.nonzero(mask, as_tuple=True)
+                return torch.ops.aten.index.Tensor(x, idx)
+
+        input_specs = [
+            Input(
+                min_shape=(2, 2),
+                opt_shape=(2, 2),
+                max_shape=(8, 8),
+                dtype=torch.float32,
+            ),
+        ]
+        # In this case the index args[1] gets itself converted to a List of TRTTensors with use_dynamo_tracer=True
+        self.run_test_with_dynamic_shape(
+            TestIndexWithRuntimeIndex(), input_specs, use_dynamo_tracer=True
+        )
 
 
 if __name__ == "__main__":
