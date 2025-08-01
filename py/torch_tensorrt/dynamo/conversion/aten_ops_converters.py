@@ -3579,3 +3579,22 @@ def aten_ops_nonzero(
         name,
         args[0],
     )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.linear.default, supports_dynamic_shapes=True)
+def aten_ops_linear(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.linear.linear(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        input=args[0],
+        weight=args[1],
+        bias=args_bounds_check(args, 2, None),
+    )
