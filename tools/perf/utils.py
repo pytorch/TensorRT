@@ -25,6 +25,7 @@ BENCHMARK_MODEL_NAMES = {
     "apple/DCLM-7B",
     "mistralai/Mistral-7B-Instruct-v0.3",
     "microsoft/Phi-3-mini-4k-instruct",
+    "monai/unet",
 }
 
 
@@ -108,6 +109,11 @@ class ModelStorage:
                 "model": hf_artifact["model"],
                 "path": "pytorch",
             }
+        elif name == "monai/unet":
+            return {
+                "model": cm.UNet(),
+                "path": "pytorch",
+            }
         else:
             raise AssertionError(f"Invalid model name {name}")
 
@@ -176,6 +182,8 @@ def torch_dtype_from_trt(dtype):
         return torch.bool
     elif dtype == trt.int32:
         return torch.int32
+    elif dtype == trt.int64:
+        return torch.int64
     elif dtype == trt.float16:
         return torch.float16
     elif dtype == trt.float32:
