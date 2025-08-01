@@ -3,6 +3,7 @@ argparse
 pyyaml
 onnx
 pandas
-transformers
-diffusers
+transformers==4.51.3
+diffusers==0.34.0
 timm==0.9.8
+monai==1.5.0
