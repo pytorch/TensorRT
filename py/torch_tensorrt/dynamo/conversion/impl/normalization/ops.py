@@ -60,28 +60,28 @@ def batch_norm(
     ):
         # We name the weight here according to the state_dict name
         weight = (
-            get_trt_tensor(ctx, 1.0, f"{name}_weight")
+            get_trt_tensor(ctx, 1.0, f"{name}_weight", dtype=input.dtype)
             if weight is None
             else get_trt_tensor(ctx, weight, f"{name}_weight")
         )
         bias = (
-            get_trt_tensor(ctx, 0.0, f"{name}_bias")
+            get_trt_tensor(ctx, 0.0, f"{name}_bias", dtype=input.dtype)
             if bias is None
             else get_trt_tensor(ctx, bias, f"{name}_bias")
         )
         running_mean = (
-            get_trt_tensor(ctx, 0.0, f"{name}_running_mean")
+            get_trt_tensor(ctx, 0.0, f"{name}_running_mean", dtype=input.dtype)
             if running_mean is None
             else get_trt_tensor(ctx, running_mean, f"{name}_running_mean")
         )
         running_var = (
-            get_trt_tensor(ctx, 1.0, f"{name}_running_var")
+            get_trt_tensor(ctx, 1.0, f"{name}_running_var", dtype=input.dtype)
             if running_var is None
             else get_trt_tensor(ctx, running_var, f"{name}_running_var")
         )
 
         # eps_tensor for numerical stability
-        eps_tensor = get_trt_tensor(ctx, eps, f"{name}_eps")
+        eps_tensor = get_trt_tensor(ctx, eps, f"{name}_eps", dtype=input.dtype)
 
         # adjusted_var = running_var + eps
         adjusted_var = impl.elementwise.add(

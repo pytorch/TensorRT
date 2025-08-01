@@ -220,7 +220,7 @@ def test_efficientnet_b0(ir, dtype):
     "transformers is required to run this test",
 )
 @pytest.mark.parametrize("dtype", [torch.float16, torch.bfloat16, torch.float32])
-def test_bert_base_uncased_lan(ir, dtype):
+def test_bert_base_uncased(ir, dtype):
     from transformers import BertModel
 
     model = BertModel.from_pretrained("bert-base-uncased").cuda().eval().to(dtype)
