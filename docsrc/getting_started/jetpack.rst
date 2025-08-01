@@ -90,22 +90,22 @@ Build Environment Setup
    .. code-block:: sh
 
       # Can only install the torch and torchvision wheel from the JPL repo which is built specifically for JetPack 6.2
-      python -m pip install torch==2.7.0 torchvision==0.22.0  --index-url=https://pypi.jetson-ai-lab.dev/jp6/cu126/
+      python -m pip install torch==2.8.0 torchvision==0.23.0  --index-url=https://pypi.jetson-ai-lab.io/jp6/cu126
 
 
 Building the Wheel
 ==================
 
 .. code-block:: sh
-   python setup.py bdist_wheel
+   python setup.py bdist_wheel --jetpack
 
 Installation
 ============
 
 .. code-block:: sh
-   # you will be able to find the wheel in the dist directory, has platform name linux_tegra_aarch64
+   # you will be able to find the wheel in the dist directory
    cd dist
-   python -m pip install torch_tensorrt-2.8.0.dev0+d8318d8fc-cp310-cp310-linux_tegra_aarch64.whl
+   python -m pip install torch_tensorrt-2.8.0.dev0+d8318d8fc-cp310-cp310-linux_aarch64.whl
 
 Post-Installation Verification
 ==============================
