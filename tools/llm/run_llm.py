@@ -9,6 +9,7 @@ This script illustrates Torch-TensorRT workflow with dynamo backend on popular L
 
 import argparse
 import copy
+import json
 import os
 import timeit
 from contextlib import nullcontext
@@ -21,9 +22,11 @@ import torch_tensorrt
 from torchtrt_ext import register_sdpa
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from utils import (
+    convert_linear_to_tensorrt_quantized,
     export_llm,
     generate,
     generate_with_static_cache,
+    quantize_model,
     record_stats,
     time_generate,
 )
@@ -48,6 +51,7 @@ def get_model(args):
         torch.nn.Module: The loaded and configured model ready for inference,
             moved to CUDA device with the specified precision
     """
+
     with torch.no_grad():
         model = (
             AutoModelForCausalLM.from_pretrained(
@@ -58,6 +62,8 @@ def get_model(args):
             .eval()
             .cuda()
         )
+    if args.pre_quantized:
+        model = convert_linear_to_tensorrt_quantized(model, args.model)
 
     if args.precision == "FP16":
         model = model.to(torch.float16)
@@ -106,7 +112,23 @@ def compile_torchtrt(model, input_ids, args):
     else:
         enabled_precisions = {torch.float32}
 
-    with torch_tensorrt.logging.debug() if args.debug else nullcontext():
+    qformat = "_q_" + args.qformat if args.qformat else ""
+
+    logging_dir = f"./{args.model}_{args.precision}{qformat}"
+    # with torch_tensorrt.logging.debug() if args.debug else nullcontext():
+    with (
+        torch_tensorrt.dynamo.Debugger(
+            "debug",
+            logging_dir=logging_dir,
+            # capture_fx_graph_after=["constant_fold"],
+            # save_engine_profile=True,
+            # profile_format="trex",
+            engine_builder_monitor=False,
+            # save_layer_info=True,
+        )
+        if args.debug
+        else nullcontext()
+    ):
         trt_model = torch_tensorrt.dynamo.compile(
             ep,
             inputs=[input_ids, position_ids],
@@ -129,12 +151,14 @@ def print_outputs(backend_name, gen_tokens, tokenizer):
     """
     Print the generated tokens from the model.
     """
+    out = tokenizer.decode(gen_tokens[0], skip_special_tokens=True)
     print(f"========= {backend_name} =========")
     print(
         f"{backend_name} model generated text: ",
-        tokenizer.decode(gen_tokens[0], skip_special_tokens=True),
+        out,
     )
     print("===================================")
+    return out
 
 
 def measure_perf(trt_model, input_signature, backend_name):
@@ -234,13 +258,24 @@ if __name__ == "__main__":
     arg_parser.add_argument(
         "--benchmark", action="store_true", help="Enable benchmark (default: False)"
     )
-
+    arg_parser.add_argument(
+        "--qformat",
+        help=("Apply quantization format. Options: fp8 (default: None)"),
+        default=None,
+    )
+    arg_parser.add_argument(
+        "--pre_quantized",
+        action="store_true",
+        help="Use pre-quantized model weights (default: False)",
+    )
     args = arg_parser.parse_args()
     with torch.inference_mode():
         model = get_model(args)
 
         tokenizer = AutoTokenizer.from_pretrained(args.tokenizer or args.model)
-
+        # Set pad token
+        if tokenizer.pad_token is None:
+            tokenizer.pad_token = tokenizer.eos_token
         # Prepare input for benchmarking or evaluation
         if args.benchmark:
             input_ids = torch.randint(
@@ -257,7 +292,8 @@ if __name__ == "__main__":
         pyt_gen_tokens = None
         pyt_timings = None
         pyt_stats = None
-
+        if args.qformat != None:
+            model = quantize_model(model, args, tokenizer)
         if args.enable_pytorch_run:
             pyt_gen_tokens = generate(
                 model, input_ids.clone(), MAX_OUTPUT_SEQ_LENGTH, tokenizer.eos_token_id
@@ -336,19 +372,41 @@ if __name__ == "__main__":
                 batch_size=args.batch_size,
                 compile_time_s=None,
             )
+        match_result = "N/A"
+        torch_out = "N/A"
+        model_name = args.model.replace("/", "_")
+        qformat = args.qformat if args.qformat else "no_quant"
 
         if not args.benchmark:
             if args.enable_pytorch_run:
-                print_outputs("PyTorch", pyt_gen_tokens, tokenizer)
+                torch_out = print_outputs("PyTorch", pyt_gen_tokens, tokenizer)
 
-            print_outputs("TensorRT", trt_gen_tokens, tokenizer)
+            trt_out = print_outputs("TensorRT", trt_gen_tokens, tokenizer)
 
             if args.enable_pytorch_run:
                 print(
                     f"PyTorch and TensorRT outputs match: {torch.equal(pyt_gen_tokens, trt_gen_tokens)}"
                 )
-
+                match_result = str(torch.equal(pyt_gen_tokens, trt_gen_tokens))
+            out_json_file = f"{model_name}_{qformat}_match.json"
+            result = {}
+            result["match"] = match_result
+            result["torch_out"] = torch_out
+            result["trt_out"] = trt_out
+            with open(os.path.join("result", out_json_file), "w") as f:
+                json.dump(result, f, indent=4)
+                print(f"Results saved to {out_json_file}")
         if args.benchmark:
+            result = {}
+            args_dict = vars(args)
+
+            result["args"] = args_dict
+            result["pyt_stats"] = pyt_stats if args.enable_pytorch_run else None
+            result["trt_stats"] = trt_stats if args.benchmark else None
+            out_json_file = f"{model_name}_{qformat}_benchmark.json"
+            with open(os.path.join("result", out_json_file), "w") as f:
+                json.dump(result, f, indent=4)
+                print(f"Results saved to {out_json_file}")
             if args.enable_pytorch_run:
                 print("=========PyTorch PERFORMANCE============ \n")
                 print(pyt_stats)
