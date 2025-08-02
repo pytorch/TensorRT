@@ -27,7 +27,53 @@ def tril(
     name: str,
     row: TRTTensor,
     col: TRTTensor,
+    sliding_window_size: Optional[int] = None,
 ) -> TRTTensor:
+
+    row_arange_tensor = impl.arange.arange(
+        ctx, target, source_ir, name + "_arange_row", start=0, end=row, step=1
+    )
+    col_arange_tensor = impl.arange.arange(
+        ctx, target, source_ir, name + "_arange_col", start=0, end=col, step=1
+    )
+    row_arange_tensor = impl.unsqueeze.unsqueeze(
+        ctx, target, source_ir, name + "_unsqueeze_row", row_arange_tensor, -1
+    )
+    col_arange_tensor = impl.unsqueeze.unsqueeze(
+        ctx, target, source_ir, name + "_unsqueeze_col", col_arange_tensor, 0
+    )
+    # sub will return the following mask tensor:
+    # [[0, -1, -2, -3],
+    #  [1,  0, -1, -2],
+    #  [2,  1,  0, -1],
+    #  [3,  2,  1,  0]]
+    mask = impl.elementwise.sub(
+        ctx, target, source_ir, name + "_sub", row_arange_tensor, col_arange_tensor
+    )
+    ge_0_mask = impl.elementwise.ge(ctx, target, source_ir, name + "_ge_0", mask, 0.0)
+    if sliding_window_size is None:
+        # return the following lower triangular mask includes the main diagonal:
+        # 0 ■ ⬚ ⬚ ⬚ ⬚     tensor([[[[ True, False, False, False, False],
+        # 1 ■ ■ ⬚ ⬚ ⬚               [ True,  True, False, False, False],
+        # 2 ■ ■ ■ ⬚ ⬚               [ True,  True,  True, False, False],
+        # 3 ■ ■ ■ ■ ⬚               [ True,  True,  True,  True, False],
+        # 4 ■ ■ ■ ■ ■               [ True,  True,  True,  True,  True]]]])
+        return ge_0_mask
+
+    lt_window_mask = impl.elementwise.lt(
+        ctx, target, source_ir, name + "_lt_window_size", mask, sliding_window_size
+    )
+    mask = impl.elementwise.logical_and(
+        ctx, target, source_ir, name + "_logical_and", ge_0_mask, lt_window_mask
+    )
+    # return the following mask if sliding_window_size is 3:
+    # 0 ■ ⬚ ⬚ ⬚ ⬚      tensor([[[[ True, False, False, False, False],
+    # 1 ■ ■ ⬚ ⬚ ⬚                [ True,  True, False, False, False],
+    # 2 ■ ■ ■ ⬚ ⬚                [ True,  True,  True, False, False],
+    # 3 ⬚ ■ ■ ■ ⬚                [False,  True,  True,  True, False],
+    # 4 ⬚ ⬚ ■ ■ ■                [False, False,  True,  True,True]]]])
+    return mask
+
     row_arange_tensor = impl.arange.arange(
         ctx, target, source_ir, name + "_arange_row", start=0, end=row, step=1
     )
@@ -66,7 +112,7 @@ def scaled_dot_product_attention(
     # TODO: remove this once we have a better way to handle the causal mask
     scale = kwargs.get("scale", None)
     source_ir = SourceIR.ATEN
-    is_causal = True
+
     # implementation as described here: https://pytorch.org/docs/stable/generated/torch.nn.functional.scaled_dot_product_attention.html
     use_fp32_acc = kwargs.get("use_fp32_acc", False)
     query_dtype = query.dtype
@@ -136,7 +182,21 @@ def scaled_dot_product_attention(
             S = impl.shape.shape(ctx, target, source_ir, name + "_shape_1", key, 2)
 
         # generate the mask tensor
-        tril_tensor = tril(ctx, target, source_ir, name + "_tril", L, S)
+        if is_causal:
+            tril_tensor = tril(ctx, target, source_ir, name + "_tril", L, S)
+        else:
+            # hard code the sliding window size to 512 for now
+            tril_tensor = tril(ctx, target, source_ir, name + "_tril", L, S, 512)
+            # TODO: lan to figure out why attn_mask passed in from transformers is not working
+            # tried both 2d and 4d, but both are not working, hence the following code is commented out
+            # assert len(attn_mask.shape) in [2, 4], f"attn_mask must be 2D or 4D, but got {attn_mask.shape=}"
+            # if len(attn_mask.shape) == 4:
+            #     if attn_mask.shape[0] != 1:
+            #         attn_mask = impl.slice.slice_op(ctx, target, source_ir, name + "_slice", attn_mask, 0, 0, 1, 1)
+            #     if attn_mask.shape[1] != 1:
+            #         attn_mask = impl.slice.slice_op(ctx, target, source_ir, name + "_slice", attn_mask, 1, 0, 1, 1)
+            #     attn_mask = impl.squeeze.squeeze(ctx, target, source_ir, name + "_squeeze", attn_mask, (0, 1))
+            # tril_tensor = attn_mask
 
         temp_mask = impl.unary.logical_not(
             ctx, target, source_ir, name + "_logical_not", tril_tensor
