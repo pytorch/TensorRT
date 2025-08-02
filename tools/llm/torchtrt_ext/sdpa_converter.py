@@ -74,25 +74,6 @@ def tril(
     # 4 ⬚ ⬚ ■ ■ ■                [False, False,  True,  True,True]]]])
     return mask
 
-    row_arange_tensor = impl.arange.arange(
-        ctx, target, source_ir, name + "_arange_row", start=0, end=row, step=1
-    )
-    row_reshape_tensor = impl.shuffle.reshape(
-        ctx, target, source_ir, name + "_reshape_row", row_arange_tensor, [row, 1]
-    )
-
-    col_arange_tensor = impl.arange.arange(
-        ctx, target, source_ir, name + "_arange_col", start=0, end=col, step=1
-    )
-    col_reshape_tensor = impl.shuffle.reshape(
-        ctx, target, source_ir, name + "_reshape_col", col_arange_tensor, [1, col]
-    )
-
-    mask = impl.elementwise.ge(
-        ctx, target, source_ir, name + "_ge", row_reshape_tensor, col_reshape_tensor
-    )
-    return mask
-
 
 @torch_tensorrt.dynamo.conversion.dynamo_tensorrt_converter(
     torch.nn.functional.scaled_dot_product_attention,
