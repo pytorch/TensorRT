@@ -19,11 +19,10 @@ from typing import (
 import numpy as np
 import tensorrt as trt
 import torch
+import torch_tensorrt.dynamo.conversion.impl as impl
 from torch.fx.experimental.proxy_tensor import unset_fake_temporarily
 from torch.fx.node import Argument, Target
 from torch.fx.passes.shape_prop import TensorMetadata
-
-import torch_tensorrt.dynamo.conversion.impl as impl
 from torch_tensorrt import _enums
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo._SourceIR import SourceIR
@@ -73,6 +72,9 @@ def get_node_io(
         # If the provided data is a scalar, return it as is
         elif isinstance(metadata, (int, float, bool)):
             return f"{metadata}@Python-{type(metadata)}"
+        # If the provided data is a SymInt, return it as is
+        elif isinstance(metadata, (torch.SymInt)):
+            return f"{metadata}@SymInt"
         # If the provided data is a sequence, recursively parse it
         elif isinstance(metadata, collections.abc.Sequence):
             formatted_str = "("
