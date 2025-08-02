@@ -42,6 +42,7 @@ class Test64BitSupport(TestCase):
             use_python_runtime=False,
             cache_built_engines=False,
             reuse_cached_engines=False,
+            use_explicit_typing=True,
         )
 
         torch_model_results = mod(in_tensor)
@@ -82,12 +83,13 @@ class Test64BitSupport(TestCase):
             use_python_runtime=True,
             cache_built_engines=False,
             reuse_cached_engines=False,
+            use_explicit_typing=True,
         )
 
         torch_model_results = mod(in_tensor)
         with torch_tensorrt.logging.debug():
             optimized_model_results = trt_mod(in_tensor)
-
+        assert torch_model_results.dtype == optimized_model_results.dtype
         max_diff = float(
             torch.max(torch.abs(optimized_model_results - torch_model_results))
         )
@@ -128,11 +130,12 @@ class Test64BitSupport(TestCase):
             use_python_runtime=False,
             cache_built_engines=False,
             reuse_cached_engines=False,
+            use_explicit_typing=True,
         )
 
         torch_model_results = mod(in_tensor)
         optimized_model_results = trt_mod(in_tensor)
-
+        assert torch_model_results.dtype == optimized_model_results.dtype
         max_diff = float(
             torch.max(torch.abs(optimized_model_results - torch_model_results))
         )
@@ -169,11 +172,12 @@ class Test64BitSupport(TestCase):
             use_python_runtime=True,
             cache_built_engines=False,
             reuse_cached_engines=False,
+            use_explicit_typing=True,
         )
 
         torch_model_results = mod(in_tensor)
         optimized_model_results = trt_mod(in_tensor)
-
+        assert torch_model_results.dtype == optimized_model_results.dtype
         max_diff = float(
             torch.max(torch.abs(optimized_model_results - torch_model_results))
         )
@@ -218,16 +222,16 @@ class TestBF16Support(TestCase):
             exp_mod,
             inputs=[in_tensor],
             pass_through_build_failures=True,
-            enabled_precisions={torch.float, torch.bfloat16, torch.half},
             min_block_size=1,
             use_python_runtime=False,
             cache_built_engines=False,
             reuse_cached_engines=False,
+            use_explicit_typing=True,
         )
 
         torch_model_results = mod(in_tensor)
         optimized_model_results = trt_mod(in_tensor)
-
+        assert torch_model_results.dtype == optimized_model_results.dtype
         max_diff = float(
             torch.max(torch.abs(optimized_model_results - torch_model_results))
         )
@@ -258,16 +262,16 @@ class TestBF16Support(TestCase):
             exp_mod,
             inputs=[in_tensor],
             pass_through_build_failures=True,
-            enabled_precisions={torch.float, torch.bfloat16, torch.half},
             min_block_size=1,
             use_python_runtime=True,
             cache_built_engines=False,
             reuse_cached_engines=False,
+            use_explicit_typing=True,
         )
 
         torch_model_results = mod(in_tensor)
         optimized_model_results = trt_mod(in_tensor)
-
+        assert torch_model_results.dtype == optimized_model_results.dtype
         max_diff = float(
             torch.max(torch.abs(optimized_model_results - torch_model_results))
         )
@@ -296,16 +300,16 @@ class TestBF16Support(TestCase):
                 mod,
                 ir="torch_compile",
                 inputs=inputs,
-                enabled_precisions={torch.bfloat16},
                 min_block_size=1,
                 device=device,
                 cache_built_engines=False,
                 reuse_cached_engines=False,
+                use_explicit_typing=True,
             )
 
             torch_model_results = mod(*inputs)
             optimized_model_results = trt_mod(*inputs)
-
+            assert torch_model_results.dtype == optimized_model_results.dtype
             max_diff = float(
                 torch.max(torch.abs(optimized_model_results - torch_model_results))
             )
