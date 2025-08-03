@@ -15,6 +15,9 @@ class TestConvolutionConverter(DispatchTestCase):
             param("non_zero_padding", 1, padding=1),
             param("dilation", 1, dilation=2),
             param("groups", 1, groups=3),
+            param("stride", 1, stride=1),
+            param("stride_2", 1, stride=2),
+            param("stride_tuple", 1, stride=(2,)),
         ]
     )
     def test_conv1d(
@@ -52,6 +55,7 @@ class TestConvolutionConverter(DispatchTestCase):
             ("tuple_parameters", 1, (1), (1)),
             param("non_zero_padding", 1, padding=1),
             param("dilation", 1, dilation=2),
+            param("stride", 1, stride=2),
         ]
     )
     def test_conv1d_TRTTensor_weight(
@@ -140,6 +144,7 @@ class TestConvolutionConverter(DispatchTestCase):
             param("tuple_dilation", 2, dilation=(3, 3)),
             param("list_dilation", 2, dilation=[3]),
             param("groups", 1, groups=3),
+            param("stride", 1, stride=(2, 2)),
         ]
     )
     def test_conv2d(

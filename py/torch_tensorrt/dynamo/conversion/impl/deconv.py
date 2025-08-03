@@ -10,7 +10,6 @@ from torch_tensorrt.dynamo.conversion import impl
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
 from torch_tensorrt.dynamo.conversion.converter_utils import (
     SourceIR,
-    extend_attr_to_tuple,
     get_trt_tensor,
     has_dynamic_shape,
     to_torch,
@@ -142,10 +141,9 @@ def deconvNd(
     # Expand parameters manually for Conv1D computations
     if is_deconv1d:
         padding = (tuple(padding) + (0,)) if padding is not None else padding
-        stride = extend_attr_to_tuple(stride, 2) if stride is not None else stride
-        dilation = (
-            extend_attr_to_tuple(dilation, 2) if dilation is not None else dilation
-        )
+        # stride in deconv1d is (2,) -> need to change to (2, 1) in deconv2d
+        stride = (stride[0], 1) if stride is not None else stride
+        dilation = (dilation[0], 1) if dilation is not None else dilation
         output_padding = (
             (tuple(output_padding) + (0,))
             if output_padding is not None
