@@ -6,17 +6,9 @@ requires = [
     "ninja>=1.11.0",
     "pyyaml>=6.0",
     "cffi>=1.15.1",
-    "typing-extensions>=4.7.0",
-    "future>=0.18.3",
-    "tensorrt-cu12>=10.11.0,<10.12.0; platform_machine != 'aarch64' or (platform_machine == 'aarch64' and 'tegra' not in platform_release)",
-    "tensorrt-cu12>=10.3.0,<10.4.0; platform_machine == 'aarch64' and 'tegra' in platform_release",
     "torch>=2.8.0,<2.9.0; platform_machine != 'aarch64' or (platform_machine == 'aarch64' and 'tegra' not in platform_release)",
-    "torch>=2.7.0,<2.8.0; platform_machine == 'aarch64' and 'tegra' in platform_release",
+    "torch>=2.8.0,<2.9.0; platform_machine == 'aarch64' and 'tegra' in platform_release",
     "pybind11==2.6.2",
-    "numpy; platform_machine != 'aarch64' or (platform_machine == 'aarch64' and 'tegra' not in platform_release)",
-    "numpy<2.0.0; platform_machine == 'aarch64' and 'tegra' in platform_release",
-    "sympy",
-    "dllist",
 ]
 build-backend = "setuptools.build_meta"
 
@@ -60,17 +52,13 @@ keywords = [
 ]
 dependencies = [
     "torch>=2.8.0,<2.9.0; platform_machine != 'aarch64' or (platform_machine == 'aarch64' and 'tegra' not in platform_release)",
-    # "torch>=2.7.0,<2.8.0; platform_machine == 'aarch64' and 'tegra' in platform_release",
+    "torch>=2.8.0,<2.9.0; platform_machine == 'aarch64' and 'tegra' in platform_release",
 
     "tensorrt>=10.12.0,<10.13.0; platform_machine != 'aarch64' or (platform_machine == 'aarch64' and 'tegra' not in platform_release)",
-    "tensorrt-cu12>=10.12.0,<10.13.0; platform_machine != 'aarch64' or (platform_machine == 'aarch64' and 'tegra' not in platform_release)",
     "tensorrt-cu12-bindings>=10.12.0,<10.13.0; platform_machine != 'aarch64' or (platform_machine == 'aarch64' and 'tegra' not in platform_release)",
     "tensorrt-cu12-libs>=10.12.0,<10.13.0; platform_machine != 'aarch64' or (platform_machine == 'aarch64' and 'tegra' not in platform_release)",
 
     "tensorrt>=10.3.0,<10.4.0;platform_machine == 'aarch64' and 'tegra' in platform_release",
-    "tensorrt-cu12>=10.3.0,<10.4.0; platform_machine == 'aarch64' and 'tegra' in platform_release",
-    "tensorrt-cu12-bindings>=10.3.0,<10.4.0; platform_machine == 'aarch64' and 'tegra' in platform_release",
-    "tensorrt-cu12-libs>=10.3.0,<10.4.0; platform_machine == 'aarch64' and 'tegra' in platform_release",
 
     "packaging>=23",
 
@@ -136,11 +124,11 @@ index-strategy = "unsafe-best-match"
 [tool.uv.sources]
 torch = [
     { index = "pytorch-test-cu129", marker = "platform_machine != 'aarch64' or (platform_machine == 'aarch64' and 'tegra' not in platform_release)" },
-    # { index = "jetson-containers", marker = "platform_machine == 'aarch64' and 'tegra' in platform_release" },
+    { index = "jetson-containers", marker = "platform_machine == 'aarch64' and 'tegra' in platform_release" },
 ]
 torchvision = [
     { index = "pytorch-test-cu129", marker = "platform_machine != 'aarch64' or (platform_machine == 'aarch64' and 'tegra' not in platform_release)" },
-    # { index = "jetson-containers", marker = "platform_machine == 'aarch64' and 'tegra' in platform_release" },
+    { index = "jetson-containers", marker = "platform_machine == 'aarch64' and 'tegra' in platform_release" },
 ]
 
 [[tool.uv.index]]
@@ -148,10 +136,10 @@ name = "pytorch-test-cu129"
 url = "https://download.pytorch.org/whl/test/cu129"
 explicit = false
 
-# [[tool.uv.index]]
-# name = "jetson-containers"
-# url = "https://pypi.jetson-ai-lab.dev/jp6/cu126/+simple"
-# explicit = false
+[[tool.uv.index]]
+name = "jetson-containers"
+url = "https://pypi.jetson-ai-lab.io/jp6/cu126"
+explicit = false
 
 [[tool.uv.index]]
 name = "nvidia"

@@ -81,7 +81,7 @@ def aot_torch_tensorrt_aten_backend(
             decompositions=settings_aot_autograd["decompositions"],
         )(gm, sample_inputs)
 
-    if is_tegra_platform():
+    if not is_tegra_platform():
         from torch.distributed.tensor import DTensor
 
         if any(isinstance(tensor, DTensor) for tensor in sample_inputs):
