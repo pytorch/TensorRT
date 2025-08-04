@@ -7,6 +7,7 @@ from typing import Callable, Dict, Optional, Sequence, Tuple, Union
 import numpy as np
 import torch
 from torch.fx.node import Argument, Node, Target
+from torch_tensorrt._utils import is_tensorrt_version_supported
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion import impl
@@ -619,11 +620,7 @@ else:
         )
 
 
-from importlib import metadata
-
-from packaging.version import Version
-
-if Version(metadata.version("tensorrt")) >= Version("10.8.0"):
+if is_tensorrt_version_supported("10.8.0"):
     try:
         import modelopt.torch.quantization as mtq  # noqa: F401
 
