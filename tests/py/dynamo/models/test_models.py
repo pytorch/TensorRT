@@ -3,20 +3,29 @@ import importlib
 import unittest
 
 import pytest
-import timm
 import torch
 import torch_tensorrt as torchtrt
-import torchvision.models as models
 from torch_tensorrt.dynamo.utils import (
     COSINE_THRESHOLD,
     cosine_similarity,
     get_model_device,
+    is_tegra_platform,
 )
 
 assertions = unittest.TestCase()
 
+if importlib.util.find_spec("torchvision"):
+    import torchvision.models as models
+
+    if not is_tegra_platform():
+        import timm
+
 
 @pytest.mark.unit
+@unittest.skipIf(
+    not importlib.util.find_spec("torchvision"),
+    "torchvision is not installed",
+)
 def test_resnet18(ir):
     model = models.resnet18(pretrained=True).eval().to("cuda")
     input = torch.randn((1, 3, 224, 224)).to("cuda")
@@ -48,6 +57,10 @@ def test_resnet18(ir):
 
 
 @pytest.mark.unit
+@unittest.skipIf(
+    not importlib.util.find_spec("torchvision"),
+    "torchvision is not installed",
+)
 def test_resnet18_cpu_offload(ir):
     model = models.resnet18(pretrained=True).eval().to("cuda")
     input = torch.randn((1, 3, 224, 224)).to("cuda")
@@ -69,11 +82,48 @@ def test_resnet18_cpu_offload(ir):
     }
 
     trt_mod = torchtrt.compile(model, **compile_spec)
+    if ir == "dynamo":
+        assertions.assertTrue(
+            get_model_device(model).type == "cpu",
+            msg="Model should be offloaded to CPU",
+        )
+        model.cuda()
+    cos_sim = cosine_similarity(model(input), trt_mod(input))
     assertions.assertTrue(
-        get_model_device(model).type == "cpu",
-        msg="Model should be offloaded to CPU",
+        cos_sim > COSINE_THRESHOLD,
+        msg=f"Resnet18 TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
     )
-    model.cuda()
+
+    # Clean up model env
+    torch._dynamo.reset()
+
+
+@unittest.skipIf(
+    not importlib.util.find_spec("torchvision"), "torchvision not installed"
+)
+def test_resnet18_torch_exec_ops(ir):
+    model = models.resnet18(pretrained=True).eval().to("cuda")
+    input = torch.randn((1, 3, 224, 224)).to("cuda")
+
+    compile_spec = {
+        "inputs": [
+            torchtrt.Input(
+                min_shape=(1, 3, 224, 224),
+                opt_shape=(8, 3, 224, 224),
+                max_shape=(16, 3, 224, 224),
+                dtype=torch.float32,
+            )
+        ],
+        "ir": ir,
+        "enabled_precisions": {torch.float32, torch.float16, torch.bfloat16},
+        "min_block_size": 1,
+        "output_format": "exported_program",
+        "cache_built_engines": True,
+        "reuse_cached_engines": True,
+        "torch_executed_ops": {torch.ops.aten.matmul, "torch.ops.aten.add"},
+    }
+
+    trt_mod = torchtrt.compile(model, **compile_spec)
     cos_sim = cosine_similarity(model(input), trt_mod(input))
     assertions.assertTrue(
         cos_sim > COSINE_THRESHOLD,
@@ -85,28 +135,35 @@ def test_resnet18_cpu_offload(ir):
 
 
 @pytest.mark.unit
-def test_mobilenet_v2(ir):
-    model = models.mobilenet_v2(pretrained=True).eval().to("cuda")
-    input = torch.randn((1, 3, 224, 224)).to("cuda")
+@unittest.skipIf(
+    not importlib.util.find_spec("torchvision"),
+    "torchvision is not installed",
+)
+@pytest.mark.parametrize("dtype", [torch.float16, torch.bfloat16, torch.float32])
+def test_mobilenet_v2(ir, dtype):
+    model = models.mobilenet_v2(pretrained=True).eval().to("cuda").to(dtype)
+    input = torch.randn((1, 3, 224, 224)).to("cuda").to(dtype)
 
     compile_spec = {
         "inputs": [
-            torchtrt.Input(
-                input.shape, dtype=torch.float, format=torch.contiguous_format
-            )
+            torchtrt.Input(input.shape, dtype=dtype, format=torch.contiguous_format)
         ],
         "device": torchtrt.Device("cuda:0"),
-        "enabled_precisions": {torch.float},
         "ir": ir,
         "pass_through_build_failures": True,
         "optimization_level": 1,
         "min_block_size": 10,
         "cache_built_engines": False,
         "reuse_cached_engines": False,
+        "use_explicit_typing": True,
     }
 
     trt_mod = torchtrt.compile(model, **compile_spec)
-    cos_sim = cosine_similarity(model(input), trt_mod(input))
+    pyt_output = model(input)
+    trt_output = trt_mod(input)
+    assert pyt_output.dtype == trt_output.dtype
+    assert pyt_output.dtype == dtype
+    cos_sim = cosine_similarity(pyt_output, trt_output)
     assertions.assertTrue(
         cos_sim > COSINE_THRESHOLD,
         msg=f"Mobilenet v2 TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
@@ -117,28 +174,40 @@ def test_mobilenet_v2(ir):
 
 
 @pytest.mark.unit
-def test_efficientnet_b0(ir):
-    model = timm.create_model("efficientnet_b0", pretrained=True).eval().to("cuda")
-    input = torch.randn((1, 3, 224, 224)).to("cuda")
+@unittest.skipIf(
+    not importlib.util.find_spec("timm") or not importlib.util.find_spec("torchvision"),
+    "timm or torchvision not installed",
+)
+@pytest.mark.parametrize("dtype", [torch.float16, torch.bfloat16, torch.float32])
+def test_efficientnet_b0(ir, dtype):
+    model = (
+        timm.create_model("efficientnet_b0", pretrained=True)
+        .eval()
+        .to("cuda")
+        .to(dtype)
+    )
+    input = torch.randn((1, 3, 224, 224)).to("cuda").to(dtype)
 
     compile_spec = {
         "inputs": [
-            torchtrt.Input(
-                input.shape, dtype=torch.float, format=torch.contiguous_format
-            )
+            torchtrt.Input(input.shape, dtype=dtype, format=torch.contiguous_format)
         ],
         "device": torchtrt.Device("cuda:0"),
-        "enabled_precisions": {torch.float},
         "ir": ir,
         "pass_through_build_failures": True,
         "optimization_level": 1,
         "min_block_size": 10,
         "cache_built_engines": False,
         "reuse_cached_engines": False,
+        "use_explicit_typing": True,
     }
 
     trt_mod = torchtrt.compile(model, **compile_spec)
-    cos_sim = cosine_similarity(model(input), trt_mod(input))
+    pyt_output = model(input)
+    trt_output = trt_mod(input)
+    assert pyt_output.dtype == trt_output.dtype
+    assert pyt_output.dtype == dtype
+    cos_sim = cosine_similarity(pyt_output, trt_output)
     assertions.assertTrue(
         cos_sim > COSINE_THRESHOLD,
         msg=f"EfficientNet-B0 TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
@@ -153,10 +222,11 @@ def test_efficientnet_b0(ir):
     not importlib.util.find_spec("transformers"),
     "transformers is required to run this test",
 )
-def test_bert_base_uncased(ir):
+@pytest.mark.parametrize("dtype", [torch.float16, torch.bfloat16, torch.float32])
+def test_bert_base_uncased(ir, dtype):
     from transformers import BertModel
 
-    model = BertModel.from_pretrained("bert-base-uncased").cuda().eval()
+    model = BertModel.from_pretrained("bert-base-uncased").cuda().eval().to(dtype)
     input = torch.randint(0, 2, (1, 14), dtype=torch.int32).to("cuda")
     input2 = torch.randint(0, 2, (1, 14), dtype=torch.int32).to("cuda")
 
@@ -174,7 +244,6 @@ def test_bert_base_uncased(ir):
             ),
         ],
         "device": torchtrt.Device("cuda:0"),
-        "enabled_precisions": {torch.float},
         "truncate_double": True,
         "ir": ir,
         "pass_through_build_failures": True,
@@ -182,6 +251,7 @@ def test_bert_base_uncased(ir):
         "min_block_size": 15,
         "cache_built_engines": False,
         "reuse_cached_engines": False,
+        "use_explicit_typing": True,
     }
     trt_mod = torchtrt.compile(model, **compile_spec)
 
@@ -189,6 +259,8 @@ def test_bert_base_uncased(ir):
     trt_model_outputs = trt_mod(input, input2)
     for key in model_outputs.keys():
         out, trt_out = model_outputs[key], trt_model_outputs[key]
+        assert out.dtype == trt_out.dtype
+        assert out.dtype == dtype
         cos_sim = cosine_similarity(out, trt_out)
         assertions.assertTrue(
             cos_sim > COSINE_THRESHOLD,
@@ -232,11 +304,12 @@ def test_bert_base_uncased_cpu_offload(ir):
         "offload_module_to_cpu": True,
     }
     trt_mod = torchtrt.compile(model, **compile_spec)
-    assertions.assertTrue(
-        get_model_device(model).type == "cpu",
-        msg="Model should be offloaded to CPU",
-    )
-    model.cuda()
+    if ir == "dynamo":
+        assertions.assertTrue(
+            get_model_device(model).type == "cpu",
+            msg="Model should be offloaded to CPU",
+        )
+        model.cuda()
 
     model_outputs = model(input, input2)
     trt_model_outputs = trt_mod(input, input2)
@@ -253,6 +326,10 @@ def test_bert_base_uncased_cpu_offload(ir):
 
 
 @pytest.mark.unit
+@unittest.skipIf(
+    not importlib.util.find_spec("torchvision"),
+    "torchvision is not installed",
+)
 def test_resnet18_half(ir):
     model = models.resnet18(pretrained=True).eval().to("cuda").half()
     input = torch.randn((1, 3, 224, 224)).to("cuda").half()

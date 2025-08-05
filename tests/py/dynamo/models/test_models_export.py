@@ -5,18 +5,29 @@ import unittest
 from importlib import metadata
 
 import pytest
-import timm
 import torch
 import torch_tensorrt as torchtrt
-import torchvision.models as models
-from torch_tensorrt.dynamo.utils import COSINE_THRESHOLD, cosine_similarity
+from torch_tensorrt.dynamo.utils import (
+    COSINE_THRESHOLD,
+    cosine_similarity,
+    is_tegra_platform,
+)
 
 from packaging.version import Version
+
+if importlib.util.find_spec("torchvision"):
+    import torchvision.models as models
+
+    if not is_tegra_platform():
+        import timm
 
 assertions = unittest.TestCase()
 
 
 @pytest.mark.unit
+@unittest.skipIf(
+    not importlib.util.find_spec("torchvision"), "torchvision not installed"
+)
 def test_resnet18(ir):
     model = models.resnet18(pretrained=True).eval().to("cuda")
     input = torch.randn((1, 3, 224, 224)).to("cuda")
@@ -81,6 +92,10 @@ def test_mobilenet_v2(ir):
 
 
 @pytest.mark.unit
+@unittest.skipIf(
+    not importlib.util.find_spec("timm") or not importlib.util.find_spec("torchvision"),
+    "timm or torchvision not installed",
+)
 def test_efficientnet_b0(ir):
     model = timm.create_model("efficientnet_b0", pretrained=True).eval().to("cuda")
     input = torch.randn((1, 3, 224, 224)).to("cuda")
@@ -200,6 +215,125 @@ def test_resnet18_half(ir):
 
 
 @unittest.skipIf(
+    torch.cuda.get_device_capability() < (10, 0),
+    "FP4 quantization requires compute capability 10.0 or later",
+)
+@unittest.skipIf(
+    not importlib.util.find_spec("modelopt"),
+    "ModelOpt is required to run this test",
+)
+@pytest.mark.unit
+def test_base_fp4_dynamic_shapes(ir):
+    import modelopt.torch.quantization as mtq
+    from modelopt.torch.quantization.utils import export_torch_mode
+
+    dtype = torch.float16
+
+    class SimpleNetwork(torch.nn.Module):
+        def __init__(self):
+            super(SimpleNetwork, self).__init__()
+            self.linear1 = torch.nn.Linear(
+                in_features=64, out_features=32, bias=True, dtype=dtype
+            )
+
+        def forward(self, x):
+            x = self.linear1(x)
+            return x
+
+    def calibrate_loop(model):
+        """Simple calibration function for testing."""
+        model(dummy_inputs)
+
+    BATCH_SIZE = torch.export.Dim("BATCH_SIZE", min=16, max=128)
+    batch_size = 64
+    dummy_inputs = torch.ones(batch_size, 64, dtype=dtype).cuda()
+
+    model = SimpleNetwork().eval().cuda()
+
+    quant_cfg = mtq.NVFP4_DEFAULT_CFG
+    mtq.quantize(model, quant_cfg, forward_loop=calibrate_loop)
+    # model has qdq nodes at this point
+    with torch.no_grad():
+        with export_torch_mode():
+            exp_program = torch.export.export(
+                model, (dummy_inputs,), strict=False, dynamic_shapes=({0: BATCH_SIZE},)
+            )
+
+            trt_model = torchtrt.dynamo.compile(
+                exp_program,
+                inputs=[dummy_inputs],
+                min_block_size=1,
+                cache_built_engines=False,
+                reuse_cached_engines=False,
+                use_explicit_typing=True,
+            )
+            batch_size = 128
+            input_tensor = torch.ones(batch_size, 64, dtype=dtype).cuda()
+            expected_output = model(input_tensor)
+            outputs_trt = trt_model(input_tensor)
+            abs_diff = torch.abs(expected_output - outputs_trt)
+            print(f"max/mean abs_diff: {abs_diff.max().item()=} {abs_diff.mean()=}")
+            assert torch.allclose(expected_output, outputs_trt, rtol=0.3, atol=0.3)
+
+
+@unittest.skipIf(
+    torch.cuda.get_device_capability() < (10, 0),
+    "FP4 quantization requires compute capability 10.0 or later",
+)
+@unittest.skipIf(
+    not importlib.util.find_spec("modelopt"),
+    "ModelOpt is required to run this test",
+)
+@pytest.mark.unit
+def test_base_fp4_static_shapes(ir):
+    import modelopt.torch.quantization as mtq
+    from modelopt.torch.quantization.utils import export_torch_mode
+
+    dtype = torch.bfloat16
+
+    class SimpleNetwork(torch.nn.Module):
+        def __init__(self):
+            super(SimpleNetwork, self).__init__()
+            self.linear1 = torch.nn.Linear(
+                in_features=64, out_features=32, bias=True, dtype=dtype
+            )
+
+        def forward(self, x):
+            x = self.linear1(x)
+            return x
+
+    def calibrate_loop(model):
+        """Simple calibration function for testing."""
+        model(input_tensor)
+
+    input_tensor = torch.randn(128, 64, dtype=dtype).cuda()
+
+    model = SimpleNetwork().eval().cuda()
+    expected_output = model(input_tensor)
+
+    quant_cfg = mtq.NVFP4_DEFAULT_CFG
+    mtq.quantize(model, quant_cfg, forward_loop=calibrate_loop)
+    # model has qdq nodes at this point
+    with torch.no_grad():
+        with export_torch_mode():
+            exp_program = torch.export.export(model, (input_tensor,), strict=False)
+            from torch.fx import passes
+
+            trt_model = torchtrt.dynamo.compile(
+                exp_program,
+                inputs=[input_tensor],
+                min_block_size=1,
+                cache_built_engines=False,
+                reuse_cached_engines=False,
+                use_explicit_typing=True,
+            )
+            outputs_trt = trt_model(input_tensor)
+            abs_diff = torch.abs(expected_output - outputs_trt)
+            print(f"max/mean abs_diff: {abs_diff.max().item()=} {abs_diff.mean()=}")
+            assert torch.allclose(expected_output, outputs_trt, rtol=0.3, atol=0.3)
+
+
+@unittest.skipIf(
     torch.cuda.get_device_capability() < (8, 9),
     "FP8 quantization requires compute capability 8.9 or later",
 )
@@ -230,8 +364,8 @@ def test_base_fp8(ir):
 
     input_tensor = torch.randn(1, 10).cuda()
     model = SimpleNetwork().eval().cuda()
-
     quant_cfg = mtq.FP8_DEFAULT_CFG
+
     mtq.quantize(model, quant_cfg, forward_loop=calibrate_loop)
     # model has FP8 qdq nodes at this point
     output_pyt = model(input_tensor)
@@ -244,7 +378,6 @@ def test_base_fp8(ir):
                 inputs=[input_tensor],
                 enabled_precisions={torch.float8_e4m3fn},
                 min_block_size=1,
-                debug=True,
                 cache_built_engines=False,
                 reuse_cached_engines=False,
             )
@@ -259,7 +392,8 @@ def test_base_fp8(ir):
     "modelopt 0.17.0 or later is required, Int8 quantization is supported in modelopt since 0.17.0 or later for linux",
 )
 @pytest.mark.unit
-def test_base_int8(ir):
+@pytest.mark.parametrize("dtype", [torch.float16, torch.bfloat16, torch.float32])
+def test_base_int8(ir, dtype):
     import modelopt.torch.quantization as mtq
     from modelopt.torch.quantization.utils import export_torch_mode
 
@@ -279,28 +413,29 @@ def test_base_int8(ir):
         """Simple calibration function for testing."""
         model(input_tensor)
 
-    input_tensor = torch.randn(1, 10).cuda()
-    model = SimpleNetwork().eval().cuda()
-
+    input_tensor = torch.randn(1, 10).cuda().to(dtype)
+    model = SimpleNetwork().eval().cuda().to(dtype)
     quant_cfg = mtq.INT8_DEFAULT_CFG
     mtq.quantize(model, quant_cfg, forward_loop=calibrate_loop)
     # model has INT8 qdq nodes at this point
     output_pyt = model(input_tensor)
-
+    breakpoint()
     with torch.no_grad():
         with export_torch_mode():
             exp_program = torch.export.export(model, (input_tensor,), strict=False)
-            trt_model = torchtrt.dynamo.compile(
-                exp_program,
-                inputs=[input_tensor],
-                enabled_precisions={torch.int8},
-                min_block_size=1,
-                debug=True,
-                cache_built_engines=False,
-                reuse_cached_engines=False,
-                truncate_double=True,
-            )
+            with torchtrt.logging.debug():
+                trt_model = torchtrt.dynamo.compile(
+                    exp_program,
+                    inputs=[input_tensor],
+                    min_block_size=1,
+                    cache_built_engines=False,
+                    reuse_cached_engines=False,
+                    truncate_double=True,
+                    use_explicit_typing=True,
+                )
             outputs_trt = trt_model(input_tensor)
+            assert output_pyt.dtype == outputs_trt.dtype
+            assert outputs_trt.dtype == dtype
             assert torch.allclose(output_pyt, outputs_trt, rtol=5e-3, atol=1e-2)
 
 
@@ -311,17 +446,16 @@ def test_base_int8(ir):
     "modelopt 0.17.0 or later is required, Int8 quantization is supported in modelopt since 0.17.0 or later for linux",
 )
 @pytest.mark.unit
-def test_base_int8_dynamic_shape(ir):
+@pytest.mark.parametrize("dtype", [torch.float16, torch.bfloat16, torch.float32])
+def test_base_int8_dynamic_shape(ir, dtype):
     import modelopt.torch.quantization as mtq
     from modelopt.torch.quantization.utils import export_torch_mode
-
-    dtype = torch.bfloat16
 
     class SimpleNetwork(torch.nn.Module):
         def __init__(self):
             super(SimpleNetwork, self).__init__()
-            self.conv = torch.nn.Conv2d(3, 3, 3, dtype=dtype)
-            self.linear = torch.nn.Linear(222, 222, dtype=dtype)
+            self.conv = torch.nn.Conv2d(3, 3, 3)
+            self.linear = torch.nn.Linear(222, 222)
 
         def forward(self, x):
             return self.linear(self.conv(x))
@@ -333,7 +467,7 @@ def test_base_int8_dynamic_shape(ir):
     BATCH_SIZE = torch.export.Dim("BATCH_SIZE", min=2, max=16)
     batch_size = 8
     input_tensor = torch.randn(batch_size, 3, 224, 224, dtype=dtype).cuda()
-    model = SimpleNetwork().eval().cuda()
+    model = SimpleNetwork().eval().cuda().to(dtype)
 
     quant_cfg = mtq.INT8_DEFAULT_CFG
     mtq.quantize(model, quant_cfg, forward_loop=calibrate_loop)
@@ -349,12 +483,11 @@ def test_base_int8_dynamic_shape(ir):
             trt_model = torchtrt.dynamo.compile(
                 exp_program,
                 inputs=[input_tensor],
-                enabled_precisions={torch.int8, dtype},
                 min_block_size=1,
-                debug=True,
                 cache_built_engines=False,
                 reuse_cached_engines=False,
                 truncate_double=True,
+                use_explicit_typing=True,
             )
             outputs_trt = trt_model(input_tensor)
             assert torch.allclose(output_pyt, outputs_trt, rtol=5e-2, atol=5e-2)

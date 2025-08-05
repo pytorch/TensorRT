@@ -3,7 +3,6 @@
 import unittest
 
 import pytest
-import timm
 import torch
 import torch_tensorrt as torchtrt
 from torch_tensorrt.dynamo.utils import COSINE_THRESHOLD, cosine_similarity

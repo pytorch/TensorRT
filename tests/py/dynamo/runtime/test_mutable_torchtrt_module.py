@@ -4,7 +4,6 @@ import tempfile
 import unittest
 
 import pytest
-import timm
 import torch
 import torch.nn.functional as F
 import torch_tensorrt as torch_trt

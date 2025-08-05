@@ -1,17 +1,26 @@
 import copy
+import importlib
 import unittest
 from typing import Dict
 
-import timm
 import torch
 import torch_tensorrt as torchtrt
-import torchvision.models as models
+from torch_tensorrt.dynamo.utils import is_tegra_platform
 from utils import COSINE_THRESHOLD, cosine_similarity
+
+if importlib.util.find_spec("torchvision"):
+    import torchvision.models as models
+
+    if not is_tegra_platform():
+        import timm
 
 
 @unittest.skipIf(
     not torchtrt.ENABLED_FEATURES.torchscript_frontend,
     "TorchScript Frontend is not available",
+)
+@unittest.skipIf(
+    not importlib.util.find_spec("torchvision"), "torchvision not installed"
 )
 class TestModels(unittest.TestCase):
     def test_resnet18(self):
@@ -39,6 +48,9 @@ class TestModels(unittest.TestCase):
             msg=f"Resnet50 TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
         )
 
+    @unittest.skipIf(
+        not importlib.util.find_spec("torchvision"), "torchvision not installed"
+    )
     def test_mobilenet_v2(self):
         self.model = models.mobilenet_v2(pretrained=True).eval().to("cuda")
         self.input = torch.randn((1, 3, 224, 224)).to("cuda")
@@ -64,6 +76,11 @@ class TestModels(unittest.TestCase):
             msg=f"Mobilenet v2 TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
         )
 
+    @unittest.skipIf(
+        not importlib.util.find_spec("timm")
+        or not importlib.util.find_spec("torchvision"),
+        "timm or torchvision not installed",
+    )
     def test_efficientnet_b0(self):
         self.model = (
             timm.create_model("efficientnet_b0", pretrained=True).eval().to("cuda")
@@ -91,6 +108,9 @@ class TestModels(unittest.TestCase):
             msg=f"EfficientNet-B0 TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
         )
 
+    @unittest.skipIf(
+        not importlib.util.find_spec("torchvision"), "torchvision not installed"
+    )
     def test_resnet18_half(self):
         self.model = models.resnet18(pretrained=True).eval().to("cuda")
         self.input = torch.randn((1, 3, 224, 224)).to("cuda")
