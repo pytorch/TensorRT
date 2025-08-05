@@ -3562,7 +3562,8 @@ def aten_ops_full(
     )
 
 
-# currently nonzero is not supported for tensorrt_rtx, will add support in future once rtx team has fixed the bug
+# currently nonzero is not supported for tensorrt_rtx
+# TODO: lan to remove this once rtx team has fixed the bug
 if not is_tensorrt_rtx():
 
     @dynamo_tensorrt_converter(

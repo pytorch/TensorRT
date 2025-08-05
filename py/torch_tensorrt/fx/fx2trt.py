@@ -214,9 +214,10 @@ class TRTInterpreter(torch.fx.Interpreter):
         builder_config.max_workspace_size = max_workspace_size
 
         # Speed up TRT build time in the test environment
-        if (is_tensorrt_version_supported("8.6")) and os.environ.get(
-            "TRT_TEST_ENV", "0"
-        ) == "1":
+        if (
+            is_tensorrt_version_supported("8.6")
+            and os.environ.get("TRT_TEST_ENV", "0") == "1"
+        ):
             _LOGGER.info("Set TRT optimization level to 0")
             builder_config.builder_optimization_level = 0
 

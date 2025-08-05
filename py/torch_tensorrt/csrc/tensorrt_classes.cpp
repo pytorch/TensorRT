@@ -342,18 +342,19 @@ core::CompileSpec CompileSpec::toInternalCompileSpec(bool converting_to_trt_engi
   }
 
   info.partitioning_info.cast_int8_inputs = true;
-
-  // if (ptq_calibrator) {
-  //   info.convert_info.engine_settings.calibrator = ptq_calibrator;
-  //   info.partitioning_info.cast_int8_inputs = false;
-  // } else {
-  //   if (info.convert_info.engine_settings.enabled_precisions.find(nvinfer1::DataType::kINT8) !=
-  //       info.convert_info.engine_settings.enabled_precisions.end()) {
-  //     info.partitioning_info.cast_int8_inputs = false;
-  //     info.lower_info.unfreeze_module = true;
-  //     info.lower_info.disable_cse = true;
-  //   }
-  // }
+#ifndef TRT_MAJOR_RTX
+  if (ptq_calibrator) {
+    info.convert_info.engine_settings.calibrator = ptq_calibrator;
+    info.partitioning_info.cast_int8_inputs = false;
+  } else {
+    if (info.convert_info.engine_settings.enabled_precisions.find(nvinfer1::DataType::kINT8) !=
+        info.convert_info.engine_settings.enabled_precisions.end()) {
+      info.partitioning_info.cast_int8_inputs = false;
+      info.lower_info.unfreeze_module = true;
+      info.lower_info.disable_cse = true;
+    }
+  }
+#endif
   info.convert_info.engine_settings.sparse_weights = sparse_weights;
   info.convert_info.engine_settings.disable_tf32 = disable_tf32;
   info.convert_info.engine_settings.refit = refit;

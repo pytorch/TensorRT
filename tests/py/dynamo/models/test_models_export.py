@@ -7,6 +7,7 @@ from importlib import metadata
 import pytest
 import torch
 import torch_tensorrt as torchtrt
+from torch_tensorrt._utils import is_tensorrt_rtx
 from torch_tensorrt.dynamo.utils import COSINE_THRESHOLD, cosine_similarity
 
 from packaging.version import Version
@@ -411,12 +412,11 @@ def test_base_int8(ir, dtype):
     model = SimpleNetwork().eval().cuda().to(dtype)
     quant_cfg = mtq.INT8_DEFAULT_CFG
     # RTX does not support INT8 default quantization(weights+activations), only support INT8 weights only quantization
-    if torchtrt.tensorrt_package_name == "tensorrt_rtx":
+    if is_tensorrt_rtx():
         quant_cfg["quant_cfg"]["*input_quantizer"] = {"enable": False}
     mtq.quantize(model, quant_cfg, forward_loop=calibrate_loop)
     # model has INT8 qdq nodes at this point
     output_pyt = model(input_tensor)
-    breakpoint()
     with torch.no_grad():
         with export_torch_mode():
             exp_program = torch.export.export(model, (input_tensor,), strict=False)
