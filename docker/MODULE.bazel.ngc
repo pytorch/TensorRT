@@ -31,7 +31,7 @@ new_local_repository = use_repo_rule("@bazel_tools//tools/build_defs/repo:local.
 # External dependency for torch_tensorrt if you already have precompiled binaries.
 new_local_repository(
     name = "torch_tensorrt",
-    build_file = "@//third_party:BUILD",
+    build_file = "@//third_party/torch_tensorrt:BUILD",
     path = "/usr/local/lib/python3.12/dist-packages/torch_tensorrt/",
 )
 
