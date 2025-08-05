@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 from contextlib import nullcontext
-from tempfile import tempdir
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import tensorrt as trt
@@ -11,6 +10,7 @@ import torch_tensorrt
 from torch.nn import Module
 from torch_tensorrt._Device import Device
 from torch_tensorrt._enums import Platform, dtype
+from torch_tensorrt.dynamo._defaults import DEBUG_LOGGING_DIR
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.debug._DebuggerConfig import DebuggerConfig
 from torch_tensorrt.dynamo.debug._supports_debugger import cls_supports_debugger
@@ -535,12 +535,9 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                                 )
 
                             if self.profiling_enabled:
-                                import tempfile
-
-                                with tempfile.TemporaryDirectory() as tmpdir:
-                                    self.cudagraph.debug_dump(
-                                        f"{tempdir}/{self.name}_cudagraph.dot"
-                                    )
+                                self.cudagraph.debug_dump(
+                                    f"{DEBUG_LOGGING_DIR}/{self.name}_cudagraph.dot"
+                                )
 
                         self.cudagraph.replay()  # type: ignore
 

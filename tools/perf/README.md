@@ -9,8 +9,6 @@ This is a comprehensive Python benchmark suite to run perf runs using different 
 5. TensorRT
 
 
-Note: Please note that for ONNX models, user can convert the ONNX model to TensorRT serialized engine and then use this package.
-
 ## Prerequisite
 
 Benchmark scripts depends on following Python packages in addition to requirements.txt packages
@@ -47,6 +45,7 @@ Here are the list of `CompileSpec` options that can be provided directly to comp
 * `--backends` : Comma separated string of backends. Eg: torch, torch_compile, dynamo, tensorrt
 * `--model` : Name of the model file (Can be a torchscript module or a tensorrt engine (ending in `.plan` extension)). If the backend is `dynamo` or `torch_compile`, the input should be a Pytorch module (instead of a torchscript module).
 * `--model_torch` : Name of the PyTorch model file (optional, only necessary if `dynamo` or `torch_compile` is a chosen backend)
+* `--onnx` : ONNX model file which helps bypass the step of exporting ONNX from `model_torch`. If this argument is provided, the ONNX will be directly converted to TRT engine
 * `--inputs` : List of input shapes & dtypes. Eg: (1, 3, 224, 224)@fp32 for Resnet or (1, 128)@int32;(1, 128)@int32 for BERT
 * `--batch_size` : Batch size
 * `--precision` : Comma separated list of precisions to build TensorRT engine Eg: fp32,fp16
@@ -54,6 +53,7 @@ Here are the list of `CompileSpec` options that can be provided directly to comp
 * `--truncate` : Truncate long and double weights in the network in Torch-TensorRT
 * `--is_trt_engine` : Boolean flag to be enabled if the model file provided is a TensorRT engine.
 * `--report` : Path of the output file where performance summary is written.
+* `--optimization_level` : Builder optimization level for TensorRT (from 1 to 5, 5 is the highest optimization).
 
 Eg:
 

@@ -1,8 +1,8 @@
+import logging
 import operator
 import warnings
 from typing import Any, Callable, Optional, Union
 
-import numpy as np
 import tensorrt as trt
 import torch
 from torch.fx.node import Target
@@ -19,6 +19,8 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     to_torch,
 )
 from torch_tensorrt.dynamo.types import TRTElementWiseOp, TRTTensor
+
+logger = logging.getLogger(__name__)
 
 
 def get_python_op_from_trt_elementwise_op(
@@ -148,7 +150,11 @@ def convert_binary_elementwise(
             ctx, rhs_val, trt_promoted_type, f"{name}_cast_rhs_val", target, source_ir
         )
 
-    if has_dynamic_shape(lhs_val.shape) or has_dynamic_shape(rhs_val.shape):
+    if len(lhs_val.shape) == len(rhs_val.shape) and all(
+        a == b or a == 1 or b == 1 for a, b in zip(lhs_val.shape, rhs_val.shape)
+    ):
+        logger.info(f"skip broadcast for {name}")
+    elif has_dynamic_shape(lhs_val.shape) or has_dynamic_shape(rhs_val.shape):
         lhs_val, rhs_val = broadcast(
             ctx, lhs_val, rhs_val, f"{name}_broadcast_lhs", f"{name}_broadcast_rhs"
         )
