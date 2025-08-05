@@ -23,7 +23,9 @@ pip install --force-reinstall --pre ${TORCH} --index-url ${INDEX_URL}
 
 if [[ ${USE_RTX} == true ]]; then
     source .github/scripts/install-tensorrt-rtx.sh
-    install_tensorrt_rtx
+    # tensorrt-rtx is not publicly available, so we need to install the wheel from the tar ball
+    install_wheel_or_not=true
+    install_tensorrt_rtx ${install_wheel_or_not}
 fi
 
 # Install Torch-TensorRT

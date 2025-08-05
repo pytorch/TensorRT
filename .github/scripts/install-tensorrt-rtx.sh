@@ -2,6 +2,7 @@
 install_tensorrt_rtx() {
     # tensorrt-rtx is not publicly available, so we need to install it from the local path
     if [[ ${USE_RTX} == true ]]; then
+        install_wheel_or_not=${1:-false}
         echo "It is the tensorrt-rtx build, install tensorrt-rtx"
         PLATFORM=$(python -c "import sys; print(sys.platform)")
         echo "PLATFORM: $PLATFORM"
@@ -19,14 +20,18 @@ install_tensorrt_rtx() {
             rtx_lib_dir=${PWD}/TensorRT-RTX-1.0.0.21/lib
             export LD_LIBRARY_PATH=${rtx_lib_dir}:$LD_LIBRARY_PATH
             echo "LD_LIBRARY_PATH: $LD_LIBRARY_PATH"
-            pip install TensorRT-RTX-1.0.0.21/python/tensorrt_rtx-1.0.0.21-${CPYTHON_TAG}-none-win_amd64.whl
+            if [[ ${install_wheel_or_not} == true ]]; then
+                pip install TensorRT-RTX-1.0.0.21/python/tensorrt_rtx-1.0.0.21-${CPYTHON_TAG}-none-win_amd64.whl
+            fi
         else
             curl -L https://developer.nvidia.com/downloads/trt/rtx_sdk/secure/1.0/TensorRT-RTX-1.0.0.21.Linux.x86_64-gnu.cuda-12.9.tar.gz -o TensorRT-RTX-1.0.0.21.Linux.x86_64-gnu.cuda-12.9.tar.gz
             tar -xzf TensorRT-RTX-1.0.0.21.Linux.x86_64-gnu.cuda-12.9.tar.gz
             rtx_lib_dir=${PWD}/TensorRT-RTX-1.0.0.21/lib
             export LD_LIBRARY_PATH=${rtx_lib_dir}:$LD_LIBRARY_PATH
             echo "LD_LIBRARY_PATH: $LD_LIBRARY_PATH"
-            pip install TensorRT-RTX-1.0.0.21/python/tensorrt_rtx-1.0.0.21-${CPYTHON_TAG}-none-linux_x86_64.whl
+            if [[ ${install_wheel_or_not} == true ]]; then
+                pip install TensorRT-RTX-1.0.0.21/python/tensorrt_rtx-1.0.0.21-${CPYTHON_TAG}-none-linux_x86_64.whl
+            fi
         fi
     else
         echo "It is the standard tensorrt build, skip install tensorrt-rtx"

@@ -76,6 +76,6 @@ fi
 cat MODULE.bazel
 export CI_BUILD=1
 
-# tensorrt-rtx is not publicly available, so we need to install it from the local path
-source .github/scripts/install-tensorrt-rtx.sh
-install_tensorrt_rtx
+if [[ ${USE_RTX} == true ]]; then
+    cat pyproject_rtx.toml.temp > pyproject.toml
+fi

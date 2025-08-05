@@ -36,3 +36,7 @@ fi
 
 cat MODULE.bazel
 echo "RELEASE=1" >> ${GITHUB_ENV}
+
+if [[ ${USE_RTX} == true ]]; then
+    cat pyproject_rtx.toml.temp > pyproject.toml
+fi
