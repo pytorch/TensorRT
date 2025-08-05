@@ -173,6 +173,8 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         self.cudagraph: Optional[torch.cuda.CUDAGraph] = None
         self._caller_stream: Optional[torch.cuda.Stream] = None
         self._engine_stream: Optional[torch.cuda.Stream] = None
+        self.output_tensors: Optional[List[torch.Tensor]] = None
+        self.sync_stream = True
 
         # TODO: Make the below a Dictionary {shape: cudagraph}
         self.shape_key: Optional[str] = None
@@ -263,12 +265,16 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         assert (
             self.target_platform == Platform.current_platform()
         ), f"TensorRT engine was not built to target current platform (target: {self.target_platform}, current: {Platform.current_platform()})"
+        # Stream handling: if the caller stream is the pytorch default stream, create a new engine stream
+        # otherwise, use the caller stream and disable stream synchronization
         self._caller_stream = torch.cuda.current_stream()
-        if (
-            self._engine_stream == torch.cuda.default_stream()
-            or self._engine_stream is None
-        ):
+        if self._caller_stream == torch.cuda.default_stream():
             self._engine_stream = torch.cuda.Stream()
+            self.sync_stream = True
+        else:
+            self._engine_stream = self._caller_stream
+            self.sync_stream = False
+
         self.initialized = True
         runtime = trt.Runtime(TRT_LOGGER)
         self.engine = runtime.deserialize_cuda_engine(self.serialized_engine)
@@ -489,15 +495,14 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                 if can_use_pre_allocated_outputs:
                     outputs = self.pre_allocated_outputs
                 else:
-                    # self.output_shapes = [
-                    #     tuple(self.context.get_tensor_shape(output_name))
-                    #     for output_name in self.output_names
-                    # ]
+
                     if DYNAMIC_DIM in self.output_shapes:
                         raise ValueError(
                             "Encountered dynamic output shapes during runtime. This could mean the network has data-dependent output shapes which is not currently supported."
                         )
-                    outputs = self.create_output_tensors()
+                    if self.output_tensors is None:
+                        self.output_tensors = self.create_output_tensors()
+                    outputs = self.output_tensors
 
                 for o, output_name in enumerate(self.output_names):
                     if need_cudagraphs_record:
@@ -520,37 +525,38 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                 else nullcontext()
             ):
 
-                self._engine_stream.wait_stream(self._caller_stream)
+                if self.sync_stream:
+                    self._engine_stream.wait_stream(self._caller_stream)
 
-                # with torch.cuda.stream(self._engine_stream):
-                # if self.cudagraphs_enabled:
-                #     if need_cudagraphs_record:
-                #         self.cudagraph = torch.cuda.CUDAGraph()
+                if self.cudagraphs_enabled:
+                    if need_cudagraphs_record:
+                        self.cudagraph = torch.cuda.CUDAGraph()
 
-                #         if self.profiling_enabled:
-                #             self.cudagraph.enable_debug_mode()
+                        if self.profiling_enabled:
+                            self.cudagraph.enable_debug_mode()
 
-                #         with torch.cuda.graph(
-                #             self.cudagraph, stream=self._engine_stream
-                #         ):
-                #             self.context.execute_async_v3(
-                #                 self._engine_stream.cuda_stream
-                #             )
+                        with torch.cuda.graph(
+                            self.cudagraph, stream=self._engine_stream
+                        ):
+                            self.context.execute_async_v3(
+                                self._engine_stream.cuda_stream
+                            )
 
-                #         if self.profiling_enabled:
-                #             import tempfile
+                        if self.profiling_enabled:
+                            import tempfile
 
-                #             with tempfile.TemporaryDirectory() as tmpdir:
-                #                 self.cudagraph.debug_dump(
-                #                     f"{tempdir}/{self.name}_cudagraph.dot"
-                #                 )
+                            with tempfile.TemporaryDirectory() as tmpdir:
+                                self.cudagraph.debug_dump(
+                                    f"{tmpdir}/{self.name}_cudagraph.dot"
+                                )
 
-                #     self.cudagraph.replay()  # type: ignore
+                    self.cudagraph.replay()  # type: ignore
 
-                # else:
-                self.context.execute_async_v3(self._engine_stream.cuda_stream)
+                else:
+                    self.context.execute_async_v3(self._engine_stream.cuda_stream)
 
-                self._caller_stream.wait_stream(self._engine_stream)
+                if self.sync_stream:
+                    self._caller_stream.wait_stream(self._engine_stream)
 
             if self.use_pre_allocated_outputs:
                 self.pre_allocated_outputs = self.create_output_tensors()
@@ -753,13 +759,13 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         # Representation of input shapes to a given model
         # Shapes are concatenated as so:
         # x: (3, 4), y: (4, 5) --> Key: (3,4)(4,5)
-        tensor_inputs = []
-        for t in inputs:
-            if not isinstance(t, torch.Tensor):
-                return True
-            tensor_inputs.append(t)
+        if not all(isinstance(t, torch.Tensor) for t in inputs):
+            return True
+
         new_shape_key = "".join(
-            str(tuple(t.shape)).replace(" ", "") for t in tensor_inputs
+            str(tuple(t.shape)).replace(" ", "")
+            for t in inputs
+            if isinstance(t, torch.Tensor)
         )
 
         # If the new shape key differs from the existing one,
