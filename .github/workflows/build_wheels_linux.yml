@@ -1,3 +1,5 @@
+# This workflow is used to build the wheels for the Linux platform
+# it should be periodically synced with https://github.com/pytorch/test-infra/blob/main/.github/workflows/build_wheels_linux.yml
 name: Build Linux Wheels
 
 on:
@@ -352,7 +354,7 @@ jobs:
     uses: pytorch/test-infra/.github/workflows/_binary_upload.yml@main
     # if it is not the jetpack build or tensorrt-rtx build, upload to pytorch index,
     # if it is the jetpack build only upload to pytorch_index for nightly builds
-    # for tensorrt-rtx build, do not upload at all
+    # for tensorrt-rtx build, do not upload to pytorch indexat all
     if: ${{ (inputs.is-jetpack == false && inputs.use-rtx == false) || (inputs.is-jetpack == true && github.event_name == 'push' && startsWith(github.event.ref, 'refs/heads/nightly')) }}
     with:
       repository: ${{ inputs.repository }}

@@ -1,0 +1,387 @@
+# This workflow is used to build the wheels for the Windows platform
+# it should be periodically synced with https://github.com/pytorch/test-infra/blob/main/.github/workflows/build_wheels_windows.yml
+name: Build Windows Wheels
+
+on:
+  workflow_call:
+    inputs:
+      repository:
+        description: 'Repository to checkout, defaults to ""'
+        default: ""
+        type: string
+      ref:
+        description: 'Reference to checkout, defaults to "nightly"'
+        default: "nightly"
+        type: string
+      test-infra-repository:
+        description: "Test infra repository to use"
+        default: "pytorch/test-infra"
+        type: string
+      test-infra-ref:
+        description: "Test infra reference to use"
+        default: ""
+        type: string
+      build-matrix:
+        description: "Build matrix to utilize"
+        default: ""
+        type: string
+      pre-script:
+        description: "Pre script to run prior to build"
+        default: ""
+        type: string
+      env-script:
+        description: "Script to setup environment variables for the build"
+        default: ""
+        type: string
+      wheel-build-params:
+        description: "Additional parameters for bdist_wheel"
+        default: ""
+        type: string
+      post-script:
+        description: "Post script to run prior to build"
+        default: ""
+        type: string
+      smoke-test-script:
+        description: "Script for Smoke Test for a specific domain"
+        default: ""
+        type: string
+      package-name:
+        description: "Name of the actual python package that is imported"
+        default: ""
+        type: string
+      build-platform:
+        description: Platform to build wheels, choose from 'python-build-package' or 'setup-py'
+        required: false
+        type: string
+        default: 'setup-py'
+      build-command:
+        description: The build command to use if build-platform is python-build-package
+        required: false
+        default: "python -m build --wheel"
+        type: string
+      trigger-event:
+        description: "Trigger Event in caller that determines whether or not to upload"
+        default: ""
+        type: string
+      cache-path:
+        description: "The path(s) on the runner to cache or restore. The path is relative to repository."
+        default: ""
+        type: string
+      cache-key:
+        description: "The key created when saving a cache and the key used to search for a cache."
+        default: ""
+        type: string
+      submodules:
+        description: "Works as stated in actions/checkout, but the default value is recursive"
+        required: false
+        type: string
+        default: recursive
+      timeout:
+        description: 'Timeout for the job (in minutes)'
+        default: 60
+        type: number
+      use-rtx:
+        description: "Set to true if use TensorRT-RTX"
+        default: false
+        type: boolean
+        required: false
+      architecture:
+        description: 'CPU architecture to build for'
+        default: "x64"
+        type: string
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(inputs.build-matrix) }}
+    env:
+      PYTHON_VERSION: ${{ matrix.python_version }}
+      PACKAGE_TYPE: wheel
+      REPOSITORY: ${{ inputs.repository }}
+      REF: ${{ inputs.ref }}
+      CU_VERSION: ${{ matrix.desired_cuda }}
+      UPLOAD_TO_BASE_BUCKET: ${{ matrix.upload_to_base_bucket }}
+      USE_RTX: ${{ inputs.use-rtx }}
+    name: build-${{ matrix.build_name }}
+    runs-on: ${{ matrix.validation_runner }}
+    defaults:
+      run:
+        shell: bash -l {0}
+    # If a build is taking longer than 60 minutes on these runners we need
+    # to have a conversation
+    timeout-minutes: ${{ inputs.timeout }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          # Support the use case where we need to checkout someone's fork
+          repository: ${{ inputs.test-infra-repository }}
+          ref: ${{ inputs.test-infra-ref }}
+          path: test-infra
+      - uses: ./test-infra/.github/actions/setup-ssh
+        name: Setup SSH
+        with:
+          github-secret: ${{ secrets.GITHUB_TOKEN }}
+          activate-with-label: false
+          instructions: "SSH with rdesktop using ssh -L 3389:localhost:3389 %%username%%@%%hostname%%"
+      - name: Add Conda scripts to GitHub path
+        if: inputs.architecture == 'x64'
+        run: |
+          echo "C:/Jenkins/Miniconda3/Scripts" >> $GITHUB_PATH
+      - name: Setup Git for Windows' minimal SDK
+        env:
+          DEPENDENCIES_DIR: c:\temp\dependencies\
+        if: inputs.architecture == 'arm64'
+        uses: git-for-windows/setup-git-for-windows-sdk@v1
+        with:
+          architecture: aarch64
+          path: "${{env.DEPENDENCIES_DIR}}\\git"
+      - uses: ./test-infra/.github/actions/set-channel
+      - name: Set PYTORCH_VERSION
+        if: env.CHANNEL == 'test'
+        run: |
+          # When building RC, set the version to be the current candidate version,
+          # otherwise, leave it alone so nightly will pick up the latest
+          echo "PYTORCH_VERSION=${{ matrix.stable_version }}" >> "${GITHUB_ENV}"
+      - uses: ./test-infra/.github/actions/setup-binary-builds
+        if: inputs.architecture == 'x64'
+        with:
+          repository: ${{ inputs.repository }}
+          ref: ${{ inputs.ref }}
+          submodules: ${{ inputs.submodules }}
+          setup-miniconda: false
+          python-version: ${{ env.PYTHON_VERSION }}
+          cuda-version: ${{ env.CU_VERSION }}
+          arch: ${{ inputs.architecture }}
+      - name: Install XPU support package
+        if: ${{ matrix.gpu_arch_type == 'xpu' }}
+        env:
+          XPU_VERSION: '2025.1'
+        run: |
+          cmd //c .\\test-infra\\.github\\scripts\\install_xpu.bat
+      - name: Checkout Target Repository (${{ env.REPOSITORY }})
+        if: inputs.architecture == 'arm64'
+        uses: actions/checkout@v4
+        with:
+            repository: ${{ env.REPOSITORY }}
+            ref: ${{ env.REF }}
+            path: ${{ env.REPOSITORY }}
+            submodules: recursive
+      - name: Bootstrap python
+        if: inputs.architecture == 'arm64'
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python_version }}
+          architecture: arm64
+      - name: Install torch dependency
+        if: inputs.architecture == 'x64'
+        run: |
+          source "${BUILD_ENV_FILE}"
+          # shellcheck disable=SC2086
+          ${CONDA_RUN} ${PIP_INSTALL_TORCH}
+      - name: Run Pre-Script with Caching
+        if: ${{ inputs.pre-script != '' && inputs.architecture == 'x64' }}
+        uses: ./test-infra/.github/actions/run-script-with-cache
+        with:
+          cache-path: ${{ inputs.cache-path }}
+          cache-key: ${{ inputs.cache-key }}
+          repository: ${{ inputs.repository  }}
+          script: ${{ inputs.pre-script }}
+          is_windows: 'enabled'
+      - name: Run Pre-Script Arm64
+        if: ${{ inputs.pre-script != '' && inputs.architecture == 'arm64' }}
+        env:
+          DOWNLOADS_DIR: c:\temp\downloads\
+          DEPENDENCIES_DIR: c:\temp\dependencies\
+          SCRIPTS_DIR: test-infra\\.github\\scripts\\winarm64
+          SRC_DIR: ${{ inputs.repository }}
+          PRE_SCRIPT: ${{ inputs.pre-script }}
+        shell: cmd
+        run: |
+          set VS_PATH=C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvarsall.bat
+          set GIT_BASH=%DEPENDENCIES_DIR%\git\usr\bin\bash.exe
+
+          cd %SRC_DIR%
+
+          call "%VS_PATH%" arm64
+          "%GIT_BASH%" -c "bash --noprofile --norc %PRE_SCRIPT%"
+      - name: Install certificates for Arm64 runner
+        if: ${{ inputs.architecture == 'arm64' }}
+        working-directory: ${{ inputs.repository }}
+        shell: cmd
+        run: |
+          call .\.venv\Scripts\activate.bat
+
+          pip install --upgrade certifi==2025.04.26
+          for /f "delims=" %%A in ('python -m certifi') do set CERT_PATH=%%A
+          echo Using cert bundle at: %CERT_PATH%
+
+          set SSL_CERT_FILE=%CERT_PATH%
+          set REQUESTS_CA_BUNDLE=%CERT_PATH%
+
+          echo SSL_CERT_FILE=%CERT_PATH% >> %GITHUB_ENV%
+          echo REQUESTS_CA_BUNDLE=%CERT_PATH% >> %GITHUB_ENV%
+      - name: Build clean
+        if: inputs.architecture == 'x64'
+        working-directory: ${{ inputs.repository }}
+        env:
+          ENV_SCRIPT: ${{ inputs.env-script }}
+        run: |
+          source "${BUILD_ENV_FILE}"
+          if [[ -z "${ENV_SCRIPT}" ]]; then
+            ${CONDA_RUN} python setup.py clean
+          else
+            if [[ ! -f ${ENV_SCRIPT} ]]; then
+              echo "::error::Specified env-script file (${ENV_SCRIPT}) not found"
+              exit 1
+            else
+              ${CONDA_RUN} ${ENV_SCRIPT} python setup.py clean
+            fi
+          fi
+      - name: Set PYTORCH_VERSION on x64
+        if: inputs.architecture == 'x64'
+        working-directory: ${{ inputs.repository }}
+        run: |
+          source "${BUILD_ENV_FILE}"
+          if [[ "$CU_VERSION" == "cpu" ]]; then
+          # CUDA and CPU are ABI compatible on the CPU-only parts, so strip
+          # in this case
+            export PYTORCH_VERSION="$(${CONDA_RUN} pip show torch | grep ^Version: | sed 's/Version:  *//' | sed 's/+.\+//')"
+          else
+            export PYTORCH_VERSION="$(${CONDA_RUN} pip show torch | grep ^Version: | sed 's/Version:  *//')"
+          fi
+      - name: Build the wheel (python-build-package) X64
+        if: ${{ inputs.build-platform == 'python-build-package' && inputs.architecture == 'x64' }}
+        working-directory: ${{ inputs.repository }}
+        env:
+          ENV_SCRIPT: ${{ inputs.env-script }}
+          BUILD_PARAMS: ${{ inputs.wheel-build-params }}
+        run: |
+          source "${BUILD_ENV_FILE}"
+          ${CONDA_RUN} python -m pip install build==1.2.2
+          echo "Successfully installed Python build package"
+          if [[ -z "${ENV_SCRIPT}" ]]; then
+            ${CONDA_RUN} ${{ inputs.build-command }}
+          else
+            ${CONDA_RUN} ${ENV_SCRIPT} ${{ inputs.build-command }}
+          fi
+      - name: Build the wheel (setup-py) X64
+        if: ${{ inputs.build-platform == 'setup-py' && inputs.architecture == 'x64' }}
+        working-directory: ${{ inputs.repository }}
+        env:
+          ENV_SCRIPT: ${{ inputs.env-script }}
+          BUILD_PARAMS: ${{ inputs.wheel-build-params }}
+        run: |
+          source "${BUILD_ENV_FILE}"
+          if [[ -z "${ENV_SCRIPT}" ]]; then
+            ${CONDA_RUN} python setup.py bdist_wheel
+          else
+            ${CONDA_RUN} ${ENV_SCRIPT} python setup.py bdist_wheel ${BUILD_PARAMS}
+          fi
+      - name: Build the wheel (bdist_wheel) Arm64
+        if: inputs.architecture == 'arm64'
+        env:
+          SRC_DIR: ${{ inputs.repository }}
+          DEPENDENCIES_DIR: c:\temp\dependencies\
+        shell: cmd
+        run: |
+          set CONDA_PREFIX=%DEPENDENCIES_DIR%
+          set PATH=%PATH%;%DEPENDENCIES_DIR%\Library\bin
+          set DISTUTILS_USE_SDK=1
+          set VS_PATH=C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvarsall.bat
+
+          call "%VS_PATH%" arm64
+          cd %SRC_DIR%
+          call .venv\Scripts\activate.bat
+
+          pip install --upgrade setuptools==72.1.0
+          python setup.py bdist_wheel
+      - name: Run post-script
+        working-directory: ${{ inputs.repository }}
+        env:
+          POST_SCRIPT: ${{ inputs.post-script }}
+          ENV_SCRIPT: ${{ inputs.env-script }}
+        if: ${{ inputs.post-script != '' && inputs.architecture == 'x64'}}
+        run: |
+          set -euxo pipefail
+          source "${BUILD_ENV_FILE}"
+          ${CONDA_RUN} ${ENV_SCRIPT} ${POST_SCRIPT}
+      - name: Smoke Test X64
+        if: inputs.architecture == 'x64'
+        env:
+          ENV_SCRIPT: ${{ inputs.env-script }}
+          PACKAGE_NAME: ${{ inputs.package-name }}
+          SMOKE_TEST_SCRIPT: ${{ inputs.smoke-test-script }}
+        run: |
+          source "${BUILD_ENV_FILE}"
+          WHEEL_NAME=$(ls "${{ inputs.repository }}/dist/")
+          echo "$WHEEL_NAME"
+          ${CONDA_RUN} pip install "${{ inputs.repository }}/dist/$WHEEL_NAME"
+          if [[ ! -f "${{ inputs.repository }}"/${SMOKE_TEST_SCRIPT} ]]; then
+            echo "${{ inputs.repository }}/${SMOKE_TEST_SCRIPT} not found"
+            ${CONDA_RUN} "${{ inputs.repository }}/${ENV_SCRIPT}" python -c "import ${PACKAGE_NAME}; print('package version is ', ${PACKAGE_NAME}.__version__)"
+          else
+            echo "${{ inputs.repository }}/${SMOKE_TEST_SCRIPT} found"
+            ${CONDA_RUN} "${{ inputs.repository }}/${ENV_SCRIPT}" python "${{ inputs.repository }}/${SMOKE_TEST_SCRIPT}"
+          fi
+      - name: Smoke Test ARM64
+        if: inputs.architecture == 'arm64'
+        env:
+          PACKAGE_NAME: ${{ inputs.package-name }}
+          SMOKE_TEST_SCRIPT: ${{ inputs.smoke-test-script }}
+          SRC_DIR: ${{ inputs.repository }}
+        run: |
+          cd $SRC_DIR
+          source .venv/Scripts/activate
+          whl=$(find dist -name "${{env.PACKAGE_NAME}}-*.whl" | head -n 1)
+          pip install $whl
+
+          if [[ ! -f ${SMOKE_TEST_SCRIPT} ]]; then
+            echo "${SMOKE_TEST_SCRIPT} not found"
+            python -c "import ${PACKAGE_NAME}; print('package version is ', ${PACKAGE_NAME}.__version__)"
+          else
+            echo "${SMOKE_TEST_SCRIPT} found"
+            python "$SMOKE_TEST_SCRIPT"
+          fi
+      # NB: Only upload to GitHub after passing smoke tests
+      - name: Get Artifact name
+        if: inputs.architecture == 'arm64'
+        env:
+          REPOSITORY: ${{ inputs.repository }}
+          REF: ${{ inputs.ref }}
+          PYTHON_VERSION: ${{ matrix.python_version }}
+          CU_VERSION: ${{ env.CU_VERSION }}
+          ARCH: ${{ inputs.architecture }}
+        run: |
+          echo "ARTIFACT_NAME=${REPOSITORY//\//_}_${REF//\//_}_${PYTHON_VERSION}_${CU_VERSION}_${ARCH}" >> "${GITHUB_ENV}"
+      - name: Upload wheel to GitHub
+        continue-on-error: true
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ${{ env.ARTIFACT_NAME }}
+          path: ${{ inputs.repository }}/dist/
+      - uses: ./test-infra/.github/actions/teardown-windows
+        if: inputs.architecture == 'x64'
+        name: Teardown Windows
+
+  upload:
+    needs: build
+    uses: ./.github/workflows/_binary_upload.yml
+    # for tensorrt-rtx build, do not upload to pytorch indexat at all
+    if: ${{ inputs.use-rtx == false }}
+    with:
+      repository: ${{ inputs.repository }}
+      ref: ${{ inputs.ref }}
+      test-infra-repository: ${{ inputs.test-infra-repository }}
+      test-infra-ref: ${{ inputs.test-infra-ref }}
+      build-matrix: ${{ inputs.build-matrix }}
+      trigger-event: ${{ inputs.trigger-event }}
+      architecture: ${{ inputs.architecture }}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}-${{ inputs.repository }}-${{ github.event_name == 'workflow_dispatch' }}
+  cancel-in-progress: true

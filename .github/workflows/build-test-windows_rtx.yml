@@ -70,8 +70,8 @@ jobs:
             env-script: packaging/vc_env_helper.bat
             smoke-test-script: packaging/smoke_test_windows.py
             package-name: torch_tensorrt
-    name: Build torch-tensorrt whl package
-    uses: pytorch/test-infra/.github/workflows/build_wheels_windows.yml@main
+    name: Build torch-tensorrt-rtx whl package
+    uses: ./.github/workflows/build_wheels_windows.yml
     with:
       repository: ${{ matrix.repository }}
       ref: ""
@@ -84,6 +84,7 @@ jobs:
       package-name: ${{ matrix.package-name }}
       trigger-event: ${{ github.event_name }}
       wheel-build-params: "--use-rtx"
+      use-rtx: true
       timeout: 120
 
   tests-py-torchscript-fe:

@@ -1,9 +1,8 @@
 
 install_tensorrt_rtx() {
-    # tensorrt-rtx is not publicly available, so we need to install it from the local path
     if [[ ${USE_RTX} == true ]]; then
         install_wheel_or_not=${1:-false}
-        echo "It is the tensorrt-rtx build, install tensorrt-rtx"
+        echo "It is the tensorrt-rtx build, install tensorrt-rtx with install_wheel_or_not:${install_wheel_or_not}"
         PLATFORM=$(python -c "import sys; print(sys.platform)")
         echo "PLATFORM: $PLATFORM"
         # PYTHON_VERSION is always set in the CI environment, add this check for local testing
