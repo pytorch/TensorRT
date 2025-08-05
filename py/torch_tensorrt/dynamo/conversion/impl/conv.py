@@ -11,7 +11,6 @@ from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContex
 from torch_tensorrt.dynamo.conversion.converter_utils import (
     SourceIR,
     cast_trt_tensor,
-    extend_attr_to_tuple,
     get_trt_tensor,
     has_dynamic_shape,
     set_layer_name,
@@ -159,10 +158,9 @@ def convNd(
     # Expand parameters manually for Conv1D computations
     if is_conv1d:
         padding = (tuple(padding) + (0,)) if padding is not None else padding
-        stride = extend_attr_to_tuple(stride, 2) if stride is not None else stride
-        dilation = (
-            extend_attr_to_tuple(dilation, 2) if dilation is not None else dilation
-        )
+        # stride in conv1d is (2,) -> need to change to (2, 1) in conv2d
+        stride = (stride[0], 1) if stride is not None else stride
+        dilation = (dilation[0], 1) if dilation is not None else dilation
 
     # Set relevant attributes of convolution layer
     if padding is not None:

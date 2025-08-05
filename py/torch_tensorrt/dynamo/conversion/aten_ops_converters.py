@@ -7,6 +7,7 @@ from typing import Callable, Dict, Optional, Sequence, Tuple, Union
 import numpy as np
 import torch
 from torch.fx.node import Argument, Node, Target
+from torch_tensorrt._utils import is_tensorrt_rtx
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion import impl
@@ -532,6 +533,7 @@ def aten_ops_gelu(
 
 
 @dynamo_tensorrt_converter(torch.ops.aten.matmul, supports_dynamic_shapes=True)
+@dynamo_tensorrt_converter(torch.ops.aten.matmul.default, supports_dynamic_shapes=True)
 @dynamo_tensorrt_converter(torch.ops.aten.dot.default, supports_dynamic_shapes=True)
 @dynamo_tensorrt_converter(torch.ops.aten.mm.default, supports_dynamic_shapes=True)
 @dynamo_tensorrt_converter(torch.ops.aten.mv.default, supports_dynamic_shapes=True)
@@ -3560,26 +3562,44 @@ def aten_ops_full(
     )
 
 
-@dynamo_tensorrt_converter(
-    torch.ops.aten.nonzero.default,
-    supports_dynamic_shapes=True,
-    requires_output_allocator=True,
-)
-def aten_ops_nonzero(
+# currently nonzero is not supported for tensorrt_rtx, will add support in future once rtx team has fixed the bug
+if not is_tensorrt_rtx():
+
+    @dynamo_tensorrt_converter(
+        torch.ops.aten.nonzero.default,
+        supports_dynamic_shapes=True,
+        requires_output_allocator=True,
+    )
+    def aten_ops_nonzero(
+        ctx: ConversionContext,
+        target: Target,
+        args: Tuple[Argument, ...],
+        kwargs: Dict[str, Argument],
+        name: str,
+    ) -> Union[TRTTensor, Sequence[TRTTensor]]:
+        return impl.unary.nonzero(
+            ctx,
+            target,
+            SourceIR.ATEN,
+            name,
+            args[0],
+        )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.linear.default, supports_dynamic_shapes=True)
+def aten_ops_linear(
     ctx: ConversionContext,
     target: Target,
     args: Tuple[Argument, ...],
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    import tensorrt as trt
-
-    if trt._package_name == "tensorrt_rtx":
-        raise NotImplementedError("Nonzero is not supported for tensorrt_rtx")
-    return impl.unary.nonzero(
+    return impl.linear.linear(
         ctx,
         target,
         SourceIR.ATEN,
         name,
-        args[0],
+        input=args[0],
+        weight=args[1],
+        bias=args_bounds_check(args, 2, None),
     )

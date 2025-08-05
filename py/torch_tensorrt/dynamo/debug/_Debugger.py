@@ -8,6 +8,7 @@ from typing import Any, List, Optional
 from unittest import mock
 
 import torch
+from torch_tensorrt._features import ENABLED_FEATURES
 from torch_tensorrt.dynamo._defaults import DEBUG_LOGGING_DIR
 from torch_tensorrt.dynamo.debug._DebuggerConfig import DebuggerConfig
 from torch_tensorrt.dynamo.debug._supports_debugger import (
@@ -93,7 +94,8 @@ class Debugger:
 
     def __enter__(self) -> None:
         self.original_lvl = _LOGGER.getEffectiveLevel()
-        self.rt_level = torch.ops.tensorrt.get_logging_level()
+        if ENABLED_FEATURES.torch_tensorrt_runtime:
+            self.rt_level = torch.ops.tensorrt.get_logging_level()
         dictConfig(self.get_logging_config(self.log_level))
 
         if self.capture_fx_graph_before or self.capture_fx_graph_after:
@@ -144,7 +146,8 @@ class Debugger:
     def __exit__(self, exc_type: Any, exc_value: Any, exc_tb: Any) -> None:
 
         dictConfig(self.get_logging_config(None))
-        torch.ops.tensorrt.set_logging_level(self.rt_level)
+        if ENABLED_FEATURES.torch_tensorrt_runtime:
+            torch.ops.tensorrt.set_logging_level(self.rt_level)
         if self.capture_fx_graph_before or self.capture_fx_graph_after:
             ATEN_PRE_LOWERING_PASSES.passes, ATEN_POST_LOWERING_PASSES.passes = (
                 self.old_pre_passes,

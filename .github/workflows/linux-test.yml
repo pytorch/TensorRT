@@ -54,7 +54,7 @@ on:
         default: ''
         type: string
       use-rtx:
-        description: "Use RTX TensorRT"
+        description: "Whether to use TensorRT-RTX"
         default: false
         type: boolean
         required: false
@@ -210,5 +210,5 @@ jobs:
           s3-prefix: ${{ env.REPOSITORY }}/${{ github.event.pull_request.number }}
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref_name }}-${{ inputs.repository }}-${{ github.event_name == 'workflow_dispatch' }}-${{ inputs.job-name }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref_name }}-${{inputs.use-rtx}}-${{ inputs.repository }}-${{ github.event_name == 'workflow_dispatch' }}-${{ inputs.job-name }}
   cancel-in-progress: true

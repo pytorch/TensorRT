@@ -5,6 +5,7 @@ import numpy as np
 import tensorrt as trt
 import torch
 from torch.fx.node import Target
+from torch_tensorrt._utils import is_tensorrt_rtx
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion import impl
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
@@ -52,7 +53,7 @@ def batch_norm(
     # In this way, the batch norm layer will be fused with the Convolution layer and get a performance boost.
     # TODO: lanl: to remove this once we have solved the batchnorm constant folding issue in RTX
     # https://github.com/pytorch/TensorRT/issues/3699
-    if trt._package_name == "tensorrt_rtx" or any(
+    if is_tensorrt_rtx() or any(
         [
             isinstance(weight, trt.ITensor),
             isinstance(bias, trt.ITensor),
@@ -62,28 +63,28 @@ def batch_norm(
     ):
         # We name the weight here according to the state_dict name
         weight = (
-            get_trt_tensor(ctx, 1.0, f"{name}_weight")
+            get_trt_tensor(ctx, 1.0, f"{name}_weight", dtype=input.dtype)
             if weight is None
             else get_trt_tensor(ctx, weight, f"{name}_weight")
         )
         bias = (
-            get_trt_tensor(ctx, 0.0, f"{name}_bias")
+            get_trt_tensor(ctx, 0.0, f"{name}_bias", dtype=input.dtype)
             if bias is None
             else get_trt_tensor(ctx, bias, f"{name}_bias")
         )
         running_mean = (
-            get_trt_tensor(ctx, 0.0, f"{name}_running_mean")
+            get_trt_tensor(ctx, 0.0, f"{name}_running_mean", dtype=input.dtype)
             if running_mean is None
             else get_trt_tensor(ctx, running_mean, f"{name}_running_mean")
         )
         running_var = (
-            get_trt_tensor(ctx, 1.0, f"{name}_running_var")
+            get_trt_tensor(ctx, 1.0, f"{name}_running_var", dtype=input.dtype)
             if running_var is None
             else get_trt_tensor(ctx, running_var, f"{name}_running_var")
         )
 
         # eps_tensor for numerical stability
-        eps_tensor = get_trt_tensor(ctx, eps, f"{name}_eps")
+        eps_tensor = get_trt_tensor(ctx, eps, f"{name}_eps", dtype=input.dtype)
 
         # adjusted_var = running_var + eps
         adjusted_var = impl.elementwise.add(
@@ -305,17 +306,13 @@ def native_group_norm(
         C == input.shape[1]
     ), f"num_channels ({C}) must be equal to number of channels in input ({input.shape[1]})"
 
-    weight_one = get_trt_tensor(ctx, 1.0, f"{name}_weight_one", input.dtype)
-    bias_zero = get_trt_tensor(ctx, 0.0, f"{name}_bias_zero", input.dtype)
-
     shape = [1, group] + [1] * (rank - 2)
 
-    weight_one = impl.slice.expand(
-        ctx, target, source_ir, f"{name}_expand_weight_one", weight_one, shape
-    )
-    bias_zero = impl.slice.expand(
-        ctx, target, source_ir, f"{name}_expand_bias_zero", bias_zero, shape
-    )
+    weight_torch = torch.ones(shape)
+    bias_torch = torch.zeros(shape)
+
+    weight_one = get_trt_tensor(ctx, weight_torch, f"{name}_weight_one", input.dtype)
+    bias_zero = get_trt_tensor(ctx, bias_torch, f"{name}_bias_zero", input.dtype)
 
     axes = get_axes_for_reduce_op(list(range(1 if group == 1 else 2, rank)))
 

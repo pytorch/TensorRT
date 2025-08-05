@@ -116,8 +116,6 @@ torch_enabled_decompositions: Set[Union[OpOverload, OpOverloadPacket]] = {
     aten.select_scatter,
     aten.sgn,
     aten.sigmoid_backward,
-    aten.silu,
-    aten.silu_,
     aten.silu_backward,
     aten.sinc,
     aten.slice_backward,
@@ -171,6 +169,8 @@ torch_disabled_decompositions: Set[Union[OpOverload, OpOverloadPacket]] = {
     aten.upsample_bilinear2d.vec,
     aten.upsample_trilinear3d.vec,
     aten.upsample_bicubic2d.vec,
+    aten.linear.default,
+    aten.matmul.default,
 }
 
 

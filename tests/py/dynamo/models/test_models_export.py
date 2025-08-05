@@ -386,7 +386,8 @@ def test_base_fp8(ir):
     "modelopt 0.17.0 or later is required, Int8 quantization is supported in modelopt since 0.17.0 or later for linux",
 )
 @pytest.mark.unit
-def test_base_int8(ir):
+@pytest.mark.parametrize("dtype", [torch.float16, torch.bfloat16, torch.float32])
+def test_base_int8(ir, dtype):
     import modelopt.torch.quantization as mtq
     from modelopt.torch.quantization.utils import export_torch_mode
 
@@ -406,9 +407,8 @@ def test_base_int8(ir):
         """Simple calibration function for testing."""
         model(input_tensor)
 
-    input_tensor = torch.randn(1, 10).cuda()
-    model = SimpleNetwork().eval().cuda()
-
+    input_tensor = torch.randn(1, 10).cuda().to(dtype)
+    model = SimpleNetwork().eval().cuda().to(dtype)
     quant_cfg = mtq.INT8_DEFAULT_CFG
     # RTX does not support INT8 default quantization(weights+activations), only support INT8 weights only quantization
     if torchtrt.tensorrt_package_name == "tensorrt_rtx":
@@ -416,20 +416,23 @@ def test_base_int8(ir):
     mtq.quantize(model, quant_cfg, forward_loop=calibrate_loop)
     # model has INT8 qdq nodes at this point
     output_pyt = model(input_tensor)
-
+    breakpoint()
     with torch.no_grad():
         with export_torch_mode():
             exp_program = torch.export.export(model, (input_tensor,), strict=False)
-            trt_model = torchtrt.dynamo.compile(
-                exp_program,
-                inputs=[input_tensor],
-                enabled_precisions={torch.int8},
-                min_block_size=1,
-                cache_built_engines=False,
-                reuse_cached_engines=False,
-                truncate_double=True,
-            )
+            with torchtrt.logging.debug():
+                trt_model = torchtrt.dynamo.compile(
+                    exp_program,
+                    inputs=[input_tensor],
+                    min_block_size=1,
+                    cache_built_engines=False,
+                    reuse_cached_engines=False,
+                    truncate_double=True,
+                    use_explicit_typing=True,
+                )
             outputs_trt = trt_model(input_tensor)
+            assert output_pyt.dtype == outputs_trt.dtype
+            assert outputs_trt.dtype == dtype
             assert torch.allclose(output_pyt, outputs_trt, rtol=5e-3, atol=1e-2)
 
 
@@ -440,17 +443,16 @@ def test_base_int8(ir):
     "modelopt 0.17.0 or later is required, Int8 quantization is supported in modelopt since 0.17.0 or later for linux",
 )
 @pytest.mark.unit
-def test_base_int8_dynamic_shape(ir):
+@pytest.mark.parametrize("dtype", [torch.float16, torch.bfloat16, torch.float32])
+def test_base_int8_dynamic_shape(ir, dtype):
     import modelopt.torch.quantization as mtq
     from modelopt.torch.quantization.utils import export_torch_mode
-
-    dtype = torch.bfloat16
 
     class SimpleNetwork(torch.nn.Module):
         def __init__(self):
             super(SimpleNetwork, self).__init__()
-            self.conv = torch.nn.Conv2d(3, 3, 3, dtype=dtype)
-            self.linear = torch.nn.Linear(222, 222, dtype=dtype)
+            self.conv = torch.nn.Conv2d(3, 3, 3)
+            self.linear = torch.nn.Linear(222, 222)
 
         def forward(self, x):
             return self.linear(self.conv(x))
@@ -462,7 +464,7 @@ def test_base_int8_dynamic_shape(ir):
     BATCH_SIZE = torch.export.Dim("BATCH_SIZE", min=2, max=16)
     batch_size = 8
     input_tensor = torch.randn(batch_size, 3, 224, 224, dtype=dtype).cuda()
-    model = SimpleNetwork().eval().cuda()
+    model = SimpleNetwork().eval().cuda().to(dtype)
 
     quant_cfg = mtq.INT8_DEFAULT_CFG
     # RTX does not support INT8 default quantization(weights+activations), only support INT8 weights only quantization
@@ -481,11 +483,11 @@ def test_base_int8_dynamic_shape(ir):
             trt_model = torchtrt.dynamo.compile(
                 exp_program,
                 inputs=[input_tensor],
-                enabled_precisions={torch.int8, dtype},
                 min_block_size=1,
                 cache_built_engines=False,
                 reuse_cached_engines=False,
                 truncate_double=True,
+                use_explicit_typing=True,
             )
             outputs_trt = trt_model(input_tensor)
             assert torch.allclose(output_pyt, outputs_trt, rtol=5e-2, atol=5e-2)
