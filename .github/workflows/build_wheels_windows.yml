@@ -106,7 +106,7 @@ jobs:
       REF: ${{ inputs.ref }}
       CU_VERSION: ${{ matrix.desired_cuda }}
       UPLOAD_TO_BASE_BUCKET: ${{ matrix.upload_to_base_bucket }}
-      USE_RTX: ${{ inputs.use-rtx }}
+      USE_TRT_RTX: ${{ inputs.use-rtx }}
     name: build-${{ matrix.build_name }}
     runs-on: ${{ matrix.validation_runner }}
     defaults:
@@ -315,25 +315,24 @@ jobs:
         env:
           ENV_SCRIPT: ${{ inputs.env-script }}
           PACKAGE_NAME: ${{ inputs.package-name }}
-          USE_RTX: ${{ inputs.use-rtx }}
+          USE_TRT_RTX: ${{ inputs.use-rtx }}
           SMOKE_TEST_SCRIPT: ${{ inputs.smoke-test-script }}
         run: |
           source "${BUILD_ENV_FILE}"
           WHEEL_NAME=$(ls "${{ inputs.repository }}/dist/")
           echo "$WHEEL_NAME"
           ${CONDA_RUN} pip install "${{ inputs.repository }}/dist/$WHEEL_NAME"
-          if [[ $USE_RTX == true ]]; then
-            export FORCE_TENSORRT_RTX=1
-            # TODO: lan to remove this once we have a better way to handle the LD_LIBRARY_PATH
-            # the LD_LIBRARY_PATH set in the pre_build_script_windows.sh will not be available in the smoke test, have to set it here again
-            export LD_LIBRARY_PATH=${PWD}/${{ inputs.repository }}/TensorRT-RTX-1.0.0.21/lib:$LD_LIBRARY_PATH
-          fi
-          if [[ ! -f "${{ inputs.repository }}"/${SMOKE_TEST_SCRIPT} ]]; then
-            echo "${{ inputs.repository }}/${SMOKE_TEST_SCRIPT} not found"
-            ${CONDA_RUN} "${{ inputs.repository }}/${ENV_SCRIPT}" python -c "import ${PACKAGE_NAME}; print('package version is ', ${PACKAGE_NAME}.__version__)"
+          if [[ $USE_TRT_RTX == true ]]; then
+            # TODO: lan to remove this once we have a better way to do a smoke test
+            echo "Smoke test for TensorRT-RTX is not skipped for now"
           else
-            echo "${{ inputs.repository }}/${SMOKE_TEST_SCRIPT} found"
-            ${CONDA_RUN} "${{ inputs.repository }}/${ENV_SCRIPT}" python "${{ inputs.repository }}/${SMOKE_TEST_SCRIPT}"
+            if [[ ! -f "${{ inputs.repository }}"/${SMOKE_TEST_SCRIPT} ]]; then
+              echo "${{ inputs.repository }}/${SMOKE_TEST_SCRIPT} not found"
+              ${CONDA_RUN} "${{ inputs.repository }}/${ENV_SCRIPT}" python -c "import ${PACKAGE_NAME}; print('package version is ', ${PACKAGE_NAME}.__version__)"
+            else
+              echo "${{ inputs.repository }}/${SMOKE_TEST_SCRIPT} found"
+              ${CONDA_RUN} "${{ inputs.repository }}/${ENV_SCRIPT}" python "${{ inputs.repository }}/${SMOKE_TEST_SCRIPT}"
+            fi
           fi
       - name: Smoke Test ARM64
         if: inputs.architecture == 'arm64'

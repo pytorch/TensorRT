@@ -19,7 +19,7 @@ Currenlty, Torch-TensorRT only supports TensorRT-RTX for the experiment purpose.
 Torch-TensorRT by default uses TensorRT during the build and run.
 
 In order to use TensorRT-RTX, you need to build the wheel with ``--use-rtx`` flag.
-And then set the ``FORCE_TENSORRT_RTX=1`` environment variable during run.
+And then set the ``USE_TRT_RTX=1`` environment variable during run.
 
 
 
@@ -60,6 +60,6 @@ Quick Start
 ===========
 
 .. code-block:: py
-    # you have to set FORCE_TENSORRT_RTX=1 to use TensorRT-RTX
-    FORCE_TENSORRT_RTX=1 python examples/dynamo/torch_compile_resnet_example.py
+    # you have to set USE_TRT_RTX=1 to use TensorRT-RTX
+    USE_TRT_RTX=1 python examples/dynamo/torch_compile_resnet_example.py
 

@@ -27,19 +27,21 @@ import torch
 tensorrt_package_name = ""
 
 try:
-    # note: trt_alias must be imported before any import tensorrt
+    # note: _TensorRTProxyModule must be imported before any import tensorrt
 
-    from . import trt_alias  # noqa: F401
+    from . import _TensorRTProxyModule  # noqa: F401
 
-    tensorrt_package_name = trt_alias.package_name
-    _LOGGER.info(f"You are using {trt_alias.package_name=} ")
+    tensorrt_package_name = _TensorRTProxyModule.package_name
+    _LOGGER.info(f"You are using {_TensorRTProxyModule.package_name=} ")
 
 except Exception as e:
-    print(f"import error when try to import trt_alias, got error {e}")
+    print(f"import error when try to import _TensorRTProxyModule, got error {e}")
     print(
         f"make sure tensorrt lib is in the LD_LIBRARY_PATH: {os.environ.get('LD_LIBRARY_PATH')}"
     )
-    raise Exception(f"import error when try to import trt_alias, got error {e}")
+    raise Exception(
+        f"import error when try to import _TensorRTProxyModule, got error {e}"
+    )
 
 
 def _register_with_torch() -> None:
@@ -68,7 +70,7 @@ def _register_with_torch() -> None:
         torch.ops.load_library(linked_file_runtime_full_path)
 
 
-# note: trt_alias must be imported before enabled features, because enabled features will check tensorrt.plugin availability
+# note: _TensorRTProxyModule must be imported before enabled features, because enabled features will check tensorrt.plugin availability
 from torch_tensorrt._features import ENABLED_FEATURES, _enabled_features_str
 
 _LOGGER.debug(_enabled_features_str())

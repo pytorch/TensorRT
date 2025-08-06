@@ -1,6 +1,6 @@
 
 install_tensorrt_rtx() {
-    if [[ ${USE_RTX} == true ]]; then
+    if [[ ${USE_TRT_RTX} == true ]]; then
         install_wheel_or_not=${1:-false}
         echo "It is the tensorrt-rtx build, install tensorrt-rtx with install_wheel_or_not:${install_wheel_or_not}"
         PLATFORM=$(python -c "import sys; print(sys.platform)")

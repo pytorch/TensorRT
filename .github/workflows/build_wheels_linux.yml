@@ -141,7 +141,7 @@ jobs:
       UPLOAD_TO_BASE_BUCKET: ${{ matrix.upload_to_base_bucket }}
       ARCH: ${{ inputs.architecture }}
       BUILD_TARGET: ${{ inputs.build-target }}
-      USE_RTX: ${{ inputs.use-rtx }}
+      USE_TRT_RTX: ${{ inputs.use-rtx }}
     name: build-wheel-${{ matrix.python_version }}-${{ matrix.desired_cuda }}-${{ matrix.gpu_arch_type }}-${{ inputs.architecture }}-${{ inputs.use-rtx }}-${{ inputs.is-jetpack }}
     runs-on: ${{ matrix.validation_runner }}
     environment: ${{(inputs.trigger-event == 'schedule' || (inputs.trigger-event == 'push' && (startsWith(github.event.ref, 'refs/heads/nightly') || startsWith(github.event.ref, 'refs/tags/v')))) && 'pytorchbot-env' || ''}}
@@ -269,7 +269,7 @@ jobs:
             BUILD_VERSION="${BUILD_VERSION}+${CU_VERSION}"
           fi
           echo "BUILD_VERSION=$BUILD_VERSION"
-          echo "USE_RTX=$USE_RTX"
+          echo "USE_TRT_RTX=$USE_TRT_RTX"
           echo "LD_LIBRARY_PATH=$LD_LIBRARY_PATH"
           if [[ ${{ inputs.use-rtx }} == true ]]; then
             echo "Building tensorrt-rtx wheel"

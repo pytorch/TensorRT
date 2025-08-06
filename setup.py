@@ -89,10 +89,10 @@ NO_TS = False
 LEGACY = False
 RELEASE = False
 CI_BUILD = False
-USE_RTX = False
+USE_TRT_RTX = False
 
 if "--use-rtx" in sys.argv:
-    USE_RTX = True
+    USE_TRT_RTX = True
     sys.argv.remove("--use-rtx")
 
 if "--fx-only" in sys.argv:
@@ -123,9 +123,9 @@ if (py_only_env_var := os.environ.get("PYTHON_ONLY")) is not None:
     if py_only_env_var == "1":
         PY_ONLY = True
 
-if (use_rtx_env_var := os.environ.get("FORCE_TENSORRT_RTX")) is not None:
+if (use_rtx_env_var := os.environ.get("USE_TRT_RTX")) is not None:
     if use_rtx_env_var == "1":
-        USE_RTX = True
+        USE_TRT_RTX = True
 
 if (release_env_var := os.environ.get("RELEASE")) is not None:
     if release_env_var == "1":
@@ -222,7 +222,7 @@ def build_libtorchtrt_cxx11_abi(
     else:
         cmd.append("--config=linux")
 
-    if USE_RTX:
+    if USE_TRT_RTX:
         cmd.append("--config=rtx")
         print("TensorRT RTX build")
 
@@ -536,12 +536,12 @@ if not (PY_ONLY or NO_TS):
     elif IS_JETPACK:
         tensorrt_linux_external_dir = tensorrt_jetpack_external_dir
     else:
-        if USE_RTX:
+        if USE_TRT_RTX:
             tensorrt_linux_external_dir = tensorrt_rtx_external_dir
         else:
             tensorrt_linux_external_dir = tensorrt_x86_64_external_dir
 
-    if USE_RTX:
+    if USE_TRT_RTX:
         tensorrt_windows_external_dir = (
             lambda: subprocess.check_output(
                 [
