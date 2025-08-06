@@ -221,8 +221,16 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         self.use_output_allocator_outputs = False
         self.device = torch.cuda.current_device()
         self.cudagraphs_enabled = torch_tensorrt.runtime.get_cudagraphs_mode()
+        self.requires_unique_output = False
         if self.serialized_engine is not None and not self.settings.lazy_engine_init:
             self.setup_engine()
+        self.is_shape_inference_io = [
+            self.engine.is_shape_inference_io(input_name)
+            for input_name in self.input_names
+        ]
+
+    def set_requires_unique_output(self, requires_unique_output: bool) -> None:
+        self.requires_unique_output = requires_unique_output
 
     def get_streamable_device_memory_budget(self) -> Any:
         return self.engine.streamable_weights_size
@@ -396,7 +404,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
 
             # For shape tensors, we use CPU pointers and for data tensors, we use GPU pointers
             # as per TensorRT requirements
-            if self.engine.is_shape_inference_io(input_name):
+            if self.is_shape_inference_io[i]:
                 # Shape tensor inputs are casted to int64 explicitly
                 # Currently Torch CPU pointers are not working; numpy pointers are used instead
                 # to refer to underlying memory
@@ -500,7 +508,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                         raise ValueError(
                             "Encountered dynamic output shapes during runtime. This could mean the network has data-dependent output shapes which is not currently supported."
                         )
-                    if self.output_tensors is None:
+                    if self.output_tensors is None or self.requires_unique_output:
                         self.output_tensors = self.create_output_tensors()
                     outputs = self.output_tensors
 
