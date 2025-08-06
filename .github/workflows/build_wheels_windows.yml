@@ -370,7 +370,7 @@ jobs:
 
   upload:
     needs: build
-    uses: ./.github/workflows/_binary_upload.yml
+    uses: pytorch/test-infra/.github/workflows/_binary_upload.yml@main
     # for tensorrt-rtx build, do not upload to pytorch indexat at all
     if: ${{ inputs.use-rtx == false }}
     with:
