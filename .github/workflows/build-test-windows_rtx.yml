@@ -110,7 +110,6 @@ jobs:
         set -euo pipefail
         export USE_HOST_DEPS=1
         export CI_BUILD=1
-        export USE_TRT_RTX=1
         pushd .
         cd tests/modules
         python hub.py
@@ -174,7 +173,6 @@ jobs:
         set -euo pipefail
         export USE_HOST_DEPS=1
         export CI_BUILD=1
-        export USE_TRT_RTX=1
         pushd .
         cd tests/py
         cd dynamo
@@ -204,7 +202,6 @@ jobs:
         set -euo pipefail
         export USE_HOST_DEPS=1
         export CI_BUILD=1
-        export USE_TRT_RTX=1
         pushd .
         cd tests/py
         cd dynamo
@@ -235,7 +232,6 @@ jobs:
         set -euo pipefail
         export USE_HOST_DEPS=1
         export CI_BUILD=1
-        export USE_TRT_RTX=1
         pushd .
         cd tests/py
         cd dynamo
@@ -267,7 +263,6 @@ jobs:
         set -euo pipefail
         export USE_HOST_DEPS=1
         export CI_BUILD=1
-        export USE_TRT_RTX=1
         pushd .
         cd tests/py
         cd dynamo
@@ -299,7 +294,6 @@ jobs:
         set -euo pipefail
         export USE_HOST_DEPS=1
         export CI_BUILD=1
-        export USE_TRT_RTX=1
         pushd .
         cd tests/py
         cd dynamo
@@ -330,7 +324,6 @@ jobs:
         set -euo pipefail
         export USE_HOST_DEPS=1
         export CI_BUILD=1
-        export USE_TRT_RTX=1
         pushd .
         cd tests/py/core
         python -m pytest -ra -n 4 --junitxml=${RUNNER_TEST_RESULTS_DIR}/tests_py_core_test_results.xml .

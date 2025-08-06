@@ -77,7 +77,6 @@ cat MODULE.bazel
 export CI_BUILD=1
 
 if [[ ${USE_TRT_RTX} == true ]]; then
-    cat pyproject_rtx.toml.temp > pyproject.toml
     source .github/scripts/install-tensorrt-rtx.sh
     install_wheel_or_not=true
     install_tensorrt_rtx ${install_wheel_or_not}

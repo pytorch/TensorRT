@@ -124,7 +124,7 @@ if (py_only_env_var := os.environ.get("PYTHON_ONLY")) is not None:
         PY_ONLY = True
 
 if (use_rtx_env_var := os.environ.get("USE_TRT_RTX")) is not None:
-    if use_rtx_env_var == "1":
+    if use_rtx_env_var == "1" or use_rtx_env_var.lower() == "true":
         USE_TRT_RTX = True
 
 if (release_env_var := os.environ.get("RELEASE")) is not None:
@@ -702,6 +702,58 @@ elif NO_TS:
 with open(os.path.join(get_root_dir(), "README.md"), "r", encoding="utf-8") as fh:
     long_description = fh.read()
 
+
+def get_requirements():
+    requirements = [
+        "packaging>=23",
+        "typing-extensions>=4.7.0",
+        "dllist",
+    ]
+
+    if IS_JETPACK:
+        requirements.extend(
+            [
+                "torch>=2.8.0,<2.9.0",
+                "tensorrt>=10.3.0,<10.4.0",
+                "numpy<2.0.0",
+            ]
+        )
+    elif IS_SBSA:
+        requirements.extend(
+            [
+                "torch>=2.9.0.dev,<2.10.0",
+                "tensorrt>=10.12.0,<10.13.0",
+                "tensorrt-cu12>=10.12.0,<10.13.0",
+                "tensorrt-cu12-bindings>=10.12.0,<10.13.0",
+                "tensorrt-cu12-libs>=10.12.0,<10.13.0",
+                "numpy",
+            ]
+        )
+    else:
+        requirements.extend(
+            [
+                "torch>=2.9.0.dev,<2.10.0",
+                "numpy",
+            ]
+        )
+        if USE_TRT_RTX:
+            requirements.extend(
+                [
+                    "tensorrt-rtx>=1.0.0.21",
+                ]
+            )
+        else:
+            requirements.extend(
+                [
+                    "tensorrt>=10.12.0,<10.13.0",
+                    "tensorrt-cu12>=10.12.0,<10.13.0",
+                    "tensorrt-cu12-bindings>=10.12.0,<10.13.0",
+                    "tensorrt-cu12-libs>=10.12.0,<10.13.0",
+                ]
+            )
+    return requirements
+
+
 setup(
     name="torch_tensorrt",
     ext_modules=ext_modules,
@@ -715,6 +767,7 @@ setup(
         "editable_wheel": EditableWheelCommand,
     },
     zip_safe=False,
+    install_requires=get_requirements(),
     packages=packages,
     package_dir=package_dir,
     include_package_data=False,

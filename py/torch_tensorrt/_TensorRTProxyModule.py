@@ -78,12 +78,13 @@ def alias_tensorrt() -> None:
         return
 
     # in order not to break or change the existing behavior, we only build and run with tensorrt by default, tensorrt-rtx is for experiment only
-    # if we want to test with tensorrt-rtx, we have to build the wheel with --use-rtx and test with USE_TRT_RTX=1
-    # eg: USE_TRT_RTX=1 python test.py
+    # if we want to test with tensorrt-rtx, we have to build the wheel with --use-rtx and test with USE_TRT_RTX=true
+    # eg: USE_TRT_RTX=true python test.py
     # in future, we can do dynamic linking either to tensorrt or tensorrt-rtx based on the gpu type
     use_rtx = False
-    if os.environ.get("USE_TRT_RTX", "0") == "1":
-        use_rtx = True
+    if (use_rtx_env_var := os.environ.get("USE_TRT_RTX")) is not None:
+        if use_rtx_env_var.lower() == "true":
+            use_rtx = True
     package_name = "tensorrt_rtx" if use_rtx else "tensorrt"
     # Import the appropriate package
     try:
