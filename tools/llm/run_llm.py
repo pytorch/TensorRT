@@ -22,11 +22,9 @@ import torch_tensorrt
 from torchtrt_ext import register_sdpa
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from utils import (
-    convert_linear_to_tensorrt_quantized,
     export_llm,
     generate,
     generate_with_static_cache,
-    quantize_model,
     record_stats,
     time_generate,
 )
@@ -58,12 +56,13 @@ def get_model(args):
                 args.model,
                 use_cache=False,
                 attn_implementation="sdpa",
+                ignore_mismatched_sizes=True,
             )
             .eval()
             .cuda()
         )
     if args.pre_quantized:
-        model = convert_linear_to_tensorrt_quantized(model, args.model)
+        model = convert_linear_to_tensorrt_quantized(model, args.model).cuda()
 
     if args.precision == "FP16":
         model = model.to(torch.float16)
@@ -97,7 +96,8 @@ def compile_torchtrt(model, input_ids, args):
             for optimized inference
     """
     max_seq_len = input_ids.shape[1] + args.num_tokens
-    ep = export_llm(model, input_ids, max_seq_len=max_seq_len)
+    with export_torch_mode() if args.qformat or args.pre_quantized else nullcontext():
+        ep = export_llm(model, input_ids, max_seq_len=max_seq_len)
     position_ids = torch.arange(input_ids.shape[1]).unsqueeze(0).to(DEVICE)
     # Set precision specific flags
     use_fp32_acc = False
@@ -269,6 +269,14 @@ if __name__ == "__main__":
         help="Use pre-quantized model weights (default: False)",
     )
     args = arg_parser.parse_args()
+
+    if args.qformat or args.pre_quantized:
+        from modelopt.torch.quantization.utils import export_torch_mode
+        from quantize_utils import (
+            convert_linear_to_tensorrt_quantized,
+            quantize_model,
+        )
+
     with torch.inference_mode():
         model = get_model(args)
 
@@ -390,6 +398,8 @@ if __name__ == "__main__":
                 match_result = str(torch.equal(pyt_gen_tokens, trt_gen_tokens))
             out_json_file = f"{model_name}_{qformat}_match.json"
             result = {}
+            args_dict = vars(args)
+            result["args"] = args_dict
             result["match"] = match_result
             result["torch_out"] = torch_out
             result["trt_out"] = trt_out
