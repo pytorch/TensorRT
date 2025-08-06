@@ -413,7 +413,6 @@ def test_base_int8(ir, dtype):
     mtq.quantize(model, quant_cfg, forward_loop=calibrate_loop)
     # model has INT8 qdq nodes at this point
     output_pyt = model(input_tensor)
-    breakpoint()
     with torch.no_grad():
         with export_torch_mode():
             exp_program = torch.export.export(model, (input_tensor,), strict=False)
