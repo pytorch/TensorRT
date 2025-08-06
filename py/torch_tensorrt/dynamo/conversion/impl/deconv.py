@@ -16,8 +16,6 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     to_trt_weights,
 )
 from torch_tensorrt.fx.converters.converter_utils import (
-    get_dyn_range,
-    mark_as_int8_layer,
     set_layer_name,
 )
 from torch_tensorrt.fx.types import TRTTensor
@@ -173,11 +171,6 @@ def deconvNd(
 
     deconv_layer.pre_padding = tuple(pre_padding_values)
     deconv_layer.post_padding = tuple(post_padding_values)
-
-    # Handle quantization cases
-    if scale is not None and zero_point is not None:
-        # Assume the dtype of activation is torch.quint8
-        mark_as_int8_layer(deconv_layer, get_dyn_range(scale, zero_point, torch.quint8))
 
     result = deconv_layer.get_output(0)
 
