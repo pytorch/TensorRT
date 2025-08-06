@@ -315,12 +315,16 @@ jobs:
         env:
           ENV_SCRIPT: ${{ inputs.env-script }}
           PACKAGE_NAME: ${{ inputs.package-name }}
+          USE_RTX: ${{ inputs.use-rtx }}
           SMOKE_TEST_SCRIPT: ${{ inputs.smoke-test-script }}
         run: |
           source "${BUILD_ENV_FILE}"
           WHEEL_NAME=$(ls "${{ inputs.repository }}/dist/")
           echo "$WHEEL_NAME"
           ${CONDA_RUN} pip install "${{ inputs.repository }}/dist/$WHEEL_NAME"
+          if [[ $USE_RTX == true ]]; then
+            export FORCE_TENSORRT_RTX=1
+          fi
           if [[ ! -f "${{ inputs.repository }}"/${SMOKE_TEST_SCRIPT} ]]; then
             echo "${{ inputs.repository }}/${SMOKE_TEST_SCRIPT} not found"
             ${CONDA_RUN} "${{ inputs.repository }}/${ENV_SCRIPT}" python -c "import ${PACKAGE_NAME}; print('package version is ', ${PACKAGE_NAME}.__version__)"
