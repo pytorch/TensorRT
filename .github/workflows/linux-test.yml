@@ -53,6 +53,11 @@ on:
         description: 'Name to give artifacts uploaded from ${RUNNER_ARTIFACT_DIR}'
         default: ''
         type: string
+      use-rtx:
+        description: "Whether to use TensorRT-RTX"
+        default: false
+        type: boolean
+        required: false
 
 jobs:
   test:
@@ -68,6 +73,7 @@ jobs:
       SCRIPT: ${{ inputs.script }}
       RUNNER_TEST_RESULTS_DIR: /tmp/test_results
       ARCH: ${{ inputs.architecture }}
+      USE_RTX: ${{ inputs.use-rtx }}
       DOWNLOAD_ARTIFACT_NAME: pytorch_tensorrt_${{ matrix.tensorrt.version }}_${{ matrix.python_version }}_${{ matrix.desired_cuda }}_${{ inputs.architecture }}
     name: ${{ inputs.job-name }}-${{ matrix.tensorrt.version }}-${{ matrix.python_version }}-${{ matrix.desired_cuda }}
     runs-on: ${{ matrix.validation_runner }}
@@ -135,6 +141,7 @@ jobs:
         working-directory: ${{ inputs.repository }}
         env:
           ALL_SECRETS: ${{ toJSON(secrets) }}
+          USE_RTX: ${{ inputs.use-rtx }}
         run: |
           set -euxo pipefail
           # shellcheck disable=SC2086
@@ -203,5 +210,5 @@ jobs:
           s3-prefix: ${{ env.REPOSITORY }}/${{ github.event.pull_request.number }}
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref_name }}-${{ inputs.repository }}-${{ github.event_name == 'workflow_dispatch' }}-${{ inputs.job-name }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref_name }}-${{inputs.use-rtx}}-${{ inputs.repository }}-${{ github.event_name == 'workflow_dispatch' }}-${{ inputs.job-name }}
   cancel-in-progress: true

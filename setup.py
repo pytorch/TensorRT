@@ -28,6 +28,7 @@ from torch.utils.cpp_extension import IS_WINDOWS, BuildExtension, CUDAExtension
 __version__: str = "0.0.0"
 __cuda_version__: str = "0.0"
 __tensorrt_version__: str = "0.0"
+__tensorrt_rtx_version__: str = "0.0"
 
 LEGACY_BASE_VERSION_SUFFIX_PATTERN = re.compile("a0$")
 
@@ -63,6 +64,7 @@ def get_base_version() -> str:
 def load_dep_info():
     global __cuda_version__
     global __tensorrt_version__
+    global __tensorrt_rtx_version__
     with open("dev_dep_versions.yml", "r") as stream:
         versions = yaml.safe_load(stream)
         if (gpu_arch_version := os.environ.get("CU_VERSION")) is not None:
@@ -72,6 +74,7 @@ def load_dep_info():
         else:
             __cuda_version__ = versions["__cuda_version__"]
         __tensorrt_version__ = versions["__tensorrt_version__"]
+        __tensorrt_rtx_version__ = versions["__tensorrt_rtx_version__"]
 
 
 load_dep_info()
@@ -86,6 +89,11 @@ NO_TS = False
 LEGACY = False
 RELEASE = False
 CI_BUILD = False
+USE_RTX = False
+
+if "--use-rtx" in sys.argv:
+    USE_RTX = True
+    sys.argv.remove("--use-rtx")
 
 if "--fx-only" in sys.argv:
     PY_ONLY = True
@@ -114,6 +122,10 @@ if (no_ts_env_var := os.environ.get("NO_TORCHSCRIPT")) is not None:
 if (py_only_env_var := os.environ.get("PYTHON_ONLY")) is not None:
     if py_only_env_var == "1":
         PY_ONLY = True
+
+if (use_rtx_env_var := os.environ.get("FORCE_TENSORRT_RTX")) is not None:
+    if use_rtx_env_var == "1":
+        USE_RTX = True
 
 if (release_env_var := os.environ.get("RELEASE")) is not None:
     if release_env_var == "1":
@@ -210,6 +222,10 @@ def build_libtorchtrt_cxx11_abi(
     else:
         cmd.append("--config=linux")
 
+    if USE_RTX:
+        cmd.append("--config=rtx")
+        print("TensorRT RTX build")
+
     if IS_JETPACK:
         cmd.append("--config=jetpack")
         print("Jetpack build")
@@ -240,6 +256,7 @@ def gen_version_file():
         f.write('__version__ = "' + __version__ + '"\n')
         f.write('__cuda_version__ = "' + __cuda_version__ + '"\n')
         f.write('__tensorrt_version__ = "' + __tensorrt_version__ + '"\n')
+        f.write('__tensorrt_rtx_version__ = "' + __tensorrt_rtx_version__ + '"\n')
 
 
 def copy_libtorchtrt(multilinux=False, rt_only=False):
@@ -487,6 +504,15 @@ if not (PY_ONLY or NO_TS):
         .split("/BUILD.bazel")[0]
     )
 
+    tensorrt_rtx_external_dir = (
+        lambda: subprocess.check_output(
+            [BAZEL_EXE, "query", "@tensorrt_rtx//:nvinfer", "--output", "location"]
+        )
+        .decode("ascii")
+        .strip()
+        .split("/BUILD.bazel")[0]
+    )
+
     tensorrt_sbsa_external_dir = (
         lambda: subprocess.check_output(
             [BAZEL_EXE, "query", "@tensorrt_sbsa//:nvinfer", "--output", "location"]
@@ -510,16 +536,35 @@ if not (PY_ONLY or NO_TS):
     elif IS_JETPACK:
         tensorrt_linux_external_dir = tensorrt_jetpack_external_dir
     else:
-        tensorrt_linux_external_dir = tensorrt_x86_64_external_dir
+        if USE_RTX:
+            tensorrt_linux_external_dir = tensorrt_rtx_external_dir
+        else:
+            tensorrt_linux_external_dir = tensorrt_x86_64_external_dir
 
-    tensorrt_windows_external_dir = (
-        lambda: subprocess.check_output(
-            [BAZEL_EXE, "query", "@tensorrt_win//:nvinfer", "--output", "location"]
+    if USE_RTX:
+        tensorrt_windows_external_dir = (
+            lambda: subprocess.check_output(
+                [
+                    BAZEL_EXE,
+                    "query",
+                    "@tensorrt_rtx_win//:nvinfer",
+                    "--output",
+                    "location",
+                ]
+            )
+            .decode("ascii")
+            .strip()
+            .split("/BUILD.bazel")[0]
         )
-        .decode("ascii")
-        .strip()
-        .split("/BUILD.bazel")[0]
-    )
+    else:
+        tensorrt_windows_external_dir = (
+            lambda: subprocess.check_output(
+                [BAZEL_EXE, "query", "@tensorrt_win//:nvinfer", "--output", "location"]
+            )
+            .decode("ascii")
+            .strip()
+            .split("/BUILD.bazel")[0]
+        )
 
     ext_modules += [
         CUDAExtension(

@@ -12,6 +12,7 @@ import tensorrt as trt
 import torch
 from torch.fx.immutable_collections import immutable_list
 from torch.fx.node import Argument, Target
+from torch_tensorrt._utils import is_tensorrt_version_supported
 from torch_tensorrt.fx.converters.impl import activation, convolution
 from torch_tensorrt.fx.passes.lower_basic_pass import (
     trt_transposed_linear,
@@ -207,7 +208,7 @@ def acc_ops_conv_transposend(
     return layer.get_output(0)
 
 
-@tensorrt_converter(acc_ops.pad, enabled=trt.__version__ < "8.2")
+@tensorrt_converter(acc_ops.pad, enabled=(not is_tensorrt_version_supported("8.2")))
 def acc_ops_pad_with_padding_layer(
     network: TRTNetwork,
     target: Target,
@@ -257,7 +258,10 @@ def acc_ops_pad_with_padding_layer(
     return layer.get_output(0)
 
 
-@tensorrt_converter(acc_ops.pad, enabled=trt.__version__ >= "8.2")
+@tensorrt_converter(
+    acc_ops.pad,
+    enabled=is_tensorrt_version_supported("8.2"),
+)
 def acc_ops_pad_with_slice_layer(
     network: TRTNetwork,
     target: Target,
@@ -880,7 +884,10 @@ def acc_ops_sign(
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     input_val = kwargs["input"]
 
-    if trt.__version__ >= "8.2" and not network.has_implicit_batch_dimension:
+    if (
+        is_tensorrt_version_supported("8.2")
+        and not network.has_implicit_batch_dimension
+    ):
         input_val = kwargs["input"]
         operation_type = trt.UnaryOperation.SIGN
         return add_unary_layer(network, input_val, operation_type, target, name)

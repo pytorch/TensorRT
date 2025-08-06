@@ -13,6 +13,7 @@ from torch.fx.experimental.normalize import NormalizeArgs
 from torch.fx.passes import shape_prop
 from torch.fx.passes.infra.pass_base import PassResult
 from torch.testing._internal.common_utils import TestCase
+from torch_tensorrt._utils import is_tensorrt_version_supported
 from torch_tensorrt.fx import InputTensorSpec, TRTInterpreter, TRTModule
 from torch_tensorrt.fx.passes.lower_basic_pass_aten import (
     compose_bmm,
@@ -258,7 +259,7 @@ class AccTestCase(TRTTestCase):
             pass_tracer = chain_passes(*apply_passes)
             mod = pass_tracer(mod, inputs)
 
-        if trt.__version__ >= "8.6":
+        if is_tensorrt_version_supported("8.6"):
             test_implicit_batch_dim = False
         if test_implicit_batch_dim:
             interp = TRTInterpreter(mod, InputTensorSpec.from_tensors(inputs))

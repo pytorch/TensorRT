@@ -1,4 +1,4 @@
-name: Build and test Windows wheels
+name: Build and test Windows wheels(RTX)
 
 on:
   pull_request:
@@ -70,7 +70,7 @@ jobs:
             env-script: packaging/vc_env_helper.bat
             smoke-test-script: packaging/smoke_test_windows.py
             package-name: torch_tensorrt
-    name: Build torch-tensorrt whl package
+    name: Build torch-tensorrt-rtx whl package
     uses: ./.github/workflows/build_wheels_windows.yml
     with:
       repository: ${{ matrix.repository }}
@@ -83,6 +83,8 @@ jobs:
       smoke-test-script: ${{ matrix.smoke-test-script }}
       package-name: ${{ matrix.package-name }}
       trigger-event: ${{ github.event_name }}
+      wheel-build-params: "--use-rtx"
+      use-rtx: true
       timeout: 120
 
   tests-py-torchscript-fe:
@@ -103,10 +105,12 @@ jobs:
       test-infra-ref: main
       build-matrix: ${{ needs.substitute-runner.outputs.matrix }}
       pre-script: packaging/driver_upgrade.bat
+      use-rtx: true
       script: |
         set -euo pipefail
         export USE_HOST_DEPS=1
         export CI_BUILD=1
+        export FORCE_TENSORRT_RTX=1
         pushd .
         cd tests/modules
         python hub.py
@@ -136,6 +140,7 @@ jobs:
       test-infra-ref: main
       build-matrix: ${{ needs.substitute-runner.outputs.matrix }}
       pre-script: packaging/driver_upgrade.bat
+      use-rtx: true
       script: |
         set -euo pipefail
         export USE_HOST_DEPS=1
@@ -164,10 +169,12 @@ jobs:
       test-infra-ref: main
       build-matrix: ${{ needs.substitute-runner.outputs.matrix }}
       pre-script: packaging/driver_upgrade.bat
+      use-rtx: true
       script: |
         set -euo pipefail
         export USE_HOST_DEPS=1
         export CI_BUILD=1
+        export FORCE_TENSORRT_RTX=1
         pushd .
         cd tests/py
         cd dynamo
@@ -192,10 +199,12 @@ jobs:
       test-infra-ref: main
       build-matrix: ${{ needs.substitute-runner.outputs.matrix }}
       pre-script: packaging/driver_upgrade.bat
+      use-rtx: true
       script: |
         set -euo pipefail
         export USE_HOST_DEPS=1
         export CI_BUILD=1
+        export FORCE_TENSORRT_RTX=1
         pushd .
         cd tests/py
         cd dynamo
@@ -221,10 +230,12 @@ jobs:
       test-infra-ref: main
       build-matrix: ${{ needs.substitute-runner.outputs.matrix }}
       pre-script: packaging/driver_upgrade.bat
+      use-rtx: true
       script: |
         set -euo pipefail
         export USE_HOST_DEPS=1
         export CI_BUILD=1
+        export FORCE_TENSORRT_RTX=1
         pushd .
         cd tests/py
         cd dynamo
@@ -251,10 +262,12 @@ jobs:
       test-infra-ref: main
       build-matrix: ${{ needs.substitute-runner.outputs.matrix }}
       pre-script: packaging/driver_upgrade.bat
+      use-rtx: true
       script: |
         set -euo pipefail
         export USE_HOST_DEPS=1
         export CI_BUILD=1
+        export FORCE_TENSORRT_RTX=1
         pushd .
         cd tests/py
         cd dynamo
@@ -281,10 +294,12 @@ jobs:
       test-infra-ref: main
       build-matrix: ${{ needs.substitute-runner.outputs.matrix }}
       pre-script: packaging/driver_upgrade.bat
+      use-rtx: true
       script: |
         set -euo pipefail
         export USE_HOST_DEPS=1
         export CI_BUILD=1
+        export FORCE_TENSORRT_RTX=1
         pushd .
         cd tests/py
         cd dynamo
@@ -310,15 +325,17 @@ jobs:
       test-infra-ref: main
       build-matrix: ${{ needs.substitute-runner.outputs.matrix }}
       pre-script: packaging/driver_upgrade.bat
+      use-rtx: true
       script: |
         set -euo pipefail
         export USE_HOST_DEPS=1
         export CI_BUILD=1
+        export FORCE_TENSORRT_RTX=1
         pushd .
         cd tests/py/core
         python -m pytest -ra -n 4 --junitxml=${RUNNER_TEST_RESULTS_DIR}/tests_py_core_test_results.xml .
         popd
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref_name }}-${{ inputs.repository }}-${{ github.event_name == 'workflow_dispatch' }}-${{ inputs.job-name }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref_name }}-tensorrt-rtx-${{ inputs.repository }}-${{ github.event_name == 'workflow_dispatch' }}-${{ inputs.job-name }}
   cancel-in-progress: true

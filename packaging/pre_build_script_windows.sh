@@ -36,3 +36,10 @@ fi
 
 cat MODULE.bazel
 echo "RELEASE=1" >> ${GITHUB_ENV}
+
+if [[ ${USE_RTX} == true ]]; then
+    cat pyproject_rtx.toml.temp > pyproject.toml
+    source .github/scripts/install-tensorrt-rtx.sh
+    install_wheel_or_not=true
+    install_tensorrt_rtx ${install_wheel_or_not}
+fi

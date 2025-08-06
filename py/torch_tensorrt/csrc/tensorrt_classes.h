@@ -139,11 +139,11 @@ struct CompileSpec : torch::CustomClassHolder {
       enabled_precisions.insert(static_cast<DataType>(p));
     }
   }
-
+#ifndef TRT_MAJOR_RTX
   int64_t getPTQCalibratorHandle() {
     return (int64_t)ptq_calibrator;
   }
-
+#endif
   void setDeviceIntrusive(const c10::intrusive_ptr<Device>& d) {
     device = *d;
   }
@@ -152,9 +152,11 @@ struct CompileSpec : torch::CustomClassHolder {
     torch_fallback = *fb;
   }
 
+#ifndef TRT_MAJOR_RTX
   void setPTQCalibratorViaHandle(int64_t handle) {
     ptq_calibrator = (nvinfer1::IInt8Calibrator*)handle;
   }
+#endif
 
   ADD_FIELD_GET_SET(disable_tf32, bool);
   ADD_FIELD_GET_SET(sparse_weights, bool);
@@ -170,11 +172,15 @@ struct CompileSpec : torch::CustomClassHolder {
   ADD_FIELD_GET_SET(allow_shape_tensors, bool);
   ADD_FIELD_GET_SET(device, Device);
   ADD_FIELD_GET_SET(torch_fallback, TorchFallback);
+#ifndef TRT_MAJOR_RTX
   ADD_FIELD_GET_SET(ptq_calibrator, nvinfer1::IInt8Calibrator*);
+#endif
 
   std::vector<Input> inputs;
   InputSignature input_signature;
+#ifndef TRT_MAJOR_RTX
   nvinfer1::IInt8Calibrator* ptq_calibrator = nullptr;
+#endif
   std::set<DataType> enabled_precisions = {};
   bool sparse_weights = false;
   bool disable_tf32 = false;

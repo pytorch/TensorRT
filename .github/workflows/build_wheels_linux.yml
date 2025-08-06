@@ -1,4 +1,6 @@
-name: Build Linux Wheels For aarch64
+# This workflow is used to build the wheels for the Linux platform
+# it should be periodically synced with https://github.com/pytorch/test-infra/blob/main/.github/workflows/build_wheels_linux.yml
+name: Build Linux Wheels
 
 on:
   workflow_call:
@@ -88,11 +90,6 @@ on:
         required: false
         default: "python -m build --wheel"
         type: string
-      is-jetpack:
-        description: Set to true if the build is for jetpack
-        required: false
-        default: false
-        type: boolean
       pip-install-torch-extra-args:
         # NOTE: Why does this exist?
         # Well setuptools / python packaging doesn't actually allow you to specify dependencies
@@ -110,10 +107,21 @@ on:
         description: 'Timeout for the job (in minutes)'
         default: 120
         type: number
+      use-rtx:
+        description: "Set to true if use TensorRT-RTX"
+        default: false
+        type: boolean
+        required: false
+      is-jetpack:
+        description: Set to true if the build is for jetpack
+        required: false
+        default: false
+        type: boolean
     secrets:
       PYPI_API_TOKEN:
         description: An optional token to upload to pypi
         required: false
+
 
 permissions:
   id-token: write
@@ -133,7 +141,8 @@ jobs:
       UPLOAD_TO_BASE_BUCKET: ${{ matrix.upload_to_base_bucket }}
       ARCH: ${{ inputs.architecture }}
       BUILD_TARGET: ${{ inputs.build-target }}
-    name: build-wheel-${{ matrix.python_version }}-${{ matrix.desired_cuda }}-${{ matrix.gpu_arch_type }}
+      USE_RTX: ${{ inputs.use-rtx }}
+    name: build-wheel-${{ matrix.python_version }}-${{ matrix.desired_cuda }}-${{ matrix.gpu_arch_type }}-${{ inputs.architecture }}-${{ inputs.use-rtx }}-${{ inputs.is-jetpack }}
     runs-on: ${{ matrix.validation_runner }}
     environment: ${{(inputs.trigger-event == 'schedule' || (inputs.trigger-event == 'push' && (startsWith(github.event.ref, 'refs/heads/nightly') || startsWith(github.event.ref, 'refs/tags/v')))) && 'pytorchbot-env' || ''}}
     container:
@@ -251,7 +260,6 @@ jobs:
         working-directory: ${{ inputs.repository }}
         shell: bash -l {0}
         run: |
-          #set -euxo pipefail
           set -x
           source "${BUILD_ENV_FILE}"
           export PYTORCH_VERSION="$(${CONDA_RUN} pip show torch | grep ^Version: | sed 's/Version: *//' | sed 's/+.\+//')"
@@ -261,28 +269,37 @@ jobs:
             BUILD_VERSION="${BUILD_VERSION}+${CU_VERSION}"
           fi
           echo "BUILD_VERSION=$BUILD_VERSION"
-          if [[ ${{ inputs.is-jetpack }} == false ]]; then
-            ${CONDA_RUN} python setup.py bdist_wheel
+          echo "USE_RTX=$USE_RTX"
+          echo "LD_LIBRARY_PATH=$LD_LIBRARY_PATH"
+          if [[ ${{ inputs.use-rtx }} == true ]]; then
+            echo "Building tensorrt-rtx wheel"
+            ${CONDA_RUN} python setup.py bdist_wheel --use-rtx
           else
-            ${CONDA_RUN} python setup.py bdist_wheel --jetpack --plat-name=linux_tegra_aarch64
+            if [[ ${{ inputs.is-jetpack }} == true ]]; then
+              echo "Building tensorrt wheel for jetpack"
+              ${CONDA_RUN} python setup.py bdist_wheel --jetpack --plat-name=linux_tegra_aarch64
+            else
+              echo "Building standard tensorrt wheel"
+              ${CONDA_RUN} python setup.py bdist_wheel
+            fi
           fi
       - name: Repair Manylinux_2_28 Wheel
         shell: bash -l {0}
         env:
           PACKAGE_NAME: ${{ inputs.package-name }}
           SMOKE_TEST_SCRIPT: ${{ inputs.smoke-test-script }}
+        if: ${{ inputs.architecture == 'x86_64' }}
         run: |
           set -euxo pipefail
           source "${BUILD_ENV_FILE}"
-          # for pkg in ${{ inputs.repository }}/dist/*-linux_*.whl; do
-          #   # if the glob didn't match anything
-          #   if [[ ! -e $pkg ]]; then
-          #       continue
-          #   fi
-          #   abs_pkg=$(realpath $pkg)
-          #   ./test-infra/.github/scripts/repair_manylinux_2_28.sh $abs_pkg
-          # done
-          echo "Repair Manylinux_2_28 Wheel is not supported for aarch64"
+          for pkg in ${{ inputs.repository }}/dist/*-linux_*.whl; do
+            # if the glob didn't match anything
+            if [[ ! -e $pkg ]]; then
+                continue
+            fi
+            abs_pkg=$(realpath $pkg)
+            ./test-infra/.github/scripts/repair_manylinux_2_28.sh $abs_pkg
+          done
       - name: Run Post-Script
         if: ${{ inputs.post-script != '' }}
         uses: ./test-infra/.github/actions/run-script-with-cache
@@ -291,7 +308,6 @@ jobs:
           script: ${{ inputs.post-script }}
       - name: Smoke Test
         shell: bash -l {0}
-        if: ${{ inputs.is-jetpack == false }}
         env:
           PACKAGE_NAME: ${{ inputs.package-name }}
           SMOKE_TEST_SCRIPT: ${{ inputs.smoke-test-script }}
@@ -336,8 +352,10 @@ jobs:
   upload:
     needs: build
     uses: pytorch/test-infra/.github/workflows/_binary_upload.yml@main
-    # for jetpack builds, only upload to pytorch index for nightly builds
-    if: ${{ inputs.is-jetpack == false || (github.event_name == 'push' && startsWith(github.event.ref, 'refs/heads/nightly')) }}
+    # if it is not the jetpack build or tensorrt-rtx build, upload to pytorch index,
+    # if it is the jetpack build only upload to pytorch_index for nightly builds
+    # for tensorrt-rtx build, do not upload to pytorch indexat all
+    if: ${{ (inputs.is-jetpack == false && inputs.use-rtx == false) || (inputs.is-jetpack == true && github.event_name == 'push' && startsWith(github.event.ref, 'refs/heads/nightly')) }}
     with:
       repository: ${{ inputs.repository }}
       ref: ${{ inputs.ref }}
@@ -351,5 +369,5 @@ jobs:
       PYPI_API_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}-${{ inputs.repository }}-${{ github.event_name == 'workflow_dispatch' }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}-${{inputs.use-rtx}}-${{inputs.architecture}}-${{inputs.is-jetpack}}-${{ inputs.repository }}-${{ github.event_name == 'workflow_dispatch' }}
   cancel-in-progress: true

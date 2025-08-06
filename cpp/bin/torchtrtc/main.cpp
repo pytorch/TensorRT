@@ -7,7 +7,9 @@
 #include "torch/script.h"
 
 #include "torch_tensorrt/logging.h"
+#ifndef TRT_MAJOR_RTX
 #include "torch_tensorrt/ptq.h"
+#endif
 #include "torch_tensorrt/torch_tensorrt.h"
 
 #include "accuracy.h"
@@ -334,8 +336,12 @@ int main(int argc, char** argv) {
   if (calibration_cache_file) {
     calibration_cache_file_path = torchtrtc::fileio::resolve_path(args::get(calibration_cache_file));
   }
-
+#ifndef TRT_MAJOR_RTX
   auto calibrator = torchtrt::ptq::make_int8_cache_calibrator(calibration_cache_file_path);
+#else
+  // rtx build has no calibrator
+  auto calibrator = nullptr;
+#endif
 
   compile_settings.require_full_compilation = require_full_compilation;
 
@@ -368,7 +374,9 @@ int main(int argc, char** argv) {
       } else if (dtype == torchtrt::DataType::kChar) {
         compile_settings.enabled_precisions.insert(torch::kI8);
         if (calibration_cache_file) {
+#ifndef TRT_MAJOR_RTX
           compile_settings.ptq_calibrator = calibrator;
+#endif
         } else {
           torchtrt::logging::log(
               torchtrt::logging::Level::kINFO,

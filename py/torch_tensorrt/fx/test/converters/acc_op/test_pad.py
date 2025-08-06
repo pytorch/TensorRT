@@ -3,10 +3,10 @@ import unittest
 import tensorrt as trt
 import torch
 import torch.nn as nn
-
 import torch_tensorrt.fx.tracer.acc_tracer.acc_ops as acc_ops
 from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
+from torch_tensorrt._utils import is_tensorrt_version_supported
 from torch_tensorrt.fx.tools.common_fx2trt import AccTestCase
 
 # from torch_tensorrt.fx.tools.common_fx2trt import AccTestCase, InputTensorSpec
@@ -80,7 +80,7 @@ class TestPadConverter(AccTestCase):
         ]
     )
     @unittest.skipIf(
-        trt.__version__ < "8.2",
+        not is_tensorrt_version_supported("8.2"),
         "Padding 3d only supported in TensorRT 8.2 and later",
     )
     def test_pad_3d(self, _, pad):
