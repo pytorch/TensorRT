@@ -503,7 +503,11 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                 if can_use_pre_allocated_outputs:
                     outputs = self.pre_allocated_outputs
                 else:
-
+                    if shape_changed:
+                        self.output_shapes = [
+                            tuple(self.context.get_tensor_shape(output_name))
+                            for output_name in self.output_names
+                        ]
                     if DYNAMIC_DIM in self.output_shapes:
                         raise ValueError(
                             "Encountered dynamic output shapes during runtime. This could mean the network has data-dependent output shapes which is not currently supported."
