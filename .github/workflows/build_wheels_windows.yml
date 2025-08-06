@@ -324,6 +324,9 @@ jobs:
           ${CONDA_RUN} pip install "${{ inputs.repository }}/dist/$WHEEL_NAME"
           if [[ $USE_RTX == true ]]; then
             export FORCE_TENSORRT_RTX=1
+            # TODO: lan to remove this once we have a better way to handle the LD_LIBRARY_PATH
+            # the LD_LIBRARY_PATH set in the pre_build_script_windows.sh will not be available in the smoke test, have to set it here again
+            export LD_LIBRARY_PATH=${{ inputs.repository }}/TensorRT-RTX-1.0.0.21/lib:$LD_LIBRARY_PATH
           fi
           if [[ ! -f "${{ inputs.repository }}"/${SMOKE_TEST_SCRIPT} ]]; then
             echo "${{ inputs.repository }}/${SMOKE_TEST_SCRIPT} not found"
