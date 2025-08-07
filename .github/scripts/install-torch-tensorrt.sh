@@ -21,6 +21,8 @@ pip uninstall -y torch torchvision
 pip install --force-reinstall --pre ${TORCHVISION} --index-url ${INDEX_URL}
 pip install --force-reinstall --pre ${TORCH} --index-url ${INDEX_URL}
 
+# TODO: remove this once we move towards using move uv
+pip install typing-extensions==4.14.1
 
 # Install Torch-TensorRT
 if [[ ${PLATFORM} == win32 ]]; then
