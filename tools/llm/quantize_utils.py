@@ -68,11 +68,6 @@ def quantize_model(model, args, tokenizer):
 class TensorRTQuantizedLinear(torch.nn.Module):
     """
     TensorRT quantized linear layer that applies quantization to both input and weight tensors.
-
-    This class implements a quantized linear layer that:
-    1. Applies quantization to input tensor using TensorQuantizer
-    2. Applies quantization to weight tensor using TensorQuantizer
-    3. Performs linear operation with quantized tensors
     """
 
     def __init__(
@@ -114,7 +109,7 @@ class TensorRTQuantizedLinear(torch.nn.Module):
 
 def convert_linear_to_tensorrt_quantized(model, model_name):
     """
-    Convert linear layers in a model to TensorRT quantized versions using pre-quantized weights.
+    Convert linear layers in a model to TensorRT quantized versions from pre-quantized weights.
 
     This function is specifically designed for Hugging Face quantized models and only
     applies quantization to linear operations. It loads pre-quantized models from
@@ -172,7 +167,7 @@ def convert_linear_to_tensorrt_quantized(model, model_name):
 
         hf_quant_algo = hf_quant_config.pop("quant_algo", None)
         if hf_quant_algo != "FP8" and hf_quant_algo != "NVFP4":
-            raise RuntimeError("Only FP8 and NVFP4 quantization is supported")
+            raise RuntimeError("Only FP8 or NVFP4 quantization is supported")
     else:
         raise RuntimeError("No quantization config found")
 
@@ -186,7 +181,6 @@ def convert_linear_to_tensorrt_quantized(model, model_name):
             weight_scale_name = name + ".weight_scale"
             input_scale_name = name + ".input_scale"
 
-            # Verify that required scale tensors exist in the loaded data
             if weight_scale_name not in tensors:
                 print(f"Weight scale tensor {weight_scale_name} not found")
                 continue
@@ -202,7 +196,7 @@ def convert_linear_to_tensorrt_quantized(model, model_name):
                 input_amax = tensors.pop(input_scale_name) * 448.0
 
                 # Dequantize the weight using the scale factor
-                dequantized_weight_data = module.weight.to(torch.float16) * weight_scale
+                dequantized_weight_data = module.weight.to(torch.float32) * weight_scale
 
                 # Configure quantizer for FP8 format (4 exponent bits, 3 mantissa bits)
                 quantizer_attribute_config = QuantizerAttributeConfig(
@@ -226,7 +220,7 @@ def convert_linear_to_tensorrt_quantized(model, model_name):
                 original_shape = list(weight_data.shape)
                 original_shape[-1] *= 2  # NVFP4 packs 2 values per element
                 nvfp4_tensor = NVFP4QTensor(
-                    torch.Size(original_shape), torch.float16, weight_data
+                    torch.Size(original_shape), torch.float32, weight_data
                 )
 
                 # Dequantize using both scales and block size configuration
@@ -242,8 +236,8 @@ def convert_linear_to_tensorrt_quantized(model, model_name):
                     enable=True,
                 )
 
-            # Apply dequantization to the original quantized weight using the scale
-            # This ensures the weight is in the correct range for the quantized layer
+            # Restore the weight to its original full-precision format so that QDQ nodes
+            # can be properly inserted and optimized during TensorRT compilation
             module.weight.data = dequantized_weight_data
 
             # Create the quantized linear layer with calculated amax values
