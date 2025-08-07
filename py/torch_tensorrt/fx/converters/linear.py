@@ -3,8 +3,7 @@ import tensorrt as trt
 import torch
 
 from ..converter_registry import tensorrt_converter
-
-from .converter_utils import get_dyn_range, mark_as_int8_layer, to_numpy
+from .converter_utils import get_dyn_range, to_numpy
 
 
 def common_linear(network, mod, input_val, layer_name, is_quantized):
@@ -23,9 +22,6 @@ def common_linear(network, mod, input_val, layer_name, is_quantized):
     layer.reshape_dims = tuple(input_val.shape) + (1, 1)
     layer.name = f"{layer_name}_pre_shuffle"
 
-    if is_quantized:
-        mark_as_int8_layer(layer, input_val.dynamic_range)
-
     kernel = to_numpy(mod.weight if not is_quantized else mod.weight())
     bias = to_numpy(mod.bias if not is_quantized else mod.bias())
 
@@ -38,17 +34,10 @@ def common_linear(network, mod, input_val, layer_name, is_quantized):
     )
     layer.name = f"{layer_name}_linear"
 
-    if is_quantized:
-        dyn_range = get_dyn_range(mod.scale, mod.zero_point, torch.quint8)
-        mark_as_int8_layer(layer, dyn_range)
-
     # reshape the output from (*, K, 1, 1) to (*, K)
     layer = network.add_shuffle(layer.get_output(0))
     layer.reshape_dims = tuple(input_val.shape[:-1]) + (mod.out_features,)
     layer.name = f"{layer_name}_post_shuffle"
-
-    if is_quantized:
-        mark_as_int8_layer(layer, dyn_range)
 
     return layer.get_output(0)
 

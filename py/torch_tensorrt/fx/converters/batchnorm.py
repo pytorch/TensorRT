@@ -5,8 +5,7 @@ import tensorrt as trt
 import torch
 
 from ..converter_registry import tensorrt_converter
-
-from .converter_utils import get_dyn_range, mark_as_int8_layer, to_numpy
+from .converter_utils import to_numpy
 
 
 def common_batchnorm(network, mod, input_val, layer_name, is_quantized):
@@ -16,11 +15,6 @@ def common_batchnorm(network, mod, input_val, layer_name, is_quantized):
 
     layer = network.add_scale(input_val, trt.ScaleMode.CHANNEL, bias, scale, power)
     layer.name = layer_name
-
-    if is_quantized:
-        mark_as_int8_layer(
-            layer, get_dyn_range(mod.scale, mod.zero_point, torch.quint8)
-        )
 
     return layer.get_output(0)
 

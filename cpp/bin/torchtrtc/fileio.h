@@ -23,7 +23,6 @@
 #include "torch/torch.h"
 
 #include "torch_tensorrt/logging.h"
-#include "torch_tensorrt/ptq.h"
 #include "torch_tensorrt/torch_tensorrt.h"
 
 namespace torchtrtc {

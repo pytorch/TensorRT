@@ -6,8 +6,6 @@ import torch
 
 from ..converter_registry import tensorrt_converter
 
-from .converter_utils import get_dyn_range, mark_as_int8_layer
-
 
 @tensorrt_converter(torch.mul)
 @tensorrt_converter(operator.mul)
@@ -42,7 +40,5 @@ def quantized_mul(network, target, args, kwargs, layer_name):
 
     layer = network.add_elementwise(lhs_val, rhs_val, trt.ElementWiseOperation.PROD)
     layer.name = layer_name
-    dyn_range = get_dyn_range(kwargs["scale"], kwargs["zero_point"], torch.quint8)
-    mark_as_int8_layer(layer, dyn_range)
 
     return layer.get_output(0)

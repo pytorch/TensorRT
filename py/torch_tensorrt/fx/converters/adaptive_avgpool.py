@@ -3,8 +3,7 @@ import tensorrt as trt
 import torch
 
 from ..converter_registry import tensorrt_converter
-
-from .converter_utils import extend_mod_attr_to_tuple, mark_as_int8_layer
+from .converter_utils import extend_mod_attr_to_tuple
 
 
 @tensorrt_converter(torch.nn.modules.pooling.AdaptiveAvgPool2d)
@@ -30,8 +29,5 @@ def adaptive_avgpool2d(network, submod, args, kwargs, name):
     )
     layer.stride = stride
     layer.name = name
-
-    if input_val.dynamic_range:
-        mark_as_int8_layer(layer, input_val.dynamic_range)
 
     return layer.get_output(0)
