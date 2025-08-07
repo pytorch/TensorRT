@@ -16,6 +16,7 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     get_trt_tensor,
     has_dynamic_shape,
     set_layer_name,
+    to_torch,
     to_trt_weights,
 )
 from torch_tensorrt.dynamo.conversion.impl.cat import cat
@@ -32,21 +33,22 @@ def batch_norm(
     source_ir: Optional[SourceIR],
     name: str,
     input: trt.ITensor,
-    weight: Optional[Union[trt.ITensor, torch.Tensor, np.ndarray]],
-    bias: Optional[Union[trt.ITensor, torch.Tensor, np.ndarray]],
-    running_mean: Optional[Union[trt.ITensor, torch.Tensor, np.ndarray]],
-    running_var: Optional[Union[trt.ITensor, torch.Tensor, np.ndarray]],
-    training: bool,
     momentum: float,
     eps: float,
-    cudnn_enabled: bool,
     return_mean_rstd: bool,
+    weight: Optional[Union[trt.ITensor, torch.Tensor, np.ndarray]] = None,
+    bias: Optional[Union[trt.ITensor, torch.Tensor, np.ndarray]] = None,
+    running_mean: Optional[Union[trt.ITensor, torch.Tensor, np.ndarray]] = None,
+    running_var: Optional[Union[trt.ITensor, torch.Tensor, np.ndarray]] = None,
+    training: bool = False,
+    cudnn_enabled: bool = False,
 ) -> Union[trt.ITensor, Tuple[trt.ITensor, torch.Tensor, torch.Tensor]]:
     if has_dynamic_shape(input.shape):
         assert input.shape[1] != -1, "Channel dim can't be dynamic for batch norm."
 
     # Save the original output shape for later use
     output_shape = input.shape
+    feature_num = output_shape[1]
     # We perform constant folding for batch norm when the weight, bias, running_mean, and running_var are all tensors.
     # Batch norm operation can be fused into a single layer, which is more efficient than the original implementation.
     # In this way, the batch norm layer will be fused with the Convolution layer and get a performance boost.
@@ -60,22 +62,30 @@ def batch_norm(
     ):
         # We name the weight here according to the state_dict name
         weight = (
-            get_trt_tensor(ctx, 1.0, f"{name}_weight", dtype=input.dtype)
+            get_trt_tensor(
+                ctx, np.ones((feature_num,)), f"{name}_weight", dtype=input.dtype
+            )
             if weight is None
             else get_trt_tensor(ctx, weight, f"{name}_weight")
         )
         bias = (
-            get_trt_tensor(ctx, 0.0, f"{name}_bias", dtype=input.dtype)
+            get_trt_tensor(
+                ctx, np.zeros((feature_num,)), f"{name}_bias", dtype=input.dtype
+            )
             if bias is None
             else get_trt_tensor(ctx, bias, f"{name}_bias")
         )
         running_mean = (
-            get_trt_tensor(ctx, 0.0, f"{name}_running_mean", dtype=input.dtype)
+            get_trt_tensor(
+                ctx, np.zeros((feature_num,)), f"{name}_running_mean", dtype=input.dtype
+            )
             if running_mean is None
             else get_trt_tensor(ctx, running_mean, f"{name}_running_mean")
         )
         running_var = (
-            get_trt_tensor(ctx, 1.0, f"{name}_running_var", dtype=input.dtype)
+            get_trt_tensor(
+                ctx, np.ones((feature_num,)), f"{name}_running_var", dtype=input.dtype
+            )
             if running_var is None
             else get_trt_tensor(ctx, running_var, f"{name}_running_var")
         )
@@ -110,8 +120,7 @@ def batch_norm(
 
         # Reshape scale and bias_adjusted to match input shape for broadcasting
         expanded_shape = [1] * len(output_shape)
-        expanded_shape[1] = output_shape[1]  # Set channel dimension
-
+        expanded_shape[1] = feature_num  # Set channel dimension
         scale_reshape = impl.shuffle.reshape(
             ctx,
             target,
@@ -144,24 +153,25 @@ def batch_norm(
 
     else:
         if weight is None:
-            weight = 1.0
+            weight = np.ones((feature_num,))
 
         if bias is None:
-            bias = 0.0
+            bias = np.zeros((feature_num,))
 
         if running_mean is None:
-            running_mean = 0.0
+            running_mean = np.zeros((feature_num,))
 
         if running_var is None:
-            running_var = 1.0
+            running_var = np.ones((feature_num,))
+
         adjusted_scale, adjusted_bias = batch_norm_constant_folding(
             weight, bias, running_mean, running_var, eps
         )
-        power = torch.ones_like(adjusted_scale)
+        power = np.ones_like(adjusted_scale)
 
         adjusted_scale = to_trt_weights(
             ctx,
-            adjusted_scale,
+            to_torch(adjusted_scale, dtype=input.dtype),
             name,
             layer_type_name="SCALE",
             weight_type_name="SCALE",
@@ -170,7 +180,7 @@ def batch_norm(
         )
         adjusted_bias = to_trt_weights(
             ctx,
-            adjusted_bias,
+            to_torch(adjusted_bias, dtype=input.dtype),
             name,
             layer_type_name="SCALE",
             weight_type_name="SHIFT",
@@ -180,7 +190,7 @@ def batch_norm(
 
         power = to_trt_weights(
             ctx,
-            power,
+            to_torch(power, dtype=input.dtype),
             name,
             layer_type_name="SCALE",
             weight_type_name="POWER",
@@ -188,9 +198,7 @@ def batch_norm(
             source_ir=source_ir,
         )
 
-        output_shape = input.shape
         if len(input.shape) < 4:
-
             new_shape = (
                 (input.shape[0], input.shape[1], 1, 1)
                 if len(input.shape) == 2
@@ -225,13 +233,13 @@ def batch_norm(
 
 
 def batch_norm_constant_folding(
-    weight: torch.Tensor,
-    bias: torch.Tensor,
-    running_mean: torch.Tensor,
-    running_var: torch.Tensor,
+    weight: np.ndarray,
+    bias: np.ndarray,
+    running_mean: np.ndarray,
+    running_var: np.ndarray,
     eps: float,
-) -> Tuple[torch.Tensor, torch.Tensor]:
-    adjusted_scale = weight / torch.sqrt(running_var + eps)
+) -> Tuple[np.ndarray, np.ndarray]:
+    adjusted_scale = weight / np.sqrt(running_var + eps)
     adjusted_bias = bias - running_mean * adjusted_scale
     return adjusted_scale, adjusted_bias
 
