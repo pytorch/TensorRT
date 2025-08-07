@@ -4,6 +4,7 @@ from typing import List, Optional, Sequence, Tuple, Union
 import numpy as np
 import tensorrt as trt
 import torch
+from torch._subclasses.fake_tensor import unset_fake_temporarily
 from torch.fx.node import Target
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion import impl
@@ -16,7 +17,6 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     get_trt_tensor,
     has_dynamic_shape,
     set_layer_name,
-    to_torch,
     to_trt_weights,
 )
 from torch_tensorrt.dynamo.conversion.impl.cat import cat
@@ -61,34 +61,41 @@ def batch_norm(
         ]
     ):
         # We name the weight here according to the state_dict name
-        weight = (
-            get_trt_tensor(
-                ctx, np.ones((feature_num,)), f"{name}_weight", dtype=input.dtype
+        with unset_fake_temporarily():
+            weight = (
+                get_trt_tensor(
+                    ctx, torch.ones((feature_num,)), f"{name}_weight", dtype=input.dtype
+                )
+                if weight is None
+                else get_trt_tensor(ctx, weight, f"{name}_weight")
             )
-            if weight is None
-            else get_trt_tensor(ctx, weight, f"{name}_weight")
-        )
-        bias = (
-            get_trt_tensor(
-                ctx, np.zeros((feature_num,)), f"{name}_bias", dtype=input.dtype
+            bias = (
+                get_trt_tensor(
+                    ctx, torch.zeros((feature_num,)), f"{name}_bias", dtype=input.dtype
+                )
+                if bias is None
+                else get_trt_tensor(ctx, bias, f"{name}_bias")
             )
-            if bias is None
-            else get_trt_tensor(ctx, bias, f"{name}_bias")
-        )
-        running_mean = (
-            get_trt_tensor(
-                ctx, np.zeros((feature_num,)), f"{name}_running_mean", dtype=input.dtype
+            running_mean = (
+                get_trt_tensor(
+                    ctx,
+                    torch.zeros((feature_num,)),
+                    f"{name}_running_mean",
+                    dtype=input.dtype,
+                )
+                if running_mean is None
+                else get_trt_tensor(ctx, running_mean, f"{name}_running_mean")
             )
-            if running_mean is None
-            else get_trt_tensor(ctx, running_mean, f"{name}_running_mean")
-        )
-        running_var = (
-            get_trt_tensor(
-                ctx, np.ones((feature_num,)), f"{name}_running_var", dtype=input.dtype
+            running_var = (
+                get_trt_tensor(
+                    ctx,
+                    torch.ones((feature_num,)),
+                    f"{name}_running_var",
+                    dtype=input.dtype,
+                )
+                if running_var is None
+                else get_trt_tensor(ctx, running_var, f"{name}_running_var")
             )
-            if running_var is None
-            else get_trt_tensor(ctx, running_var, f"{name}_running_var")
-        )
 
         # eps_tensor for numerical stability
         eps_tensor = get_trt_tensor(ctx, eps, f"{name}_eps", dtype=input.dtype)
@@ -152,26 +159,28 @@ def batch_norm(
         )
 
     else:
-        if weight is None:
-            weight = np.ones((feature_num,))
+        with unset_fake_temporarily():
+            if weight is None:
+                weight = torch.ones((feature_num,))
 
-        if bias is None:
-            bias = np.zeros((feature_num,))
+            if bias is None:
+                bias = torch.zeros((feature_num,))
 
-        if running_mean is None:
-            running_mean = np.zeros((feature_num,))
+            if running_mean is None:
+                running_mean = torch.zeros((feature_num,))
 
-        if running_var is None:
-            running_var = np.ones((feature_num,))
+            if running_var is None:
+                running_var = torch.ones((feature_num,))
 
-        adjusted_scale, adjusted_bias = batch_norm_constant_folding(
-            weight, bias, running_mean, running_var, eps
-        )
-        power = np.ones_like(adjusted_scale)
+            power = torch.ones_like(weight)
+
+            adjusted_scale, adjusted_bias = batch_norm_constant_folding(
+                weight, bias, running_mean, running_var, eps
+            )
 
         adjusted_scale = to_trt_weights(
             ctx,
-            to_torch(adjusted_scale, dtype=input.dtype),
+            adjusted_scale,
             name,
             layer_type_name="SCALE",
             weight_type_name="SCALE",
@@ -180,7 +189,7 @@ def batch_norm(
         )
         adjusted_bias = to_trt_weights(
             ctx,
-            to_torch(adjusted_bias, dtype=input.dtype),
+            adjusted_bias,
             name,
             layer_type_name="SCALE",
             weight_type_name="SHIFT",
@@ -190,7 +199,7 @@ def batch_norm(
 
         power = to_trt_weights(
             ctx,
-            to_torch(power, dtype=input.dtype),
+            power,
             name,
             layer_type_name="SCALE",
             weight_type_name="POWER",
@@ -233,13 +242,13 @@ def batch_norm(
 
 
 def batch_norm_constant_folding(
-    weight: np.ndarray,
-    bias: np.ndarray,
-    running_mean: np.ndarray,
-    running_var: np.ndarray,
+    weight: torch.Tensor,
+    bias: torch.Tensor,
+    running_mean: torch.Tensor,
+    running_var: torch.Tensor,
     eps: float,
-) -> Tuple[np.ndarray, np.ndarray]:
-    adjusted_scale = weight / np.sqrt(running_var + eps)
+) -> Tuple[torch.Tensor, torch.Tensor]:
+    adjusted_scale = weight / torch.sqrt(running_var + eps)
     adjusted_bias = bias - running_mean * adjusted_scale
     return adjusted_scale, adjusted_bias
 
