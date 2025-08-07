@@ -58,6 +58,9 @@ new_local_repository(
     build_file = "third_party/libtorch/BUILD"
 )
 
+
+# This is a workaround (WAR), not a functional Bazel repository.
+# It directly references a system-installed PyTorch package, which breaks hermeticity
 new_local_repository(
     name = "torch_l4t",
     path = "/usr/local/lib/python3.12/dist-packages/torch/",
