@@ -365,7 +365,7 @@ int main(int argc, char** argv) {
       } else if (dtype == torchtrt::DataType::kChar) {
         compile_settings.enabled_precisions.insert(torch::kI8);
         torchtrt::logging::log(
-            torchtrt::logging::Level::kINFO,
+            torchtrt::logging::Level::kDEBUG,
             "Int8 precision has been enabled which assumes the network has Q/DQ nodes obtained");
       } else {
         std::stringstream ss;

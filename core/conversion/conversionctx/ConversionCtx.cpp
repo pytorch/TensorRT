@@ -63,7 +63,7 @@ ConversionCtx::ConversionCtx(BuilderSettings build_settings)
         cfg->setFlag(nvinfer1::BuilderFlag::kFP16);
         break;
       case nvinfer1::DataType::kINT8:
-        LOG_WARNING("INT8 precision has been enabled, we assume the network has Q/DQ nodes obtained from modelopt");
+        LOG_DEBUG("INT8 precision has been enabled, we assume the network has Q/DQ nodes obtained from modelopt");
         break;
       case nvinfer1::DataType::kFLOAT:
         break;
