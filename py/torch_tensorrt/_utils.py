@@ -1,6 +1,7 @@
 import sys
 from typing import Any
 
+import tensorrt as trt
 import torch
 
 
@@ -24,3 +25,34 @@ def check_cross_compile_trt_win_lib() -> bool:
         target_lib = ".*libnvinfer_builder_resource_win.so.*"
         return any(re.match(target_lib, lib) for lib in loaded_libs)
     return False
+
+
+def is_tensorrt_rtx() -> bool:
+    if trt._package_name == "tensorrt_rtx":
+        return True
+    return False
+
+
+def is_tensorrt_version_supported(min_version: str) -> bool:
+    """
+    Check if the installed TensorRT version supports the specified minimum version.
+    Args:
+        min_version (str): Minimum required TensorRT version
+    Returns:
+        bool: True if TensorRT version is >= min_version, False otherwise
+    Example:
+        >>> if is_tensorrt_version_supported("10.8.0"):
+        ...     # Use FP4 features
+        ...     pass
+    """
+    try:
+        if is_tensorrt_rtx():
+            return True
+        from importlib import metadata
+
+        from packaging.version import Version
+
+        return bool(Version(metadata.version("tensorrt")) >= Version(min_version))
+    except (ImportError, ValueError):
+        # If tensorrt is not installed or version cannot be determined
+        return False

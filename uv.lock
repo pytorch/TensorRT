@@ -48,8 +48,7 @@ dependencies = [
     { name = "psutil", marker = "sys_platform == 'linux' or sys_platform == 'windows'" },
     { name = "pyyaml", marker = "sys_platform == 'linux' or sys_platform == 'windows'" },
     { name = "safetensors", marker = "sys_platform == 'linux' or sys_platform == 'windows'" },
-    { name = "torch", version = "2.7.0", source = { registry = "https://pypi.org/simple" }, marker = "(platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'linux') or (platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'windows')" },
-    { name = "torch", version = "2.9.0.dev20250701+cu129", source = { registry = "https://download.pytorch.org/whl/nightly/cu129" }, marker = "(platform_machine != 'aarch64' and sys_platform == 'linux') or (platform_machine != 'aarch64' and sys_platform == 'windows') or ('tegra' not in platform_release and sys_platform == 'linux') or ('tegra' not in platform_release and sys_platform == 'windows')" },
+    { name = "torch", marker = "sys_platform == 'linux' or sys_platform == 'windows'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/97/33/47bbd507e3a851d33d19ce7b2141c5ea3689bfae91ba168044d7db24b0e9/accelerate-1.7.0.tar.gz", hash = "sha256:e8a2a5503d6237b9eee73cc8d36cf543f9c2d8dd2c6713450b322f5e6d53a610", size = 376026, upload-time = "2025-05-15T10:00:52.117Z" }
 wheels = [
@@ -1343,11 +1342,9 @@ all = [
     { name = "pynvml", marker = "(python_full_version < '3.12' and 'tegra' in platform_release and sys_platform == 'linux') or (python_full_version < '3.12' and 'tegra' in platform_release and sys_platform == 'windows') or (python_full_version < '3.10' and sys_platform == 'linux') or (python_full_version < '3.10' and sys_platform == 'windows')" },
     { name = "regex", marker = "(python_full_version < '3.12' and 'tegra' in platform_release and sys_platform == 'linux') or (python_full_version < '3.12' and 'tegra' in platform_release and sys_platform == 'windows') or (python_full_version < '3.10' and sys_platform == 'linux') or (python_full_version < '3.10' and sys_platform == 'windows')" },
     { name = "safetensors", marker = "(python_full_version < '3.12' and 'tegra' in platform_release and sys_platform == 'linux') or (python_full_version < '3.12' and 'tegra' in platform_release and sys_platform == 'windows') or (python_full_version < '3.10' and sys_platform == 'linux') or (python_full_version < '3.10' and sys_platform == 'windows')" },
-    { name = "torch", version = "2.7.0", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version < '3.12' and platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'linux') or (python_full_version < '3.12' and platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'windows')" },
-    { name = "torch", version = "2.9.0.dev20250701+cu129", source = { registry = "https://download.pytorch.org/whl/nightly/cu129" }, marker = "(python_full_version < '3.12' and platform_machine != 'aarch64' and 'tegra' in platform_release and sys_platform == 'linux') or (python_full_version < '3.12' and platform_machine != 'aarch64' and 'tegra' in platform_release and sys_platform == 'windows') or (python_full_version < '3.10' and platform_machine != 'aarch64' and sys_platform == 'linux') or (python_full_version < '3.10' and platform_machine != 'aarch64' and sys_platform == 'windows') or (python_full_version < '3.10' and 'tegra' not in platform_release and sys_platform == 'linux') or (python_full_version < '3.10' and 'tegra' not in platform_release and sys_platform == 'windows')" },
+    { name = "torch", marker = "(python_full_version < '3.12' and 'tegra' in platform_release and sys_platform == 'linux') or (python_full_version < '3.12' and 'tegra' in platform_release and sys_platform == 'windows') or (python_full_version < '3.10' and sys_platform == 'linux') or (python_full_version < '3.10' and sys_platform == 'windows')" },
     { name = "torchprofile", marker = "(python_full_version < '3.12' and 'tegra' in platform_release and sys_platform == 'linux') or (python_full_version < '3.12' and 'tegra' in platform_release and sys_platform == 'windows') or (python_full_version < '3.10' and sys_platform == 'linux') or (python_full_version < '3.10' and sys_platform == 'windows')" },
-    { name = "torchvision", version = "0.22.0", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version < '3.12' and platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'linux') or (python_full_version < '3.12' and platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'windows')" },
-    { name = "torchvision", version = "0.23.0.dev20250701+cu129", source = { registry = "https://download.pytorch.org/whl/nightly/cu129" }, marker = "(python_full_version < '3.12' and platform_machine != 'aarch64' and 'tegra' in platform_release and sys_platform == 'linux') or (python_full_version < '3.12' and platform_machine != 'aarch64' and 'tegra' in platform_release and sys_platform == 'windows') or (python_full_version < '3.10' and platform_machine != 'aarch64' and sys_platform == 'linux') or (python_full_version < '3.10' and platform_machine != 'aarch64' and sys_platform == 'windows') or (python_full_version < '3.10' and 'tegra' not in platform_release and sys_platform == 'linux') or (python_full_version < '3.10' and 'tegra' not in platform_release and sys_platform == 'windows')" },
+    { name = "torchvision", marker = "(python_full_version < '3.12' and 'tegra' in platform_release and sys_platform == 'linux') or (python_full_version < '3.12' and 'tegra' in platform_release and sys_platform == 'windows') or (python_full_version < '3.10' and sys_platform == 'linux') or (python_full_version < '3.10' and sys_platform == 'windows')" },
     { name = "transformers", marker = "(python_full_version < '3.12' and 'tegra' in platform_release and sys_platform == 'linux') or (python_full_version < '3.12' and 'tegra' in platform_release and sys_platform == 'windows') or (python_full_version < '3.10' and sys_platform == 'linux') or (python_full_version < '3.10' and sys_platform == 'windows')" },
 ]
 
@@ -1406,11 +1403,9 @@ all = [
     { name = "pulp", marker = "(python_full_version >= '3.10' and 'tegra' not in platform_release and sys_platform == 'linux') or (python_full_version >= '3.10' and 'tegra' not in platform_release and sys_platform == 'windows') or (python_full_version >= '3.12' and sys_platform == 'linux') or (python_full_version >= '3.12' and sys_platform == 'windows')" },
     { name = "regex", marker = "(python_full_version >= '3.10' and 'tegra' not in platform_release and sys_platform == 'linux') or (python_full_version >= '3.10' and 'tegra' not in platform_release and sys_platform == 'windows') or (python_full_version >= '3.12' and sys_platform == 'linux') or (python_full_version >= '3.12' and sys_platform == 'windows')" },
     { name = "safetensors", marker = "(python_full_version >= '3.10' and 'tegra' not in platform_release and sys_platform == 'linux') or (python_full_version >= '3.10' and 'tegra' not in platform_release and sys_platform == 'windows') or (python_full_version >= '3.12' and sys_platform == 'linux') or (python_full_version >= '3.12' and sys_platform == 'windows')" },
-    { name = "torch", version = "2.7.0", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version >= '3.12' and platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'linux') or (python_full_version >= '3.12' and platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'windows')" },
-    { name = "torch", version = "2.9.0.dev20250701+cu129", source = { registry = "https://download.pytorch.org/whl/nightly/cu129" }, marker = "(python_full_version >= '3.10' and python_full_version < '3.12' and 'tegra' not in platform_release and sys_platform == 'linux') or (python_full_version >= '3.10' and python_full_version < '3.12' and 'tegra' not in platform_release and sys_platform == 'windows') or (python_full_version >= '3.10' and platform_machine == 'aarch64' and 'tegra' not in platform_release and sys_platform == 'linux') or (python_full_version >= '3.10' and platform_machine == 'aarch64' and 'tegra' not in platform_release and sys_platform == 'windows') or (python_full_version >= '3.12' and platform_machine != 'aarch64' and sys_platform == 'linux') or (python_full_version >= '3.12' and platform_machine != 'aarch64' and sys_platform == 'windows')" },
+    { name = "torch", marker = "(python_full_version >= '3.10' and 'tegra' not in platform_release and sys_platform == 'linux') or (python_full_version >= '3.10' and 'tegra' not in platform_release and sys_platform == 'windows') or (python_full_version >= '3.12' and sys_platform == 'linux') or (python_full_version >= '3.12' and sys_platform == 'windows')" },
     { name = "torchprofile", marker = "(python_full_version >= '3.10' and 'tegra' not in platform_release and sys_platform == 'linux') or (python_full_version >= '3.10' and 'tegra' not in platform_release and sys_platform == 'windows') or (python_full_version >= '3.12' and sys_platform == 'linux') or (python_full_version >= '3.12' and sys_platform == 'windows')" },
-    { name = "torchvision", version = "0.22.0", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version >= '3.12' and platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'linux') or (python_full_version >= '3.12' and platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'windows')" },
-    { name = "torchvision", version = "0.23.0.dev20250701+cu129", source = { registry = "https://download.pytorch.org/whl/nightly/cu129" }, marker = "(python_full_version >= '3.10' and python_full_version < '3.12' and 'tegra' not in platform_release and sys_platform == 'linux') or (python_full_version >= '3.10' and python_full_version < '3.12' and 'tegra' not in platform_release and sys_platform == 'windows') or (python_full_version >= '3.10' and platform_machine == 'aarch64' and 'tegra' not in platform_release and sys_platform == 'linux') or (python_full_version >= '3.10' and platform_machine == 'aarch64' and 'tegra' not in platform_release and sys_platform == 'windows') or (python_full_version >= '3.12' and platform_machine != 'aarch64' and sys_platform == 'linux') or (python_full_version >= '3.12' and platform_machine != 'aarch64' and sys_platform == 'windows')" },
+    { name = "torchvision", marker = "(python_full_version >= '3.10' and 'tegra' not in platform_release and sys_platform == 'linux') or (python_full_version >= '3.10' and 'tegra' not in platform_release and sys_platform == 'windows') or (python_full_version >= '3.12' and sys_platform == 'linux') or (python_full_version >= '3.12' and sys_platform == 'windows')" },
     { name = "transformers", marker = "(python_full_version >= '3.10' and 'tegra' not in platform_release and sys_platform == 'linux') or (python_full_version >= '3.10' and 'tegra' not in platform_release and sys_platform == 'windows') or (python_full_version >= '3.12' and sys_platform == 'linux') or (python_full_version >= '3.12' and sys_platform == 'windows')" },
 ]
 
@@ -1791,8 +1786,7 @@ dependencies = [
     { name = "psutil", marker = "sys_platform == 'linux' or sys_platform == 'windows'" },
     { name = "pyyaml", marker = "sys_platform == 'linux' or sys_platform == 'windows'" },
     { name = "safetensors", marker = "sys_platform == 'linux' or sys_platform == 'windows'" },
-    { name = "torch", version = "2.7.0", source = { registry = "https://pypi.org/simple" }, marker = "(platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'linux') or (platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'windows')" },
-    { name = "torch", version = "2.9.0.dev20250701+cu129", source = { registry = "https://download.pytorch.org/whl/nightly/cu129" }, marker = "(platform_machine != 'aarch64' and sys_platform == 'linux') or (platform_machine != 'aarch64' and sys_platform == 'windows') or ('tegra' not in platform_release and sys_platform == 'linux') or ('tegra' not in platform_release and sys_platform == 'windows')" },
+    { name = "torch", marker = "sys_platform == 'linux' or sys_platform == 'windows'" },
     { name = "tqdm", marker = "sys_platform == 'linux' or sys_platform == 'windows'" },
     { name = "transformers", marker = "sys_platform == 'linux' or sys_platform == 'windows'" },
 ]
@@ -2507,207 +2501,51 @@ wheels = [
 
 [[package]]
 name = "tensorrt"
-version = "10.3.0"
+version = "10.12.0.36"
 source = { registry = "https://pypi.nvidia.com/" }
-resolution-markers = [
-    "python_full_version >= '3.12' and platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'linux'",
-    "python_full_version == '3.11.*' and platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'linux'",
-    "python_full_version == '3.10.*' and platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'linux'",
-    "python_full_version < '3.10' and platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'linux'",
-    "python_full_version >= '3.12' and platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'windows'",
-    "python_full_version == '3.11.*' and platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'windows'",
-    "python_full_version == '3.10.*' and platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'windows'",
-    "python_full_version < '3.10' and platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'windows'",
-]
 dependencies = [
-    { name = "tensorrt-cu12", version = "10.3.0", source = { registry = "https://pypi.nvidia.com/" }, marker = "(platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'linux') or (platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'windows')" },
+    { name = "tensorrt-cu12", marker = "sys_platform == 'linux' or sys_platform == 'windows'" },
 ]
-sdist = { url = "https://pypi.nvidia.com/tensorrt/tensorrt-10.3.0.tar.gz", hash = "sha256:23b0dbeeada4ba1c72021d3ee0a2f172fb7cb60c72ad5e268b62822fab698d1e" }
-
-[[package]]
-name = "tensorrt"
-version = "10.11.0.33"
-source = { registry = "https://pypi.nvidia.com/" }
-resolution-markers = [
-    "python_full_version >= '3.12' and platform_machine != 'aarch64' and 'tegra' not in platform_release and sys_platform == 'linux'",
-    "python_full_version >= '3.12' and platform_machine == 'aarch64' and 'tegra' not in platform_release and sys_platform == 'linux'",
-    "python_full_version == '3.11.*' and platform_machine != 'aarch64' and 'tegra' not in platform_release and sys_platform == 'linux'",
-    "python_full_version == '3.10.*' and platform_machine != 'aarch64' and 'tegra' not in platform_release and sys_platform == 'linux'",
-    "python_full_version == '3.11.*' and platform_machine == 'aarch64' and 'tegra' not in platform_release and sys_platform == 'linux'",
-    "python_full_version == '3.10.*' and platform_machine == 'aarch64' and 'tegra' not in platform_release and sys_platform == 'linux'",
-    "python_full_version < '3.10' and platform_machine != 'aarch64' and 'tegra' not in platform_release and sys_platform == 'linux'",
-    "python_full_version < '3.10' and platform_machine == 'aarch64' and 'tegra' not in platform_release and sys_platform == 'linux'",
-    "python_full_version >= '3.12' and platform_machine != 'aarch64' and 'tegra' in platform_release and sys_platform == 'linux'",
-    "python_full_version == '3.11.*' and platform_machine != 'aarch64' and 'tegra' in platform_release and sys_platform == 'linux'",
-    "python_full_version == '3.10.*' and platform_machine != 'aarch64' and 'tegra' in platform_release and sys_platform == 'linux'",
-    "python_full_version < '3.10' and platform_machine != 'aarch64' and 'tegra' in platform_release and sys_platform == 'linux'",
-    "python_full_version >= '3.12' and 'tegra' not in platform_release and sys_platform == 'windows'",
-    "python_full_version == '3.11.*' and 'tegra' not in platform_release and sys_platform == 'windows'",
-    "python_full_version == '3.10.*' and 'tegra' not in platform_release and sys_platform == 'windows'",
-    "python_full_version < '3.10' and 'tegra' not in platform_release and sys_platform == 'windows'",
-    "python_full_version >= '3.12' and platform_machine != 'aarch64' and 'tegra' in platform_release and sys_platform == 'windows'",
-    "python_full_version == '3.11.*' and platform_machine != 'aarch64' and 'tegra' in platform_release and sys_platform == 'windows'",
-    "python_full_version == '3.10.*' and platform_machine != 'aarch64' and 'tegra' in platform_release and sys_platform == 'windows'",
-    "python_full_version < '3.10' and platform_machine != 'aarch64' and 'tegra' in platform_release and sys_platform == 'windows'",
-]
-dependencies = [
-    { name = "tensorrt-cu12", version = "10.11.0.33", source = { registry = "https://pypi.nvidia.com/" }, marker = "(platform_machine != 'aarch64' and sys_platform == 'linux') or (platform_machine != 'aarch64' and sys_platform == 'windows') or ('tegra' not in platform_release and sys_platform == 'linux') or ('tegra' not in platform_release and sys_platform == 'windows')" },
-]
-sdist = { url = "https://pypi.nvidia.com/tensorrt/tensorrt-10.11.0.33.tar.gz", hash = "sha256:a3d6048f86e11ea5202d473646194d3be866c0c8d578ac0b7eeb91d923f65d0b" }
+sdist = { url = "https://pypi.nvidia.com/tensorrt/tensorrt-10.12.0.36.tar.gz", hash = "sha256:b246a830c26713e097b73151917e101cfb81aa0e7274c3c3b4c1f9f8b886be2e" }
 
 [[package]]
 name = "tensorrt-cu12"
-version = "10.3.0"
+version = "10.12.0.36"
 source = { registry = "https://pypi.nvidia.com/" }
-resolution-markers = [
-    "python_full_version >= '3.12' and platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'linux'",
-    "python_full_version == '3.11.*' and platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'linux'",
-    "python_full_version == '3.10.*' and platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'linux'",
-    "python_full_version < '3.10' and platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'linux'",
-    "python_full_version >= '3.12' and platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'windows'",
-    "python_full_version == '3.11.*' and platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'windows'",
-    "python_full_version == '3.10.*' and platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'windows'",
-    "python_full_version < '3.10' and platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'windows'",
-]
-sdist = { url = "https://pypi.nvidia.com/tensorrt-cu12/tensorrt-cu12-10.3.0.tar.gz", hash = "sha256:14f0e60f40713a658f9634fffb1a5a665c35feb019be48b2f49e25ac12d2d084" }
-
-[[package]]
-name = "tensorrt-cu12"
-version = "10.11.0.33"
-source = { registry = "https://pypi.nvidia.com/" }
-resolution-markers = [
-    "python_full_version >= '3.12' and platform_machine != 'aarch64' and 'tegra' not in platform_release and sys_platform == 'linux'",
-    "python_full_version >= '3.12' and platform_machine == 'aarch64' and 'tegra' not in platform_release and sys_platform == 'linux'",
-    "python_full_version == '3.11.*' and platform_machine != 'aarch64' and 'tegra' not in platform_release and sys_platform == 'linux'",
-    "python_full_version == '3.10.*' and platform_machine != 'aarch64' and 'tegra' not in platform_release and sys_platform == 'linux'",
-    "python_full_version == '3.11.*' and platform_machine == 'aarch64' and 'tegra' not in platform_release and sys_platform == 'linux'",
-    "python_full_version == '3.10.*' and platform_machine == 'aarch64' and 'tegra' not in platform_release and sys_platform == 'linux'",
-    "python_full_version < '3.10' and platform_machine != 'aarch64' and 'tegra' not in platform_release and sys_platform == 'linux'",
-    "python_full_version < '3.10' and platform_machine == 'aarch64' and 'tegra' not in platform_release and sys_platform == 'linux'",
-    "python_full_version >= '3.12' and platform_machine != 'aarch64' and 'tegra' in platform_release and sys_platform == 'linux'",
-    "python_full_version == '3.11.*' and platform_machine != 'aarch64' and 'tegra' in platform_release and sys_platform == 'linux'",
-    "python_full_version == '3.10.*' and platform_machine != 'aarch64' and 'tegra' in platform_release and sys_platform == 'linux'",
-    "python_full_version < '3.10' and platform_machine != 'aarch64' and 'tegra' in platform_release and sys_platform == 'linux'",
-    "python_full_version >= '3.12' and 'tegra' not in platform_release and sys_platform == 'windows'",
-    "python_full_version == '3.11.*' and 'tegra' not in platform_release and sys_platform == 'windows'",
-    "python_full_version == '3.10.*' and 'tegra' not in platform_release and sys_platform == 'windows'",
-    "python_full_version < '3.10' and 'tegra' not in platform_release and sys_platform == 'windows'",
-    "python_full_version >= '3.12' and platform_machine != 'aarch64' and 'tegra' in platform_release and sys_platform == 'windows'",
-    "python_full_version == '3.11.*' and platform_machine != 'aarch64' and 'tegra' in platform_release and sys_platform == 'windows'",
-    "python_full_version == '3.10.*' and platform_machine != 'aarch64' and 'tegra' in platform_release and sys_platform == 'windows'",
-    "python_full_version < '3.10' and platform_machine != 'aarch64' and 'tegra' in platform_release and sys_platform == 'windows'",
-]
 dependencies = [
-    { name = "tensorrt-cu12-bindings", version = "10.11.0.33", source = { registry = "https://pypi.nvidia.com/" }, marker = "(platform_machine != 'aarch64' and sys_platform == 'linux') or (platform_machine != 'aarch64' and sys_platform == 'windows') or ('tegra' not in platform_release and sys_platform == 'linux') or ('tegra' not in platform_release and sys_platform == 'windows')" },
-    { name = "tensorrt-cu12-libs", version = "10.11.0.33", source = { registry = "https://pypi.nvidia.com/" }, marker = "(platform_machine != 'aarch64' and sys_platform == 'linux') or (platform_machine != 'aarch64' and sys_platform == 'windows') or ('tegra' not in platform_release and sys_platform == 'linux') or ('tegra' not in platform_release and sys_platform == 'windows')" },
+    { name = "tensorrt-cu12-bindings", marker = "sys_platform == 'linux' or sys_platform == 'windows'" },
+    { name = "tensorrt-cu12-libs", marker = "sys_platform == 'linux' or sys_platform == 'windows'" },
 ]
-sdist = { url = "https://pypi.nvidia.com/tensorrt-cu12/tensorrt_cu12-10.11.0.33.tar.gz", hash = "sha256:7e29c8b16771c025320035ba9609c2a074767d9a8c05696a30c9d5c0fdfb37df" }
+sdist = { url = "https://pypi.nvidia.com/tensorrt-cu12/tensorrt_cu12-10.12.0.36.tar.gz", hash = "sha256:aedeee0195c042592ac6b0536b19bc8cdbb1a548f35e09d24fbe78e1c76217c5" }
 
 [[package]]
 name = "tensorrt-cu12-bindings"
-version = "10.3.0"
+version = "10.12.0.36"
 source = { registry = "https://pypi.nvidia.com/" }
-resolution-markers = [
-    "python_full_version >= '3.12' and platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'linux'",
-    "python_full_version == '3.11.*' and platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'linux'",
-    "python_full_version == '3.10.*' and platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'linux'",
-    "python_full_version < '3.10' and platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'linux'",
-    "python_full_version >= '3.12' and platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'windows'",
-    "python_full_version == '3.11.*' and platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'windows'",
-    "python_full_version == '3.10.*' and platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'windows'",
-    "python_full_version < '3.10' and platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'windows'",
-]
-
-[[package]]
-name = "tensorrt-cu12-bindings"
-version = "10.11.0.33"
-source = { registry = "https://pypi.nvidia.com/" }
-resolution-markers = [
-    "python_full_version >= '3.12' and platform_machine != 'aarch64' and 'tegra' not in platform_release and sys_platform == 'linux'",
-    "python_full_version >= '3.12' and platform_machine == 'aarch64' and 'tegra' not in platform_release and sys_platform == 'linux'",
-    "python_full_version == '3.11.*' and platform_machine != 'aarch64' and 'tegra' not in platform_release and sys_platform == 'linux'",
-    "python_full_version == '3.10.*' and platform_machine != 'aarch64' and 'tegra' not in platform_release and sys_platform == 'linux'",
-    "python_full_version == '3.11.*' and platform_machine == 'aarch64' and 'tegra' not in platform_release and sys_platform == 'linux'",
-    "python_full_version == '3.10.*' and platform_machine == 'aarch64' and 'tegra' not in platform_release and sys_platform == 'linux'",
-    "python_full_version < '3.10' and platform_machine != 'aarch64' and 'tegra' not in platform_release and sys_platform == 'linux'",
-    "python_full_version < '3.10' and platform_machine == 'aarch64' and 'tegra' not in platform_release and sys_platform == 'linux'",
-    "python_full_version >= '3.12' and platform_machine != 'aarch64' and 'tegra' in platform_release and sys_platform == 'linux'",
-    "python_full_version == '3.11.*' and platform_machine != 'aarch64' and 'tegra' in platform_release and sys_platform == 'linux'",
-    "python_full_version == '3.10.*' and platform_machine != 'aarch64' and 'tegra' in platform_release and sys_platform == 'linux'",
-    "python_full_version < '3.10' and platform_machine != 'aarch64' and 'tegra' in platform_release and sys_platform == 'linux'",
-    "python_full_version >= '3.12' and 'tegra' not in platform_release and sys_platform == 'windows'",
-    "python_full_version == '3.11.*' and 'tegra' not in platform_release and sys_platform == 'windows'",
-    "python_full_version == '3.10.*' and 'tegra' not in platform_release and sys_platform == 'windows'",
-    "python_full_version < '3.10' and 'tegra' not in platform_release and sys_platform == 'windows'",
-    "python_full_version >= '3.12' and platform_machine != 'aarch64' and 'tegra' in platform_release and sys_platform == 'windows'",
-    "python_full_version == '3.11.*' and platform_machine != 'aarch64' and 'tegra' in platform_release and sys_platform == 'windows'",
-    "python_full_version == '3.10.*' and platform_machine != 'aarch64' and 'tegra' in platform_release and sys_platform == 'windows'",
-    "python_full_version < '3.10' and platform_machine != 'aarch64' and 'tegra' in platform_release and sys_platform == 'windows'",
-]
 wheels = [
-    { url = "https://pypi.nvidia.com/tensorrt-cu12-bindings/tensorrt_cu12_bindings-10.11.0.33-cp310-none-manylinux_2_28_x86_64.whl", hash = "sha256:a2d27745575be5d7f06caa9565230025b8e41a8915ee6a5dc735d41c3faf206d" },
-    { url = "https://pypi.nvidia.com/tensorrt-cu12-bindings/tensorrt_cu12_bindings-10.11.0.33-cp310-none-manylinux_2_31_aarch64.whl", hash = "sha256:546c7ee976366dc9cb76ffefbde555dec4feddcfb508b4c99ee626447b8c72de" },
-    { url = "https://pypi.nvidia.com/tensorrt-cu12-bindings/tensorrt_cu12_bindings-10.11.0.33-cp311-none-manylinux_2_28_x86_64.whl", hash = "sha256:e7b7a5b80174f8c4ddd8a63bc9fa97cad3320409eafad79428bc2b1e15884068" },
-    { url = "https://pypi.nvidia.com/tensorrt-cu12-bindings/tensorrt_cu12_bindings-10.11.0.33-cp311-none-manylinux_2_31_aarch64.whl", hash = "sha256:492e3e91d7c1083bff1f7c15fdd8f5fb09a782dcfa6d1d0f8d9034b2e3b38cad" },
-    { url = "https://pypi.nvidia.com/tensorrt-cu12-bindings/tensorrt_cu12_bindings-10.11.0.33-cp312-none-manylinux_2_28_x86_64.whl", hash = "sha256:a8f374f6d752ce4b0d4a8303d29c3ba9904eb29da0dc95b4db6b75c501997e4a" },
-    { url = "https://pypi.nvidia.com/tensorrt-cu12-bindings/tensorrt_cu12_bindings-10.11.0.33-cp312-none-manylinux_2_31_aarch64.whl", hash = "sha256:6a3b768cea69b153ed0c2eb50130d150406d5c1498fdb0bf6c8a1be160137a6a" },
-    { url = "https://pypi.nvidia.com/tensorrt-cu12-bindings/tensorrt_cu12_bindings-10.11.0.33-cp313-none-manylinux_2_28_x86_64.whl", hash = "sha256:1ceda290d1ed79b6107b0eb29eeb178f569d007c1506b72caae8248975d57662" },
-    { url = "https://pypi.nvidia.com/tensorrt-cu12-bindings/tensorrt_cu12_bindings-10.11.0.33-cp313-none-manylinux_2_31_aarch64.whl", hash = "sha256:3c27e0d6e36a3b1f06e1dc8b735e34f04f5b8aac3e7d9b21762b8264496e825f" },
-    { url = "https://pypi.nvidia.com/tensorrt-cu12-bindings/tensorrt_cu12_bindings-10.11.0.33-cp39-none-manylinux_2_28_x86_64.whl", hash = "sha256:9a801886f389b75f92e69fc6be40308392ec7746dbf4de4a2b76585d591960f0" },
-    { url = "https://pypi.nvidia.com/tensorrt-cu12-bindings/tensorrt_cu12_bindings-10.11.0.33-cp39-none-manylinux_2_31_aarch64.whl", hash = "sha256:42e9b3cc2e3c6bcc0785c9c96b4dd25cd7043ff95e4fd09c8d35331f63ce9634" },
+    { url = "https://pypi.nvidia.com/tensorrt-cu12-bindings/tensorrt_cu12_bindings-10.12.0.36-cp310-none-manylinux_2_28_x86_64.whl", hash = "sha256:7ecdb6fc2555caed7d4fbbd8158ed7ced64e230c125484f62a5369c40dcc70e5" },
+    { url = "https://pypi.nvidia.com/tensorrt-cu12-bindings/tensorrt_cu12_bindings-10.12.0.36-cp310-none-manylinux_2_31_aarch64.whl", hash = "sha256:d8548ab5976ca5c91279c68ee77f4c892e03460709cfa3fbd2a22aa8123cb731" },
+    { url = "https://pypi.nvidia.com/tensorrt-cu12-bindings/tensorrt_cu12_bindings-10.12.0.36-cp311-none-manylinux_2_28_x86_64.whl", hash = "sha256:58cf45605bb330e86f8ad49bc8997ed68cfdf5b09da229534fb7f84aa3fe5bf4" },
+    { url = "https://pypi.nvidia.com/tensorrt-cu12-bindings/tensorrt_cu12_bindings-10.12.0.36-cp311-none-manylinux_2_31_aarch64.whl", hash = "sha256:ae0866a89caaeada1c16776de85413a523f78f53b1fd83f1b903c39eed264d82" },
+    { url = "https://pypi.nvidia.com/tensorrt-cu12-bindings/tensorrt_cu12_bindings-10.12.0.36-cp312-none-manylinux_2_28_x86_64.whl", hash = "sha256:fb3a2ce96c7472a46bbee2030ce6a54fd6a32deda401c1c67d9de057550e0171" },
+    { url = "https://pypi.nvidia.com/tensorrt-cu12-bindings/tensorrt_cu12_bindings-10.12.0.36-cp312-none-manylinux_2_31_aarch64.whl", hash = "sha256:f5128b8b2a379e65c09745ba97df58abf3a418cbfd6508d37f76121d9bdd3bc8" },
+    { url = "https://pypi.nvidia.com/tensorrt-cu12-bindings/tensorrt_cu12_bindings-10.12.0.36-cp313-none-manylinux_2_28_x86_64.whl", hash = "sha256:0eb8d3e41279b1d0d329b85372d5d720c8d2ff1228f6273142d717b44d75935b" },
+    { url = "https://pypi.nvidia.com/tensorrt-cu12-bindings/tensorrt_cu12_bindings-10.12.0.36-cp313-none-manylinux_2_31_aarch64.whl", hash = "sha256:a850992cad842340e6fed41fe74f529064064ff61881d50ef5a2be1816526f9b" },
+    { url = "https://pypi.nvidia.com/tensorrt-cu12-bindings/tensorrt_cu12_bindings-10.12.0.36-cp39-none-manylinux_2_28_x86_64.whl", hash = "sha256:986cb86202ef9541279b59d4e254743aff43bae1def87d14dd06e02369107c8b" },
+    { url = "https://pypi.nvidia.com/tensorrt-cu12-bindings/tensorrt_cu12_bindings-10.12.0.36-cp39-none-manylinux_2_31_aarch64.whl", hash = "sha256:c5b86638ae5e3a2101755d469ac2ce831d4bdece1d20fa2bd546c05c554b5952" },
 ]
 
 [[package]]
 name = "tensorrt-cu12-libs"
-version = "10.3.0"
+version = "10.12.0.36"
 source = { registry = "https://pypi.nvidia.com/" }
-resolution-markers = [
-    "python_full_version >= '3.12' and platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'linux'",
-    "python_full_version == '3.11.*' and platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'linux'",
-    "python_full_version == '3.10.*' and platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'linux'",
-    "python_full_version < '3.10' and platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'linux'",
-    "python_full_version >= '3.12' and platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'windows'",
-    "python_full_version == '3.11.*' and platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'windows'",
-    "python_full_version == '3.10.*' and platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'windows'",
-    "python_full_version < '3.10' and platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'windows'",
-]
 dependencies = [
-    { name = "nvidia-cuda-runtime-cu12", version = "12.8.90", source = { registry = "https://pypi.nvidia.com/" }, marker = "(platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'linux') or (platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'windows')" },
-]
-
-[[package]]
-name = "tensorrt-cu12-libs"
-version = "10.11.0.33"
-source = { registry = "https://pypi.nvidia.com/" }
-resolution-markers = [
-    "python_full_version >= '3.12' and platform_machine != 'aarch64' and 'tegra' not in platform_release and sys_platform == 'linux'",
-    "python_full_version >= '3.12' and platform_machine == 'aarch64' and 'tegra' not in platform_release and sys_platform == 'linux'",
-    "python_full_version == '3.11.*' and platform_machine != 'aarch64' and 'tegra' not in platform_release and sys_platform == 'linux'",
-    "python_full_version == '3.10.*' and platform_machine != 'aarch64' and 'tegra' not in platform_release and sys_platform == 'linux'",
-    "python_full_version == '3.11.*' and platform_machine == 'aarch64' and 'tegra' not in platform_release and sys_platform == 'linux'",
-    "python_full_version == '3.10.*' and platform_machine == 'aarch64' and 'tegra' not in platform_release and sys_platform == 'linux'",
-    "python_full_version < '3.10' and platform_machine != 'aarch64' and 'tegra' not in platform_release and sys_platform == 'linux'",
-    "python_full_version < '3.10' and platform_machine == 'aarch64' and 'tegra' not in platform_release and sys_platform == 'linux'",
-    "python_full_version >= '3.12' and platform_machine != 'aarch64' and 'tegra' in platform_release and sys_platform == 'linux'",
-    "python_full_version == '3.11.*' and platform_machine != 'aarch64' and 'tegra' in platform_release and sys_platform == 'linux'",
-    "python_full_version == '3.10.*' and platform_machine != 'aarch64' and 'tegra' in platform_release and sys_platform == 'linux'",
-    "python_full_version < '3.10' and platform_machine != 'aarch64' and 'tegra' in platform_release and sys_platform == 'linux'",
-    "python_full_version >= '3.12' and 'tegra' not in platform_release and sys_platform == 'windows'",
-    "python_full_version == '3.11.*' and 'tegra' not in platform_release and sys_platform == 'windows'",
-    "python_full_version == '3.10.*' and 'tegra' not in platform_release and sys_platform == 'windows'",
-    "python_full_version < '3.10' and 'tegra' not in platform_release and sys_platform == 'windows'",
-    "python_full_version >= '3.12' and platform_machine != 'aarch64' and 'tegra' in platform_release and sys_platform == 'windows'",
-    "python_full_version == '3.11.*' and platform_machine != 'aarch64' and 'tegra' in platform_release and sys_platform == 'windows'",
-    "python_full_version == '3.10.*' and platform_machine != 'aarch64' and 'tegra' in platform_release and sys_platform == 'windows'",
-    "python_full_version < '3.10' and platform_machine != 'aarch64' and 'tegra' in platform_release and sys_platform == 'windows'",
-]
-dependencies = [
-    { name = "nvidia-cuda-runtime-cu12", version = "12.8.90", source = { registry = "https://pypi.nvidia.com/" }, marker = "(platform_machine == 'aarch64' and 'tegra' not in platform_release and sys_platform == 'linux') or (platform_machine != 'aarch64' and sys_platform == 'windows') or ('tegra' not in platform_release and sys_platform == 'windows')" },
+    { name = "nvidia-cuda-runtime-cu12", version = "12.8.90", source = { registry = "https://pypi.nvidia.com/" }, marker = "(platform_machine == 'aarch64' and sys_platform == 'linux') or sys_platform == 'windows'" },
     { name = "nvidia-cuda-runtime-cu12", version = "12.9.79", source = { registry = "https://download.pytorch.org/whl/nightly/cu129" }, marker = "platform_machine != 'aarch64' and sys_platform == 'linux'" },
 ]
 wheels = [
-    { url = "https://pypi.nvidia.com/tensorrt-cu12-libs/tensorrt_cu12_libs-10.11.0.33-py2.py3-none-manylinux_2_28_x86_64.whl", hash = "sha256:81ace8d3284fdbef0804c444a4d7555343ee079370e79c93cb328c7d9b08f968" },
-    { url = "https://pypi.nvidia.com/tensorrt-cu12-libs/tensorrt_cu12_libs-10.11.0.33-py2.py3-none-manylinux_2_31_aarch64.whl", hash = "sha256:b6846dbc32d717a5031d9757f16293dd9e25de8a1c4aae8c00701d52351ef173" },
+    { url = "https://pypi.nvidia.com/tensorrt-cu12-libs/tensorrt_cu12_libs-10.12.0.36-py2.py3-none-manylinux_2_28_x86_64.whl", hash = "sha256:3910039e1d49de0edfdc8bf273e40ad4b85a9d57c7c383fe0e22f75417df9610" },
+    { url = "https://pypi.nvidia.com/tensorrt-cu12-libs/tensorrt_cu12_libs-10.12.0.36-py2.py3-none-manylinux_2_31_aarch64.whl", hash = "sha256:1c117effa7318b65508457e9a11e67941859c8e5c346b59fd0090f66be28f2f4" },
 ]
 
 [[package]]
@@ -2718,10 +2556,8 @@ dependencies = [
     { name = "huggingface-hub", marker = "sys_platform == 'linux' or sys_platform == 'windows'" },
     { name = "pyyaml", marker = "sys_platform == 'linux' or sys_platform == 'windows'" },
     { name = "safetensors", marker = "sys_platform == 'linux' or sys_platform == 'windows'" },
-    { name = "torch", version = "2.7.0", source = { registry = "https://pypi.org/simple" }, marker = "(platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'linux') or (platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'windows')" },
-    { name = "torch", version = "2.9.0.dev20250701+cu129", source = { registry = "https://download.pytorch.org/whl/nightly/cu129" }, marker = "(platform_machine != 'aarch64' and sys_platform == 'linux') or (platform_machine != 'aarch64' and sys_platform == 'windows') or ('tegra' not in platform_release and sys_platform == 'linux') or ('tegra' not in platform_release and sys_platform == 'windows')" },
-    { name = "torchvision", version = "0.22.0", source = { registry = "https://pypi.org/simple" }, marker = "(platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'linux') or (platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'windows')" },
-    { name = "torchvision", version = "0.23.0.dev20250701+cu129", source = { registry = "https://download.pytorch.org/whl/nightly/cu129" }, marker = "(platform_machine != 'aarch64' and sys_platform == 'linux') or (platform_machine != 'aarch64' and sys_platform == 'windows') or ('tegra' not in platform_release and sys_platform == 'linux') or ('tegra' not in platform_release and sys_platform == 'windows')" },
+    { name = "torch", marker = "sys_platform == 'linux' or sys_platform == 'windows'" },
+    { name = "torchvision", marker = "sys_platform == 'linux' or sys_platform == 'windows'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/bc/0c/66b0f9b4a4cb9ffdac7b52b17b37c7d3c4f75623b469e388b0c6d89b4e88/timm-1.0.15.tar.gz", hash = "sha256:756a3bc30c96565f056e608a9b559daed904617eaadb6be536f96874879b1055", size = 2230258, upload-time = "2025-02-23T05:05:55.959Z" }
 wheels = [
@@ -2778,71 +2614,15 @@ wheels = [
 
 [[package]]
 name = "torch"
-version = "2.7.0"
-source = { registry = "https://pypi.org/simple" }
-resolution-markers = [
-    "python_full_version >= '3.12' and platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'linux'",
-    "python_full_version == '3.11.*' and platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'linux'",
-    "python_full_version == '3.10.*' and platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'linux'",
-    "python_full_version < '3.10' and platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'linux'",
-    "python_full_version >= '3.12' and platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'windows'",
-    "python_full_version == '3.11.*' and platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'windows'",
-    "python_full_version == '3.10.*' and platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'windows'",
-    "python_full_version < '3.10' and platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'windows'",
-]
-dependencies = [
-    { name = "filelock", marker = "(platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'linux') or (platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'windows')" },
-    { name = "fsspec", marker = "(platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'linux') or (platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'windows')" },
-    { name = "jinja2", marker = "(platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'linux') or (platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'windows')" },
-    { name = "networkx", version = "3.2.1", source = { registry = "https://download.pytorch.org/whl/nightly/cu129" }, marker = "(python_full_version < '3.10' and platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'linux') or (python_full_version < '3.10' and platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'windows')" },
-    { name = "networkx", version = "3.4.2", source = { registry = "https://download.pytorch.org/whl/nightly/cu129" }, marker = "(python_full_version == '3.10.*' and platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'linux') or (python_full_version == '3.10.*' and platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'windows')" },
-    { name = "networkx", version = "3.5", source = { registry = "https://download.pytorch.org/whl/nightly/cu129" }, marker = "(python_full_version >= '3.11' and platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'linux') or (python_full_version >= '3.11' and platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'windows')" },
-    { name = "setuptools", marker = "(python_full_version >= '3.12' and platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'linux') or (python_full_version >= '3.12' and platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'windows')" },
-    { name = "sympy", marker = "(platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'linux') or (platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'windows')" },
-    { name = "typing-extensions", marker = "(platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'linux') or (platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'windows')" },
-]
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/46/c2/3fb87940fa160d956ee94d644d37b99a24b9c05a4222bf34f94c71880e28/torch-2.7.0-cp310-cp310-manylinux_2_28_aarch64.whl", hash = "sha256:c9afea41b11e1a1ab1b258a5c31afbd646d6319042bfe4f231b408034b51128b", size = 99158447, upload-time = "2025-04-23T14:35:10.557Z" },
-    { url = "https://files.pythonhosted.org/packages/40/da/7378d16cc636697f2a94f791cb496939b60fb8580ddbbef22367db2c2274/torch-2.7.0-cp311-cp311-manylinux_2_28_aarch64.whl", hash = "sha256:2b7813e904757b125faf1a9a3154e1d50381d539ced34da1992f52440567c156", size = 99159397, upload-time = "2025-04-23T14:35:35.304Z" },
-    { url = "https://files.pythonhosted.org/packages/aa/5e/ac759f4c0ab7c01feffa777bd68b43d2ac61560a9770eeac074b450f81d4/torch-2.7.0-cp312-cp312-manylinux_2_28_aarch64.whl", hash = "sha256:36a6368c7ace41ad1c0f69f18056020b6a5ca47bedaca9a2f3b578f5a104c26c", size = 99013250, upload-time = "2025-04-23T14:35:15.589Z" },
-    { url = "https://files.pythonhosted.org/packages/14/24/720ea9a66c29151b315ea6ba6f404650834af57a26b2a04af23ec246b2d5/torch-2.7.0-cp313-cp313-manylinux_2_28_aarch64.whl", hash = "sha256:868ccdc11798535b5727509480cd1d86d74220cfdc42842c4617338c1109a205", size = 99015553, upload-time = "2025-04-23T14:34:41.075Z" },
-    { url = "https://files.pythonhosted.org/packages/cb/b4/8df3f9fe6bdf59e56a0e538592c308d18638eb5f5dc4b08d02abb173c9f0/torch-2.7.0-cp313-cp313t-manylinux_2_28_aarch64.whl", hash = "sha256:2a885fc25afefb6e6eb18a7d1e8bfa01cc153e92271d980a49243b250d5ab6d9", size = 99091348, upload-time = "2025-04-23T14:33:48.975Z" },
-    { url = "https://files.pythonhosted.org/packages/57/6a/36775d1b553a443ba1453e1bfeae903ef20d94c95ab31aa09225bf52fda1/torch-2.7.0-cp39-cp39-manylinux_2_28_aarch64.whl", hash = "sha256:e362efaa5b3078e5f75c33efc05005b9b46de0d2e899519d5b4cad0e050ed0f7", size = 99197389, upload-time = "2025-04-23T14:32:33.083Z" },
-]
-
-[[package]]
-name = "torch"
 version = "2.9.0.dev20250701+cu129"
 source = { registry = "https://download.pytorch.org/whl/nightly/cu129" }
-resolution-markers = [
-    "python_full_version >= '3.12' and platform_machine != 'aarch64' and 'tegra' not in platform_release and sys_platform == 'linux'",
-    "python_full_version >= '3.12' and platform_machine == 'aarch64' and 'tegra' not in platform_release and sys_platform == 'linux'",
-    "python_full_version == '3.11.*' and platform_machine != 'aarch64' and 'tegra' not in platform_release and sys_platform == 'linux'",
-    "python_full_version == '3.10.*' and platform_machine != 'aarch64' and 'tegra' not in platform_release and sys_platform == 'linux'",
-    "python_full_version == '3.11.*' and platform_machine == 'aarch64' and 'tegra' not in platform_release and sys_platform == 'linux'",
-    "python_full_version == '3.10.*' and platform_machine == 'aarch64' and 'tegra' not in platform_release and sys_platform == 'linux'",
-    "python_full_version < '3.10' and platform_machine != 'aarch64' and 'tegra' not in platform_release and sys_platform == 'linux'",
-    "python_full_version < '3.10' and platform_machine == 'aarch64' and 'tegra' not in platform_release and sys_platform == 'linux'",
-    "python_full_version >= '3.12' and platform_machine != 'aarch64' and 'tegra' in platform_release and sys_platform == 'linux'",
-    "python_full_version == '3.11.*' and platform_machine != 'aarch64' and 'tegra' in platform_release and sys_platform == 'linux'",
-    "python_full_version == '3.10.*' and platform_machine != 'aarch64' and 'tegra' in platform_release and sys_platform == 'linux'",
-    "python_full_version < '3.10' and platform_machine != 'aarch64' and 'tegra' in platform_release and sys_platform == 'linux'",
-    "python_full_version >= '3.12' and 'tegra' not in platform_release and sys_platform == 'windows'",
-    "python_full_version == '3.11.*' and 'tegra' not in platform_release and sys_platform == 'windows'",
-    "python_full_version == '3.10.*' and 'tegra' not in platform_release and sys_platform == 'windows'",
-    "python_full_version < '3.10' and 'tegra' not in platform_release and sys_platform == 'windows'",
-    "python_full_version >= '3.12' and platform_machine != 'aarch64' and 'tegra' in platform_release and sys_platform == 'windows'",
-    "python_full_version == '3.11.*' and platform_machine != 'aarch64' and 'tegra' in platform_release and sys_platform == 'windows'",
-    "python_full_version == '3.10.*' and platform_machine != 'aarch64' and 'tegra' in platform_release and sys_platform == 'windows'",
-    "python_full_version < '3.10' and platform_machine != 'aarch64' and 'tegra' in platform_release and sys_platform == 'windows'",
-]
 dependencies = [
-    { name = "filelock", marker = "(platform_machine != 'aarch64' and sys_platform == 'linux') or (platform_machine != 'aarch64' and sys_platform == 'windows') or ('tegra' not in platform_release and sys_platform == 'linux') or ('tegra' not in platform_release and sys_platform == 'windows')" },
-    { name = "fsspec", marker = "(platform_machine != 'aarch64' and sys_platform == 'linux') or (platform_machine != 'aarch64' and sys_platform == 'windows') or ('tegra' not in platform_release and sys_platform == 'linux') or ('tegra' not in platform_release and sys_platform == 'windows')" },
-    { name = "jinja2", marker = "(platform_machine != 'aarch64' and sys_platform == 'linux') or (platform_machine != 'aarch64' and sys_platform == 'windows') or ('tegra' not in platform_release and sys_platform == 'linux') or ('tegra' not in platform_release and sys_platform == 'windows')" },
-    { name = "networkx", version = "3.2.1", source = { registry = "https://download.pytorch.org/whl/nightly/cu129" }, marker = "(python_full_version < '3.10' and platform_machine != 'aarch64' and sys_platform == 'linux') or (python_full_version < '3.10' and platform_machine != 'aarch64' and sys_platform == 'windows') or (python_full_version < '3.10' and 'tegra' not in platform_release and sys_platform == 'linux') or (python_full_version < '3.10' and 'tegra' not in platform_release and sys_platform == 'windows')" },
-    { name = "networkx", version = "3.4.2", source = { registry = "https://download.pytorch.org/whl/nightly/cu129" }, marker = "(python_full_version == '3.10.*' and platform_machine != 'aarch64' and sys_platform == 'linux') or (python_full_version == '3.10.*' and platform_machine != 'aarch64' and sys_platform == 'windows') or (python_full_version == '3.10.*' and 'tegra' not in platform_release and sys_platform == 'linux') or (python_full_version == '3.10.*' and 'tegra' not in platform_release and sys_platform == 'windows')" },
-    { name = "networkx", version = "3.5", source = { registry = "https://download.pytorch.org/whl/nightly/cu129" }, marker = "(python_full_version >= '3.11' and platform_machine != 'aarch64' and sys_platform == 'linux') or (python_full_version >= '3.11' and platform_machine != 'aarch64' and sys_platform == 'windows') or (python_full_version >= '3.11' and 'tegra' not in platform_release and sys_platform == 'linux') or (python_full_version >= '3.11' and 'tegra' not in platform_release and sys_platform == 'windows')" },
+    { name = "filelock", marker = "sys_platform == 'linux' or sys_platform == 'windows'" },
+    { name = "fsspec", marker = "sys_platform == 'linux' or sys_platform == 'windows'" },
+    { name = "jinja2", marker = "sys_platform == 'linux' or sys_platform == 'windows'" },
+    { name = "networkx", version = "3.2.1", source = { registry = "https://download.pytorch.org/whl/nightly/cu129" }, marker = "(python_full_version < '3.10' and sys_platform == 'linux') or (python_full_version < '3.10' and sys_platform == 'windows')" },
+    { name = "networkx", version = "3.4.2", source = { registry = "https://download.pytorch.org/whl/nightly/cu129" }, marker = "(python_full_version == '3.10.*' and sys_platform == 'linux') or (python_full_version == '3.10.*' and sys_platform == 'windows')" },
+    { name = "networkx", version = "3.5", source = { registry = "https://download.pytorch.org/whl/nightly/cu129" }, marker = "(python_full_version >= '3.11' and sys_platform == 'linux') or (python_full_version >= '3.11' and sys_platform == 'windows')" },
     { name = "nvidia-cublas-cu12", marker = "platform_machine == 'x86_64' and sys_platform == 'linux'" },
     { name = "nvidia-cuda-cupti-cu12", marker = "platform_machine == 'x86_64' and sys_platform == 'linux'" },
     { name = "nvidia-cuda-nvrtc-cu12", marker = "platform_machine == 'x86_64' and sys_platform == 'linux'" },
@@ -2858,9 +2638,9 @@ dependencies = [
     { name = "nvidia-nvjitlink-cu12", marker = "platform_machine == 'x86_64' and sys_platform == 'linux'" },
     { name = "nvidia-nvtx-cu12", marker = "platform_machine == 'x86_64' and sys_platform == 'linux'" },
     { name = "pytorch-triton", marker = "platform_machine == 'x86_64' and sys_platform == 'linux'" },
-    { name = "setuptools", marker = "(python_full_version >= '3.12' and platform_machine != 'aarch64' and sys_platform == 'linux') or (python_full_version >= '3.12' and platform_machine != 'aarch64' and sys_platform == 'windows') or (python_full_version >= '3.12' and 'tegra' not in platform_release and sys_platform == 'linux') or (python_full_version >= '3.12' and 'tegra' not in platform_release and sys_platform == 'windows')" },
-    { name = "sympy", marker = "(platform_machine != 'aarch64' and sys_platform == 'linux') or (platform_machine != 'aarch64' and sys_platform == 'windows') or ('tegra' not in platform_release and sys_platform == 'linux') or ('tegra' not in platform_release and sys_platform == 'windows')" },
-    { name = "typing-extensions", marker = "(platform_machine != 'aarch64' and sys_platform == 'linux') or (platform_machine != 'aarch64' and sys_platform == 'windows') or ('tegra' not in platform_release and sys_platform == 'linux') or ('tegra' not in platform_release and sys_platform == 'windows')" },
+    { name = "setuptools", marker = "(python_full_version >= '3.12' and sys_platform == 'linux') or (python_full_version >= '3.12' and sys_platform == 'windows')" },
+    { name = "sympy", marker = "sys_platform == 'linux' or sys_platform == 'windows'" },
+    { name = "typing-extensions", marker = "sys_platform == 'linux' or sys_platform == 'windows'" },
 ]
 wheels = [
     { url = "https://download.pytorch.org/whl/nightly/cu129/torch-2.9.0.dev20250701%2Bcu129-cp310-cp310-manylinux_2_28_aarch64.whl" },
@@ -2885,27 +2665,12 @@ dependencies = [
     { name = "numpy", version = "1.26.4", source = { registry = "https://download.pytorch.org/whl/nightly/cu129" }, marker = "(python_full_version < '3.10' and sys_platform == 'linux') or (python_full_version < '3.10' and sys_platform == 'windows') or ('tegra' in platform_release and sys_platform == 'linux') or ('tegra' in platform_release and sys_platform == 'windows')" },
     { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version >= '3.10' and 'tegra' not in platform_release and sys_platform == 'linux') or (python_full_version >= '3.10' and 'tegra' not in platform_release and sys_platform == 'windows')" },
     { name = "packaging", marker = "sys_platform == 'linux' or sys_platform == 'windows'" },
-    { name = "tensorrt", version = "10.3.0", source = { registry = "https://pypi.nvidia.com/" }, marker = "(platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'linux') or (platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'windows')" },
-    { name = "tensorrt", version = "10.11.0.33", source = { registry = "https://pypi.nvidia.com/" }, marker = "(platform_machine != 'aarch64' and sys_platform == 'linux') or (platform_machine != 'aarch64' and sys_platform == 'windows') or ('tegra' not in platform_release and sys_platform == 'linux') or ('tegra' not in platform_release and sys_platform == 'windows')" },
-    { name = "tensorrt-cu12", version = "10.3.0", source = { registry = "https://pypi.nvidia.com/" }, marker = "(platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'linux') or (platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'windows')" },
-    { name = "tensorrt-cu12", version = "10.11.0.33", source = { registry = "https://pypi.nvidia.com/" }, marker = "(platform_machine != 'aarch64' and sys_platform == 'linux') or (platform_machine != 'aarch64' and sys_platform == 'windows') or ('tegra' not in platform_release and sys_platform == 'linux') or ('tegra' not in platform_release and sys_platform == 'windows')" },
-    { name = "tensorrt-cu12-bindings", version = "10.3.0", source = { registry = "https://pypi.nvidia.com/" }, marker = "(platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'linux') or (platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'windows')" },
-    { name = "tensorrt-cu12-bindings", version = "10.11.0.33", source = { registry = "https://pypi.nvidia.com/" }, marker = "(platform_machine != 'aarch64' and sys_platform == 'linux') or (platform_machine != 'aarch64' and sys_platform == 'windows') or ('tegra' not in platform_release and sys_platform == 'linux') or ('tegra' not in platform_release and sys_platform == 'windows')" },
-    { name = "tensorrt-cu12-libs", version = "10.3.0", source = { registry = "https://pypi.nvidia.com/" }, marker = "(platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'linux') or (platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'windows')" },
-    { name = "tensorrt-cu12-libs", version = "10.11.0.33", source = { registry = "https://pypi.nvidia.com/" }, marker = "(platform_machine != 'aarch64' and sys_platform == 'linux') or (platform_machine != 'aarch64' and sys_platform == 'windows') or ('tegra' not in platform_release and sys_platform == 'linux') or ('tegra' not in platform_release and sys_platform == 'windows')" },
-    { name = "torch", version = "2.7.0", source = { registry = "https://pypi.org/simple" }, marker = "(platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'linux') or (platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'windows')" },
-    { name = "torch", version = "2.9.0.dev20250701+cu129", source = { registry = "https://download.pytorch.org/whl/nightly/cu129" }, marker = "(platform_machine != 'aarch64' and sys_platform == 'linux') or (platform_machine != 'aarch64' and sys_platform == 'windows') or ('tegra' not in platform_release and sys_platform == 'linux') or ('tegra' not in platform_release and sys_platform == 'windows')" },
+    { name = "tensorrt", marker = "sys_platform == 'linux' or sys_platform == 'windows'" },
+    { name = "tensorrt-cu12", marker = "sys_platform == 'linux' or sys_platform == 'windows'" },
+    { name = "tensorrt-cu12-bindings", marker = "sys_platform == 'linux' or sys_platform == 'windows'" },
+    { name = "tensorrt-cu12-libs", marker = "sys_platform == 'linux' or sys_platform == 'windows'" },
+    { name = "torch", marker = "sys_platform == 'linux' or sys_platform == 'windows'" },
     { name = "typing-extensions", marker = "sys_platform == 'linux' or sys_platform == 'windows'" },
-]
-
-[package.optional-dependencies]
-quantization = [
-    { name = "nvidia-modelopt", version = "0.29.0", source = { registry = "https://pypi.nvidia.com/" }, extra = ["all"], marker = "(python_full_version < '3.12' and 'tegra' in platform_release and sys_platform == 'linux') or (python_full_version < '3.12' and 'tegra' in platform_release and sys_platform == 'windows') or (python_full_version < '3.10' and sys_platform == 'linux') or (python_full_version < '3.10' and sys_platform == 'windows')" },
-    { name = "nvidia-modelopt", version = "0.31.0", source = { registry = "https://pypi.nvidia.com/" }, extra = ["all"], marker = "(python_full_version >= '3.10' and 'tegra' not in platform_release and sys_platform == 'linux') or (python_full_version >= '3.10' and 'tegra' not in platform_release and sys_platform == 'windows') or (python_full_version >= '3.12' and sys_platform == 'linux') or (python_full_version >= '3.12' and sys_platform == 'windows')" },
-]
-torchvision = [
-    { name = "torchvision", version = "0.22.0", source = { registry = "https://pypi.org/simple" }, marker = "(platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'linux') or (platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'windows')" },
-    { name = "torchvision", version = "0.23.0.dev20250701+cu129", source = { registry = "https://download.pytorch.org/whl/nightly/cu129" }, marker = "(platform_machine != 'aarch64' and sys_platform == 'linux') or (platform_machine != 'aarch64' and sys_platform == 'windows') or ('tegra' not in platform_release and sys_platform == 'linux') or ('tegra' not in platform_release and sys_platform == 'windows')" },
 ]
 
 [package.dev-dependencies]
@@ -2924,6 +2689,10 @@ dev = [
     { name = "ruff", marker = "sys_platform == 'linux' or sys_platform == 'windows'" },
     { name = "typos", marker = "sys_platform == 'linux' or sys_platform == 'windows'" },
 ]
+quantization = [
+    { name = "nvidia-modelopt", version = "0.29.0", source = { registry = "https://pypi.nvidia.com/" }, extra = ["all"], marker = "(python_full_version < '3.12' and 'tegra' in platform_release and sys_platform == 'linux') or (python_full_version < '3.12' and 'tegra' in platform_release and sys_platform == 'windows') or (python_full_version < '3.10' and sys_platform == 'linux') or (python_full_version < '3.10' and sys_platform == 'windows')" },
+    { name = "nvidia-modelopt", version = "0.31.0", source = { registry = "https://pypi.nvidia.com/" }, extra = ["all"], marker = "(python_full_version >= '3.10' and 'tegra' not in platform_release and sys_platform == 'linux') or (python_full_version >= '3.10' and 'tegra' not in platform_release and sys_platform == 'windows') or (python_full_version >= '3.12' and sys_platform == 'linux') or (python_full_version >= '3.12' and sys_platform == 'windows')" },
+]
 test = [
     { name = "expecttest", marker = "sys_platform == 'linux' or sys_platform == 'windows'" },
     { name = "parameterized", marker = "sys_platform == 'linux' or sys_platform == 'windows'" },
@@ -2936,25 +2705,16 @@ test = [
 [package.metadata]
 requires-dist = [
     { name = "dllist" },
-    { name = "numpy", marker = "platform_machine != 'aarch64' or 'tegra' not in platform_release" },
-    { name = "numpy", marker = "platform_machine == 'aarch64' and 'tegra' in platform_release", specifier = "<2.0.0" },
-    { name = "nvidia-modelopt", extras = ["all"], marker = "extra == 'quantization'", specifier = ">=0.27.1" },
+    { name = "numpy" },
     { name = "packaging", specifier = ">=23" },
-    { name = "tensorrt", marker = "platform_machine != 'aarch64' or 'tegra' not in platform_release", specifier = ">=10.11.0,<10.12.0" },
-    { name = "tensorrt", marker = "platform_machine == 'aarch64' and 'tegra' in platform_release", specifier = ">=10.3.0,<10.4.0" },
-    { name = "tensorrt-cu12", marker = "platform_machine != 'aarch64' or 'tegra' not in platform_release", specifier = ">=10.11.0,<10.12.0" },
-    { name = "tensorrt-cu12", marker = "platform_machine == 'aarch64' and 'tegra' in platform_release", specifier = ">=10.3.0,<10.4.0" },
-    { name = "tensorrt-cu12-bindings", marker = "platform_machine != 'aarch64' or 'tegra' not in platform_release", specifier = ">=10.11.0,<10.12.0" },
-    { name = "tensorrt-cu12-bindings", marker = "platform_machine == 'aarch64' and 'tegra' in platform_release", specifier = ">=10.3.0,<10.4.0" },
-    { name = "tensorrt-cu12-libs", marker = "platform_machine != 'aarch64' or 'tegra' not in platform_release", specifier = ">=10.11.0,<10.12.0" },
-    { name = "tensorrt-cu12-libs", marker = "platform_machine == 'aarch64' and 'tegra' in platform_release", specifier = ">=10.3.0,<10.4.0" },
+    { name = "tensorrt", specifier = ">=10.12.0,<10.13.0" },
+    { name = "tensorrt-cu12", specifier = ">=10.12.0,<10.13.0" },
+    { name = "tensorrt-cu12-bindings", specifier = ">=10.12.0,<10.13.0" },
+    { name = "tensorrt-cu12-libs", specifier = ">=10.12.0,<10.13.0" },
     { name = "torch", marker = "platform_machine != 'aarch64' or 'tegra' not in platform_release", specifier = ">=2.9.0.dev0,<2.10.0", index = "https://download.pytorch.org/whl/nightly/cu129" },
-    { name = "torch", marker = "platform_machine == 'aarch64' and 'tegra' in platform_release", specifier = ">=2.7.0,<2.8.0" },
-    { name = "torchvision", marker = "platform_machine == 'aarch64' and 'tegra' in platform_release and extra == 'torchvision'", specifier = ">=0.22.0,<0.23.0" },
-    { name = "torchvision", marker = "(platform_machine != 'aarch64' and extra == 'torchvision') or ('tegra' not in platform_release and extra == 'torchvision')", specifier = ">=0.23.0.dev0,<0.24.0", index = "https://download.pytorch.org/whl/nightly/cu129" },
+    { name = "torch", marker = "platform_machine == 'aarch64' and 'tegra' in platform_release", specifier = ">=2.9.0.dev0,<2.10.0" },
     { name = "typing-extensions", specifier = ">=4.7.0" },
 ]
-provides-extras = ["torchvision", "quantization"]
 
 [package.metadata.requires-dev]
 debug = [
@@ -2972,6 +2732,7 @@ dev = [
     { name = "ruff" },
     { name = "typos" },
 ]
+quantization = [{ name = "nvidia-modelopt", extras = ["all"], specifier = ">=0.27.1" }]
 test = [
     { name = "expecttest", specifier = "==0.1.6" },
     { name = "parameterized", specifier = ">=0.2.0" },
@@ -2988,10 +2749,8 @@ source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "numpy", version = "1.26.4", source = { registry = "https://download.pytorch.org/whl/nightly/cu129" }, marker = "(python_full_version < '3.10' and sys_platform == 'linux') or (python_full_version < '3.10' and sys_platform == 'windows') or ('tegra' in platform_release and sys_platform == 'linux') or ('tegra' in platform_release and sys_platform == 'windows')" },
     { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version >= '3.10' and 'tegra' not in platform_release and sys_platform == 'linux') or (python_full_version >= '3.10' and 'tegra' not in platform_release and sys_platform == 'windows')" },
-    { name = "torch", version = "2.7.0", source = { registry = "https://pypi.org/simple" }, marker = "(platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'linux') or (platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'windows')" },
-    { name = "torch", version = "2.9.0.dev20250701+cu129", source = { registry = "https://download.pytorch.org/whl/nightly/cu129" }, marker = "(platform_machine != 'aarch64' and sys_platform == 'linux') or (platform_machine != 'aarch64' and sys_platform == 'windows') or ('tegra' not in platform_release and sys_platform == 'linux') or ('tegra' not in platform_release and sys_platform == 'windows')" },
-    { name = "torchvision", version = "0.22.0", source = { registry = "https://pypi.org/simple" }, marker = "(platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'linux') or (platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'windows')" },
-    { name = "torchvision", version = "0.23.0.dev20250701+cu129", source = { registry = "https://download.pytorch.org/whl/nightly/cu129" }, marker = "(platform_machine != 'aarch64' and sys_platform == 'linux') or (platform_machine != 'aarch64' and sys_platform == 'windows') or ('tegra' not in platform_release and sys_platform == 'linux') or ('tegra' not in platform_release and sys_platform == 'windows')" },
+    { name = "torch", marker = "sys_platform == 'linux' or sys_platform == 'windows'" },
+    { name = "torchvision", marker = "sys_platform == 'linux' or sys_platform == 'windows'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/6f/36/574c0c46e818533b78b3c09505211162918188325ab4165ef11a3f295755/torchprofile-0.0.4.tar.gz", hash = "sha256:96b6da17d752a06b02977e078aea95614893b31d4117dd5dcd081f30ce65611b", size = 4557, upload-time = "2021-06-22T04:58:03.592Z" }
 wheels = [
@@ -3000,71 +2759,18 @@ wheels = [
 
 [[package]]
 name = "torchvision"
-version = "0.22.0"
+version = "0.11.3"
 source = { registry = "https://pypi.org/simple" }
-resolution-markers = [
-    "python_full_version >= '3.12' and platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'linux'",
-    "python_full_version == '3.11.*' and platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'linux'",
-    "python_full_version == '3.10.*' and platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'linux'",
-    "python_full_version < '3.10' and platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'linux'",
-    "python_full_version >= '3.12' and platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'windows'",
-    "python_full_version == '3.11.*' and platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'windows'",
-    "python_full_version == '3.10.*' and platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'windows'",
-    "python_full_version < '3.10' and platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'windows'",
-]
 dependencies = [
-    { name = "numpy", version = "1.26.4", source = { registry = "https://download.pytorch.org/whl/nightly/cu129" }, marker = "(platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'linux') or (platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'windows')" },
-    { name = "pillow", marker = "(platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'linux') or (platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'windows')" },
-    { name = "torch", version = "2.7.0", source = { registry = "https://pypi.org/simple" }, marker = "(platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'linux') or (platform_machine == 'aarch64' and 'tegra' in platform_release and sys_platform == 'windows')" },
-]
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/a3/e5/ec4b52041cd8c440521b75864376605756bd2d112d6351ea6a1ab25008c1/torchvision-0.22.0-cp310-cp310-manylinux_2_28_aarch64.whl", hash = "sha256:810ea4af3bc63cf39e834f91f4218ff5999271caaffe2456247df905002bd6c0", size = 2512604, upload-time = "2025-04-23T14:41:56.515Z" },
-    { url = "https://files.pythonhosted.org/packages/7e/71/ce9a303b94e64fe25d534593522ffc76848c4e64c11e4cbe9f6b8d537210/torchvision-0.22.0-cp311-cp311-manylinux_2_28_aarch64.whl", hash = "sha256:6c5620e10ffe388eb6f4744962106ed7cf1508d26e6fdfa0c10522d3249aea24", size = 2514016, upload-time = "2025-04-23T14:41:48.566Z" },
-    { url = "https://files.pythonhosted.org/packages/72/ef/21f8b6122e13ae045b8e49658029c695fd774cd21083b3fa5c3f9c5d3e35/torchvision-0.22.0-cp312-cp312-manylinux_2_28_aarch64.whl", hash = "sha256:8f116bc82e0c076e70ba7776e611ed392b9666aa443662e687808b08993d26af", size = 2514571, upload-time = "2025-04-23T14:41:53.458Z" },
-    { url = "https://files.pythonhosted.org/packages/77/77/88f64879483d66daf84f1d1c4d5c31ebb08e640411139042a258d5f7dbfe/torchvision-0.22.0-cp313-cp313-manylinux_2_28_aarch64.whl", hash = "sha256:471c6dd75bb984c6ebe4f60322894a290bf3d4b195e769d80754f3689cd7f238", size = 2471592, upload-time = "2025-04-23T14:41:54.991Z" },
-    { url = "https://files.pythonhosted.org/packages/6a/9a/2b59f5758ba7e3f23bc84e16947493bbce97392ec6d18efba7bdf0a3b10e/torchvision-0.22.0-cp313-cp313t-manylinux_2_28_aarch64.whl", hash = "sha256:753d3c84eeadd5979a33b3b73a25ecd0aa4af44d6b45ed2c70d44f5e0ac68312", size = 2476555, upload-time = "2025-04-23T14:41:38.357Z" },
-    { url = "https://files.pythonhosted.org/packages/2c/40/ca84add0f8e548a5b083b271e832786cd397047a9c2e7fac76c0c1f3de04/torchvision-0.22.0-cp39-cp39-manylinux_2_28_aarch64.whl", hash = "sha256:4095fac2b2e49a9c30f701e09ec1bdf3d11b1e48b006a76a9015a2ed8b39556e", size = 2512670, upload-time = "2025-04-23T14:41:33.739Z" },
-]
-
-[[package]]
-name = "torchvision"
-version = "0.23.0.dev20250701+cu129"
-source = { registry = "https://download.pytorch.org/whl/nightly/cu129" }
-resolution-markers = [
-    "python_full_version >= '3.12' and platform_machine != 'aarch64' and 'tegra' not in platform_release and sys_platform == 'linux'",
-    "python_full_version >= '3.12' and platform_machine == 'aarch64' and 'tegra' not in platform_release and sys_platform == 'linux'",
-    "python_full_version == '3.11.*' and platform_machine != 'aarch64' and 'tegra' not in platform_release and sys_platform == 'linux'",
-    "python_full_version == '3.10.*' and platform_machine != 'aarch64' and 'tegra' not in platform_release and sys_platform == 'linux'",
-    "python_full_version == '3.11.*' and platform_machine == 'aarch64' and 'tegra' not in platform_release and sys_platform == 'linux'",
-    "python_full_version == '3.10.*' and platform_machine == 'aarch64' and 'tegra' not in platform_release and sys_platform == 'linux'",
-    "python_full_version < '3.10' and platform_machine != 'aarch64' and 'tegra' not in platform_release and sys_platform == 'linux'",
-    "python_full_version < '3.10' and platform_machine == 'aarch64' and 'tegra' not in platform_release and sys_platform == 'linux'",
-    "python_full_version >= '3.12' and platform_machine != 'aarch64' and 'tegra' in platform_release and sys_platform == 'linux'",
-    "python_full_version == '3.11.*' and platform_machine != 'aarch64' and 'tegra' in platform_release and sys_platform == 'linux'",
-    "python_full_version == '3.10.*' and platform_machine != 'aarch64' and 'tegra' in platform_release and sys_platform == 'linux'",
-    "python_full_version < '3.10' and platform_machine != 'aarch64' and 'tegra' in platform_release and sys_platform == 'linux'",
-    "python_full_version >= '3.12' and 'tegra' not in platform_release and sys_platform == 'windows'",
-    "python_full_version == '3.11.*' and 'tegra' not in platform_release and sys_platform == 'windows'",
-    "python_full_version == '3.10.*' and 'tegra' not in platform_release and sys_platform == 'windows'",
-    "python_full_version < '3.10' and 'tegra' not in platform_release and sys_platform == 'windows'",
-    "python_full_version >= '3.12' and platform_machine != 'aarch64' and 'tegra' in platform_release and sys_platform == 'windows'",
-    "python_full_version == '3.11.*' and platform_machine != 'aarch64' and 'tegra' in platform_release and sys_platform == 'windows'",
-    "python_full_version == '3.10.*' and platform_machine != 'aarch64' and 'tegra' in platform_release and sys_platform == 'windows'",
-    "python_full_version < '3.10' and platform_machine != 'aarch64' and 'tegra' in platform_release and sys_platform == 'windows'",
-]
-dependencies = [
-    { name = "numpy", version = "1.26.4", source = { registry = "https://download.pytorch.org/whl/nightly/cu129" }, marker = "(python_full_version < '3.10' and platform_machine != 'aarch64' and sys_platform == 'linux') or (python_full_version < '3.10' and platform_machine != 'aarch64' and sys_platform == 'windows') or (python_full_version < '3.10' and 'tegra' not in platform_release and sys_platform == 'linux') or (python_full_version < '3.10' and 'tegra' not in platform_release and sys_platform == 'windows') or (platform_machine != 'aarch64' and 'tegra' in platform_release and sys_platform == 'linux') or (platform_machine != 'aarch64' and 'tegra' in platform_release and sys_platform == 'windows')" },
+    { name = "numpy", version = "1.26.4", source = { registry = "https://download.pytorch.org/whl/nightly/cu129" }, marker = "(python_full_version < '3.10' and sys_platform == 'linux') or (python_full_version < '3.10' and sys_platform == 'windows') or ('tegra' in platform_release and sys_platform == 'linux') or ('tegra' in platform_release and sys_platform == 'windows')" },
     { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version >= '3.10' and 'tegra' not in platform_release and sys_platform == 'linux') or (python_full_version >= '3.10' and 'tegra' not in platform_release and sys_platform == 'windows')" },
-    { name = "pillow", marker = "(platform_machine != 'aarch64' and sys_platform == 'linux') or (platform_machine != 'aarch64' and sys_platform == 'windows') or ('tegra' not in platform_release and sys_platform == 'linux') or ('tegra' not in platform_release and sys_platform == 'windows')" },
-    { name = "torch", version = "2.9.0.dev20250701+cu129", source = { registry = "https://download.pytorch.org/whl/nightly/cu129" }, marker = "(platform_machine != 'aarch64' and sys_platform == 'linux') or (platform_machine != 'aarch64' and sys_platform == 'windows') or ('tegra' not in platform_release and sys_platform == 'linux') or ('tegra' not in platform_release and sys_platform == 'windows')" },
+    { name = "pillow", marker = "sys_platform == 'linux' or sys_platform == 'windows'" },
+    { name = "torch", marker = "sys_platform == 'linux' or sys_platform == 'windows'" },
 ]
 wheels = [
-    { url = "https://download.pytorch.org/whl/nightly/cu129/torchvision-0.23.0.dev20250701%2Bcu129-cp310-cp310-manylinux_2_28_x86_64.whl" },
-    { url = "https://download.pytorch.org/whl/nightly/cu129/torchvision-0.23.0.dev20250701%2Bcu129-cp311-cp311-manylinux_2_28_x86_64.whl" },
-    { url = "https://download.pytorch.org/whl/nightly/cu129/torchvision-0.23.0.dev20250701%2Bcu129-cp312-cp312-manylinux_2_28_x86_64.whl" },
-    { url = "https://download.pytorch.org/whl/nightly/cu129/torchvision-0.23.0.dev20250701%2Bcu129-cp313-cp313-manylinux_2_28_x86_64.whl" },
-    { url = "https://download.pytorch.org/whl/nightly/cu129/torchvision-0.23.0.dev20250701%2Bcu129-cp313-cp313t-manylinux_2_28_x86_64.whl" },
-    { url = "https://download.pytorch.org/whl/nightly/cu129/torchvision-0.23.0.dev20250701%2Bcu129-cp39-cp39-manylinux_2_28_x86_64.whl" },
+    { url = "https://files.pythonhosted.org/packages/48/20/380758a94be49d38798a6cfd25824f72ec1f230b00c0014efb15903777c6/torchvision-0.11.3-cp310-cp310-manylinux2014_aarch64.whl", hash = "sha256:8bc8a7db80c97ca254be362ba883a202192e361ba2f6dff7ff5bb010d4bfc23a", size = 14675721, upload-time = "2022-01-27T20:36:45.882Z" },
+    { url = "https://files.pythonhosted.org/packages/ac/b1/9702d02e233bec7ce231cc8be94489ee31084fb6d350703f0ed22086ebed/torchvision-0.11.3-cp39-cp39-manylinux1_x86_64.whl", hash = "sha256:eca0b0f7a0e462bdecf7926d89faae6dcd51da418ca0cf70e725981ed775a11b", size = 23199346, upload-time = "2022-01-27T20:36:38.508Z" },
+    { url = "https://files.pythonhosted.org/packages/ac/d3/913e25d7775c74f76d174a82eba45bf68e384dc78373598f6c2b3a727fed/torchvision-0.11.3-cp39-cp39-manylinux2014_aarch64.whl", hash = "sha256:25e72231be8ce03467a77806d9c3f5fd34b9cd23b9543d3e999bf57622377532", size = 14674764, upload-time = "2022-01-27T20:37:09.227Z" },
 ]
 
 [[package]]

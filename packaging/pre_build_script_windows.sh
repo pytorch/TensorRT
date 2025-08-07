@@ -36,3 +36,9 @@ fi
 
 cat MODULE.bazel
 echo "RELEASE=1" >> ${GITHUB_ENV}
+
+if [[ ${USE_TRT_RTX} == true ]]; then
+    source .github/scripts/install-tensorrt-rtx.sh
+    install_wheel_or_not=true
+    install_tensorrt_rtx ${install_wheel_or_not}
+fi

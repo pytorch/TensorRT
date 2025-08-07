@@ -342,7 +342,7 @@ core::CompileSpec CompileSpec::toInternalCompileSpec(bool converting_to_trt_engi
   }
 
   info.partitioning_info.cast_int8_inputs = true;
-
+#ifndef TRT_MAJOR_RTX
   if (ptq_calibrator) {
     info.convert_info.engine_settings.calibrator = ptq_calibrator;
     info.partitioning_info.cast_int8_inputs = false;
@@ -354,6 +354,7 @@ core::CompileSpec CompileSpec::toInternalCompileSpec(bool converting_to_trt_engi
       info.lower_info.disable_cse = true;
     }
   }
+#endif
   info.convert_info.engine_settings.sparse_weights = sparse_weights;
   info.convert_info.engine_settings.disable_tf32 = disable_tf32;
   info.convert_info.engine_settings.refit = refit;

@@ -2,9 +2,7 @@ import copy
 import unittest
 from typing import Dict
 
-import tensorrt as trt
 import torch
-import torch_tensorrt
 import torch_tensorrt as torchtrt
 from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import TorchTensorRTModule
 
@@ -58,7 +56,7 @@ class TestDevice(unittest.TestCase):
 
 
 @unittest.skipIf(
-    not torch_tensorrt.ENABLED_FEATURES.torch_tensorrt_runtime,
+    not torchtrt.ENABLED_FEATURES.torch_tensorrt_runtime,
     "Torch-TensorRT runtime is not available",
 )
 class TestPlatform(unittest.TestCase):

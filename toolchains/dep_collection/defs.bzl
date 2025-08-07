@@ -1,7 +1,7 @@
 # buildifier: disable=module-docstring
 DependencyCollectionInfo = provider(doc = "", fields = ["type"])
 
-collection_types = ["default", "jetpack"]
+collection_types = ["default", "jetpack", "rtx"]
 
 def _impl(ctx):
     _type = ctx.build_setting_value

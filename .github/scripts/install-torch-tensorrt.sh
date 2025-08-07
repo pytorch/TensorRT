@@ -21,6 +21,12 @@ pip uninstall -y torch torchvision
 pip install --force-reinstall --pre ${TORCHVISION} --index-url ${INDEX_URL}
 pip install --force-reinstall --pre ${TORCH} --index-url ${INDEX_URL}
 
+if [[ ${USE_TRT_RTX} == true ]]; then
+    source .github/scripts/install-tensorrt-rtx.sh
+    # tensorrt-rtx is not publicly available, so we need to install the wheel from the tar ball
+    install_wheel_or_not=true
+    install_tensorrt_rtx ${install_wheel_or_not}
+fi
 
 # Install Torch-TensorRT
 if [[ ${PLATFORM} == win32 ]]; then
