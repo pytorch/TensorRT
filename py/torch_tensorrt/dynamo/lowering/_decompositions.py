@@ -9,7 +9,6 @@ from torch._export.utils import (
     _get_decomp_for_cia,
 )
 from torch._ops import OpOverload
-
 from torch_tensorrt.dynamo._defaults import default_device
 from torch_tensorrt.dynamo.conversion.converter_utils import get_positive_dim
 from torch_tensorrt.dynamo.utils import to_torch_device
@@ -423,8 +422,8 @@ def instance_norm_decomposition(
 
 @register_torch_trt_decomposition(
     torch.ops.aten.full_like, registry=TORCH_TRT_DECOMPOSITIONS
-)  # type: ignore
-def full_like_decomposition(*args, **kwargs) -> torch.Tensor:
+)
+def full_like_decomposition(*args: Any, **kwargs: Any) -> torch.Tensor:
     input = args[0]
     shape = args[0].shape
     fill_value = args[1]
@@ -454,11 +453,13 @@ def scaled_dot_product_attention_decomposition(
 ) -> torch.Tensor:
     L, S = query.size(-2), key.size(-2)
     device = query.device
-    attn_bias = torch.zeros(L, S, dtype=query.dtype, device=device)
+
+    if is_causal or attn_mask is not None:
+        attn_bias = torch.zeros((L, S), dtype=query.dtype, device=device)
 
     if is_causal:
         assert attn_mask is None, "attn_mask must be None when is_causal=True"
-        temp_mask = torch.ones(L, S, dtype=torch.bool, device=device).tril(diagonal=0)
+        temp_mask = torch.ones((L, S), dtype=torch.bool, device=device).tril(diagonal=0)
         attn_bias = attn_bias.masked_fill(temp_mask.logical_not(), float("-inf"))
 
     if attn_mask is not None:
@@ -471,7 +472,7 @@ def scaled_dot_product_attention_decomposition(
         key = key.repeat_interleave(query.size(-3) // key.size(-3), -3)
         value = value.repeat_interleave(query.size(-3) // value.size(-3), -3)
 
-    attn_weight = query @ key.transpose(-2, -1)
+    attn_weight = torch.matmul(query, key.transpose(-2, -1))
 
     if scale is None:
         scale = torch.sqrt(torch.scalar_tensor(query.size(-1), dtype=torch.int))
@@ -479,9 +480,12 @@ def scaled_dot_product_attention_decomposition(
     else:
         attn_weight = attn_weight * scale
 
-    attn_weight = attn_weight + attn_bias
+    if is_causal or attn_mask is not None:
+        # We only add attn_bias when we have to, otherwise this will have a negative impact on the performance even it's 0.
+        attn_weight = attn_weight + attn_bias
+
     attn_weight = torch.softmax(attn_weight, dim=-1)
-    return attn_weight @ value
+    return torch.matmul(attn_weight, value)
 
 
 @register_torch_trt_decomposition(

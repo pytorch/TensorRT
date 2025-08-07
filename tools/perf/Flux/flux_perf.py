@@ -44,9 +44,22 @@ def benchmark(pipe, prompt, inference_step, batch_size=1, iterations=1):
     return
 
 
+from diffusers import FluxPipeline
+
+
 def main(args):
     print(f"Running flux_perfwith args: {args}")
-    pipe, backbone, trt_gm = compile_model(args)
+    if not args.pytorch:
+        pipe, backbone, trt_gm = compile_model(args)
+    else:
+        pipe = (
+            FluxPipeline.from_pretrained(
+                "black-forest-labs/FLUX.1-dev",
+                torch_dtype=torch.float16,
+            )
+            .to(torch.float16)
+            .to("cuda:0")
+        )
 
     benchmark(pipe, ["Test"], 20, batch_size=args.max_batch_size, iterations=3)
 
@@ -76,6 +89,11 @@ if __name__ == "__main__":
         "-d",
         action="store_true",
         help="Use dynamic shapes",
+    )
+    parser.add_argument(
+        "--pytorch",
+        action="store_true",
+        help="Use pytorch runtime and no tensorrt",
     )
     parser.add_argument("--max_batch_size", type=int, default=1)
     args = parser.parse_args()
