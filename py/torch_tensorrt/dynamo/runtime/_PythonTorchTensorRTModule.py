@@ -378,6 +378,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         contiguous_inputs: List[torch.Tensor],
         cudagraphs_enabled: bool,
         need_cudagraphs_record: bool,
+        shape_changed: bool = True,
     ) -> None:
         for i, input_name in enumerate(self.input_names):
             if not contiguous_inputs[i].is_cuda:
@@ -411,9 +412,10 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                 inputs_cpu = contiguous_inputs[i].cpu().to(torch.int64).numpy().copy()
                 self.context.set_tensor_address(input_name, inputs_cpu.ctypes.data)
             else:
-                self.context.set_input_shape(
-                    input_name, tuple(contiguous_inputs[i].shape)
-                )
+                if shape_changed:
+                    self.context.set_input_shape(
+                        input_name, tuple(contiguous_inputs[i].shape)
+                    )
                 if cudagraphs_enabled:
                     self._input_buffers[i].copy_(contiguous_inputs[i])
                     self.context.set_tensor_address(
@@ -481,7 +483,11 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                 ), f"Wrong number of inputs, expect {len(self.input_names)} get {len(contiguous_inputs)}."
 
                 self.setup_input_tensors(
-                    contiguous_inputs, self.cudagraphs_enabled, need_cudagraphs_record
+                    contiguous_inputs,
+                    self.cudagraphs_enabled,
+                    need_cudagraphs_record,
+                    shape_changed
+                    or self.output_tensors is None,  # First time execution
                 )
 
                 if shape_changed:
@@ -512,7 +518,11 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                         raise ValueError(
                             "Encountered dynamic output shapes during runtime. This could mean the network has data-dependent output shapes which is not currently supported."
                         )
-                    if self.output_tensors is None or self.requires_unique_output:
+                    if (
+                        self.output_tensors is None
+                        or self.requires_unique_output
+                        or shape_changed
+                    ):
                         self.output_tensors = self.create_output_tensors()
                     outputs = self.output_tensors
 

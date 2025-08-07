@@ -994,6 +994,7 @@ def compile_module(
                     ) as f:
                         f.write(trt_module.get_layer_info())
 
+    # Only set the requires_unique_output flag for the last TRT Module when user has access to the output tensor
     if trt_module and settings.use_python_runtime:
         trt_module.set_requires_unique_output(True)
 
