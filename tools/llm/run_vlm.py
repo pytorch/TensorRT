@@ -21,6 +21,10 @@ Key Features:
 
 This tool mirrors the style and structure of `run_llm.py`, providing a clear
 workflow for VLM optimization and analysis.
+
+Dependencies:
+- For Qwen VLM models: pip install qwen-vl-utils
+- For Eagle2 models: pip install flash-attn --no-build-isolation -v
 """
 
 import argparse
@@ -33,6 +37,12 @@ from typing import Tuple
 import requests
 import torch
 import torch_tensorrt
+
+# we "monkey-patch" the global attention function map for Qwen2.
+# This ensures that any part of the code (including torch.export) requesting
+# "flash_attention_2" will receive the "sdpa" implementation instead.
+# This patch is global for the script's execution context.
+import transformers.models.qwen2.modeling_qwen2 as mq
 from PIL import Image
 from torchtrt_ext import register_sdpa
 from transformers import AutoConfig, AutoModel, AutoProcessor
@@ -46,21 +56,11 @@ from utils import (
     time_generate_mm,
 )
 
-# -----------------------------------------------------------------------------#
-# Global configuration
-# -----------------------------------------------------------------------------#
-DEVICE = torch.device("cuda:0")
-
 # --- WORKAROUND FOR EAGLE2 SDPA COMPILATION ---
 # Eagle2's language model (Qwen2) implicitly defaults to "flash_attention_2"
 # due to settings in its remote code and config.json. This prevents direct
 # compilation with SDPA. To work around this without modifying the library,
 
-# we "monkey-patch" the global attention function map for Qwen2.
-# This ensures that any part of the code (including torch.export) requesting
-# "flash_attention_2" will receive the "sdpa" implementation instead.
-# This patch is global for the script's execution context.
-import transformers.models.qwen2.modeling_qwen2 as mq
 
 mq.ALL_ATTENTION_FUNCTIONS["flash_attention_2"] = mq.ALL_ATTENTION_FUNCTIONS["sdpa"]
 # --- END WORKAROUND ---
@@ -96,17 +96,25 @@ def _load_eagle2(device: torch.device, torch_dtype: torch.dtype):
         The model, its processor and the language-model input embedding layer.
     """
     model_id = "nvidia/Eagle2-2B"
-    with torch.no_grad():
-        model = (
-            AutoModel.from_pretrained(
-                model_id,
-                trust_remote_code=True,
-                torch_dtype=torch_dtype,
-                # attn_implementation="sdpa" is ignored due to the model's remote code.
+    try:
+        with torch.no_grad():
+            model = (
+                AutoModel.from_pretrained(
+                    model_id,
+                    trust_remote_code=True,
+                    torch_dtype=torch_dtype,
+                    # attn_implementation="sdpa" is ignored due to the model's remote code.
+                )
+                .eval()
+                .to(device)
             )
-            .eval()
-            .to(device)
-        )
+    except ImportError as e:
+        if "flash_attn" in str(e):
+            raise ImportError(
+                "FlashAttention2 is required for Eagle2 models but not installed. "
+                "Please install it using: pip install flash-attn --no-build-isolation -v"
+            ) from e
+        raise
 
     processor = AutoProcessor.from_pretrained(
         model_id, trust_remote_code=True, use_fast=True
@@ -154,8 +162,14 @@ def load_inputs(args: argparse.Namespace, processor, device: torch.device):
     """
     Loads and constructs the input dictionary for the specified VLM model.
     """
-    url = "https://www.ilankelman.org/stopsigns/australia.jpg"
-    image = Image.open(requests.get(url, stream=True).raw)
+    # Load image from local path if provided, otherwise use default URL
+    if args.image_path is not None:
+        # Use local image file
+        image = Image.open(args.image_path)
+    else:
+        # Use default URL image
+        url = "https://www.ilankelman.org/stopsigns/australia.jpg"
+        image = Image.open(requests.get(url, stream=True).raw)
 
     if args.benchmark:
         model_constants = MODEL_CONSTANTS[args.model]
@@ -184,8 +198,14 @@ def load_inputs(args: argparse.Namespace, processor, device: torch.device):
     ]
 
     # --- Model-specific vision processing ---
-    if "qwen" in args.model.lower():
-        from qwen_vl_utils import process_vision_info
+    if args.model == "Qwen/Qwen2.5-VL-3B-Instruct":
+        try:
+            from qwen_vl_utils import process_vision_info
+        except ImportError:
+            raise ImportError(
+                "The 'qwen-vl-utils' package is required for Qwen VLM models. "
+                "Please install it using: pip install qwen-vl-utils"
+            )
 
         image_inputs, video_inputs = process_vision_info(messages)
     else:  # eagle2
@@ -229,15 +249,16 @@ def _compile_lm(
     language_model: torch.nn.Module,
     input_embeds: torch.Tensor,
     args: argparse.Namespace,
+    device: torch.device,
 ) -> torch.nn.Module:
     """
     Compile the language model component of a VLM with Torch-TensorRT
     """
-    lm_wrap = _LMNoCache(language_model).to(DEVICE).eval()
+    lm_wrap = _LMNoCache(language_model).to(device).eval()
     max_seq_len = input_embeds.shape[1] + args.num_tokens
 
     seq_len = torch.export.Dim("seq", min=1, max=max_seq_len)
-    position_ids = torch.arange(input_embeds.shape[1]).unsqueeze(0).to(DEVICE)
+    position_ids = torch.arange(input_embeds.shape[1]).unsqueeze(0).to(device)
 
     dyn_shapes = {"inputs_embeds": {1: seq_len}, "position_ids": {1: seq_len}}
 
@@ -247,8 +268,6 @@ def _compile_lm(
         enabled_precisions = {torch.float32}
         use_fp32_acc = True
         use_explicit_typing = True
-    elif args.precision == "BF16":
-        enabled_precisions = {torch.bfloat16}
     else:  # FP32
         enabled_precisions = {torch.float32}
 
@@ -263,18 +282,17 @@ def _compile_lm(
             enabled_precisions=enabled_precisions,
             use_explicit_typing=use_explicit_typing,
             use_fp32_acc=use_fp32_acc,
-            device=DEVICE,
-            disable_tf32=True,
-            use_python_runtime=True,
-            debug=args.debug,
-            offload_module_to_cpu=True,
+            device=device,
+            disable_tf32=args.disable_tf32,
+            use_python_runtime=args.use_python_runtime,
+            offload_module_to_cpu=args.offload_module_to_cpu,
             min_block_size=args.min_block_size,
         )
     return trt_mod
 
 
 def compile_lm_torchtrt(
-    model: torch.nn.Module, args: argparse.Namespace
+    model: torch.nn.Module, args: argparse.Namespace, device: torch.device
 ) -> torch.nn.Module:
     """
     Compiles the Language Model (LLM) component of the VLM using Torch-TensorRT.
@@ -284,7 +302,11 @@ def compile_lm_torchtrt(
         "BF16": torch.bfloat16,
     }.get(args.precision, torch.float32)
 
-    lm_model = model.model if "qwen" in args.model.lower() else model.language_model
+    lm_model = (
+        model.model
+        if args.model == "Qwen/Qwen2.5-VL-3B-Instruct"
+        else model.language_model
+    )
 
     model_constants = MODEL_CONSTANTS.get(
         args.model, {"EXAMPLE_SEQLEN": args.num_tokens}
@@ -296,12 +318,12 @@ def compile_lm_torchtrt(
         example_seq_len,
         lm_model.config.hidden_size,
         dtype=torch_dtype,
-        device=DEVICE,
+        device=device,
     )
 
     # All supported models use the same compilation helper.
     if args.model in ["nvidia/Eagle2-2B", "Qwen/Qwen2.5-VL-3B-Instruct"]:
-        return _compile_lm(lm_model, example_embeds, args)
+        return _compile_lm(lm_model, example_embeds, args, device)
     else:
         msg = f"Unsupported model: '{args.model}'. Supported models are: ['nvidia/Eagle2-2B', 'Qwen/Qwen2.5-VL-3B-Instruct']"
         raise ValueError(msg)
@@ -311,6 +333,7 @@ def _compile_eagle2_vision(
     vision_model: torch.nn.Module,
     example_pixel_values: torch.Tensor,
     args: argparse.Namespace,
+    device: torch.device,
 ) -> torch.nn.Module:
     """
     Compile Eagle2 vision model with Torch-TensorRT.
@@ -341,11 +364,10 @@ def _compile_eagle2_vision(
             enabled_precisions=enabled_precisions,
             use_explicit_typing=use_explicit_typing,
             use_fp32_acc=use_fp32_acc,
-            device=DEVICE,
-            disable_tf32=True,
-            use_python_runtime=True,
-            debug=args.debug,
-            offload_module_to_cpu=True,
+            device=device,
+            disable_tf32=args.disable_tf32,
+            use_python_runtime=args.use_python_runtime,
+            offload_module_to_cpu=args.offload_module_to_cpu,
             min_block_size=args.min_block_size,
         )
     return trt_mod
@@ -355,12 +377,15 @@ def compile_vision_torchtrt(
     model: torch.nn.Module,
     args: argparse.Namespace,
     example_pixel_values: torch.Tensor,
+    device: torch.device,
 ) -> torch.nn.Module:
     """
     Dispatcher function for vision model compilation.
     """
     if args.model == "nvidia/Eagle2-2B":
-        return _compile_eagle2_vision(model.vision_model, example_pixel_values, args)
+        return _compile_eagle2_vision(
+            model.vision_model, example_pixel_values, args, device
+        )
     elif args.model == "Qwen/Qwen2.5-VL-3B-Instruct":
         # TODO: Vision model compilation for Qwen2.5-VL is currently skipped.
         # The model's `get_window_index` method uses dynamic Python list operations
@@ -396,7 +421,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--model",
-        default="Qwen/Qwen2.5-VL-3B-Instruct",
+        default="nvidia/Eagle2-2B",
         choices=["nvidia/Eagle2-2B", "Qwen/Qwen2.5-VL-3B-Instruct"],
         help="VLM model name",
     )
@@ -404,7 +429,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--precision",
         default="FP16",
-        choices=["FP16", "BF16", "FP32"],
+        choices=["FP16", "FP32"],
         help="Computation precision",
     )
     parser.add_argument("--iterations", type=int, default=5, help="# iterations")
@@ -429,8 +454,42 @@ if __name__ == "__main__":
     parser.add_argument(
         "--benchmark", action="store_true", help="Enable benchmarking mode"
     )
+    parser.add_argument(
+        "--image_path",
+        type=str,
+        default=None,
+        help="Path to local image file. If not provided, uses default URL image.",
+    )
+    parser.add_argument(
+        "--device",
+        type=str,
+        default="cuda:0",
+        help="Device to run inference on (e.g., 'cuda:0', 'cuda:1')",
+    )
+    parser.add_argument(
+        "--disable_tf32",
+        action="store_false",
+        default=True,
+        help="Disable TF32 precision for TensorRT compilation (default: True)",
+    )
+    parser.add_argument(
+        "--use_python_runtime",
+        action="store_false",
+        default=True,
+        help="Use Python runtime for TensorRT compilation (default: True)",
+    )
+    parser.add_argument(
+        "--offload_module_to_cpu",
+        action="store_false",
+        default=True,
+        help="Offload module to CPU for TensorRT compilation (default: True)",
+    )
 
     args = parser.parse_args()
+
+    device = torch.device(args.device)
+    if device.type == "cuda":
+        torch.cuda.set_device(device)
 
     # -------------------------------------------------------------------------#
     # 1. Model / processor / embeddings
@@ -440,12 +499,12 @@ if __name__ == "__main__":
         "BF16": torch.bfloat16,
     }.get(args.precision, torch.float32)
 
-    model, processor, emb_layer = load_model(args.model, DEVICE, dtype)
+    model, processor, emb_layer = load_model(args.model, device, dtype)
 
     # -------------------------------------------------------------------------#
     # 2. Input construction (image + text prompt)
     # -------------------------------------------------------------------------#
-    inputs = load_inputs(args, processor, DEVICE)
+    inputs = load_inputs(args, processor, device)
 
     max_output_len = inputs["input_ids"].shape[1] + args.num_tokens
 
@@ -454,7 +513,7 @@ if __name__ == "__main__":
     # -------------------------------------------------------------------------#
     pyt_gen_tokens = pyt_timings = pyt_stats = None
     if args.enable_pytorch_run:
-        if "qwen" in args.model.lower():
+        if args.model == "Qwen/Qwen2.5-VL-3B-Instruct":
             pyt_gen_tokens = generate_mm_qwen2_5_vl(
                 model,
                 inputs["pixel_values"],
@@ -473,7 +532,7 @@ if __name__ == "__main__":
                 processor.tokenizer.eos_token_id,
                 emb_layer,
             )
-        print_outputs("PyTorch", pyt_gen_tokens, processor.tokenizer)
+
         if args.benchmark:
             # Prepare args for the timing function
             time_generate_args = {
@@ -486,7 +545,7 @@ if __name__ == "__main__":
             }
 
             # Select the correct generation function and add model-specific args
-            if "qwen" in args.model.lower():
+            if args.model == "Qwen/Qwen2.5-VL-3B-Instruct":
                 generate_fn_for_timing = generate_mm_qwen2_5_vl
                 time_generate_args["image_grid_thw"] = inputs["image_grid_thw"]
             else:  # eagle2
@@ -511,8 +570,8 @@ if __name__ == "__main__":
     # 4.1. Vision model compilation
     # --- Add vision model compilation --- #
     example_pixel_values = inputs["pixel_values"]
-    trt_vision = compile_vision_torchtrt(model, args, example_pixel_values)
-    if "qwen" in args.model.lower():
+    trt_vision = compile_vision_torchtrt(model, args, example_pixel_values, device)
+    if args.model == "Qwen/Qwen2.5-VL-3B-Instruct":
         trt_model.visual = trt_vision
     else:
         trt_model.vision_model = trt_vision
@@ -524,24 +583,28 @@ if __name__ == "__main__":
     # Cache is not applied to vision model.
     if args.cache == "static_v1":
         import static_cache_v1  # noqa: F401
+    elif args.cache not in ("", None):
+        raise ValueError(
+            f"Cache mode '{args.cache}' is not supported. Only 'static_v1' is supported."
+        )
 
-    trt_lm = compile_lm_torchtrt(model, args)
-    if "qwen" in args.model.lower():
+    trt_lm = compile_lm_torchtrt(model, args, device)
+    if args.model == "Qwen/Qwen2.5-VL-3B-Instruct":
         trt_model.model = trt_lm
     else:
         trt_model.language_model = trt_lm
 
-    emb_layer = emb_layer.to(DEVICE)
-    if "qwen" in args.model.lower():
-        trt_model.lm_head = trt_model.lm_head.to(DEVICE)
+    emb_layer = emb_layer.to(device)
+    if args.model == "Qwen/Qwen2.5-VL-3B-Instruct":
+        trt_model.lm_head = trt_model.lm_head.to(device)
 
     if args.cache == "static_v1":
-        if "qwen" in args.model.lower():
+        if args.model == "Qwen/Qwen2.5-VL-3B-Instruct":
             trt_generate = generate_mm_qwen2_5_vl_with_static_cache
         else:  # eagle2
             trt_generate = generate_mm_with_static_cache
     else:
-        if "qwen" in args.model.lower():
+        if args.model == "Qwen/Qwen2.5-VL-3B-Instruct":
             trt_generate = generate_mm_qwen2_5_vl
         else:  # eagle2
             trt_generate = generate_mm
@@ -555,10 +618,10 @@ if __name__ == "__main__":
         "eos_token_id": processor.tokenizer.eos_token_id,
         "emb_layer": emb_layer,
     }
-    if "qwen" in args.model.lower():
+    if args.model == "Qwen/Qwen2.5-VL-3B-Instruct":
         generate_args["image_grid_thw"] = inputs["image_grid_thw"]
     if args.cache == "static_v1":
-        generate_args["device"] = DEVICE
+        generate_args["device"] = device
 
     trt_gen_tokens = trt_generate(**generate_args)
 
@@ -574,10 +637,10 @@ if __name__ == "__main__":
         }
 
         # Add model-specific args
-        if "qwen" in args.model.lower():
+        if args.model == "Qwen/Qwen2.5-VL-3B-Instruct":
             time_generate_args["image_grid_thw"] = inputs["image_grid_thw"]
         if args.cache == "static_v1":
-            time_generate_args["device"] = DEVICE
+            time_generate_args["device"] = device
 
         trt_timings = time_generate_mm(
             trt_generate,
