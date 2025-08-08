@@ -1,6 +1,7 @@
 from typing import Optional, Sequence, Tuple, Union
 
 import tensorrt as trt
+from tensorrt import ITensor as TRTTensor
 from torch.fx.node import Target
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion import impl
@@ -11,7 +12,6 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     get_positive_dim,
     set_layer_name,
 )
-from torch_tensorrt.dynamo.types import TRTTensor
 
 
 def amax(

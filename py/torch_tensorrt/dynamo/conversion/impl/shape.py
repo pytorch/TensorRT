@@ -5,22 +5,20 @@ from typing import List, Optional, Tuple
 import numpy as np
 import tensorrt as trt
 import torch
+from tensorrt import ITensor as TRTTensor
 from torch.fx.node import Target
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
 from torch_tensorrt.dynamo.conversion.converter_utils import (
+    Frameworks,
     cast_trt_tensor,
     get_positive_dim,
     get_trt_tensor,
+    set_layer_name,
+    unified_dtype_converter,
 )
 from torch_tensorrt.dynamo.conversion.impl.elementwise.base import (
     convert_binary_elementwise,
-)
-from torch_tensorrt.dynamo.types import TRTTensor
-from torch_tensorrt.fx.converters.converter_utils import (
-    Frameworks,
-    set_layer_name,
-    unified_dtype_converter,
 )
 
 

@@ -4,6 +4,7 @@ from typing import List, Optional, Sequence, Union
 import numpy as np
 import tensorrt as trt
 import torch
+from tensorrt import ITensor as TRTTensor
 from torch.fx.node import Target
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion import impl
@@ -13,16 +14,13 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     cast_trt_tensor,
     get_positive_dim,
     get_trt_tensor,
+    has_dynamic_shape,
+    set_layer_name,
     to_numpy,
 )
 from torch_tensorrt.dynamo.conversion.impl.elementwise import convert_binary_elementwise
 from torch_tensorrt.dynamo.conversion.impl.shape import shape as get_shape
-from torch_tensorrt.dynamo.types import TRTTensor
 from torch_tensorrt.dynamo.utils import DYNAMIC_DIM
-from torch_tensorrt.fx.converters.converter_utils import (
-    has_dynamic_shape,
-    set_layer_name,
-)
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 

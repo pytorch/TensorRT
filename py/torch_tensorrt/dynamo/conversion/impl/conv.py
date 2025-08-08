@@ -5,6 +5,7 @@ import numpy as np
 # @manual=//deeplearning/trt/python:py_tensorrt
 import tensorrt as trt
 import torch
+from tensorrt import ITensor as TRTTensor
 from torch.fx.node import Target
 from torch_tensorrt.dynamo.conversion import impl
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
@@ -17,7 +18,6 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     to_torch,
     to_trt_weights,
 )
-from torch_tensorrt.dynamo.types import TRTTensor
 
 
 def convNd(

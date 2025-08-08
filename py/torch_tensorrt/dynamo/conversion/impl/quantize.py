@@ -3,6 +3,7 @@ from typing import Optional, Union
 import numpy as np
 import tensorrt as trt
 import torch
+from tensorrt import ITensor as TRTTensor
 from torch.fx.experimental.proxy_tensor import unset_fake_temporarily
 from torch.fx.node import Target
 from torch_tensorrt.dynamo._SourceIR import SourceIR
@@ -13,7 +14,6 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     set_layer_name,
     to_torch,
 )
-from torch_tensorrt.dynamo.types import TRTTensor
 
 
 def get_ir(target: Target) -> SourceIR:

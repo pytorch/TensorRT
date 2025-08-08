@@ -5,6 +5,7 @@ import numpy as np
 # @manual=//deeplearning/trt/python:py_tensorrt
 import tensorrt as trt
 import torch
+from tensorrt import ITensor as TRTTensor
 from torch.fx.node import Target
 from torch_tensorrt.dynamo.conversion import impl
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
@@ -12,12 +13,9 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     SourceIR,
     get_trt_tensor,
     has_dynamic_shape,
+    set_layer_name,
     to_torch,
     to_trt_weights,
-)
-from torch_tensorrt.dynamo.types import TRTTensor
-from torch_tensorrt.fx.converters.converter_utils import (
-    set_layer_name,
 )
 
 

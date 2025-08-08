@@ -4,6 +4,7 @@ import numpy as np
 import tensorrt as trt
 import torch
 import torch_tensorrt.dynamo.conversion.impl as impl
+from tensorrt import ITensor as TRTTensor
 from torch.fx.node import Target
 from torch_tensorrt import _enums
 from torch_tensorrt.dynamo._SourceIR import SourceIR
@@ -21,7 +22,6 @@ from torch_tensorrt.dynamo.conversion.impl.elementwise.base import (
 )
 from torch_tensorrt.dynamo.conversion.impl.unary import atan, sign
 from torch_tensorrt.dynamo.conversion.impl.unary.base import convert_unary
-from torch_tensorrt.dynamo.types import TRTTensor
 
 
 def trunc_div(
