@@ -213,9 +213,8 @@ class dtype(Enum):
             elif t == trt.DataType.BF16:
                 return dtype.bf16
             else:
-                if is_tensorrt_version_supported("10.8.0"):
-                    if t == trt.DataType.FP4:
-                        return dtype.fp4
+                if is_tensorrt_version_supported("10.8.0") and t == trt.DataType.FP4:
+                    return dtype.fp4
                 raise TypeError(
                     f"Provided an unsupported data type as a data type for translation (support: bool, int, half, float, bfloat16), got: {t}"
                 )
@@ -414,9 +413,8 @@ class dtype(Enum):
             elif use_default:
                 return trt.DataType.FLOAT
             else:
-                if is_tensorrt_version_supported("10.8.0"):
-                    if self == dtype.f4:
-                        return trt.DataType.FP4
+                if is_tensorrt_version_supported("10.8.0") and self == dtype.f4:
+                    return trt.DataType.FP4
                 raise TypeError("Unsupported tensorrt dtype")
 
         elif t == np.dtype:
