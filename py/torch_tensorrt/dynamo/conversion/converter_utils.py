@@ -19,11 +19,10 @@ from typing import (
 import numpy as np
 import tensorrt as trt
 import torch
+import torch_tensorrt.dynamo.conversion.impl as impl
 from torch.fx.experimental.proxy_tensor import unset_fake_temporarily
 from torch.fx.node import Argument, Target
 from torch.fx.passes.shape_prop import TensorMetadata
-
-import torch_tensorrt.dynamo.conversion.impl as impl
 from torch_tensorrt import _enums
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo._SourceIR import SourceIR
@@ -345,7 +344,7 @@ def to_trt_weights(
     count: Optional[int] = None,
 ) -> trt.Weights:
     """
-    Convert a PyTorch tensor or NumPy array to TensorRT weights.
+    Convert a PyTorch tensor to TensorRT weights.
 
     Args:
         value (Union[torch.Tensor, np.ndarray]): The tensor or array to convert to TRT weights
