@@ -8,7 +8,6 @@ from conversion.harness import DispatchTestCase
 from distributed_utils import set_environment_variables_pytest
 from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
-from torch_tensorrt._enums import Platform
 from torch_tensorrt.dynamo.utils import is_platform_supported_for_trtllm
 
 
@@ -42,12 +41,9 @@ class DistributedReduceScatterModel(nn.Module):
         return torch.ops._c10d_functional.wait_tensor(out)
 
 
-platform_str = str(Platform.current_platform()).lower()
-
-
 class TestNcclOpsConverter(DispatchTestCase):
     @unittest.skipIf(
-        not is_platform_supported_for_trtllm(platform_str),
+        not is_platform_supported_for_trtllm(),
         "Skipped on Windows, Jetson: NCCL backend is not supported.",
     )
     @classmethod

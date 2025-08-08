@@ -5,6 +5,7 @@ import gc
 import getpass
 import logging
 import os
+import platform
 import tempfile
 import urllib.request
 import warnings
@@ -29,7 +30,7 @@ import torch
 from torch._subclasses.fake_tensor import FakeTensor
 from torch.fx.experimental.proxy_tensor import unset_fake_temporarily
 from torch_tensorrt._Device import Device
-from torch_tensorrt._enums import Platform, dtype
+from torch_tensorrt._enums import dtype
 from torch_tensorrt._features import ENABLED_FEATURES
 from torch_tensorrt._Input import Input
 from torch_tensorrt._version import __tensorrt_llm_version__
@@ -99,37 +100,6 @@ if trt.__version__ >= "7.0":
         Frameworks.TORCH: torch.bool,
         Frameworks.TRT: trt.bool,
     }
-
-
-def unified_dtype_converter(
-    dtype: Union[TRTDataType, torch.dtype, np.dtype], to: Frameworks
-) -> Union[np.dtype, torch.dtype, TRTDataType]:
-    """
-    Convert TensorRT, Numpy, or Torch data types to any other of those data types.
-
-    Args:
-        dtype (TRTDataType, torch.dtype, np.dtype): A TensorRT, Numpy, or Torch data type.
-        to (Frameworks): The framework to convert the data type to.
-
-    Returns:
-        The equivalent data type in the requested framework.
-    """
-    assert to in Frameworks, f"Expected valid Framework for translation, got {to}"
-    trt_major_version = int(trt.__version__.split(".")[0])
-    if dtype in (np.int8, torch.int8, trt.int8):
-        return DataTypeEquivalence[trt.int8][to]
-    elif trt_major_version >= 7 and dtype in (np.bool_, torch.bool, trt.bool):
-        return DataTypeEquivalence[trt.bool][to]
-    elif dtype in (np.int32, torch.int32, trt.int32):
-        return DataTypeEquivalence[trt.int32][to]
-    elif dtype in (np.int64, torch.int64, trt.int64):
-        return DataTypeEquivalence[trt.int64][to]
-    elif dtype in (np.float16, torch.float16, trt.float16):
-        return DataTypeEquivalence[trt.float16][to]
-    elif dtype in (np.float32, torch.float32, trt.float32):
-        return DataTypeEquivalence[trt.float32][to]
-    else:
-        raise TypeError("%s is not a supported dtype" % dtype)
 
 
 def deallocate_module(module: torch.fx.GraphModule, delete_module: bool = True) -> None:
@@ -870,29 +840,33 @@ def is_tegra_platform() -> bool:
     return False
 
 
-def is_platform_supported_for_trtllm(platform: str) -> bool:
+def is_platform_supported_for_trtllm() -> bool:
     """
-    Checks if the current platform supports TensorRT-LLM plugins for NCCL backend
-    Returns:
-        bool: True if the platform supports TensorRT-LLM plugins for NCCL backend, False otherwise.
-    Note:
-        TensorRT-LLM plugins for NCCL backend are not supported on:
-        - Windows platforms
-        - Orin, Xavier, or Tegra devices (aarch64 architecture)
+    Checks if the current platform supports TensorRT-LLM plugins for the NCCL backend.
 
+    Returns:
+        bool: True if supported, False otherwise.
+
+    Unsupported:
+        - Windows platforms
+        - Jetson/Orin/Xavier (aarch64 architecture + 'tegra' in platform release)
     """
-    if "windows" in platform:
+    system = platform.system().lower()
+    machine = platform.machine().lower()
+    release = platform.release().lower()
+
+    if "windows" in system:
         logger.info(
-            "TensorRT-LLM plugins for NCCL backend are not supported on Windows"
+            "TensorRT-LLM plugins for NCCL backend are not supported on Windows."
         )
         return False
-    if torch.cuda.is_available():
-        device_name = torch.cuda.get_device_name().lower()
-        if any(keyword in device_name for keyword in ["orin", "xavier", "tegra"]):
-            return False
+
+    if machine == "aarch64" and "tegra" in release:
         logger.info(
-            "TensorRT-LLM plugins for NCCL backend are not supported on Jetson devices"
+            "TensorRT-LLM plugins for NCCL backend are not supported on Jetson/Orin/Xavier (Tegra) devices."
         )
+        return False
+
     return True
 
 
@@ -905,7 +879,7 @@ def _extracted_dir_trtllm(platform: str) -> Path:
     return _cache_root() / "trtllm" / f"{__tensorrt_llm_version__}_{platform}"
 
 
-def download_and_get_plugin_lib_path(platform: str) -> Optional[str]:
+def download_and_get_plugin_lib_path() -> Optional[str]:
     """
     Returns the path to the TensorRT‑LLM shared library, downloading and extracting if necessary.
 
@@ -919,12 +893,13 @@ def download_and_get_plugin_lib_path(platform: str) -> Optional[str]:
         f"tensorrt_llm-{__tensorrt_llm_version__}-{_WHL_CPYTHON_VERSION}-"
         f"{_WHL_CPYTHON_VERSION}-{platform}.whl"
     )
+    platform_system = platform.system().lower()
     wheel_path = _cache_root() / wheel_filename
-    extract_dir = _extracted_dir_trtllm(platform)
+    extract_dir = _extracted_dir_trtllm(platform_system)
     # else will never be met though
     lib_filename = (
         "libnvinfer_plugin_tensorrt_llm.so"
-        if "linux" in platform
+        if "linux" in platform_system
         else "libnvinfer_plugin_tensorrt_llm.dll"
     )
     # eg: /tmp/torch_tensorrt_<username>/trtllm/0.17.0.post1_linux_x86_64/tensorrt_llm/libs/libnvinfer_plugin_tensorrt_llm.so
@@ -1057,10 +1032,7 @@ def load_tensorrt_llm_for_nccl() -> bool:
     Returns:
         bool: True if the plugin was successfully loaded and initialized, False otherwise.
     """
-    # Check platform compatibility first
-    platform = Platform.current_platform()
-    platform = str(platform).lower()
-    if not is_platform_supported_for_trtllm(platform):
+    if not is_platform_supported_for_trtllm():
         return False
     plugin_lib_path = os.environ.get("TRTLLM_PLUGINS_PATH")
 
@@ -1080,6 +1052,6 @@ def load_tensorrt_llm_for_nccl() -> bool:
             )
             return False
 
-        plugin_lib_path = download_and_get_plugin_lib_path(platform)
+        plugin_lib_path = download_and_get_plugin_lib_path()
         return load_and_initialize_trtllm_plugin(plugin_lib_path)  # type: ignore[arg-type]
     return False
