@@ -8,9 +8,12 @@ from torch.fx.node import Target
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion import impl
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
-from torch_tensorrt.dynamo.conversion.converter_utils import get_trt_tensor, to_torch
+from torch_tensorrt.dynamo.conversion.converter_utils import (
+    get_trt_tensor,
+    set_layer_name,
+    to_torch,
+)
 from torch_tensorrt.dynamo.types import TRTTensor
-from torch_tensorrt.fx.converters.converter_utils import set_layer_name
 
 
 def get_ir(target: Target) -> SourceIR:

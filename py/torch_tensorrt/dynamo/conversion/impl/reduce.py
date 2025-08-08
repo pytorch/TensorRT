@@ -9,9 +9,9 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     cast_trt_tensor,
     get_axes_for_reduce_op,
     get_positive_dim,
+    set_layer_name,
 )
 from torch_tensorrt.dynamo.types import TRTTensor
-from torch_tensorrt.fx.converters.converter_utils import set_layer_name
 
 
 def amax(

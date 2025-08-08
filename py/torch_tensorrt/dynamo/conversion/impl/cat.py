@@ -11,9 +11,9 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     cast_trt_tensor,
     get_positive_dim,
     get_trt_tensor,
+    set_layer_name,
 )
 from torch_tensorrt.dynamo.types import TRTTensor
-from torch_tensorrt.fx.converters.converter_utils import set_layer_name
 
 
 def cat(
