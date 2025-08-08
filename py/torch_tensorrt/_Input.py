@@ -380,9 +380,13 @@ class Input(object):
                 )
             else:
                 if isinstance(self.shape, tuple):
-                    return torch.rand(self.shape).to(
-                        dtype=self.dtype.to(torch.dtype, use_default=True)
-                    )
+                    shape = self.shape
+                    dtype = self.dtype.to(torch.dtype, use_default=True)
+                    if dtype.is_floating_point:
+                        return torch.rand(shape).to(dtype=dtype)
+                    else:
+                        # For integer types, use randint to get a better range of values for testing
+                        return torch.randint(-10, 10, shape, dtype=dtype)
                 else:
                     RuntimeError(
                         f"Input shape is dynamic but shapes are not provided as sequence (found: {self.shape})"
@@ -400,9 +404,13 @@ class Input(object):
                     )
 
                 if isinstance(self.shape, dict):
-                    return torch.rand(self.shape[optimization_profile_field]).to(
-                        dtype=self.dtype.to(torch.dtype, use_default=True)
-                    )
+                    shape = self.shape[optimization_profile_field]
+                    dtype = self.dtype.to(torch.dtype, use_default=True)
+                    if dtype.is_floating_point:
+                        return torch.rand(shape).to(dtype=dtype)
+                    else:
+                        # For integer types, use randint to get a better range of values for testing
+                        return torch.randint(-10, 10, shape, dtype=dtype)
                 else:
                     raise RuntimeError(
                         f"Input shape is dynamic but shapes are not provided as dictionary (found: {self.shape})"
@@ -412,4 +420,3 @@ class Input(object):
                 raise ValueError(
                     "Requested an example tensor from a dynamic shaped input but did not specific which profile field to use."
                 )
-        raise

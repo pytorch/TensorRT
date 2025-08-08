@@ -34,7 +34,8 @@ def full(
         # in static shape scenario, shape is a list of int
         if all(isinstance(dim, int) for dim in shape):
             output_np_dtype = output_dtype.try_to(np.dtype, use_default=True)
-            return np.full(shape, fill_value, dtype=output_np_dtype)
+            np_array = np.full(shape, fill_value, dtype=output_np_dtype)
+            return get_trt_tensor(ctx, np_array, name, dtype=output_dtype)
         else:
             shape = impl.cat.cat(
                 ctx, target, source_ir, name + "_concat_shape", shape, 0
