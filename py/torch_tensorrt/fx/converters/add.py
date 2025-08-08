@@ -5,6 +5,7 @@ import tensorrt as trt
 import torch
 
 from ..converter_registry import tensorrt_converter
+from .converter_utils import get_dyn_range, mark_as_int8_layer
 
 
 @tensorrt_converter(operator.add)
@@ -41,6 +42,8 @@ def quantized_add(network, target, args, kwargs, layer_name):
 
     layer = network.add_elementwise(lhs_val, rhs_val, trt.ElementWiseOperation.SUM)
     layer.name = layer_name
+    dyn_range = get_dyn_range(kwargs["scale"], kwargs["zero_point"], torch.quint8)
+    mark_as_int8_layer(layer, dyn_range)
 
     return layer.get_output(0)
 
@@ -56,10 +59,13 @@ def quantized_add_relu(network, submod, args, kwargs, layer_name):
 
     layer = network.add_elementwise(lhs_val, rhs_val, trt.ElementWiseOperation.SUM)
     layer.name = f"{layer_name}_add"
+    dyn_range = get_dyn_range(kwargs["scale"], kwargs["zero_point"], torch.quint8)
+    mark_as_int8_layer(layer, dyn_range)
 
     layer = network.add_activation(
         input=layer.get_output(0), type=trt.ActivationType.RELU
     )
     layer.name = f"{layer_name}_relu"
+    mark_as_int8_layer(layer, dyn_range)
 
     return layer.get_output(0)

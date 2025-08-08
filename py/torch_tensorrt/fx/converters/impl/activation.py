@@ -8,7 +8,11 @@ import numpy as np
 import tensorrt as trt
 import torch
 from torch.fx.node import Argument, Target
-from torch_tensorrt.fx.converters.converter_utils import SourceIR, set_layer_name
+from torch_tensorrt.fx.converters.converter_utils import (
+    SourceIR,
+    mark_as_int8_layer,
+    set_layer_name,
+)
 from torch_tensorrt.fx.types import (
     TRTNetwork,
     TRTTensor,
@@ -59,6 +63,9 @@ def convert_activation(
         layer.beta = beta
     set_layer_name(layer, target, name, source_ir)
 
+    if input_val.dynamic_range is not None:
+        dyn_range = dyn_range_fn(input_val.dynamic_range)
+        mark_as_int8_layer(layer, dyn_range)
     return layer.get_output(0)
 
 

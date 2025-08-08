@@ -10,8 +10,10 @@ from torch_tensorrt.fx.converters import acc_ops_converters
 from torch_tensorrt.fx.converters.converter_utils import (
     SourceIR,
     extend_attr_to_tuple,
+    get_dyn_range,
     get_trt_tensor,
     has_dynamic_shape,
+    mark_as_int8_layer,
     set_layer_name,
     to_numpy,
 )
@@ -120,6 +122,11 @@ def convNd(
 
     if groups is not None:
         conv_layer.num_groups = groups
+
+    # Handle quantization cases
+    if scale is not None and zero_point is not None:
+        # Assume the dtype of activation is torch.quint8
+        mark_as_int8_layer(conv_layer, get_dyn_range(scale, zero_point, torch.quint8))
 
     result = conv_layer.get_output(0)
 
