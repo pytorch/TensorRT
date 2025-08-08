@@ -5,6 +5,7 @@ import gc
 import getpass
 import logging
 import os
+import platform
 import tempfile
 import urllib.request
 import warnings
@@ -29,7 +30,7 @@ import torch
 from torch._subclasses.fake_tensor import FakeTensor
 from torch.fx.experimental.proxy_tensor import unset_fake_temporarily
 from torch_tensorrt._Device import Device
-from torch_tensorrt._enums import Platform, dtype
+from torch_tensorrt._enums import dtype
 from torch_tensorrt._features import ENABLED_FEATURES
 from torch_tensorrt._Input import Input
 from torch_tensorrt._version import __tensorrt_llm_version__
@@ -839,29 +840,33 @@ def is_tegra_platform() -> bool:
     return False
 
 
-def is_platform_supported_for_trtllm(platform: str) -> bool:
+def is_platform_supported_for_trtllm() -> bool:
     """
-    Checks if the current platform supports TensorRT-LLM plugins for NCCL backend
-    Returns:
-        bool: True if the platform supports TensorRT-LLM plugins for NCCL backend, False otherwise.
-    Note:
-        TensorRT-LLM plugins for NCCL backend are not supported on:
-        - Windows platforms
-        - Orin, Xavier, or Tegra devices (aarch64 architecture)
+    Checks if the current platform supports TensorRT-LLM plugins for the NCCL backend.
 
+    Returns:
+        bool: True if supported, False otherwise.
+
+    Unsupported:
+        - Windows platforms
+        - Jetson/Orin/Xavier (aarch64 architecture + 'tegra' in platform release)
     """
-    if "windows" in platform:
+    system = platform.system().lower()
+    machine = platform.machine().lower()
+    release = platform.release().lower()
+
+    if "windows" in system:
         logger.info(
-            "TensorRT-LLM plugins for NCCL backend are not supported on Windows"
+            "TensorRT-LLM plugins for NCCL backend are not supported on Windows."
         )
         return False
-    if torch.cuda.is_available():
-        device_name = torch.cuda.get_device_name().lower()
-        if any(keyword in device_name for keyword in ["orin", "xavier", "tegra"]):
-            return False
+
+    if machine == "aarch64" and "tegra" in release:
         logger.info(
-            "TensorRT-LLM plugins for NCCL backend are not supported on Jetson devices"
+            "TensorRT-LLM plugins for NCCL backend are not supported on Jetson/Orin/Xavier (Tegra) devices."
         )
+        return False
+
     return True
 
 
@@ -1026,10 +1031,7 @@ def load_tensorrt_llm_for_nccl() -> bool:
     Returns:
         bool: True if the plugin was successfully loaded and initialized, False otherwise.
     """
-    # Check platform compatibility first
-    platform = Platform.current_platform()
-    platform = str(platform).lower()
-    if not is_platform_supported_for_trtllm(platform):
+    if not is_platform_supported_for_trtllm():
         return False
     plugin_lib_path = os.environ.get("TRTLLM_PLUGINS_PATH")
 
