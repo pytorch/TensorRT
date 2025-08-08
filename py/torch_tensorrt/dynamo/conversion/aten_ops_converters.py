@@ -1123,7 +1123,7 @@ def aten_ops_clone_copy_placeholder(
         name,
         args[0],
         kwargs.get("dtype", args[0].dtype),
-        force_layer=False,
+        force_layer=True,
     )
 
 
@@ -3229,7 +3229,7 @@ def aten_ops_copy(
         name,
         src,
         src.dtype,
-        force_layer=False,
+        force_layer=True,
     )
 
 
