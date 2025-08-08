@@ -140,20 +140,12 @@ struct CompileSpec : torch::CustomClassHolder {
     }
   }
 
-  int64_t getPTQCalibratorHandle() {
-    return (int64_t)ptq_calibrator;
-  }
-
   void setDeviceIntrusive(const c10::intrusive_ptr<Device>& d) {
     device = *d;
   }
 
   void setTorchFallbackIntrusive(const c10::intrusive_ptr<TorchFallback>& fb) {
     torch_fallback = *fb;
-  }
-
-  void setPTQCalibratorViaHandle(int64_t handle) {
-    ptq_calibrator = (nvinfer1::IInt8Calibrator*)handle;
   }
 
   ADD_FIELD_GET_SET(disable_tf32, bool);
@@ -170,11 +162,9 @@ struct CompileSpec : torch::CustomClassHolder {
   ADD_FIELD_GET_SET(allow_shape_tensors, bool);
   ADD_FIELD_GET_SET(device, Device);
   ADD_FIELD_GET_SET(torch_fallback, TorchFallback);
-  ADD_FIELD_GET_SET(ptq_calibrator, nvinfer1::IInt8Calibrator*);
 
   std::vector<Input> inputs;
   InputSignature input_signature;
-  nvinfer1::IInt8Calibrator* ptq_calibrator = nullptr;
   std::set<DataType> enabled_precisions = {};
   bool sparse_weights = false;
   bool disable_tf32 = false;

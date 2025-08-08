@@ -1,6 +1,7 @@
 from typing import Optional, Tuple, Union
 
 import tensorrt as trt
+from tensorrt import ITensor as TRTTensor
 from torch.fx.node import Target
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion import impl
@@ -10,14 +11,13 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     flatten_dims,
     get_axes_for_reduce_op,
     get_positive_dim,
-    set_layer_name,
     get_trt_tensor,
     has_dynamic_shape,
+    set_layer_name,
 )
 from torch_tensorrt.dynamo.conversion.impl.elementwise import convert_binary_elementwise
 from torch_tensorrt.dynamo.conversion.impl.shape import shape as get_shape
 from torch_tensorrt.dynamo.utils import DYNAMIC_DIM
-from torch_tensorrt.dynamo.types import TRTTensor
 
 
 def argmax_argmin(

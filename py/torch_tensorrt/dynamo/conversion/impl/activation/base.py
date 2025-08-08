@@ -1,14 +1,13 @@
 from typing import Any, Callable, Optional
 
 import tensorrt as trt
+from tensorrt import ITensor as TRTTensor
 from torch.fx.node import Target
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
-from torch_tensorrt.fx.converters.converter_utils import (
-    mark_as_int8_layer,
+from torch_tensorrt.dynamo.conversion.converter_utils import (
     set_layer_name,
 )
-from torch_tensorrt.fx.types import TRTTensor
 
 
 def convert_activation(
@@ -37,11 +36,4 @@ def convert_activation(
         layer.beta = beta
     set_layer_name(layer, target, name, source_ir)
 
-    if (
-        not ctx.net.get_flag(trt.NetworkDefinitionCreationFlag.STRONGLY_TYPED)
-        and input_val.dynamic_range is not None
-        and dyn_range_fn is not None
-    ):
-        dyn_range = dyn_range_fn(input_val.dynamic_range)
-        mark_as_int8_layer(layer, dyn_range)
     return layer.get_output(0)

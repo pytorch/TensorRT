@@ -13,7 +13,6 @@ py_library(
         "torch_tensorrt/_types.py",
         "torch_tensorrt/_version.py",
         "torch_tensorrt/logging.py",
-        "torch_tensorrt/ptq.py",
     ],
     data = [
         "torch_tensorrt/lib/libtrtorch.so",

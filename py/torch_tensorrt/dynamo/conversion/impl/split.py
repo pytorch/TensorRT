@@ -1,14 +1,14 @@
 from typing import List, Optional, Sequence, Union
 
+from tensorrt import ITensor as TRTTensor
 from torch.fx.node import Target
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
-from torch_tensorrt.dynamo.conversion.impl.shape import get_shape_with_dynamic_shape
-from torch_tensorrt.fx.converters.converter_utils import (
+from torch_tensorrt.dynamo.conversion.converter_utils import (
     has_dynamic_shape,
     set_layer_name,
 )
-from torch_tensorrt.fx.types import TRTTensor
+from torch_tensorrt.dynamo.conversion.impl.shape import get_shape_with_dynamic_shape
 
 
 def split(

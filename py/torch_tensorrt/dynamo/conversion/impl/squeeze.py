@@ -1,5 +1,6 @@
 from typing import Optional, Sequence, Union
 
+from tensorrt import ITensor as TRTTensor
 from torch.fx.node import Target
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
@@ -7,7 +8,6 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     get_positive_dim,
     set_layer_name,
 )
-from torch_tensorrt.fx.types import TRTTensor
 
 
 def squeeze(

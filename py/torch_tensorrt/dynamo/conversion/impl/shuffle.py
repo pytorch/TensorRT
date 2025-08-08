@@ -3,6 +3,7 @@ from typing import Optional, Sequence, Union
 import numpy as np
 import tensorrt as trt
 import torch_tensorrt.dynamo.conversion.impl as impl
+from tensorrt import ITensor as TRTTensor
 from torch.fx.node import Target
 from torch_tensorrt import _enums
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
@@ -14,7 +15,6 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     set_layer_name,
 )
 from torch_tensorrt.dynamo.conversion.impl.shape import get_shape_with_dynamic_shape
-from torch_tensorrt.fx.types import TRTTensor
 
 
 def reshape(

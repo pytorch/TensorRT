@@ -5,6 +5,7 @@ import numpy as np
 # @manual=//deeplearning/trt/python:py_tensorrt
 import tensorrt as trt
 import torch
+from tensorrt import ITensor as TRTTensor
 from torch.fx.node import Target
 from torch_tensorrt.dynamo.conversion import impl
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
@@ -12,15 +13,10 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     SourceIR,
     get_trt_tensor,
     has_dynamic_shape,
+    set_layer_name,
     to_torch,
     to_trt_weights,
 )
-from torch_tensorrt.fx.converters.converter_utils import (
-    get_dyn_range,
-    mark_as_int8_layer,
-    set_layer_name,
-)
-from torch_tensorrt.fx.types import TRTTensor
 
 
 def deconvNd(
@@ -173,11 +169,6 @@ def deconvNd(
 
     deconv_layer.pre_padding = tuple(pre_padding_values)
     deconv_layer.post_padding = tuple(post_padding_values)
-
-    # Handle quantization cases
-    if scale is not None and zero_point is not None:
-        # Assume the dtype of activation is torch.quint8
-        mark_as_int8_layer(deconv_layer, get_dyn_range(scale, zero_point, torch.quint8))
 
     result = deconv_layer.get_output(0)
 

@@ -2,6 +2,7 @@ import logging
 from typing import Dict, Sequence, Tuple, Union
 
 import torch
+from tensorrt import ITensor as TRTTensor
 from torch.fx.node import Argument, Target
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo._SourceIR import SourceIR
@@ -10,7 +11,6 @@ from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContex
 from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
     dynamo_tensorrt_converter,
 )
-from torch_tensorrt.fx.types import TRTTensor
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 

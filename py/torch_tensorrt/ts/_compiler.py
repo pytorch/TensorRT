@@ -27,7 +27,6 @@ def compile(
     dla_sram_size: int = 1048576,
     dla_local_dram_size: int = 1073741824,
     dla_global_dram_size: int = 536870912,
-    calibrator: object = None,
     truncate_long_and_double: bool = False,
     require_full_compilation: bool = False,
     min_block_size: int = 3,
@@ -92,7 +91,6 @@ def compile(
         dla_local_dram_size (int): Host RAM used by DLA to share intermediate tensor data across operations
         dla_global_dram_size (int): Host RAM used by DLA to store weights and metadata for execution
         truncate_long_and_double (bool): Truncate weights provided in int64 or double (float64) to int32 and float32
-        calibrator (Union(torch_tensorrt._C.IInt8Calibrator, tensorrt.IInt8Calibrator)): Calibrator object which will provide data to the PTQ system for INT8 Calibration
         require_full_compilation (bool): Require modules to be compiled end to end or return an error as opposed to returning a hybrid graph where operations that cannot be run in TensorRT are run in PyTorch
         min_block_size (int): The minimum number of contiguous TensorRT convertible operations in order to run a set of operations in TensorRT
         torch_executed_ops (List[str]): List of aten operators that must be run in PyTorch. An error will be thrown if this list is not empty but ``require_full_compilation`` is True
@@ -147,7 +145,6 @@ def compile(
         "dla_sram_size": dla_sram_size,
         "dla_local_dram_size": dla_local_dram_size,
         "dla_global_dram_size": dla_global_dram_size,
-        "calibrator": calibrator,
         "truncate_long_and_double": truncate_long_and_double,
         "torch_fallback": {
             "enabled": not require_full_compilation,
@@ -182,7 +179,6 @@ def convert_method_to_trt_engine(
     dla_local_dram_size: int = 1073741824,
     dla_global_dram_size: int = 536870912,
     truncate_long_and_double: int = False,
-    calibrator: object = None,
     allow_shape_tensors: bool = False,
 ) -> bytes:
     """Convert a TorchScript module method to a serialized TensorRT engine
@@ -241,7 +237,6 @@ def convert_method_to_trt_engine(
         dla_local_dram_size (int): Host RAM used by DLA to share intermediate tensor data across operations
         dla_global_dram_size (int): Host RAM used by DLA to store weights and metadata for execution
         truncate_long_and_double (bool): Truncate weights provided in int64 or double (float64) to int32 and float32
-        calibrator (Union(torch_tensorrt._C.IInt8Calibrator, tensorrt.IInt8Calibrator)): Calibrator object which will provide data to the PTQ system for INT8 Calibration
         allow_shape_tensors: (Experimental) Allow aten::size to output shape tensors using IShapeLayer in TensorRT
 
     Returns:
@@ -274,7 +269,6 @@ def convert_method_to_trt_engine(
         "capability": capability,  # Restrict kernel selection to safe gpu kernels or safe dla kernels
         "num_avg_timing_iters": num_avg_timing_iters,  # Number of averaging timing iterations used to select kernels
         "workspace_size": workspace_size,  # Maximum size of workspace given to TensorRT
-        "calibrator": calibrator,
         "truncate_long_and_double": truncate_long_and_double,
         "allow_shape_tensors": allow_shape_tensors,
     }

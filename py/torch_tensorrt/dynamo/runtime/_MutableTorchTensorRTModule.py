@@ -95,7 +95,6 @@ class MutableTorchTensorRTModule(object):
             dla_local_dram_size (int): Host RAM used by DLA to share intermediate tensor data across operations
             dla_global_dram_size (int): Host RAM used by DLA to store weights and metadata for execution
             truncate_double (bool): Truncate weights provided in double (float64) to float32
-            calibrator (Union(torch_tensorrt._C.IInt8Calibrator, tensorrt.IInt8Calibrator)): Calibrator object which will provide data to the PTQ system for INT8 Calibration
             require_full_compilation (bool): Require modules to be compiled end to end or return an error as opposed to returning a hybrid graph where operations that cannot be run in TensorRT are run in PyTorch
             min_block_size (int): The minimum number of contiguous TensorRT convertible operations in order to run a set of operations in TensorRT
             torch_executed_ops (Collection[Target]): Set of aten operators that must be run in PyTorch. An error will be thrown if this set is not empty but ``require_full_compilation`` is True

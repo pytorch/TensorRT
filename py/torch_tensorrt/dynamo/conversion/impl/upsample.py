@@ -1,6 +1,7 @@
 from typing import Optional, Sequence
 
 import tensorrt as trt
+from tensorrt import ITensor as TRTTensor
 from torch.fx.node import Target
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
@@ -9,7 +10,6 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     set_layer_name,
 )
 from torch_tensorrt.dynamo.conversion.impl.shape import get_shape_with_dynamic_shape
-from torch_tensorrt.dynamo.types import TRTTensor
 
 
 def upsample(
