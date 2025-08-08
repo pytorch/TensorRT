@@ -532,6 +532,7 @@ def aten_ops_gelu(
 
 
 @dynamo_tensorrt_converter(torch.ops.aten.matmul, supports_dynamic_shapes=True)
+@dynamo_tensorrt_converter(torch.ops.aten.matmul.default, supports_dynamic_shapes=True)
 @dynamo_tensorrt_converter(torch.ops.aten.dot.default, supports_dynamic_shapes=True)
 @dynamo_tensorrt_converter(torch.ops.aten.mm.default, supports_dynamic_shapes=True)
 @dynamo_tensorrt_converter(torch.ops.aten.mv.default, supports_dynamic_shapes=True)
@@ -3578,4 +3579,23 @@ def aten_ops_nonzero(
         SourceIR.ATEN,
         name,
         args[0],
+    )
+
+
+@dynamo_tensorrt_converter(torch.ops.aten.linear.default, supports_dynamic_shapes=True)
+def aten_ops_linear(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.linear.linear(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        input=args[0],
+        weight=args[1],
+        bias=args_bounds_check(args, 2, None),
     )
