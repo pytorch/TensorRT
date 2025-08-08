@@ -1,18 +1,18 @@
+import numpy as np
 import operator
 import warnings
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
-
-import numpy as np
 
 # @manual=//deeplearning/trt/python:py_tensorrt
 import tensorrt as trt
 import torch
 from torch.fx.node import Argument, Target
-from torch_tensorrt.fx.converters.converter_utils import (
-    SourceIR,
-    mark_as_int8_layer,
-    set_layer_name,
-)
+
+
+from torch_tensorrt.fx.converters.converter_utils import mark_as_int8_layer
+from torch_tensorrt.fx.converters.converter_utils import set_layer_name
+from torch_tensorrt.fx.converters.converter_utils import SourceIR
+
 from torch_tensorrt.fx.types import (
     TRTNetwork,
     TRTTensor,

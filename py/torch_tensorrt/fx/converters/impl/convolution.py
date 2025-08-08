@@ -1,22 +1,23 @@
-from typing import Any, Optional, Sequence, Union
-
 import numpy as np
+from typing import Any, Optional, Sequence, Union
 
 # @manual=//deeplearning/trt/python:py_tensorrt
 import tensorrt as trt
 import torch
 from torch.fx.node import Target
-from torch_tensorrt.fx.converters import acc_ops_converters
+
 from torch_tensorrt.fx.converters.converter_utils import (
     SourceIR,
     extend_attr_to_tuple,
     get_dyn_range,
-    get_trt_tensor,
-    has_dynamic_shape,
     mark_as_int8_layer,
     set_layer_name,
+    has_dynamic_shape,
     to_numpy,
+    get_trt_tensor,
 )
+from torch_tensorrt.fx.converters import acc_ops_converters
+
 from torch_tensorrt.fx.types import (
     TRTNetwork,
     TRTTensor,
