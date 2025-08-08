@@ -110,6 +110,11 @@ jobs:
         set -x
         export USE_HOST_DEPS=1
         export CI_BUILD=1
+        export USE_TRT_RTX=true
+        echo $LD_LIBRARY_PATH
+        nvidia-smi
+        python -c "import torch; print(torch.cuda.get_device_capability())"
+        python -c "import torch; print(torch.cuda.get_device_properties(0))"
         packaging/vc_env_helper.bat python tools/perf/resnet50.py
         packaging/vc_env_helper.bat python tools/perf/bert.py
 
@@ -136,6 +141,11 @@ jobs:
         set -x
         export USE_HOST_DEPS=1
         export CI_BUILD=1
+        export USE_TRT_RTX=true
+        echo $LD_LIBRARY_PATH
+        nvidia-smi
+        python -c "import torch; print(torch.cuda.get_device_capability())"
+        python -c "import torch; print(torch.cuda.get_device_properties(0))"
         packaging/vc_env_helper.bat  python tools/llm/run_llm.py --model Qwen/Qwen3-0.6B --prompt "Gemma is Google’s family of open-weights LLMs, launched in February 2024 (Gemma 1.0, 2B/7B sizes). Designed to be lightweight, efficient, can you please tell me the difference between gemma3 and deepseek? which one is better in performance?" --precision FP16 --num_tokens 128 --benchmark
 
   # tests-py-dynamo-fe:
