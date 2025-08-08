@@ -7,6 +7,7 @@ from typing import Callable, Dict, Optional, Sequence, Tuple, Union
 import numpy as np
 import torch
 from torch.fx.node import Argument, Node, Target
+from torch_tensorrt._utils import is_tensorrt_version_supported
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion import impl
@@ -22,7 +23,6 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     is_only_operator_on_placeholder,
 )
 from torch_tensorrt.dynamo.types import TRTTensor
-from torch_tensorrt._utils import is_tensorrt_version_supported
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -619,6 +619,7 @@ else:
             args[2],
             args[3],
         )
+
 
 if is_tensorrt_version_supported("10.8.0"):
     try:

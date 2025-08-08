@@ -35,6 +35,7 @@ pre_lowering_pass_list = [
 
 if not is_tegra_platform():
     from .fuse_distributed_ops import fuse_distributed_ops
+
     post_lowering_pass_list.append(fuse_distributed_ops)
 
 ATEN_POST_LOWERING_PASSES = DynamoPassManager.build_from_passlist(

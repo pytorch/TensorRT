@@ -13,7 +13,6 @@ from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
 )
 from torch_tensorrt.dynamo.conversion.converter_utils import load_tensorrt_llm
 
-
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
 if load_tensorrt_llm():
@@ -21,6 +20,7 @@ if load_tensorrt_llm():
         tensorrt_fused_nccl_all_gather_op,
         tensorrt_fused_nccl_reduce_scatter_op,
     )
+
     @dynamo_tensorrt_converter(tensorrt_fused_nccl_all_gather_op)
     def fused_nccl_gather(
         ctx: ConversionContext,
