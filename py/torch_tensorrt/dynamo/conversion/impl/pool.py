@@ -10,11 +10,11 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     extend_attr_to_tuple,
     get_positive_dim,
 )
+from torch_tensorrt.dynamo.types import TRTTensor
 from torch_tensorrt.fx.converters.converter_utils import (
     has_dynamic_shape,
     set_layer_name,
 )
-from torch_tensorrt.fx.types import TRTTensor
 
 
 def avg_poolNd(

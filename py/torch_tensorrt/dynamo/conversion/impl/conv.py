@@ -17,7 +17,7 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     to_torch,
     to_trt_weights,
 )
-from torch_tensorrt.fx.types import TRTTensor
+from torch_tensorrt.dynamo.types import TRTTensor
 
 
 def convNd(

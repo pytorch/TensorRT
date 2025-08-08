@@ -16,8 +16,8 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     set_item,
     to_numpy,
 )
+from torch_tensorrt.dynamo.types import TRTTensor
 from torch_tensorrt.fx.converters.converter_utils import set_layer_name
-from torch_tensorrt.fx.types import TRTTensor
 
 
 def embedding(
