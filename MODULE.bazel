@@ -1,6 +1,6 @@
 module(
     name = "torch_tensorrt",
-    version = "2.9.0a0",
+    version = "2.8.0a0",
     repo_name = "org_pytorch_tensorrt",
 )
 
@@ -90,10 +90,9 @@ http_archive(
 http_archive(
     name = "torch_l4t",
     build_file = "@//third_party/libtorch:BUILD",
-    sha256 = "6eff643c0a7acda92734cc798338f733ff35c7df1a4434576f5ff7c66fc97319",
     strip_prefix = "torch",
     type = "zip",
-    urls = ["https://pypi.jetson-ai-lab.dev/jp6/cu126/+f/6ef/f643c0a7acda9/torch-2.7.0-cp310-cp310-linux_aarch64.whl"],
+    urls = ["https://pypi.jetson-ai-lab.io/jp6/cu126/+f/62a/1beee9f2f1470/torch-2.8.0-cp310-cp310-linux_aarch64.whl"],
 )
 
 # Download these tarballs manually from the NVIDIA website
