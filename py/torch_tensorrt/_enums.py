@@ -8,6 +8,7 @@ import numpy as np
 import tensorrt as trt
 import torch
 from torch_tensorrt._features import ENABLED_FEATURES, needs_torch_tensorrt_runtime
+from torch_tensorrt._utils import is_tensorrt_version_supported
 
 
 class dtype(Enum):
@@ -199,8 +200,6 @@ class dtype(Enum):
                 return dtype.i8
             elif t == trt.DataType.FP8:
                 return dtype.f8
-            elif t == trt.DataType.FP4:
-                return dtype.fp4
             elif t == trt.DataType.INT32:
                 return dtype.i32
             elif t == trt.DataType.INT64:
@@ -214,6 +213,9 @@ class dtype(Enum):
             elif t == trt.DataType.BF16:
                 return dtype.bf16
             else:
+                if is_tensorrt_version_supported("10.8.0"):
+                    if t == trt.DataType.FP4:
+                        return dtype.fp4
                 raise TypeError(
                     f"Provided an unsupported data type as a data type for translation (support: bool, int, half, float, bfloat16), got: {t}"
                 )
@@ -409,11 +411,12 @@ class dtype(Enum):
                 return trt.DataType.BOOL
             elif self == dtype.bf16:
                 return trt.DataType.BF16
-            elif self == dtype.f4:
-                return trt.DataType.FP4
             elif use_default:
                 return trt.DataType.FLOAT
             else:
+                if is_tensorrt_version_supported("10.8.0"):
+                    if self == dtype.f4:
+                        return trt.DataType.FP4
                 raise TypeError("Unsupported tensorrt dtype")
 
         elif t == np.dtype:
