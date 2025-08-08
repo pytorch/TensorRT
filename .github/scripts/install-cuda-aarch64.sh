@@ -20,7 +20,7 @@ install_cuda_aarch64() {
     nvshmem_filename="libnvshmem_cuda12-linux-sbsa-${nvshmem_version}.tar.gz"
     curl -L ${nvshmem_path}/${nvshmem_filename} -o nvshmem.tar.gz
     tar -xzf nvshmem.tar.gz
-    cp -a libnvshmem/lib* /usr/local/cuda/lib64/
+    cp -a libnvshmem/lib/* /usr/local/cuda/lib64/
     cp -a libnvshmem/include/* /usr/local/cuda/include/
     rm -rf nvshmem.tar.gz nvshmem
     echo "nvshmem ${nvshmem_version} for cuda ${CUDA_MAJOR_VERSION} installed successfully"
