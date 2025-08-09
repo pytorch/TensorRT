@@ -66,7 +66,7 @@ jobs:
             post-script: packaging/post_build_script.sh
             smoke-test-script: packaging/smoke_test_script.sh
             package-name: torch_tensorrt
-    name: Build torch-tensorrt whl package
+    name: Build torch-tensorrt whl package for jetpack
     uses: ./.github/workflows/build_wheels_linux_aarch64.yml
     with:
       repository: ${{ matrix.repository }}
