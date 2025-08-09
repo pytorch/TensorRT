@@ -67,9 +67,9 @@ def test_module_perf(model, *input):
 # Load bert model
 model = (
     BertModel.from_pretrained("bert-base-uncased", torchscript=True)
-    .eval()
-    .half()
     .to("cuda")
+    .half()
+    .eval()
 )
 # Define sample inputs
 inputs = [

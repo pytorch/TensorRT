@@ -18,7 +18,7 @@ from transformers import BertModel
 # %%
 
 # Initialize model with float precision and sample inputs
-model = BertModel.from_pretrained("bert-base-uncased").eval().to("cuda")
+model = BertModel.from_pretrained("bert-base-uncased").to("cuda").eval()
 inputs = [
     torch.randint(0, 2, (1, 14), dtype=torch.int32).to("cuda"),
     torch.randint(0, 2, (1, 14), dtype=torch.int32).to("cuda"),

@@ -217,7 +217,7 @@ class MyModel(nn.Module):  # type: ignore[misc]
         return y
 
 
-my_model = MyModel((1, 1, 2, 0)).to("cuda")
+my_model = MyModel((1, 1, 2, 0)).to("cuda").eval()
 my_model(ex_input)
 
 ##############################################################################

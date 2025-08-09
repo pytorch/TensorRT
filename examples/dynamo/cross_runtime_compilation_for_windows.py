@@ -46,7 +46,7 @@ PARSER.add_argument(
 
 args = PARSER.parse_args()
 torch.manual_seed(0)
-model = models.resnet18().eval().cuda()
+model = models.resnet18().cuda().eval()
 input = torch.rand((1, 3, 224, 224)).to("cuda")
 inputs = [input]
 

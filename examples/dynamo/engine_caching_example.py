@@ -37,7 +37,7 @@ from torch_tensorrt.dynamo._engine_cache import BaseEngineCache
 np.random.seed(0)
 torch.manual_seed(0)
 
-model = models.resnet18(pretrained=True).eval().to("cuda")
+model = models.resnet18(pretrained=True).to("cuda").eval()
 enabled_precisions = {torch.float}
 min_block_size = 1
 use_python_runtime = False
