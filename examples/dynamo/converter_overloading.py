@@ -34,7 +34,7 @@ class GeLU(torch.nn.Module):
         return torch.nn.functional.gelu(x, approximate=self.mode)
 
 
-my_mod = GeLU(mode="tanh")
+my_mod = GeLU(mode="tanh").to("cuda").eval()
 ex_input = torch.randn(2, 5).to("cuda")
 
 
@@ -198,7 +198,7 @@ print(
 #
 # Finally, we want to verify that in the case that the ``approximate`` argument is not set to ``tanh``, our custom converter is not used.
 
-my_mod_erf = GeLU(mode="none")
+my_mod_erf = GeLU(mode="none").to("cuda").eval()
 my_gelu_erf = torch_tensorrt.compile(
     my_mod_erf, arg_inputs=(ex_input,), min_block_size=1
 )

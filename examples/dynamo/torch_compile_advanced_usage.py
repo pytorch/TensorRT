@@ -36,7 +36,7 @@ class Model(torch.nn.Module):
 
 # Define sample float inputs and initialize model
 sample_inputs = [torch.rand((5, 7)).cuda(), torch.rand((5, 7)).cuda()]
-model = Model().eval().cuda()
+model = Model().cuda().eval()
 
 # %%
 
@@ -60,7 +60,7 @@ sample_inputs_half = [
     torch.rand((5, 7)).half().cuda(),
     torch.rand((5, 7)).half().cuda(),
 ]
-model_half = Model().eval().cuda()
+model_half = Model().cuda().eval()
 
 # %%
 

@@ -110,8 +110,8 @@ class SAM2FullModel(torch.nn.Module):
 # Initialize the ``SAM2FullModel`` with the pretrained weights. Since we already initialized
 # ``SAM2ImagePredictor``, we can directly use the model from it (``predictor.model``). We cast the model
 # to FP16 precision for faster performance.
-encoder = predictor.model.eval().cuda()
-sam_model = SAM2FullModel(encoder.half()).eval().cuda()
+encoder = predictor.model.cuda().eval()
+sam_model = SAM2FullModel(encoder.half()).cuda().eval()
 
 # %%
 # Load a sample image provided in the repository.

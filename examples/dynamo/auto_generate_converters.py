@@ -169,7 +169,7 @@ class MyModel(torch.nn.Module):  # type: ignore[misc]
         return res
 
 
-my_model = MyModel().to("cuda")
+my_model = MyModel().to("cuda").eval()
 m = torch.full((64, 64), 2, device="cuda", dtype=torch.float)
 n = torch.full((64, 64), 3, device="cuda", dtype=torch.float)
 

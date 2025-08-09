@@ -220,7 +220,7 @@ config = LlamaConfig(
 
 # 2. Initialize model (random weights)
 with torch.no_grad():
-    model = LlamaForCausalLM(config).eval().half()
+    model = LlamaForCausalLM(config).cuda().half().eval()
 
 # 3. Export with static shapes
 input_ids = torch.randint(0, 32000, (1, 64))  # Static [batch=1, seq=64]

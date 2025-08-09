@@ -44,8 +44,8 @@ with torch.no_grad():
             use_cache=False,
             attn_implementation="eager",
         )
+        .to(DEVICE)
         .eval()
-        .cuda()
     )
 
 # %%
@@ -54,7 +54,7 @@ with torch.no_grad():
 # Tokenize a sample input prompt and get pytorch model outputs
 prompt = "I enjoy walking with my cute dog"
 model_inputs = tokenizer(prompt, return_tensors="pt")
-input_ids = model_inputs["input_ids"].cuda()
+input_ids = model_inputs["input_ids"].to(DEVICE)
 
 # %%
 # The ``generate()`` API of the ``AutoModelForCausalLM`` class is used for auto-regressive generation with greedy decoding.

@@ -25,7 +25,7 @@ import torchvision.models as models
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 # We begin by defining and initializing a model
-model = models.resnet18(pretrained=True).eval().to("cuda")
+model = models.resnet18(pretrained=True).cuda().eval()
 
 # Define sample inputs
 inputs = torch.randn((16, 3, 224, 224)).cuda()
@@ -101,8 +101,8 @@ class SampleModel(torch.nn.Module):
         return torch.relu((x + 2) * 0.5)
 
 
-model = SampleModel().eval().cuda()
-input = torch.randn((1, 3, 224, 224)).to("cuda")
+model = SampleModel().cuda().eval()
+input = torch.randn((1, 3, 224, 224)).cuda()
 
 # The 'torch_executed_ops' compiler option is used in this example to intentionally introduce graph breaks within the module.
 # Note: The Dynamo backend is required for the CUDA Graph context manager to handle modules in an Ahead-Of-Time (AOT) manner.

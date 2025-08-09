@@ -120,7 +120,7 @@ PARSER.add_argument(
 args = PARSER.parse_args()
 
 model = vgg16(num_classes=10, init_weights=False)
-model = model.cuda()
+model = model.cuda().eval()
 
 # %%
 # Load the pre-trained model weights

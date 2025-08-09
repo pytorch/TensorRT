@@ -37,7 +37,7 @@ settings = {
     "immutable_weights": False,
 }
 
-model = models.resnet18(pretrained=True).eval().to("cuda")
+model = models.resnet18(pretrained=True).to("cuda").eval()
 mutable_module = torch_trt.MutableTorchTensorRTModule(model, **settings)
 # You can use the mutable module just like the original pytorch module. The compilation happens while you first call the mutable module.
 mutable_module(*inputs)
@@ -47,7 +47,7 @@ mutable_module(*inputs)
 
 # %%
 # Making changes to mutable module can trigger refit or re-compilation. For example, loading a different state_dict and setting new weight values will trigger refit, and adding a module to the model will trigger re-compilation.
-model2 = models.resnet18(pretrained=False).eval().to("cuda")
+model2 = models.resnet18(pretrained=False).to("cuda").eval()
 mutable_module.load_state_dict(model2.state_dict())
 
 
@@ -163,7 +163,7 @@ class Model(torch.nn.Module):
 
 
 device = "cuda:0"
-model = Model().eval().to(device)
+model = Model().to(device).eval()
 inputs = (torch.rand(10, 3).to(device), torch.rand(3, 30).to(device))
 kwargs = {
     "c": {"a": torch.rand(10, 30).to(device), "b": torch.rand(10, 30).to(device)},
@@ -199,7 +199,7 @@ import os
 
 from torch_tensorrt.dynamo._defaults import TIMING_CACHE_PATH
 
-model = models.resnet18(pretrained=True).eval().to("cuda")
+model = models.resnet18(pretrained=True).to("cuda").eval()
 
 times = []
 start = torch.cuda.Event(enable_timing=True)

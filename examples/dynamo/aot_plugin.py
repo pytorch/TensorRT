@@ -153,7 +153,7 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    my_model = MyModel().to("cuda")
+    my_model = MyModel().to("cuda").eval()
     m = torch.full((64, 64), 2, device="cuda", dtype=torch.float)
 
     assert my_model(X=m)[0][0] == 3.0
