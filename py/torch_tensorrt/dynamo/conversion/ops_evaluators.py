@@ -14,7 +14,7 @@ from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
     ConverterRegistry,
     dynamo_tensorrt_converter,
 )
-from torch_tensorrt.dynamo.conversion.converter_utils import (
+from torch_tensorrt.dynamo.utils import (
     Frameworks,
     unified_dtype_converter,
 )

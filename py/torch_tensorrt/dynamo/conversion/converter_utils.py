@@ -19,11 +19,10 @@ from typing import (
 import numpy as np
 import tensorrt as trt
 import torch
+import torch_tensorrt.dynamo.conversion.impl as impl
 from torch.fx.experimental.proxy_tensor import unset_fake_temporarily
 from torch.fx.node import Argument, Target
 from torch.fx.passes.shape_prop import TensorMetadata
-
-import torch_tensorrt.dynamo.conversion.impl as impl
 from torch_tensorrt import _enums
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo._SourceIR import SourceIR
