@@ -239,9 +239,6 @@ def _parse_compile_spec(compile_spec_: Dict[str, Any]) -> _ts_C.CompileSpec:
             compile_spec["enabled_precisions"]
         )
 
-    if "calibrator" in compile_spec and compile_spec["calibrator"]:
-        info.ptq_calibrator = compile_spec["calibrator"]
-
     if "sparse_weights" in compile_spec:
         assert isinstance(compile_spec["sparse_weights"], bool)
         info.sparse_weights = compile_spec["sparse_weights"]
@@ -319,7 +316,6 @@ def TensorRTCompileSpec(
     dla_local_dram_size: int = 1073741824,
     dla_global_dram_size: int = 536870912,
     truncate_long_and_double: bool = False,
-    calibrator: object = None,
     allow_shape_tensors: bool = False,
 ) -> torch.classes.tensorrt.CompileSpec:
     """Utility to create a formatted spec dictionary for using the PyTorch TensorRT backend
@@ -354,7 +350,6 @@ def TensorRTCompileSpec(
         num_avg_timing_iters (int): Number of averaging timing iterations used to select kernels
         workspace_size (int): Maximum size of workspace given to TensorRT
         truncate_long_and_double (bool): Truncate weights provided in int64 or double (float64) to int32 and float32
-        calibrator (Union(torch_tensorrt._C.IInt8Calibrator, tensorrt.IInt8Calibrator)): Calibrator object which will provide data to the PTQ system for INT8 Calibration
         allow_shape_tensors: (Experimental) Allow aten::size to output shape tensors using IShapeLayer in TensorRT
 
       Returns:
@@ -378,7 +373,6 @@ def TensorRTCompileSpec(
         "dla_sram_size": dla_sram_size,  # Fast software managed RAM used by DLA to communicate within a layer.
         "dla_local_dram_size": dla_local_dram_size,  # Host RAM used by DLA to share intermediate tensor data across operations
         "dla_global_dram_size": dla_global_dram_size,  # Host RAM used by DLA to store weights and metadata for execution
-        "calibrator": calibrator,
         "truncate_long_and_double": truncate_long_and_double,
         "allow_shape_tensors": allow_shape_tensors,
     }
@@ -433,6 +427,5 @@ def TensorRTCompileSpec(
     backend_spec._set_dla_global_dram_size(parsed_spec.dla_global_dram_size)
     backend_spec._set_truncate_long_and_double(parsed_spec.truncate_long_and_double)
     backend_spec._set_allow_shape_tensors(parsed_spec.allow_shape_tensors)
-    backend_spec._set_ptq_calibrator(parsed_spec._get_calibrator_handle())
 
     return backend_spec
