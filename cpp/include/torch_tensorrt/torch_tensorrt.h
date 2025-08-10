@@ -34,9 +34,6 @@ template <class>
 class ArrayRef;
 } // namespace c10
 
-namespace nvinfer1 {
-class IInt8Calibrator;
-}
 #endif // DOXYGEN_SHOULD_SKIP_THIS
 
 namespace torch_tensorrt {
@@ -832,12 +829,7 @@ struct CompileSpec {
    * host RAM used by DLA to store weights and metadata for execution
    */
   uint64_t dla_global_dram_size = 536870912;
-#ifndef TRT_MAJOR_RTX
-  /**
-   * Calibration dataloaders for each input for post training quantizatiom
-   */
-  nvinfer1::IInt8Calibrator* ptq_calibrator = nullptr;
-#endif
+
   /**
    * Require the full module be compiled to TensorRT instead of potentially running unsupported operations in PyTorch
    */

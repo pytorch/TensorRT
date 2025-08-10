@@ -5,8 +5,9 @@ from typing import Optional, Tuple, Union
 import numpy as np
 import tensorrt as trt
 from torch.fx.node import Argument, Target
+from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
-from torch_tensorrt.fx.converters.converter_utils import SourceIR, set_layer_name
+from torch_tensorrt.dynamo.conversion.converter_utils import set_layer_name
 
 
 # class for AllReduce

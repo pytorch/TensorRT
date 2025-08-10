@@ -85,6 +85,37 @@ if is_tensorrt_version_supported("7.0"):
     }
 
 
+def unified_dtype_converter(
+    dtype: Union[TRTDataType, torch.dtype, np.dtype], to: Frameworks
+) -> Union[np.dtype, torch.dtype, TRTDataType]:
+    """
+    Convert TensorRT, Numpy, or Torch data types to any other of those data types.
+
+    Args:
+        dtype (TRTDataType, torch.dtype, np.dtype): A TensorRT, Numpy, or Torch data type.
+        to (Frameworks): The framework to convert the data type to.
+
+    Returns:
+        The equivalent data type in the requested framework.
+    """
+    assert to in Frameworks, f"Expected valid Framework for translation, got {to}"
+    trt_major_version = int(trt.__version__.split(".")[0])
+    if dtype in (np.int8, torch.int8, trt.int8):
+        return DataTypeEquivalence[trt.int8][to]
+    elif trt_major_version >= 7 and dtype in (np.bool_, torch.bool, trt.bool):
+        return DataTypeEquivalence[trt.bool][to]
+    elif dtype in (np.int32, torch.int32, trt.int32):
+        return DataTypeEquivalence[trt.int32][to]
+    elif dtype in (np.int64, torch.int64, trt.int64):
+        return DataTypeEquivalence[trt.int64][to]
+    elif dtype in (np.float16, torch.float16, trt.float16):
+        return DataTypeEquivalence[trt.float16][to]
+    elif dtype in (np.float32, torch.float32, trt.float32):
+        return DataTypeEquivalence[trt.float32][to]
+    else:
+        raise TypeError("%s is not a supported dtype" % dtype)
+
+
 def deallocate_module(module: torch.fx.GraphModule, delete_module: bool = True) -> None:
     """
     This is a helper function to delete the instance of module. We first move it to CPU and then

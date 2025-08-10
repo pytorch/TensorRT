@@ -277,7 +277,7 @@ jobs:
           else
             if [[ ${{ inputs.is-jetpack }} == true ]]; then
               echo "Building tensorrt wheel for jetpack"
-              ${CONDA_RUN} python setup.py bdist_wheel --jetpack --plat-name=linux_tegra_aarch64
+              ${CONDA_RUN} python setup.py bdist_wheel --jetpack
             else
               echo "Building standard tensorrt wheel"
               ${CONDA_RUN} python setup.py bdist_wheel
@@ -351,11 +351,10 @@ jobs:
 
   upload:
     needs: build
+    name: upload-wheel-${{ matrix.python_version }}-${{ matrix.desired_cuda }}-${{ matrix.gpu_arch_type }}-${{ inputs.is-jetpack }}
     uses: pytorch/test-infra/.github/workflows/_binary_upload.yml@main
-    # if it is not the jetpack build or tensorrt-rtx build, upload to pytorch index,
-    # if it is the jetpack build only upload to pytorch_index for nightly builds
-    # for tensorrt-rtx build, do not upload to pytorch indexat all
-    if: ${{ (inputs.is-jetpack == false && inputs.use-rtx == false) || (inputs.is-jetpack == true && github.event_name == 'push' && startsWith(github.event.ref, 'refs/heads/nightly')) }}
+    #  if it is not jetpack nor rtx, then upload to pytorch index
+    if: ${{ inputs.is-jetpack == false && inputs.use-rtx == false }}
     with:
       repository: ${{ inputs.repository }}
       ref: ${{ inputs.ref }}

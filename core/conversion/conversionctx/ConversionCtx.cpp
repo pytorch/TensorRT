@@ -32,7 +32,6 @@ std::ostream& operator<<(std::ostream& os, const BuilderSettings& s) {
     os << "\n    DLACore: " << s.device.dla_core;
     }
     os << "\n    Engine Capability: " << s.capability;
-      //  << "\n    Calibrator Created: " << (s.calibrator != nullptr);
     return os;
 }
 // clang-format on
@@ -67,17 +66,7 @@ ConversionCtx::ConversionCtx(BuilderSettings build_settings)
         break;
 #endif
       case nvinfer1::DataType::kINT8:
-// tensorrt_rtx is strong typed, cannot set int8 by builder config, only do this for tensorrt build
-#ifndef TRT_MAJOR_RTX
-        TORCHTRT_CHECK(
-            builder->platformHasFastInt8(), "Requested inference in INT8 but platform does not support INT8");
-        cfg->setFlag(nvinfer1::BuilderFlag::kINT8);
-        if (!settings.calibrator) {
-          LOG_INFO(
-              "Int8 precision has been enabled but no calibrator provided. This assumes the network has Q/DQ nodes obtained from Quantization aware training. For more details, refer to https://docs.nvidia.com/deeplearning/tensorrt/developer-guide/index.html#work-with-qat-networks");
-        } else {
-          cfg->setInt8Calibrator(settings.calibrator);
-        }
+        LOG_DEBUG("INT8 precision has been enabled, we assume the network has Q/DQ nodes obtained from modelopt");
         break;
 #endif
       case nvinfer1::DataType::kFLOAT:

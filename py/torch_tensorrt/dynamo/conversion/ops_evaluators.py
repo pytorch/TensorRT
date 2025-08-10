@@ -6,6 +6,7 @@ from typing import Dict, Sequence, Tuple, Union
 
 import numpy as np
 import torch
+from tensorrt import ITensor as TRTTensor
 from torch.fx.node import Argument, Node, Target
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
@@ -13,8 +14,10 @@ from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
     ConverterRegistry,
     dynamo_tensorrt_converter,
 )
-from torch_tensorrt.fx.types import TRTTensor
-from torch_tensorrt.fx.utils import Frameworks, unified_dtype_converter
+from torch_tensorrt.dynamo.utils import (
+    Frameworks,
+    unified_dtype_converter,
+)
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 

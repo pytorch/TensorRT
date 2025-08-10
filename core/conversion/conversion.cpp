@@ -202,13 +202,7 @@ void AddInputs(ConversionCtx* ctx, c10::ArrayRef<const torch::jit::Value*> input
   TORCHTRT_CHECK(
       profile->isValid(),
       "Optimization profile is invalid, please check the input range provided (conversion.AddInputs)");
-
   ctx->cfg->addOptimizationProfile(profile);
-#ifndef TRT_MAJOR_RTX && (NV_TENSORRT_MAJOR > 7 || (NV_TENSORRT_MAJOR == 7 && NV_TENSORRT_MINOR >= 1))
-  if (ctx->enabled_precisions.find(nvinfer1::DataType::kINT8) != ctx->enabled_precisions.end()) {
-    ctx->cfg->setCalibrationProfile(profile);
-  }
-#endif
 }
 
 void MarkOutputs(ConversionCtx* ctx, at::ArrayRef<const torch::jit::Value*> outputs) {
