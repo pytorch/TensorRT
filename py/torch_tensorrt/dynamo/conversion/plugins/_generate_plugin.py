@@ -73,10 +73,10 @@ def _generate_plugin(plugin_name: str) -> None:
             elif arg.type.isSubtypeOf(torch._C.IntType.get()):
                 register_func_annotation[arg.name] = int
                 impl_func_annotation[arg.name] = int
-            elif arg.type.isSubtypeOf(torch._C.Booltype.get()):
+            elif arg.type.isSubtypeOf(torch._C.BoolType.get()):
                 register_func_annotation[arg.name] = bool
                 impl_func_annotation[arg.name] = bool
-            elif arg.type.isSubtypeOf(torch._C.Stringtype.get()):
+            elif arg.type.isSubtypeOf(torch._C.StringType.get()):
                 register_func_annotation[arg.name] = str
                 impl_func_annotation[arg.name] = str
             else:
