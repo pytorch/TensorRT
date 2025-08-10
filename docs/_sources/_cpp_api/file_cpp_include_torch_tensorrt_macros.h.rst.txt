@@ -34,8 +34,6 @@ Included By
 
 - :ref:`file_cpp_include_torch_tensorrt_logging.h`
 
-- :ref:`file_cpp_include_torch_tensorrt_ptq.h`
-
 - :ref:`file_cpp_include_torch_tensorrt_torch_tensorrt.h`
 
 
@@ -61,8 +59,6 @@ Defines
 - :ref:`exhale_define_macros_8h_1a35703561b26b1a9d2738ad7d58b27827`
 
 - :ref:`exhale_define_macros_8h_1a282fd3c0b1c3a215148ae372070e1268`
-
-- :ref:`exhale_define_macros_8h_1a46612a64c219548c5ef03013eb2144ec`
 
 - :ref:`exhale_define_macros_8h_1adad592a7b1b7eed529cdf6acd584c883`
 

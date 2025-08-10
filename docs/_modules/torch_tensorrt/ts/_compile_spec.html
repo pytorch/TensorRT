@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt.ts._compile_spec &mdash; Torch-TensorRT v2.9.0.dev0+dbc061c documentation</title>
+  <title>torch_tensorrt.ts._compile_spec &mdash; Torch-TensorRT v2.9.0.dev0+a2f6b2c documentation</title>
   
 
   
@@ -290,7 +290,7 @@
               
               
                 <div class="version">
-                  v2.9.0.dev0+dbc061c
+                  v2.9.0.dev0+a2f6b2c
                 </div>
               
             
@@ -394,7 +394,6 @@
 <li class="toctree-l1"><a class="reference internal" href="../../../_cpp_api/namespace_torch_tensorrt.html">Namespace torch_tensorrt</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../_cpp_api/namespace_torch_tensorrt__logging.html">Namespace torch_tensorrt::logging</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../_cpp_api/namespace_torch_tensorrt__torchscript.html">Namespace torch_tensorrt::torchscript</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../../_cpp_api/namespace_torch_tensorrt__ptq.html">Namespace torch_tensorrt::ptq</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">CLI Documentation</span></p>
 <ul>
@@ -727,9 +726,6 @@
             <span class="n">compile_spec</span><span class="p">[</span><span class="s2">&quot;enabled_precisions&quot;</span><span class="p">]</span>
         <span class="p">)</span>
 
-    <span class="k">if</span> <span class="s2">&quot;calibrator&quot;</span> <span class="ow">in</span> <span class="n">compile_spec</span> <span class="ow">and</span> <span class="n">compile_spec</span><span class="p">[</span><span class="s2">&quot;calibrator&quot;</span><span class="p">]:</span>
-        <span class="n">info</span><span class="o">.</span><span class="n">ptq_calibrator</span> <span class="o">=</span> <span class="n">compile_spec</span><span class="p">[</span><span class="s2">&quot;calibrator&quot;</span><span class="p">]</span>
-
     <span class="k">if</span> <span class="s2">&quot;sparse_weights&quot;</span> <span class="ow">in</span> <span class="n">compile_spec</span><span class="p">:</span>
         <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">compile_spec</span><span class="p">[</span><span class="s2">&quot;sparse_weights&quot;</span><span class="p">],</span> <span class="nb">bool</span><span class="p">)</span>
         <span class="n">info</span><span class="o">.</span><span class="n">sparse_weights</span> <span class="o">=</span> <span class="n">compile_spec</span><span class="p">[</span><span class="s2">&quot;sparse_weights&quot;</span><span class="p">]</span>
@@ -807,7 +803,6 @@
     <span class="n">dla_local_dram_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1073741824</span><span class="p">,</span>
     <span class="n">dla_global_dram_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">536870912</span><span class="p">,</span>
     <span class="n">truncate_long_and_double</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
-    <span class="n">calibrator</span><span class="p">:</span> <span class="nb">object</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">allow_shape_tensors</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">classes</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">CompileSpec</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Utility to create a formatted spec dictionary for using the PyTorch TensorRT backend</span>
@@ -842,7 +837,6 @@
 <span class="sd">        num_avg_timing_iters (int): Number of averaging timing iterations used to select kernels</span>
 <span class="sd">        workspace_size (int): Maximum size of workspace given to TensorRT</span>
 <span class="sd">        truncate_long_and_double (bool): Truncate weights provided in int64 or double (float64) to int32 and float32</span>
-<span class="sd">        calibrator (Union(torch_tensorrt._C.IInt8Calibrator, tensorrt.IInt8Calibrator)): Calibrator object which will provide data to the PTQ system for INT8 Calibration</span>
 <span class="sd">        allow_shape_tensors: (Experimental) Allow aten::size to output shape tensors using IShapeLayer in TensorRT</span>
 
 <span class="sd">      Returns:</span>
@@ -866,7 +860,6 @@
         <span class="s2">&quot;dla_sram_size&quot;</span><span class="p">:</span> <span class="n">dla_sram_size</span><span class="p">,</span>  <span class="c1"># Fast software managed RAM used by DLA to communicate within a layer.</span>
         <span class="s2">&quot;dla_local_dram_size&quot;</span><span class="p">:</span> <span class="n">dla_local_dram_size</span><span class="p">,</span>  <span class="c1"># Host RAM used by DLA to share intermediate tensor data across operations</span>
         <span class="s2">&quot;dla_global_dram_size&quot;</span><span class="p">:</span> <span class="n">dla_global_dram_size</span><span class="p">,</span>  <span class="c1"># Host RAM used by DLA to store weights and metadata for execution</span>
-        <span class="s2">&quot;calibrator&quot;</span><span class="p">:</span> <span class="n">calibrator</span><span class="p">,</span>
         <span class="s2">&quot;truncate_long_and_double&quot;</span><span class="p">:</span> <span class="n">truncate_long_and_double</span><span class="p">,</span>
         <span class="s2">&quot;allow_shape_tensors&quot;</span><span class="p">:</span> <span class="n">allow_shape_tensors</span><span class="p">,</span>
     <span class="p">}</span>
@@ -921,7 +914,6 @@
     <span class="n">backend_spec</span><span class="o">.</span><span class="n">_set_dla_global_dram_size</span><span class="p">(</span><span class="n">parsed_spec</span><span class="o">.</span><span class="n">dla_global_dram_size</span><span class="p">)</span>
     <span class="n">backend_spec</span><span class="o">.</span><span class="n">_set_truncate_long_and_double</span><span class="p">(</span><span class="n">parsed_spec</span><span class="o">.</span><span class="n">truncate_long_and_double</span><span class="p">)</span>
     <span class="n">backend_spec</span><span class="o">.</span><span class="n">_set_allow_shape_tensors</span><span class="p">(</span><span class="n">parsed_spec</span><span class="o">.</span><span class="n">allow_shape_tensors</span><span class="p">)</span>
-    <span class="n">backend_spec</span><span class="o">.</span><span class="n">_set_ptq_calibrator</span><span class="p">(</span><span class="n">parsed_spec</span><span class="o">.</span><span class="n">_get_calibrator_handle</span><span class="p">())</span>
 
     <span class="k">return</span> <span class="n">backend_spec</span></div>
 </pre></div>
