@@ -63,7 +63,8 @@ cc_library(
             [
                 "include/x86_64-linux-gnu/NvInfer*.h",
             ],
-            exclude = [
+            allow_empty = True,
+	    exclude = [
                 "include/x86_64-linux-gnu/NvInferPlugin.h",
                 "include/x86_64-linux-gnu/NvInferPluginUtils.h",
             ],
