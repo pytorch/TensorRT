@@ -3,11 +3,12 @@ from typing import Optional, Union
 import numpy as np
 import tensorrt as trt
 import torch
+from tensorrt import ITensor as TRTTensor
 from torch.fx.node import Target
+from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion import impl
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
-from torch_tensorrt.dynamo.conversion.converter_utils import SourceIR, get_trt_tensor
-from torch_tensorrt.dynamo.types import TRTTensor
+from torch_tensorrt.dynamo.conversion.converter_utils import get_trt_tensor
 
 
 def linear(

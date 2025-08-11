@@ -19,8 +19,6 @@ Namespaces
 
 - :ref:`namespace_torch_tensorrt__logging`
 
-- :ref:`namespace_torch_tensorrt__ptq`
-
 - :ref:`namespace_torch_tensorrt__torchscript`
 
 

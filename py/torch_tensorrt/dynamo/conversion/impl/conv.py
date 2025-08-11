@@ -5,6 +5,7 @@ import numpy as np
 # @manual=//deeplearning/trt/python:py_tensorrt
 import tensorrt as trt
 import torch
+from tensorrt import ITensor as TRTTensor
 from torch.fx.node import Target
 from torch_tensorrt.dynamo.conversion import impl
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
@@ -17,11 +18,6 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     to_torch,
     to_trt_weights,
 )
-from torch_tensorrt.fx.converters.converter_utils import (
-    get_dyn_range,
-    mark_as_int8_layer,
-)
-from torch_tensorrt.fx.types import TRTTensor
 
 
 def convNd(
@@ -171,11 +167,6 @@ def convNd(
         conv_layer.dilation_nd = dilation
     if groups is not None:
         conv_layer.num_groups = groups
-
-    # Handle quantization cases
-    if scale is not None and zero_point is not None:
-        # Assume the dtype of activation is torch.quint8
-        mark_as_int8_layer(conv_layer, get_dyn_range(scale, zero_point, torch.quint8))
 
     result = conv_layer.get_output(0)
 

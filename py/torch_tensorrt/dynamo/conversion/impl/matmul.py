@@ -2,6 +2,7 @@ from typing import Optional
 
 import tensorrt as trt
 import torch
+from tensorrt import ITensor as TRTTensor
 from torch.fx.node import Target
 from torch_tensorrt import _enums
 from torch_tensorrt.dynamo._SourceIR import SourceIR
@@ -12,7 +13,6 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     get_trt_tensor,
     set_layer_name,
 )
-from torch_tensorrt.dynamo.types import TRTTensor
 
 
 def matrix_multiply(

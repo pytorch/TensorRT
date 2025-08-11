@@ -46,9 +46,6 @@ Program Listing for File torch_tensorrt.h
    class ArrayRef;
    } // namespace c10
    
-   namespace nvinfer1 {
-   class IInt8Calibrator;
-   }
    #endif // DOXYGEN_SHOULD_SKIP_THIS
    
    namespace torch_tensorrt {
@@ -324,8 +321,6 @@ Program Listing for File torch_tensorrt.h
      uint64_t dla_local_dram_size = 1073741824;
    
      uint64_t dla_global_dram_size = 536870912;
-   
-     nvinfer1::IInt8Calibrator* ptq_calibrator = nullptr;
    
      bool require_full_compilation = false;
    

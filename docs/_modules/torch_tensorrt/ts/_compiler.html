@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt.ts._compiler &mdash; Torch-TensorRT v2.9.0.dev0+a187d1b documentation</title>
+  <title>torch_tensorrt.ts._compiler &mdash; Torch-TensorRT v2.9.0.dev0+a2f6b2c documentation</title>
   
 
   
@@ -290,7 +290,7 @@
               
               
                 <div class="version">
-                  v2.9.0.dev0+a187d1b
+                  v2.9.0.dev0+a2f6b2c
                 </div>
               
             
@@ -394,7 +394,6 @@
 <li class="toctree-l1"><a class="reference internal" href="../../../_cpp_api/namespace_torch_tensorrt.html">Namespace torch_tensorrt</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../_cpp_api/namespace_torch_tensorrt__logging.html">Namespace torch_tensorrt::logging</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../_cpp_api/namespace_torch_tensorrt__torchscript.html">Namespace torch_tensorrt::torchscript</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../../_cpp_api/namespace_torch_tensorrt__ptq.html">Namespace torch_tensorrt::ptq</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">CLI Documentation</span></p>
 <ul>
@@ -515,7 +514,6 @@
     <span class="n">dla_sram_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1048576</span><span class="p">,</span>
     <span class="n">dla_local_dram_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1073741824</span><span class="p">,</span>
     <span class="n">dla_global_dram_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">536870912</span><span class="p">,</span>
-    <span class="n">calibrator</span><span class="p">:</span> <span class="nb">object</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">truncate_long_and_double</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
     <span class="n">require_full_compilation</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
     <span class="n">min_block_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">3</span><span class="p">,</span>
@@ -580,7 +578,6 @@
 <span class="sd">        dla_local_dram_size (int): Host RAM used by DLA to share intermediate tensor data across operations</span>
 <span class="sd">        dla_global_dram_size (int): Host RAM used by DLA to store weights and metadata for execution</span>
 <span class="sd">        truncate_long_and_double (bool): Truncate weights provided in int64 or double (float64) to int32 and float32</span>
-<span class="sd">        calibrator (Union(torch_tensorrt._C.IInt8Calibrator, tensorrt.IInt8Calibrator)): Calibrator object which will provide data to the PTQ system for INT8 Calibration</span>
 <span class="sd">        require_full_compilation (bool): Require modules to be compiled end to end or return an error as opposed to returning a hybrid graph where operations that cannot be run in TensorRT are run in PyTorch</span>
 <span class="sd">        min_block_size (int): The minimum number of contiguous TensorRT convertible operations in order to run a set of operations in TensorRT</span>
 <span class="sd">        torch_executed_ops (List[str]): List of aten operators that must be run in PyTorch. An error will be thrown if this list is not empty but ``require_full_compilation`` is True</span>
@@ -635,7 +632,6 @@
         <span class="s2">&quot;dla_sram_size&quot;</span><span class="p">:</span> <span class="n">dla_sram_size</span><span class="p">,</span>
         <span class="s2">&quot;dla_local_dram_size&quot;</span><span class="p">:</span> <span class="n">dla_local_dram_size</span><span class="p">,</span>
         <span class="s2">&quot;dla_global_dram_size&quot;</span><span class="p">:</span> <span class="n">dla_global_dram_size</span><span class="p">,</span>
-        <span class="s2">&quot;calibrator&quot;</span><span class="p">:</span> <span class="n">calibrator</span><span class="p">,</span>
         <span class="s2">&quot;truncate_long_and_double&quot;</span><span class="p">:</span> <span class="n">truncate_long_and_double</span><span class="p">,</span>
         <span class="s2">&quot;torch_fallback&quot;</span><span class="p">:</span> <span class="p">{</span>
             <span class="s2">&quot;enabled&quot;</span><span class="p">:</span> <span class="ow">not</span> <span class="n">require_full_compilation</span><span class="p">,</span>
@@ -670,7 +666,6 @@
     <span class="n">dla_local_dram_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1073741824</span><span class="p">,</span>
     <span class="n">dla_global_dram_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">536870912</span><span class="p">,</span>
     <span class="n">truncate_long_and_double</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
-    <span class="n">calibrator</span><span class="p">:</span> <span class="nb">object</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">allow_shape_tensors</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bytes</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Convert a TorchScript module method to a serialized TensorRT engine</span>
@@ -729,7 +724,6 @@
 <span class="sd">        dla_local_dram_size (int): Host RAM used by DLA to share intermediate tensor data across operations</span>
 <span class="sd">        dla_global_dram_size (int): Host RAM used by DLA to store weights and metadata for execution</span>
 <span class="sd">        truncate_long_and_double (bool): Truncate weights provided in int64 or double (float64) to int32 and float32</span>
-<span class="sd">        calibrator (Union(torch_tensorrt._C.IInt8Calibrator, tensorrt.IInt8Calibrator)): Calibrator object which will provide data to the PTQ system for INT8 Calibration</span>
 <span class="sd">        allow_shape_tensors: (Experimental) Allow aten::size to output shape tensors using IShapeLayer in TensorRT</span>
 
 <span class="sd">    Returns:</span>
@@ -762,7 +756,6 @@
         <span class="s2">&quot;capability&quot;</span><span class="p">:</span> <span class="n">capability</span><span class="p">,</span>  <span class="c1"># Restrict kernel selection to safe gpu kernels or safe dla kernels</span>
         <span class="s2">&quot;num_avg_timing_iters&quot;</span><span class="p">:</span> <span class="n">num_avg_timing_iters</span><span class="p">,</span>  <span class="c1"># Number of averaging timing iterations used to select kernels</span>
         <span class="s2">&quot;workspace_size&quot;</span><span class="p">:</span> <span class="n">workspace_size</span><span class="p">,</span>  <span class="c1"># Maximum size of workspace given to TensorRT</span>
-        <span class="s2">&quot;calibrator&quot;</span><span class="p">:</span> <span class="n">calibrator</span><span class="p">,</span>
         <span class="s2">&quot;truncate_long_and_double&quot;</span><span class="p">:</span> <span class="n">truncate_long_and_double</span><span class="p">,</span>
         <span class="s2">&quot;allow_shape_tensors&quot;</span><span class="p">:</span> <span class="n">allow_shape_tensors</span><span class="p">,</span>
     <span class="p">}</span>

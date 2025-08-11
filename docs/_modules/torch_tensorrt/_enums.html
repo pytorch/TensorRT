@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt._enums &mdash; Torch-TensorRT v2.9.0.dev0+a187d1b documentation</title>
+  <title>torch_tensorrt._enums &mdash; Torch-TensorRT v2.9.0.dev0+a2f6b2c documentation</title>
   
 
   
@@ -290,7 +290,7 @@
               
               
                 <div class="version">
-                  v2.9.0.dev0+a187d1b
+                  v2.9.0.dev0+a2f6b2c
                 </div>
               
             
@@ -394,7 +394,6 @@
 <li class="toctree-l1"><a class="reference internal" href="../../_cpp_api/namespace_torch_tensorrt.html">Namespace torch_tensorrt</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../_cpp_api/namespace_torch_tensorrt__logging.html">Namespace torch_tensorrt::logging</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../_cpp_api/namespace_torch_tensorrt__torchscript.html">Namespace torch_tensorrt::torchscript</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../_cpp_api/namespace_torch_tensorrt__ptq.html">Namespace torch_tensorrt::ptq</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">CLI Documentation</span></p>
 <ul>
@@ -496,6 +495,7 @@
 <span class="kn">import</span><span class="w"> </span><span class="nn">tensorrt</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">trt</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt._features</span><span class="w"> </span><span class="kn">import</span> <span class="n">ENABLED_FEATURES</span><span class="p">,</span> <span class="n">needs_torch_tensorrt_runtime</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt._utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">is_tensorrt_version_supported</span>
 
 
 <div class="viewcode-block" id="dtype"><a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.dtype">[docs]</a><span class="k">class</span><span class="w"> </span><span class="nc">dtype</span><span class="p">(</span><span class="n">Enum</span><span class="p">):</span>
@@ -687,8 +687,6 @@
                 <span class="k">return</span> <span class="n">dtype</span><span class="o">.</span><span class="n">i8</span>
             <span class="k">elif</span> <span class="n">t</span> <span class="o">==</span> <span class="n">trt</span><span class="o">.</span><span class="n">DataType</span><span class="o">.</span><span class="n">FP8</span><span class="p">:</span>
                 <span class="k">return</span> <span class="n">dtype</span><span class="o">.</span><span class="n">f8</span>
-            <span class="k">elif</span> <span class="n">t</span> <span class="o">==</span> <span class="n">trt</span><span class="o">.</span><span class="n">DataType</span><span class="o">.</span><span class="n">FP4</span><span class="p">:</span>
-                <span class="k">return</span> <span class="n">dtype</span><span class="o">.</span><span class="n">fp4</span>
             <span class="k">elif</span> <span class="n">t</span> <span class="o">==</span> <span class="n">trt</span><span class="o">.</span><span class="n">DataType</span><span class="o">.</span><span class="n">INT32</span><span class="p">:</span>
                 <span class="k">return</span> <span class="n">dtype</span><span class="o">.</span><span class="n">i32</span>
             <span class="k">elif</span> <span class="n">t</span> <span class="o">==</span> <span class="n">trt</span><span class="o">.</span><span class="n">DataType</span><span class="o">.</span><span class="n">INT64</span><span class="p">:</span>
@@ -702,6 +700,8 @@
             <span class="k">elif</span> <span class="n">t</span> <span class="o">==</span> <span class="n">trt</span><span class="o">.</span><span class="n">DataType</span><span class="o">.</span><span class="n">BF16</span><span class="p">:</span>
                 <span class="k">return</span> <span class="n">dtype</span><span class="o">.</span><span class="n">bf16</span>
             <span class="k">else</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">is_tensorrt_version_supported</span><span class="p">(</span><span class="s2">&quot;10.8.0&quot;</span><span class="p">)</span> <span class="ow">and</span> <span class="n">t</span> <span class="o">==</span> <span class="n">trt</span><span class="o">.</span><span class="n">DataType</span><span class="o">.</span><span class="n">FP4</span><span class="p">:</span>
+                    <span class="k">return</span> <span class="n">dtype</span><span class="o">.</span><span class="n">fp4</span>
                 <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
                     <span class="sa">f</span><span class="s2">&quot;Provided an unsupported data type as a data type for translation (support: bool, int, half, float, bfloat16), got: </span><span class="si">{</span><span class="n">t</span><span class="si">}</span><span class="s2">&quot;</span>
                 <span class="p">)</span>
@@ -897,11 +897,11 @@
                 <span class="k">return</span> <span class="n">trt</span><span class="o">.</span><span class="n">DataType</span><span class="o">.</span><span class="n">BOOL</span>
             <span class="k">elif</span> <span class="bp">self</span> <span class="o">==</span> <span class="n">dtype</span><span class="o">.</span><span class="n">bf16</span><span class="p">:</span>
                 <span class="k">return</span> <span class="n">trt</span><span class="o">.</span><span class="n">DataType</span><span class="o">.</span><span class="n">BF16</span>
-            <span class="k">elif</span> <span class="bp">self</span> <span class="o">==</span> <span class="n">dtype</span><span class="o">.</span><span class="n">f4</span><span class="p">:</span>
-                <span class="k">return</span> <span class="n">trt</span><span class="o">.</span><span class="n">DataType</span><span class="o">.</span><span class="n">FP4</span>
             <span class="k">elif</span> <span class="n">use_default</span><span class="p">:</span>
                 <span class="k">return</span> <span class="n">trt</span><span class="o">.</span><span class="n">DataType</span><span class="o">.</span><span class="n">FLOAT</span>
             <span class="k">else</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">is_tensorrt_version_supported</span><span class="p">(</span><span class="s2">&quot;10.8.0&quot;</span><span class="p">)</span> <span class="ow">and</span> <span class="bp">self</span> <span class="o">==</span> <span class="n">dtype</span><span class="o">.</span><span class="n">f4</span><span class="p">:</span>
+                    <span class="k">return</span> <span class="n">trt</span><span class="o">.</span><span class="n">DataType</span><span class="o">.</span><span class="n">FP4</span>
                 <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;Unsupported tensorrt dtype&quot;</span><span class="p">)</span>
 
         <span class="k">elif</span> <span class="n">t</span> <span class="o">==</span> <span class="n">np</span><span class="o">.</span><span class="n">dtype</span><span class="p">:</span>

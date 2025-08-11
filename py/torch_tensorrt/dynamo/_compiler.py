@@ -148,7 +148,6 @@ def cross_compile_for_windows(
         dla_local_dram_size (int): Host RAM used by DLA to share intermediate tensor data across operations
         dla_global_dram_size (int): Host RAM used by DLA to store weights and metadata for execution
         truncate_double (bool): Truncate weights provided in double (float64) to float32
-        calibrator (Union(torch_tensorrt._C.IInt8Calibrator, tensorrt.IInt8Calibrator)): Calibrator object which will provide data to the PTQ system for INT8 Calibration
         require_full_compilation (bool): Require modules to be compiled end to end or return an error as opposed to returning a hybrid graph where operations that cannot be run in TensorRT are run in PyTorch
         min_block_size (int): The minimum number of contiguous TensorRT convertible operations in order to run a set of operations in TensorRT
         torch_executed_ops (Collection[Target]): Set of aten operators that must be run in PyTorch. An error will be thrown if this set is not empty but ``require_full_compilation`` is True
@@ -487,7 +486,6 @@ def compile(
         dla_local_dram_size (int): Host RAM used by DLA to share intermediate tensor data across operations
         dla_global_dram_size (int): Host RAM used by DLA to store weights and metadata for execution
         truncate_double (bool): Truncate weights provided in double (float64) to float32
-        calibrator (Union(torch_tensorrt._C.IInt8Calibrator, tensorrt.IInt8Calibrator)): Calibrator object which will provide data to the PTQ system for INT8 Calibration
         require_full_compilation (bool): Require modules to be compiled end to end or return an error as opposed to returning a hybrid graph where operations that cannot be run in TensorRT are run in PyTorch
         min_block_size (int): The minimum number of contiguous TensorRT convertible operations in order to run a set of operations in TensorRT
         torch_executed_ops (Collection[Target]): Set of aten operators that must be run in PyTorch. An error will be thrown if this set is not empty but ``require_full_compilation`` is True
@@ -1042,7 +1040,6 @@ def convert_exported_program_to_serialized_trt_engine(
     dla_sram_size: int = _defaults.DLA_SRAM_SIZE,
     dla_local_dram_size: int = _defaults.DLA_LOCAL_DRAM_SIZE,
     dla_global_dram_size: int = _defaults.DLA_GLOBAL_DRAM_SIZE,
-    calibrator: object = None,
     allow_shape_tensors: bool = False,
     timing_cache_path: str = _defaults.TIMING_CACHE_PATH,
     use_explicit_typing: bool = _defaults.USE_EXPLICIT_TYPING,
@@ -1107,7 +1104,6 @@ def convert_exported_program_to_serialized_trt_engine(
         dla_sram_size (int): Fast software managed RAM used by DLA to communicate within a layer.
         dla_local_dram_size (int): Host RAM used by DLA to share intermediate tensor data across operations
         dla_global_dram_size (int): Host RAM used by DLA to store weights and metadata for execution
-        calibrator (Union(torch_tensorrt._C.IInt8Calibrator, tensorrt.IInt8Calibrator)): Calibrator object which will provide data to the PTQ system for INT8 Calibration
         allow_shape_tensors: (Experimental) Allow aten::size to output shape tensors using IShapeLayer in TensorRT
         timing_cache_path (str): Path to the timing cache if it exists (or) where it will be saved after compilation
         use_explicit_typing (bool): This flag enables strong typing in TensorRT compilation which respects the precisions set in the Pytorch model. This is useful when users have mixed precision graphs.
