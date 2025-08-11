@@ -70,7 +70,7 @@ jobs:
             env-script: packaging/vc_env_helper.bat
             smoke-test-script: packaging/smoke_test_windows.py
             package-name: torch_tensorrt
-    name: Build torch-tensorrt-rtx whl package
+    name: RTX - Build torch-tensorrt-rtx whl package for Windows
     uses: ./.github/workflows/build_wheels_windows.yml
     with:
       repository: ${{ matrix.repository }}

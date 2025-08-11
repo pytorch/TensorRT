@@ -416,7 +416,18 @@ class CleanCommand(Command):
 
 ext_modules = []
 
-packages = [
+fx_packages = [
+    "torch_tensorrt.fx",
+    "torch_tensorrt.fx.converters",
+    "torch_tensorrt.fx.converters.impl",
+    "torch_tensorrt.fx.passes",
+    "torch_tensorrt.fx.tools",
+    "torch_tensorrt.fx.tracer",
+    "torch_tensorrt.fx.tracer.acc_tracer",
+    "torch_tensorrt.fx.tracer.dispatch_tracer",
+]
+
+dynamo_packages = [
     "torch_tensorrt",
     "torch_tensorrt.dynamo",
     "torch_tensorrt.dynamo.backend",
@@ -435,18 +446,22 @@ packages = [
     "torch_tensorrt.dynamo.partitioning",
     "torch_tensorrt.dynamo.runtime",
     "torch_tensorrt.dynamo.tools",
-    "torch_tensorrt.fx",
-    "torch_tensorrt.fx.converters",
-    "torch_tensorrt.fx.converters.impl",
-    "torch_tensorrt.fx.passes",
-    "torch_tensorrt.fx.tools",
-    "torch_tensorrt.fx.tracer",
-    "torch_tensorrt.fx.tracer.acc_tracer",
-    "torch_tensorrt.fx.tracer.dispatch_tracer",
     "torch_tensorrt.runtime",
 ]
 
-package_dir = {
+fx_package_dir = {
+    "torch_tensorrt.fx": "py/torch_tensorrt/fx",
+    "torch_tensorrt.fx.converters": "py/torch_tensorrt/fx/converters",
+    "torch_tensorrt.fx.converters.impl": "py/torch_tensorrt/fx/converters/impl",
+    "torch_tensorrt.fx.passes": "py/torch_tensorrt/fx/passes",
+    "torch_tensorrt.fx.tools": "py/torch_tensorrt/fx/tools",
+    "torch_tensorrt.fx.tracer": "py/torch_tensorrt/fx/tracer",
+    "torch_tensorrt.fx.tracer.acc_tracer": "py/torch_tensorrt/fx/tracer/acc_tracer",
+    "torch_tensorrt.fx.tracer.dispatch_tracer": "py/torch_tensorrt/fx/tracer/dispatch_tracer",
+}
+
+
+dynamo_package_dir = {
     "torch_tensorrt": "py/torch_tensorrt",
     "torch_tensorrt.dynamo": "py/torch_tensorrt/dynamo",
     "torch_tensorrt.dynamo.backend": "py/torch_tensorrt/dynamo/backend",
@@ -465,16 +480,48 @@ package_dir = {
     "torch_tensorrt.dynamo.partitioning": "py/torch_tensorrt/dynamo/partitioning",
     "torch_tensorrt.dynamo.runtime": "py/torch_tensorrt/dynamo/runtime",
     "torch_tensorrt.dynamo.tools": "py/torch_tensorrt/dynamo/tools",
-    "torch_tensorrt.fx": "py/torch_tensorrt/fx",
-    "torch_tensorrt.fx.converters": "py/torch_tensorrt/fx/converters",
-    "torch_tensorrt.fx.converters.impl": "py/torch_tensorrt/fx/converters/impl",
-    "torch_tensorrt.fx.passes": "py/torch_tensorrt/fx/passes",
-    "torch_tensorrt.fx.tools": "py/torch_tensorrt/fx/tools",
-    "torch_tensorrt.fx.tracer": "py/torch_tensorrt/fx/tracer",
-    "torch_tensorrt.fx.tracer.acc_tracer": "py/torch_tensorrt/fx/tracer/acc_tracer",
-    "torch_tensorrt.fx.tracer.dispatch_tracer": "py/torch_tensorrt/fx/tracer/dispatch_tracer",
     "torch_tensorrt.runtime": "py/torch_tensorrt/runtime",
 }
+
+if USE_TRT_RTX:
+    package_dir = dynamo_package_dir
+    packages = dynamo_packages
+    exclude_package_data = {
+        "": [
+            "py/torch_tensorrt/csrc/*.cpp",
+            "torch_tensorrt/csrc/*.cpp",
+            "test*",
+            "*.cpp",
+        ],
+        "torch_tensorrt": [
+            "py/torch_tensorrt/csrc/*.cpp",
+            "torch_tensorrt/csrc/*.cpp",
+            "test*",
+            "*.cpp",
+        ],
+    }
+else:
+    package_dir = dynamo_package_dir | fx_package_dir
+    packages = dynamo_packages + fx_packages
+    exclude_package_data = {
+        "": [
+            "py/torch_tensorrt/csrc/*.cpp",
+            "py/torch_tensorrt/fx/test*",
+            "torch_tensorrt/csrc/*.cpp",
+            "torch_tensorrt/fx/test*",
+            "test*",
+            "*.cpp",
+        ],
+        "torch_tensorrt": [
+            "py/torch_tensorrt/csrc/*.cpp",
+            "py/torch_tensorrt/fx/test*",
+            "torch_tensorrt/csrc/*.cpp",
+            "torch_tensorrt/fx/test*",
+            "test*",
+            "*.cpp",
+        ],
+        "torch_tensorrt.fx": ["test/*.py"],
+    }
 
 package_data = {}
 
@@ -756,24 +803,5 @@ setup(
     package_dir=package_dir,
     include_package_data=False,
     package_data=package_data,
-    exclude_package_data={
-        "": [
-            "py/torch_tensorrt/csrc/*.cpp",
-            "py/torch_tensorrt/fx/test*",
-            "torch_tensorrt/csrc/*.cpp",
-            "torch_tensorrt/fx/test*",
-            "test*",
-            "*.cpp",
-        ],
-        "torch_tensorrt": [
-            "py/torch_tensorrt/csrc/*.cpp",
-            "py/torch_tensorrt/fx/test*",
-            "torch_tensorrt/csrc/*.cpp",
-            "torch_tensorrt/fx/test*",
-            "test*",
-            "*.cpp",
-        ],
-        "torch_tensorrt.dynamo": ["test/*.py"],
-        "torch_tensorrt.fx": ["test/*.py"],
-    },
+    exclude_package_data=exclude_package_data,
 )

@@ -8,7 +8,7 @@ import tensorrt as trt
 import torch
 from functorch import make_fx
 from functorch.experimental import functionalize
-from torch_tensorrt._utils import is_tensorrt_version_supported, sanitized_torch_version
+from torch_tensorrt._utils import sanitized_torch_version
 from torch_tensorrt.fx.passes.lower_basic_pass import (
     replace_op_with_indices,
     run_const_fold,
@@ -60,7 +60,7 @@ DataTypeEquivalence: Dict[
     },
 }
 
-if is_tensorrt_version_supported("7.0"):
+if trt.__version__ >= "7.0":
     DataTypeEquivalence[trt.bool] = {
         Frameworks.NUMPY: np.bool_,
         Frameworks.TORCH: torch.bool,
@@ -105,11 +105,7 @@ def unified_dtype_converter(
     trt_major_version = int(trt.__version__.split(".")[0])
     if dtype in (np.int8, torch.int8, trt.int8):
         return DataTypeEquivalence[trt.int8][to]
-    elif is_tensorrt_version_supported("7.0") and dtype in (
-        np.bool_,
-        torch.bool,
-        trt.bool,
-    ):
+    elif trt_major_version >= 7 and dtype in (np.bool_, torch.bool, trt.bool):
         return DataTypeEquivalence[trt.bool][to]
     elif dtype in (np.int32, torch.int32, trt.int32):
         return DataTypeEquivalence[trt.int32][to]

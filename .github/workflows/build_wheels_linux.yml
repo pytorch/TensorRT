@@ -288,7 +288,8 @@ jobs:
         env:
           PACKAGE_NAME: ${{ inputs.package-name }}
           SMOKE_TEST_SCRIPT: ${{ inputs.smoke-test-script }}
-        if: ${{ inputs.architecture == 'x86_64' }}
+        # TODO: lan to verify whether manylinux repair is needed for jetpack
+        #if: ${{ inputs.is-jetpack == true }}
         run: |
           set -euxo pipefail
           source "${BUILD_ENV_FILE}"

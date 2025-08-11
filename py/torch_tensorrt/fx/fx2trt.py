@@ -13,7 +13,6 @@ import torch.fx
 from torch._ops import OpOverload
 from torch.fx.node import _get_qualified_name
 from torch.fx.passes.shape_prop import TensorMetadata
-from torch_tensorrt._utils import is_tensorrt_version_supported
 
 from .converter_registry import CONVERTERS
 from .input_tensor_spec import InputTensorSpec
@@ -214,10 +213,7 @@ class TRTInterpreter(torch.fx.Interpreter):
         builder_config.max_workspace_size = max_workspace_size
 
         # Speed up TRT build time in the test environment
-        if (
-            is_tensorrt_version_supported("8.6")
-            and os.environ.get("TRT_TEST_ENV", "0") == "1"
-        ):
+        if trt.__version__ >= "8.6" and os.environ.get("TRT_TEST_ENV", "0") == "1":
             _LOGGER.info("Set TRT optimization level to 0")
             builder_config.builder_optimization_level = 0
 
@@ -229,7 +225,7 @@ class TRTInterpreter(torch.fx.Interpreter):
             cache = builder_config.create_timing_cache(b"")
         builder_config.set_timing_cache(cache, False)
 
-        if is_tensorrt_version_supported("8.2"):
+        if trt.__version__ >= "8.2":
             builder_config.profiling_verbosity = (
                 profiling_verbosity
                 if profiling_verbosity

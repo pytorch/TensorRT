@@ -68,7 +68,6 @@ ConversionCtx::ConversionCtx(BuilderSettings build_settings)
       case nvinfer1::DataType::kINT8:
         LOG_DEBUG("INT8 precision has been enabled, we assume the network has Q/DQ nodes obtained from modelopt");
         break;
-#endif
       case nvinfer1::DataType::kFLOAT:
         break;
       case nvinfer1::DataType::kINT32:

@@ -17,8 +17,8 @@ install_tensorrt_rtx() {
             curl -L https://developer.nvidia.com/downloads/trt/rtx_sdk/secure/1.0/TensorRT-RTX-1.0.0.21.Windows.win10.cuda-12.9.zip -o TensorRT-RTX-1.0.0.21.Windows.win10.cuda-12.9.zip
             unzip TensorRT-RTX-1.0.0.21.Windows.win10.cuda-12.9.zip
             rtx_lib_dir=${PWD}/TensorRT-RTX-1.0.0.21/lib
-            export LD_LIBRARY_PATH=${rtx_lib_dir}:$LD_LIBRARY_PATH
-            echo "LD_LIBRARY_PATH: $LD_LIBRARY_PATH"
+            export PATH=${rtx_lib_dir}:$PATH
+            echo "PATH: $PATH"
             if [[ ${install_wheel_or_not} == true ]]; then
                 pip install TensorRT-RTX-1.0.0.21/python/tensorrt_rtx-1.0.0.21-${CPYTHON_TAG}-none-win_amd64.whl
             fi

@@ -5,7 +5,6 @@ import torch.fx
 import torch.nn as nn
 import torch_tensorrt.fx.tracer.acc_tracer.acc_ops as acc_ops
 from torch.testing._internal.common_utils import run_tests
-from torch_tensorrt._utils import is_tensorrt_version_supported
 from torch_tensorrt.fx.tools.common_fx2trt import AccTestCase, InputTensorSpec
 
 
@@ -15,7 +14,7 @@ from torch_tensorrt.fx.tools.common_fx2trt import AccTestCase, InputTensorSpec
     """
 )
 @unittest.skipIf(
-    not is_tensorrt_version_supported("8.0"),
+    trt.__version__ < "8.0",
     "Explicit quantization only supported in TensorRT 8.0 and later",
 )
 class TestQuantizePerTensorConverter(AccTestCase):

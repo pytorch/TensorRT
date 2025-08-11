@@ -4,7 +4,6 @@ import tensorrt as trt
 import torch
 from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
-from torch_tensorrt._utils import is_tensorrt_version_supported
 from torch_tensorrt.fx.tools.common_fx2trt import DispatchTestCase, InputTensorSpec
 
 
@@ -16,7 +15,7 @@ class TestReshapeConverter(DispatchTestCase):
         ]
     )
     @unittest.skipIf(
-        not is_tensorrt_version_supported("8.5"),
+        trt.__version__ < "8.5",
         "Shape tensor supported well in TensorRT 8.5 and later",
     )
     def test_reshape(self, target_shape):
@@ -43,7 +42,7 @@ class TestReshapeConverter(DispatchTestCase):
         ]
     )
     @unittest.skipIf(
-        not is_tensorrt_version_supported("8.5"),
+        trt.__version__ < "8.5",
         "Shape tensor supported well in TensorRT 8.5 and later",
     )
     def test_reshape_with_dynamic_shape(self, target_shape):
@@ -69,7 +68,7 @@ class TestReshapeConverter(DispatchTestCase):
         )
 
     @unittest.skipIf(
-        not is_tensorrt_version_supported("8.5"),
+        trt.__version__ < "8.5",
         "Shape tensor supported well in TensorRT 8.5 and later",
     )
     def test_reshape_with_dynamic_shape_size(self):
