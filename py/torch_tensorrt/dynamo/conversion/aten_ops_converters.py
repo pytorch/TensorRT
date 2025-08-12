@@ -387,13 +387,19 @@ def index_dtype_validator(
     for ind in index:
         if ind is not None:
             val = ind.meta.get("val")
-            if val is not None and val.dtype not in (torch.int32, torch.int64):
+            if val is not None and val.dtype not in (
+                torch.int32,
+                torch.int64,
+                torch.bool,
+            ):
                 return False
     return True
 
 
 @dynamo_tensorrt_converter(
-    torch.ops.aten.index.Tensor, capability_validator=index_dtype_validator
+    torch.ops.aten.index.Tensor,
+    capability_validator=index_dtype_validator,
+    supports_dynamic_shapes=True,
 )
 @enforce_tensor_types(
     {

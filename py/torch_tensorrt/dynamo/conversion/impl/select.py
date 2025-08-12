@@ -51,6 +51,65 @@ def select(
     return layer.get_output(0)
 
 
+def is_boolean_tensor(tensor: Union[TRTTensor, np.ndarray, torch.Tensor]) -> bool:
+    if isinstance(tensor, (TRTTensor)):
+        val = tensor.meta.get("val")
+        if val is not None and val.dtype is torch.bool:
+            return True
+    return isinstance(tensor, (torch.Tensor, np.ndarray)) and tensor.dtype == torch.bool
+
+
+def expand_boolean_indices(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    input: TRTTensor,
+    indices: Sequence[Union[TRTTensor, np.ndarray, torch.Tensor]],
+) -> Sequence[Union[TRTTensor, np.ndarray, torch.Tensor]]:
+    for i, ind in enumerate(indices):
+        if ind is not None and is_boolean_tensor(ind):
+            _LOGGER.debug(
+                f"Boolean index detected at position {i}, converting with nonzero()"
+            )
+
+            mask_tensor = get_trt_tensor(ctx, ind, name + f"_bool_mask_{i}")
+
+            nonzero_layer = ctx.net.add_non_zero(mask_tensor)
+            set_layer_name(
+                nonzero_layer, target, name + f"_bool_nonzero_{i}", source_ir
+            )
+            nonzero_indices = nonzero_layer.get_output(0)
+
+            # nonzero returns shape [N, dims], we need to extract dim i
+            if len(indices) == 1:
+                # x[mask] — 1D mask
+                squeeze_layer = ctx.net.add_shuffle(nonzero_indices)
+                squeeze_layer.reshape_dims = (-1,)
+                set_layer_name(
+                    squeeze_layer,
+                    target,
+                    name + f"_bool_nonzero_squeeze_{i}",
+                    source_ir,
+                )
+                squeezed_index = squeeze_layer.get_output(0)
+                ind = squeezed_index
+            else:
+                # Advanced multi-axis mask: extract index i from shape [N, D]
+                gather_axis = 1  # dim index
+                gather_layer = ctx.net.add_gather(
+                    nonzero_indices,
+                    get_trt_tensor(ctx, i, name + f"_dim_index_{i}"),
+                    gather_axis,
+                )
+                set_layer_name(
+                    gather_layer, target, name + f"_bool_nonzero_extract_{i}", source_ir
+                )
+                extracted_index = gather_layer.get_output(0)
+                ind = extracted_index
+    return indices
+
+
 def index(
     ctx: ConversionContext,
     target: Target,
@@ -61,8 +120,6 @@ def index(
 ) -> TRTTensor:
     adv_indx_indices = []
     tensor_indices = []
-    # check if the input is dynamic
-    dynamic_shape = has_dynamic_shape(input.shape)
     # is_numpy is a flag to specify if all the indices are numpy or torchTensor.
     # If any is not this flag will be set to False
     _LOGGER.debug(
@@ -76,6 +133,7 @@ def index(
     # here we need to check if all the index are broadcastable
     # if no, then we need to broadcast
     last_index = None
+    indices = expand_boolean_indices(ctx, target, source_ir, name, input, indices)
     for i, ind in enumerate(indices):
         if ind is not None:
             _LOGGER.debug(f"Shape of {i} index is {ind.shape}")
