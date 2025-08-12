@@ -23,9 +23,9 @@ import torch
 from torch import SymBool, SymFloat, SymInt
 from torch._ops import OpOverloadPacket
 from torch.fx.node import Argument, Node, Target, _get_qualified_name
+from torch_tensorrt._utils import is_tensorrt_rtx
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
-from torch_tensorrt.fx.converter_registry import CONVERTERS as FX_CONVERTERS
 
 logger = logging.getLogger(__name__)
 
@@ -624,8 +624,17 @@ class ConverterRegistry:
 
 # Initialize dynamo converter registry with the FX and Dynamo aten registries
 # Note the Dynamo registry is listed first, for precedence
-DYNAMO_CONVERTERS: ConverterRegistry = ConverterRegistry(
-    [DYNAMO_ATEN_CONVERTERS, FX_CONVERTERS],  # type: ignore[list-item]
-    ["Dynamo ATen Converters Registry", "FX Legacy ATen Converters Registry"],
-    [CallingConvention.CTX, CallingConvention.LEGACY],
-)
+if is_tensorrt_rtx():
+    DYNAMO_CONVERTERS = ConverterRegistry(
+        [DYNAMO_ATEN_CONVERTERS],  # type: ignore[list-item]
+        ["Dynamo ATen Converters Registry"],
+        [CallingConvention.CTX],
+    )
+else:
+    from torch_tensorrt.fx.converter_registry import CONVERTERS as FX_CONVERTERS
+
+    DYNAMO_CONVERTERS = ConverterRegistry(
+        [DYNAMO_ATEN_CONVERTERS, FX_CONVERTERS],  # type: ignore[list-item]
+        ["Dynamo ATen Converters Registry", "FX Legacy ATen Converters Registry"],
+        [CallingConvention.CTX, CallingConvention.LEGACY],
+    )
