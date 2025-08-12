@@ -7,17 +7,14 @@ from enum import Enum
 from typing import Any, Callable, List, Optional, Sequence, Set, Union
 
 import torch
-import torch.fx
 from torch_tensorrt._enums import dtype
 from torch_tensorrt._features import ENABLED_FEATURES, needs_cross_compile
 from torch_tensorrt._Input import Input
+from torch_tensorrt._utils import is_tensorrt_rtx
 from torch_tensorrt.dynamo import _defaults
 from torch_tensorrt.dynamo.runtime._CudaGraphsTorchTensorRTModule import (
     CudaGraphsTorchTensorRTModule,
 )
-from torch_tensorrt.fx import InputTensorSpec
-from torch_tensorrt.fx.lower import compile as fx_compile
-from torch_tensorrt.fx.utils import LowerPrecision
 from typing_extensions import TypeGuard
 
 if ENABLED_FEATURES.torchscript_frontend:
@@ -60,12 +57,6 @@ def _non_fx_input_interface(
     inputs: Sequence[Input | torch.Tensor | InputTensorSpec],
 ) -> TypeGuard[List[Input | torch.Tensor]]:
     return all(isinstance(i, (torch.Tensor, Input)) for i in inputs)
-
-
-def _fx_input_interface(
-    inputs: Sequence[Input | torch.Tensor | InputTensorSpec],
-) -> TypeGuard[List[InputTensorSpec | torch.Tensor]]:
-    return all(isinstance(i, (torch.Tensor, InputTensorSpec)) for i in inputs)
 
 
 class _IRType(Enum):
@@ -237,6 +228,13 @@ def compile(
         )
         return compiled_ts_module
     elif target_ir == _IRType.fx:
+        if is_tensorrt_rtx():
+            raise RuntimeError("FX frontend is not supported on TensorRT-RTX")
+        import torch.fx
+        from torch_tensorrt.fx import InputTensorSpec
+        from torch_tensorrt.fx.lower import compile as fx_compile
+        from torch_tensorrt.fx.utils import LowerPrecision
+
         if (
             torch.float16 in enabled_precisions_set
             or torch_tensorrt.dtype.half in enabled_precisions_set
@@ -249,6 +247,11 @@ def compile(
             lower_precision = LowerPrecision.FP32
         else:
             raise ValueError(f"Precision {enabled_precisions_set} not supported on FX")
+
+        def _fx_input_interface(
+            inputs: Sequence[Input | torch.Tensor | InputTensorSpec],
+        ) -> TypeGuard[List[InputTensorSpec | torch.Tensor]]:
+            return all(isinstance(i, (torch.Tensor, InputTensorSpec)) for i in inputs)
 
         assert _fx_input_interface(input_list)
         compiled_fx_module: torch.nn.Module = fx_compile(
