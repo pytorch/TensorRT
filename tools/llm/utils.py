@@ -1,4 +1,3 @@
-import copy
 import timeit
 
 import numpy as np
