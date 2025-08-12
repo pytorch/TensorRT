@@ -48,8 +48,8 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
 )
 from torch_tensorrt.dynamo.debug._DebuggerConfig import DebuggerConfig
 from torch_tensorrt.dynamo.debug._supports_debugger import cls_supports_debugger
+from torch_tensorrt.dynamo.observer import Observer
 from torch_tensorrt.dynamo.utils import DYNAMIC_DIM, deallocate_module, to_torch_device
-from torch_tensorrt.fx.observer import Observer
 from torch_tensorrt.logging import TRT_LOGGER
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)

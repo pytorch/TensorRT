@@ -95,9 +95,12 @@ Build Locally with TensorRT-RTX
 
 .. code-block:: sh
 
-    # If you have previously built with standard TensorRT, make sure to clean the build environment
+    # If you have previously built with standard TensorRT, make sure to clean the build environment,
+    # otherwise it will use the existing .so built with standard TensorRT, which is not compatible with TensorRT-RTX.
     python setup.py clean
     bazel clean --expunge
+    #remove everything under build directory, 
+    rm -rf build/*
 
     # Build wheel with TensorRT-RTX
     python setup.py bdist_wheel --use-rtx
