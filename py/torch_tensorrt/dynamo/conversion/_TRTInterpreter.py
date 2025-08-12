@@ -943,7 +943,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
 
         marked_outputs_ids = []
         for i, output in enumerate(outputs):
-            # In some cases, the same output tensor may be marked multiple times, such as _to_oppy,
+            # In some cases, the same output tensor may be marked multiple times, such as _to_copy,
             # so we skip marking if the output is already marked
             if id(output) in marked_outputs_ids:
                 continue
