@@ -63,7 +63,8 @@ if args.load:
     loaded_model = torchtrt.load_cross_compiled_exported_program(args.path).module()
     print(f"model has been successfully loaded from ${args.path}")
     # inference
-    trt_output = loaded_model(input)
+    with torch.no_grad():
+        trt_output = loaded_model(input)
     print(f"inference result: {trt_output}")
 else:
     if platform.system() != "Linux" or platform.architecture()[0] != "64bit":

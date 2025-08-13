@@ -167,8 +167,9 @@ if __name__ == "__main__":
         )
         print("Model compiled successfully!")
         print("Running inference with compiled model...")
-        for i in range(10):
-            res = model_trt(m)
-            assert torch.allclose(res, my_model(m)), "Results do not match!"
+        with torch.no_grad():
+            for i in range(10):
+                res = model_trt(m)
+                assert torch.allclose(res, my_model(m)), "Results do not match!"
 
     print("Inference successful!")

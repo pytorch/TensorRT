@@ -58,12 +58,13 @@ input_ids = model_inputs["input_ids"].to(DEVICE)
 
 # %%
 # The ``generate()`` API of the ``AutoModelForCausalLM`` class is used for auto-regressive generation with greedy decoding.
-pyt_gen_tokens = model.generate(
-    input_ids,
-    max_length=MAX_LENGTH,
-    use_cache=False,
-    pad_token_id=tokenizer.eos_token_id,
-)
+with torch.no_grad():
+    pyt_gen_tokens = model.generate(
+        input_ids,
+        max_length=MAX_LENGTH,
+        use_cache=False,
+        pad_token_id=tokenizer.eos_token_id,
+    )
 
 # %%
 # Torch-TensorRT compilation and inference
@@ -87,12 +88,13 @@ model.forward = torch.compile(
 # Auto-regressive generation loop for greedy decoding using TensorRT model
 # The first token generation compiles the model using TensorRT and the second token
 # encounters recompilation (which is an issue currently that would be resolved in the future)
-trt_gen_tokens = model.generate(
-    inputs=input_ids,
-    max_length=MAX_LENGTH,
-    use_cache=False,
-    pad_token_id=tokenizer.eos_token_id,
-)
+with torch.no_grad():
+    trt_gen_tokens = model.generate(
+        inputs=input_ids,
+        max_length=MAX_LENGTH,
+        use_cache=False,
+        pad_token_id=tokenizer.eos_token_id,
+    )
 
 # %%
 # Decode the output sentences of PyTorch and TensorRT

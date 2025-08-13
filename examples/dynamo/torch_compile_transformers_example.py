@@ -61,7 +61,8 @@ optimized_model = torch.compile(
     dynamic=False,
     options=compilation_kwargs,
 )
-optimized_model(*inputs)
+with torch.no_grad():
+    optimized_model(*inputs)
 
 # %%
 # Equivalently, we could have run the above via the convenience frontend, as so:
@@ -76,7 +77,8 @@ new_inputs = [
     torch.randint(0, 2, (1, 14), dtype=torch.int32).to("cuda"),
     torch.randint(0, 2, (1, 14), dtype=torch.int32).to("cuda"),
 ]
-new_outputs = optimized_model(*new_inputs)
+with torch.no_grad():
+    new_outputs = optimized_model(*new_inputs)
 
 # %%
 
@@ -85,7 +87,8 @@ new_inputs = [
     torch.randint(0, 2, (4, 14), dtype=torch.int32).to("cuda"),
     torch.randint(0, 2, (4, 14), dtype=torch.int32).to("cuda"),
 ]
-new_outputs = optimized_model(*new_inputs)
+with torch.no_grad():
+    new_outputs = optimized_model(*new_inputs)
 
 # %%
 # Cleanup

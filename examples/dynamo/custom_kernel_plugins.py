@@ -218,7 +218,8 @@ class MyModel(nn.Module):  # type: ignore[misc]
 
 
 my_model = MyModel((1, 1, 2, 0)).to("cuda").eval()
-my_model(ex_input)
+with torch.no_grad():
+    my_model(ex_input)
 
 ##############################################################################
 # .. code-block:: none
@@ -607,7 +608,8 @@ trt_model = torchtrt.compile(
 ##############################################
 # As you can see, now there is only one subgraph created for the TensorRT engine that contains both our custom kernel and the native convolution operator.
 
-print(trt_model(ex_input))
+with torch.no_grad():
+    print(trt_model(ex_input))
 
 ##############################################################################
 #    .. code-block:: none
@@ -636,7 +638,8 @@ print(trt_model(ex_input))
 # %%
 # We can verify our implementation is run correctly by both TensorRT and PyTorch
 
-print(my_model(ex_input) - trt_model(ex_input))
+with torch.no_grad():
+    print(my_model(ex_input) - trt_model(ex_input))
 
 ##############################################################################
 # .. code-block:: none

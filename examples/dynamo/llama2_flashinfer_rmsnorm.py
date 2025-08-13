@@ -253,5 +253,6 @@ with torch_tensorrt.logging.errors():
 
 input_ids = input_ids.to(DEVICE)
 
-res = trt_model.forward(input_ids)
+with torch.no_grad():
+    res = trt_model.forward(input_ids)
 print(res)

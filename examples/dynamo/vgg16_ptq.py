@@ -254,18 +254,21 @@ with torch.no_grad():
         loss = 0.0
         class_probs = []
         class_preds = []
-        for data, labels in testing_dataloader:
-            data, labels = data.cuda(), labels.cuda(non_blocking=True)
-            out = trt_model(data)
-            loss += crit(out, labels)
-            preds = torch.max(out, 1)[1]
-            class_probs.append([F.softmax(i, dim=0) for i in out])
-            class_preds.append(preds)
-            total += labels.size(0)
-            correct += (preds == labels).sum().item()
+        with torch.no_grad():
+            for data, labels in testing_dataloader:
+                data, labels = data.cuda(), labels.cuda(non_blocking=True)
+                out = trt_model(data)
+                loss += crit(out, labels)
+                preds = torch.max(out, 1)[1]
+                class_probs.append([F.softmax(i, dim=0) for i in out])
+                class_preds.append(preds)
+                total += labels.size(0)
+                correct += (preds == labels).sum().item()
 
-        test_probs = torch.cat([torch.stack(batch) for batch in class_probs])
-        test_preds = torch.cat(class_preds)
-        test_loss = loss / total
-        test_acc = correct / total
-        print("Test Loss: {:.5f} Test Acc: {:.2f}%".format(test_loss, 100 * test_acc))
+            test_probs = torch.cat([torch.stack(batch) for batch in class_probs])
+            test_preds = torch.cat(class_preds)
+            test_loss = loss / total
+            test_acc = correct / total
+            print(
+                "Test Loss: {:.5f} Test Acc: {:.2f}%".format(test_loss, 100 * test_acc)
+            )

@@ -40,7 +40,8 @@ settings = {
 model = models.resnet18(pretrained=True).to("cuda").eval()
 mutable_module = torch_trt.MutableTorchTensorRTModule(model, **settings)
 # You can use the mutable module just like the original pytorch module. The compilation happens while you first call the mutable module.
-mutable_module(*inputs)
+with torch.no_grad():
+    mutable_module(*inputs)
 # %%
 # Make modifications to the mutable module.
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -53,7 +54,8 @@ mutable_module.load_state_dict(model2.state_dict())
 
 # Check the output
 # The refit happens while you call the mutable module again.
-expected_outputs, refitted_outputs = model2(*inputs), mutable_module(*inputs)
+with torch.no_grad():
+    expected_outputs, refitted_outputs = model2(*inputs), mutable_module(*inputs)
 for expected_output, refitted_output in zip(expected_outputs, refitted_outputs):
     assert torch.allclose(
         expected_output, refitted_output, 1e-2, 1e-2
@@ -182,14 +184,15 @@ kwarg_dynamic_shapes = {
 model = torch_trt.MutableTorchTensorRTModule(model, min_block_size=1)
 model.set_expected_dynamic_shape_range(args_dynamic_shapes, kwarg_dynamic_shapes)
 # Compile
-model(*inputs, **kwargs)
-# Change input shape
-inputs_2 = (torch.rand(10, 5).to(device), torch.rand(10, 30).to(device))
-kwargs_2 = {
-    "c": {"a": torch.rand(10, 30).to(device), "b": torch.rand(5, 30).to(device)},
-}
-# Run without recompiling
-model(*inputs_2, **kwargs_2)
+with torch.no_grad():
+    model(*inputs, **kwargs)
+    # Change input shape
+    inputs_2 = (torch.rand(10, 5).to(device), torch.rand(10, 30).to(device))
+    kwargs_2 = {
+        "c": {"a": torch.rand(10, 30).to(device), "b": torch.rand(5, 30).to(device)},
+    }
+    # Run without recompiling
+    model(*inputs_2, **kwargs_2)
 
 # %%
 # Use Mutable Torch TensorRT module with persistent cache
@@ -225,14 +228,15 @@ def remove_timing_cache(path=TIMING_CACHE_PATH):
 
 remove_timing_cache()
 
-for i in range(4):
-    inputs = [torch.rand((100 + i, 3, 224, 224)).to("cuda")]
+with torch.no_grad():
+    for i in range(4):
+        inputs = [torch.rand((100 + i, 3, 224, 224)).to("cuda")]
 
-    start.record()
-    model(*inputs)  # Recompile
-    end.record()
-    torch.cuda.synchronize()
-    times.append(start.elapsed_time(end))
+        start.record()
+        model(*inputs)  # Recompile
+        end.record()
+        torch.cuda.synchronize()
+        times.append(start.elapsed_time(end))
 
 print("----------------dynamo_compile----------------")
 print("Without engine caching, used:", times[0], "ms")

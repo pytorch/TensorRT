@@ -261,7 +261,9 @@ trt_model = torch_tensorrt.dynamo.compile(
     enabled_precisions={torch.float16},
     use_fp32_acc=True,
 )
-trt_out = trt_model(*torchtrt_inputs)
+
+with torch.no_grad():
+    trt_out = trt_model(*torchtrt_inputs)
 
 # %%
 # Output visualization
