@@ -102,6 +102,35 @@ if trt.__version__ >= "7.0":
     }
 
 
+def unified_dtype_converter(
+    dtype: Union[TRTDataType, torch.dtype, np.dtype], to: Frameworks
+) -> Union[np.dtype, torch.dtype, TRTDataType]:
+    """
+    Convert TensorRT, Numpy, or Torch data types to any other of those data types.
+    Args:
+        dtype (TRTDataType, torch.dtype, np.dtype): A TensorRT, Numpy, or Torch data type.
+        to (Frameworks): The framework to convert the data type to.
+    Returns:
+        The equivalent data type in the requested framework.
+    """
+    assert to in Frameworks, f"Expected valid Framework for translation, got {to}"
+    trt_major_version = int(trt.__version__.split(".")[0])
+    if dtype in (np.int8, torch.int8, trt.int8):
+        return DataTypeEquivalence[trt.int8][to]
+    elif trt_major_version >= 7 and dtype in (np.bool_, torch.bool, trt.bool):
+        return DataTypeEquivalence[trt.bool][to]
+    elif dtype in (np.int32, torch.int32, trt.int32):
+        return DataTypeEquivalence[trt.int32][to]
+    elif dtype in (np.int64, torch.int64, trt.int64):
+        return DataTypeEquivalence[trt.int64][to]
+    elif dtype in (np.float16, torch.float16, trt.float16):
+        return DataTypeEquivalence[trt.float16][to]
+    elif dtype in (np.float32, torch.float32, trt.float32):
+        return DataTypeEquivalence[trt.float32][to]
+    else:
+        raise TypeError("%s is not a supported dtype" % dtype)
+
+
 def deallocate_module(module: torch.fx.GraphModule, delete_module: bool = True) -> None:
     """
     This is a helper function to delete the instance of module. We first move it to CPU and then
@@ -875,8 +904,12 @@ def _cache_root() -> Path:
     return Path(tempfile.gettempdir()) / f"torch_tensorrt_{username}"
 
 
-def _extracted_dir_trtllm(platform: str) -> Path:
-    return _cache_root() / "trtllm" / f"{__tensorrt_llm_version__}_{platform}"
+def _extracted_dir_trtllm(platform_system: str, platform_machine: str) -> Path:
+    return (
+        _cache_root()
+        / "trtllm"
+        / f"{__tensorrt_llm_version__}_{platform_system}_{platform_machine}"
+    )
 
 
 def download_and_get_plugin_lib_path() -> Optional[str]:
@@ -889,13 +922,14 @@ def download_and_get_plugin_lib_path() -> Optional[str]:
     Returns:
         Optional[str]: Path to shared library or None if operation fails.
     """
+    platform_system = platform.system().lower()
+    platform_machine = platform.machine().lower()
     wheel_filename = (
         f"tensorrt_llm-{__tensorrt_llm_version__}-{_WHL_CPYTHON_VERSION}-"
-        f"{_WHL_CPYTHON_VERSION}-{platform}.whl"
+        f"{_WHL_CPYTHON_VERSION}-{platform_system}_{platform_machine}.whl"
     )
-    platform_system = platform.system().lower()
     wheel_path = _cache_root() / wheel_filename
-    extract_dir = _extracted_dir_trtllm(platform_system)
+    extract_dir = _extracted_dir_trtllm(platform_system, platform_machine)
     # else will never be met though
     lib_filename = (
         "libnvinfer_plugin_tensorrt_llm.so"
