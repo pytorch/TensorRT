@@ -49,7 +49,6 @@ class TestNcclOpsConverter(DispatchTestCase):
     @classmethod
     def setUpClass(cls):
         set_environment_variables_pytest()
-        print("USE_TRTLLM_PLUGINS =", os.environ.get("USE_TRTLLM_PLUGINS"))
         cls.world_size = 1
         if not dist.is_initialized():
             dist.init_process_group(backend="nccl")
