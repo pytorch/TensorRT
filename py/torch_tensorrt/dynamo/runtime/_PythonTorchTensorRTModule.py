@@ -430,7 +430,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
     def forward(self, *inputs: torch.Tensor) -> torch.Tensor | Tuple[torch.Tensor, ...]:
 
         def run_standard_execution() -> torch.Tensor | Tuple[torch.Tensor, ...]:
-            shape_changed = self.validate_input_shapes(inputs)
+            shape_changed = self.validate_input_shapes(contiguous_inputs)
             (
                 need_cudagraphs_record,
                 can_use_pre_allocated_outputs,
