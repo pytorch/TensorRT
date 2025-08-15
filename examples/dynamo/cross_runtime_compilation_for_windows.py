@@ -46,7 +46,7 @@ PARSER.add_argument(
 
 args = PARSER.parse_args()
 torch.manual_seed(0)
-model = models.resnet18().eval().cuda()
+model = models.resnet18().cuda().eval()
 input = torch.rand((1, 3, 224, 224)).to("cuda")
 inputs = [input]
 
@@ -63,7 +63,8 @@ if args.load:
     loaded_model = torchtrt.load_cross_compiled_exported_program(args.path).module()
     print(f"model has been successfully loaded from ${args.path}")
     # inference
-    trt_output = loaded_model(input)
+    with torch.no_grad():
+        trt_output = loaded_model(input)
     print(f"inference result: {trt_output}")
 else:
     if platform.system() != "Linux" or platform.architecture()[0] != "64bit":

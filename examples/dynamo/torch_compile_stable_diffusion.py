@@ -46,9 +46,9 @@ pipe.unet = torch.compile(
 # %%
 # Inference
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+with torch.no_grad():
+    prompt = "a majestic castle in the clouds"
+    image = pipe(prompt).images[0]
 
-prompt = "a majestic castle in the clouds"
-image = pipe(prompt).images[0]
-
-image.save("images/majestic_castle.png")
-image.show()
+    image.save("images/majestic_castle.png")
+    image.show()

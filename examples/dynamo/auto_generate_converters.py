@@ -169,14 +169,15 @@ class MyModel(torch.nn.Module):  # type: ignore[misc]
         return res
 
 
-my_model = MyModel().to("cuda")
+my_model = MyModel().to("cuda").eval()
 m = torch.full((64, 64), 2, device="cuda", dtype=torch.float)
 n = torch.full((64, 64), 3, device="cuda", dtype=torch.float)
 
 with torch_tensorrt.logging.errors():
     model_trt = torch_tensorrt.compile(my_model, inputs=[m, n], min_block_size=1)
-    for i in range(300):
-        res = model_trt(m, n)
-        assert torch.allclose(res, my_model(m, n))
+    with torch.no_grad():
+        for i in range(300):
+            res = model_trt(m, n)
+            assert torch.allclose(res, my_model(m, n))
 
 print("Ran with custom plugin!")

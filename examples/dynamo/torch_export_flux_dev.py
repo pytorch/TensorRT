@@ -140,14 +140,15 @@ trt_gm.device = torch.device("cuda")
 # Function which generates images from the flux pipeline
 def generate_image(pipe, prompt, image_name):
     seed = 42
-    image = pipe(
-        prompt,
-        output_type="pil",
-        num_inference_steps=20,
-        generator=torch.Generator("cuda").manual_seed(seed),
-    ).images[0]
-    image.save(f"{image_name}.png")
-    print(f"Image generated using {image_name} model saved as {image_name}.png")
+    with torch.no_grad():
+        image = pipe(
+            prompt,
+            output_type="pil",
+            num_inference_steps=20,
+            generator=torch.Generator("cuda").manual_seed(seed),
+        ).images[0]
+        image.save(f"{image_name}.png")
+        print(f"Image generated using {image_name} model saved as {image_name}.png")
 
 
 generate_image(pipe, ["A golden retriever holding a sign to code"], "dog_code")

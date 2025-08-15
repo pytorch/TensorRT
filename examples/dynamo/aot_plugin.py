@@ -153,7 +153,7 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    my_model = MyModel().to("cuda")
+    my_model = MyModel().to("cuda").eval()
     m = torch.full((64, 64), 2, device="cuda", dtype=torch.float)
 
     assert my_model(X=m)[0][0] == 3.0
@@ -167,8 +167,9 @@ if __name__ == "__main__":
         )
         print("Model compiled successfully!")
         print("Running inference with compiled model...")
-        for i in range(10):
-            res = model_trt(m)
-            assert torch.allclose(res, my_model(m)), "Results do not match!"
+        with torch.no_grad():
+            for i in range(10):
+                res = model_trt(m)
+                assert torch.allclose(res, my_model(m)), "Results do not match!"
 
     print("Inference successful!")

@@ -43,10 +43,9 @@ def test_module_perf(model, *input):
     with torch.no_grad():
         for _ in range(3):
             model(*input)
-    torch.cuda.synchronize()
 
-    # Timing phase to measure inference performance
-    with torch.no_grad():
+        torch.cuda.synchronize()
+        # Timing phase to measure inference performance
         for i in range(10):
             start_time = timeit.default_timer()
             model(*input)
@@ -67,9 +66,9 @@ def test_module_perf(model, *input):
 # Load bert model
 model = (
     BertModel.from_pretrained("bert-base-uncased", torchscript=True)
-    .eval()
-    .half()
     .to("cuda")
+    .half()
+    .eval()
 )
 # Define sample inputs
 inputs = [
@@ -89,25 +88,26 @@ optimized_model = torch_tensorrt.compile(
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 # Enable pre-allocated output buffer using a context manager
-with torch_tensorrt.runtime.enable_pre_allocated_outputs(optimized_model):
+with torch.no_grad():
+    with torch_tensorrt.runtime.enable_pre_allocated_outputs(optimized_model):
+        out_trt = optimized_model(*inputs)
+        # Subsequent inferences can use the pre-allocated output buffer (no shape change)
+        out_trt = optimized_model(*inputs)
+
+    # Alternatively, we can enable the feature using a context object
+    pre_allocated_output_ctx = torch_tensorrt.runtime.enable_pre_allocated_outputs(
+        optimized_model
+    )
+    pre_allocated_output_ctx.set_pre_allocated_output(True)
+    time_opt = test_module_perf(optimized_model, *inputs)
+
+    # Disable the pre-allocated output buffer feature and perform inference normally
+    pre_allocated_output_ctx.set_pre_allocated_output(False)
     out_trt = optimized_model(*inputs)
-    # Subsequent inferences can use the pre-allocated output buffer (no shape change)
-    out_trt = optimized_model(*inputs)
+    time_normal = test_module_perf(optimized_model, *inputs)
 
-# Alternatively, we can enable the feature using a context object
-pre_allocated_output_ctx = torch_tensorrt.runtime.enable_pre_allocated_outputs(
-    optimized_model
-)
-pre_allocated_output_ctx.set_pre_allocated_output(True)
-time_opt = test_module_perf(optimized_model, *inputs)
+    time_opt_ms = time_opt * 1000
+    time_normal_ms = time_normal * 1000
 
-# Disable the pre-allocated output buffer feature and perform inference normally
-pre_allocated_output_ctx.set_pre_allocated_output(False)
-out_trt = optimized_model(*inputs)
-time_normal = test_module_perf(optimized_model, *inputs)
-
-time_opt_ms = time_opt * 1000
-time_normal_ms = time_normal * 1000
-
-print(f"normal trt model time: {time_normal_ms:.3f} ms")
-print(f"pre-allocated output buffer model time: {time_opt_ms:.3f} ms")
+    print(f"normal trt model time: {time_normal_ms:.3f} ms")
+    print(f"pre-allocated output buffer model time: {time_opt_ms:.3f} ms")

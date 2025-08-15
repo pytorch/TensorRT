@@ -79,7 +79,8 @@ def main():
 
     print("Original Model Structure:\n", gm)
 
-    original_output = model(example_input)
+    with torch.no_grad():
+        original_output = model(example_input)
 
     # 1. Partition the model into blocks that can be executed by different backends
     partitioned_model, op_support = hierarchical_adjacency_partition(

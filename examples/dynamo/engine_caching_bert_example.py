@@ -62,7 +62,8 @@ def compile_bert(iterations=3):
             backend="torch_tensorrt",
             options=compilation_kwargs,
         )
-        optimized_model(*inputs)
+        with torch.no_grad():
+            optimized_model(*inputs)
         end.record()
         torch.cuda.synchronize()
         times.append(start.elapsed_time(end))
