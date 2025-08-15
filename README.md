@@ -93,9 +93,11 @@ auto results = trt_mod.forward({input_tensor});
 ```
 
 ## Further resources
+- [Double PyTorch Inference Speed for Diffusion Models Using Torch-TensorRT](https://developer.nvidia.com/blog/double-pytorch-inference-speed-for-diffusion-models-using-torch-tensorrt/)
 - [Up to 50% faster Stable Diffusion inference with one line of code](https://pytorch.org/TensorRT/tutorials/_rendered_examples/dynamo/torch_compile_stable_diffusion.html#sphx-glr-tutorials-rendered-examples-dynamo-torch-compile-stable-diffusion-py)
-- [Optimize LLMs from Hugging Face with Torch-TensorRT]() \[coming soon\]
+- [Optimize LLMs from Hugging Face with Torch-TensorRT](https://docs.pytorch.org/TensorRT/tutorials/compile_hf_models.html#compile-hf-models)
 - [Run your model in FP8 with Torch-TensorRT](https://pytorch.org/TensorRT/tutorials/_rendered_examples/dynamo/vgg16_fp8_ptq.html)
+- [Accelerated Inference in PyTorch 2.X with Torch-TensorRT](https://www.youtube.com/watch?v=eGDMJ3MY4zk&t=1s)
 - [Tools to resolve graph breaks and boost performance]() \[coming soon\]
 - [Tech Talk (GTC '23)](https://www.nvidia.com/en-us/on-demand/session/gtcspring23-s51714/)
 - [Documentation](https://nvidia.github.io/Torch-TensorRT/)
