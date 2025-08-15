@@ -201,13 +201,6 @@ def scaled_dot_product_attention(
             temp_mask = impl.unary.logical_not(
                 ctx, target, source_ir, name + "_logical_not", tril_tensor
             )
-            temp_mask = cast_trt_tensor(
-                ctx, temp_mask, trt.float32, name + "_casted_bool", target, source_ir
-            )
-            temp_mask = impl.elementwise.mul(
-                ctx, target, source_ir, name + "_mul_-inf", temp_mask, float("-inf")
-            )
-            attn_bias = temp_mask
 
             # This need_mask determines if we want to use the causal mask or not
             # When KV caching is enabled, L = 1 and != S. In this case, we shouldn't use the causal mask.
