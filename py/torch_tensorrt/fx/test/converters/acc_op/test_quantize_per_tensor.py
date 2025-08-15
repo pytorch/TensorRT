@@ -3,6 +3,7 @@ import unittest
 import tensorrt as trt
 import torch.fx
 import torch.nn as nn
+
 import torch_tensorrt.fx.tracer.acc_tracer.acc_ops as acc_ops
 from torch.testing._internal.common_utils import run_tests
 from torch_tensorrt.fx.tools.common_fx2trt import AccTestCase, InputTensorSpec

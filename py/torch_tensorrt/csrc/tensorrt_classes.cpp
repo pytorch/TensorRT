@@ -349,7 +349,6 @@ core::CompileSpec CompileSpec::toInternalCompileSpec(bool converting_to_trt_engi
     info.lower_info.unfreeze_module = true;
     info.lower_info.disable_cse = true;
   }
-
   info.convert_info.engine_settings.sparse_weights = sparse_weights;
   info.convert_info.engine_settings.disable_tf32 = disable_tf32;
   info.convert_info.engine_settings.refit = refit;
