@@ -100,8 +100,7 @@ pkg_tar(
     name = "libtorchtrt",
     srcs = [
         "//:LICENSE",
-        "//bzl_def:BUILD",
-        "//bzl_def:WORKSPACE",
+        "//third_party/torch_tensorrt:BUILD",
     ],
     extension = "tar.gz",
     package_dir = "torch_tensorrt",
@@ -120,8 +119,7 @@ pkg_tar(
     name = "libtorchtrt_runtime",
     srcs = [
         "//:LICENSE",
-        "//bzl_def:BUILD",
-        "//bzl_def:WORKSPACE",
+        "//third_party/torch_tensorrt:BUILD",
     ],
     extension = "tar.gz",
     package_dir = "torch_tensorrt_runtime",
