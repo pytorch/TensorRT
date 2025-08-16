@@ -31,6 +31,16 @@ config_setting(
 )
 
 config_setting(
+    name = "rtx_win",
+    constraint_values = [
+        "@platforms//os:windows",
+    ],
+    flag_values = {
+        "//toolchains/dep_collection:compute_libs": "rtx",
+    },
+)
+
+config_setting(
     name = "windows",
     constraint_values = [
         "@platforms//os:windows",
@@ -76,9 +86,10 @@ cc_library(
     deps = [
         "//core/util:prelude",
     ] + select({
+        ":jetpack": ["@torch_l4t//:libtorch"],
+        ":rtx_win": ["@libtorch_win//:libtorch"],
         ":use_torch_whl": ["@torch_whl//:libtorch"],
         ":windows": ["@libtorch_win//:libtorch"],
-        ":jetpack": ["@torch_l4t//:libtorch"],
         "//conditions:default": ["@libtorch"],
     }),
     alwayslink = True,

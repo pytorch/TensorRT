@@ -1,10 +1,12 @@
-import unittest
-import torch_tensorrt as torchtrt
-import torch
-import torchvision.models as models
 import copy
+import unittest
 from typing import Dict
-from utils import cosine_similarity, COSINE_THRESHOLD
+
+import torch
+import torch_tensorrt as torchtrt
+import torchvision.models as models
+from torch_tensorrt._utils import is_tensorrt_rtx
+from utils import COSINE_THRESHOLD, cosine_similarity
 
 
 class TestCompile(unittest.TestCase):
@@ -139,10 +141,11 @@ class TestModuleIdentification(unittest.TestCase):
             torchtrt._compile._parse_module_type(ts_module),
             torchtrt._compile._ModuleType.ts,
         )
-        self.assertEqual(
-            torchtrt._compile._parse_module_type(fx_module),
-            torchtrt._compile._ModuleType.fx,
-        )
+        if not is_tensorrt_rtx():
+            self.assertEqual(
+                torchtrt._compile._parse_module_type(fx_module),
+                torchtrt._compile._ModuleType.fx,
+            )
 
 
 if __name__ == "__main__":

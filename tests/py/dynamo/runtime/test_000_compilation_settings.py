@@ -5,6 +5,7 @@ import tensorrt as trt
 import torch
 import torch_tensorrt
 from torch.testing._internal.common_utils import TestCase, run_tests
+from torch_tensorrt._utils import is_tensorrt_version_supported
 from torch_tensorrt.dynamo.utils import is_tegra_platform
 
 from packaging.version import Version
@@ -61,7 +62,7 @@ class TestEnableTRTFlags(TestCase):
         torch._dynamo.reset()
 
     @unittest.skipIf(
-        is_tegra_platform() and Version(metadata.version("tensorrt")) > Version("10.8"),
+        is_tegra_platform() and is_tensorrt_version_supported("10.8"),
         "DLA is not supported on Jetson platform starting TRT 10.8",
     )
     def test_dla_args(self):

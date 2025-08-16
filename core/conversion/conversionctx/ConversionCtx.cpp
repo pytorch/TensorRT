@@ -58,10 +58,13 @@ ConversionCtx::ConversionCtx(BuilderSettings build_settings)
   for (auto p = settings.enabled_precisions.begin(); p != settings.enabled_precisions.end(); ++p) {
     switch (*p) {
       case nvinfer1::DataType::kHALF:
+// tensorrt_rtx is strong typed, cannot set fp16 by builder config, only do this for tensorrt build
+#ifndef TRT_MAJOR_RTX
         TORCHTRT_CHECK(
             builder->platformHasFastFp16(), "Requested inference in FP16 but platform does not support FP16");
         cfg->setFlag(nvinfer1::BuilderFlag::kFP16);
         break;
+#endif
       case nvinfer1::DataType::kINT8:
         LOG_DEBUG("INT8 precision has been enabled, we assume the network has Q/DQ nodes obtained from modelopt");
         break;
@@ -80,7 +83,7 @@ ConversionCtx::ConversionCtx(BuilderSettings build_settings)
   if (settings.disable_tf32) {
     cfg->clearFlag(nvinfer1::BuilderFlag::kTF32);
   }
-#if NV_TENSORRT_MAJOR > 7
+#if defined(TRT_MAJOR_RTX) || (NV_TENSORRT_MAJOR > 7)
   if (settings.sparse_weights) {
     cfg->setFlag(nvinfer1::BuilderFlag::kSPARSE_WEIGHTS);
   }
@@ -154,7 +157,7 @@ void ConversionCtx::RecordNewITensor(const torch::jit::Value* value, nvinfer1::I
 }
 
 std::string ConversionCtx::SerializeEngine() {
-#if NV_TENSORRT_MAJOR > 7
+#if defined(TRT_MAJOR_RTX) || (NV_TENSORRT_MAJOR > 7)
   auto serialized_network = make_trt(builder->buildSerializedNetwork(*net, *cfg));
   if (!serialized_network) {
     TORCHTRT_THROW_ERROR("Building serialized network failed in TensorRT");

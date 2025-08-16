@@ -1,4 +1,6 @@
-name: Build Linux Wheels For aarch64
+# This workflow is used to build the wheels for the Linux platform
+# it should be periodically synced with https://github.com/pytorch/test-infra/blob/main/.github/workflows/build_wheels_linux.yml
+name: Build Linux Wheels
 
 on:
   workflow_call:
@@ -88,11 +90,6 @@ on:
         required: false
         default: "python -m build --wheel"
         type: string
-      is-jetpack:
-        description: Set to true if the build is for jetpack
-        required: false
-        default: false
-        type: boolean
       pip-install-torch-extra-args:
         # NOTE: Why does this exist?
         # Well setuptools / python packaging doesn't actually allow you to specify dependencies
@@ -110,10 +107,21 @@ on:
         description: 'Timeout for the job (in minutes)'
         default: 120
         type: number
+      use-rtx:
+        description: "Set to true if use TensorRT-RTX"
+        default: false
+        type: boolean
+        required: false
+      is-jetpack:
+        description: Set to true if the build is for jetpack
+        required: false
+        default: false
+        type: boolean
     secrets:
       PYPI_API_TOKEN:
         description: An optional token to upload to pypi
         required: false
+
 
 permissions:
   id-token: write
@@ -133,7 +141,8 @@ jobs:
       UPLOAD_TO_BASE_BUCKET: ${{ matrix.upload_to_base_bucket }}
       ARCH: ${{ inputs.architecture }}
       BUILD_TARGET: ${{ inputs.build-target }}
-    name: build-wheel-${{ matrix.python_version }}-${{ matrix.desired_cuda }}-${{ matrix.gpu_arch_type }}-${{ inputs.is-jetpack }}
+      USE_TRT_RTX: ${{ inputs.use-rtx }}
+    name: build-wheel-${{ matrix.python_version }}-${{ matrix.desired_cuda }}-${{ matrix.gpu_arch_type }}-${{ inputs.architecture }}-${{ inputs.use-rtx }}-${{ inputs.is-jetpack }}
     runs-on: ${{ matrix.validation_runner }}
     environment: ${{(inputs.trigger-event == 'schedule' || (inputs.trigger-event == 'push' && (startsWith(github.event.ref, 'refs/heads/nightly') || startsWith(github.event.ref, 'refs/tags/v')))) && 'pytorchbot-env' || ''}}
     container:
@@ -251,7 +260,6 @@ jobs:
         working-directory: ${{ inputs.repository }}
         shell: bash -l {0}
         run: |
-          #set -euxo pipefail
           set -x
           source "${BUILD_ENV_FILE}"
           export PYTORCH_VERSION="$(${CONDA_RUN} pip show torch | grep ^Version: | sed 's/Version: *//' | sed 's/+.\+//')"
@@ -261,28 +269,38 @@ jobs:
             BUILD_VERSION="${BUILD_VERSION}+${CU_VERSION}"
           fi
           echo "BUILD_VERSION=$BUILD_VERSION"
-          if [[ ${{ inputs.is-jetpack }} == false ]]; then
-            ${CONDA_RUN} python setup.py bdist_wheel
+          echo "USE_TRT_RTX=$USE_TRT_RTX"
+          echo "LD_LIBRARY_PATH=$LD_LIBRARY_PATH"
+          if [[ ${{ inputs.use-rtx }} == true ]]; then
+            echo "Building tensorrt-rtx wheel"
+            ${CONDA_RUN} python setup.py bdist_wheel --use-rtx
           else
-            ${CONDA_RUN} python setup.py bdist_wheel --jetpack
+            if [[ ${{ inputs.is-jetpack }} == true ]]; then
+              echo "Building tensorrt wheel for jetpack"
+              ${CONDA_RUN} python setup.py bdist_wheel --jetpack
+            else
+              echo "Building standard tensorrt wheel"
+              ${CONDA_RUN} python setup.py bdist_wheel
+            fi
           fi
       - name: Repair Manylinux_2_28 Wheel
         shell: bash -l {0}
         env:
           PACKAGE_NAME: ${{ inputs.package-name }}
           SMOKE_TEST_SCRIPT: ${{ inputs.smoke-test-script }}
+        # TODO: lan to verify whether manylinux repair is needed for jetpack
+        #if: ${{ inputs.is-jetpack == true }}
         run: |
           set -euxo pipefail
           source "${BUILD_ENV_FILE}"
-          # for pkg in ${{ inputs.repository }}/dist/*-linux_*.whl; do
-          #   # if the glob didn't match anything
-          #   if [[ ! -e $pkg ]]; then
-          #       continue
-          #   fi
-          #   abs_pkg=$(realpath $pkg)
-          #   ./test-infra/.github/scripts/repair_manylinux_2_28.sh $abs_pkg
-          # done
-          echo "Repair Manylinux_2_28 Wheel is not supported for aarch64"
+          for pkg in ${{ inputs.repository }}/dist/*-linux_*.whl; do
+            # if the glob didn't match anything
+            if [[ ! -e $pkg ]]; then
+                continue
+            fi
+            abs_pkg=$(realpath $pkg)
+            ./test-infra/.github/scripts/repair_manylinux_2_28.sh $abs_pkg
+          done
       - name: Run Post-Script
         if: ${{ inputs.post-script != '' }}
         uses: ./test-infra/.github/actions/run-script-with-cache
@@ -291,7 +309,6 @@ jobs:
           script: ${{ inputs.post-script }}
       - name: Smoke Test
         shell: bash -l {0}
-        if: ${{ inputs.is-jetpack == false }}
         env:
           PACKAGE_NAME: ${{ inputs.package-name }}
           SMOKE_TEST_SCRIPT: ${{ inputs.smoke-test-script }}
@@ -300,30 +317,34 @@ jobs:
           source "${BUILD_ENV_FILE}"
           WHEEL_NAME=$(ls "${{ inputs.repository }}/dist/")
           echo "$WHEEL_NAME"
-
-          ${CONDA_RUN} pip install "${{ inputs.repository }}/dist/$WHEEL_NAME"
-          # Checking that we have a pinned version of torch in our dependency tree
-          (
-            pushd "${RUNNER_TEMP}"
-            unzip -o "${GITHUB_WORKSPACE}/${{ inputs.repository }}/dist/$WHEEL_NAME"
-            # Ensure that pytorch version is pinned, should output file where it was found
-            grep "Requires-Dist: torch (==.*)" -r .
-          )
-
-          if [[ (! -f "${{ inputs.repository }}"/${SMOKE_TEST_SCRIPT}) ]]; then
-            echo "${{ inputs.repository }}/${SMOKE_TEST_SCRIPT} not found"
-            if [[ "${PACKAGE_NAME}" = "torchrec" ]]; then
-              # Special case for torchrec temporarily since __version__ does not
-              # work correctly on main in torchrec. This block will be
-              # removed once we fix it.
-              ${CONDA_RUN} python -c "import ${PACKAGE_NAME}"
-            else
-              ${CONDA_RUN} python -c "import ${PACKAGE_NAME}; print('package version is ', ${PACKAGE_NAME}.__version__)"
-            fi
+          if [[ ${{ inputs.is-jetpack }} == true ]]; then
+            echo "Skipping smoke test for jetpack, since it is not the actual jetpack environment"
           else
-            echo "${{ inputs.repository }}/${SMOKE_TEST_SCRIPT} found"
-            ${CONDA_RUN} python "${{ inputs.repository }}/${SMOKE_TEST_SCRIPT}"
+            ${CONDA_RUN} pip install "${{ inputs.repository }}/dist/$WHEEL_NAME"
+            # Checking that we have a pinned version of torch in our dependency tree
+            (
+              pushd "${RUNNER_TEMP}"
+              unzip -o "${GITHUB_WORKSPACE}/${{ inputs.repository }}/dist/$WHEEL_NAME"
+              # Ensure that pytorch version is pinned, should output file where it was found
+              grep "Requires-Dist: torch (==.*)" -r .
+            )
+
+            if [[ (! -f "${{ inputs.repository }}"/${SMOKE_TEST_SCRIPT}) ]]; then
+              echo "${{ inputs.repository }}/${SMOKE_TEST_SCRIPT} not found"
+              if [[ "${PACKAGE_NAME}" = "torchrec" ]]; then
+                # Special case for torchrec temporarily since __version__ does not
+                # work correctly on main in torchrec. This block will be
+                # removed once we fix it.
+                ${CONDA_RUN} python -c "import ${PACKAGE_NAME}"
+              else
+                ${CONDA_RUN} python -c "import ${PACKAGE_NAME}; print('package version is ', ${PACKAGE_NAME}.__version__)"
+              fi
+            else
+              echo "${{ inputs.repository }}/${SMOKE_TEST_SCRIPT} found"
+              ${CONDA_RUN} python "${{ inputs.repository }}/${SMOKE_TEST_SCRIPT}"
+            fi
           fi
+
       # NB: Only upload to GitHub after passing smoke tests
 
       - name: Upload wheel to GitHub
@@ -337,8 +358,8 @@ jobs:
     needs: build
     name: upload-wheel-${{ matrix.python_version }}-${{ matrix.desired_cuda }}-${{ matrix.gpu_arch_type }}-${{ inputs.is-jetpack }}
     uses: pytorch/test-infra/.github/workflows/_binary_upload.yml@main
-    # for jetpack builds, do not upload to pytorch nightly index, only upload to https://pypi.jetson-ai-lab.io/ manually for each release
-    if: ${{ inputs.is-jetpack == false }}
+    #  if it is not jetpack nor rtx, then upload to pytorch index
+    if: ${{ inputs.is-jetpack == false && inputs.use-rtx == false }}
     with:
       repository: ${{ inputs.repository }}
       ref: ${{ inputs.ref }}
@@ -352,5 +373,5 @@ jobs:
       PYPI_API_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}-${{ inputs.repository }}-${{ inputs.is-jetpack }}-${{ github.event_name == 'workflow_dispatch' }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}-${{inputs.use-rtx}}-${{inputs.architecture}}-${{inputs.is-jetpack}}-${{ inputs.repository }}-${{ github.event_name == 'workflow_dispatch' }}
   cancel-in-progress: true

@@ -6,6 +6,7 @@ from typing import Any, Callable, Dict, List, Optional, Type, TypeVar
 
 from torch_tensorrt._utils import (
     check_cross_compile_trt_win_lib,
+    is_tensorrt_rtx,
     sanitized_torch_version,
 )
 
@@ -42,7 +43,7 @@ linked_file_runtime_full_path = os.path.join(trtorch_dir, linked_file_runtime)
 _TS_FE_AVAIL = os.path.isfile(linked_file_full_path)
 _TORCHTRT_RT_AVAIL = _TS_FE_AVAIL or os.path.isfile(linked_file_runtime_full_path)
 _DYNAMO_FE_AVAIL = version.parse(sanitized_torch_version()) >= version.parse("2.1.dev")
-_FX_FE_AVAIL = True
+_FX_FE_AVAIL = False if is_tensorrt_rtx() else True
 _REFIT_AVAIL = True
 _WINDOWS_CROSS_COMPILE = check_cross_compile_trt_win_lib()
 
