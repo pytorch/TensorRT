@@ -116,7 +116,7 @@ def compile_torchtrt(model, input_ids, args):
             use_fp32_acc=use_fp32_acc,
             device=DEVICE,
             disable_tf32=True,
-            use_python_runtime=True,
+            use_python_runtime=False,
             debug=args.debug,
             offload_module_to_cpu=True,
             min_block_size=args.min_block_size,

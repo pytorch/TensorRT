@@ -27,24 +27,51 @@ def tril(
     name: str,
     row: TRTTensor,
     col: TRTTensor,
+    sliding_window_size: Optional[int] = None,
 ) -> TRTTensor:
+
     row_arange_tensor = impl.arange.arange(
         ctx, target, source_ir, name + "_arange_row", start=0, end=row, step=1
     )
-    row_reshape_tensor = impl.shuffle.reshape(
-        ctx, target, source_ir, name + "_reshape_row", row_arange_tensor, [row, 1]
-    )
-
     col_arange_tensor = impl.arange.arange(
         ctx, target, source_ir, name + "_arange_col", start=0, end=col, step=1
     )
-    col_reshape_tensor = impl.shuffle.reshape(
-        ctx, target, source_ir, name + "_reshape_col", col_arange_tensor, [1, col]
+    row_arange_tensor = impl.unsqueeze.unsqueeze(
+        ctx, target, source_ir, name + "_unsqueeze_row", row_arange_tensor, -1
     )
+    col_arange_tensor = impl.unsqueeze.unsqueeze(
+        ctx, target, source_ir, name + "_unsqueeze_col", col_arange_tensor, 0
+    )
+    # sub will return the following mask tensor:
+    # [[0, -1, -2, -3],
+    #  [1,  0, -1, -2],
+    #  [2,  1,  0, -1],
+    #  [3,  2,  1,  0]]
+    mask = impl.elementwise.sub(
+        ctx, target, source_ir, name + "_sub", row_arange_tensor, col_arange_tensor
+    )
+    ge_0_mask = impl.elementwise.ge(ctx, target, source_ir, name + "_ge_0", mask, 0.0)
+    if sliding_window_size is None:
+        # return the following lower triangular mask includes the main diagonal:
+        # 0 ■ ⬚ ⬚ ⬚ ⬚     tensor([[[[ True, False, False, False, False],
+        # 1 ■ ■ ⬚ ⬚ ⬚               [ True,  True, False, False, False],
+        # 2 ■ ■ ■ ⬚ ⬚               [ True,  True,  True, False, False],
+        # 3 ■ ■ ■ ■ ⬚               [ True,  True,  True,  True, False],
+        # 4 ■ ■ ■ ■ ■               [ True,  True,  True,  True,  True]]]])
+        return ge_0_mask
 
-    mask = impl.elementwise.ge(
-        ctx, target, source_ir, name + "_ge", row_reshape_tensor, col_reshape_tensor
+    lt_window_mask = impl.elementwise.lt(
+        ctx, target, source_ir, name + "_lt_window_size", mask, sliding_window_size
     )
+    mask = impl.elementwise.logical_and(
+        ctx, target, source_ir, name + "_logical_and", ge_0_mask, lt_window_mask
+    )
+    # return the following mask if sliding_window_size is 3:
+    # 0 ■ ⬚ ⬚ ⬚ ⬚      tensor([[[[ True, False, False, False, False],
+    # 1 ■ ■ ⬚ ⬚ ⬚                [ True,  True, False, False, False],
+    # 2 ■ ■ ■ ⬚ ⬚                [ True,  True,  True, False, False],
+    # 3 ⬚ ■ ■ ■ ⬚                [False,  True,  True,  True, False],
+    # 4 ⬚ ⬚ ■ ■ ■                [False, False,  True,  True,True]]]])
     return mask
 
 
@@ -66,7 +93,7 @@ def scaled_dot_product_attention(
     # TODO: remove this once we have a better way to handle the causal mask
     scale = kwargs.get("scale", None)
     source_ir = SourceIR.ATEN
-    is_causal = True
+
     # implementation as described here: https://pytorch.org/docs/stable/generated/torch.nn.functional.scaled_dot_product_attention.html
     use_fp32_acc = kwargs.get("use_fp32_acc", False)
     query_dtype = query.dtype
@@ -134,37 +161,70 @@ def scaled_dot_product_attention(
             L = impl.shape.shape(ctx, target, source_ir, name + "_shape_0", query, 2)
         if S < 0:
             S = impl.shape.shape(ctx, target, source_ir, name + "_shape_1", key, 2)
-
         # generate the mask tensor
-        tril_tensor = tril(ctx, target, source_ir, name + "_tril", L, S)
+        if is_causal:
+            tril_tensor = tril(ctx, target, source_ir, name + "_tril", L, S)
+        else:
+            # TODO: lan to figure out why attn_mask passed in from transformers is not working
+            # tried both 2d and 4d, but both are not working
+            assert len(attn_mask.shape) in [
+                2,
+                4,
+            ], f"attn_mask must be 2D or 4D, but got {attn_mask.shape=}"
+            if len(attn_mask.shape) == 4:
+                if attn_mask.shape[0] != 1:
+                    attn_mask = impl.slice.slice_op(
+                        ctx, target, source_ir, name + "_slice", attn_mask, 0, 0, 1, 1
+                    )
+                if attn_mask.shape[1] != 1:
+                    attn_mask = impl.slice.slice_op(
+                        ctx, target, source_ir, name + "_slice", attn_mask, 1, 0, 1, 1
+                    )
+                attn_mask = impl.squeeze.squeeze(
+                    ctx, target, source_ir, name + "_squeeze", attn_mask, (0, 1)
+                )
+            tril_tensor = attn_mask
 
-        temp_mask = impl.unary.logical_not(
-            ctx, target, source_ir, name + "_logical_not", tril_tensor
-        )
+        # generate attn_bias via where instead of (logical_and, sub, log) to see whether nan is related to this
+        attn_bias_via_where = True
+        if attn_bias_via_where:
+            attn_bias = impl.condition.where(
+                ctx,
+                target,
+                source_ir,
+                name + "_where",
+                torch.tensor(0.0, dtype=torch.float32).cuda(),
+                torch.tensor(-float("inf"), dtype=torch.float32).cuda(),
+                tril_tensor,
+            )
+        else:
+            temp_mask = impl.unary.logical_not(
+                ctx, target, source_ir, name + "_logical_not", tril_tensor
+            )
 
-        # This need_mask determines if we want to use the causal mask or not
-        # When KV caching is enabled, L = 1 and != S. In this case, we shouldn't use the causal mask.
-        # So need_mask will be all False values in this case.
-        # TODO: Implement more general case where L != 1 and S != L
-        need_mask = impl.elementwise.eq(ctx, target, source_ir, name + "_eq", L, S)
-        temp_mask = impl.elementwise.logical_and(
-            ctx, target, source_ir, name + "_logical_and", need_mask, temp_mask
-        )
-        temp_mask_casted = cast_trt_tensor(
-            ctx, temp_mask, query_dtype, name + "_casted_bool", target, source_ir
-        )
+            # This need_mask determines if we want to use the causal mask or not
+            # When KV caching is enabled, L = 1 and != S. In this case, we shouldn't use the causal mask.
+            # So need_mask will be all False values in this case.
+            # TODO: Implement more general case where L != 1 and S != L
+            need_mask = impl.elementwise.eq(ctx, target, source_ir, name + "_eq", L, S)
+            temp_mask = impl.elementwise.logical_and(
+                ctx, target, source_ir, name + "_logical_and", need_mask, temp_mask
+            )
+            temp_mask_casted = cast_trt_tensor(
+                ctx, temp_mask, query_dtype, name + "_casted_bool", target, source_ir
+            )
 
-        one_minus_temp_mask = impl.elementwise.sub(
-            ctx,
-            target,
-            source_ir,
-            name + "_one_minus_temp_mask",
-            1.0,
-            temp_mask_casted,
-        )
-        attn_bias = impl.unary.log(
-            ctx, target, source_ir, name + "_log", one_minus_temp_mask
-        )
+            one_minus_temp_mask = impl.elementwise.sub(
+                ctx,
+                target,
+                source_ir,
+                name + "_one_minus_temp_mask",
+                1.0,
+                temp_mask_casted,
+            )
+            attn_bias = impl.unary.log(
+                ctx, target, source_ir, name + "_log", one_minus_temp_mask
+            )
 
     scaled_add_attn_bias = impl.elementwise.add(
         ctx, target, source_ir, name + "_attn_bias_add", mm, attn_bias
