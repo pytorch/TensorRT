@@ -162,11 +162,7 @@ def scaled_dot_product_attention(
         if S < 0:
             S = impl.shape.shape(ctx, target, source_ir, name + "_shape_1", key, 2)
         # generate the mask tensor
-        if is_causal:
-            tril_tensor = tril(ctx, target, source_ir, name + "_tril", L, S)
-        else:
-            # TODO: lan to figure out why attn_mask passed in from transformers is not working
-            # tried both 2d and 4d, but both are not working
+        if not is_causal:
             assert len(attn_mask.shape) in [
                 2,
                 4,
@@ -183,48 +179,56 @@ def scaled_dot_product_attention(
                 attn_mask = impl.squeeze.squeeze(
                     ctx, target, source_ir, name + "_squeeze", attn_mask, (0, 1)
                 )
-            tril_tensor = attn_mask
-
-        # generate attn_bias via where instead of (logical_and, sub, log) to see whether nan is related to this
-        attn_bias_via_where = True
-        if attn_bias_via_where:
-            attn_bias = impl.condition.where(
-                ctx,
-                target,
-                source_ir,
-                name + "_where",
-                torch.tensor(0.0, dtype=torch.float32).cuda(),
-                torch.tensor(-float("inf"), dtype=torch.float32).cuda(),
-                tril_tensor,
-            )
+            attn_bias = attn_mask
         else:
-            temp_mask = impl.unary.logical_not(
-                ctx, target, source_ir, name + "_logical_not", tril_tensor
-            )
+            tril_tensor = tril(ctx, target, source_ir, name + "_tril", L, S)
+            # generate attn_bias via where instead of (logical_and, sub, log) to see whether nan is related to this
+            attn_bias_via_where = True
+            if attn_bias_via_where:
+                attn_bias = impl.condition.where(
+                    ctx,
+                    target,
+                    source_ir,
+                    name + "_where",
+                    torch.tensor(0.0, dtype=torch.float32).cuda(),
+                    torch.tensor(-float("inf"), dtype=torch.float32).cuda(),
+                    tril_tensor,
+                )
+            else:
+                temp_mask = impl.unary.logical_not(
+                    ctx, target, source_ir, name + "_logical_not", tril_tensor
+                )
 
-            # This need_mask determines if we want to use the causal mask or not
-            # When KV caching is enabled, L = 1 and != S. In this case, we shouldn't use the causal mask.
-            # So need_mask will be all False values in this case.
-            # TODO: Implement more general case where L != 1 and S != L
-            need_mask = impl.elementwise.eq(ctx, target, source_ir, name + "_eq", L, S)
-            temp_mask = impl.elementwise.logical_and(
-                ctx, target, source_ir, name + "_logical_and", need_mask, temp_mask
-            )
-            temp_mask_casted = cast_trt_tensor(
-                ctx, temp_mask, query_dtype, name + "_casted_bool", target, source_ir
-            )
+                # This need_mask determines if we want to use the causal mask or not
+                # When KV caching is enabled, L = 1 and != S. In this case, we shouldn't use the causal mask.
+                # So need_mask will be all False values in this case.
+                # TODO: Implement more general case where L != 1 and S != L
+                need_mask = impl.elementwise.eq(
+                    ctx, target, source_ir, name + "_eq", L, S
+                )
+                temp_mask = impl.elementwise.logical_and(
+                    ctx, target, source_ir, name + "_logical_and", need_mask, temp_mask
+                )
+                temp_mask_casted = cast_trt_tensor(
+                    ctx,
+                    temp_mask,
+                    query_dtype,
+                    name + "_casted_bool",
+                    target,
+                    source_ir,
+                )
 
-            one_minus_temp_mask = impl.elementwise.sub(
-                ctx,
-                target,
-                source_ir,
-                name + "_one_minus_temp_mask",
-                1.0,
-                temp_mask_casted,
-            )
-            attn_bias = impl.unary.log(
-                ctx, target, source_ir, name + "_log", one_minus_temp_mask
-            )
+                one_minus_temp_mask = impl.elementwise.sub(
+                    ctx,
+                    target,
+                    source_ir,
+                    name + "_one_minus_temp_mask",
+                    1.0,
+                    temp_mask_casted,
+                )
+                attn_bias = impl.unary.log(
+                    ctx, target, source_ir, name + "_log", one_minus_temp_mask
+                )
 
     scaled_add_attn_bias = impl.elementwise.add(
         ctx, target, source_ir, name + "_attn_bias_add", mm, attn_bias

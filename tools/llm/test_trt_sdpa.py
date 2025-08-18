@@ -13,6 +13,7 @@ class SimpleNetwork(torch.nn.Module):
             enable_flash=False,
             enable_math=False,
             enable_mem_efficient=True,
+            enable_cudnn=False,
         ):
             return torch.nn.functional.scaled_dot_product_attention(
                 query, key, value, attn_mask, 0.0, False, scale=0.0625
