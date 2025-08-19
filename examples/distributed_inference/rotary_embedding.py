@@ -84,20 +84,20 @@ def parallel_rotary_block(rotary_block, tp_mesh):
         "wk": ColwiseParallel(),
         "wo": RowwiseParallel(output_layouts=Shard(0)),
     }
-    rotary_block.n_parallel = 1  # this is for single GPU, to do remove this hardcode
+    rotary_block.n_parallel = tp_mesh.size()
 
     parallelize_module(rotary_block, tp_mesh, plan)
 
 
 class RotaryAttention(nn.Module):
-    def __init__(self, dim: int, seq_len: int):
+    def __init__(self, dim: int, seq_len: int, n_parallel: int = 1):
         super().__init__()
         self.dim = dim
         self.wq = nn.Linear(dim, dim)
         self.wk = nn.Linear(dim, dim)
         self.wo = nn.Linear(dim, dim)
         self.seq_len = seq_len
-        self.n_parallel = 1
+        self.n_parallel = n_parallel
         self.register_buffer("freqs_cis", self._precompute_freqs_cis(), persistent=True)
         self.init_weights()
 
