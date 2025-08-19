@@ -41,7 +41,7 @@ HEADS = 4
 DIM = 128
 
 with torch.no_grad():
-    model = RotaryAttention(DIM, SEQ_LEN)
+    model = RotaryAttention(DIM, SEQ_LEN, device_mesh.size())
     parallel_rotary_block(model, device_mesh)
     device = torch.device("cuda", device_mesh.get_rank())
     model.to(device)

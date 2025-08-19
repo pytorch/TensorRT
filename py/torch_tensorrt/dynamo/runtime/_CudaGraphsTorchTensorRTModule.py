@@ -8,6 +8,7 @@ import torch_tensorrt
 from torch.fx.experimental.proxy_tensor import unset_fake_temporarily
 from torch.utils._pytree import tree_flatten, tree_map, tree_unflatten
 from torch_tensorrt.dynamo import partitioning
+from torch_tensorrt.dynamo.runtime.utils import complex_to_ri_stacked_tensor
 
 logger = logging.getLogger(__name__)
 
@@ -142,6 +143,9 @@ class CudaGraphsTorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
 
             for i, _ in enumerate(inputs):
                 if not contiguous_inputs[i].is_cuda:
+                    contiguous_inputs[i] = complex_to_ri_stacked_tensor(
+                        contiguous_inputs[i]
+                    )
                     logger.warning(
                         f"Detected input[{i}] is not on a cuda device. "
                         "This tensor is being moved by the runtime but for performance considerations, "
