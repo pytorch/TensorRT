@@ -201,6 +201,12 @@ void create_output_allocator(c10::intrusive_ptr<TRTEngine> compiled_engine) {
 }
 
 std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intrusive_ptr<TRTEngine> compiled_engine) {
+  torch::Tensor dynamic_workspace;
+  if (compiled_engine->resource_allocation_strategy == TRTEngine::ResourceAllocationStrategy::kDynamic) {
+    dynamic_workspace = torch::empty(compiled_engine->cuda_engine->getDeviceMemorySizeV2(), {torch::kCUDA});
+    compiled_engine->exec_ctx->setDeviceMemory(dynamic_workspace.data_ptr());
+  }
+
   auto run_standard_execution = [&]() {
     bool cudagraphs_enabled = (CUDAGRAPHS_MODE == SUBGRAPH_CUDAGRAPHS);
     bool shape_changed = _validate_shapes(inputs, compiled_engine);
