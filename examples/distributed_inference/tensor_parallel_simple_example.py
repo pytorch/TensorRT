@@ -36,10 +36,19 @@ from torch.distributed.tensor.parallel import (
     RowwiseParallel,
     parallelize_module,
 )
-
-device_mesh, _world_size, _rank, logger = initialize_distributed_env(
-    "./tensor_parallel_simple_example"
+from torch_tensorrt.dynamo.distributed.utils import (
+    cleanup_distributed_env,
+    get_tensor_parallel_device_mesh,
+    initialize_distributed_env,
+    initialize_logger,
 )
+
+if not dist.is_initialized():
+    initialize_distributed_env()
+
+device_mesh, _world_size, _rank = get_tensor_parallel_device_mesh()
+logger = initialize_logger(_rank, "tensor_parallel_simple_example")
+
 
 """
 This example takes some code from https://github.com/pytorch/examples/blob/main/distributed/tensor_parallelism/tensor_parallel_example.py
