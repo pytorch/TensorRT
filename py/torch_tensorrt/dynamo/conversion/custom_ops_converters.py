@@ -12,6 +12,7 @@ from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContex
 from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
     dynamo_tensorrt_converter,
 )
+from torch_tensorrt.dynamo.distributed.utils import load_tensorrt_llm_for_nccl
 from torch_tensorrt.dynamo.lowering.passes.fuse_distributed_ops import (
     tensorrt_fused_nccl_all_gather_op,
     tensorrt_fused_nccl_reduce_scatter_op,
