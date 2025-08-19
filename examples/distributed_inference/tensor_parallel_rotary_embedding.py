@@ -16,15 +16,19 @@ import time
 import torch
 import torch_tensorrt
 from rotary_embedding import RotaryAttention, parallel_rotary_block
-from tensor_parallel_initialize_dist import (
+from torch.distributed import dist
+from torch_tensorrt.dynamo.distributed.utils import (
     cleanup_distributed_env,
+    get_tensor_parallel_device_mesh,
     initialize_distributed_env,
+    initialize_logger,
 )
 
-device_mesh, _world_size, _rank, logger = initialize_distributed_env(
-    "./tensor_parallel_rotary_embedding"
-)
+if not dist.is_initialized():
+    initialize_distributed_env()
 
+device_mesh, _world_size, _rank = get_tensor_parallel_device_mesh()
+logger = initialize_logger(_rank, "tensor_parallel_simple_example")
 
 """
 This example covers the rotary embedding in Llama3 model and is derived from https://lightning.ai/lightning-ai/studios/tensor-parallelism-supercharging-large-model-training-with-pytorch-lightning
