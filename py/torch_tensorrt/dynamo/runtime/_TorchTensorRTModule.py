@@ -15,6 +15,7 @@ from torch_tensorrt._features import (
     needs_torch_tensorrt_runtime,
 )
 from torch_tensorrt.dynamo._settings import CompilationSettings
+from torch_tensorrt.dynamo.runtime.utils import complex_to_ri_stacked_tensor
 
 logger = logging.getLogger(__name__)
 
@@ -320,6 +321,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         # directly cast the input to a Torch Tensor.
         #
         # This also avoids the need for type-checking inputs, since they are now explicitly casted to Torch tensors
+        inputs = tuple(complex_to_ri_stacked_tensor(i) for i in inputs)
         input_tensors: List[torch.Tensor] = [
             (i if isinstance(i, torch.Tensor) else torch.tensor(i).cuda())
             for i in inputs
