@@ -995,8 +995,8 @@ def compile_module(
                         f.write(trt_module.get_layer_info())
 
     # Only set the requires_unique_output flag for the last TRT Module when user has access to the output tensor
-    if trt_module and settings.use_python_runtime:
-        trt_module.set_requires_unique_output(True)
+    if trt_module:
+        trt_module.set_requires_new_output_tensor(True)
 
     # Parse the graph I/O and store it in dryrun tracker
     parse_graph_io(gm, dryrun_tracker)

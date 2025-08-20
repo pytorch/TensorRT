@@ -221,16 +221,16 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         self.use_output_allocator_outputs = False
         self.device = torch.cuda.current_device()
         self.cudagraphs_enabled = torch_tensorrt.runtime.get_cudagraphs_mode()
-        self.requires_unique_output = False
+        self.requires_new_output_tensor = False
         if self.serialized_engine is not None and not self.settings.lazy_engine_init:
             self.setup_engine()
-        self.is_shape_inference_io = [
-            self.engine.is_shape_inference_io(input_name)
+        self.is_shape_inference_io = {
+            input_name: self.engine.is_shape_inference_io(input_name)
             for input_name in self.input_names
-        ]
+        }
 
-    def set_requires_unique_output(self, requires_unique_output: bool) -> None:
-        self.requires_unique_output = requires_unique_output
+    def set_requires_new_output_tensor(self, enabled: bool) -> None:
+        self.requires_new_output_tensor = enabled
 
     def get_streamable_device_memory_budget(self) -> Any:
         return self.engine.streamable_weights_size
@@ -405,7 +405,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
 
             # For shape tensors, we use CPU pointers and for data tensors, we use GPU pointers
             # as per TensorRT requirements
-            if self.is_shape_inference_io[i]:
+            if self.is_shape_inference_io[input_name]:
                 # Shape tensor inputs are casted to int64 explicitly
                 # Currently Torch CPU pointers are not working; numpy pointers are used instead
                 # to refer to underlying memory
@@ -520,7 +520,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                         )
                     if (
                         self.output_tensors is None
-                        or self.requires_unique_output
+                        or self.requires_new_output_tensor
                         or shape_changed
                     ):
                         self.output_tensors = self.create_output_tensors()
