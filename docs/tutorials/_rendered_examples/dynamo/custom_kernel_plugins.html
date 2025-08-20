@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Using Custom Kernels within TensorRT Engines with Torch-TensorRT &mdash; Torch-TensorRT v2.9.0.dev0+99c3499 documentation</title>
+  <title>Using Custom Kernels within TensorRT Engines with Torch-TensorRT &mdash; Torch-TensorRT v2.9.0.dev0+33a53cf documentation</title>
   
 
   
@@ -293,7 +293,7 @@
               
               
                 <div class="version">
-                  v2.9.0.dev0+99c3499
+                  v2.9.0.dev0+33a53cf
                 </div>
               
             
@@ -681,8 +681,9 @@ In our case we can just use the native circular pad operation as our FakeTensor 
         <span class="k">return</span> <span class="n">y</span>
 
 
-<span class="n">my_model</span> <span class="o">=</span> <span class="n">MyModel</span><span class="p">((</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">0</span><span class="p">))</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">&quot;cuda&quot;</span><span class="p">)</span>
-<span class="n">my_model</span><span class="p">(</span><span class="n">ex_input</span><span class="p">)</span>
+<span class="n">my_model</span> <span class="o">=</span> <span class="n">MyModel</span><span class="p">((</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">0</span><span class="p">))</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">&quot;cuda&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span>
+<span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
+    <span class="n">my_model</span><span class="p">(</span><span class="n">ex_input</span><span class="p">)</span>
 </pre></div>
 </div>
 <div class="highlight-none notranslate"><div class="highlight"><pre><span></span>tensor([[[[-0.2604, -0.4232, -0.3041],
@@ -1057,7 +1058,8 @@ Compiled with: CompilationSettings(enabled_precisions={&lt;dtype.f32: 7&gt;}, wo
 </pre></div>
 </div>
 <p>As you can see, now there is only one subgraph created for the TensorRT engine that contains both our custom kernel and the native convolution operator.</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="nb">print</span><span class="p">(</span><span class="n">trt_model</span><span class="p">(</span><span class="n">ex_input</span><span class="p">))</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">trt_model</span><span class="p">(</span><span class="n">ex_input</span><span class="p">))</span>
 </pre></div>
 </div>
 <div class="highlight-none notranslate"><div class="highlight"><pre><span></span>tensor([[[[-0.2604, -0.4232, -0.3041],
@@ -1082,7 +1084,8 @@ Compiled with: CompilationSettings(enabled_precisions={&lt;dtype.f32: 7&gt;}, wo
 </pre></div>
 </div>
 <p>We can verify our implementation is run correctly by both TensorRT and PyTorch</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="nb">print</span><span class="p">(</span><span class="n">my_model</span><span class="p">(</span><span class="n">ex_input</span><span class="p">)</span> <span class="o">-</span> <span class="n">trt_model</span><span class="p">(</span><span class="n">ex_input</span><span class="p">))</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">my_model</span><span class="p">(</span><span class="n">ex_input</span><span class="p">)</span> <span class="o">-</span> <span class="n">trt_model</span><span class="p">(</span><span class="n">ex_input</span><span class="p">))</span>
 </pre></div>
 </div>
 <div class="highlight-none notranslate"><div class="highlight"><pre><span></span>tensor([[[[0., 0., 0.],

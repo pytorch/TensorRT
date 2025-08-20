@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Cross runtime compilation for windows example &mdash; Torch-TensorRT v2.9.0.dev0+99c3499 documentation</title>
+  <title>Cross runtime compilation for windows example &mdash; Torch-TensorRT v2.9.0.dev0+33a53cf documentation</title>
   
 
   
@@ -291,7 +291,7 @@
               
               
                 <div class="version">
-                  v2.9.0.dev0+99c3499
+                  v2.9.0.dev0+33a53cf
                 </div>
               
             
@@ -527,7 +527,7 @@ It cannot be loaded in Windows with GeForceRTX 3080 which has Compute Capability
 
 <span class="n">args</span> <span class="o">=</span> <span class="n">PARSER</span><span class="o">.</span><span class="n">parse_args</span><span class="p">()</span>
 <span class="n">torch</span><span class="o">.</span><span class="n">manual_seed</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
-<span class="n">model</span> <span class="o">=</span> <span class="n">models</span><span class="o">.</span><span class="n">resnet18</span><span class="p">()</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">models</span><span class="o">.</span><span class="n">resnet18</span><span class="p">()</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span>
 <span class="nb">input</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">rand</span><span class="p">((</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">))</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">&quot;cuda&quot;</span><span class="p">)</span>
 <span class="n">inputs</span> <span class="o">=</span> <span class="p">[</span><span class="nb">input</span><span class="p">]</span>
 </pre></div>
@@ -544,7 +544,8 @@ or load the saved resnet model in Windows
     <span class="n">loaded_model</span> <span class="o">=</span> <span class="n">torchtrt</span><span class="o">.</span><span class="n">load_cross_compiled_exported_program</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">path</span><span class="p">)</span><span class="o">.</span><span class="n">module</span><span class="p">()</span>
     <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;model has been successfully loaded from $</span><span class="si">{</span><span class="n">args</span><span class="o">.</span><span class="n">path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
     <span class="c1"># inference</span>
-    <span class="n">trt_output</span> <span class="o">=</span> <span class="n">loaded_model</span><span class="p">(</span><span class="nb">input</span><span class="p">)</span>
+    <span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
+        <span class="n">trt_output</span> <span class="o">=</span> <span class="n">loaded_model</span><span class="p">(</span><span class="nb">input</span><span class="p">)</span>
     <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;inference result: </span><span class="si">{</span><span class="n">trt_output</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 <span class="k">else</span><span class="p">:</span>
     <span class="k">if</span> <span class="n">platform</span><span class="o">.</span><span class="n">system</span><span class="p">()</span> <span class="o">!=</span> <span class="s2">&quot;Linux&quot;</span> <span class="ow">or</span> <span class="n">platform</span><span class="o">.</span><span class="n">architecture</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span> <span class="o">!=</span> <span class="s2">&quot;64bit&quot;</span><span class="p">:</span>

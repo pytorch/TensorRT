@@ -155,8 +155,8 @@ to FP16 precision for faster performance.
 
 .. code-block:: python
 
-    encoder = predictor.model.eval().cuda()
-    sam_model = SAM2FullModel(encoder.half()).eval().cuda()
+    encoder = predictor.model.cuda().eval()
+    sam_model = SAM2FullModel(encoder.half()).cuda().eval()
 
 
 .. GENERATED FROM PYTHON SOURCE LINES 117-118
@@ -337,7 +337,7 @@ Torch-TensorRT compilation
 Export the model in non-strict mode and perform Torch-TensorRT compilation in FP16 precision.
 We enable FP32 matmul accumulation using ``use_fp32_acc=True`` to preserve accuracy with the original Pytorch model.
 
-.. GENERATED FROM PYTHON SOURCE LINES 256-266
+.. GENERATED FROM PYTHON SOURCE LINES 256-268
 
 .. code-block:: python
 
@@ -349,17 +349,19 @@ We enable FP32 matmul accumulation using ``use_fp32_acc=True`` to preserve accur
         enabled_precisions={torch.float16},
         use_fp32_acc=True,
     )
-    trt_out = trt_model(*torchtrt_inputs)
+
+    with torch.no_grad():
+        trt_out = trt_model(*torchtrt_inputs)
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 267-271
+.. GENERATED FROM PYTHON SOURCE LINES 269-273
 
 Output visualization
 ---------------------------
 Post process the outputs of Torch-TensorRT and visualize the masks using the post processing
 components provided above. The outputs should be stored in your current directory.
 
-.. GENERATED FROM PYTHON SOURCE LINES 271-282
+.. GENERATED FROM PYTHON SOURCE LINES 273-284
 
 .. code-block:: python
 
@@ -375,7 +377,7 @@ components provided above. The outputs should be stored in your current director
     )
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 283-292
+.. GENERATED FROM PYTHON SOURCE LINES 285-294
 
 The predicted masks are as shown below
    .. image:: sam_mask1.png
@@ -387,7 +389,7 @@ The predicted masks are as shown below
    .. image:: sam_mask3.png
       :width: 50%
 
-.. GENERATED FROM PYTHON SOURCE LINES 294-298
+.. GENERATED FROM PYTHON SOURCE LINES 296-300
 
 References
 ---------------------------

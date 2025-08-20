@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Torch Export with Cudagraphs &mdash; Torch-TensorRT v2.9.0.dev0+99c3499 documentation</title>
+  <title>Torch Export with Cudagraphs &mdash; Torch-TensorRT v2.9.0.dev0+33a53cf documentation</title>
   
 
   
@@ -293,7 +293,7 @@
               
               
                 <div class="version">
-                  v2.9.0.dev0+99c3499
+                  v2.9.0.dev0+33a53cf
                 </div>
               
             
@@ -511,7 +511,7 @@ to download the full example code</p>
 <section id="compilation-with-torch-tensorrt-compile-using-default-settings">
 <h2>Compilation with <cite>torch_tensorrt.compile</cite> Using Default Settings<a class="headerlink" href="#compilation-with-torch-tensorrt-compile-using-default-settings" title="Permalink to this heading">¶</a></h2>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># We begin by defining and initializing a model</span>
-<span class="n">model</span> <span class="o">=</span> <span class="n">models</span><span class="o">.</span><span class="n">resnet18</span><span class="p">(</span><span class="n">pretrained</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">&quot;cuda&quot;</span><span class="p">)</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">models</span><span class="o">.</span><span class="n">resnet18</span><span class="p">(</span><span class="n">pretrained</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span>
 
 <span class="c1"># Define sample inputs</span>
 <span class="n">inputs</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">((</span><span class="mi">16</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">))</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
@@ -537,25 +537,27 @@ to download the full example code</p>
 <section id="inference-using-the-cudagraphs-integration">
 <h2>Inference using the Cudagraphs Integration<a class="headerlink" href="#inference-using-the-cudagraphs-integration" title="Permalink to this heading">¶</a></h2>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># We can enable the cudagraphs API with a context manager</span>
-<span class="k">with</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">runtime</span><span class="o">.</span><span class="n">enable_cudagraphs</span><span class="p">(</span><span class="n">opt</span><span class="p">)</span> <span class="k">as</span> <span class="n">cudagraphs_module</span><span class="p">:</span>
-    <span class="n">out_trt</span> <span class="o">=</span> <span class="n">cudagraphs_module</span><span class="p">(</span><span class="n">inputs</span><span class="p">)</span>
+<span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
+    <span class="k">with</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">runtime</span><span class="o">.</span><span class="n">enable_cudagraphs</span><span class="p">(</span><span class="n">opt</span><span class="p">)</span> <span class="k">as</span> <span class="n">cudagraphs_module</span><span class="p">:</span>
+        <span class="n">out_trt</span> <span class="o">=</span> <span class="n">cudagraphs_module</span><span class="p">(</span><span class="n">inputs</span><span class="p">)</span>
 
-<span class="c1"># Alternatively, we can set the cudagraphs mode for the session</span>
-<span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">runtime</span><span class="o">.</span><span class="n">set_cudagraphs_mode</span><span class="p">(</span><span class="kc">True</span><span class="p">)</span>
-<span class="n">out_trt</span> <span class="o">=</span> <span class="n">opt</span><span class="p">(</span><span class="n">inputs</span><span class="p">)</span>
+    <span class="c1"># Alternatively, we can set the cudagraphs mode for the session</span>
+    <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">runtime</span><span class="o">.</span><span class="n">set_cudagraphs_mode</span><span class="p">(</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">out_trt</span> <span class="o">=</span> <span class="n">opt</span><span class="p">(</span><span class="n">inputs</span><span class="p">)</span>
 
-<span class="c1"># We can also turn off cudagraphs mode and perform inference as normal</span>
-<span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">runtime</span><span class="o">.</span><span class="n">set_cudagraphs_mode</span><span class="p">(</span><span class="kc">False</span><span class="p">)</span>
-<span class="n">out_trt</span> <span class="o">=</span> <span class="n">opt</span><span class="p">(</span><span class="n">inputs</span><span class="p">)</span>
+    <span class="c1"># We can also turn off cudagraphs mode and perform inference as normal</span>
+    <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">runtime</span><span class="o">.</span><span class="n">set_cudagraphs_mode</span><span class="p">(</span><span class="kc">False</span><span class="p">)</span>
+    <span class="n">out_trt</span> <span class="o">=</span> <span class="n">opt</span><span class="p">(</span><span class="n">inputs</span><span class="p">)</span>
 </pre></div>
 </div>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># If we provide new input shapes, cudagraphs will re-record the graph</span>
 <span class="n">inputs_2</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">((</span><span class="mi">8</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">))</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
 <span class="n">inputs_3</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">((</span><span class="mi">4</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">))</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
 
-<span class="k">with</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">runtime</span><span class="o">.</span><span class="n">enable_cudagraphs</span><span class="p">(</span><span class="n">opt</span><span class="p">)</span> <span class="k">as</span> <span class="n">cudagraphs_module</span><span class="p">:</span>
-    <span class="n">out_trt_2</span> <span class="o">=</span> <span class="n">cudagraphs_module</span><span class="p">(</span><span class="n">inputs_2</span><span class="p">)</span>
-    <span class="n">out_trt_3</span> <span class="o">=</span> <span class="n">cudagraphs_module</span><span class="p">(</span><span class="n">inputs_3</span><span class="p">)</span>
+<span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
+    <span class="k">with</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">runtime</span><span class="o">.</span><span class="n">enable_cudagraphs</span><span class="p">(</span><span class="n">opt</span><span class="p">)</span> <span class="k">as</span> <span class="n">cudagraphs_module</span><span class="p">:</span>
+        <span class="n">out_trt_2</span> <span class="o">=</span> <span class="n">cudagraphs_module</span><span class="p">(</span><span class="n">inputs_2</span><span class="p">)</span>
+        <span class="n">out_trt_3</span> <span class="o">=</span> <span class="n">cudagraphs_module</span><span class="p">(</span><span class="n">inputs_3</span><span class="p">)</span>
 </pre></div>
 </div>
 </section>
@@ -578,8 +580,8 @@ recorded in CUDA Graphs, which helps maintain consistent execution paths and opt
         <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">relu</span><span class="p">((</span><span class="n">x</span> <span class="o">+</span> <span class="mi">2</span><span class="p">)</span> <span class="o">*</span> <span class="mf">0.5</span><span class="p">)</span>
 
 
-<span class="n">model</span> <span class="o">=</span> <span class="n">SampleModel</span><span class="p">()</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
-<span class="nb">input</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">((</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">))</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">&quot;cuda&quot;</span><span class="p">)</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">SampleModel</span><span class="p">()</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span>
+<span class="nb">input</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">((</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">))</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
 
 <span class="c1"># The &#39;torch_executed_ops&#39; compiler option is used in this example to intentionally introduce graph breaks within the module.</span>
 <span class="c1"># Note: The Dynamo backend is required for the CUDA Graph context manager to handle modules in an Ahead-Of-Time (AOT) manner.</span>
@@ -594,10 +596,11 @@ recorded in CUDA Graphs, which helps maintain consistent execution paths and opt
 </pre></div>
 </div>
 <p>If module has graph breaks, whole submodules are recorded and replayed by cuda graphs</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">with</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">runtime</span><span class="o">.</span><span class="n">enable_cudagraphs</span><span class="p">(</span>
-    <span class="n">opt_with_graph_break</span>
-<span class="p">)</span> <span class="k">as</span> <span class="n">cudagraphs_module</span><span class="p">:</span>
-    <span class="n">cudagraphs_module</span><span class="p">(</span><span class="nb">input</span><span class="p">)</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
+    <span class="k">with</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">runtime</span><span class="o">.</span><span class="n">enable_cudagraphs</span><span class="p">(</span>
+        <span class="n">opt_with_graph_break</span>
+    <span class="p">)</span> <span class="k">as</span> <span class="n">cudagraphs_module</span><span class="p">:</span>
+        <span class="n">cudagraphs_module</span><span class="p">(</span><span class="nb">input</span><span class="p">)</span>
 </pre></div>
 </div>
 <p class="sphx-glr-timing"><strong>Total running time of the script:</strong> ( 0 minutes  0.000 seconds)</p>

@@ -61,7 +61,7 @@ Imports and Model Definition
 Define function to measure inference performance
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. GENERATED FROM PYTHON SOURCE LINES 37-63
+.. GENERATED FROM PYTHON SOURCE LINES 37-62
 
 .. code-block:: python
 
@@ -74,10 +74,9 @@ Define function to measure inference performance
         with torch.no_grad():
             for _ in range(3):
                 model(*input)
-        torch.cuda.synchronize()
 
-        # Timing phase to measure inference performance
-        with torch.no_grad():
+            torch.cuda.synchronize()
+            # Timing phase to measure inference performance
             for i in range(10):
                 start_time = timeit.default_timer()
                 model(*input)
@@ -92,12 +91,12 @@ Define function to measure inference performance
 
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 64-66
+.. GENERATED FROM PYTHON SOURCE LINES 63-65
 
 Load model and compile
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. GENERATED FROM PYTHON SOURCE LINES 66-87
+.. GENERATED FROM PYTHON SOURCE LINES 65-86
 
 .. code-block:: python
 
@@ -105,9 +104,9 @@ Load model and compile
     # Load bert model
     model = (
         BertModel.from_pretrained("bert-base-uncased", torchscript=True)
-        .eval()
-        .half()
         .to("cuda")
+        .half()
+        .eval()
     )
     # Define sample inputs
     inputs = [
@@ -123,39 +122,40 @@ Load model and compile
     )
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 88-90
+.. GENERATED FROM PYTHON SOURCE LINES 87-89
 
 Enable/Disable pre-allocated output buffer feature using runtime api
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. GENERATED FROM PYTHON SOURCE LINES 90-114
+.. GENERATED FROM PYTHON SOURCE LINES 89-114
 
 .. code-block:: python
 
 
     # Enable pre-allocated output buffer using a context manager
-    with torch_tensorrt.runtime.enable_pre_allocated_outputs(optimized_model):
+    with torch.no_grad():
+        with torch_tensorrt.runtime.enable_pre_allocated_outputs(optimized_model):
+            out_trt = optimized_model(*inputs)
+            # Subsequent inferences can use the pre-allocated output buffer (no shape change)
+            out_trt = optimized_model(*inputs)
+
+        # Alternatively, we can enable the feature using a context object
+        pre_allocated_output_ctx = torch_tensorrt.runtime.enable_pre_allocated_outputs(
+            optimized_model
+        )
+        pre_allocated_output_ctx.set_pre_allocated_output(True)
+        time_opt = test_module_perf(optimized_model, *inputs)
+
+        # Disable the pre-allocated output buffer feature and perform inference normally
+        pre_allocated_output_ctx.set_pre_allocated_output(False)
         out_trt = optimized_model(*inputs)
-        # Subsequent inferences can use the pre-allocated output buffer (no shape change)
-        out_trt = optimized_model(*inputs)
+        time_normal = test_module_perf(optimized_model, *inputs)
 
-    # Alternatively, we can enable the feature using a context object
-    pre_allocated_output_ctx = torch_tensorrt.runtime.enable_pre_allocated_outputs(
-        optimized_model
-    )
-    pre_allocated_output_ctx.set_pre_allocated_output(True)
-    time_opt = test_module_perf(optimized_model, *inputs)
+        time_opt_ms = time_opt * 1000
+        time_normal_ms = time_normal * 1000
 
-    # Disable the pre-allocated output buffer feature and perform inference normally
-    pre_allocated_output_ctx.set_pre_allocated_output(False)
-    out_trt = optimized_model(*inputs)
-    time_normal = test_module_perf(optimized_model, *inputs)
-
-    time_opt_ms = time_opt * 1000
-    time_normal_ms = time_normal * 1000
-
-    print(f"normal trt model time: {time_normal_ms:.3f} ms")
-    print(f"pre-allocated output buffer model time: {time_opt_ms:.3f} ms")
+        print(f"normal trt model time: {time_normal_ms:.3f} ms")
+        print(f"pre-allocated output buffer model time: {time_opt_ms:.3f} ms")
 
 
 .. rst-class:: sphx-glr-timing

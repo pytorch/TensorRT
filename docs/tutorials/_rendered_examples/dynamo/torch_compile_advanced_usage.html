@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Torch Compile Advanced Usage &mdash; Torch-TensorRT v2.9.0.dev0+99c3499 documentation</title>
+  <title>Torch Compile Advanced Usage &mdash; Torch-TensorRT v2.9.0.dev0+33a53cf documentation</title>
   
 
   
@@ -293,7 +293,7 @@
               
               
                 <div class="version">
-                  v2.9.0.dev0+99c3499
+                  v2.9.0.dev0+33a53cf
                 </div>
               
             
@@ -521,7 +521,7 @@ to download the full example code</p>
 <h2>Compilation with <cite>torch.compile</cite> Using Default Settings<a class="headerlink" href="#compilation-with-torch-compile-using-default-settings" title="Permalink to this heading">¶</a></h2>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Define sample float inputs and initialize model</span>
 <span class="n">sample_inputs</span> <span class="o">=</span> <span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">rand</span><span class="p">((</span><span class="mi">5</span><span class="p">,</span> <span class="mi">7</span><span class="p">))</span><span class="o">.</span><span class="n">cuda</span><span class="p">(),</span> <span class="n">torch</span><span class="o">.</span><span class="n">rand</span><span class="p">((</span><span class="mi">5</span><span class="p">,</span> <span class="mi">7</span><span class="p">))</span><span class="o">.</span><span class="n">cuda</span><span class="p">()]</span>
-<span class="n">model</span> <span class="o">=</span> <span class="n">Model</span><span class="p">()</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">Model</span><span class="p">()</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span>
 </pre></div>
 </div>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Next, we compile the model using torch.compile</span>
@@ -529,7 +529,8 @@ to download the full example code</p>
 <span class="c1"># with the backend &quot;torch_tensorrt&quot;, and run the model on an</span>
 <span class="c1"># input to cause compilation, as so:</span>
 <span class="n">optimized_model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">backend</span><span class="o">=</span><span class="s2">&quot;torch_tensorrt&quot;</span><span class="p">,</span> <span class="n">dynamic</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
-<span class="n">optimized_model</span><span class="p">(</span><span class="o">*</span><span class="n">sample_inputs</span><span class="p">)</span>
+<span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
+    <span class="n">optimized_model</span><span class="p">(</span><span class="o">*</span><span class="n">sample_inputs</span><span class="p">)</span>
 </pre></div>
 </div>
 </section>
@@ -544,7 +545,7 @@ to download the full example code</p>
     <span class="n">torch</span><span class="o">.</span><span class="n">rand</span><span class="p">((</span><span class="mi">5</span><span class="p">,</span> <span class="mi">7</span><span class="p">))</span><span class="o">.</span><span class="n">half</span><span class="p">()</span><span class="o">.</span><span class="n">cuda</span><span class="p">(),</span>
     <span class="n">torch</span><span class="o">.</span><span class="n">rand</span><span class="p">((</span><span class="mi">5</span><span class="p">,</span> <span class="mi">7</span><span class="p">))</span><span class="o">.</span><span class="n">half</span><span class="p">()</span><span class="o">.</span><span class="n">cuda</span><span class="p">(),</span>
 <span class="p">]</span>
-<span class="n">model_half</span> <span class="o">=</span> <span class="n">Model</span><span class="p">()</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
+<span class="n">model_half</span> <span class="o">=</span> <span class="n">Model</span><span class="p">()</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span>
 </pre></div>
 </div>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># If we want to customize certain options in the backend,</span>
@@ -569,7 +570,8 @@ to download the full example code</p>
     <span class="n">options</span><span class="o">=</span><span class="n">backend_kwargs</span><span class="p">,</span>
     <span class="n">dynamic</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
 <span class="p">)</span>
-<span class="n">optimized_model_custom</span><span class="p">(</span><span class="o">*</span><span class="n">sample_inputs_half</span><span class="p">)</span>
+<span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
+    <span class="n">optimized_model_custom</span><span class="p">(</span><span class="o">*</span><span class="n">sample_inputs_half</span><span class="p">)</span>
 </pre></div>
 </div>
 </section>

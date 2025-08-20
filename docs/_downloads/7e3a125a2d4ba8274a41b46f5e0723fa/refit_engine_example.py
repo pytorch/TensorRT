@@ -53,7 +53,7 @@ inputs = [torch.rand((1, 3, 224, 224)).to("cuda")]
 #
 # In this case we are going to compile a ResNet18 model with randomly initialized weights and save it.
 
-model = models.resnet18(pretrained=False).eval().to("cuda")
+model = models.resnet18(pretrained=False).to("cuda").eval()
 exp_program = torch.export.export(model, tuple(inputs))
 enabled_precisions = {torch.float}
 workspace_size = 20 << 30
@@ -85,7 +85,7 @@ torch_trt.save(trt_gm, "./compiled.ep", inputs=inputs)
 # function is used to update the weights of the compiled module with the new weights.
 
 # Create and compile the updated model
-model2 = models.resnet18(pretrained=True).eval().to("cuda")
+model2 = models.resnet18(pretrained=True).to("cuda").eval()
 exp_program2 = torch.export.export(model2, tuple(inputs))
 
 
@@ -99,12 +99,14 @@ new_trt_gm = refit_module_weights(
 )
 
 # Check the output
-model2.to("cuda")
-expected_outputs, refitted_outputs = exp_program2.module()(*inputs), new_trt_gm(*inputs)
-for expected_output, refitted_output in zip(expected_outputs, refitted_outputs):
-    assert torch.allclose(
-        expected_output, refitted_output, 1e-2, 1e-2
-    ), "Refit Result is not correct. Refit failed"
+with torch.no_grad():
+    expected_outputs, refitted_outputs = exp_program2.module()(*inputs), new_trt_gm(
+        *inputs
+    )
+    for expected_output, refitted_output in zip(expected_outputs, refitted_outputs):
+        assert torch.allclose(
+            expected_output, refitted_output, 1e-2, 1e-2
+        ), "Refit Result is not correct. Refit failed"
 
 print("Refit successfully!")
 

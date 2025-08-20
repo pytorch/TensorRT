@@ -25,7 +25,7 @@ Engine Caching (BERT)
 
 Small caching example on BERT.
 
-.. GENERATED FROM PYTHON SOURCE LINES 10-75
+.. GENERATED FROM PYTHON SOURCE LINES 10-76
 
 .. code-block:: python
 
@@ -84,7 +84,8 @@ Small caching example on BERT.
                 backend="torch_tensorrt",
                 options=compilation_kwargs,
             )
-            optimized_model(*inputs)
+            with torch.no_grad():
+                optimized_model(*inputs)
             end.record()
             torch.cuda.synchronize()
             times.append(start.elapsed_time(end))

@@ -169,7 +169,7 @@ Now we can use our custom operator in a model and compile it with Torch-TensorRT
 We can see that the custom operator is used as one of the operations in the forward pass of the model.
 The process of compiling the model at this point is identical to standard Torch-TensorRT usage.
 
-.. GENERATED FROM PYTHON SOURCE LINES 131-153
+.. GENERATED FROM PYTHON SOURCE LINES 131-154
 
 .. code-block:: python
 
@@ -184,15 +184,16 @@ The process of compiling the model at this point is identical to standard Torch-
             return res
 
 
-    my_model = MyModel().to("cuda")
+    my_model = MyModel().to("cuda").eval()
     m = torch.randint(0, 5, (64, 64), device="cuda", dtype=torch.float)
     n = torch.randint(0, 5, (64, 64), device="cuda", dtype=torch.float)
 
     with torch_tensorrt.logging.errors():
         model_trt = torch_tensorrt.compile(my_model, inputs=[m, n], min_block_size=1)
-        for i in range(300):
-            res = model_trt(m, n)
-            assert torch.allclose(res, my_model(m, n))
+        with torch.no_grad():
+            for i in range(300):
+                res = model_trt(m, n)
+                assert torch.allclose(res, my_model(m, n))
 
     print("Ran with custom plugin!")
 

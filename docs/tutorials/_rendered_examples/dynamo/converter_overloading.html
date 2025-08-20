@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Overloading Torch-TensorRT Converters with Custom Converters &mdash; Torch-TensorRT v2.9.0.dev0+99c3499 documentation</title>
+  <title>Overloading Torch-TensorRT Converters with Custom Converters &mdash; Torch-TensorRT v2.9.0.dev0+33a53cf documentation</title>
   
 
   
@@ -293,7 +293,7 @@
               
               
                 <div class="version">
-                  v2.9.0.dev0+99c3499
+                  v2.9.0.dev0+33a53cf
                 </div>
               
             
@@ -519,7 +519,7 @@ TensorRT natively supports both implementations as an activation layer, but supp
         <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">functional</span><span class="o">.</span><span class="n">gelu</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">approximate</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">mode</span><span class="p">)</span>
 
 
-<span class="n">my_mod</span> <span class="o">=</span> <span class="n">GeLU</span><span class="p">(</span><span class="n">mode</span><span class="o">=</span><span class="s2">&quot;tanh&quot;</span><span class="p">)</span>
+<span class="n">my_mod</span> <span class="o">=</span> <span class="n">GeLU</span><span class="p">(</span><span class="n">mode</span><span class="o">=</span><span class="s2">&quot;tanh&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">&quot;cuda&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span>
 <span class="n">ex_input</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">5</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">&quot;cuda&quot;</span><span class="p">)</span>
 </pre></div>
 </div>
@@ -651,9 +651,9 @@ In this case, we will use the Torch-TensorRT <code class="docutils literal notra
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">my_custom_gelu</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span>
     <span class="n">my_mod</span><span class="p">,</span> <span class="n">arg_inputs</span><span class="o">=</span><span class="p">(</span><span class="n">ex_input</span><span class="p">,),</span> <span class="n">min_block_size</span><span class="o">=</span><span class="mi">1</span>
 <span class="p">)</span>
-
-<span class="nb">print</span><span class="p">(</span><span class="n">my_custom_gelu</span><span class="o">.</span><span class="n">graph</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="n">my_custom_gelu</span><span class="p">(</span><span class="n">ex_input</span><span class="p">))</span>
+<span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">my_custom_gelu</span><span class="o">.</span><span class="n">graph</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">my_custom_gelu</span><span class="p">(</span><span class="n">ex_input</span><span class="p">))</span>
 </pre></div>
 </div>
 <p>We can verify that our implementation matches the TensorRT implementation for the <code class="docutils literal notranslate"><span class="pre">tanh</span></code> approximation.</p>
@@ -663,7 +663,7 @@ In this case, we will use the Torch-TensorRT <code class="docutils literal notra
 </pre></div>
 </div>
 <p>Finally, we want to verify that in the case that the <code class="docutils literal notranslate"><span class="pre">approximate</span></code> argument is not set to <code class="docutils literal notranslate"><span class="pre">tanh</span></code>, our custom converter is not used.</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">my_mod_erf</span> <span class="o">=</span> <span class="n">GeLU</span><span class="p">(</span><span class="n">mode</span><span class="o">=</span><span class="s2">&quot;none&quot;</span><span class="p">)</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">my_mod_erf</span> <span class="o">=</span> <span class="n">GeLU</span><span class="p">(</span><span class="n">mode</span><span class="o">=</span><span class="s2">&quot;none&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">&quot;cuda&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span>
 <span class="n">my_gelu_erf</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span>
     <span class="n">my_mod_erf</span><span class="p">,</span> <span class="n">arg_inputs</span><span class="o">=</span><span class="p">(</span><span class="n">ex_input</span><span class="p">,),</span> <span class="n">min_block_size</span><span class="o">=</span><span class="mi">1</span>
 <span class="p">)</span>
@@ -671,8 +671,9 @@ In this case, we will use the Torch-TensorRT <code class="docutils literal notra
 </div>
 <p>Notice that we don’t see the print statement from our custom converter, indicating that it was not used. However, looking at the graph, we can still see that a TensorRT engine was created to run the GeLU operation.
 In this case, the validator for our custom converter returned <code class="docutils literal notranslate"><span class="pre">False</span></code>, so the conversion system moved on to the next converter in the list, the standard GeLU converter and used that one to convert the operation.</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="nb">print</span><span class="p">(</span><span class="n">my_gelu_erf</span><span class="o">.</span><span class="n">graph</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="n">my_gelu_erf</span><span class="p">(</span><span class="n">ex_input</span><span class="p">))</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">my_gelu_erf</span><span class="o">.</span><span class="n">graph</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">my_gelu_erf</span><span class="p">(</span><span class="n">ex_input</span><span class="p">))</span>
 </pre></div>
 </div>
 <p class="sphx-glr-timing"><strong>Total running time of the script:</strong> ( 0 minutes  0.000 seconds)</p>
