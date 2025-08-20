@@ -609,7 +609,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         cached_data = self.engine_cache.check(hash_val)  # type: ignore[union-attr]
         if cached_data is not None:  # hit the cache
             (
-                weight_stripped_serialized_engine,
+                serialized_engine,  # weight-stripped engine
                 self._input_names,
                 self._output_names,
                 cached_engine_input_specs,
@@ -643,7 +643,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             if not self.compilation_settings.strip_engine_weights:
                 runtime = trt.Runtime(TRT_LOGGER)
                 weight_stripped_engine = runtime.deserialize_cuda_engine(
-                    weight_stripped_serialized_engine
+                    serialized_engine
                 )
 
                 from torch_tensorrt.dynamo._refit import (
