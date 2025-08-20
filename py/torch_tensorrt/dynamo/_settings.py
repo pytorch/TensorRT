@@ -157,6 +157,7 @@ class CompilationSettings:
         self.__dict__.update(state)
 
 
+# TODO: @Evan If changing the setting would affect the behavior of engine compilation, then should be added to this list
 _SETTINGS_TO_BE_ENGINE_INVARIANT = (
     "enabled_precisions",
     "max_aux_streams",
