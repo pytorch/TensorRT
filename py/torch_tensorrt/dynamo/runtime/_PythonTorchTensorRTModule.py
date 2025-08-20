@@ -394,9 +394,9 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                     + contiguous_inputs[i + 1 :]
                 )
 
-            # assert (
-            #     contiguous_inputs[i].dtype == self.input_dtypes[i]
-            # ), f"Dtype mismatch for {i}th input({input_name}). Expect {self.input_dtypes[i]}, got {contiguous_inputs[i].dtype}."
+            assert (
+                contiguous_inputs[i].dtype == self.input_dtypes[i]
+            ), f"Dtype mismatch for {i}th input({input_name}). Expect {self.input_dtypes[i]}, got {contiguous_inputs[i].dtype}."
 
             if need_cudagraphs_record:
                 # If cudagraphs is enabled, this memory is reserved for future cudagraph runs
