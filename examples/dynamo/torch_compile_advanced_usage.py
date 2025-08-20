@@ -36,7 +36,7 @@ class Model(torch.nn.Module):
 
 # Define sample float inputs and initialize model
 sample_inputs = [torch.rand((5, 7)).cuda(), torch.rand((5, 7)).cuda()]
-model = Model().eval().cuda()
+model = Model().cuda().eval()
 
 # %%
 
@@ -45,7 +45,8 @@ model = Model().eval().cuda()
 # with the backend "torch_tensorrt", and run the model on an
 # input to cause compilation, as so:
 optimized_model = torch.compile(model, backend="torch_tensorrt", dynamic=False)
-optimized_model(*sample_inputs)
+with torch.no_grad():
+    optimized_model(*sample_inputs)
 
 # %%
 # Compilation with `torch.compile` Using Custom Settings
@@ -60,7 +61,7 @@ sample_inputs_half = [
     torch.rand((5, 7)).half().cuda(),
     torch.rand((5, 7)).half().cuda(),
 ]
-model_half = Model().eval().cuda()
+model_half = Model().cuda().eval()
 
 # %%
 
@@ -86,7 +87,8 @@ optimized_model_custom = torch.compile(
     options=backend_kwargs,
     dynamic=False,
 )
-optimized_model_custom(*sample_inputs_half)
+with torch.no_grad():
+    optimized_model_custom(*sample_inputs_half)
 
 # %%
 # Cleanup
