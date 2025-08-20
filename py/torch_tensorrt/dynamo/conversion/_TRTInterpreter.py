@@ -669,7 +669,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                 serialized_engine = weight_stripped_engine.serialize_with_config(
                     serialization_config
                 )
-                # Start from there, the serialized_engine is weight-stripped and refittable
+                # Start from here, the serialized_engine is weight-included and refittable
 
             with io.BytesIO() as engine_bytes:
                 engine_bytes.write(serialized_engine)
