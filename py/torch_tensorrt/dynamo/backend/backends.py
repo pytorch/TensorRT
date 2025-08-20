@@ -157,10 +157,6 @@ def _pretraced_backend(
                 logger.warning(
                     "require_full_compilation arg is not applicable for torch.compile with backend='torch_tensorrt"
                 )
-            if settings.strip_engine_weights:
-                logger.error(
-                    "strip_engine_weights arg is not supported for torch.compile()"
-                )
             trt_compiled = compile_module(
                 gm,
                 torchtrt_inputs,
