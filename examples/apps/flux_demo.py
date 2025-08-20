@@ -120,7 +120,7 @@ def compile_model(
         "enabled_precisions": enabled_precisions,
         "truncate_double": True,
         "min_block_size": 1,
-        "use_python_runtime": False,
+        "use_python_runtime": True,
         "immutable_weights": False,
         "offload_module_to_cpu": args.low_vram_mode,
         "use_explicit_typing": use_explicit_typing,

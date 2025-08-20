@@ -2,6 +2,7 @@ from typing import Optional, Union
 
 import numpy as np
 import tensorrt as trt
+from tensorrt import ITensor as TRTTensor
 from torch.fx.node import Target
 from torch_tensorrt.dynamo.conversion import impl
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
@@ -11,7 +12,6 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     get_trt_tensor,
     set_layer_name,
 )
-from torch_tensorrt.fx.types import TRTTensor
 
 
 def arange(

@@ -7,7 +7,6 @@ from torch_tensorrt.dynamo.utils import is_tegra_platform
 
 from .complex_graph_rewrite import complex_graph_detection
 from .constant_folding import constant_fold
-from .fuse_distributed_ops import fuse_distributed_ops
 from .fuse_prims_broadcast import fuse_prims_broadcast
 from .pass_manager import DynamoPassManager
 from .remove_assert_nodes import remove_assert_nodes
@@ -33,6 +32,8 @@ pre_lowering_pass_list = [
 ]
 
 if not is_tegra_platform():
+    from .fuse_distributed_ops import fuse_distributed_ops
+
     post_lowering_pass_list.append(fuse_distributed_ops)
 
 ATEN_POST_LOWERING_PASSES = DynamoPassManager.build_from_passlist(

@@ -156,15 +156,8 @@ torchtrt::core::CompileSpec to_internal_compile_spec(CompileSpec external, bool 
   if (internal.convert_info.engine_settings.enabled_precisions.find(nvinfer1::DataType::kINT8) !=
       internal.convert_info.engine_settings.enabled_precisions.end()) {
     internal.partitioning_info.cast_int8_inputs = false;
-    if (external.ptq_calibrator) {
-      internal.convert_info.engine_settings.calibrator = external.ptq_calibrator;
-    } else {
-      internal.lower_info.unfreeze_module = true;
-      internal.lower_info.disable_cse = true;
-      internal.convert_info.engine_settings.calibrator = nullptr;
-    }
-  } else {
-    internal.convert_info.engine_settings.calibrator = nullptr;
+    internal.lower_info.unfreeze_module = true;
+    internal.lower_info.disable_cse = true;
   }
 
   return internal;

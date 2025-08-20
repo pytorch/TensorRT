@@ -1,9 +1,10 @@
+import logging
 from typing import Optional, Union
 
-import numpy as np
 import tensorrt as trt
 import torch
 import torch_tensorrt.dynamo.conversion.impl as impl
+from tensorrt import ITensor as TRTTensor
 from torch.fx.node import Target
 from torch_tensorrt import _enums
 from torch_tensorrt.dynamo._SourceIR import SourceIR
@@ -15,13 +16,15 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     cast_trt_tensor,
     get_trt_tensor,
     has_dynamic_shape,
+    set_layer_name,
 )
 from torch_tensorrt.dynamo.conversion.impl.elementwise.base import (
     convert_binary_elementwise,
 )
 from torch_tensorrt.dynamo.conversion.impl.unary import atan, sign
 from torch_tensorrt.dynamo.conversion.impl.unary.base import convert_unary
-from torch_tensorrt.fx.types import TRTTensor
+
+_LOGGER = logging.getLogger(__name__)
 
 
 def trunc_div(
@@ -250,12 +253,26 @@ def atan2(
         A TensorRT tensor representing the result of the atan2 operation.
     """
     pi_value = 3.141592653589793
-    pi_tensor = get_trt_tensor(ctx, pi_value, f"{name}_pi")
 
-    if isinstance(input, TRTTensor):
-        input = cast_trt_tensor(ctx, input, trt.float32, f"{name}_input")
-    if isinstance(other, TRTTensor):
-        other = cast_trt_tensor(ctx, other, trt.float32, f"{name}_other")
+    promoted_type = _enums.dtype._from(
+        torch.promote_types(
+            _enums.dtype._from(input.dtype).to(torch.dtype),
+            _enums.dtype._from(other.dtype).to(torch.dtype),
+        )
+    )
+    # atan2's output is always float, so we promote any integer types to float32
+    # This mirrors PyTorch's behavior where atan2(int, int) -> float.
+    if not promoted_type.to(torch.dtype).is_floating_point:
+        promoted_type = _enums.dtype.float32
+
+    trt_promoted_type = promoted_type.to(trt.DataType)
+
+    pi_tensor = get_trt_tensor(ctx, pi_value, f"{name}_pi", dtype=trt_promoted_type)
+
+    if input.dtype != trt_promoted_type:
+        input = cast_trt_tensor(ctx, input, trt_promoted_type, f"{name}_input_casted")
+    if other.dtype != trt_promoted_type:
+        other = cast_trt_tensor(ctx, other, trt_promoted_type, f"{name}_other_casted")
 
     input, other = broadcast(ctx, input, other, f"{name}_input", f"{name}_other")
 
@@ -333,56 +350,43 @@ def atan2(
         y_positive,
     )
 
+    # Create constant tensors for boundary conditions (x=0 or y=0)
+    # Use impl.full which handles both dynamic and static shapes efficiently.
     if has_dynamic_shape(input.shape):
-        pi_over_2_tensor = convert_binary_elementwise(
-            ctx,
-            target,
-            source_ir,
-            f"{name}_pi_over_2_tensor",
-            trt.ElementWiseOperation.PROD,
-            (pi_value / 2),
-            input,
-        )
-
-        minus_pi_over_2_tensor = convert_binary_elementwise(
-            ctx,
-            target,
-            source_ir,
-            f"{name}_minus_pi_over_2_tensor",
-            trt.ElementWiseOperation.PROD,
-            (-pi_value / 2),
-            input,
-        )
-        zero_tensor = convert_binary_elementwise(
-            ctx,
-            target,
-            source_ir,
-            f"{name}_zero_tensor",
-            trt.ElementWiseOperation.PROD,
-            0,
-            input,
-        )
+        shape_layer = ctx.net.add_shape(input)
+        set_layer_name(shape_layer, target, f"{name}_shape", source_ir)
+        shape = shape_layer.get_output(0)
     else:
-        # on x or y-axis
-        pi_over_2_tensor = get_trt_tensor(
-            ctx,
-            (pi_value / 2) * np.ones(input.shape, dtype=np.float32),
-            f"{name}_pi_over_2_tensor",
-            dtype=trt.float32,
-        )
+        shape = list(input.shape)
 
-        minus_pi_over_2_tensor = get_trt_tensor(
-            ctx,
-            (-pi_value / 2) * np.ones(input.shape, dtype=np.float32),
-            f"{name}_minus_pi_over_2_tensor",
-            dtype=trt.float32,
-        )
-        zero_tensor = get_trt_tensor(
-            ctx,
-            np.zeros(input.shape, dtype=np.float32),
-            f"{name}_zero_tensor",
-            dtype=trt.float32,
-        )
+    pi_over_2_tensor = impl.full.full(
+        ctx,
+        target,
+        source_ir,
+        f"{name}_pi_over_2_tensor",
+        shape,
+        pi_value / 2,
+        dtype=trt_promoted_type,
+    )
+
+    minus_pi_over_2_tensor = impl.full.full(
+        ctx,
+        target,
+        source_ir,
+        f"{name}_minus_pi_over_2_tensor",
+        shape,
+        -pi_value / 2,
+        dtype=trt_promoted_type,
+    )
+    zero_tensor = impl.full.full(
+        ctx,
+        target,
+        source_ir,
+        f"{name}_zero_tensor",
+        shape,
+        0.0,
+        dtype=trt_promoted_type,
+    )
 
     # π/2 if x>0 and y=0,
     pi_over_2_output = impl.condition.select(

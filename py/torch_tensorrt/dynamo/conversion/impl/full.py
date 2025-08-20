@@ -3,6 +3,7 @@ from typing import List, Optional, Union
 import numpy as np
 import tensorrt as trt
 import torch
+from tensorrt import ITensor as TRTTensor
 from torch.fx.node import Target
 from torch_tensorrt import _enums
 from torch_tensorrt.dynamo.conversion import impl
@@ -12,7 +13,6 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     cast_trt_tensor,
     get_trt_tensor,
 )
-from torch_tensorrt.fx.types import TRTTensor
 
 
 def full(
@@ -34,7 +34,8 @@ def full(
         # in static shape scenario, shape is a list of int
         if all(isinstance(dim, int) for dim in shape):
             output_np_dtype = output_dtype.try_to(np.dtype, use_default=True)
-            return np.full(shape, fill_value, dtype=output_np_dtype)
+            np_array = np.full(shape, fill_value, dtype=output_np_dtype)
+            return get_trt_tensor(ctx, np_array, name, dtype=output_dtype)
         else:
             shape = impl.cat.cat(
                 ctx, target, source_ir, name + "_concat_shape", shape, 0
