@@ -25,7 +25,7 @@ import torchvision.models as models
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 # We begin by defining and initializing a model
-model = models.resnet18(pretrained=True).eval().to("cuda")
+model = models.resnet18(pretrained=True).cuda().eval()
 
 # Define sample inputs
 inputs = torch.randn((16, 3, 224, 224)).cuda()
@@ -52,16 +52,17 @@ opt = torch_tensorrt.compile(
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 # We can enable the cudagraphs API with a context manager
-with torch_tensorrt.runtime.enable_cudagraphs(opt) as cudagraphs_module:
-    out_trt = cudagraphs_module(inputs)
+with torch.no_grad():
+    with torch_tensorrt.runtime.enable_cudagraphs(opt) as cudagraphs_module:
+        out_trt = cudagraphs_module(inputs)
 
-# Alternatively, we can set the cudagraphs mode for the session
-torch_tensorrt.runtime.set_cudagraphs_mode(True)
-out_trt = opt(inputs)
+    # Alternatively, we can set the cudagraphs mode for the session
+    torch_tensorrt.runtime.set_cudagraphs_mode(True)
+    out_trt = opt(inputs)
 
-# We can also turn off cudagraphs mode and perform inference as normal
-torch_tensorrt.runtime.set_cudagraphs_mode(False)
-out_trt = opt(inputs)
+    # We can also turn off cudagraphs mode and perform inference as normal
+    torch_tensorrt.runtime.set_cudagraphs_mode(False)
+    out_trt = opt(inputs)
 
 # %%
 
@@ -69,9 +70,10 @@ out_trt = opt(inputs)
 inputs_2 = torch.randn((8, 3, 224, 224)).cuda()
 inputs_3 = torch.randn((4, 3, 224, 224)).cuda()
 
-with torch_tensorrt.runtime.enable_cudagraphs(opt) as cudagraphs_module:
-    out_trt_2 = cudagraphs_module(inputs_2)
-    out_trt_3 = cudagraphs_module(inputs_3)
+with torch.no_grad():
+    with torch_tensorrt.runtime.enable_cudagraphs(opt) as cudagraphs_module:
+        out_trt_2 = cudagraphs_module(inputs_2)
+        out_trt_3 = cudagraphs_module(inputs_3)
 
 # %%
 # Cuda graphs with module that contains graph breaks
@@ -101,8 +103,8 @@ class SampleModel(torch.nn.Module):
         return torch.relu((x + 2) * 0.5)
 
 
-model = SampleModel().eval().cuda()
-input = torch.randn((1, 3, 224, 224)).to("cuda")
+model = SampleModel().cuda().eval()
+input = torch.randn((1, 3, 224, 224)).cuda()
 
 # The 'torch_executed_ops' compiler option is used in this example to intentionally introduce graph breaks within the module.
 # Note: The Dynamo backend is required for the CUDA Graph context manager to handle modules in an Ahead-Of-Time (AOT) manner.
@@ -117,7 +119,8 @@ opt_with_graph_break = torch_tensorrt.compile(
 
 # %%
 # If module has graph breaks, whole submodules are recorded and replayed by cuda graphs
-with torch_tensorrt.runtime.enable_cudagraphs(
-    opt_with_graph_break
-) as cudagraphs_module:
-    cudagraphs_module(input)
+with torch.no_grad():
+    with torch_tensorrt.runtime.enable_cudagraphs(
+        opt_with_graph_break
+    ) as cudagraphs_module:
+        cudagraphs_module(input)

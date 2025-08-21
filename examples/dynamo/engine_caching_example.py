@@ -37,7 +37,7 @@ from torch_tensorrt.dynamo._engine_cache import BaseEngineCache
 np.random.seed(0)
 torch.manual_seed(0)
 
-model = models.resnet18(pretrained=True).eval().to("cuda")
+model = models.resnet18(pretrained=True).to("cuda").eval()
 enabled_precisions = {torch.float}
 min_block_size = 1
 use_python_runtime = False
@@ -100,7 +100,8 @@ def torch_compile(iterations=3):
                 "reuse_cached_engines": reuse_cached_engines,
             },
         )
-        compiled_model(*inputs)  # trigger the compilation
+        with torch.no_grad():
+            compiled_model(*inputs)  # trigger the compilation
         end.record()
         torch.cuda.synchronize()
         times.append(start.elapsed_time(end))
@@ -270,7 +271,8 @@ def torch_compile_my_cache(iterations=3):
                 "custom_engine_cache": engine_cache,
             },
         )
-        compiled_model(*inputs)  # trigger the compilation
+        with torch.no_grad():
+            compiled_model(*inputs)  # trigger the compilation
         end.record()
         torch.cuda.synchronize()
         times.append(start.elapsed_time(end))

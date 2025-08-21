@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Pre-allocated output buffer &mdash; Torch-TensorRT v2.9.0.dev0+9509357 documentation</title>
+  <title>Pre-allocated output buffer &mdash; Torch-TensorRT v2.9.0.dev0+33a53cf documentation</title>
   
 
   
@@ -293,7 +293,7 @@
               
               
                 <div class="version">
-                  v2.9.0.dev0+9509357
+                  v2.9.0.dev0+33a53cf
                 </div>
               
             
@@ -544,10 +544,9 @@ If output buffer allocation is moved after the execution of the TensorRT context
     <span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
         <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
             <span class="n">model</span><span class="p">(</span><span class="o">*</span><span class="nb">input</span><span class="p">)</span>
-    <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">synchronize</span><span class="p">()</span>
 
-    <span class="c1"># Timing phase to measure inference performance</span>
-    <span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
+        <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">synchronize</span><span class="p">()</span>
+        <span class="c1"># Timing phase to measure inference performance</span>
         <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">10</span><span class="p">):</span>
             <span class="n">start_time</span> <span class="o">=</span> <span class="n">timeit</span><span class="o">.</span><span class="n">default_timer</span><span class="p">()</span>
             <span class="n">model</span><span class="p">(</span><span class="o">*</span><span class="nb">input</span><span class="p">)</span>
@@ -567,9 +566,9 @@ If output buffer allocation is moved after the execution of the TensorRT context
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Load bert model</span>
 <span class="n">model</span> <span class="o">=</span> <span class="p">(</span>
     <span class="n">BertModel</span><span class="o">.</span><span class="n">from_pretrained</span><span class="p">(</span><span class="s2">&quot;bert-base-uncased&quot;</span><span class="p">,</span> <span class="n">torchscript</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-    <span class="o">.</span><span class="n">eval</span><span class="p">()</span>
-    <span class="o">.</span><span class="n">half</span><span class="p">()</span>
     <span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">&quot;cuda&quot;</span><span class="p">)</span>
+    <span class="o">.</span><span class="n">half</span><span class="p">()</span>
+    <span class="o">.</span><span class="n">eval</span><span class="p">()</span>
 <span class="p">)</span>
 <span class="c1"># Define sample inputs</span>
 <span class="n">inputs</span> <span class="o">=</span> <span class="p">[</span>
@@ -589,28 +588,29 @@ If output buffer allocation is moved after the execution of the TensorRT context
 <section id="enable-disable-pre-allocated-output-buffer-feature-using-runtime-api">
 <h2>Enable/Disable pre-allocated output buffer feature using runtime api<a class="headerlink" href="#enable-disable-pre-allocated-output-buffer-feature-using-runtime-api" title="Permalink to this heading">¶</a></h2>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Enable pre-allocated output buffer using a context manager</span>
-<span class="k">with</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">runtime</span><span class="o">.</span><span class="n">enable_pre_allocated_outputs</span><span class="p">(</span><span class="n">optimized_model</span><span class="p">):</span>
+<span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
+    <span class="k">with</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">runtime</span><span class="o">.</span><span class="n">enable_pre_allocated_outputs</span><span class="p">(</span><span class="n">optimized_model</span><span class="p">):</span>
+        <span class="n">out_trt</span> <span class="o">=</span> <span class="n">optimized_model</span><span class="p">(</span><span class="o">*</span><span class="n">inputs</span><span class="p">)</span>
+        <span class="c1"># Subsequent inferences can use the pre-allocated output buffer (no shape change)</span>
+        <span class="n">out_trt</span> <span class="o">=</span> <span class="n">optimized_model</span><span class="p">(</span><span class="o">*</span><span class="n">inputs</span><span class="p">)</span>
+
+    <span class="c1"># Alternatively, we can enable the feature using a context object</span>
+    <span class="n">pre_allocated_output_ctx</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">runtime</span><span class="o">.</span><span class="n">enable_pre_allocated_outputs</span><span class="p">(</span>
+        <span class="n">optimized_model</span>
+    <span class="p">)</span>
+    <span class="n">pre_allocated_output_ctx</span><span class="o">.</span><span class="n">set_pre_allocated_output</span><span class="p">(</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">time_opt</span> <span class="o">=</span> <span class="n">test_module_perf</span><span class="p">(</span><span class="n">optimized_model</span><span class="p">,</span> <span class="o">*</span><span class="n">inputs</span><span class="p">)</span>
+
+    <span class="c1"># Disable the pre-allocated output buffer feature and perform inference normally</span>
+    <span class="n">pre_allocated_output_ctx</span><span class="o">.</span><span class="n">set_pre_allocated_output</span><span class="p">(</span><span class="kc">False</span><span class="p">)</span>
     <span class="n">out_trt</span> <span class="o">=</span> <span class="n">optimized_model</span><span class="p">(</span><span class="o">*</span><span class="n">inputs</span><span class="p">)</span>
-    <span class="c1"># Subsequent inferences can use the pre-allocated output buffer (no shape change)</span>
-    <span class="n">out_trt</span> <span class="o">=</span> <span class="n">optimized_model</span><span class="p">(</span><span class="o">*</span><span class="n">inputs</span><span class="p">)</span>
+    <span class="n">time_normal</span> <span class="o">=</span> <span class="n">test_module_perf</span><span class="p">(</span><span class="n">optimized_model</span><span class="p">,</span> <span class="o">*</span><span class="n">inputs</span><span class="p">)</span>
 
-<span class="c1"># Alternatively, we can enable the feature using a context object</span>
-<span class="n">pre_allocated_output_ctx</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">runtime</span><span class="o">.</span><span class="n">enable_pre_allocated_outputs</span><span class="p">(</span>
-    <span class="n">optimized_model</span>
-<span class="p">)</span>
-<span class="n">pre_allocated_output_ctx</span><span class="o">.</span><span class="n">set_pre_allocated_output</span><span class="p">(</span><span class="kc">True</span><span class="p">)</span>
-<span class="n">time_opt</span> <span class="o">=</span> <span class="n">test_module_perf</span><span class="p">(</span><span class="n">optimized_model</span><span class="p">,</span> <span class="o">*</span><span class="n">inputs</span><span class="p">)</span>
+    <span class="n">time_opt_ms</span> <span class="o">=</span> <span class="n">time_opt</span> <span class="o">*</span> <span class="mi">1000</span>
+    <span class="n">time_normal_ms</span> <span class="o">=</span> <span class="n">time_normal</span> <span class="o">*</span> <span class="mi">1000</span>
 
-<span class="c1"># Disable the pre-allocated output buffer feature and perform inference normally</span>
-<span class="n">pre_allocated_output_ctx</span><span class="o">.</span><span class="n">set_pre_allocated_output</span><span class="p">(</span><span class="kc">False</span><span class="p">)</span>
-<span class="n">out_trt</span> <span class="o">=</span> <span class="n">optimized_model</span><span class="p">(</span><span class="o">*</span><span class="n">inputs</span><span class="p">)</span>
-<span class="n">time_normal</span> <span class="o">=</span> <span class="n">test_module_perf</span><span class="p">(</span><span class="n">optimized_model</span><span class="p">,</span> <span class="o">*</span><span class="n">inputs</span><span class="p">)</span>
-
-<span class="n">time_opt_ms</span> <span class="o">=</span> <span class="n">time_opt</span> <span class="o">*</span> <span class="mi">1000</span>
-<span class="n">time_normal_ms</span> <span class="o">=</span> <span class="n">time_normal</span> <span class="o">*</span> <span class="mi">1000</span>
-
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;normal trt model time: </span><span class="si">{</span><span class="n">time_normal_ms</span><span class="si">:</span><span class="s2">.3f</span><span class="si">}</span><span class="s2"> ms&quot;</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;pre-allocated output buffer model time: </span><span class="si">{</span><span class="n">time_opt_ms</span><span class="si">:</span><span class="s2">.3f</span><span class="si">}</span><span class="s2"> ms&quot;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;normal trt model time: </span><span class="si">{</span><span class="n">time_normal_ms</span><span class="si">:</span><span class="s2">.3f</span><span class="si">}</span><span class="s2"> ms&quot;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;pre-allocated output buffer model time: </span><span class="si">{</span><span class="n">time_opt_ms</span><span class="si">:</span><span class="s2">.3f</span><span class="si">}</span><span class="s2"> ms&quot;</span><span class="p">)</span>
 </pre></div>
 </div>
 <p class="sphx-glr-timing"><strong>Total running time of the script:</strong> ( 0 minutes  0.000 seconds)</p>

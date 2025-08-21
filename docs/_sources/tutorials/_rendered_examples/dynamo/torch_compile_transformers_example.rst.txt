@@ -46,7 +46,7 @@ Imports and Model Definition
 
 
     # Initialize model with float precision and sample inputs
-    model = BertModel.from_pretrained("bert-base-uncased").eval().to("cuda")
+    model = BertModel.from_pretrained("bert-base-uncased").to("cuda").eval()
     inputs = [
         torch.randint(0, 2, (1, 14), dtype=torch.int32).to("cuda"),
         torch.randint(0, 2, (1, 14), dtype=torch.int32).to("cuda"),
@@ -83,7 +83,7 @@ Optional Input Arguments to `torch_tensorrt.compile`
 Compilation with `torch.compile`
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. GENERATED FROM PYTHON SOURCE LINES 48-66
+.. GENERATED FROM PYTHON SOURCE LINES 48-67
 
 .. code-block:: python
 
@@ -103,20 +103,21 @@ Compilation with `torch.compile`
         dynamic=False,
         options=compilation_kwargs,
     )
-    optimized_model(*inputs)
+    with torch.no_grad():
+        optimized_model(*inputs)
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 67-69
+.. GENERATED FROM PYTHON SOURCE LINES 68-70
 
 Equivalently, we could have run the above via the convenience frontend, as so:
 `torch_tensorrt.compile(model, ir="torch_compile", inputs=inputs, **compilation_kwargs)`
 
-.. GENERATED FROM PYTHON SOURCE LINES 71-73
+.. GENERATED FROM PYTHON SOURCE LINES 72-74
 
 Inference
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. GENERATED FROM PYTHON SOURCE LINES 73-81
+.. GENERATED FROM PYTHON SOURCE LINES 74-83
 
 .. code-block:: python
 
@@ -126,10 +127,11 @@ Inference
         torch.randint(0, 2, (1, 14), dtype=torch.int32).to("cuda"),
         torch.randint(0, 2, (1, 14), dtype=torch.int32).to("cuda"),
     ]
-    new_outputs = optimized_model(*new_inputs)
+    with torch.no_grad():
+        new_outputs = optimized_model(*new_inputs)
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 82-90
+.. GENERATED FROM PYTHON SOURCE LINES 84-93
 
 .. code-block:: python
 
@@ -139,15 +141,16 @@ Inference
         torch.randint(0, 2, (4, 14), dtype=torch.int32).to("cuda"),
         torch.randint(0, 2, (4, 14), dtype=torch.int32).to("cuda"),
     ]
-    new_outputs = optimized_model(*new_inputs)
+    with torch.no_grad():
+        new_outputs = optimized_model(*new_inputs)
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 91-93
+.. GENERATED FROM PYTHON SOURCE LINES 94-96
 
 Cleanup
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. GENERATED FROM PYTHON SOURCE LINES 93-97
+.. GENERATED FROM PYTHON SOURCE LINES 96-100
 
 .. code-block:: python
 
@@ -156,7 +159,7 @@ Cleanup
     torch._dynamo.reset()
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 98-107
+.. GENERATED FROM PYTHON SOURCE LINES 101-110
 
 Cuda Driver Error Note
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

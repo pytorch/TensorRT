@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Compiling Stable Diffusion model using the torch.compile backend &mdash; Torch-TensorRT v2.9.0.dev0+9509357 documentation</title>
+  <title>Compiling Stable Diffusion model using the torch.compile backend &mdash; Torch-TensorRT v2.9.0.dev0+33a53cf documentation</title>
   
 
   
@@ -293,7 +293,7 @@
               
               
                 <div class="version">
-                  v2.9.0.dev0+9509357
+                  v2.9.0.dev0+33a53cf
                 </div>
               
             
@@ -530,11 +530,12 @@ to download the full example code</p>
 </section>
 <section id="inference">
 <h2>Inference<a class="headerlink" href="#inference" title="Permalink to this heading">¶</a></h2>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">prompt</span> <span class="o">=</span> <span class="s2">&quot;a majestic castle in the clouds&quot;</span>
-<span class="n">image</span> <span class="o">=</span> <span class="n">pipe</span><span class="p">(</span><span class="n">prompt</span><span class="p">)</span><span class="o">.</span><span class="n">images</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
+    <span class="n">prompt</span> <span class="o">=</span> <span class="s2">&quot;a majestic castle in the clouds&quot;</span>
+    <span class="n">image</span> <span class="o">=</span> <span class="n">pipe</span><span class="p">(</span><span class="n">prompt</span><span class="p">)</span><span class="o">.</span><span class="n">images</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
 
-<span class="n">image</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="s2">&quot;images/majestic_castle.png&quot;</span><span class="p">)</span>
-<span class="n">image</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+    <span class="n">image</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="s2">&quot;images/majestic_castle.png&quot;</span><span class="p">)</span>
+    <span class="n">image</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
 </pre></div>
 </div>
 <p class="sphx-glr-timing"><strong>Total running time of the script:</strong> ( 0 minutes  0.000 seconds)</p>

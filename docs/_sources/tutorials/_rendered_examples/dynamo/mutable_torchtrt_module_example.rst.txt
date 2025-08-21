@@ -55,7 +55,7 @@ In this tutorial, we are going to walk through
 Initialize the Mutable Torch TensorRT Module with settings.
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. GENERATED FROM PYTHON SOURCE LINES 34-44
+.. GENERATED FROM PYTHON SOURCE LINES 34-45
 
 .. code-block:: python
 
@@ -65,31 +65,33 @@ Initialize the Mutable Torch TensorRT Module with settings.
         "immutable_weights": False,
     }
 
-    model = models.resnet18(pretrained=True).eval().to("cuda")
+    model = models.resnet18(pretrained=True).to("cuda").eval()
     mutable_module = torch_trt.MutableTorchTensorRTModule(model, **settings)
     # You can use the mutable module just like the original pytorch module. The compilation happens while you first call the mutable module.
-    mutable_module(*inputs)
+    with torch.no_grad():
+        mutable_module(*inputs)
 
-.. GENERATED FROM PYTHON SOURCE LINES 45-47
+.. GENERATED FROM PYTHON SOURCE LINES 46-48
 
 Make modifications to the mutable module.
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. GENERATED FROM PYTHON SOURCE LINES 49-50
+.. GENERATED FROM PYTHON SOURCE LINES 50-51
 
 Making changes to mutable module can trigger refit or re-compilation. For example, loading a different state_dict and setting new weight values will trigger refit, and adding a module to the model will trigger re-compilation.
 
-.. GENERATED FROM PYTHON SOURCE LINES 50-64
+.. GENERATED FROM PYTHON SOURCE LINES 51-66
 
 .. code-block:: python
 
-    model2 = models.resnet18(pretrained=False).eval().to("cuda")
+    model2 = models.resnet18(pretrained=False).to("cuda").eval()
     mutable_module.load_state_dict(model2.state_dict())
 
 
     # Check the output
     # The refit happens while you call the mutable module again.
-    expected_outputs, refitted_outputs = model2(*inputs), mutable_module(*inputs)
+    with torch.no_grad():
+        expected_outputs, refitted_outputs = model2(*inputs), mutable_module(*inputs)
     for expected_output, refitted_output in zip(expected_outputs, refitted_outputs):
         assert torch.allclose(
             expected_output, refitted_output, 1e-2, 1e-2
@@ -98,12 +100,12 @@ Making changes to mutable module can trigger refit or re-compilation. For exampl
     print("Refit successfully!")
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 65-67
+.. GENERATED FROM PYTHON SOURCE LINES 67-69
 
 Saving Mutable Torch TensorRT Module
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. GENERATED FROM PYTHON SOURCE LINES 67-72
+.. GENERATED FROM PYTHON SOURCE LINES 69-74
 
 .. code-block:: python
 
@@ -113,12 +115,12 @@ Saving Mutable Torch TensorRT Module
     reload = torch_trt.MutableTorchTensorRTModule.load("mutable_module.pkl")
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 73-75
+.. GENERATED FROM PYTHON SOURCE LINES 75-77
 
 Stable Diffusion with Huggingface
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. GENERATED FROM PYTHON SOURCE LINES 75-144
+.. GENERATED FROM PYTHON SOURCE LINES 77-146
 
 .. code-block:: python
 
@@ -192,7 +194,7 @@ Stable Diffusion with Huggingface
 
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 145-151
+.. GENERATED FROM PYTHON SOURCE LINES 147-153
 
 Use Mutable Torch TensorRT module with dynamic shape
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -201,7 +203,7 @@ and should not omit any entries (except None in the kwarg_inputs). If there is a
 If the dynamic shape is not required for an input, an empty dictionary should be given as the shape hint for that input.
 Note that you should exclude keyword arguments with value None as those will be filtered out.
 
-.. GENERATED FROM PYTHON SOURCE LINES 151-194
+.. GENERATED FROM PYTHON SOURCE LINES 153-197
 
 .. code-block:: python
 
@@ -220,7 +222,7 @@ Note that you should exclude keyword arguments with value None as those will be 
 
 
     device = "cuda:0"
-    model = Model().eval().to(device)
+    model = Model().to(device).eval()
     inputs = (torch.rand(10, 3).to(device), torch.rand(3, 30).to(device))
     kwargs = {
         "c": {"a": torch.rand(10, 30).to(device), "b": torch.rand(10, 30).to(device)},
@@ -239,23 +241,24 @@ Note that you should exclude keyword arguments with value None as those will be 
     model = torch_trt.MutableTorchTensorRTModule(model, min_block_size=1)
     model.set_expected_dynamic_shape_range(args_dynamic_shapes, kwarg_dynamic_shapes)
     # Compile
-    model(*inputs, **kwargs)
-    # Change input shape
-    inputs_2 = (torch.rand(10, 5).to(device), torch.rand(10, 30).to(device))
-    kwargs_2 = {
-        "c": {"a": torch.rand(10, 30).to(device), "b": torch.rand(5, 30).to(device)},
-    }
-    # Run without recompiling
-    model(*inputs_2, **kwargs_2)
+    with torch.no_grad():
+        model(*inputs, **kwargs)
+        # Change input shape
+        inputs_2 = (torch.rand(10, 5).to(device), torch.rand(10, 30).to(device))
+        kwargs_2 = {
+            "c": {"a": torch.rand(10, 30).to(device), "b": torch.rand(5, 30).to(device)},
+        }
+        # Run without recompiling
+        model(*inputs_2, **kwargs_2)
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 195-198
+.. GENERATED FROM PYTHON SOURCE LINES 198-201
 
 Use Mutable Torch TensorRT module with persistent cache
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Leveraging engine caching, we are able to shortcut the engine compilation and save much time.
 
-.. GENERATED FROM PYTHON SOURCE LINES 198-242
+.. GENERATED FROM PYTHON SOURCE LINES 201-246
 
 .. code-block:: python
 
@@ -263,7 +266,7 @@ Leveraging engine caching, we are able to shortcut the engine compilation and sa
 
     from torch_tensorrt.dynamo._defaults import TIMING_CACHE_PATH
 
-    model = models.resnet18(pretrained=True).eval().to("cuda")
+    model = models.resnet18(pretrained=True).to("cuda").eval()
 
     times = []
     start = torch.cuda.Event(enable_timing=True)
@@ -289,14 +292,15 @@ Leveraging engine caching, we are able to shortcut the engine compilation and sa
 
     remove_timing_cache()
 
-    for i in range(4):
-        inputs = [torch.rand((100 + i, 3, 224, 224)).to("cuda")]
+    with torch.no_grad():
+        for i in range(4):
+            inputs = [torch.rand((100 + i, 3, 224, 224)).to("cuda")]
 
-        start.record()
-        model(*inputs)  # Recompile
-        end.record()
-        torch.cuda.synchronize()
-        times.append(start.elapsed_time(end))
+            start.record()
+            model(*inputs)  # Recompile
+            end.record()
+            torch.cuda.synchronize()
+            times.append(start.elapsed_time(end))
 
     print("----------------dynamo_compile----------------")
     print("Without engine caching, used:", times[0], "ms")

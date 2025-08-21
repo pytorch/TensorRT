@@ -62,7 +62,7 @@ TensorRT natively supports both implementations as an activation layer, but supp
             return torch.nn.functional.gelu(x, approximate=self.mode)
 
 
-    my_mod = GeLU(mode="tanh")
+    my_mod = GeLU(mode="tanh").to("cuda").eval()
     ex_input = torch.randn(2, 5).to("cuda")
 
 
@@ -245,9 +245,9 @@ We can now recompile and see that our custom converter is being called to conver
     my_custom_gelu = torch_tensorrt.compile(
         my_mod, arg_inputs=(ex_input,), min_block_size=1
     )
-
-    print(my_custom_gelu.graph)
-    print(my_custom_gelu(ex_input))
+    with torch.no_grad():
+        print(my_custom_gelu.graph)
+        print(my_custom_gelu(ex_input))
 
 
 .. GENERATED FROM PYTHON SOURCE LINES 190-191
@@ -273,7 +273,7 @@ Finally, we want to verify that in the case that the ``approximate`` argument is
 .. code-block:: python
 
 
-    my_mod_erf = GeLU(mode="none")
+    my_mod_erf = GeLU(mode="none").to("cuda").eval()
     my_gelu_erf = torch_tensorrt.compile(
         my_mod_erf, arg_inputs=(ex_input,), min_block_size=1
     )
@@ -288,9 +288,9 @@ In this case, the validator for our custom converter returned ``False``, so the 
 
 .. code-block:: python
 
-
-    print(my_gelu_erf.graph)
-    print(my_gelu_erf(ex_input))
+    with torch.no_grad():
+        print(my_gelu_erf.graph)
+        print(my_gelu_erf(ex_input))
 
 
 .. rst-class:: sphx-glr-timing
