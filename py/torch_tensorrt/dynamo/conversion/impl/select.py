@@ -54,7 +54,7 @@ def select(
 def is_boolean_tensor(tensor: Union[TRTTensor, np.ndarray, torch.Tensor]) -> bool:
     if isinstance(tensor, (TRTTensor)):
         if getattr(tensor, "meta", None) is None:
-            return tensor.dtype == torch.bool
+            return tensor.dtype == trt.DataType.BOOL
         val = tensor.meta.get("val")
         if val is not None and val.dtype is torch.bool:
             return True
