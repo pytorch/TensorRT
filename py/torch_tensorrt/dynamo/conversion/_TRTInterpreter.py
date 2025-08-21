@@ -277,18 +277,18 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                 trt.MemoryPoolType.DLA_GLOBAL_DRAM,
                 self.compilation_settings.dla_global_dram_size,
             )
+        if not self.compilation_settings.use_explicit_typing:
+            if dtype.float16 in self.compilation_settings.enabled_precisions:
+                builder_config.set_flag(trt.BuilderFlag.FP16)
 
-        if dtype.float16 in self.compilation_settings.enabled_precisions:
-            builder_config.set_flag(trt.BuilderFlag.FP16)
+            if dtype.int8 in self.compilation_settings.enabled_precisions:
+                builder_config.set_flag(trt.BuilderFlag.INT8)
 
-        if dtype.int8 in self.compilation_settings.enabled_precisions:
-            builder_config.set_flag(trt.BuilderFlag.INT8)
+            if dtype.fp8 in self.compilation_settings.enabled_precisions:
+                builder_config.set_flag(trt.BuilderFlag.FP8)
 
-        if dtype.fp8 in self.compilation_settings.enabled_precisions:
-            builder_config.set_flag(trt.BuilderFlag.FP8)
-
-        if dtype.bfloat16 in self.compilation_settings.enabled_precisions:
-            builder_config.set_flag(trt.BuilderFlag.BF16)
+            if dtype.bfloat16 in self.compilation_settings.enabled_precisions:
+                builder_config.set_flag(trt.BuilderFlag.BF16)
 
         if self.compilation_settings.sparse_weights:
             builder_config.set_flag(trt.BuilderFlag.SPARSE_WEIGHTS)
@@ -440,7 +440,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             except Exception:
                 return torch.all(sd_weight == network_weight)
 
-    @needs_refit
+    @needs_refit  # type: ignore[misc]
     def _save_weight_mapping(self) -> None:
         """
         Construct the weight name mapping from engine weight name to state_dict weight name.
@@ -577,7 +577,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         gc.collect()
         torch.cuda.empty_cache()
 
-    @needs_refit
+    @needs_refit  # type: ignore[misc]
     def _insert_engine_to_cache(self, hash_val: str, serialized_engine: bytes) -> None:
         # TODO: @Evan is waiting for TRT's feature to cache the weight-stripped engine
         # if not self.compilation_settings.strip_engine_weights:
@@ -605,7 +605,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             ),
         )
 
-    @needs_refit
+    @needs_refit  # type: ignore[misc]
     def _pull_cached_engine(self, hash_val: str) -> Optional[TRTInterpreterResult]:
         # query the cached TRT engine
         cached_data = self.engine_cache.check(hash_val)  # type: ignore[union-attr]
@@ -941,7 +941,14 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                 f"Specified output dtypes ({len(self.output_dtypes)}) differ from number of outputs ({len(outputs)})"
             )
 
+        marked_outputs_ids = []
         for i, output in enumerate(outputs):
+            # In some cases, the same output tensor may be marked multiple times, such as _to_copy,
+            # so we skip marking if the output is already marked
+            if id(output) in marked_outputs_ids:
+                continue
+            marked_outputs_ids.append(id(output))
+
             name = f"output{i}"
 
             output_dtype = dtype.unknown

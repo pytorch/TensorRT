@@ -5,23 +5,18 @@ import numpy as np
 # @manual=//deeplearning/trt/python:py_tensorrt
 import tensorrt as trt
 import torch
+from tensorrt import ITensor as TRTTensor
 from torch.fx.node import Target
 from torch_tensorrt.dynamo.conversion import impl
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
 from torch_tensorrt.dynamo.conversion.converter_utils import (
     SourceIR,
-    extend_attr_to_tuple,
     get_trt_tensor,
     has_dynamic_shape,
+    set_layer_name,
     to_torch,
     to_trt_weights,
 )
-from torch_tensorrt.fx.converters.converter_utils import (
-    get_dyn_range,
-    mark_as_int8_layer,
-    set_layer_name,
-)
-from torch_tensorrt.fx.types import TRTTensor
 
 
 def deconvNd(
@@ -142,10 +137,9 @@ def deconvNd(
     # Expand parameters manually for Conv1D computations
     if is_deconv1d:
         padding = (tuple(padding) + (0,)) if padding is not None else padding
-        stride = extend_attr_to_tuple(stride, 2) if stride is not None else stride
-        dilation = (
-            extend_attr_to_tuple(dilation, 2) if dilation is not None else dilation
-        )
+        # stride in deconv1d is (2,) -> need to change to (2, 1) in deconv2d
+        stride = (stride[0], 1) if stride is not None else stride
+        dilation = (dilation[0], 1) if dilation is not None else dilation
         output_padding = (
             (tuple(output_padding) + (0,))
             if output_padding is not None
@@ -175,11 +169,6 @@ def deconvNd(
 
     deconv_layer.pre_padding = tuple(pre_padding_values)
     deconv_layer.post_padding = tuple(post_padding_values)
-
-    # Handle quantization cases
-    if scale is not None and zero_point is not None:
-        # Assume the dtype of activation is torch.quint8
-        mark_as_int8_layer(deconv_layer, get_dyn_range(scale, zero_point, torch.quint8))
 
     result = deconv_layer.get_output(0)
 

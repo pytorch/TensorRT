@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Hierarchical Partitioner Example &mdash; Torch-TensorRT v2.9.0.dev0+b00ff13 documentation</title>
+  <title>Hierarchical Partitioner Example &mdash; Torch-TensorRT v2.9.0.dev0+844cfd4 documentation</title>
   
 
   
@@ -291,7 +291,7 @@
               
               
                 <div class="version">
-                  v2.9.0.dev0+b00ff13
+                  v2.9.0.dev0+844cfd4
                 </div>
               
             
@@ -395,7 +395,6 @@
 <li class="toctree-l1"><a class="reference internal" href="../../../_cpp_api/namespace_torch_tensorrt.html">Namespace torch_tensorrt</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../_cpp_api/namespace_torch_tensorrt__logging.html">Namespace torch_tensorrt::logging</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../_cpp_api/namespace_torch_tensorrt__torchscript.html">Namespace torch_tensorrt::torchscript</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../../_cpp_api/namespace_torch_tensorrt__ptq.html">Namespace torch_tensorrt::ptq</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">CLI Documentation</span></p>
 <ul>
@@ -567,7 +566,8 @@ Not yet available in the compile API.</p>
 
     <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Original Model Structure:</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">gm</span><span class="p">)</span>
 
-    <span class="n">original_output</span> <span class="o">=</span> <span class="n">model</span><span class="p">(</span><span class="n">example_input</span><span class="p">)</span>
+    <span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
+        <span class="n">original_output</span> <span class="o">=</span> <span class="n">model</span><span class="p">(</span><span class="n">example_input</span><span class="p">)</span>
 
     <span class="c1"># 1. Partition the model into blocks that can be executed by different backends</span>
     <span class="n">partitioned_model</span><span class="p">,</span> <span class="n">op_support</span> <span class="o">=</span> <span class="n">hierarchical_adjacency_partition</span><span class="p">(</span>

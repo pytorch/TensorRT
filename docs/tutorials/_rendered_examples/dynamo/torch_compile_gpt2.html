@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Compiling GPT2 using the Torch-TensorRT torch.compile frontend &mdash; Torch-TensorRT v2.9.0.dev0+b00ff13 documentation</title>
+  <title>Compiling GPT2 using the Torch-TensorRT torch.compile frontend &mdash; Torch-TensorRT v2.9.0.dev0+844cfd4 documentation</title>
   
 
   
@@ -293,7 +293,7 @@
               
               
                 <div class="version">
-                  v2.9.0.dev0+b00ff13
+                  v2.9.0.dev0+844cfd4
                 </div>
               
             
@@ -397,7 +397,6 @@
 <li class="toctree-l1"><a class="reference internal" href="../../../_cpp_api/namespace_torch_tensorrt.html">Namespace torch_tensorrt</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../_cpp_api/namespace_torch_tensorrt__logging.html">Namespace torch_tensorrt::logging</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../_cpp_api/namespace_torch_tensorrt__torchscript.html">Namespace torch_tensorrt::torchscript</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../../_cpp_api/namespace_torch_tensorrt__ptq.html">Namespace torch_tensorrt::ptq</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">CLI Documentation</span></p>
 <ul>
@@ -534,8 +533,8 @@ number of new tokens generated</p>
             <span class="n">use_cache</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
             <span class="n">attn_implementation</span><span class="o">=</span><span class="s2">&quot;eager&quot;</span><span class="p">,</span>
         <span class="p">)</span>
+        <span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">DEVICE</span><span class="p">)</span>
         <span class="o">.</span><span class="n">eval</span><span class="p">()</span>
-        <span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
     <span class="p">)</span>
 </pre></div>
 </div>
@@ -545,16 +544,17 @@ number of new tokens generated</p>
 <p>Tokenize a sample input prompt and get pytorch model outputs</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">prompt</span> <span class="o">=</span> <span class="s2">&quot;I enjoy walking with my cute dog&quot;</span>
 <span class="n">model_inputs</span> <span class="o">=</span> <span class="n">tokenizer</span><span class="p">(</span><span class="n">prompt</span><span class="p">,</span> <span class="n">return_tensors</span><span class="o">=</span><span class="s2">&quot;pt&quot;</span><span class="p">)</span>
-<span class="n">input_ids</span> <span class="o">=</span> <span class="n">model_inputs</span><span class="p">[</span><span class="s2">&quot;input_ids&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
+<span class="n">input_ids</span> <span class="o">=</span> <span class="n">model_inputs</span><span class="p">[</span><span class="s2">&quot;input_ids&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">DEVICE</span><span class="p">)</span>
 </pre></div>
 </div>
 <p>The <code class="docutils literal notranslate"><span class="pre">generate()</span></code> API of the <code class="docutils literal notranslate"><span class="pre">AutoModelForCausalLM</span></code> class is used for auto-regressive generation with greedy decoding.</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">pyt_gen_tokens</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">generate</span><span class="p">(</span>
-    <span class="n">input_ids</span><span class="p">,</span>
-    <span class="n">max_length</span><span class="o">=</span><span class="n">MAX_LENGTH</span><span class="p">,</span>
-    <span class="n">use_cache</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
-    <span class="n">pad_token_id</span><span class="o">=</span><span class="n">tokenizer</span><span class="o">.</span><span class="n">eos_token_id</span><span class="p">,</span>
-<span class="p">)</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
+    <span class="n">pyt_gen_tokens</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">generate</span><span class="p">(</span>
+        <span class="n">input_ids</span><span class="p">,</span>
+        <span class="n">max_length</span><span class="o">=</span><span class="n">MAX_LENGTH</span><span class="p">,</span>
+        <span class="n">use_cache</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+        <span class="n">pad_token_id</span><span class="o">=</span><span class="n">tokenizer</span><span class="o">.</span><span class="n">eos_token_id</span><span class="p">,</span>
+    <span class="p">)</span>
 </pre></div>
 </div>
 </section>
@@ -579,12 +579,13 @@ Usually, this would be the context length for the model. We start with <code cla
 <p>Auto-regressive generation loop for greedy decoding using TensorRT model
 The first token generation compiles the model using TensorRT and the second token
 encounters recompilation (which is an issue currently that would be resolved in the future)</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">trt_gen_tokens</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">generate</span><span class="p">(</span>
-    <span class="n">inputs</span><span class="o">=</span><span class="n">input_ids</span><span class="p">,</span>
-    <span class="n">max_length</span><span class="o">=</span><span class="n">MAX_LENGTH</span><span class="p">,</span>
-    <span class="n">use_cache</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
-    <span class="n">pad_token_id</span><span class="o">=</span><span class="n">tokenizer</span><span class="o">.</span><span class="n">eos_token_id</span><span class="p">,</span>
-<span class="p">)</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
+    <span class="n">trt_gen_tokens</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">generate</span><span class="p">(</span>
+        <span class="n">inputs</span><span class="o">=</span><span class="n">input_ids</span><span class="p">,</span>
+        <span class="n">max_length</span><span class="o">=</span><span class="n">MAX_LENGTH</span><span class="p">,</span>
+        <span class="n">use_cache</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+        <span class="n">pad_token_id</span><span class="o">=</span><span class="n">tokenizer</span><span class="o">.</span><span class="n">eos_token_id</span><span class="p">,</span>
+    <span class="p">)</span>
 </pre></div>
 </div>
 </section>

@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt.dynamo.runtime._MutableTorchTensorRTModule &mdash; Torch-TensorRT v2.9.0.dev0+b00ff13 documentation</title>
+  <title>torch_tensorrt.dynamo.runtime._MutableTorchTensorRTModule &mdash; Torch-TensorRT v2.9.0.dev0+844cfd4 documentation</title>
   
 
   
@@ -290,7 +290,7 @@
               
               
                 <div class="version">
-                  v2.9.0.dev0+b00ff13
+                  v2.9.0.dev0+844cfd4
                 </div>
               
             
@@ -394,7 +394,6 @@
 <li class="toctree-l1"><a class="reference internal" href="../../../../_cpp_api/namespace_torch_tensorrt.html">Namespace torch_tensorrt</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../../_cpp_api/namespace_torch_tensorrt__logging.html">Namespace torch_tensorrt::logging</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../../_cpp_api/namespace_torch_tensorrt__torchscript.html">Namespace torch_tensorrt::torchscript</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../../../_cpp_api/namespace_torch_tensorrt__ptq.html">Namespace torch_tensorrt::ptq</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">CLI Documentation</span></p>
 <ul>
@@ -583,7 +582,6 @@
 <span class="sd">            dla_local_dram_size (int): Host RAM used by DLA to share intermediate tensor data across operations</span>
 <span class="sd">            dla_global_dram_size (int): Host RAM used by DLA to store weights and metadata for execution</span>
 <span class="sd">            truncate_double (bool): Truncate weights provided in double (float64) to float32</span>
-<span class="sd">            calibrator (Union(torch_tensorrt._C.IInt8Calibrator, tensorrt.IInt8Calibrator)): Calibrator object which will provide data to the PTQ system for INT8 Calibration</span>
 <span class="sd">            require_full_compilation (bool): Require modules to be compiled end to end or return an error as opposed to returning a hybrid graph where operations that cannot be run in TensorRT are run in PyTorch</span>
 <span class="sd">            min_block_size (int): The minimum number of contiguous TensorRT convertible operations in order to run a set of operations in TensorRT</span>
 <span class="sd">            torch_executed_ops (Collection[Target]): Set of aten operators that must be run in PyTorch. An error will be thrown if this set is not empty but ``require_full_compilation`` is True</span>

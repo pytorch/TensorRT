@@ -144,7 +144,7 @@ Imports and Model Definition
     args = PARSER.parse_args()
 
     model = vgg16(num_classes=10, init_weights=False)
-    model = model.cuda()
+    model = model.cuda().eval()
 
 
 .. GENERATED FROM PYTHON SOURCE LINES 126-128
@@ -262,7 +262,7 @@ Tune the pre-trained model with FP8 and PTQ
 Inference
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. GENERATED FROM PYTHON SOURCE LINES 210-272
+.. GENERATED FROM PYTHON SOURCE LINES 210-275
 
 .. code-block:: python
 
@@ -313,21 +313,24 @@ Inference
             loss = 0.0
             class_probs = []
             class_preds = []
-            for data, labels in testing_dataloader:
-                data, labels = data.cuda(), labels.cuda(non_blocking=True)
-                out = trt_model(data)
-                loss += crit(out, labels)
-                preds = torch.max(out, 1)[1]
-                class_probs.append([F.softmax(i, dim=0) for i in out])
-                class_preds.append(preds)
-                total += labels.size(0)
-                correct += (preds == labels).sum().item()
+            with torch.no_grad():
+                for data, labels in testing_dataloader:
+                    data, labels = data.cuda(), labels.cuda(non_blocking=True)
+                    out = trt_model(data)
+                    loss += crit(out, labels)
+                    preds = torch.max(out, 1)[1]
+                    class_probs.append([F.softmax(i, dim=0) for i in out])
+                    class_preds.append(preds)
+                    total += labels.size(0)
+                    correct += (preds == labels).sum().item()
 
-            test_probs = torch.cat([torch.stack(batch) for batch in class_probs])
-            test_preds = torch.cat(class_preds)
-            test_loss = loss / total
-            test_acc = correct / total
-            print("Test Loss: {:.5f} Test Acc: {:.2f}%".format(test_loss, 100 * test_acc))
+                test_probs = torch.cat([torch.stack(batch) for batch in class_probs])
+                test_preds = torch.cat(class_preds)
+                test_loss = loss / total
+                test_acc = correct / total
+                print(
+                    "Test Loss: {:.5f} Test Acc: {:.2f}%".format(test_loss, 100 * test_acc)
+                )
 
 
 .. rst-class:: sphx-glr-timing

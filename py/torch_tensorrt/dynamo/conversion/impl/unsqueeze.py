@@ -1,6 +1,7 @@
 import logging
 from typing import List, Optional, Sequence, cast
 
+from tensorrt import ITensor as TRTTensor
 from torch.fx.node import Target
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
@@ -9,7 +10,6 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     get_trt_tensor,
     set_layer_name,
 )
-from torch_tensorrt.dynamo.types import TRTTensor
 
 logger = logging.getLogger(__name__)
 

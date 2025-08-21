@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Automatically generate a TensorRT Plugin for RMSNorm module and apply it in Llama2 &mdash; Torch-TensorRT v2.9.0.dev0+b00ff13 documentation</title>
+  <title>Automatically generate a TensorRT Plugin for RMSNorm module and apply it in Llama2 &mdash; Torch-TensorRT v2.9.0.dev0+844cfd4 documentation</title>
   
 
   
@@ -291,7 +291,7 @@
               
               
                 <div class="version">
-                  v2.9.0.dev0+b00ff13
+                  v2.9.0.dev0+844cfd4
                 </div>
               
             
@@ -395,7 +395,6 @@
 <li class="toctree-l1"><a class="reference internal" href="../../../_cpp_api/namespace_torch_tensorrt.html">Namespace torch_tensorrt</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../_cpp_api/namespace_torch_tensorrt__logging.html">Namespace torch_tensorrt::logging</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../_cpp_api/namespace_torch_tensorrt__torchscript.html">Namespace torch_tensorrt::torchscript</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../../_cpp_api/namespace_torch_tensorrt__ptq.html">Namespace torch_tensorrt::ptq</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">CLI Documentation</span></p>
 <ul>
@@ -708,7 +707,7 @@ to download the full example code</p>
 
 <span class="c1"># 2. Initialize model (random weights)</span>
 <span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
-    <span class="n">model</span> <span class="o">=</span> <span class="n">LlamaForCausalLM</span><span class="p">(</span><span class="n">config</span><span class="p">)</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span><span class="o">.</span><span class="n">half</span><span class="p">()</span>
+    <span class="n">model</span> <span class="o">=</span> <span class="n">LlamaForCausalLM</span><span class="p">(</span><span class="n">config</span><span class="p">)</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span><span class="o">.</span><span class="n">half</span><span class="p">()</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span>
 
 <span class="c1"># 3. Export with static shapes</span>
 <span class="n">input_ids</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randint</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">32000</span><span class="p">,</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">64</span><span class="p">))</span>  <span class="c1"># Static [batch=1, seq=64]</span>
@@ -741,7 +740,8 @@ to download the full example code</p>
 
 <span class="n">input_ids</span> <span class="o">=</span> <span class="n">input_ids</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">DEVICE</span><span class="p">)</span>
 
-<span class="n">res</span> <span class="o">=</span> <span class="n">trt_model</span><span class="o">.</span><span class="n">forward</span><span class="p">(</span><span class="n">input_ids</span><span class="p">)</span>
+<span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
+    <span class="n">res</span> <span class="o">=</span> <span class="n">trt_model</span><span class="o">.</span><span class="n">forward</span><span class="p">(</span><span class="n">input_ids</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="n">res</span><span class="p">)</span>
 </pre></div>
 </div>

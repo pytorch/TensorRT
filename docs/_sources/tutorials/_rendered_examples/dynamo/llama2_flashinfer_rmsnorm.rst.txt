@@ -33,7 +33,7 @@ Key features:
 
 This example illustrates advanced extensibility in Torch-TensorRT through automatic plugin generation and operator lowering customization.
 
-.. GENERATED FROM PYTHON SOURCE LINES 17-258
+.. GENERATED FROM PYTHON SOURCE LINES 17-259
 
 .. code-block:: python
 
@@ -243,7 +243,7 @@ This example illustrates advanced extensibility in Torch-TensorRT through automa
 
     # 2. Initialize model (random weights)
     with torch.no_grad():
-        model = LlamaForCausalLM(config).eval().half()
+        model = LlamaForCausalLM(config).cuda().half().eval()
 
     # 3. Export with static shapes
     input_ids = torch.randint(0, 32000, (1, 64))  # Static [batch=1, seq=64]
@@ -276,7 +276,8 @@ This example illustrates advanced extensibility in Torch-TensorRT through automa
 
     input_ids = input_ids.to(DEVICE)
 
-    res = trt_model.forward(input_ids)
+    with torch.no_grad():
+        res = trt_model.forward(input_ids)
     print(res)
 
 

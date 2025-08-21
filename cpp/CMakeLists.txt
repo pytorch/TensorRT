@@ -4,7 +4,6 @@ add_library(${lib_name} OBJECT)
 set(CXX_SRCS
     "${CMAKE_CURRENT_SOURCE_DIR}/src/compile_spec.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/logging.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/ptq.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/torch_tensorrt.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/types.cpp"
 )
@@ -12,7 +11,6 @@ set(CXX_SRCS
 set(HEADER_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/include/torch_tensorrt/logging.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/include/torch_tensorrt/macros.h"
-    "${CMAKE_CURRENT_SOURCE_DIR}/include/torch_tensorrt/ptq.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/include/torch_tensorrt/torch_tensorrt.h"
 )
 

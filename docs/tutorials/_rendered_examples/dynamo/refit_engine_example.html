@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Refitting Torch-TensorRT Programs with New Weights &mdash; Torch-TensorRT v2.9.0.dev0+b00ff13 documentation</title>
+  <title>Refitting Torch-TensorRT Programs with New Weights &mdash; Torch-TensorRT v2.9.0.dev0+844cfd4 documentation</title>
   
 
   
@@ -293,7 +293,7 @@
               
               
                 <div class="version">
-                  v2.9.0.dev0+b00ff13
+                  v2.9.0.dev0+844cfd4
                 </div>
               
             
@@ -397,7 +397,6 @@
 <li class="toctree-l1"><a class="reference internal" href="../../../_cpp_api/namespace_torch_tensorrt.html">Namespace torch_tensorrt</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../_cpp_api/namespace_torch_tensorrt__logging.html">Namespace torch_tensorrt::logging</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../_cpp_api/namespace_torch_tensorrt__torchscript.html">Namespace torch_tensorrt::torchscript</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../../_cpp_api/namespace_torch_tensorrt__ptq.html">Namespace torch_tensorrt::ptq</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">CLI Documentation</span></p>
 <ul>
@@ -539,7 +538,7 @@ additional parameter <cite>immutable_weights</cite> that is set to <cite>False</
 indicate that the engine being built should support weight refitting later. Engines built without
 these setttings will not be able to be refit.</p>
 <p>In this case we are going to compile a ResNet18 model with randomly initialized weights and save it.</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">model</span> <span class="o">=</span> <span class="n">models</span><span class="o">.</span><span class="n">resnet18</span><span class="p">(</span><span class="n">pretrained</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">&quot;cuda&quot;</span><span class="p">)</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">model</span> <span class="o">=</span> <span class="n">models</span><span class="o">.</span><span class="n">resnet18</span><span class="p">(</span><span class="n">pretrained</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">&quot;cuda&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span>
 <span class="n">exp_program</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">export</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">inputs</span><span class="p">))</span>
 <span class="n">enabled_precisions</span> <span class="o">=</span> <span class="p">{</span><span class="n">torch</span><span class="o">.</span><span class="n">float</span><span class="p">}</span>
 <span class="n">workspace_size</span> <span class="o">=</span> <span class="mi">20</span> <span class="o">&lt;&lt;</span> <span class="mi">30</span>
@@ -569,7 +568,7 @@ refit the model with the pretrained weights. This is done by setting up another 
 with the target weights and exporting it as an ExportedProgram. Then the <code class="docutils literal notranslate"><span class="pre">refit_module_weights</span></code>
 function is used to update the weights of the compiled module with the new weights.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Create and compile the updated model</span>
-<span class="n">model2</span> <span class="o">=</span> <span class="n">models</span><span class="o">.</span><span class="n">resnet18</span><span class="p">(</span><span class="n">pretrained</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">&quot;cuda&quot;</span><span class="p">)</span>
+<span class="n">model2</span> <span class="o">=</span> <span class="n">models</span><span class="o">.</span><span class="n">resnet18</span><span class="p">(</span><span class="n">pretrained</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">&quot;cuda&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span>
 <span class="n">exp_program2</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">export</span><span class="p">(</span><span class="n">model2</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">inputs</span><span class="p">))</span>
 
 
@@ -583,12 +582,14 @@ function is used to update the weights of the compiled module with the new weigh
 <span class="p">)</span>
 
 <span class="c1"># Check the output</span>
-<span class="n">model2</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">&quot;cuda&quot;</span><span class="p">)</span>
-<span class="n">expected_outputs</span><span class="p">,</span> <span class="n">refitted_outputs</span> <span class="o">=</span> <span class="n">exp_program2</span><span class="o">.</span><span class="n">module</span><span class="p">()(</span><span class="o">*</span><span class="n">inputs</span><span class="p">),</span> <span class="n">new_trt_gm</span><span class="p">(</span><span class="o">*</span><span class="n">inputs</span><span class="p">)</span>
-<span class="k">for</span> <span class="n">expected_output</span><span class="p">,</span> <span class="n">refitted_output</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">expected_outputs</span><span class="p">,</span> <span class="n">refitted_outputs</span><span class="p">):</span>
-    <span class="k">assert</span> <span class="n">torch</span><span class="o">.</span><span class="n">allclose</span><span class="p">(</span>
-        <span class="n">expected_output</span><span class="p">,</span> <span class="n">refitted_output</span><span class="p">,</span> <span class="mf">1e-2</span><span class="p">,</span> <span class="mf">1e-2</span>
-    <span class="p">),</span> <span class="s2">&quot;Refit Result is not correct. Refit failed&quot;</span>
+<span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
+    <span class="n">expected_outputs</span><span class="p">,</span> <span class="n">refitted_outputs</span> <span class="o">=</span> <span class="n">exp_program2</span><span class="o">.</span><span class="n">module</span><span class="p">()(</span><span class="o">*</span><span class="n">inputs</span><span class="p">),</span> <span class="n">new_trt_gm</span><span class="p">(</span>
+        <span class="o">*</span><span class="n">inputs</span>
+    <span class="p">)</span>
+    <span class="k">for</span> <span class="n">expected_output</span><span class="p">,</span> <span class="n">refitted_output</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">expected_outputs</span><span class="p">,</span> <span class="n">refitted_outputs</span><span class="p">):</span>
+        <span class="k">assert</span> <span class="n">torch</span><span class="o">.</span><span class="n">allclose</span><span class="p">(</span>
+            <span class="n">expected_output</span><span class="p">,</span> <span class="n">refitted_output</span><span class="p">,</span> <span class="mf">1e-2</span><span class="p">,</span> <span class="mf">1e-2</span>
+        <span class="p">),</span> <span class="s2">&quot;Refit Result is not correct. Refit failed&quot;</span>
 
 <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Refit successfully!&quot;</span><span class="p">)</span>
 </pre></div>

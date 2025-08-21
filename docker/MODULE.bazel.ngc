@@ -24,13 +24,16 @@ git_override(
 
 local_repository = use_repo_rule("@bazel_tools//tools/build_defs/repo:local.bzl", "local_repository")
 
-# External dependency for torch_tensorrt if you already have precompiled binaries.
-local_repository(
-    name = "torch_tensorrt",
-    path = "/usr/local/lib/python3.12/dist-packages/torch_tensorrt/",
-)
 
 new_local_repository = use_repo_rule("@bazel_tools//tools/build_defs/repo:local.bzl", "new_local_repository")
+
+
+# External dependency for torch_tensorrt if you already have precompiled binaries.
+new_local_repository(
+    name = "torch_tensorrt",
+    build_file = "@//third_party/torch_tensorrt:BUILD",
+    path = "/usr/local/lib/python3.12/dist-packages/torch_tensorrt/",
+)
 
 
 # CUDA should be installed on the system locally
@@ -55,8 +58,29 @@ new_local_repository(
     build_file = "third_party/libtorch/BUILD"
 )
 
+
+# This is a workaround (WAR), not a functional Bazel repository.
+# It directly references a system-installed PyTorch package, which breaks hermeticity
+new_local_repository(
+    name = "torch_l4t",
+    path = "/usr/local/lib/python3.12/dist-packages/torch/",
+    build_file = "third_party/libtorch/BUILD"
+)
+
 new_local_repository(
    name = "tensorrt",
+   path = "/usr/",
+   build_file = "@//third_party/tensorrt/local:BUILD"
+)
+
+new_local_repository(
+   name = "tensorrt_sbsa",
+   path = "/usr/",
+   build_file = "@//third_party/tensorrt/local:BUILD"
+)
+
+new_local_repository(
+   name = "tensorrt_l4t",
    path = "/usr/",
    build_file = "@//third_party/tensorrt/local:BUILD"
 )

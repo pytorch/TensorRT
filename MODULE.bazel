@@ -24,13 +24,15 @@ git_override(
 
 local_repository = use_repo_rule("@bazel_tools//tools/build_defs/repo:local.bzl", "local_repository")
 
-# External dependency for torch_tensorrt if you already have precompiled binaries.
-local_repository(
-    name = "torch_tensorrt",
-    path = "/opt/conda/lib/python3.11/site-packages/torch_tensorrt",
-)
 
 new_local_repository = use_repo_rule("@bazel_tools//tools/build_defs/repo:local.bzl", "new_local_repository")
+
+# External dependency for torch_tensorrt if you already have precompiled binaries.
+new_local_repository(
+    name = "torch_tensorrt",
+    build_file = "@//third_party/torch_tensorrt:BUILD",
+    path = "/usr/local/lib/python3.12/site-packages/torch_tensorrt/",
+)
 
 # CUDA should be installed on the system locally
 # for linux x86_64 and aarch64
@@ -90,10 +92,9 @@ http_archive(
 http_archive(
     name = "torch_l4t",
     build_file = "@//third_party/libtorch:BUILD",
-    sha256 = "6eff643c0a7acda92734cc798338f733ff35c7df1a4434576f5ff7c66fc97319",
     strip_prefix = "torch",
     type = "zip",
-    urls = ["https://pypi.jetson-ai-lab.dev/jp6/cu126/+f/6ef/f643c0a7acda9/torch-2.7.0-cp310-cp310-linux_aarch64.whl"],
+    urls = ["https://pypi.jetson-ai-lab.io/jp6/cu126/+f/62a/1beee9f2f1470/torch-2.8.0-cp310-cp310-linux_aarch64.whl"],
 )
 
 # Download these tarballs manually from the NVIDIA website

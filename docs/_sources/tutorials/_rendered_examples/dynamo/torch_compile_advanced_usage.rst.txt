@@ -71,10 +71,10 @@ Compilation with `torch.compile` Using Default Settings
 
     # Define sample float inputs and initialize model
     sample_inputs = [torch.rand((5, 7)).cuda(), torch.rand((5, 7)).cuda()]
-    model = Model().eval().cuda()
+    model = Model().cuda().eval()
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 42-50
+.. GENERATED FROM PYTHON SOURCE LINES 42-51
 
 .. code-block:: python
 
@@ -84,15 +84,16 @@ Compilation with `torch.compile` Using Default Settings
     # with the backend "torch_tensorrt", and run the model on an
     # input to cause compilation, as so:
     optimized_model = torch.compile(model, backend="torch_tensorrt", dynamic=False)
-    optimized_model(*sample_inputs)
+    with torch.no_grad():
+        optimized_model(*sample_inputs)
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 51-53
+.. GENERATED FROM PYTHON SOURCE LINES 52-54
 
 Compilation with `torch.compile` Using Custom Settings
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. GENERATED FROM PYTHON SOURCE LINES 53-65
+.. GENERATED FROM PYTHON SOURCE LINES 54-66
 
 .. code-block:: python
 
@@ -106,10 +107,10 @@ Compilation with `torch.compile` Using Custom Settings
         torch.rand((5, 7)).half().cuda(),
         torch.rand((5, 7)).half().cuda(),
     ]
-    model_half = Model().eval().cuda()
+    model_half = Model().cuda().eval()
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 66-91
+.. GENERATED FROM PYTHON SOURCE LINES 67-93
 
 .. code-block:: python
 
@@ -136,15 +137,16 @@ Compilation with `torch.compile` Using Custom Settings
         options=backend_kwargs,
         dynamic=False,
     )
-    optimized_model_custom(*sample_inputs_half)
+    with torch.no_grad():
+        optimized_model_custom(*sample_inputs_half)
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 92-94
+.. GENERATED FROM PYTHON SOURCE LINES 94-96
 
 Cleanup
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. GENERATED FROM PYTHON SOURCE LINES 94-98
+.. GENERATED FROM PYTHON SOURCE LINES 96-100
 
 .. code-block:: python
 
@@ -153,7 +155,7 @@ Cleanup
     torch._dynamo.reset()
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 99-108
+.. GENERATED FROM PYTHON SOURCE LINES 101-110
 
 Cuda Driver Error Note
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

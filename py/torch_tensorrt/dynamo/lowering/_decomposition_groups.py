@@ -91,7 +91,6 @@ torch_enabled_decompositions: Set[Union[OpOverload, OpOverloadPacket]] = {
     aten.narrow,
     # TODO: Disable the below operators once freezing is done
     aten.native_batch_norm_backward,
-    aten._native_batch_norm_legit,
     aten._native_batch_norm_legit_functional,
     aten.native_dropout_backward,
     aten.native_group_norm_backward,
@@ -170,6 +169,7 @@ torch_disabled_decompositions: Set[Union[OpOverload, OpOverloadPacket]] = {
     aten.upsample_trilinear3d.vec,
     aten.upsample_bicubic2d.vec,
     aten.linear.default,
+    aten.matmul.default,
 }
 
 

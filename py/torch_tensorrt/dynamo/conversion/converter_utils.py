@@ -19,11 +19,10 @@ from typing import (
 import numpy as np
 import tensorrt as trt
 import torch
+import torch_tensorrt.dynamo.conversion.impl as impl
 from torch.fx.experimental.proxy_tensor import unset_fake_temporarily
 from torch.fx.node import Argument, Target
 from torch.fx.passes.shape_prop import TensorMetadata
-
-import torch_tensorrt.dynamo.conversion.impl as impl
 from torch_tensorrt import _enums
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo._SourceIR import SourceIR
@@ -32,7 +31,7 @@ from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
     ConverterRegistry,
     DynamoConverterImplSignature,
 )
-
+from torch_tensorrt._utils import is_tensorrt_version_supported
 from ..types import Shape, TRTDataType, TRTLayer, TRTTensor
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
@@ -345,7 +344,7 @@ def to_trt_weights(
     count: Optional[int] = None,
 ) -> trt.Weights:
     """
-    Convert a PyTorch tensor or NumPy array to TensorRT weights.
+    Convert a PyTorch tensor to TensorRT weights.
 
     Args:
         value (Union[torch.Tensor, np.ndarray]): The tensor or array to convert to TRT weights
@@ -448,31 +447,35 @@ def create_constant(
         if torch_value is not None:
 
             if torch_value.dtype == torch.uint8:
-                if (
-                    target_quantized_type is None
-                    or target_quantized_type != trt.DataType.FP4
-                ):
-                    # Iconstant layer does not support Uint8, it only support that FP4 data packed in uint8
-                    raise ValueError(
-                        "Currently supported target_quantized_type for uint8 is FP4, got {target_quantized_type=}"
+                if is_tensorrt_version_supported("10.8.0"):
+                    if (
+                        target_quantized_type is None
+                        or target_quantized_type != trt.DataType.FP4
+                    ):
+                        # Iconstant layer does not support Uint8, it only support that FP4 data packed in uint8
+                        raise ValueError(
+                            "Currently supported target_quantized_type for uint8 is FP4, got {target_quantized_type=}"
+                        )
+                    shape[-1] = shape[-1] * 2
+                    weights = to_trt_weights(
+                        ctx,
+                        torch_value,
+                        name,
+                        "CONSTANT",
+                        "CONSTANT",
+                        dtype=trt.DataType.FP4,
+                        count=torch_value.numel() * 2,
                     )
-                shape[-1] = shape[-1] * 2
-                weights = to_trt_weights(
-                    ctx,
-                    torch_value,
-                    name,
-                    "CONSTANT",
-                    "CONSTANT",
-                    dtype=trt.DataType.FP4,
-                    count=torch_value.numel() * 2,
-                )
-                constant = ctx.net.add_constant(
-                    shape,
-                    weights,
-                )
-                constant.name = name
-                return constant.get_output(0)
-
+                    constant = ctx.net.add_constant(
+                        shape,
+                        weights,
+                    )
+                    constant.name = name
+                    return constant.get_output(0)
+                else:
+                    raise ValueError(
+                        "Currently FP4 is only supported in TensorRT 10.8.0 and above"
+                    )
             # Record the weight in ctx for refit and cpu memory reference
 
             # Convert the torch.Tensor to a trt.Weights object

@@ -196,7 +196,7 @@ Image generation using prompt
 Provide a prompt and the file name of the image to be generated. Here we use the
 prompt ``A golden retriever holding a sign to code``.
 
-.. GENERATED FROM PYTHON SOURCE LINES 138-155
+.. GENERATED FROM PYTHON SOURCE LINES 138-156
 
 .. code-block:: python
 
@@ -205,20 +205,21 @@ prompt ``A golden retriever holding a sign to code``.
     # Function which generates images from the flux pipeline
     def generate_image(pipe, prompt, image_name):
         seed = 42
-        image = pipe(
-            prompt,
-            output_type="pil",
-            num_inference_steps=20,
-            generator=torch.Generator("cuda").manual_seed(seed),
-        ).images[0]
-        image.save(f"{image_name}.png")
-        print(f"Image generated using {image_name} model saved as {image_name}.png")
+        with torch.no_grad():
+            image = pipe(
+                prompt,
+                output_type="pil",
+                num_inference_steps=20,
+                generator=torch.Generator("cuda").manual_seed(seed),
+            ).images[0]
+            image.save(f"{image_name}.png")
+            print(f"Image generated using {image_name} model saved as {image_name}.png")
 
 
     generate_image(pipe, ["A golden retriever holding a sign to code"], "dog_code")
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 156-160
+.. GENERATED FROM PYTHON SOURCE LINES 157-161
 
 The generated image is as shown below
 

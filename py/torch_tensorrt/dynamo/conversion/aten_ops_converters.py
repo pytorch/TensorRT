@@ -6,7 +6,9 @@ from typing import Callable, Dict, Optional, Sequence, Tuple, Union
 
 import numpy as np
 import torch
+from tensorrt import ITensor as TRTTensor
 from torch.fx.node import Argument, Node, Target
+from torch_tensorrt._utils import is_tensorrt_version_supported
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion import impl
@@ -21,7 +23,6 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     get_positive_dim,
     is_only_operator_on_placeholder,
 )
-from torch_tensorrt.dynamo.types import TRTTensor
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -123,6 +124,33 @@ def aten_ops_batch_norm_legit_no_training(
         return_mean_rstd=(
             target == torch.ops.aten._native_batch_norm_legit_no_training.default
         ),
+    )
+
+
+@dynamo_tensorrt_converter(
+    torch.ops.aten._native_batch_norm_legit.no_stats,
+    capability_validator=one_user_validator,
+    supports_dynamic_shapes=True,
+)
+def aten_ops_batch_norm_legit_no_stats(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.normalization.batch_norm(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        input=args[0],
+        weight=args[1],
+        bias=args[2],
+        training=False,
+        momentum=args[4],
+        eps=args[5],
+        return_mean_rstd=True,
     )
 
 
@@ -538,6 +566,7 @@ def aten_ops_gelu(
 
 
 @dynamo_tensorrt_converter(torch.ops.aten.matmul, supports_dynamic_shapes=True)
+@dynamo_tensorrt_converter(torch.ops.aten.matmul.default, supports_dynamic_shapes=True)
 @dynamo_tensorrt_converter(torch.ops.aten.dot.default, supports_dynamic_shapes=True)
 @dynamo_tensorrt_converter(torch.ops.aten.mm.default, supports_dynamic_shapes=True)
 @dynamo_tensorrt_converter(torch.ops.aten.mv.default, supports_dynamic_shapes=True)
@@ -625,40 +654,41 @@ else:
         )
 
 
-try:
-    import modelopt.torch.quantization as mtq  # noqa: F401
+if is_tensorrt_version_supported("10.8.0"):
+    try:
+        import modelopt.torch.quantization as mtq  # noqa: F401
 
-    assert torch.ops.tensorrt.dynamic_block_quantize_op.default
-except Exception as e:
-    _LOGGER.warning(
-        "Unable to import quantize op. Please install modelopt library (https://github.com/NVIDIA/TensorRT-Model-Optimizer?tab=readme-ov-file#installation) to add support for compiling quantized models"
-    )
-else:
-
-    @dynamo_tensorrt_converter(
-        torch.ops.tensorrt.dynamic_block_quantize_op.default,
-        supports_dynamic_shapes=True,
-    )
-    def aten_ops_dynamic_block_quantize_op(
-        ctx: ConversionContext,
-        target: Target,
-        args: Tuple[Argument, ...],
-        kwargs: Dict[str, Argument],
-        name: str,
-    ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-        return impl.dynamic_block_quantize.quantize(
-            ctx,
-            target,
-            SourceIR.ATEN,
-            name,
-            args[0],
-            args[1],
-            args[2],
-            args[3],
-            args[4],
-            args[5],
-            args[6],
+        assert torch.ops.tensorrt.dynamic_block_quantize_op.default
+    except Exception as e:
+        _LOGGER.warning(
+            "Unable to import quantize op. Please install modelopt library (https://github.com/NVIDIA/TensorRT-Model-Optimizer?tab=readme-ov-file#installation) to add support for compiling quantized models"
         )
+    else:
+
+        @dynamo_tensorrt_converter(
+            torch.ops.tensorrt.dynamic_block_quantize_op.default,
+            supports_dynamic_shapes=True,
+        )
+        def aten_ops_dynamic_block_quantize_op(
+            ctx: ConversionContext,
+            target: Target,
+            args: Tuple[Argument, ...],
+            kwargs: Dict[str, Argument],
+            name: str,
+        ) -> Union[TRTTensor, Sequence[TRTTensor]]:
+            return impl.dynamic_block_quantize.quantize(
+                ctx,
+                target,
+                SourceIR.ATEN,
+                name,
+                args[0],
+                args[1],
+                args[2],
+                args[3],
+                args[4],
+                args[5],
+                args[6],
+            )
 
 
 @dynamo_tensorrt_converter(torch.ops.aten.squeeze.dim, supports_dynamic_shapes=True)
@@ -1099,7 +1129,7 @@ def aten_ops_clone_copy_dtype(
         name,
         args[0],
         kwargs.get("dtype", args[0].dtype),
-        force_layer=True,
+        force_layer=False,  # force_layer=False results in better performance
     )
 
 
@@ -1231,7 +1261,7 @@ def aten_ops_sum(
             name,
             sum_,
             kwargs["output_dtype"],
-            force_layer=True,
+            force_layer=False,  # force_layer=False results in better performance
         )
     else:
         return sum_
