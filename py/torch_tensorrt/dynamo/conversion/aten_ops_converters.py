@@ -128,6 +128,33 @@ def aten_ops_batch_norm_legit_no_training(
 
 
 @dynamo_tensorrt_converter(
+    torch.ops.aten._native_batch_norm_legit.no_stats,
+    capability_validator=one_user_validator,
+    supports_dynamic_shapes=True,
+)
+def aten_ops_batch_norm_legit_no_stats(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.normalization.batch_norm(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        input=args[0],
+        weight=args[1],
+        bias=args[2],
+        training=False,
+        momentum=args[4],
+        eps=args[5],
+        return_mean_rstd=True,
+    )
+
+
+@dynamo_tensorrt_converter(
     torch.ops.aten.native_layer_norm.default,
     supports_dynamic_shapes=True,
 )
