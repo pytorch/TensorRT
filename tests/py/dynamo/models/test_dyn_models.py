@@ -183,6 +183,9 @@ def test_resnet_dynamic(ir, dtype):
     """
     Tests the Resnet18 model (which is fully convertible) with dynamic shapes
     """
+    if is_tensorrt_rtx() and dtype == torch.bfloat16:
+        pytest.skip("TensorRT-RTX does not support bfloat16")
+
     import torchvision.models as models
 
     model = models.resnet18(pretrained=True).eval().to("cuda").to(dtype)

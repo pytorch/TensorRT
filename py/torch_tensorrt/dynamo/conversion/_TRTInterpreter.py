@@ -111,7 +111,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         if not CONVERTERS.compilation_settings:
             # Configure user compilation settings to converters.
             CONVERTERS.set_compilation_settings(compilation_settings)
-
+        self.validate_compile_settings
         assert TRTInterpreter._all_precisions_supported(
             compilation_settings.enabled_precisions
         ), f"Attempted to enable kernel precisions that are not supported (got: {compilation_settings.enabled_precisions}, support: {_defaults.SUPPORTED_KERNEL_PRECISIONS})"
@@ -196,6 +196,11 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         return enabled_precisions.issubset(_defaults.SUPPORTED_KERNEL_PRECISIONS)
 
     def validate_compile_settings(self) -> None:
+        if is_tensorrt_rtx():
+            if dtype.bfloat16 in self.compilation_settings.enabled_precisions:
+                raise RuntimeError("TensorRT-RTX does not support bfloat16!")
+            return
+
         if (
             dtype.i8 in self.compilation_settings.enabled_precisions
             and not self.builder.platform_has_fast_int8
