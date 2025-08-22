@@ -66,7 +66,11 @@ def scaled_dot_product_attention(
     # TODO: remove this once we have a better way to handle the causal mask
     scale = kwargs.get("scale", None)
     source_ir = SourceIR.ATEN
-    is_causal = True
+
+    assert (
+        not is_causal and attn_mask is None
+    ), "either is_causal or attn_mask should be set"
+
     # implementation as described here: https://pytorch.org/docs/stable/generated/torch.nn.functional.scaled_dot_product_attention.html
     use_fp32_acc = kwargs.get("use_fp32_acc", False)
     query_dtype = query.dtype
@@ -134,37 +138,39 @@ def scaled_dot_product_attention(
             L = impl.shape.shape(ctx, target, source_ir, name + "_shape_0", query, 2)
         if S < 0:
             S = impl.shape.shape(ctx, target, source_ir, name + "_shape_1", key, 2)
+        if is_causal:
+            # generate the mask tensor
+            tril_tensor = tril(ctx, target, source_ir, name + "_tril", L, S)
 
-        # generate the mask tensor
-        tril_tensor = tril(ctx, target, source_ir, name + "_tril", L, S)
+            temp_mask = impl.unary.logical_not(
+                ctx, target, source_ir, name + "_logical_not", tril_tensor
+            )
 
-        temp_mask = impl.unary.logical_not(
-            ctx, target, source_ir, name + "_logical_not", tril_tensor
-        )
+            # This need_mask determines if we want to use the causal mask or not
+            # When KV caching is enabled, L = 1 and != S. In this case, we shouldn't use the causal mask.
+            # So need_mask will be all False values in this case.
+            # TODO: Implement more general case where L != 1 and S != L
+            need_mask = impl.elementwise.eq(ctx, target, source_ir, name + "_eq", L, S)
+            temp_mask = impl.elementwise.logical_and(
+                ctx, target, source_ir, name + "_logical_and", need_mask, temp_mask
+            )
+            temp_mask_casted = cast_trt_tensor(
+                ctx, temp_mask, query_dtype, name + "_casted_bool", target, source_ir
+            )
 
-        # This need_mask determines if we want to use the causal mask or not
-        # When KV caching is enabled, L = 1 and != S. In this case, we shouldn't use the causal mask.
-        # So need_mask will be all False values in this case.
-        # TODO: Implement more general case where L != 1 and S != L
-        need_mask = impl.elementwise.eq(ctx, target, source_ir, name + "_eq", L, S)
-        temp_mask = impl.elementwise.logical_and(
-            ctx, target, source_ir, name + "_logical_and", need_mask, temp_mask
-        )
-        temp_mask_casted = cast_trt_tensor(
-            ctx, temp_mask, query_dtype, name + "_casted_bool", target, source_ir
-        )
-
-        one_minus_temp_mask = impl.elementwise.sub(
-            ctx,
-            target,
-            source_ir,
-            name + "_one_minus_temp_mask",
-            1.0,
-            temp_mask_casted,
-        )
-        attn_bias = impl.unary.log(
-            ctx, target, source_ir, name + "_log", one_minus_temp_mask
-        )
+            one_minus_temp_mask = impl.elementwise.sub(
+                ctx,
+                target,
+                source_ir,
+                name + "_one_minus_temp_mask",
+                1.0,
+                temp_mask_casted,
+            )
+            attn_bias = impl.unary.log(
+                ctx, target, source_ir, name + "_log", one_minus_temp_mask
+            )
+        else:
+            attn_bias = attn_mask
 
     scaled_add_attn_bias = impl.elementwise.add(
         ctx, target, source_ir, name + "_attn_bias_add", mm, attn_bias

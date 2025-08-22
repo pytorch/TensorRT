@@ -47,7 +47,8 @@ repos:
       hooks:
           - id: ruff
     - repo: https://github.com/psf/black
-      rev: 25.1.0
+      # pin to a lower version for py3.9 compatibility
+      rev: 23.12.1
       hooks:
           - id: black
             exclude: ^examples/custom_converters/elu_converter/setup.py|^docs

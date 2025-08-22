@@ -72,9 +72,14 @@ def replace_variants_of_sdpa(
                 == torch.ops.aten._scaled_dot_product_flash_attention.default
             ):
                 if len(node.args) == 6:
-                    query, key, value, dropout_p, is_causal, return_debug_mask = (
-                        node.args
-                    )
+                    (
+                        query,
+                        key,
+                        value,
+                        dropout_p,
+                        is_causal,
+                        return_debug_mask,
+                    ) = node.args
                 if len(node.args) == 5:
                     query, key, value, dropout_p, is_causal = node.args
                 elif len(node.args) == 3:
@@ -87,11 +92,11 @@ def replace_variants_of_sdpa(
                     )
 
             logger.warning(
-                f"This current version of SDPA converter only supports attn_mask = None, dropout_p = 0.0 and is_causal = True configuration. This could cause issues with accuracy for models with different configurations."
+                f"This current version of SDPA converter only supports attn_mask = {attn_mask}, dropout_p = {dropout_p} and is_causal = {is_causal} configuration. This could cause issues with accuracy for models with different configurations."
             )
-            modified_input_args = (query, key, value, None, dropout_p, True)
+            modified_input_args = (query, key, value, attn_mask, dropout_p, is_causal)
             # Create a new node with torch.nn.functional.scaled_dot_product_attention
-            # The input args is (query, key, value, is_causal). kwargs has scale
+            # The input args is (query, key, value, attn_mask, dropout_p, is_causal). kwargs has scale
             with gm.graph.inserting_after(node):
                 new_node = gm.graph.call_function(
                     torch.nn.functional.scaled_dot_product_attention,
