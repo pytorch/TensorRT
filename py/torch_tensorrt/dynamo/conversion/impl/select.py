@@ -87,16 +87,7 @@ def expand_boolean_indices(
             # nonzero returns shape [N, dims], we need to extract dim i
             if len(indices) == 1:
                 # x[mask] — 1D mask
-                squeeze_layer = ctx.net.add_shuffle(nonzero_indices)
-                squeeze_layer.reshape_dims = (-1,)
-                set_layer_name(
-                    squeeze_layer,
-                    target,
-                    name + f"_bool_nonzero_squeeze_{i}",
-                    source_ir,
-                )
-                squeezed_index = squeeze_layer.get_output(0)
-                new_indices.append(squeezed_index)
+                to_squeeze = nonzero_indices
             else:
                 # Advanced multi-axis mask: extract index i from shape [N, D]
                 gather_axis = 1  # dim index
@@ -108,11 +99,17 @@ def expand_boolean_indices(
                 set_layer_name(
                     gather_layer, target, name + f"_bool_nonzero_extract_{i}", source_ir
                 )
-                extracted_index = gather_layer.get_output(0)
-                squeeze_layer = ctx.net.add_shuffle(extracted_index)
-                squeeze_layer.reshape_dims = (-1,)
-                squeezed_index = squeeze_layer.get_output(0)
-                new_indices.append(squeezed_index)
+                to_squeeze = gather_layer.get_output(0)
+            squeeze_layer = ctx.net.add_shuffle(to_squeeze)
+            squeeze_layer.reshape_dims = (-1,)
+            set_layer_name(
+                squeeze_layer,
+                target,
+                name + f"_bool_mask_squeeze_{i}",
+                source_ir,
+            )
+            squeezed_index = squeeze_layer.get_output(0)
+            new_indices.append(squeezed_index)
         else:
             new_indices.append(ind)
     return new_indices
