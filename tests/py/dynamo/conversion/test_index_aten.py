@@ -86,7 +86,7 @@ class TestIndexConstantConverter(DispatchTestCase):
                 "mask_index_multi_axis",
                 [
                     None,
-                    torch.tensor([[True, False, False, True]]),  # axis 1
+                    torch.tensor([True, False]),  # axis 1
                     None,
                     torch.tensor([True, False]),  # axis 3
                 ],
