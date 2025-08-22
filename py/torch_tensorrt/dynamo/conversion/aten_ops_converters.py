@@ -23,6 +23,7 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     get_positive_dim,
     is_only_operator_on_placeholder,
 )
+from torch_tensorrt.dynamo.utils import DYNAMIC_DIM
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -2694,6 +2695,13 @@ def sort_validator(node: Node, settings: Optional[CompilationSettings] = None) -
 
 
 def topk_sort_validator(k: int) -> bool:
+
+    # topk layer supports dynamic k value but we cannot determine supported dynamic topk value at
+    # compile time.
+    if k == DYNAMIC_DIM:
+        _LOGGER.debug("k value cannot be dynamic!")
+        return False
+
     if k > 3840:
         _LOGGER.debug(
             f"Currently only topk values up to 3840 are supported, got k={k}."
@@ -3160,7 +3168,9 @@ def aten_ops_upsample_bicubic2d(
 
 
 @dynamo_tensorrt_converter(
-    torch.ops.aten.topk.default, capability_validator=topk_validator
+    torch.ops.aten.topk.default,
+    capability_validator=topk_validator,
+    supports_dynamic_shapes=True,
 )
 @enforce_tensor_types(
     {
