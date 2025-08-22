@@ -81,6 +81,17 @@ class TestIndexConstantConverter(DispatchTestCase):
                 [torch.tensor([True, False])],
                 torch.randn(2, 2),
             ),
+            (
+                # covers multi axis and discontinuous indices
+                "mask_index_multi_axis",
+                [
+                    None,
+                    torch.tensor([[True, False, False, True]]),  # axis 1
+                    None,
+                    torch.tensor([True, False]),  # axis 3
+                ],
+                torch.randn(2, 4, 4, 2),
+            ),
         ]
     )
     def test_index_constant(self, _, index, input):
