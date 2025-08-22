@@ -14,7 +14,6 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     cast_trt_tensor,
     get_positive_dim,
     get_trt_tensor,
-    has_dynamic_shape,
     set_layer_name,
     to_numpy,
 )
@@ -52,10 +51,14 @@ def select(
 
 
 def is_boolean_tensor(tensor: Union[TRTTensor, np.ndarray, torch.Tensor]) -> bool:
-    if isinstance(tensor, (TRTTensor)):
+    if isinstance(tensor, (torch.Tensor, np.ndarray, TRTTensor)):
+        return bool(tensor.dtype == torch.bool)
+    # when index is a node
+    else:
         val = tensor.meta.get("val")
         if val is not None and val.dtype is torch.bool:
             return True
+
     return isinstance(tensor, (torch.Tensor, np.ndarray)) and tensor.dtype == torch.bool
 
 
@@ -67,12 +70,12 @@ def expand_boolean_indices(
     input: TRTTensor,
     indices: Sequence[Union[TRTTensor, np.ndarray, torch.Tensor]],
 ) -> Sequence[Union[TRTTensor, np.ndarray, torch.Tensor]]:
+    new_indices = []
     for i, ind in enumerate(indices):
         if ind is not None and is_boolean_tensor(ind):
             _LOGGER.debug(
                 f"Boolean index detected at position {i}, converting with nonzero()"
             )
-
             mask_tensor = get_trt_tensor(ctx, ind, name + f"_bool_mask_{i}")
 
             nonzero_layer = ctx.net.add_non_zero(mask_tensor)
@@ -93,7 +96,7 @@ def expand_boolean_indices(
                     source_ir,
                 )
                 squeezed_index = squeeze_layer.get_output(0)
-                ind = squeezed_index
+                new_indices.append(squeezed_index)
             else:
                 # Advanced multi-axis mask: extract index i from shape [N, D]
                 gather_axis = 1  # dim index
@@ -106,8 +109,13 @@ def expand_boolean_indices(
                     gather_layer, target, name + f"_bool_nonzero_extract_{i}", source_ir
                 )
                 extracted_index = gather_layer.get_output(0)
-                ind = extracted_index
-    return indices
+                squeeze_layer = ctx.net.add_shuffle(extracted_index)
+                squeeze_layer.reshape_dims = (-1,)
+                squeezed_index = squeeze_layer.get_output(0)
+                new_indices.append(squeezed_index)
+        else:
+            new_indices.append(ind)
+    return new_indices
 
 
 def index(
@@ -125,6 +133,7 @@ def index(
     _LOGGER.debug(
         "Determining whether aten.index constant-index optimization can be invoked"
     )
+    indices = expand_boolean_indices(ctx, target, source_ir, name, input, indices)
     is_numpy = all(
         isinstance(ind, (torch.Tensor, np.ndarray))
         for ind in indices
@@ -133,7 +142,6 @@ def index(
     # here we need to check if all the index are broadcastable
     # if no, then we need to broadcast
     last_index = None
-    indices = expand_boolean_indices(ctx, target, source_ir, name, input, indices)
     for i, ind in enumerate(indices):
         if ind is not None:
             _LOGGER.debug(f"Shape of {i} index is {ind.shape}")
