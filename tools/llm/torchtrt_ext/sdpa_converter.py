@@ -27,24 +27,50 @@ def tril(
     name: str,
     row: TRTTensor,
     col: TRTTensor,
+    sliding_window_size: Optional[int] = None,
 ) -> TRTTensor:
     row_arange_tensor = impl.arange.arange(
         ctx, target, source_ir, name + "_arange_row", start=0, end=row, step=1
     )
-    row_reshape_tensor = impl.shuffle.reshape(
-        ctx, target, source_ir, name + "_reshape_row", row_arange_tensor, [row, 1]
-    )
-
     col_arange_tensor = impl.arange.arange(
         ctx, target, source_ir, name + "_arange_col", start=0, end=col, step=1
     )
-    col_reshape_tensor = impl.shuffle.reshape(
-        ctx, target, source_ir, name + "_reshape_col", col_arange_tensor, [1, col]
+    row_arange_tensor = impl.unsqueeze.unsqueeze(
+        ctx, target, source_ir, name + "_unsqueeze_row", row_arange_tensor, -1
     )
+    col_arange_tensor = impl.unsqueeze.unsqueeze(
+        ctx, target, source_ir, name + "_unsqueeze_col", col_arange_tensor, 0
+    )
+    # sub will return the following mask tensor:
+    # [[0, -1, -2, -3],
+    #  [1,  0, -1, -2],
+    #  [2,  1,  0, -1],
+    #  [3,  2,  1,  0]]
+    mask = impl.elementwise.sub(
+        ctx, target, source_ir, name + "_sub", row_arange_tensor, col_arange_tensor
+    )
+    ge_0_mask = impl.elementwise.ge(ctx, target, source_ir, name + "_ge_0", mask, 0.0)
+    if sliding_window_size is None:
+        # return the following lower triangular mask includes the main diagonal:
+        # 0 ■ ⬚ ⬚ ⬚ ⬚     tensor([[[[ True, False, False, False, False],
+        # 1 ■ ■ ⬚ ⬚ ⬚               [ True,  True, False, False, False],
+        # 2 ■ ■ ■ ⬚ ⬚               [ True,  True,  True, False, False],
+        # 3 ■ ■ ■ ■ ⬚               [ True,  True,  True,  True, False],
+        # 4 ■ ■ ■ ■ ■               [ True,  True,  True,  True,  True]]]])
+        return ge_0_mask
 
-    mask = impl.elementwise.ge(
-        ctx, target, source_ir, name + "_ge", row_reshape_tensor, col_reshape_tensor
+    lt_window_mask = impl.elementwise.lt(
+        ctx, target, source_ir, name + "_lt_window_size", mask, sliding_window_size
     )
+    mask = impl.elementwise.logical_and(
+        ctx, target, source_ir, name + "_logical_and", ge_0_mask, lt_window_mask
+    )
+    # return the following mask if sliding_window_size is 3:
+    # 0 ■ ⬚ ⬚ ⬚ ⬚      tensor([[[[ True, False, False, False, False],
+    # 1 ■ ■ ⬚ ⬚ ⬚                [ True,  True, False, False, False],
+    # 2 ■ ■ ■ ⬚ ⬚                [ True,  True,  True, False, False],
+    # 3 ⬚ ■ ■ ■ ⬚                [False,  True,  True,  True, False],
+    # 4 ⬚ ⬚ ■ ■ ■                [False, False,  True,  True,True]]]])
     return mask
 
 
@@ -68,8 +94,11 @@ def scaled_dot_product_attention(
     source_ir = SourceIR.ATEN
 
     assert (
-        not is_causal and attn_mask is None
-    ), "either is_causal or attn_mask should be set"
+        is_causal or attn_mask is not None
+    ), "at least one of is_causal or attn_mask should be set"
+    assert is_causal ^ (
+        attn_mask is not None
+    ), "Exactly one of is_causal or attn_mask must be set"
 
     # implementation as described here: https://pytorch.org/docs/stable/generated/torch.nn.functional.scaled_dot_product_attention.html
     use_fp32_acc = kwargs.get("use_fp32_acc", False)

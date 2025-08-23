@@ -233,16 +233,18 @@ def insert_kv_slicing_before_sdpa(
         q_node, k_node, v_node, attn_mask, dropout_p, is_causal = sdpa_node.args
         incoming_key, incoming_value = incoming_keys_values[idx]
         # For keys
-        new_current_key_node, new_incoming_key_cache_node = (
-            create_kv_cache_update_nodes(
-                gm, sdpa_node, k_node, incoming_key, start_idx_input, end_idx_input
-            )
+        (
+            new_current_key_node,
+            new_incoming_key_cache_node,
+        ) = create_kv_cache_update_nodes(
+            gm, sdpa_node, k_node, incoming_key, start_idx_input, end_idx_input
         )
         # For values
-        new_current_value_node, new_incoming_value_cache_node = (
-            create_kv_cache_update_nodes(
-                gm, sdpa_node, v_node, incoming_value, start_idx_input, end_idx_input
-            )
+        (
+            new_current_value_node,
+            new_incoming_value_cache_node,
+        ) = create_kv_cache_update_nodes(
+            gm, sdpa_node, v_node, incoming_value, start_idx_input, end_idx_input
         )
 
         # Store the KV cache nodes for the current SDPA node
@@ -254,7 +256,7 @@ def insert_kv_slicing_before_sdpa(
         sdpa_node.args = (q_node, new_current_key_node, new_current_value_node) + (
             attn_mask,
             dropout_p,
-            True,
+            is_causal,
         )
 
     # kv_cache_for_graph.extend([k_node, v_node])

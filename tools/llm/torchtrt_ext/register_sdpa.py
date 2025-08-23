@@ -41,9 +41,10 @@ def replace_variants_of_sdpa(
     """Replace scaled_dot_product_attention with an equivalent
     implementation which can be accurately converted to TRT
     """
-    attn_mask = None
-    is_causal = True
+
     for node in gm.graph.nodes:
+        attn_mask = None
+        is_causal = False
         if node.op == "call_function" and node.target in REPLACEABLE_ATEN_OPS:
             if (
                 node.target
@@ -54,7 +55,7 @@ def replace_variants_of_sdpa(
                         query,
                         key,
                         value,
-                        attn_bias,
+                        attn_mask,
                         compute_log_sumexp,
                         dropout_p,
                         is_causal,
