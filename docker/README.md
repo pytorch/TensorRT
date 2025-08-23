@@ -15,14 +15,14 @@
 
 ### Instructions
 
-- The example below uses TensorRT 10.12.0.36
+- The example below uses TensorRT 10.13.2.6
 - See <a href="https://github.com/pytorch/TensorRT#dependencies">dependencies</a> for a list of current default dependencies.
 
 > From root of Torch-TensorRT repo
 
 Build:
 ```
-DOCKER_BUILDKIT=1 docker build --build-arg TENSORRT_VERSION=10.12.0 -f docker/Dockerfile -t torch_tensorrt:latest .
+DOCKER_BUILDKIT=1 docker build --build-arg TENSORRT_VERSION=10.13.2 -f docker/Dockerfile -t torch_tensorrt:latest .
 ```
 
 Run:
