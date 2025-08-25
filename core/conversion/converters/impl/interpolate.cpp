@@ -14,6 +14,7 @@ namespace {
 /*
  * Helper functions
  */
+#ifndef TRT_MAJOR_RTX
 void create_plugin(
     ConversionCtx* ctx,
     const torch::jit::Node* n,
@@ -65,6 +66,7 @@ void create_plugin(
 
   LOG_DEBUG("Output tensor shape: " << layer_output->getDimensions());
 }
+#endif
 
 void resize_layer_size(
     ConversionCtx* ctx,

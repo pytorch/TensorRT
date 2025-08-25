@@ -119,6 +119,10 @@ class TestCompile(unittest.TestCase):
         )
 
 
+@unittest.skipIf(
+    is_tensorrt_rtx(),
+    "aten::adaptive_avg_pool2d is implemented via plugins which is not supported for tensorrt_rtx",
+)
 class TestCheckMethodOpSupport(unittest.TestCase):
     def test_check_support(self):
         module = models.alexnet(pretrained=True).eval().to("cuda")

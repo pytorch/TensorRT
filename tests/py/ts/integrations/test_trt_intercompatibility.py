@@ -11,6 +11,10 @@ from utils import COSINE_THRESHOLD, cosine_similarity
     not torchtrt.ENABLED_FEATURES.torchscript_frontend,
     "TorchScript Frontend is not available",
 )
+@unittest.skipIf(
+    is_tensorrt_rtx(),
+    "aten::adaptive_avg_pool2d is implemented via plugins which is not supported for tensorrt_rtx",
+)
 class TestPyTorchToTRTEngine(unittest.TestCase):
     def test_pt_to_trt(self):
         self.model = models.resnet18(pretrained=True).eval().to("cuda:0")

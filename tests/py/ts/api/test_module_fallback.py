@@ -1,12 +1,18 @@
-import unittest
-import torch_tensorrt as torchtrt
-import torch
-import torchvision.models as models
 import copy
+import unittest
 from typing import Dict
-from utils import cosine_similarity, COSINE_THRESHOLD
+
+import torch
+import torch_tensorrt as torchtrt
+import torchvision.models as models
+from torch_tensorrt._utils import is_tensorrt_rtx
+from utils import COSINE_THRESHOLD, cosine_similarity
 
 
+@unittest.skipIf(
+    is_tensorrt_rtx(),
+    "aten::adaptive_avg_pool2d is implemented via plugins which is not supported for tensorrt_rtx",
+)
 class TestModuleFallback(unittest.TestCase):
     def test_fallback_resnet18(self):
         self.model = models.resnet18(pretrained=True).eval().to("cuda")

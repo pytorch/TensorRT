@@ -468,8 +468,7 @@ auto element_wise_registrations TORCHTRT_UNUSED =
                auto options = torch::TensorOptions().dtype(torch::kFloat32);
                auto ones = at::full({1}, 1, {options});
                auto ones_tensor = tensor_to_const(ctx, ones);
-               nvinfer1::IIdentityLayer* cast_layer = ctx->net->addIdentity(*ones_tensor);
-               cast_layer->setOutputType(0, nvinfer1::DataType::kBOOL);
+               nvinfer1::ICastLayer* cast_layer = ctx->net->addCast(*ones_tensor, nvinfer1::DataType::kBOOL);
 
                auto sub = add_elementwise(
                    ctx,
@@ -500,8 +499,7 @@ auto element_wise_registrations TORCHTRT_UNUSED =
                auto options = torch::TensorOptions().dtype(torch::kFloat32);
                auto ones = at::full({1}, 1, {options});
                auto ones_tensor = tensor_to_const(ctx, ones);
-               nvinfer1::IIdentityLayer* cast_layer = ctx->net->addIdentity(*ones_tensor);
-               cast_layer->setOutputType(0, nvinfer1::DataType::kBOOL);
+               nvinfer1::ICastLayer* cast_layer = ctx->net->addCast(*ones_tensor, nvinfer1::DataType::kBOOL);
 
                auto sub = add_elementwise(
                    ctx,

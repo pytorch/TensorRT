@@ -149,17 +149,12 @@ cc_library(
         "impl/topk.cpp",
         "impl/unary.cpp",
         "impl/unsqueeze.cpp",
-    ] + select({
-        ":rtx_win": [],
-        # exclude plugins from rtx build
-        ":rtx_x86_64": [],
-        "//conditions:default": [
-            "impl/batch_norm.cpp",
-            "impl/interpolate.cpp",
-            "impl/normalize.cpp",
-            "impl/pooling.cpp",
-        ],
-    }),
+        # these files has plugins which is not supported for tensorrt_rtx, commented inside the files
+        "impl/batch_norm.cpp",
+        "impl/interpolate.cpp",
+        "impl/normalize.cpp",
+        "impl/pooling.cpp",
+    ],
     hdrs = [
         "converters.h",
     ],
