@@ -1,7 +1,7 @@
 .. _mixed_precision:
 
 Compile Mixed Precision models with Torch-TensorRT
-====================================
+===================================================
 .. currentmodule:: torch_tensorrt.dynamo
 
 .. automodule:: torch_tensorrt.dynamo
@@ -9,7 +9,10 @@ Compile Mixed Precision models with Torch-TensorRT
    :undoc-members:
    :show-inheritance:
 
-Consider the following Pytorch model which explicitly casts intermediate layer to run in FP16. 
+Explicit Typing
+---------------
+
+Consider the following PyTorch model which explicitly casts intermediate layer to run in FP16. 
 
 .. code-block:: python
 
@@ -54,6 +57,7 @@ the compilation setting ``use_explicit_typing=True``. Compiling with this option
 
 .. note:: If you enable ``use_explicit_typing=True``, only torch.float32 is supported in the enabled_precisions.
 
+
 .. code-block:: python
 
     inputs = [torch.randn((1, 10), dtype=torch.float32).cuda()]
@@ -62,7 +66,7 @@ the compilation setting ``use_explicit_typing=True``. Compiling with this option
     with torch_tensorrt.logging.debug():
         trt_gm = torch_tensorrt.dynamo.compile(ep, 
                                             inputs=inputs, 
-                                            use_explicit_typing=True
+                                            use_explicit_typing=True,
                                             debug=True)
 
     # Debug log info
@@ -72,3 +76,35 @@ the compilation setting ``use_explicit_typing=True``. Compiling with this option
     # Name: __myl_ResMulSumAdd_myl0_2, LayerType: kgen, Inputs: [ { Name: __mye142_dconst, Dimensions: [30,40], Format/Datatype: Float }, { Name: linear3/addmm_2_constant_0 _ linear3/addmm_2_add_broadcast_to_same_shape_lhs_broadcast_constantFloat, Dimensions: [1,40], Format/Datatype: Float }, { Name: __myln_k_arg__bb1_3, Dimensions: [1,30], Format/Datatype: Float }], Outputs: [ { Name: output0, Dimensions: [1,40], Format/Datatype: Float }], TacticName: __myl_ResMulSumAdd_0x3fad91127c640fd6db771aa9cde67db0, StreamId: 0, Metadata: 
 
 Now the ``linear2`` layer runs in FP16 as shown in the above logs. 
+
+
+
+FP32 Accumulation
+-----------------
+
+When ``use_fp32_acc=True`` is set, Torch-TensorRT will attempt to use FP32 accumulation for matmul layers, even if the input and output tensors are in FP16. This is particularly useful for models that are sensitive to numerical errors introduced by lower-precision accumulation.
+
+.. important::
+
+    When enabling ``use_fp32_acc=True``, **explicit typing must be enabled** by setting ``use_explicit_typing=True``. Without ``use_explicit_typing=True``, the accumulation type may not be properly respected, and you may not see the intended numerical benefits.
+
+.. code-block:: python
+
+    inputs = [torch.randn((1, 10), dtype=torch.float16).cuda()]
+    mod = MyModule().eval().cuda()
+    ep = torch.export.export(mod, tuple(inputs))
+    with torch_tensorrt.logging.debug():
+        trt_gm = torch_tensorrt.dynamo.compile(
+            ep,
+            inputs=inputs,
+            use_fp32_acc=True,
+            use_explicit_typing=True,  # Explicit typing must be enabled
+            debug=True
+        )
+
+    # Debug log info
+    # Layers:
+    # Name: __myl_MulSumAddCas_myl0_0, LayerType: kgen, Inputs: [ ... ], Outputs: [ ... ], Format/Datatype: Half, Accumulation: Float
+    # ...
+
+For more information on these settings, see the explicit typing examples above.
