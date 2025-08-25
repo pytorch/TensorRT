@@ -129,4 +129,39 @@ def replace_variants_of_sdpa(
     logger.debug(
         "Replaced variants of scaled_dot_product_attention with torch.nn.functional.scaled_dot_product_attention"
     )
+    add_attn_mask_as_output = False
+    if add_attn_mask_as_output:
+        add_one_attn_mask_as_output(gm)
+    return gm
+
+
+# try to add one of the attn_mask as output, so that I can actually see the shape and value in the generation phase.
+def add_one_attn_mask_as_output(gm: torch.fx.GraphModule):
+    import torch.utils._pytree as pytree
+    from cache_utils import create_random_output_tensors
+
+    attn_mask_node = None
+    for node in gm.graph.nodes:
+        if (
+            node.op == "call_function"
+            and node.target == torch.nn.functional.scaled_dot_product_attention
+        ):
+            attn_mask_node = node.args[3]
+            break
+
+    output_node = next(node for node in gm.graph.nodes if node.op == "output")
+
+    current_outputs = output_node.args[0]
+    if isinstance(current_outputs, tuple):
+        new_outputs = current_outputs + (attn_mask_node,)
+    else:
+        new_outputs = (current_outputs, attn_mask_node)
+    output_node.args = new_outputs
+    gm.graph.output(new_outputs)
+    gm.graph.erase_node(output_node)
+
+    gm = clean_up_graph_after_modifications(gm)
+    new_output_tensors = create_random_output_tensors(new_outputs)
+    new_out_spec = pytree.tree_flatten(new_output_tensors)[1]
+    gm._out_spec = new_out_spec
     return gm
