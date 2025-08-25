@@ -5,6 +5,7 @@ import torch.nn as nn
 from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
 from torch_tensorrt import Input
+from torch_tensorrt._utils import is_tensorrt_rtx
 
 from .harness import DispatchTestCase
 
@@ -234,6 +235,10 @@ class TestBinaryOpConverters(DispatchTestCase):
             for op in elementwise_ops
             if op[0].__name__ not in ["pow.Tensor_Tensor", "fmod.Tensor"]
         ]
+    )
+    @unittest.skipIf(
+        is_tensorrt_rtx(),
+        "bf16 is not supported for tensorrt_rtx",
     )
     def test_elementwise_ops_bf16(self, _, orig_op):
         class TestModule(nn.Module):

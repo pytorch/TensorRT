@@ -5,11 +5,11 @@ import unittest
 import pytest
 import torch
 import torch_tensorrt as torchtrt
+from torch_tensorrt._utils import is_tensorrt_rtx
 from torch_tensorrt.dynamo.utils import (
     COSINE_THRESHOLD,
     cosine_similarity,
     get_model_device,
-    is_tensorrt_rtx,
 )
 
 assertions = unittest.TestCase()
@@ -113,7 +113,7 @@ def test_resnet18_torch_exec_ops(ir):
             )
         ],
         "ir": ir,
-        "enabled_precisions": {torch.float32, torch.float16, torch.bfloat16},
+        "enabled_precisions": {torch.float32, torch.float16},
         "min_block_size": 1,
         "output_format": "exported_program",
         "cache_built_engines": True,
@@ -368,6 +368,10 @@ def test_resnet18_half(ir):
 
 
 @pytest.mark.unit
+@unittest.skipIf(
+    is_tensorrt_rtx(),
+    "bf16 is not supported for tensorrt_rtx",
+)
 def test_bf16_model(ir):
     class MyModule(torch.nn.Module):
         def __init__(self):
@@ -412,6 +416,10 @@ def test_bf16_model(ir):
 
 
 @pytest.mark.unit
+@unittest.skipIf(
+    is_tensorrt_rtx(),
+    "bf16 is not supported for tensorrt_rtx",
+)
 def test_bf16_fallback_model(ir):
     class MyModule(torch.nn.Module):
         def __init__(self):

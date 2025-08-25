@@ -64,6 +64,10 @@ class TestToCopyConverter(DispatchTestCase):
             precision=torch.float,
         )
 
+    @unittest.skipIf(
+        is_tensorrt_rtx(),
+        "bf16 is not supported for tensorrt_rtx",
+    )
     def test_to_copy_bfloat16(self):
         class ToCopyBFloat16(nn.Module):
             def forward(self, x):
