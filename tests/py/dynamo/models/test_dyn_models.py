@@ -5,7 +5,11 @@ import unittest
 import pytest
 import torch
 import torch_tensorrt as torchtrt
-from torch_tensorrt.dynamo.utils import COSINE_THRESHOLD, cosine_similarity
+from torch_tensorrt.dynamo.utils import (
+    COSINE_THRESHOLD,
+    cosine_similarity,
+    is_tensorrt_rtx,
+)
 
 assertions = unittest.TestCase()
 

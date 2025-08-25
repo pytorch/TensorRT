@@ -9,6 +9,7 @@ from torch_tensorrt.dynamo.utils import (
     COSINE_THRESHOLD,
     cosine_similarity,
     get_model_device,
+    is_tensorrt_rtx,
 )
 
 assertions = unittest.TestCase()

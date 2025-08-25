@@ -111,7 +111,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         if not CONVERTERS.compilation_settings:
             # Configure user compilation settings to converters.
             CONVERTERS.set_compilation_settings(compilation_settings)
-        self.validate_compile_settings
+        self.validate_compile_settings()
         assert TRTInterpreter._all_precisions_supported(
             compilation_settings.enabled_precisions
         ), f"Attempted to enable kernel precisions that are not supported (got: {compilation_settings.enabled_precisions}, support: {_defaults.SUPPORTED_KERNEL_PRECISIONS})"
