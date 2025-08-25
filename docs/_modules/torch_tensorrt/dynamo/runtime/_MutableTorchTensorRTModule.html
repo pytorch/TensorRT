@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt.dynamo.runtime._MutableTorchTensorRTModule &mdash; Torch-TensorRT v2.9.0.dev0+844cfd4 documentation</title>
+  <title>torch_tensorrt.dynamo.runtime._MutableTorchTensorRTModule &mdash; Torch-TensorRT v2.9.0.dev0+91bb090 documentation</title>
   
 
   
@@ -290,7 +290,7 @@
               
               
                 <div class="version">
-                  v2.9.0.dev0+844cfd4
+                  v2.9.0.dev0+91bb090
                 </div>
               
             
@@ -854,7 +854,8 @@
             <span class="n">enabled_precisions</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">enabled_precisions</span><span class="p">,</span>
             <span class="o">**</span><span class="bp">self</span><span class="o">.</span><span class="n">additional_settings</span><span class="p">,</span>
         <span class="p">)</span>
-        <span class="n">deallocate_module</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">original_model</span><span class="p">,</span> <span class="n">delete_module</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">additional_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;offload_module_to_cpu&quot;</span><span class="p">,</span> <span class="kc">False</span><span class="p">):</span>
+            <span class="n">deallocate_module</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">original_model</span><span class="p">,</span> <span class="n">delete_module</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">enable_weight_streaming</span><span class="p">:</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">set_weight_streaming_ctx</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">weight_streaming_budget</span><span class="p">)</span></div>
 

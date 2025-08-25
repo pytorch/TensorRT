@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Compile Mixed Precision models with Torch-TensorRT &mdash; Torch-TensorRT v2.9.0.dev0+844cfd4 documentation</title>
+  <title>Compile Mixed Precision models with Torch-TensorRT &mdash; Torch-TensorRT v2.9.0.dev0+91bb090 documentation</title>
   
 
   
@@ -293,7 +293,7 @@
               
               
                 <div class="version">
-                  v2.9.0.dev0+844cfd4
+                  v2.9.0.dev0+91bb090
                 </div>
               
             
@@ -491,7 +491,9 @@
               
   <section id="compile-mixed-precision-models-with-torch-tensorrt">
 <span id="mixed-precision"></span><h1>Compile Mixed Precision models with Torch-TensorRT<a class="headerlink" href="#compile-mixed-precision-models-with-torch-tensorrt" title="Permalink to this heading">¶</a></h1>
-<span class="target" id="module-torch_tensorrt.dynamo"></span><p>Consider the following Pytorch model which explicitly casts intermediate layer to run in FP16.</p>
+<span class="target" id="module-torch_tensorrt.dynamo"></span><section id="explicit-typing">
+<h2>Explicit Typing<a class="headerlink" href="#explicit-typing" title="Permalink to this heading">¶</a></h2>
+<p>Consider the following PyTorch model which explicitly casts intermediate layer to run in FP16.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">MyModule</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
@@ -537,7 +539,7 @@ the compilation setting <code class="docutils literal notranslate"><span class="
 <span class="k">with</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">logging</span><span class="o">.</span><span class="n">debug</span><span class="p">():</span>
     <span class="n">trt_gm</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">dynamo</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">ep</span><span class="p">,</span>
                                         <span class="n">inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">,</span>
-                                        <span class="n">use_explicit_typing</span><span class="o">=</span><span class="kc">True</span>
+                                        <span class="n">use_explicit_typing</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
                                         <span class="n">debug</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 
 <span class="c1"># Debug log info</span>
@@ -548,6 +550,34 @@ the compilation setting <code class="docutils literal notranslate"><span class="
 </pre></div>
 </div>
 <p>Now the <code class="docutils literal notranslate"><span class="pre">linear2</span></code> layer runs in FP16 as shown in the above logs.</p>
+</section>
+<section id="fp32-accumulation">
+<h2>FP32 Accumulation<a class="headerlink" href="#fp32-accumulation" title="Permalink to this heading">¶</a></h2>
+<p>When <code class="docutils literal notranslate"><span class="pre">use_fp32_acc=True</span></code> is set, Torch-TensorRT will attempt to use FP32 accumulation for matmul layers, even if the input and output tensors are in FP16. This is particularly useful for models that are sensitive to numerical errors introduced by lower-precision accumulation.</p>
+<div class="admonition important">
+<p class="admonition-title">Important</p>
+<p>When enabling <code class="docutils literal notranslate"><span class="pre">use_fp32_acc=True</span></code>, <strong>explicit typing must be enabled</strong> by setting <code class="docutils literal notranslate"><span class="pre">use_explicit_typing=True</span></code>. Without <code class="docutils literal notranslate"><span class="pre">use_explicit_typing=True</span></code>, the accumulation type may not be properly respected, and you may not see the intended numerical benefits.</p>
+</div>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">inputs</span> <span class="o">=</span> <span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">((</span><span class="mi">1</span><span class="p">,</span> <span class="mi">10</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float16</span><span class="p">)</span><span class="o">.</span><span class="n">cuda</span><span class="p">()]</span>
+<span class="n">mod</span> <span class="o">=</span> <span class="n">MyModule</span><span class="p">()</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
+<span class="n">ep</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">export</span><span class="p">(</span><span class="n">mod</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">inputs</span><span class="p">))</span>
+<span class="k">with</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">logging</span><span class="o">.</span><span class="n">debug</span><span class="p">():</span>
+    <span class="n">trt_gm</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">dynamo</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span>
+        <span class="n">ep</span><span class="p">,</span>
+        <span class="n">inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">,</span>
+        <span class="n">use_fp32_acc</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">use_explicit_typing</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>  <span class="c1"># Explicit typing must be enabled</span>
+        <span class="n">debug</span><span class="o">=</span><span class="kc">True</span>
+    <span class="p">)</span>
+
+<span class="c1"># Debug log info</span>
+<span class="c1"># Layers:</span>
+<span class="c1"># Name: __myl_MulSumAddCas_myl0_0, LayerType: kgen, Inputs: [ ... ], Outputs: [ ... ], Format/Datatype: Half, Accumulation: Float</span>
+<span class="c1"># ...</span>
+</pre></div>
+</div>
+<p>For more information on these settings, see the explicit typing examples above.</p>
+</section>
 </section>
 
 
@@ -593,7 +623,11 @@ the compilation setting <code class="docutils literal notranslate"><span class="
           <div class="pytorch-right-menu" id="pytorch-right-menu">
             <div class="pytorch-side-scroll" id="pytorch-side-scroll-right">
               <ul>
-<li><a class="reference internal" href="#">Compile Mixed Precision models with Torch-TensorRT</a></li>
+<li><a class="reference internal" href="#">Compile Mixed Precision models with Torch-TensorRT</a><ul>
+<li><a class="reference internal" href="#explicit-typing">Explicit Typing</a></li>
+<li><a class="reference internal" href="#fp32-accumulation">FP32 Accumulation</a></li>
+</ul>
+</li>
 </ul>
 
             </div>
