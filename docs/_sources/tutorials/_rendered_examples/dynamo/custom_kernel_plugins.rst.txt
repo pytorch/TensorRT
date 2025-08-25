@@ -247,7 +247,7 @@ Using the Custom Operator in a Model
 -----------------------------------------
 We can now create models using our custom op. Here is a small example one that uses both natively supported operators (Convolution) and our custom op.
 
-.. GENERATED FROM PYTHON SOURCE LINES 200-223
+.. GENERATED FROM PYTHON SOURCE LINES 200-224
 
 .. code-block:: python
 
@@ -271,11 +271,12 @@ We can now create models using our custom op. Here is a small example one that u
             return y
 
 
-    my_model = MyModel((1, 1, 2, 0)).to("cuda")
-    my_model(ex_input)
+    my_model = MyModel((1, 1, 2, 0)).to("cuda").eval()
+    with torch.no_grad():
+        my_model(ex_input)
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 224-245
+.. GENERATED FROM PYTHON SOURCE LINES 225-246
 
 .. code-block:: none
 
@@ -299,11 +300,11 @@ We can now create models using our custom op. Here is a small example one that u
              [-4.3668, -4.1006, -5.1447],
              [-5.0352, -4.7689, -5.8131]]]], device='cuda:0')
 
-.. GENERATED FROM PYTHON SOURCE LINES 247-248
+.. GENERATED FROM PYTHON SOURCE LINES 248-249
 
 If we try to compile this model with Torch-TensorRT, we can see that (as of Torch-TensorRT 2.4.0) a number of subgraphs are created to run the custom op in PyTorch and the convolution in TensorRT
 
-.. GENERATED FROM PYTHON SOURCE LINES 248-258
+.. GENERATED FROM PYTHON SOURCE LINES 249-259
 
 .. code-block:: python
 
@@ -318,7 +319,7 @@ If we try to compile this model with Torch-TensorRT, we can see that (as of Torc
     )
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 259-303
+.. GENERATED FROM PYTHON SOURCE LINES 260-304
 
 .. code-block:: none
 
@@ -365,7 +366,7 @@ If we try to compile this model with Torch-TensorRT, we can see that (as of Torc
 
 We see that there is going to be 2 subgraphs, one that will run through PyTorch for our custom op and one through TensorRT for the convolution. This graph break is going to be a significant portion of the latency of this model.
 
-.. GENERATED FROM PYTHON SOURCE LINES 306-313
+.. GENERATED FROM PYTHON SOURCE LINES 307-314
 
 Wrapping Custom Kernels to use in TensorRT
 --------------------------------------------
@@ -375,7 +376,7 @@ TensorRT plugins refer `here <https://github.com/NVIDIA/TensorRT/tree/release/10
 define systems to handle setting up the operator, calculating the effect of the operation abstractly, serializing the op and the actual mechanics of calling the implementation of the op in the engine.
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 313-499
+.. GENERATED FROM PYTHON SOURCE LINES 314-500
 
 .. code-block:: python
 
@@ -566,14 +567,14 @@ define systems to handle setting up the operator, calculating the effect of the 
 
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 500-504
+.. GENERATED FROM PYTHON SOURCE LINES 501-505
 
 Using Torch-TensorRT to Insert the Kernel
 -------------------------------------------
 Now with our TensorRT plugin, we can create a converter so that Torch-TensorRT knows to insert our plugin in place of our custom circular padding operator.
 More information on writing converters can be found `here <https://pytorch.org/TensorRT/contributors/dynamo_converters.html>`_
 
-.. GENERATED FROM PYTHON SOURCE LINES 504-565
+.. GENERATED FROM PYTHON SOURCE LINES 505-566
 
 .. code-block:: python
 
@@ -639,11 +640,11 @@ More information on writing converters can be found `here <https://pytorch.org/T
 
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 566-567
+.. GENERATED FROM PYTHON SOURCE LINES 567-568
 
 Finally, we are now able to fully compile our model
 
-.. GENERATED FROM PYTHON SOURCE LINES 567-573
+.. GENERATED FROM PYTHON SOURCE LINES 568-574
 
 .. code-block:: python
 
@@ -654,7 +655,7 @@ Finally, we are now able to fully compile our model
         min_block_size=1,
     )
 
-.. GENERATED FROM PYTHON SOURCE LINES 574-606
+.. GENERATED FROM PYTHON SOURCE LINES 575-607
 
 .. code-block:: none
 
@@ -689,19 +690,20 @@ Finally, we are now able to fully compile our model
          - For minimal graph segmentation, select min_block_size=2 which would generate 1 TRT engine(s)
          - The current level of graph segmentation is equivalent to selecting min_block_size=2 which generates 1 TRT engine(s)
 
-.. GENERATED FROM PYTHON SOURCE LINES 608-609
+.. GENERATED FROM PYTHON SOURCE LINES 609-610
 
 As you can see, now there is only one subgraph created for the TensorRT engine that contains both our custom kernel and the native convolution operator.
 
-.. GENERATED FROM PYTHON SOURCE LINES 609-612
+.. GENERATED FROM PYTHON SOURCE LINES 610-614
 
 .. code-block:: python
 
 
-    print(trt_model(ex_input))
+    with torch.no_grad():
+        print(trt_model(ex_input))
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 613-634
+.. GENERATED FROM PYTHON SOURCE LINES 615-636
 
 .. code-block:: none
 
@@ -725,19 +727,20 @@ As you can see, now there is only one subgraph created for the TensorRT engine t
           [-4.3668, -4.1006, -5.1447],
           [-5.0352, -4.7689, -5.8131]]]], device='cuda:0')
 
-.. GENERATED FROM PYTHON SOURCE LINES 637-638
+.. GENERATED FROM PYTHON SOURCE LINES 639-640
 
 We can verify our implementation is run correctly by both TensorRT and PyTorch
 
-.. GENERATED FROM PYTHON SOURCE LINES 638-641
+.. GENERATED FROM PYTHON SOURCE LINES 640-644
 
 .. code-block:: python
 
 
-    print(my_model(ex_input) - trt_model(ex_input))
+    with torch.no_grad():
+        print(my_model(ex_input) - trt_model(ex_input))
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 642-663
+.. GENERATED FROM PYTHON SOURCE LINES 645-666
 
 .. code-block:: none
 

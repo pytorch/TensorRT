@@ -82,8 +82,8 @@ We use ``AutoModelForCausalLM`` class to load the pretrained GPT2 model from hug
                 use_cache=False,
                 attn_implementation="eager",
             )
+            .to(DEVICE)
             .eval()
-            .cuda()
         )
 
 
@@ -99,26 +99,27 @@ Tokenize a sample input prompt and get pytorch model outputs
 
     prompt = "I enjoy walking with my cute dog"
     model_inputs = tokenizer(prompt, return_tensors="pt")
-    input_ids = model_inputs["input_ids"].cuda()
+    input_ids = model_inputs["input_ids"].to(DEVICE)
 
 
 .. GENERATED FROM PYTHON SOURCE LINES 60-61
 
 The ``generate()`` API of the ``AutoModelForCausalLM`` class is used for auto-regressive generation with greedy decoding.
 
-.. GENERATED FROM PYTHON SOURCE LINES 61-68
+.. GENERATED FROM PYTHON SOURCE LINES 61-69
 
 .. code-block:: python
 
-    pyt_gen_tokens = model.generate(
-        input_ids,
-        max_length=MAX_LENGTH,
-        use_cache=False,
-        pad_token_id=tokenizer.eos_token_id,
-    )
+    with torch.no_grad():
+        pyt_gen_tokens = model.generate(
+            input_ids,
+            max_length=MAX_LENGTH,
+            use_cache=False,
+            pad_token_id=tokenizer.eos_token_id,
+        )
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 69-74
+.. GENERATED FROM PYTHON SOURCE LINES 70-75
 
 Torch-TensorRT compilation and inference
 -----------------------------
@@ -126,7 +127,7 @@ The input sequence length is dynamic, so we mark it using ``torch._dynamo.mark_d
 We provide a (min, max) range of this value so that TensorRT knows in advance what values to optimize for.
 Usually, this would be the context length for the model. We start with ``min=2`` due to the `0/1 specialization <https://docs.google.com/document/d/16VPOa3d-Liikf48teAOmxLc92rgvJdfosIy-yoT38Io/edit?fbclid=IwAR3HNwmmexcitV0pbZm_x1a4ykdXZ9th_eJWK-3hBtVgKnrkmemz6Pm5jRQ&tab=t.0#heading=h.ez923tomjvyk>`_
 
-.. GENERATED FROM PYTHON SOURCE LINES 74-86
+.. GENERATED FROM PYTHON SOURCE LINES 75-87
 
 .. code-block:: python
 
@@ -143,30 +144,31 @@ Usually, this would be the context length for the model. We start with ``min=2``
     )
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 87-90
+.. GENERATED FROM PYTHON SOURCE LINES 88-91
 
 Auto-regressive generation loop for greedy decoding using TensorRT model
 The first token generation compiles the model using TensorRT and the second token
 encounters recompilation (which is an issue currently that would be resolved in the future)
 
-.. GENERATED FROM PYTHON SOURCE LINES 90-97
+.. GENERATED FROM PYTHON SOURCE LINES 91-99
 
 .. code-block:: python
 
-    trt_gen_tokens = model.generate(
-        inputs=input_ids,
-        max_length=MAX_LENGTH,
-        use_cache=False,
-        pad_token_id=tokenizer.eos_token_id,
-    )
+    with torch.no_grad():
+        trt_gen_tokens = model.generate(
+            inputs=input_ids,
+            max_length=MAX_LENGTH,
+            use_cache=False,
+            pad_token_id=tokenizer.eos_token_id,
+        )
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 98-100
+.. GENERATED FROM PYTHON SOURCE LINES 100-102
 
 Decode the output sentences of PyTorch and TensorRT
 -----------------------------
 
-.. GENERATED FROM PYTHON SOURCE LINES 100-110
+.. GENERATED FROM PYTHON SOURCE LINES 102-112
 
 .. code-block:: python
 
@@ -181,11 +183,11 @@ Decode the output sentences of PyTorch and TensorRT
     )
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 111-112
+.. GENERATED FROM PYTHON SOURCE LINES 113-114
 
 The output sentences should look like
 
-.. GENERATED FROM PYTHON SOURCE LINES 112-118
+.. GENERATED FROM PYTHON SOURCE LINES 114-120
 
 .. code-block:: python
 

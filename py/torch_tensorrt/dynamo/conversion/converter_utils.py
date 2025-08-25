@@ -344,7 +344,7 @@ def to_trt_weights(
     count: Optional[int] = None,
 ) -> trt.Weights:
     """
-    Convert a PyTorch tensor or NumPy array to TensorRT weights.
+    Convert a PyTorch tensor to TensorRT weights.
 
     Args:
         value (Union[torch.Tensor, np.ndarray]): The tensor or array to convert to TRT weights

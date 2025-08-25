@@ -59,7 +59,7 @@ and when reusing cached engines.
     np.random.seed(0)
     torch.manual_seed(0)
 
-    model = models.resnet18(pretrained=True).eval().to("cuda")
+    model = models.resnet18(pretrained=True).to("cuda").eval()
     enabled_precisions = {torch.float}
     min_block_size = 1
     use_python_runtime = False
@@ -88,7 +88,7 @@ pull the built engine and **refit** the weights which can reduce compilation tim
 As such, in order to insert a new engine into the cache (i.e. ``cache_built_engines=True``),
 the engine must be refittable (``immutable_weights=False``). See :ref:`refit_engine_example` for more details.
 
-.. GENERATED FROM PYTHON SOURCE LINES 66-116
+.. GENERATED FROM PYTHON SOURCE LINES 66-117
 
 .. code-block:: python
 
@@ -129,7 +129,8 @@ the engine must be refittable (``immutable_weights=False``). See :ref:`refit_eng
                     "reuse_cached_engines": reuse_cached_engines,
                 },
             )
-            compiled_model(*inputs)  # trigger the compilation
+            with torch.no_grad():
+                compiled_model(*inputs)  # trigger the compilation
             end.record()
             torch.cuda.synchronize()
             times.append(start.elapsed_time(end))
@@ -143,7 +144,7 @@ the engine must be refittable (``immutable_weights=False``). See :ref:`refit_eng
     torch_compile()
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 117-122
+.. GENERATED FROM PYTHON SOURCE LINES 118-123
 
 Engine Caching for AOT Compilation
 ----------------------------------
@@ -151,7 +152,7 @@ Similarly to the JIT workflow, AOT workflows can benefit from engine caching.
 As the same architecture or common subgraphs get recompiled, the cache will pull
 previously built engines and refit the weights.
 
-.. GENERATED FROM PYTHON SOURCE LINES 122-175
+.. GENERATED FROM PYTHON SOURCE LINES 123-176
 
 .. code-block:: python
 
@@ -209,7 +210,7 @@ previously built engines and refit the weights.
     dynamo_compile()
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 176-192
+.. GENERATED FROM PYTHON SOURCE LINES 177-193
 
 Custom Engine Cache
 ----------------------
@@ -228,7 +229,7 @@ The blob contains a serialized engine, calling spec data, and weight map informa
 
 Below is an example of a custom engine cache implementation that implents a ``RAMEngineCache``.
 
-.. GENERATED FROM PYTHON SOURCE LINES 192-285
+.. GENERATED FROM PYTHON SOURCE LINES 193-287
 
 .. code-block:: python
 
@@ -313,7 +314,8 @@ Below is an example of a custom engine cache implementation that implents a ``RA
                     "custom_engine_cache": engine_cache,
                 },
             )
-            compiled_model(*inputs)  # trigger the compilation
+            with torch.no_grad():
+                compiled_model(*inputs)  # trigger the compilation
             end.record()
             torch.cuda.synchronize()
             times.append(start.elapsed_time(end))

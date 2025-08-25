@@ -56,7 +56,7 @@ Compilation with `torch_tensorrt.compile` Using Default Settings
 
 
     # We begin by defining and initializing a model
-    model = models.resnet18(pretrained=True).eval().to("cuda")
+    model = models.resnet18(pretrained=True).cuda().eval()
 
     # Define sample inputs
     inputs = torch.randn((16, 3, 224, 224)).cuda()
@@ -88,25 +88,26 @@ Compilation with `torch_tensorrt.compile` Using Default Settings
 Inference using the Cudagraphs Integration
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. GENERATED FROM PYTHON SOURCE LINES 53-66
+.. GENERATED FROM PYTHON SOURCE LINES 53-67
 
 .. code-block:: python
 
 
     # We can enable the cudagraphs API with a context manager
-    with torch_tensorrt.runtime.enable_cudagraphs(opt) as cudagraphs_module:
-        out_trt = cudagraphs_module(inputs)
+    with torch.no_grad():
+        with torch_tensorrt.runtime.enable_cudagraphs(opt) as cudagraphs_module:
+            out_trt = cudagraphs_module(inputs)
 
-    # Alternatively, we can set the cudagraphs mode for the session
-    torch_tensorrt.runtime.set_cudagraphs_mode(True)
-    out_trt = opt(inputs)
+        # Alternatively, we can set the cudagraphs mode for the session
+        torch_tensorrt.runtime.set_cudagraphs_mode(True)
+        out_trt = opt(inputs)
 
-    # We can also turn off cudagraphs mode and perform inference as normal
-    torch_tensorrt.runtime.set_cudagraphs_mode(False)
-    out_trt = opt(inputs)
+        # We can also turn off cudagraphs mode and perform inference as normal
+        torch_tensorrt.runtime.set_cudagraphs_mode(False)
+        out_trt = opt(inputs)
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 67-76
+.. GENERATED FROM PYTHON SOURCE LINES 68-78
 
 .. code-block:: python
 
@@ -115,12 +116,13 @@ Inference using the Cudagraphs Integration
     inputs_2 = torch.randn((8, 3, 224, 224)).cuda()
     inputs_3 = torch.randn((4, 3, 224, 224)).cuda()
 
-    with torch_tensorrt.runtime.enable_cudagraphs(opt) as cudagraphs_module:
-        out_trt_2 = cudagraphs_module(inputs_2)
-        out_trt_3 = cudagraphs_module(inputs_3)
+    with torch.no_grad():
+        with torch_tensorrt.runtime.enable_cudagraphs(opt) as cudagraphs_module:
+            out_trt_2 = cudagraphs_module(inputs_2)
+            out_trt_3 = cudagraphs_module(inputs_3)
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 77-97
+.. GENERATED FROM PYTHON SOURCE LINES 79-99
 
 Cuda graphs with module that contains graph breaks
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -143,7 +145,7 @@ recorded in CUDA Graphs, which helps maintain consistent execution paths and opt
    :scale: 60 %
    :align: left
 
-.. GENERATED FROM PYTHON SOURCE LINES 97-118
+.. GENERATED FROM PYTHON SOURCE LINES 99-120
 
 .. code-block:: python
 
@@ -154,8 +156,8 @@ recorded in CUDA Graphs, which helps maintain consistent execution paths and opt
             return torch.relu((x + 2) * 0.5)
 
 
-    model = SampleModel().eval().cuda()
-    input = torch.randn((1, 3, 224, 224)).to("cuda")
+    model = SampleModel().cuda().eval()
+    input = torch.randn((1, 3, 224, 224)).cuda()
 
     # The 'torch_executed_ops' compiler option is used in this example to intentionally introduce graph breaks within the module.
     # Note: The Dynamo backend is required for the CUDA Graph context manager to handle modules in an Ahead-Of-Time (AOT) manner.
@@ -169,18 +171,19 @@ recorded in CUDA Graphs, which helps maintain consistent execution paths and opt
     )
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 119-120
+.. GENERATED FROM PYTHON SOURCE LINES 121-122
 
 If module has graph breaks, whole submodules are recorded and replayed by cuda graphs
 
-.. GENERATED FROM PYTHON SOURCE LINES 120-124
+.. GENERATED FROM PYTHON SOURCE LINES 122-127
 
 .. code-block:: python
 
-    with torch_tensorrt.runtime.enable_cudagraphs(
-        opt_with_graph_break
-    ) as cudagraphs_module:
-        cudagraphs_module(input)
+    with torch.no_grad():
+        with torch_tensorrt.runtime.enable_cudagraphs(
+            opt_with_graph_break
+        ) as cudagraphs_module:
+            cudagraphs_module(input)
 
 
 .. rst-class:: sphx-glr-timing

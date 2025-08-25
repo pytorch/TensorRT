@@ -7,7 +7,7 @@ Torch-TensorRT
 [![Documentation](https://img.shields.io/badge/docs-master-brightgreen)](https://nvidia.github.io/Torch-TensorRT/)
 [![pytorch](https://img.shields.io/badge/PyTorch-2.8-green)](https://download.pytorch.org/whl/nightly/cu128)
 [![cuda](https://img.shields.io/badge/CUDA-12.8-green)](https://developer.nvidia.com/cuda-downloads)
-[![trt](https://img.shields.io/badge/TensorRT-10.11.0-green)](https://github.com/nvidia/tensorrt-llm)
+[![trt](https://img.shields.io/badge/TensorRT-10.12.0-green)](https://github.com/nvidia/tensorrt-llm)
 [![license](https://img.shields.io/badge/license-BSD--3--Clause-blue)](./LICENSE)
 [![Linux x86-64 Nightly Wheels](https://github.com/pytorch/TensorRT/actions/workflows/build-test-linux-x86_64.yml/badge.svg?branch=nightly)](https://github.com/pytorch/TensorRT/actions/workflows/build-test-linux-x86_64.yml)
 [![Linux SBSA Nightly Wheels](https://github.com/pytorch/TensorRT/actions/workflows/build-test-linux-aarch64.yml/badge.svg?branch=nightly)](https://github.com/pytorch/TensorRT/actions/workflows/build-test-linux-aarch64.yml)
@@ -93,9 +93,11 @@ auto results = trt_mod.forward({input_tensor});
 ```
 
 ## Further resources
+- [Double PyTorch Inference Speed for Diffusion Models Using Torch-TensorRT](https://developer.nvidia.com/blog/double-pytorch-inference-speed-for-diffusion-models-using-torch-tensorrt/)
 - [Up to 50% faster Stable Diffusion inference with one line of code](https://pytorch.org/TensorRT/tutorials/_rendered_examples/dynamo/torch_compile_stable_diffusion.html#sphx-glr-tutorials-rendered-examples-dynamo-torch-compile-stable-diffusion-py)
-- [Optimize LLMs from Hugging Face with Torch-TensorRT]() \[coming soon\]
+- [Optimize LLMs from Hugging Face with Torch-TensorRT](https://docs.pytorch.org/TensorRT/tutorials/compile_hf_models.html#compile-hf-models)
 - [Run your model in FP8 with Torch-TensorRT](https://pytorch.org/TensorRT/tutorials/_rendered_examples/dynamo/vgg16_fp8_ptq.html)
+- [Accelerated Inference in PyTorch 2.X with Torch-TensorRT](https://www.youtube.com/watch?v=eGDMJ3MY4zk&t=1s)
 - [Tools to resolve graph breaks and boost performance]() \[coming soon\]
 - [Tech Talk (GTC '23)](https://www.nvidia.com/en-us/on-demand/session/gtcspring23-s51714/)
 - [Documentation](https://nvidia.github.io/Torch-TensorRT/)
@@ -119,9 +121,9 @@ auto results = trt_mod.forward({input_tensor});
 These are the following dependencies used to verify the testcases. Torch-TensorRT can work with other versions, but the tests are not guaranteed to pass.
 
 - Bazel 8.1.1
-- Libtorch 2.8.0.dev (latest nightly)
+- Libtorch 2.9.0.dev (latest nightly)
 - CUDA 12.8 (CUDA 12.6 on Jetson)
-- TensorRT 10.11 (TensorRT 10.3 on Jetson)
+- TensorRT 10.12 (TensorRT 10.3 on Jetson)
 
 ## Deprecation Policy
 

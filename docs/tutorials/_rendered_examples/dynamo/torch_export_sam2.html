@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Compiling SAM2 using the dynamo backend &mdash; Torch-TensorRT v2.9.0.dev0+33b8bbc documentation</title>
+  <title>Compiling SAM2 using the dynamo backend &mdash; Torch-TensorRT v2.9.0.dev0+844cfd4 documentation</title>
   
 
   
@@ -293,7 +293,7 @@
               
               
                 <div class="version">
-                  v2.9.0.dev0+33b8bbc
+                  v2.9.0.dev0+844cfd4
                 </div>
               
             
@@ -594,8 +594,8 @@ standalone module <code class="docutils literal notranslate"><span class="pre">S
 <p>Initialize the <code class="docutils literal notranslate"><span class="pre">SAM2FullModel</span></code> with the pretrained weights. Since we already initialized
 <code class="docutils literal notranslate"><span class="pre">SAM2ImagePredictor</span></code>, we can directly use the model from it (<code class="docutils literal notranslate"><span class="pre">predictor.model</span></code>). We cast the model
 to FP16 precision for faster performance.</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">encoder</span> <span class="o">=</span> <span class="n">predictor</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
-<span class="n">sam_model</span> <span class="o">=</span> <span class="n">SAM2FullModel</span><span class="p">(</span><span class="n">encoder</span><span class="o">.</span><span class="n">half</span><span class="p">())</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">encoder</span> <span class="o">=</span> <span class="n">predictor</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span>
+<span class="n">sam_model</span> <span class="o">=</span> <span class="n">SAM2FullModel</span><span class="p">(</span><span class="n">encoder</span><span class="o">.</span><span class="n">half</span><span class="p">())</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span>
 </pre></div>
 </div>
 <p>Load a sample image provided in the repository.</p>
@@ -740,7 +740,9 @@ We enable FP32 matmul accumulation using <code class="docutils literal notransla
     <span class="n">enabled_precisions</span><span class="o">=</span><span class="p">{</span><span class="n">torch</span><span class="o">.</span><span class="n">float16</span><span class="p">},</span>
     <span class="n">use_fp32_acc</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
 <span class="p">)</span>
-<span class="n">trt_out</span> <span class="o">=</span> <span class="n">trt_model</span><span class="p">(</span><span class="o">*</span><span class="n">torchtrt_inputs</span><span class="p">)</span>
+
+<span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
+    <span class="n">trt_out</span> <span class="o">=</span> <span class="n">trt_model</span><span class="p">(</span><span class="o">*</span><span class="n">torchtrt_inputs</span><span class="p">)</span>
 </pre></div>
 </div>
 </section>

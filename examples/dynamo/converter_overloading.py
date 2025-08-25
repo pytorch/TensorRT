@@ -34,7 +34,7 @@ class GeLU(torch.nn.Module):
         return torch.nn.functional.gelu(x, approximate=self.mode)
 
 
-my_mod = GeLU(mode="tanh")
+my_mod = GeLU(mode="tanh").to("cuda").eval()
 ex_input = torch.randn(2, 5).to("cuda")
 
 
@@ -182,9 +182,9 @@ def aten_ops_gelu(
 my_custom_gelu = torch_tensorrt.compile(
     my_mod, arg_inputs=(ex_input,), min_block_size=1
 )
-
-print(my_custom_gelu.graph)
-print(my_custom_gelu(ex_input))
+with torch.no_grad():
+    print(my_custom_gelu.graph)
+    print(my_custom_gelu(ex_input))
 
 # %%
 #
@@ -198,7 +198,7 @@ print(
 #
 # Finally, we want to verify that in the case that the ``approximate`` argument is not set to ``tanh``, our custom converter is not used.
 
-my_mod_erf = GeLU(mode="none")
+my_mod_erf = GeLU(mode="none").to("cuda").eval()
 my_gelu_erf = torch_tensorrt.compile(
     my_mod_erf, arg_inputs=(ex_input,), min_block_size=1
 )
@@ -207,6 +207,6 @@ my_gelu_erf = torch_tensorrt.compile(
 #
 # Notice that we don't see the print statement from our custom converter, indicating that it was not used. However, looking at the graph, we can still see that a TensorRT engine was created to run the GeLU operation.
 # In this case, the validator for our custom converter returned ``False``, so the conversion system moved on to the next converter in the list, the standard GeLU converter and used that one to convert the operation.
-
-print(my_gelu_erf.graph)
-print(my_gelu_erf(ex_input))
+with torch.no_grad():
+    print(my_gelu_erf.graph)
+    print(my_gelu_erf(ex_input))

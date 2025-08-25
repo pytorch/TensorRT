@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Engine Caching (BERT) &mdash; Torch-TensorRT v2.9.0.dev0+33b8bbc documentation</title>
+  <title>Engine Caching (BERT) &mdash; Torch-TensorRT v2.9.0.dev0+844cfd4 documentation</title>
   
 
   
@@ -293,7 +293,7 @@
               
               
                 <div class="version">
-                  v2.9.0.dev0+33b8bbc
+                  v2.9.0.dev0+844cfd4
                 </div>
               
             
@@ -551,7 +551,8 @@ to download the full example code</p>
             <span class="n">backend</span><span class="o">=</span><span class="s2">&quot;torch_tensorrt&quot;</span><span class="p">,</span>
             <span class="n">options</span><span class="o">=</span><span class="n">compilation_kwargs</span><span class="p">,</span>
         <span class="p">)</span>
-        <span class="n">optimized_model</span><span class="p">(</span><span class="o">*</span><span class="n">inputs</span><span class="p">)</span>
+        <span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
+            <span class="n">optimized_model</span><span class="p">(</span><span class="o">*</span><span class="n">inputs</span><span class="p">)</span>
         <span class="n">end</span><span class="o">.</span><span class="n">record</span><span class="p">()</span>
         <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">synchronize</span><span class="p">()</span>
         <span class="n">times</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">start</span><span class="o">.</span><span class="n">elapsed_time</span><span class="p">(</span><span class="n">end</span><span class="p">))</span>

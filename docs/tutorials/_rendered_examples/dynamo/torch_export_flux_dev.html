@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Compiling FLUX.1-dev model using the Torch-TensorRT dynamo backend &mdash; Torch-TensorRT v2.9.0.dev0+33b8bbc documentation</title>
+  <title>Compiling FLUX.1-dev model using the Torch-TensorRT dynamo backend &mdash; Torch-TensorRT v2.9.0.dev0+844cfd4 documentation</title>
   
 
   
@@ -293,7 +293,7 @@
               
               
                 <div class="version">
-                  v2.9.0.dev0+33b8bbc
+                  v2.9.0.dev0+844cfd4
                 </div>
               
             
@@ -630,14 +630,15 @@ prompt <code class="docutils literal notranslate"><span class="pre">A</span> <sp
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Function which generates images from the flux pipeline</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">generate_image</span><span class="p">(</span><span class="n">pipe</span><span class="p">,</span> <span class="n">prompt</span><span class="p">,</span> <span class="n">image_name</span><span class="p">):</span>
     <span class="n">seed</span> <span class="o">=</span> <span class="mi">42</span>
-    <span class="n">image</span> <span class="o">=</span> <span class="n">pipe</span><span class="p">(</span>
-        <span class="n">prompt</span><span class="p">,</span>
-        <span class="n">output_type</span><span class="o">=</span><span class="s2">&quot;pil&quot;</span><span class="p">,</span>
-        <span class="n">num_inference_steps</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span>
-        <span class="n">generator</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">Generator</span><span class="p">(</span><span class="s2">&quot;cuda&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">manual_seed</span><span class="p">(</span><span class="n">seed</span><span class="p">),</span>
-    <span class="p">)</span><span class="o">.</span><span class="n">images</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
-    <span class="n">image</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">image_name</span><span class="si">}</span><span class="s2">.png&quot;</span><span class="p">)</span>
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Image generated using </span><span class="si">{</span><span class="n">image_name</span><span class="si">}</span><span class="s2"> model saved as </span><span class="si">{</span><span class="n">image_name</span><span class="si">}</span><span class="s2">.png&quot;</span><span class="p">)</span>
+    <span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
+        <span class="n">image</span> <span class="o">=</span> <span class="n">pipe</span><span class="p">(</span>
+            <span class="n">prompt</span><span class="p">,</span>
+            <span class="n">output_type</span><span class="o">=</span><span class="s2">&quot;pil&quot;</span><span class="p">,</span>
+            <span class="n">num_inference_steps</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span>
+            <span class="n">generator</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">Generator</span><span class="p">(</span><span class="s2">&quot;cuda&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">manual_seed</span><span class="p">(</span><span class="n">seed</span><span class="p">),</span>
+        <span class="p">)</span><span class="o">.</span><span class="n">images</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">image</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">image_name</span><span class="si">}</span><span class="s2">.png&quot;</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Image generated using </span><span class="si">{</span><span class="n">image_name</span><span class="si">}</span><span class="s2"> model saved as </span><span class="si">{</span><span class="n">image_name</span><span class="si">}</span><span class="s2">.png&quot;</span><span class="p">)</span>
 
 
 <span class="n">generate_image</span><span class="p">(</span><span class="n">pipe</span><span class="p">,</span> <span class="p">[</span><span class="s2">&quot;A golden retriever holding a sign to code&quot;</span><span class="p">],</span> <span class="s2">&quot;dog_code&quot;</span><span class="p">)</span>

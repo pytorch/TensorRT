@@ -18,7 +18,7 @@ import torchvision.models as models
 # %%
 
 # Initialize model with half precision and sample inputs
-model = models.resnet18(pretrained=True).half().eval().to("cuda")
+model = models.resnet18(pretrained=True).to("cuda").half().eval()
 inputs = [torch.randn((1, 3, 224, 224)).to("cuda").half()]
 
 # %%
@@ -63,21 +63,23 @@ optimized_model = torch_tensorrt.compile(
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 # Does not cause recompilation (same batch size as input)
-new_inputs = [torch.randn((1, 3, 224, 224)).half().to("cuda")]
-new_outputs = optimized_model(*new_inputs)
+new_inputs = [torch.randn((1, 3, 224, 224)).to("cuda").half()]
+with torch.no_grad():
+    new_outputs = optimized_model(*new_inputs)
 
 # %%
 
 # Does cause recompilation (new batch size)
-new_batch_size_inputs = [torch.randn((8, 3, 224, 224)).half().to("cuda")]
-new_batch_size_outputs = optimized_model(*new_batch_size_inputs)
+new_batch_size_inputs = [torch.randn((8, 3, 224, 224)).to("cuda").half()]
+with torch.no_grad():
+    new_batch_size_outputs = optimized_model(*new_batch_size_inputs)
 
 # %%
 # Avoid recompilation by specifying dynamic shapes before Torch-TRT compilation
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 # The following code illustrates the workflow using ir=torch_compile (which uses torch.compile under the hood)
-inputs_bs8 = torch.randn((8, 3, 224, 224)).half().to("cuda")
+inputs_bs8 = torch.randn((8, 3, 224, 224)).to("cuda").half()
 # This indicates dimension 0 of inputs_bs8 is dynamic whose range of values is [2, 16]
 torch._dynamo.mark_dynamic(inputs_bs8, 0, min=2, max=16)
 optimized_model = torch_tensorrt.compile(
@@ -89,11 +91,14 @@ optimized_model = torch_tensorrt.compile(
     min_block_size=min_block_size,
     torch_executed_ops=torch_executed_ops,
 )
-outputs_bs8 = optimized_model(inputs_bs8)
+
+with torch.no_grad():
+    outputs_bs8 = optimized_model(inputs_bs8)
 
 # No recompilation happens for batch size = 12
-inputs_bs12 = torch.randn((12, 3, 224, 224)).half().to("cuda")
-outputs_bs12 = optimized_model(inputs_bs12)
+inputs_bs12 = torch.randn((12, 3, 224, 224)).to("cuda").half()
+with torch.no_grad():
+    outputs_bs12 = optimized_model(inputs_bs12)
 
 # The following code illustrates the workflow using ir=dynamo (which uses torch.export APIs under the hood)
 # dynamic shapes for any inputs are specified using torch_tensorrt.Input API
@@ -112,5 +117,6 @@ compile_spec = {
 trt_model = torch_tensorrt.compile(model, **compile_spec)
 
 # No recompilation happens for batch size = 12
-inputs_bs12 = torch.randn((12, 3, 224, 224)).half().to("cuda")
-outputs_bs12 = trt_model(inputs_bs12)
+inputs_bs12 = torch.randn((12, 3, 224, 224)).to("cuda").half()
+with torch.no_grad():
+    outputs_bs12 = trt_model(inputs_bs12)
