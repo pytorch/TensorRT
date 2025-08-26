@@ -60,8 +60,22 @@ System Preparation
       sudo cp -a libcusparse_lt-linux-sbsa-0.5.2.1-archive/include/* /usr/local/cuda/include/
       sudo cp -a libcusparse_lt-linux-sbsa-0.5.2.1-archive/lib/* /usr/local/cuda/lib64/
 
-Building Torch-TensorRT
-***********************
+Installation Torch-TensorRT in JetPack
+*************************************
+
+You can directly install the torch-tensorrt wheel from the JPL repo which is built specifically for JetPack 6.2.
+
+.. code-block:: sh
+   # verify tensorrt 10.3 is already installed via jetpack installation process
+   python -m pip list | grep tensorrt
+   # install torch-tensorrt wheel from JPL repo which is built specifically for JetPack 6.2
+   python -m pip install torch==2.8.0 torch_tensorrt==2.8.0 torchvision==0.24.0 --extra-index-url https://pypi.jetson-ai-lab.io/jp6/cu126
+
+
+Building Torch-TensorRT in JetPack
+*********************************
+
+You can also build the torch-tensorrt wheel from the source code on your own.
 
 Build Environment Setup
 =======================
@@ -92,25 +106,22 @@ Build Environment Setup
       # Can only install the torch and torchvision wheel from the JPL repo which is built specifically for JetPack 6.2
       python -m pip install torch==2.8.0 torchvision==0.23.0  --index-url=https://pypi.jetson-ai-lab.io/jp6/cu126
 
+4. **Build the Wheel**:
 
-Building the Wheel
-==================
+   .. code-block:: sh
 
-.. code-block:: sh
-   python setup.py bdist_wheel --jetpack
+      python setup.py bdist_wheel --jetpack
 
-Installation
-============
+5. **Install the Wheel**:
 
-.. code-block:: sh
-   # you will be able to find the wheel in the dist directory, has platform name linux_tegra_aarch64
+   .. code-block:: sh
+
+   # you will be able to find the wheel in the dist directory
    cd dist
-   python -m pip install torch_tensorrt-2.8.0.dev0+d8318d8fc-cp310-cp310-linux_tegra_aarch64.whl
+   python -m pip install torch_tensorrt-2.8.0.dev0+d8318d8fc-cp310-cp310-linux_aarch64.whl
 
-Post-Installation Verification
-==============================
+6. **Verify installation by importing in Python**:
 
-Verify installation by importing in Python:
 .. code-block:: python
 
    # verify whether the torch-tensorrt can be imported
