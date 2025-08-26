@@ -24,7 +24,6 @@ from setuptools.command.develop import develop
 from setuptools.command.editable_wheel import editable_wheel
 from setuptools.command.install import install
 from torch.utils.cpp_extension import IS_WINDOWS, BuildExtension, CUDAExtension
-from torch_tensorrt._features import _FX_FE_AVAIL
 
 __version__: str = "0.0.0"
 __cuda_version__: str = "0.0"
@@ -415,6 +414,7 @@ class CleanCommand(Command):
                 os.remove(path)
 
 
+_FX_FE_AVAIL = False if USE_TRT_RTX else True
 ext_modules = []
 
 fx_packages = [
