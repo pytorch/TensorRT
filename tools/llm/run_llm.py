@@ -175,7 +175,7 @@ if __name__ == "__main__":
     arg_parser.add_argument(
         "--model",
         type=str,
-        default="meta-llama/Llama-3.2-1B-Instruct",
+        default="Qwen/Qwen2.5-0.5B-Instruct",
         help="Name of LLM model",
     )
     arg_parser.add_argument(
