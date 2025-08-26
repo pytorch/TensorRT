@@ -24,6 +24,7 @@ from torch.fx.experimental.proxy_tensor import unset_fake_temporarily
 from torch.fx.node import Argument, Target
 from torch.fx.passes.shape_prop import TensorMetadata
 from torch_tensorrt import _enums
+from torch_tensorrt._utils import is_tensorrt_version_supported
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
@@ -31,7 +32,7 @@ from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
     ConverterRegistry,
     DynamoConverterImplSignature,
 )
-from torch_tensorrt._utils import is_tensorrt_version_supported
+
 from ..types import Shape, TRTDataType, TRTLayer, TRTTensor
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
@@ -72,6 +73,9 @@ def get_node_io(
         # If the provided data is a scalar, return it as is
         elif isinstance(metadata, (int, float, bool)):
             return f"{metadata}@Python-{type(metadata)}"
+        # If the provided data is a SymInt, return it as is
+        elif isinstance(metadata, (torch.SymInt)):
+            return f"{metadata}@SymInt"
         # If the provided data is a sequence, recursively parse it
         elif isinstance(metadata, collections.abc.Sequence):
             formatted_str = "("
