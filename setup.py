@@ -24,6 +24,7 @@ from setuptools.command.develop import develop
 from setuptools.command.editable_wheel import editable_wheel
 from setuptools.command.install import install
 from torch.utils.cpp_extension import IS_WINDOWS, BuildExtension, CUDAExtension
+from torch_tensorrt._features import _FX_FE_AVAIL
 
 __version__: str = "0.0.0"
 __cuda_version__: str = "0.0"
@@ -483,45 +484,33 @@ dynamo_package_dir = {
     "torch_tensorrt.runtime": "py/torch_tensorrt/runtime",
 }
 
-if USE_TRT_RTX:
-    package_dir = dynamo_package_dir
-    packages = dynamo_packages
-    exclude_package_data = {
-        "": [
-            "py/torch_tensorrt/csrc/*.cpp",
-            "torch_tensorrt/csrc/*.cpp",
-            "test*",
-            "*.cpp",
-        ],
-        "torch_tensorrt": [
-            "py/torch_tensorrt/csrc/*.cpp",
-            "torch_tensorrt/csrc/*.cpp",
-            "test*",
-            "*.cpp",
-        ],
-    }
-else:
-    package_dir = dynamo_package_dir | fx_package_dir
-    packages = dynamo_packages + fx_packages
-    exclude_package_data = {
-        "": [
-            "py/torch_tensorrt/csrc/*.cpp",
-            "py/torch_tensorrt/fx/test*",
-            "torch_tensorrt/csrc/*.cpp",
-            "torch_tensorrt/fx/test*",
-            "test*",
-            "*.cpp",
-        ],
-        "torch_tensorrt": [
-            "py/torch_tensorrt/csrc/*.cpp",
-            "py/torch_tensorrt/fx/test*",
-            "torch_tensorrt/csrc/*.cpp",
-            "torch_tensorrt/fx/test*",
-            "test*",
-            "*.cpp",
-        ],
-        "torch_tensorrt.fx": ["test/*.py"],
-    }
+package_dir = dynamo_package_dir
+packages = dynamo_packages
+exclude_package_data = {
+    "": [
+        "py/torch_tensorrt/csrc/*.cpp",
+        "torch_tensorrt/csrc/*.cpp",
+        "test*",
+        "*.cpp",
+    ],
+    "torch_tensorrt": [
+        "py/torch_tensorrt/csrc/*.cpp",
+        "torch_tensorrt/csrc/*.cpp",
+        "test*",
+        "*.cpp",
+    ],
+}
+
+if _FX_FE_AVAIL:
+    package_dir = package_dir | fx_package_dir
+    packages = packages + fx_packages
+    exclude_package_data["torch_tensorrt.fx"] = ["test/*.py"]
+    exclude_package_data[""].extend(
+        ["py/torch_tensorrt/fx/test*", "torch_tensorrt/fx/test*"]
+    )
+    exclude_package_data["torch_tensorrt"].extend(
+        ["py/torch_tensorrt/fx/test*", "torch_tensorrt/fx/test*"]
+    )
 
 package_data = {}
 
