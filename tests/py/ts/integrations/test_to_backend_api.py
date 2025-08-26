@@ -4,7 +4,6 @@ import unittest
 import torch
 import torch_tensorrt as torchtrt
 import torchvision.models as models
-from torch_tensorrt._utils import is_tensorrt_rtx
 from utils import COSINE_THRESHOLD, cosine_similarity
 
 
@@ -13,7 +12,7 @@ from utils import COSINE_THRESHOLD, cosine_similarity
     "TorchScript Frontend is not available",
 )
 @unittest.skipIf(
-    is_tensorrt_rtx(),
+    torch_tensorrt.ENABLED_FEATURES.tensorrt_rtx,
     "aten::adaptive_avg_pool2d is implemented via plugins which is not supported for tensorrt_rtx",
 )
 class TestToBackendLowering(unittest.TestCase):

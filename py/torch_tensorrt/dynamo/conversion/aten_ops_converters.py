@@ -8,7 +8,8 @@ import numpy as np
 import torch
 from tensorrt import ITensor as TRTTensor
 from torch.fx.node import Argument, Node, Target
-from torch_tensorrt._utils import is_tensorrt_rtx, is_tensorrt_version_supported
+from torch_tensorrt import ENABLED_FEATURES
+from torch_tensorrt._utils import is_tensorrt_version_supported
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion import impl
@@ -3592,7 +3593,7 @@ def aten_ops_full(
 
 # currently nonzero is not supported for tensorrt_rtx
 # TODO: lan to remove this once rtx team has fixed the bug
-if not is_tensorrt_rtx():
+if not ENABLED_FEATURES.tensorrt_rtx:
 
     @dynamo_tensorrt_converter(
         torch.ops.aten.nonzero.default,

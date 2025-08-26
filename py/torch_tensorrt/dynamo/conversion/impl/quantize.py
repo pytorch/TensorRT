@@ -6,7 +6,7 @@ import torch
 from tensorrt import ITensor as TRTTensor
 from torch.fx.experimental.proxy_tensor import unset_fake_temporarily
 from torch.fx.node import Target
-from torch_tensorrt._utils import is_tensorrt_rtx
+from torch_tensorrt import ENABLED_FEATURES
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion import impl
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
@@ -81,7 +81,7 @@ def quantize(
         if (
             dtype == trt.DataType.INT8
             and ".input_quantizer" in name
-            and is_tensorrt_rtx()
+            and ENABLED_FEATURES.tensorrt_rtx
         ):
             # RTX does not support int8 activation quantization
             # TODO: lan to remove this once rtx team has added the support for int8 activation quantization

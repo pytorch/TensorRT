@@ -20,10 +20,10 @@ from typing import (
 
 import tensorrt as trt
 import torch
+import torch_tensorrt
 from torch import SymBool, SymFloat, SymInt
 from torch._ops import OpOverloadPacket
 from torch.fx.node import Argument, Node, Target, _get_qualified_name
-from torch_tensorrt._utils import is_tensorrt_rtx
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
 
@@ -624,23 +624,19 @@ class ConverterRegistry:
 
 # Initialize dynamo converter registry with the FX and Dynamo aten registries
 # Note the Dynamo registry is listed first, for precedence
-if is_tensorrt_rtx():
-    registries = [
-        DYNAMO_ATEN_CONVERTERS,
-    ]
-    registry_names = ["Dynamo ATen Converters Registry"]
-    registry_calling_conventions = [
-        CallingConvention.CTX,
-    ]
-else:
+registries = [
+    DYNAMO_ATEN_CONVERTERS,
+]
+registry_names = ["Dynamo ATen Converters Registry"]
+registry_calling_conventions = [
+    CallingConvention.CTX,
+]
+if torch_tensorrt.ENABLED_FEATURES.fx_frontend:
     from torch_tensorrt.fx.converter_registry import CONVERTERS as FX_CONVERTERS
 
-    registries = [DYNAMO_ATEN_CONVERTERS, FX_CONVERTERS]
-    registry_names = [
-        "Dynamo ATen Converters Registry",
-        "FX Legacy ATen Converters Registry",
-    ]
-    registry_calling_conventions = [CallingConvention.CTX, CallingConvention.LEGACY]
+    registries.append(FX_CONVERTERS)
+    registry_names.append("FX Legacy ATen Converters Registry")
+    registry_calling_conventions.append(CallingConvention.LEGACY)
 
 
 DYNAMO_CONVERTERS: ConverterRegistry = ConverterRegistry(

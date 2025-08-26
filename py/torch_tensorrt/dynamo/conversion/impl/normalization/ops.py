@@ -6,7 +6,7 @@ import tensorrt as trt
 import torch
 from torch._subclasses.fake_tensor import unset_fake_temporarily
 from torch.fx.node import Target
-from torch_tensorrt._utils import is_tensorrt_rtx
+from torch_tensorrt import ENABLED_FEATURES
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion import impl
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
@@ -55,7 +55,7 @@ def batch_norm(
     # In this way, the batch norm layer will be fused with the Convolution layer and get a performance boost.
     # TODO: lanl: to remove this once we have solved the batchnorm constant folding issue in RTX
     # https://github.com/pytorch/TensorRT/issues/3699
-    if is_tensorrt_rtx() or any(
+    if ENABLED_FEATURES.tensorrt_rtx or any(
         [
             isinstance(weight, trt.ITensor),
             isinstance(bias, trt.ITensor),

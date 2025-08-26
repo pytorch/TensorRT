@@ -1,10 +1,10 @@
 import unittest
 
 import torch
+import torch_tensorrt
 from parameterized import param, parameterized
 from torch.testing._internal.common_utils import run_tests
 from torch_tensorrt import Input
-from torch_tensorrt._utils import is_tensorrt_rtx
 
 from .harness import DispatchTestCase
 
@@ -204,7 +204,9 @@ class TestDeconvolutionConverter(DispatchTestCase):
             enable_passes=True,
         )
 
-    @unittest.skipIf(is_tensorrt_rtx(), "TensorRT-RTX has bug on deconv3d")
+    @unittest.skipIf(
+        torch_tensorrt.ENABLED_FEATURES.tensorrt_rtx, "TensorRT-RTX has bug on deconv3d"
+    )
     @parameterized.expand(
         [
             ("default", 1),

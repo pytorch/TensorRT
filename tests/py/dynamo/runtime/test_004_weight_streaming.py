@@ -6,7 +6,6 @@ import torch
 import torch_tensorrt as torchtrt
 from parameterized import parameterized
 from torch.testing._internal.common_utils import TestCase, run_tests
-from torch_tensorrt._utils import is_tensorrt_rtx
 from torch_tensorrt.dynamo.utils import prepare_inputs
 
 INPUT_SIZE = (64, 100)
@@ -292,7 +291,9 @@ class TestWeightStreamingPython(TestCase):
             ("cpp_runtime", False),
         ]
     )
-    @unittest.skipIf(is_tensorrt_rtx(), "TensorRT-RTX has bug on cudagraphs")
+    @unittest.skipIf(
+        torchtrt.ENABLED_FEATURES.tensorrt_rtx, "TensorRT-RTX has bug on cudagraphs"
+    )
     def test_runtime_state_change(self, _, use_python_runtime):
         class SampleModel(torch.nn.Module):
             def __init__(self):

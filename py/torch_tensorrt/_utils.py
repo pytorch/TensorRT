@@ -27,12 +27,6 @@ def check_cross_compile_trt_win_lib() -> bool:
     return False
 
 
-def is_tensorrt_rtx() -> bool:
-    if trt._package_name == "tensorrt_rtx":
-        return True
-    return False
-
-
 def is_tensorrt_version_supported(min_version: str) -> bool:
     """
     Check if the installed TensorRT version supports the specified minimum version.
@@ -46,7 +40,7 @@ def is_tensorrt_version_supported(min_version: str) -> bool:
         ...     pass
     """
     try:
-        if is_tensorrt_rtx():
+        if trt._package_name == "tensorrt_rtx":
             return True
         from importlib import metadata
 

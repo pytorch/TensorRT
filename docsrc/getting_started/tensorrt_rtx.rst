@@ -1,6 +1,6 @@
-.. _Torch-TensorRT_in_RTX:
+.. _Torch-TensorRT-RTX:
 
-Torch-TensorRT in RTX
+Torch-TensorRT-RTX
 =====================
 
 Overview

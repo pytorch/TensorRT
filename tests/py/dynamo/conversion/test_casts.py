@@ -4,9 +4,9 @@ import unittest
 
 import torch
 import torch.nn as nn
+import torch_tensorrt
 from torch.testing._internal.common_utils import run_tests
 from torch_tensorrt import dtype
-from torch_tensorrt._utils import is_tensorrt_rtx
 from torch_tensorrt.dynamo.conversion import UnsupportedOperatorException
 
 from .harness import DispatchTestCase
@@ -68,7 +68,7 @@ class TestToCopyConverter(DispatchTestCase):
         )
 
     @unittest.skipIf(
-        is_tensorrt_rtx(),
+        torch_tensorrt.ENABLED_FEATURES.tensorrt_rtx,
         "bf16 is not supported for tensorrt_rtx",
     )
     def test_to_copy_bfloat16(self):

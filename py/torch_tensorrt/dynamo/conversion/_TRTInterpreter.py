@@ -25,10 +25,11 @@ from torch.fx.experimental.proxy_tensor import unset_fake_temporarily
 from torch.fx.node import _get_qualified_name
 from torch.fx.passes.shape_prop import TensorMetadata
 from torch.utils._python_dispatch import _disable_current_modes
+from torch_tensorrt import ENABLED_FEATURES
 from torch_tensorrt._enums import dtype
 from torch_tensorrt._features import needs_refit
 from torch_tensorrt._Input import Input
-from torch_tensorrt._utils import is_tensorrt_rtx, is_tensorrt_version_supported
+from torch_tensorrt._utils import is_tensorrt_version_supported
 from torch_tensorrt.dynamo import _defaults
 from torch_tensorrt.dynamo._engine_cache import BaseEngineCache
 from torch_tensorrt.dynamo._settings import CompilationSettings, settings_are_compatible
@@ -90,10 +91,10 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         self._debugger_config = _debugger_config
         flag = 0
         # rtx build, strongly typed is enabled by default, can not set it by builder config
-        if is_tensorrt_rtx():
+        if ENABLED_FEATURES.tensorrt_rtx:
             if not compilation_settings.use_explicit_typing:
                 warnings.warn(
-                    "Strongly typed is enabled by default in rtx build,  setting use_explicit_typing to True"
+                    "Strongly typed is enabled by default in torch-tensorrt-rtx build,  setting use_explicit_typing to True"
                 )
                 compilation_settings.use_explicit_typing = True
         else:
@@ -196,7 +197,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         return enabled_precisions.issubset(_defaults.SUPPORTED_KERNEL_PRECISIONS)
 
     def validate_compile_settings(self) -> None:
-        if is_tensorrt_rtx():
+        if ENABLED_FEATURES.tensorrt_rtx:
             if dtype.bfloat16 in self.compilation_settings.enabled_precisions:
                 raise RuntimeError("TensorRT-RTX does not support bfloat16!")
             return

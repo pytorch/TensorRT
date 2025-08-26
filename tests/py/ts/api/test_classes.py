@@ -5,7 +5,6 @@ from typing import Dict
 import torch
 import torch_tensorrt as torchtrt
 import torchvision.models as models
-from torch_tensorrt._utils import is_tensorrt_rtx
 from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import TorchTensorRTModule
 
 
@@ -315,7 +314,7 @@ class TestTorchTensorRTModule(unittest.TestCase):
             self.assertTrue(trt_mod.engine.profile_path_prefix == "/tmp/")
 
     @unittest.skipIf(
-        is_tensorrt_rtx(),
+        torchtrt.ENABLED_FEATURES.tensorrt_rtx,
         "layer info is different for tensorrt_rtx",
     )
     def test_get_layer_info(self):

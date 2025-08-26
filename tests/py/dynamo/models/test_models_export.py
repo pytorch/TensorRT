@@ -7,7 +7,6 @@ from importlib import metadata
 import pytest
 import torch
 import torch_tensorrt as torchtrt
-from torch_tensorrt._utils import is_tensorrt_rtx
 from torch_tensorrt.dynamo.utils import COSINE_THRESHOLD, cosine_similarity
 
 from packaging.version import Version
@@ -392,7 +391,7 @@ def test_base_int8(ir, dtype):
     import modelopt.torch.quantization as mtq
     from modelopt.torch.quantization.utils import export_torch_mode
 
-    if is_tensorrt_rtx() and dtype == torch.bfloat16:
+    if torchtrt.ENABLED_FEATURES.tensorrt_rtx and dtype == torch.bfloat16:
         pytest.skip("TensorRT-RTX does not support bfloat16")
 
     class SimpleNetwork(torch.nn.Module):
@@ -415,7 +414,7 @@ def test_base_int8(ir, dtype):
     model = SimpleNetwork().eval().cuda().to(dtype)
     quant_cfg = mtq.INT8_DEFAULT_CFG
     # RTX does not support INT8 default quantization(weights+activations), only support INT8 weights only quantization
-    if is_tensorrt_rtx():
+    if torchtrt.ENABLED_FEATURES.tensorrt_rtx:
         quant_cfg["quant_cfg"]["*input_quantizer"] = {"enable": False}
     mtq.quantize(model, quant_cfg, forward_loop=calibrate_loop)
     # model has INT8 qdq nodes at this point
@@ -451,7 +450,7 @@ def test_base_int8_dynamic_shape(ir, dtype):
     import modelopt.torch.quantization as mtq
     from modelopt.torch.quantization.utils import export_torch_mode
 
-    if is_tensorrt_rtx() and dtype == torch.bfloat16:
+    if torchtrt.ENABLED_FEATURES.tensorrt_rtx and dtype == torch.bfloat16:
         pytest.skip("TensorRT-RTX does not support bfloat16")
 
     class SimpleNetwork(torch.nn.Module):

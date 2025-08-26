@@ -11,15 +11,13 @@ if importlib.util.find_spec("torchvision"):
     import timm
     import torchvision.models as models
 
-from torch_tensorrt._utils import is_tensorrt_rtx
-
 
 class TestModelToEngineToModel(unittest.TestCase):
     @unittest.skipIf(
         not importlib.util.find_spec("torchvision"), "torchvision not installed"
     )
     @unittest.skipIf(
-        is_tensorrt_rtx(),
+        torch_tensorrt.ENABLED_FEATURES.tensorrt_rtx,
         "aten::adaptive_avg_pool2d is implemented via plugins which is not supported for tensorrt_rtx",
     )
     def test_resnet50(self):
@@ -56,7 +54,7 @@ class TestModelToEngineToModel(unittest.TestCase):
         "timm or torchvision not installed",
     )
     @unittest.skipIf(
-        is_tensorrt_rtx(),
+        torch_tensorrt.ENABLED_FEATURES.tensorrt_rtx,
         "aten::adaptive_avg_pool2d is implemented via plugins which is not supported for tensorrt_rtx",
     )
     def test_efficientnet_b0(self):

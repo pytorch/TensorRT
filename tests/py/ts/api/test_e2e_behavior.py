@@ -5,12 +5,11 @@ from typing import Dict
 import torch
 import torch_tensorrt as torchtrt
 import torchvision.models as models
-from torch_tensorrt._utils import is_tensorrt_rtx
 from utils import same_output_format
 
 
 @unittest.skipIf(
-    is_tensorrt_rtx(),
+    torch_tensorrt.ENABLED_FEATURES.tensorrt_rtx,
     "aten::adaptive_avg_pool2d is implemented via plugins which is not supported for tensorrt_rtx",
 )
 class TestInputTypeDefaultsFP32Model(unittest.TestCase):
@@ -58,7 +57,7 @@ class TestInputTypeDefaultsFP32Model(unittest.TestCase):
 
 class TestInputTypeDefaultsFP16Model(unittest.TestCase):
     @unittest.skipIf(
-        is_tensorrt_rtx(),
+        torch_tensorrt.ENABLED_FEATURES.tensorrt_rtx,
         "aten::adaptive_avg_pool2d is implemented via plugins which is not supported for tensorrt_rtx",
     )
     def test_input_use_default_fp16(self):
@@ -76,7 +75,7 @@ class TestInputTypeDefaultsFP16Model(unittest.TestCase):
         trt_mod(self.input.half())
 
     @unittest.skipIf(
-        is_tensorrt_rtx(),
+        torch_tensorrt.ENABLED_FEATURES.tensorrt_rtx,
         "aten::adaptive_avg_pool2d is implemented via plugins which is not supported for tensorrt_rtx",
     )
     def test_input_use_default_fp16_without_fp16_enabled(self):
@@ -92,7 +91,7 @@ class TestInputTypeDefaultsFP16Model(unittest.TestCase):
         trt_mod(self.input.half())
 
     @unittest.skipIf(
-        is_tensorrt_rtx(),
+        torch_tensorrt.ENABLED_FEATURES.tensorrt_rtx,
         "aten::adaptive_avg_pool2d is implemented via plugins which is not supported for tensorrt_rtx",
     )
     def test_input_respect_user_setting_fp16_weights_fp32_in(self):
@@ -111,7 +110,7 @@ class TestInputTypeDefaultsFP16Model(unittest.TestCase):
         trt_mod(self.input)
 
     @unittest.skipIf(
-        is_tensorrt_rtx(),
+        torch_tensorrt.ENABLED_FEATURES.tensorrt_rtx,
         "aten::adaptive_avg_pool2d is implemented via plugins which is not supported for tensorrt_rtx",
     )
     def test_input_respect_user_setting_fp16_weights_fp32_in_non_constuctor(self):

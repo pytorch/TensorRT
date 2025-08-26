@@ -5,7 +5,6 @@ from typing import Dict
 import torch
 import torch_tensorrt as torchtrt
 import torchvision.models as models
-from torch_tensorrt._utils import is_tensorrt_rtx
 from utils import COSINE_THRESHOLD, cosine_similarity
 
 
@@ -120,7 +119,7 @@ class TestCompile(unittest.TestCase):
 
 
 @unittest.skipIf(
-    is_tensorrt_rtx(),
+    torch_tensorrt.ENABLED_FEATURES.tensorrt_rtx,
     "aten::adaptive_avg_pool2d is implemented via plugins which is not supported for tensorrt_rtx",
 )
 class TestCheckMethodOpSupport(unittest.TestCase):
@@ -145,7 +144,7 @@ class TestModuleIdentification(unittest.TestCase):
             torchtrt._compile._parse_module_type(ts_module),
             torchtrt._compile._ModuleType.ts,
         )
-        if not is_tensorrt_rtx():
+        if not torch_tensorrt.ENABLED_FEATURES.tensorrt_rtx:
             self.assertEqual(
                 torchtrt._compile._parse_module_type(fx_module),
                 torchtrt._compile._ModuleType.fx,

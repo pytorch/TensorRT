@@ -5,7 +5,6 @@ import unittest
 import pytest
 import torch
 import torch_tensorrt as torchtrt
-from torch_tensorrt._utils import is_tensorrt_rtx
 from torch_tensorrt.dynamo.utils import (
     COSINE_THRESHOLD,
     cosine_similarity,
@@ -139,7 +138,7 @@ def test_resnet18_torch_exec_ops(ir):
 )
 @pytest.mark.parametrize("dtype", [torch.float16, torch.bfloat16, torch.float32])
 def test_mobilenet_v2(ir, dtype):
-    if is_tensorrt_rtx() and dtype == torch.bfloat16:
+    if torchtrt.ENABLED_FEATURES.tensorrt_rtx and dtype == torch.bfloat16:
         pytest.skip("TensorRT-RTX does not support bfloat16")
 
     model = models.mobilenet_v2(pretrained=True).eval().to("cuda").to(dtype)
@@ -181,7 +180,7 @@ def test_mobilenet_v2(ir, dtype):
 )
 @pytest.mark.parametrize("dtype", [torch.float16, torch.bfloat16, torch.float32])
 def test_efficientnet_b0(ir, dtype):
-    if is_tensorrt_rtx() and dtype == torch.bfloat16:
+    if torchtrt.ENABLED_FEATURES.tensorrt_rtx and dtype == torch.bfloat16:
         pytest.skip("TensorRT-RTX does not support bfloat16")
 
     model = (
@@ -228,7 +227,7 @@ def test_efficientnet_b0(ir, dtype):
 )
 @pytest.mark.parametrize("dtype", [torch.float16, torch.bfloat16, torch.float32])
 def test_bert_base_uncased(ir, dtype):
-    if is_tensorrt_rtx() and dtype == torch.bfloat16:
+    if torchtrt.ENABLED_FEATURES.tensorrt_rtx and dtype == torch.bfloat16:
         pytest.skip("TensorRT-RTX does not support bfloat16")
 
     from transformers import BertModel
@@ -369,7 +368,7 @@ def test_resnet18_half(ir):
 
 @pytest.mark.unit
 @unittest.skipIf(
-    is_tensorrt_rtx(),
+    torchtrt.ENABLED_FEATURES.tensorrt_rtx,
     "bf16 is not supported for tensorrt_rtx",
 )
 def test_bf16_model(ir):
@@ -417,7 +416,7 @@ def test_bf16_model(ir):
 
 @pytest.mark.unit
 @unittest.skipIf(
-    is_tensorrt_rtx(),
+    torchtrt.ENABLED_FEATURES.tensorrt_rtx,
     "bf16 is not supported for tensorrt_rtx",
 )
 def test_bf16_fallback_model(ir):

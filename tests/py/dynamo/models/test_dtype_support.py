@@ -8,7 +8,6 @@ import torch_tensorrt
 from torch import nn
 from torch.nn.parameter import Parameter, UninitializedParameter
 from torch.testing._internal.common_utils import TestCase, run_tests
-from torch_tensorrt._utils import is_tensorrt_rtx
 
 from ..testing_utilities import DECIMALS_OF_AGREEMENT, lower_graph_testing
 
@@ -199,7 +198,7 @@ class Test64BitSupport(TestCase):
     "Platform does not have BF16 support",
 )
 @unittest.skipIf(
-    is_tensorrt_rtx(),
+    torch_tensorrt.ENABLED_FEATURES.tensorrt_rtx,
     "bf16 is not supported for tensorrt_rtx",
 )
 class TestBF16Support(TestCase):
