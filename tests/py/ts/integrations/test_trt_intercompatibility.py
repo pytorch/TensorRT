@@ -4,6 +4,7 @@ import tensorrt as trt
 import torch
 import torch_tensorrt as torchtrt
 import torchvision.models as models
+from torch_tensorrt._utils import is_tensorrt_rtx
 from utils import COSINE_THRESHOLD, cosine_similarity
 
 
