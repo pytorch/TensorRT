@@ -6,6 +6,7 @@ import torch
 import torch.nn as nn
 from torch.testing._internal.common_utils import run_tests
 from torch_tensorrt import dtype
+from torch_tensorrt._utils import is_tensorrt_rtx
 from torch_tensorrt.dynamo.conversion import UnsupportedOperatorException
 
 from .harness import DispatchTestCase

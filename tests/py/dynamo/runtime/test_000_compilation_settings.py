@@ -1,7 +1,6 @@
 import unittest
 from importlib import metadata
 
-import tensorrt as trt
 import torch
 import torch_tensorrt
 from torch.testing._internal.common_utils import TestCase, run_tests

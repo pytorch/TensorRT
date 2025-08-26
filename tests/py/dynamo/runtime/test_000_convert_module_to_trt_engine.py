@@ -5,8 +5,6 @@ import torch_tensorrt
 from torch_tensorrt.dynamo.runtime import PythonTorchTensorRTModule
 from torch_tensorrt.dynamo.utils import COSINE_THRESHOLD, cosine_similarity
 
-import tensorrt as trt
-
 
 class TestConvertModuleToTrtEngine(unittest.TestCase):
     def test_convert_module(self):
