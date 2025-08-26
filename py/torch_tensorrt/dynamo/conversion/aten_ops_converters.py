@@ -421,7 +421,9 @@ def index_dtype_validator(
 
 
 @dynamo_tensorrt_converter(
-    torch.ops.aten.index.Tensor, capability_validator=index_dtype_validator
+    torch.ops.aten.index.Tensor,
+    capability_validator=index_dtype_validator,
+    supports_dynamic_shapes=True,
 )
 @enforce_tensor_types(
     {

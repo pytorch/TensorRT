@@ -11,8 +11,10 @@ from torch_tensorrt._enums import dtype
 
 from ..conversion.harness import DispatchTestCase
 
-if importlib.util.find_spec("flashinfer"):
-    import flashinfer
+# flashinfer has been impacted by torch upstream change: https://github.com/pytorch/pytorch/commit/660b0b8128181d11165176ea3f979fa899f24db1
+# got ImportError: cannot import name '_get_pybind11_abi_build_flags' from 'torch.utils.cpp_extension'
+# if importlib.util.find_spec("flashinfer"):
+# import flashinfer
 
 
 @torch.library.custom_op("flashinfer::rmsnorm", mutates_args=())  # type: ignore[misc]
