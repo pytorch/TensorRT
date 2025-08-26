@@ -1,6 +1,6 @@
 import unittest
 
-import tensorrt as trt
+
 import torch
 import torch_tensorrt as torchtrt
 import torchvision.models as models
@@ -12,7 +12,7 @@ from utils import COSINE_THRESHOLD, cosine_similarity
     "TorchScript Frontend is not available",
 )
 @unittest.skipIf(
-    torch_tensorrt.ENABLED_FEATURES.tensorrt_rtx,
+    torchtrt.ENABLED_FEATURES.tensorrt_rtx,
     "aten::adaptive_avg_pool2d is implemented via plugins which is not supported for tensorrt_rtx",
 )
 class TestPyTorchToTRTEngine(unittest.TestCase):
@@ -35,7 +35,7 @@ class TestPyTorchToTRTEngine(unittest.TestCase):
         trt_engine = torchtrt.ts.convert_method_to_trt_engine(
             self.ts_model, "forward", **compile_spec
         )
-
+        import tensorrt as trt
         TRT_LOGGER = trt.Logger(trt.Logger.WARNING)
         with trt.Runtime(TRT_LOGGER) as rt:
             engine = rt.deserialize_cuda_engine(trt_engine)

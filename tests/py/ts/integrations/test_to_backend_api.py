@@ -12,7 +12,7 @@ from utils import COSINE_THRESHOLD, cosine_similarity
     "TorchScript Frontend is not available",
 )
 @unittest.skipIf(
-    torch_tensorrt.ENABLED_FEATURES.tensorrt_rtx,
+    torchtrt.ENABLED_FEATURES.tensorrt_rtx,
     "aten::adaptive_avg_pool2d is implemented via plugins which is not supported for tensorrt_rtx",
 )
 class TestToBackendLowering(unittest.TestCase):
