@@ -85,6 +85,8 @@ def needs_tensorrt_rtx(f: Callable[..., Any]) -> Callable[..., Any]:
         else:
             raise NotImplementedError("TensorRT-RTX is not available")
 
+    return wrapper
+
 
 # this is for tensorrt only
 def needs_tensorrt(f: Callable[..., Any]) -> Callable[..., Any]:

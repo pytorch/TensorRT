@@ -3595,12 +3595,12 @@ def aten_ops_full(
 
 # currently nonzero is not supported for tensorrt_rtx
 # TODO: lan to add the nonzero support once tensorrt_rtx team has added the support
-@needs_tensorrt
 @dynamo_tensorrt_converter(
     torch.ops.aten.nonzero.default,
     supports_dynamic_shapes=True,
     requires_output_allocator=True,
 )
+@needs_tensorrt
 def aten_ops_nonzero(
     ctx: ConversionContext,
     target: Target,

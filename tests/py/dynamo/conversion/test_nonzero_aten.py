@@ -10,6 +10,10 @@ from torch_tensorrt import Input
 from .harness import DispatchTestCase
 
 
+@unittest.skipIf(
+    torch_tensorrt.ENABLED_FEATURES.tensorrt_rtx,
+    "nonzero is not supported for tensorrt_rtx",
+)
 class TestNonZeroConverter(DispatchTestCase):
     @parameterized.expand(
         [
@@ -19,10 +23,6 @@ class TestNonZeroConverter(DispatchTestCase):
             ((2, 3, 4), torch.float),
             ((2, 3, 4, 5), torch.float),
         ]
-    )
-    @unittest.skipIf(
-        torch_tensorrt.ENABLED_FEATURES.tensorrt_rtx,
-        "nonzero is not supported for tensorrt_rtx",
     )
     def test_nonzero_dds(self, input_shape, dtype):
         class NonZero(nn.Module):
@@ -45,10 +45,6 @@ class TestNonZeroConverter(DispatchTestCase):
             ((2, 3, 4), torch.float),
             ((2, 3, 4, 5), torch.float),
         ]
-    )
-    @unittest.skipIf(
-        torch_tensorrt.ENABLED_FEATURES.tensorrt_rtx,
-        "nonzero is not supported for tensorrt_rtx",
     )
     def test_nonzero_non_dds(self, input_shape, dtype):
         class NonZero(nn.Module):
@@ -88,10 +84,6 @@ class TestNonZeroConverter(DispatchTestCase):
                 torch.float,
             ),
         ]
-    )
-    @unittest.skipIf(
-        torch_tensorrt.ENABLED_FEATURES.tensorrt_rtx,
-        "nonzero is not supported for tensorrt_rtx",
     )
     def test_nonzero_dynamic_shape_dds(self, _, min_shape, opt_shape, max_shape, dtype):
         class NonZero(nn.Module):
@@ -133,10 +125,6 @@ class TestNonZeroConverter(DispatchTestCase):
                 torch.float,
             ),
         ]
-    )
-    @unittest.skipIf(
-        torch_tensorrt.ENABLED_FEATURES.tensorrt_rtx,
-        "nonzero is not supported for tensorrt_rtx",
     )
     def test_nonzero_dynamic_shape_non_dds(
         self, _, min_shape, opt_shape, max_shape, dtype
