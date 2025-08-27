@@ -52,8 +52,13 @@ def compile_model(
 
     print(f"\nUsing {args.dtype}")
 
-    pipe = FluxPipeline.from_pretrained(
+    if args.model not in [
         "black-forest-labs/FLUX.1-dev",
+        "black-forest-labs/FLUX.1-Kontext-dev",
+    ]:
+        raise ValueError(f"Model {args.model} is not supported")
+    pipe = FluxPipeline.from_pretrained(
+        args.model,
         torch_dtype=torch.float16,
     ).to(torch.float16)
 
@@ -261,6 +266,11 @@ def main(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Run Flux quantization with different dtypes"
+    )
+    parser.add_argument(
+        "--model",
+        default="black-forest-labs/FLUX.1-dev",
+        help="Model to use",
     )
     parser.add_argument(
         "--use_sdpa",

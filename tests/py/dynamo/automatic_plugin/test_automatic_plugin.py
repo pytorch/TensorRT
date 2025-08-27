@@ -59,6 +59,10 @@ torch_tensorrt.dynamo.conversion.plugins.custom_op(
 )
 
 
+@unittest.skipIf(
+    torch_trt.ENABLED_FEATURES.tensorrt_rtx,
+    "TensorRT RTX does not support plugins",
+)
 class TestAutomaticPlugin(DispatchTestCase):
     @parameterized.expand(
         [
