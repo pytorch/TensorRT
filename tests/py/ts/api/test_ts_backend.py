@@ -144,7 +144,7 @@ class TestModuleIdentification(unittest.TestCase):
             torchtrt._compile._parse_module_type(ts_module),
             torchtrt._compile._ModuleType.ts,
         )
-        if not torch_tensorrt.ENABLED_FEATURES.tensorrt_rtx:
+        if not torchtrt.ENABLED_FEATURES.tensorrt_rtx:
             self.assertEqual(
                 torchtrt._compile._parse_module_type(fx_module),
                 torchtrt._compile._ModuleType.fx,

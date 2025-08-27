@@ -1,6 +1,5 @@
 import unittest
 
-
 import torch
 import torch_tensorrt as torchtrt
 import torchvision.models as models
@@ -35,7 +34,9 @@ class TestPyTorchToTRTEngine(unittest.TestCase):
         trt_engine = torchtrt.ts.convert_method_to_trt_engine(
             self.ts_model, "forward", **compile_spec
         )
+
         import tensorrt as trt
+
         TRT_LOGGER = trt.Logger(trt.Logger.WARNING)
         with trt.Runtime(TRT_LOGGER) as rt:
             engine = rt.deserialize_cuda_engine(trt_engine)
