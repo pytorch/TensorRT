@@ -18,6 +18,10 @@ if importlib.util.find_spec("torchvision"):
 @unittest.skipIf(
     not importlib.util.find_spec("torchvision"), "torchvision not installed"
 )
+@unittest.skipIf(
+    torchtrt.ENABLED_FEATURES.tensorrt_rtx,
+    "TensorRT RTX does not support plugins which are required for this test",
+)
 class TestModelToEngineToModel(unittest.TestCase):
     def test_multiple_engines(self):
         self.resnet18 = models.resnet18(pretrained=True).eval().to("cuda")
