@@ -243,6 +243,11 @@ def compile(
         )
         return compiled_ts_module
     elif target_ir == _IRType.fx:
+        warnings.warn(
+            "FX frontend is deprecated. Please use the Dynamo frontend instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         if (
             torch.float16 in enabled_precisions_set
             or torch_tensorrt.dtype.half in enabled_precisions_set
