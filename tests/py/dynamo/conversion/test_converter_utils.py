@@ -6,7 +6,7 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     enforce_tensor_types,
     flatten_dims,
 )
-from torch_tensorrt.fx.types import TRTTensor
+from torch_tensorrt.dynamo.types import TRTTensor
 
 from ..testing_utilities import DECIMALS_OF_AGREEMENT, lower_graph_testing
 

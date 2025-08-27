@@ -3,6 +3,7 @@ from typing import Callable
 
 import torch
 import torch.nn as nn
+import torch_tensorrt
 from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
 from torch_tensorrt import Input
@@ -237,7 +238,7 @@ class TestBinaryOpConverters(DispatchTestCase):
         ]
     )
     @unittest.skipIf(
-        torchtrt.ENABLED_FEATURES.tensorrt_rtx,
+        torch_tensorrt.ENABLED_FEATURES.tensorrt_rtx,
         "bf16 is not supported for tensorrt_rtx",
     )
     def test_elementwise_ops_bf16(self, _, orig_op):

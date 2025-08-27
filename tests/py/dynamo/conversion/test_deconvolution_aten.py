@@ -204,9 +204,6 @@ class TestDeconvolutionConverter(DispatchTestCase):
             enable_passes=True,
         )
 
-    @unittest.skipIf(
-        torch_tensorrt.ENABLED_FEATURES.tensorrt_rtx, "TensorRT-RTX has bug on deconv3d"
-    )
     @parameterized.expand(
         [
             ("default", 1),
@@ -229,6 +226,9 @@ class TestDeconvolutionConverter(DispatchTestCase):
                 output_padding=2,
             ),
         ]
+    )
+    @unittest.skipIf(
+        torch_tensorrt.ENABLED_FEATURES.tensorrt_rtx, "TensorRT-RTX has bug on deconv3d"
     )
     def test_deconv3d(
         self,
