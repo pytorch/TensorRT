@@ -551,10 +551,26 @@ def pow(
 
     lhs_dtype = None
     rhs_dtype = None
-    if isinstance(lhs_val, int):
-        lhs_dtype = torch.int32
-    if isinstance(rhs_val, int):
-        rhs_dtype = torch.int32
+    if isinstance(lhs_val, (int, float)) and isinstance(rhs_val, (int, float)):
+        raise ValueError(
+            "Both lhs_val and rhs_val are int or float, at least one of them should be a tensor"
+        )
+    elif isinstance(lhs_val, (int, float)):
+        # At this point, rhs_val must be a Tensor since we checked both aren't scalars
+        assert isinstance(rhs_val, (TRTTensor, torch.Tensor))
+        rhs_dtype = rhs_val.dtype
+        lhs_dtype = rhs_dtype
+    elif isinstance(rhs_val, (int, float)):
+        # At this point, lhs_val must be a Tensor since we checked both aren't scalars
+        assert isinstance(lhs_val, (TRTTensor, torch.Tensor))
+        lhs_dtype = lhs_val.dtype
+        rhs_dtype = lhs_dtype
+    else:
+        assert isinstance(lhs_val, (TRTTensor, torch.Tensor))
+        assert isinstance(rhs_val, (TRTTensor, torch.Tensor))
+        lhs_dtype = lhs_val.dtype
+        rhs_dtype = rhs_val.dtype
+
     # POW operation supports only float32 and int8 inputs
     lhs_val = get_trt_tensor(ctx, lhs_val, name + "_lhs_val", lhs_dtype)
     rhs_val = get_trt_tensor(ctx, rhs_val, name + "_rhs_val", rhs_dtype)
