@@ -35,6 +35,19 @@ def get_ir(target: Target) -> SourceIR:
     return SourceIR.UNKNOWN
 
 
+def validate_int8_activation_quantization(name: str, dtype: trt.DataType) -> None:
+    if (
+        dtype == trt.DataType.INT8
+        and ".input_quantizer" in name
+        and ENABLED_FEATURES.tensorrt_rtx
+    ):
+        # RTX does not support int8 activation quantization
+        # TODO: lan to remove this once rtx team has added the support for int8 activation quantization
+        raise NotImplementedError(
+            "TensorRT-RTX does not support int8 activation quantization, only support int8 weight quantization"
+        )
+
+
 def quantize(
     ctx: ConversionContext,
     target: Target,
@@ -78,16 +91,7 @@ def quantize(
             dtype = trt.DataType.FP8
             max_bound = 448
 
-        if (
-            dtype == trt.DataType.INT8
-            and ".input_quantizer" in name
-            and ENABLED_FEATURES.tensorrt_rtx
-        ):
-            # RTX does not support int8 activation quantization
-            # TODO: lan to remove this once rtx team has added the support for int8 activation quantization
-            raise NotImplementedError(
-                "TensorRT-RTX does not support int8 activation quantization, only support int8 weight quantization"
-            )
+        validate_int8_activation_quantization(name, dtype)
 
         axis = None
         # int8 weight quantization is per-channel quantization(it can have one or multiple amax values)

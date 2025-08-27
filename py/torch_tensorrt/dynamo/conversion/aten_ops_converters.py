@@ -8,7 +8,7 @@ import numpy as np
 import torch
 from tensorrt import ITensor as TRTTensor
 from torch.fx.node import Argument, Node, Target
-from torch_tensorrt import ENABLED_FEATURES
+from torch_tensorrt._features import needs_tensorrt
 from torch_tensorrt._utils import is_tensorrt_version_supported
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo._SourceIR import SourceIR
@@ -3594,28 +3594,27 @@ def aten_ops_full(
 
 
 # currently nonzero is not supported for tensorrt_rtx
-# TODO: lan to remove this once rtx team has fixed the bug
-if not ENABLED_FEATURES.tensorrt_rtx:
-
-    @dynamo_tensorrt_converter(
-        torch.ops.aten.nonzero.default,
-        supports_dynamic_shapes=True,
-        requires_output_allocator=True,
+# TODO: lan to add the nonzero support once tensorrt_rtx team has added the support
+@needs_tensorrt
+@dynamo_tensorrt_converter(
+    torch.ops.aten.nonzero.default,
+    supports_dynamic_shapes=True,
+    requires_output_allocator=True,
+)
+def aten_ops_nonzero(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.unary.nonzero(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
     )
-    def aten_ops_nonzero(
-        ctx: ConversionContext,
-        target: Target,
-        args: Tuple[Argument, ...],
-        kwargs: Dict[str, Argument],
-        name: str,
-    ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-        return impl.unary.nonzero(
-            ctx,
-            target,
-            SourceIR.ATEN,
-            name,
-            args[0],
-        )
 
 
 @dynamo_tensorrt_converter(torch.ops.aten.linear.default, supports_dynamic_shapes=True)
