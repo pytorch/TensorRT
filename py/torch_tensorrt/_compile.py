@@ -3,6 +3,7 @@ from __future__ import annotations
 import collections.abc
 import logging
 import platform
+import warnings
 from enum import Enum
 from typing import Any, Callable, List, Optional, Sequence, Set, Union
 
@@ -121,6 +122,11 @@ def _get_target_fe(module_type: _ModuleType, ir: str) -> _IRType:
                 "Requested using the TS frontend but the TS frontend is not available in this build of Torch-TensorRT"
             )
     elif module_is_fxable and ir_targets_fx:
+        warnings.warn(
+            "FX frontend is deprecated. Please use the Dynamo frontend instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         if ENABLED_FEATURES.fx_frontend:
             return _IRType.fx
         else:
@@ -237,6 +243,11 @@ def compile(
         )
         return compiled_ts_module
     elif target_ir == _IRType.fx:
+        warnings.warn(
+            "FX frontend is deprecated. Please use the Dynamo frontend instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         if not ENABLED_FEATURES.fx_frontend:
             raise RuntimeError(
                 "FX frontend is not enabled, cannot compile with target_ir=fx"
