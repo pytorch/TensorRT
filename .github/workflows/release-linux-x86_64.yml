@@ -74,7 +74,7 @@ jobs:
       package-name: ${{ matrix.package-name }}
       smoke-test-script: ${{ matrix.smoke-test-script }}
       trigger-event: ${{ github.event_name }}
-      is-release-tarball: "true"
+      is-release-tarball: true
 
   generate-release-wheel-matrix:
     needs: [generate-matrix]
@@ -110,7 +110,7 @@ jobs:
             env-var-script: packaging/env_vars.txt
             post-script: packaging/post_build_script.sh
             smoke-test-script: packaging/smoke_test_script.sh
-            is-release-wheel: "true"
+            is-release-wheel:  true
     uses: ./.github/workflows/build_wheels_linux.yml
     with:
       repository: ${{ matrix.repository }}
@@ -124,7 +124,7 @@ jobs:
       package-name: ${{ matrix.package-name }}
       smoke-test-script: ${{ matrix.smoke-test-script }}
       trigger-event: ${{ github.event_name }}
-      is-release-wheel: "true"
+      is-release-wheel: true
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref_name }}-${{ inputs.repository }}-${{ github.event_name == 'workflow_dispatch' }}-${{ inputs.job-name }}

@@ -285,6 +285,7 @@ jobs:
                   bazel build //:libtorchtrt --compilation_mode opt --config=linux
                   cp bazel-bin/libtorchtrt.tar.gz \
                   release/tarball/libtorchtrt-${BUILD_VERSION}-tensorrt${TRT_VERSION}-cuda${CU_VERSION:2}-libtorch${PYTORCH_VERSION}-x86_64-linux.tar.gz
+                  return 0
               else
                   if [[ ${{ inputs.is-release-wheel }} == true ]]; then
                     param="--release"
@@ -378,7 +379,7 @@ jobs:
       # NB: Only upload to GitHub after passing smoke tests
 
       - name: Upload wheel to GitHub
-        if: ${{ inputs.is-release-wheel == false }}
+        if: ${{ inputs.is-release-tarball == false }}
         continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
