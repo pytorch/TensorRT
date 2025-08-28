@@ -17,26 +17,28 @@ from ..conversion.harness import DispatchTestCase
 # import flashinfer
 
 
-@torch.library.custom_op("flashinfer::rmsnorm", mutates_args=())  # type: ignore[misc]
-def flashinfer_rmsnorm(
-    input: torch.Tensor, weight: torch.Tensor, eps: float = 1e-6
-) -> torch.Tensor:
-    return flashinfer.norm.rmsnorm(input, weight)
-
-
-@torch.library.register_fake("flashinfer::rmsnorm")
-def _(input: torch.Tensor, weight: torch.Tensor, b: float = 1e-6) -> torch.Tensor:
-    return input
-
-
-torch_tensorrt.dynamo.conversion.plugins.custom_op(
-    "flashinfer::rmsnorm", supports_dynamic_shapes=True
-)
-
-
 @unittest.skip("Not Available")
-@unittest.skipIf(not importlib.util.find_spec("flashinfer"), "flashinfer not installed")
+@unittest.skipIf(
+    not importlib.util.find_spec("flashinfer")
+    or torch_tensorrt.ENABLED_FEATURES.tensorrt_rtx,
+    "flashinfer not installed or TensorRT RTX is present",
+)
 class TestAutomaticPlugin(DispatchTestCase):
+
+    @torch.library.custom_op("flashinfer::rmsnorm", mutates_args=())  # type: ignore[misc]
+    def flashinfer_rmsnorm(
+        input: torch.Tensor, weight: torch.Tensor, eps: float = 1e-6
+    ) -> torch.Tensor:
+        return flashinfer.norm.rmsnorm(input, weight)
+
+    @torch.library.register_fake("flashinfer::rmsnorm")
+    def _(input: torch.Tensor, weight: torch.Tensor, b: float = 1e-6) -> torch.Tensor:
+        return input
+
+    torch_tensorrt.dynamo.conversion.plugins.custom_op(
+        "flashinfer::rmsnorm", supports_dynamic_shapes=True
+    )
+
     @parameterized.expand(
         [
             ((64, 64), (64,), torch.float16),

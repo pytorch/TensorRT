@@ -14,6 +14,7 @@ namespace {
 /*
  * Helper functions
  */
+#ifndef TRT_MAJOR_RTX
 void create_plugin(
     ConversionCtx* ctx,
     const torch::jit::Node* n,
@@ -52,6 +53,7 @@ void create_plugin(
 
   LOG_DEBUG("Normalize layer output tensor shape: " << layer_output->getDimensions());
 }
+#endif
 
 int32_t axes_mask_from_axes_values(
     const torch::jit::Node* n,
@@ -93,7 +95,7 @@ nvinfer1::ITensor* frobenius_norm(
   auto sqrt_output = sqrt_layer->getOutput(0);
   return sqrt_output;
 }
-
+#ifndef TRT_MAJOR_RTX
 auto normalize_registrations TORCHTRT_UNUSED =
     RegisterNodeConversionPatterns()
         .pattern(
@@ -165,6 +167,62 @@ auto normalize_registrations TORCHTRT_UNUSED =
                LOG_DEBUG("Output tensor shape: " << out->getDimensions());
                return true;
              }});
+#else
+auto normalize_registrations TORCHTRT_UNUSED =
+    RegisterNodeConversionPatterns()
+        .pattern(
+            {"aten::frobenius_norm.dim(Tensor self, int[1] dim, bool keepdim=False) -> (Tensor)",
+             [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+               auto self = args[0].ITensorOrFreeze(ctx);
+               auto axes_values = args[1].unwrapToIntList().vec();
+               auto keep_dims = args[2].unwrapToBool();
+
+               auto axes_mask = axes_mask_from_axes_values(n, self->getDimensions().nbDims, axes_values);
+
+               auto norm = frobenius_norm(ctx, n, self, axes_mask, keep_dims);
+               auto out = ctx->AssociateValueAndTensor(n->outputs()[0], norm);
+               LOG_DEBUG("Output tensor shape: " << out->getDimensions());
+               return true;
+             }})
+        .pattern(
+            {"aten::linalg_norm(Tensor self, Scalar? ord=None, int[1]? dim=None, bool keepdim=False, *, int? dtype=None) -> (Tensor)",
+             [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+               // https://pytorch.org/docs/stable/generated/torch.linalg.norm.html
+               auto self = args[0].ITensorOrFreeze(ctx);
+               TORCHTRT_CHECK(
+                   args[1].IValue()->isNone(),
+                   "aten::linalg_norm converter does not yet support non-None 'ord' arguments. Add aten::linalg_norm to torch_executed_ops to force it to fallback.");
+               auto keep_dims = args[3].unwrapToBool();
+               auto self_nb_dims = self->getDimensions().nbDims;
+
+               if (!args.back().IValue()->isNone()) {
+                 // If specified, the input tensor is cast to dtype before performing the operation, and the returned
+                 // tensor’s type will be dtype
+                 auto dtype = args.back().unwrapToScalar().to<int64_t>();
+                 auto trt_dtype = util::ScalarTypeToTRTDataType(static_cast<at::ScalarType>(dtype));
+                 self = castITensor(ctx, self, trt_dtype);
+               }
+
+               int32_t axes_mask = 0;
+               if (args[2].IValue()->isNone()) {
+                 // If dim= None and ord= None, self will be flattened to 1D and the 2-norm of the resulting vector will
+                 // be computed.
+                 axes_mask = 1;
+                 keep_dims = true; // the single output dim is always preserved
+                 auto flatten_layer = ctx->net->addShuffle(*self);
+                 TORCHTRT_CHECK(flatten_layer, "Unable to create shuffle layer from node: " << *n);
+                 flatten_layer->setReshapeDimensions(util::toDims(std::vector<int64_t>({-1})));
+                 flatten_layer->setName((util::node_info(n) + "_flatten").c_str());
+                 self = flatten_layer->getOutput(0);
+               } else {
+                 axes_mask = axes_mask_from_axes_values(n, self_nb_dims, args[2].unwrapToIntList().vec());
+               }
+               auto norm = frobenius_norm(ctx, n, self, axes_mask, keep_dims);
+               auto out = ctx->AssociateValueAndTensor(n->outputs()[0], norm);
+               LOG_DEBUG("Output tensor shape: " << out->getDimensions());
+               return true;
+             }});
+#endif
 
 } // namespace
 } // namespace impl

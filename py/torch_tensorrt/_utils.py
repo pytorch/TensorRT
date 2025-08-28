@@ -1,6 +1,7 @@
 import sys
 from typing import Any
 
+import tensorrt as trt
 import torch
 
 
@@ -26,11 +27,11 @@ def check_cross_compile_trt_win_lib() -> bool:
     return False
 
 
-def is_tensorrt_version_supported(min_version: str = "10.8.0") -> bool:
+def is_tensorrt_version_supported(min_version: str) -> bool:
     """
     Check if the installed TensorRT version supports the specified minimum version.
     Args:
-        min_version (str): Minimum required TensorRT version (default: "10.8.0" for FP4 support)
+        min_version (str): Minimum required TensorRT version
     Returns:
         bool: True if TensorRT version is >= min_version, False otherwise
     Example:
@@ -39,6 +40,8 @@ def is_tensorrt_version_supported(min_version: str = "10.8.0") -> bool:
         ...     pass
     """
     try:
+        if trt._package_name == "tensorrt_rtx":
+            return True
         from importlib import metadata
 
         from packaging.version import Version

@@ -112,7 +112,7 @@ def test_resnet18_torch_exec_ops(ir):
             )
         ],
         "ir": ir,
-        "enabled_precisions": {torch.float32, torch.float16, torch.bfloat16},
+        "enabled_precisions": {torch.float32, torch.float16},
         "min_block_size": 1,
         "output_format": "exported_program",
         "cache_built_engines": True,
@@ -138,6 +138,9 @@ def test_resnet18_torch_exec_ops(ir):
 )
 @pytest.mark.parametrize("dtype", [torch.float16, torch.bfloat16, torch.float32])
 def test_mobilenet_v2(ir, dtype):
+    if torchtrt.ENABLED_FEATURES.tensorrt_rtx and dtype == torch.bfloat16:
+        pytest.skip("TensorRT-RTX does not support bfloat16")
+
     model = models.mobilenet_v2(pretrained=True).eval().to("cuda").to(dtype)
     input = torch.randn((1, 3, 224, 224)).to("cuda").to(dtype)
 
@@ -177,6 +180,9 @@ def test_mobilenet_v2(ir, dtype):
 )
 @pytest.mark.parametrize("dtype", [torch.float16, torch.bfloat16, torch.float32])
 def test_efficientnet_b0(ir, dtype):
+    if torchtrt.ENABLED_FEATURES.tensorrt_rtx and dtype == torch.bfloat16:
+        pytest.skip("TensorRT-RTX does not support bfloat16")
+
     model = (
         timm.create_model("efficientnet_b0", pretrained=True)
         .eval()
@@ -221,6 +227,9 @@ def test_efficientnet_b0(ir, dtype):
 )
 @pytest.mark.parametrize("dtype", [torch.float16, torch.bfloat16, torch.float32])
 def test_bert_base_uncased(ir, dtype):
+    if torchtrt.ENABLED_FEATURES.tensorrt_rtx and dtype == torch.bfloat16:
+        pytest.skip("TensorRT-RTX does not support bfloat16")
+
     from transformers import BertModel
 
     model = BertModel.from_pretrained("bert-base-uncased").cuda().eval().to(dtype)
@@ -358,6 +367,10 @@ def test_resnet18_half(ir):
 
 
 @pytest.mark.unit
+@unittest.skipIf(
+    torchtrt.ENABLED_FEATURES.tensorrt_rtx,
+    "bf16 is not supported for tensorrt_rtx",
+)
 def test_bf16_model(ir):
     class MyModule(torch.nn.Module):
         def __init__(self):
@@ -402,6 +415,10 @@ def test_bf16_model(ir):
 
 
 @pytest.mark.unit
+@unittest.skipIf(
+    torchtrt.ENABLED_FEATURES.tensorrt_rtx,
+    "bf16 is not supported for tensorrt_rtx",
+)
 def test_bf16_fallback_model(ir):
     class MyModule(torch.nn.Module):
         def __init__(self):
