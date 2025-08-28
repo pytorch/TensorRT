@@ -58,6 +58,7 @@ def get_model(args):
             .eval()
             .cuda()
         )
+        register_sdpa.register_sdpa_pass_with_model_config(model_config=model.config)
 
     if args.precision == "FP16":
         model = model.to(torch.float16)

@@ -93,15 +93,12 @@ def scaled_dot_product_attention(
     scale = kwargs.get("scale", None)
     source_ir = SourceIR.ATEN
 
-    assert (
-        is_causal or attn_mask is not None
-    ), "One of is_causal or attn_mask should be set"
-    assert is_causal ^ (
-        attn_mask is not None
-    ), "Exactly one of is_causal or attn_mask should be set"
+    assert is_causal == True, "is_causal should be set to True"
 
     # implementation as described here: https://pytorch.org/docs/stable/generated/torch.nn.functional.scaled_dot_product_attention.html
     use_fp32_acc = kwargs.get("use_fp32_acc", False)
+    sliding_window_size = kwargs.get("sliding_window_size", None)
+
     query_dtype = query.dtype
 
     if scale is None:
@@ -169,7 +166,9 @@ def scaled_dot_product_attention(
             S = impl.shape.shape(ctx, target, source_ir, name + "_shape_1", key, 2)
         if is_causal:
             # generate the mask tensor
-            tril_tensor = tril(ctx, target, source_ir, name + "_tril", L, S)
+            tril_tensor = tril(
+                ctx, target, source_ir, name + "_tril", L, S, sliding_window_size
+            )
 
             temp_mask = impl.unary.logical_not(
                 ctx, target, source_ir, name + "_logical_not", tril_tensor
@@ -288,7 +287,6 @@ def scaled_dot_product_attention(
                         true_input.get_output(0), false_input.get_output(0)
                     )
                     scaled_add_attn_bias = output_layer.get_output(0)
-    
 
     softmax = impl.normalization.softmax(
         ctx, target, source_ir, name + "_softmax", scaled_add_attn_bias, -1, False
