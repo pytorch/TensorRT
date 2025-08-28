@@ -280,7 +280,7 @@ class TestWeightStrippedEngine(TestCase):
         "torchvision is not installed",
     )
     @unittest.skipIf(
-        not torch_trt.ENABLED_FEATURES.tensorrt_rtx,
+        torch_trt.ENABLED_FEATURES.tensorrt_rtx,
         # TODO: need to fix this https://github.com/pytorch/TensorRT/issues/3752
         "There is bug in refit, so we skip the test for now",
     )
