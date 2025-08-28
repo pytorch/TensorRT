@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Using Torch-TensorRT in Python &mdash; Torch-TensorRT v2.9.0.dev0+996e33b documentation</title>
+  <title>Torch-TensorRT-RTX &mdash; Torch-TensorRT v2.9.0.dev0+996e33b documentation</title>
   
 
   
@@ -39,8 +39,8 @@
   <link rel="stylesheet" href="../_static/css/custom.css" type="text/css" />
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="Using Torch-TensorRT in C++" href="getting_started_with_cpp_api.html" />
-    <link rel="prev" title="Creating a TorchScript Module" href="creating_torchscript_module_in_python.html" />
+    <link rel="next" title="Torch-TensorRT Explained" href="../user_guide/torch_tensorrt_explained.html" />
+    <link rel="prev" title="Quick Start" href="quick_start.html" />
   <!-- Google Tag Manager -->
     <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
     new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
@@ -322,11 +322,11 @@
             
             
               <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
-<ul>
-<li class="toctree-l1"><a class="reference internal" href="../getting_started/installation.html">Installation</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../getting_started/jetpack.html">Torch-TensorRT in JetPack</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../getting_started/quick_start.html">Quick Start</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../getting_started/tensorrt_rtx.html">Torch-TensorRT-RTX</a></li>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="jetpack.html">Torch-TensorRT in JetPack</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quick_start.html">Quick Start</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Torch-TensorRT-RTX</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">User Guide</span></p>
 <ul>
@@ -360,13 +360,13 @@
 <li class="toctree-l1"><a class="reference internal" href="../dynamo/dynamo_export.html">Compiling Exported Programs with Torch-TensorRT</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">TorchScript Frontend</span></p>
-<ul class="current">
-<li class="toctree-l1"><a class="reference internal" href="creating_torchscript_module_in_python.html">Creating a TorchScript Module</a></li>
-<li class="toctree-l1"><a class="reference internal" href="creating_torchscript_module_in_python.html#working-with-torchscript-in-python">Working with TorchScript in Python</a></li>
-<li class="toctree-l1"><a class="reference internal" href="creating_torchscript_module_in_python.html#saving-torchscript-module-to-disk">Saving TorchScript Module to Disk</a></li>
-<li class="toctree-l1 current"><a class="current reference internal" href="#">Using Torch-TensorRT in Python</a></li>
-<li class="toctree-l1"><a class="reference internal" href="getting_started_with_cpp_api.html">Using Torch-TensorRT in  C++</a></li>
-<li class="toctree-l1"><a class="reference internal" href="ptq.html">Post Training Quantization (PTQ)</a></li>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../ts/creating_torchscript_module_in_python.html">Creating a TorchScript Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../ts/creating_torchscript_module_in_python.html#working-with-torchscript-in-python">Working with TorchScript in Python</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../ts/creating_torchscript_module_in_python.html#saving-torchscript-module-to-disk">Saving TorchScript Module to Disk</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../ts/getting_started_with_python_api.html">Using Torch-TensorRT in Python</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../ts/getting_started_with_cpp_api.html">Using Torch-TensorRT in  C++</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../ts/ptq.html">Post Training Quantization (PTQ)</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">FX Frontend</span></p>
 <ul>
@@ -454,13 +454,13 @@
       </li>
 
         
-      <li>Using Torch-TensorRT in Python</li>
+      <li>Torch-TensorRT-RTX</li>
     
     
       <li class="pytorch-breadcrumbs-aside">
         
             
-            <a href="../_sources/ts/getting_started_with_python_api.rst.txt" rel="nofollow"><img src="../_static/images/view-page-source-icon.svg"></a>
+            <a href="../_sources/getting_started/tensorrt_rtx.rst.txt" rel="nofollow"><img src="../_static/images/view-page-source-icon.svg"></a>
           
         
       </li>
@@ -490,78 +490,123 @@
             <div role="main" class="main-content" itemscope="itemscope" itemtype="http://schema.org/Article">
              <article itemprop="articleBody" id="pytorch-article" class="pytorch-article">
               
-  <section id="using-torch-tensorrt-in-python">
-<span id="getting-started-with-python-api"></span><h1>Using Torch-TensorRT in Python<a class="headerlink" href="#using-torch-tensorrt-in-python" title="Permalink to this heading">¶</a></h1>
-<p>The Torch-TensorRT Python API supports a number of unique usecases compared to the CLI and C++ APIs which solely support TorchScript compilation.</p>
-<p>Torch-TensorRT Python API can accept a <code class="docutils literal notranslate"><span class="pre">torch.nn.Module</span></code>, <code class="docutils literal notranslate"><span class="pre">torch.jit.ScriptModule</span></code>, or <code class="docutils literal notranslate"><span class="pre">torch.fx.GraphModule</span></code> as an input.
-Depending on what is provided one of the two frontends (TorchScript or FX) will be selected to compile the module. Provided the
-module type is supported, users may explicitly set which frontend they would like to use using the <code class="docutils literal notranslate"><span class="pre">ir</span></code> flag for <code class="docutils literal notranslate"><span class="pre">compile</span></code>.
-If given a <code class="docutils literal notranslate"><span class="pre">torch.nn.Module</span></code> and the <code class="docutils literal notranslate"><span class="pre">ir</span></code> flag is set to either <code class="docutils literal notranslate"><span class="pre">default</span></code> or <code class="docutils literal notranslate"><span class="pre">torchscript</span></code> the module will be run through
-<code class="docutils literal notranslate"><span class="pre">torch.jit.script</span></code> to convert the input module into a  TorchScript module.</p>
-<p>To compile your input <code class="docutils literal notranslate"><span class="pre">torch.nn.Module</span></code> with Torch-TensorRT, all you need to do is provide the module and inputs
-to Torch-TensorRT and you will be returned an optimized TorchScript module to run or add into another PyTorch module. Inputs
-is a list of <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.Input</span></code> classes which define input Tensors’ shape, datatype and memory format. Alternatively, if your input is a more complex data type, such as a tuple or list of Tensors, you can use the <code class="docutils literal notranslate"><span class="pre">input_signature</span></code> argument to specify a collection-based input, such as <code class="docutils literal notranslate"><span class="pre">(List[Tensor],</span> <span class="pre">Tuple[Tensor,</span> <span class="pre">Tensor])</span></code>. See the second sample below for an example. You can also specify settings such as operating precision for the engine or target device. After compilation you can save the module just like any other module
-to load in a deployment application. In order to load a TensorRT/TorchScript module, make sure you first import <code class="docutils literal notranslate"><span class="pre">torch_tensorrt</span></code>.</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">torch_tensorrt</span>
-
-<span class="o">...</span>
-
-<span class="n">model</span> <span class="o">=</span> <span class="n">MyModel</span><span class="p">()</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span>  <span class="c1"># torch module needs to be in eval (not training) mode</span>
-
-<span class="n">inputs</span> <span class="o">=</span> <span class="p">[</span>
-    <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">Input</span><span class="p">(</span>
-        <span class="n">min_shape</span><span class="o">=</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">16</span><span class="p">,</span> <span class="mi">16</span><span class="p">],</span>
-        <span class="n">opt_shape</span><span class="o">=</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">32</span><span class="p">,</span> <span class="mi">32</span><span class="p">],</span>
-        <span class="n">max_shape</span><span class="o">=</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">64</span><span class="p">,</span> <span class="mi">64</span><span class="p">],</span>
-        <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">half</span><span class="p">,</span>
-    <span class="p">)</span>
-<span class="p">]</span>
-<span class="n">enabled_precisions</span> <span class="o">=</span> <span class="p">{</span><span class="n">torch</span><span class="o">.</span><span class="n">float</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">half</span><span class="p">}</span>  <span class="c1"># Run with fp16</span>
-
-<span class="n">trt_ts_module</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span>
-    <span class="n">model</span><span class="p">,</span> <span class="n">inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">,</span> <span class="n">enabled_precisions</span><span class="o">=</span><span class="n">enabled_precisions</span>
-<span class="p">)</span>
-
-<span class="n">input_data</span> <span class="o">=</span> <span class="n">input_data</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">&quot;cuda&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">half</span><span class="p">()</span>
-<span class="n">result</span> <span class="o">=</span> <span class="n">trt_ts_module</span><span class="p">(</span><span class="n">input_data</span><span class="p">)</span>
-<span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">trt_ts_module</span><span class="p">,</span> <span class="s2">&quot;trt_ts_module.ts&quot;</span><span class="p">)</span>
+  <section id="torch-tensorrt-rtx">
+<span id="id1"></span><h1>Torch-TensorRT-RTX<a class="headerlink" href="#torch-tensorrt-rtx" title="Permalink to this heading">¶</a></h1>
+<section id="overview">
+<h2>Overview<a class="headerlink" href="#overview" title="Permalink to this heading">¶</a></h2>
+<section id="tensorrt-rtx">
+<h3>TensorRT-RTX<a class="headerlink" href="#tensorrt-rtx" title="Permalink to this heading">¶</a></h3>
+<p>TensorRT for RTX builds on the proven performance of the NVIDIA TensorRT inference library, and simplifies the deployment of AI models on NVIDIA RTX GPUs across desktops, laptops, and workstations.</p>
+<p>TensorRT for RTX is a drop-in replacement for NVIDIA TensorRT in applications targeting NVIDIA RTX GPUs from Turing through Blackwell generations. It introduces a Just-In-Time (JIT) optimizer in the runtime that compiles improved inference engines directly on the end-user’s RTX-accelerated PC in under 30 seconds. This eliminates the need for lengthy pre-compilation steps and enables rapid engine generation, improved application portability, and cutting-edge inference performance.</p>
+<p>For detailed information about TensorRT-RTX, refer to:</p>
+<ul class="simple">
+<li><p><a class="reference external" href="https://docs.nvidia.com/deeplearning/tensorrt-rtx/latest/index.html">TensorRT-RTX Documentation</a></p></li>
+</ul>
+<p>Currently, Torch-TensorRT only supports TensorRT-RTX for experimental purposes.
+Torch-TensorRT by default uses standard TensorRT during the build and run.</p>
+<p>To use TensorRT-RTX:</p>
+<ul class="simple">
+<li><p>Build the wheel with the <code class="docutils literal notranslate"><span class="pre">--use-rtx</span></code> flag or set <code class="docutils literal notranslate"><span class="pre">USE_TRT_RTX=true</span></code>.</p></li>
+<li><p>During runtime, set the <code class="docutils literal notranslate"><span class="pre">USE_TRT_RTX=true</span></code> environment variable to invoke TensorRT-RTX.</p></li>
+</ul>
+</section>
+</section>
+<section id="prerequisites">
+<h2>Prerequisites<a class="headerlink" href="#prerequisites" title="Permalink to this heading">¶</a></h2>
+<section id="install-bazel">
+<h3>Install Bazel<a class="headerlink" href="#install-bazel" title="Permalink to this heading">¶</a></h3>
+<p>Bazel is required to build the wheel with TensorRT-RTX.</p>
+<p><strong>In Linux:</strong></p>
+<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span>curl<span class="w"> </span>-L<span class="w"> </span>https://github.com/bazelbuild/bazelisk/releases/download/v1.26.0/bazelisk-linux-amd64<span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>-o<span class="w"> </span>bazelisk<span class="w"> </span><span class="se">\</span>
+<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>mv<span class="w"> </span>bazelisk<span class="w"> </span>/usr/bin/bazel<span class="w"> </span><span class="se">\</span>
+<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>chmod<span class="w"> </span>+x<span class="w"> </span>/usr/bin/bazel
 </pre></div>
 </div>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Sample using collection-based inputs via the input_signature argument</span>
-<span class="kn">import</span><span class="w"> </span><span class="nn">torch_tensorrt</span>
-
-<span class="o">...</span>
-
-<span class="n">model</span> <span class="o">=</span> <span class="n">MyModel</span><span class="p">()</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span>
-
-<span class="c1"># input_signature expects a tuple of individual input arguments to the module</span>
-<span class="c1"># The module below, for example, would have a docstring of the form:</span>
-<span class="c1"># def forward(self, input0: List[torch.Tensor], input1: Tuple[torch.Tensor, torch.Tensor])</span>
-<span class="n">input_signature</span> <span class="o">=</span> <span class="p">(</span>
-    <span class="p">[</span><span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">Input</span><span class="p">(</span><span class="n">shape</span><span class="o">=</span><span class="p">[</span><span class="mi">64</span><span class="p">,</span> <span class="mi">64</span><span class="p">],</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">half</span><span class="p">),</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">Input</span><span class="p">(</span><span class="n">shape</span><span class="o">=</span><span class="p">[</span><span class="mi">64</span><span class="p">,</span> <span class="mi">64</span><span class="p">],</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">half</span><span class="p">)],</span>
-    <span class="p">(</span><span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">Input</span><span class="p">(</span><span class="n">shape</span><span class="o">=</span><span class="p">[</span><span class="mi">64</span><span class="p">,</span> <span class="mi">64</span><span class="p">],</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">half</span><span class="p">),</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">Input</span><span class="p">(</span><span class="n">shape</span><span class="o">=</span><span class="p">[</span><span class="mi">64</span><span class="p">,</span> <span class="mi">64</span><span class="p">],</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">half</span><span class="p">)),</span>
-<span class="p">)</span>
-<span class="n">enabled_precisions</span> <span class="o">=</span> <span class="p">{</span><span class="n">torch</span><span class="o">.</span><span class="n">float</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">half</span><span class="p">}</span>
-
-<span class="n">trt_ts_module</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span>
-    <span class="n">model</span><span class="p">,</span> <span class="n">input_signature</span><span class="o">=</span><span class="n">input_signature</span><span class="p">,</span> <span class="n">enabled_precisions</span><span class="o">=</span><span class="n">enabled_precisions</span>
-<span class="p">)</span>
-
-<span class="n">input_data</span> <span class="o">=</span> <span class="n">input_data</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">&quot;cuda&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">half</span><span class="p">()</span>
-<span class="n">result</span> <span class="o">=</span> <span class="n">trt_ts_module</span><span class="p">(</span><span class="n">input_data</span><span class="p">)</span>
-<span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">trt_ts_module</span><span class="p">,</span> <span class="s2">&quot;trt_ts_module.ts&quot;</span><span class="p">)</span>
+<p><strong>In Windows:</strong></p>
+<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span>choco<span class="w"> </span>install<span class="w"> </span>bazelisk<span class="w"> </span>-y
 </pre></div>
 </div>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Deployment application</span>
-<span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
-<span class="kn">import</span><span class="w"> </span><span class="nn">torch_tensorrt</span>
-
-<span class="n">trt_ts_module</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s2">&quot;trt_ts_module.ts&quot;</span><span class="p">)</span>
-<span class="n">input_data</span> <span class="o">=</span> <span class="n">input_data</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">&quot;cuda&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">half</span><span class="p">()</span>
-<span class="n">result</span> <span class="o">=</span> <span class="n">trt_ts_module</span><span class="p">(</span><span class="n">input_data</span><span class="p">)</span>
+</section>
+<section id="install-tensorrt-rtx-tarball">
+<h3>Install TensorRT-RTX Tarball<a class="headerlink" href="#install-tensorrt-rtx-tarball" title="Permalink to this heading">¶</a></h3>
+<p>TensorRT-RTX tarball can be downloaded from <a class="reference external" href="https://developer.nvidia.com/tensorrt-rtx">https://developer.nvidia.com/tensorrt-rtx</a>.
+Currently, Torch-TensorRT uses TensorRT-RTX version <strong>1.0.0.21</strong>.</p>
+<p>Once downloaded:</p>
+<p><strong>In Linux:</strong></p>
+<p>Make sure you add the lib path to the <code class="docutils literal notranslate"><span class="pre">LD_LIBRARY_PATH</span></code> environment variable.</p>
+<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span><span class="c1"># If TensorRT-RTX is downloaded in /your_local_download_path/TensorRT-RTX-1.0.0.21</span>
+<span class="nb">export</span><span class="w"> </span><span class="nv">LD_LIBRARY_PATH</span><span class="o">=</span>/your_local_download_path/TensorRT-RTX-1.0.0.21/lib:<span class="nv">$LD_LIBRARY_PATH</span>
+<span class="nb">echo</span><span class="w"> </span><span class="nv">$LD_LIBRARY_PATH</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>TensorRT-RTX
 </pre></div>
 </div>
-<p>Torch-TensorRT Python API also provides <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.ts.compile</span></code> which accepts a TorchScript module as input and <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.fx.compile</span></code> which accepts a FX GraphModule as input.</p>
+<p><strong>In Windows:</strong></p>
+<p>Make sure you add the lib path to the Windows system variable <code class="docutils literal notranslate"><span class="pre">PATH</span></code>.</p>
+<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span><span class="c1"># If TensorRT-RTX is downloaded in C:\your_local_download_path\TensorRT-RTX-1.0.0.21</span>
+<span class="nb">set</span><span class="w"> </span><span class="nv">PATH</span><span class="o">=</span><span class="s2">&quot;%PATH%;C:\your_local_download_path\TensorRT-RTX-1.0.0.21\lib&quot;</span>
+<span class="nb">echo</span><span class="w"> </span>%PATH%<span class="w"> </span><span class="p">|</span><span class="w"> </span>findstr<span class="w"> </span>TensorRT-RTX
+</pre></div>
+</div>
+</section>
+<section id="install-tensorrt-rtx-wheel">
+<h3>Install TensorRT-RTX Wheel<a class="headerlink" href="#install-tensorrt-rtx-wheel" title="Permalink to this heading">¶</a></h3>
+<p>Currently, the <cite>tensorrt_rtx</cite> wheel is not published on PyPI.
+You must install it manually from the downloaded tarball.</p>
+<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span><span class="c1"># If the tarball is downloaded in /your_local_download_path/TensorRT-RTX-1.0.0.21</span>
+python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>/your_local_download_path/TensorRT-RTX-1.0.0.21/python/tensorrt_rtx-1.0.0.21-cp39-none-linux_x86_64.whl
+</pre></div>
+</div>
+</section>
+</section>
+<section id="build-torch-tensorrt-with-tensorrt-rtx">
+<h2>Build Torch-TensorRT with TensorRT-RTX<a class="headerlink" href="#build-torch-tensorrt-with-tensorrt-rtx" title="Permalink to this heading">¶</a></h2>
+<section id="build-locally-with-tensorrt-rtx">
+<h3>Build Locally with TensorRT-RTX<a class="headerlink" href="#build-locally-with-tensorrt-rtx" title="Permalink to this heading">¶</a></h3>
+<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span><span class="c1"># If you have previously built with standard TensorRT, make sure to clean the build environment,</span>
+<span class="c1"># otherwise it will use the existing .so built with standard TensorRT, which is not compatible with TensorRT-RTX.</span>
+python<span class="w"> </span>setup.py<span class="w"> </span>clean
+bazel<span class="w"> </span>clean<span class="w"> </span>--expunge
+<span class="c1">#remove everything under build directory,</span>
+rm<span class="w"> </span>-rf<span class="w"> </span>build/*
+
+<span class="c1"># Build wheel with TensorRT-RTX</span>
+python<span class="w"> </span>setup.py<span class="w"> </span>bdist_wheel<span class="w"> </span>--use-rtx
+
+<span class="c1"># Install the wheel</span>
+python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>dist/torch-tensorrt-*.whl
+</pre></div>
+</div>
+</section>
+</section>
+<section id="quick-start">
+<h2>Quick Start<a class="headerlink" href="#quick-start" title="Permalink to this heading">¶</a></h2>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># You must set USE_TRT_RTX=true to use TensorRT-RTX</span>
+<span class="n">USE_TRT_RTX</span><span class="o">=</span><span class="n">true</span> <span class="n">python</span> <span class="n">examples</span><span class="o">/</span><span class="n">dynamo</span><span class="o">/</span><span class="n">torch_compile_resnet_example</span><span class="o">.</span><span class="n">py</span>
+</pre></div>
+</div>
+</section>
+<section id="troubleshooting">
+<h2>Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permalink to this heading">¶</a></h2>
+<p>If you encounter load or link errors, check if <cite>tensorrt_rtx</cite> is linked correctly.
+If not, clean up the environment and rebuild.</p>
+<p><strong>In Linux:</strong></p>
+<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span><span class="c1"># Ensure only tensorrt_rtx is installed (no standard tensorrt wheels)</span>
+python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>list<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>tensorrt
+
+<span class="c1"># Check if libtorchtrt.so links to the correct tensorrt_rtx shared object</span>
+<span class="nv">trt_install_path</span><span class="o">=</span><span class="k">$(</span>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>show<span class="w"> </span>torch-tensorrt<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span><span class="s2">&quot;Location&quot;</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>awk<span class="w"> </span><span class="s1">&#39;{print $2}&#39;</span><span class="k">)</span>/torch_tensorrt
+
+<span class="c1"># Verify libtensorrt_rtx.so.1 is linked, and libnvinfer.so.10 is NOT</span>
+ldd<span class="w"> </span><span class="nv">$trt_install_path</span>/lib/libtorchtrt.so
+</pre></div>
+</div>
+<p><strong>In Windows:</strong></p>
+<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span><span class="c1"># Check if tensorrt_rtx_1_0.dll is linked, and libnvinfer.dll is NOT</span>
+<span class="nb">cd</span><span class="w"> </span>py/torch_tensorrt
+dumpbin<span class="w"> </span>/DEPENDENTS<span class="w"> </span>torchtrt.dll
+</pre></div>
+</div>
+</section>
 </section>
 
 
@@ -572,10 +617,10 @@ to load in a deployment application. In order to load a TensorRT/TorchScript mod
   
     <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
       
-        <a href="getting_started_with_cpp_api.html" class="btn btn-neutral float-right" title="Using Torch-TensorRT in C++" accesskey="n" rel="next">Next <img src="../_static/images/chevron-right-orange.svg" class="next-page"></a>
+        <a href="../user_guide/torch_tensorrt_explained.html" class="btn btn-neutral float-right" title="Torch-TensorRT Explained" accesskey="n" rel="next">Next <img src="../_static/images/chevron-right-orange.svg" class="next-page"></a>
       
       
-        <a href="creating_torchscript_module_in_python.html" class="btn btn-neutral" title="Creating a TorchScript Module" accesskey="p" rel="prev"><img src="../_static/images/chevron-right-orange.svg" class="previous-page"> Previous</a>
+        <a href="quick_start.html" class="btn btn-neutral" title="Quick Start" accesskey="p" rel="prev"><img src="../_static/images/chevron-right-orange.svg" class="previous-page"> Previous</a>
       
     </div>
   
@@ -607,7 +652,25 @@ to load in a deployment application. In order to load a TensorRT/TorchScript mod
           <div class="pytorch-right-menu" id="pytorch-right-menu">
             <div class="pytorch-side-scroll" id="pytorch-side-scroll-right">
               <ul>
-<li><a class="reference internal" href="#">Using Torch-TensorRT in Python</a></li>
+<li><a class="reference internal" href="#">Torch-TensorRT-RTX</a><ul>
+<li><a class="reference internal" href="#overview">Overview</a><ul>
+<li><a class="reference internal" href="#tensorrt-rtx">TensorRT-RTX</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#prerequisites">Prerequisites</a><ul>
+<li><a class="reference internal" href="#install-bazel">Install Bazel</a></li>
+<li><a class="reference internal" href="#install-tensorrt-rtx-tarball">Install TensorRT-RTX Tarball</a></li>
+<li><a class="reference internal" href="#install-tensorrt-rtx-wheel">Install TensorRT-RTX Wheel</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#build-torch-tensorrt-with-tensorrt-rtx">Build Torch-TensorRT with TensorRT-RTX</a><ul>
+<li><a class="reference internal" href="#build-locally-with-tensorrt-rtx">Build Locally with TensorRT-RTX</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#quick-start">Quick Start</a></li>
+<li><a class="reference internal" href="#troubleshooting">Troubleshooting</a></li>
+</ul>
+</li>
 </ul>
 
             </div>
