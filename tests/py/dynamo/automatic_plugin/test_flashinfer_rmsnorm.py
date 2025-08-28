@@ -11,10 +11,26 @@ from torch_tensorrt._enums import dtype
 
 from ..conversion.harness import DispatchTestCase
 
-# flashinfer has been impacted by torch upstream change: https://github.com/pytorch/pytorch/commit/660b0b8128181d11165176ea3f979fa899f24db1
-# got ImportError: cannot import name '_get_pybind11_abi_build_flags' from 'torch.utils.cpp_extension'
-# if importlib.util.find_spec("flashinfer"):
-# import flashinfer
+if importlib.util.find_spec("flashinfer"):
+    import flashinfer
+
+
+@torch.library.custom_op("flashinfer::rmsnorm", mutates_args=())  # type: ignore[misc]
+def flashinfer_rmsnorm(
+    input: torch.Tensor, weight: torch.Tensor, eps: float = 1e-6
+) -> torch.Tensor:
+    return flashinfer.norm.rmsnorm(input, weight)
+
+
+@torch.library.register_fake("flashinfer::rmsnorm")
+def _(input: torch.Tensor, weight: torch.Tensor, b: float = 1e-6) -> torch.Tensor:
+    return input
+
+
+if not torch_tensorrt.ENABLED_FEATURES.tensorrt_rtx:
+    torch_tensorrt.dynamo.conversion.plugins.custom_op(
+        "flashinfer::rmsnorm", supports_dynamic_shapes=True
+    )
 
 
 @unittest.skip("Not Available")
@@ -24,20 +40,6 @@ from ..conversion.harness import DispatchTestCase
     "flashinfer not installed or TensorRT RTX is present",
 )
 class TestAutomaticPlugin(DispatchTestCase):
-
-    @torch.library.custom_op("flashinfer::rmsnorm", mutates_args=())  # type: ignore[misc]
-    def flashinfer_rmsnorm(
-        input: torch.Tensor, weight: torch.Tensor, eps: float = 1e-6
-    ) -> torch.Tensor:
-        return flashinfer.norm.rmsnorm(input, weight)
-
-    @torch.library.register_fake("flashinfer::rmsnorm")
-    def _(input: torch.Tensor, weight: torch.Tensor, b: float = 1e-6) -> torch.Tensor:
-        return input
-
-    torch_tensorrt.dynamo.conversion.plugins.custom_op(
-        "flashinfer::rmsnorm", supports_dynamic_shapes=True
-    )
 
     @parameterized.expand(
         [
