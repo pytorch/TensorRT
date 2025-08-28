@@ -291,6 +291,9 @@ class TestWeightStreamingPython(TestCase):
             ("cpp_runtime", False),
         ]
     )
+    @unittest.skipIf(
+        torchtrt.ENABLED_FEATURES.tensorrt_rtx, "TensorRT-RTX has bug on cudagraphs"
+    )
     def test_runtime_state_change(self, _, use_python_runtime):
         class SampleModel(torch.nn.Module):
             def __init__(self):

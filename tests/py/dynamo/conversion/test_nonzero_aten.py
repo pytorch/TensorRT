@@ -1,5 +1,8 @@
+import unittest
+
 import torch
 import torch.nn as nn
+import torch_tensorrt
 from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
 from torch_tensorrt import Input
@@ -7,6 +10,10 @@ from torch_tensorrt import Input
 from .harness import DispatchTestCase
 
 
+@unittest.skipIf(
+    torch_tensorrt.ENABLED_FEATURES.tensorrt_rtx,
+    "nonzero is not supported for tensorrt_rtx",
+)
 class TestNonZeroConverter(DispatchTestCase):
     @parameterized.expand(
         [

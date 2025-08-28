@@ -1,3 +1,5 @@
+import unittest
+
 import pytest
 import torch
 import torch_tensorrt
@@ -150,6 +152,10 @@ class TestOutputAllocatorStaticModel(TestCase):
                     out = cudagraphs_module(*inputs)
 
 
+@unittest.skipIf(
+    torch_tensorrt.ENABLED_FEATURES.tensorrt_rtx,
+    "TensorRT RTX does not support nonzero which are required for this test",
+)
 class TestOutputAllocatorDDSModel(TestCase):
     @parameterized.expand(
         [
@@ -256,6 +262,10 @@ class TestOutputAllocatorDDSModel(TestCase):
                     out = cudagraphs_module(*inputs)
 
 
+@unittest.skipIf(
+    torch_tensorrt.ENABLED_FEATURES.tensorrt_rtx,
+    "TensorRT RTX does not support nonzero which are required for this test",
+)
 class TestOutputAllocatorDDSOpWithReductionOpModel(TestCase):
     """
     The DDSOpWithReductionOpModel is a model that contains DDS op + reduction op.
@@ -366,6 +376,10 @@ class TestOutputAllocatorDDSOpWithReductionOpModel(TestCase):
                     out = cudagraphs_module(*inputs)
 
 
+@unittest.skipIf(
+    torch_tensorrt.ENABLED_FEATURES.tensorrt_rtx,
+    "TensorRT RTX does not support nonzero which are required for this test",
+)
 class TestOutputAllocatorDDSModelWithGraphBreak(TestCase):
     @parameterized.expand(
         [

@@ -25,9 +25,11 @@ from torch.fx.experimental.proxy_tensor import unset_fake_temporarily
 from torch.fx.node import _get_qualified_name
 from torch.fx.passes.shape_prop import TensorMetadata
 from torch.utils._python_dispatch import _disable_current_modes
+from torch_tensorrt import ENABLED_FEATURES
 from torch_tensorrt._enums import dtype
 from torch_tensorrt._features import needs_refit
 from torch_tensorrt._Input import Input
+from torch_tensorrt._utils import is_tensorrt_version_supported
 from torch_tensorrt.dynamo import _defaults
 from torch_tensorrt.dynamo._engine_cache import BaseEngineCache
 from torch_tensorrt.dynamo._settings import CompilationSettings, settings_are_compatible
@@ -47,11 +49,9 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
 )
 from torch_tensorrt.dynamo.debug._DebuggerConfig import DebuggerConfig
 from torch_tensorrt.dynamo.debug._supports_debugger import cls_supports_debugger
+from torch_tensorrt.dynamo.observer import Observer
 from torch_tensorrt.dynamo.utils import DYNAMIC_DIM, deallocate_module, to_torch_device
-from torch_tensorrt.fx.observer import Observer
 from torch_tensorrt.logging import TRT_LOGGER
-
-from packaging import version
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -90,11 +90,19 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         self.builder = trt.Builder(self.logger)
         self._debugger_config = _debugger_config
         flag = 0
-        if compilation_settings.use_explicit_typing:
-            STRONGLY_TYPED = 1 << (int)(
-                trt.NetworkDefinitionCreationFlag.STRONGLY_TYPED
-            )
-            flag |= STRONGLY_TYPED
+        # rtx build, strongly typed is enabled by default, can not set it by builder config
+        if ENABLED_FEATURES.tensorrt_rtx:
+            if not compilation_settings.use_explicit_typing:
+                warnings.warn(
+                    "Strongly typed is enabled by default in torch-tensorrt-rtx build,  setting use_explicit_typing to True"
+                )
+                compilation_settings.use_explicit_typing = True
+        else:
+            if compilation_settings.use_explicit_typing:
+                STRONGLY_TYPED = 1 << (int)(
+                    trt.NetworkDefinitionCreationFlag.STRONGLY_TYPED
+                )
+                flag |= STRONGLY_TYPED
 
         self.ctx = ConversionContext(
             self.builder.create_network(flag), compilation_settings
@@ -104,7 +112,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         if not CONVERTERS.compilation_settings:
             # Configure user compilation settings to converters.
             CONVERTERS.set_compilation_settings(compilation_settings)
-
+        self.validate_compile_settings()
         assert TRTInterpreter._all_precisions_supported(
             compilation_settings.enabled_precisions
         ), f"Attempted to enable kernel precisions that are not supported (got: {compilation_settings.enabled_precisions}, support: {_defaults.SUPPORTED_KERNEL_PRECISIONS})"
@@ -189,6 +197,11 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         return enabled_precisions.issubset(_defaults.SUPPORTED_KERNEL_PRECISIONS)
 
     def validate_compile_settings(self) -> None:
+        if ENABLED_FEATURES.tensorrt_rtx:
+            if dtype.bfloat16 in self.compilation_settings.enabled_precisions:
+                raise RuntimeError("TensorRT-RTX does not support bfloat16!")
+            return
+
         if (
             dtype.i8 in self.compilation_settings.enabled_precisions
             and not self.builder.platform_has_fast_int8
@@ -217,14 +230,14 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                 trt.MemoryPoolType.WORKSPACE, self.compilation_settings.workspace_size
             )
 
-        if version.parse(trt.__version__) >= version.parse("8.2"):
+        if is_tensorrt_version_supported("8.2"):
             builder_config.profiling_verbosity = (
                 trt.ProfilingVerbosity.DETAILED
                 if self._debugger_config and self._debugger_config.save_engine_profile
                 else trt.ProfilingVerbosity.LAYER_NAMES_ONLY
             )
 
-        if version.parse(trt.__version__) >= version.parse("8.6"):
+        if is_tensorrt_version_supported("8.6"):
             if self.compilation_settings.max_aux_streams is not None:
                 _LOGGER.info(
                     f"Setting max aux streams to {self.compilation_settings.max_aux_streams}"
@@ -277,6 +290,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                 trt.MemoryPoolType.DLA_GLOBAL_DRAM,
                 self.compilation_settings.dla_global_dram_size,
             )
+
         if not self.compilation_settings.use_explicit_typing:
             if dtype.float16 in self.compilation_settings.enabled_precisions:
                 builder_config.set_flag(trt.BuilderFlag.FP16)
@@ -336,7 +350,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         if self.compilation_settings.enable_weight_streaming:
             builder_config.set_flag(trt.BuilderFlag.WEIGHT_STREAMING)
 
-        if version.parse(trt.__version__) >= version.parse("10.8"):
+        if is_tensorrt_version_supported("10.8"):
             TilingOptimizationLevel = {
                 "none": trt.TilingOptimizationLevel.NONE,
                 "fast": trt.TilingOptimizationLevel.FAST,

@@ -5,7 +5,10 @@ import unittest
 import pytest
 import torch
 import torch_tensorrt as torchtrt
-from torch_tensorrt.dynamo.utils import COSINE_THRESHOLD, cosine_similarity
+from torch_tensorrt.dynamo.utils import (
+    COSINE_THRESHOLD,
+    cosine_similarity,
+)
 
 assertions = unittest.TestCase()
 
@@ -183,6 +186,9 @@ def test_resnet_dynamic(ir, dtype):
     """
     Tests the Resnet18 model (which is fully convertible) with dynamic shapes
     """
+    if torchtrt.ENABLED_FEATURES.tensorrt_rtx and dtype == torch.bfloat16:
+        pytest.skip("TensorRT-RTX does not support bfloat16")
+
     import torchvision.models as models
 
     model = models.resnet18(pretrained=True).eval().to("cuda").to(dtype)

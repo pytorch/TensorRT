@@ -6,6 +6,7 @@ import torch
 from tensorrt import ITensor as TRTTensor
 from torch.fx.experimental.proxy_tensor import unset_fake_temporarily
 from torch.fx.node import Target
+from torch_tensorrt import ENABLED_FEATURES
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion import impl
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
@@ -32,6 +33,19 @@ def get_ir(target: Target) -> SourceIR:
         return SourceIR.NN
 
     return SourceIR.UNKNOWN
+
+
+def validate_int8_activation_quantization(name: str, dtype: trt.DataType) -> None:
+    if (
+        dtype == trt.DataType.INT8
+        and ".input_quantizer" in name
+        and ENABLED_FEATURES.tensorrt_rtx
+    ):
+        # RTX does not support int8 activation quantization
+        # TODO: lan to remove this once rtx team has added the support for int8 activation quantization
+        raise NotImplementedError(
+            "TensorRT-RTX does not support int8 activation quantization, only support int8 weight quantization"
+        )
 
 
 def quantize(
@@ -76,6 +90,8 @@ def quantize(
         elif num_bits == 8 and exponent_bits == 4:
             dtype = trt.DataType.FP8
             max_bound = 448
+
+        validate_int8_activation_quantization(name, dtype)
 
         axis = None
         # int8 weight quantization is per-channel quantization(it can have one or multiple amax values)

@@ -11,6 +11,10 @@ from utils import COSINE_THRESHOLD, cosine_similarity
     not torchtrt.ENABLED_FEATURES.torchscript_frontend,
     "TorchScript Frontend is not available",
 )
+@unittest.skipIf(
+    torchtrt.ENABLED_FEATURES.tensorrt_rtx,
+    "aten::adaptive_avg_pool2d is implemented via plugins which is not supported for tensorrt_rtx",
+)
 class TestToBackendLowering(unittest.TestCase):
     def setUp(self):
         self.input = torch.randn((1, 3, 300, 300)).to("cuda")
