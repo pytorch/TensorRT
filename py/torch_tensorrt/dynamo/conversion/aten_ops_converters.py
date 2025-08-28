@@ -882,7 +882,7 @@ def aten_ops_select(
 
 
 @dynamo_tensorrt_converter(
-    torch.ops.aten.index_put.default,
+    torch.ops.aten.index_put.default, supports_dynamic_shapes=True
 )
 @enforce_tensor_types(
     {
