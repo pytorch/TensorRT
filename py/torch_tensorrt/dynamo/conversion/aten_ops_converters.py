@@ -8,7 +8,7 @@ import numpy as np
 import torch
 from tensorrt import ITensor as TRTTensor
 from torch.fx.node import Argument, Node, Target
-from torch_tensorrt._features import needs_tensorrt
+from torch_tensorrt._features import needs_not_tensorrt_rtx
 from torch_tensorrt._utils import is_tensorrt_version_supported
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo._SourceIR import SourceIR
@@ -3600,7 +3600,7 @@ def aten_ops_full(
     supports_dynamic_shapes=True,
     requires_output_allocator=True,
 )
-@needs_tensorrt
+@needs_not_tensorrt_rtx
 def aten_ops_nonzero(
     ctx: ConversionContext,
     target: Target,
