@@ -279,6 +279,11 @@ class TestWeightStrippedEngine(TestCase):
         not importlib.util.find_spec("torchvision"),
         "torchvision is not installed",
     )
+    @unittest.skipIf(
+        torch_trt.ENABLED_FEATURES.tensorrt_rtx,
+        # TODO: need to fix this https://github.com/pytorch/TensorRT/issues/3752
+        "There is bug in refit, so we skip the test for now",
+    )
     def test_dynamo_compile_with_refittable_weight_stripped_engine(self):
         pyt_model = models.resnet18(pretrained=True).eval().to("cuda")
         example_inputs = (torch.randn((100, 3, 224, 224)).to("cuda"),)

@@ -15,7 +15,7 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     cast_trt_tensor,
     get_trt_tensor,
 )
-from torch_tensorrt.fx.types import TRTTensor
+from torch_tensorrt.dynamo.types import TRTTensor
 
 logger = logging.getLogger(__name__)
 
