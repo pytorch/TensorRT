@@ -5,16 +5,16 @@ import json
 import sys
 
 RELEASE_CUDA_VERSION = {
-    "wheel": ["cu128"],
-    "tarball": ["cu128"],
+    "wheel": ["cu129"],
+    "tarball": ["cu129"],
 }
 RELEASE_PYTHON_VERSION = {
-    "wheel": ["3.9", "3.10", "3.11", "3.12", "3.13"],
+    "wheel": ["3.10", "3.11", "3.12", "3.13"],
     "tarball": ["3.11"],
 }
 
 CXX11_TARBALL_CONTAINER_IMAGE = {
-    "cu128": "pytorch/libtorch-cxx11-builder:cuda12.8-main",
+    "cu129": "pytorch/libtorch-cxx11-builder:cuda12.9-main",
 }
 
 
