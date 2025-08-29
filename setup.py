@@ -631,7 +631,7 @@ if not (PY_ONLY or NO_TS):
             ),
             extra_compile_args=(
                 [
-                    f'/DPYBIND11_BUILD_ABI=\\"{torch._C._PYBIND11_BUILD_ABI}\\"',
+                    f'/DPYBIND11_BUILD_ABI=\\"{getattr(torch._C, "_PYBIND11_BUILD_ABI", "_cxxabi1018")}\\"',
                     "/GS-",
                     "/permissive-",
                     "/utf-8",
