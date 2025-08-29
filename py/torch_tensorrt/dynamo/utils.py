@@ -851,3 +851,10 @@ def is_tegra_platform() -> bool:
     if torch.cuda.get_device_capability() in [(8, 7), (7, 2)]:
         return True
     return False
+
+
+def is_thor() -> bool:
+    if torch.cuda.get_device_capability() == (11,0):
+        return True
+    return False 
+
