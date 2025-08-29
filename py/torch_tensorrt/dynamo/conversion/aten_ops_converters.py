@@ -881,8 +881,30 @@ def aten_ops_select(
     )
 
 
+def index_put_indices_continuity_validator(
+    node: Node, settings: Optional[CompilationSettings] = None
+) -> bool:
+    idxs = node.args[1]  # this is a list of indices
+    present_indices = [idx is not None for idx in idxs]
+    if len(present_indices) == 0:
+        return True
+    first_present_index = next((i for i, v in enumerate(present_indices) if v), None)
+    if first_present_index is None:
+        return False
+    rev_index = next((i for i, v in enumerate(reversed(present_indices)) if v), None)
+    if rev_index is None:
+        return False
+    last_present_index = len(present_indices) - 1 - rev_index
+    for i in range(first_present_index, last_present_index + 1):
+        if not present_indices[i]:
+            return False
+    return True
+
+
 @dynamo_tensorrt_converter(
-    torch.ops.aten.index_put.default, supports_dynamic_shapes=True
+    torch.ops.aten.index_put.default,
+    capability_validator=index_put_indices_continuity_validator,
+    supports_dynamic_shapes=True,
 )
 @enforce_tensor_types(
     {
