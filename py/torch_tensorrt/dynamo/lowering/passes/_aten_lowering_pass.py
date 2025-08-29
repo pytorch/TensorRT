@@ -5,7 +5,6 @@ import torch
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.utils import is_tegra_platform
 
-from .accumulate_fp32_matmul import accumulate_fp32_matmul
 from .complex_graph_rewrite import complex_graph_detection
 from .constant_folding import constant_fold
 from .fuse_prims_broadcast import fuse_prims_broadcast
@@ -24,7 +23,6 @@ post_lowering_pass_list = [
     fuse_prims_broadcast,
     replace_max_pool_with_indices,
     remove_assert_nodes,
-    accumulate_fp32_matmul,
     remove_num_users_is_0_nodes,
     complex_graph_detection,
 ]

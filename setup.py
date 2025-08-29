@@ -28,6 +28,7 @@ from torch.utils.cpp_extension import IS_WINDOWS, BuildExtension, CUDAExtension
 __version__: str = "0.0.0"
 __cuda_version__: str = "0.0"
 __tensorrt_version__: str = "0.0"
+__tensorrt_rtx_version__: str = "0.0"
 
 LEGACY_BASE_VERSION_SUFFIX_PATTERN = re.compile("a0$")
 
@@ -63,6 +64,7 @@ def get_base_version() -> str:
 def load_dep_info():
     global __cuda_version__
     global __tensorrt_version__
+    global __tensorrt_rtx_version__
     with open("dev_dep_versions.yml", "r") as stream:
         versions = yaml.safe_load(stream)
         if (gpu_arch_version := os.environ.get("CU_VERSION")) is not None:
@@ -72,6 +74,7 @@ def load_dep_info():
         else:
             __cuda_version__ = versions["__cuda_version__"]
         __tensorrt_version__ = versions["__tensorrt_version__"]
+        __tensorrt_rtx_version__ = versions["__tensorrt_rtx_version__"]
 
 
 load_dep_info()
@@ -86,6 +89,11 @@ NO_TS = False
 LEGACY = False
 RELEASE = False
 CI_BUILD = False
+USE_TRT_RTX = False
+
+if "--use-rtx" in sys.argv:
+    USE_TRT_RTX = True
+    sys.argv.remove("--use-rtx")
 
 if "--fx-only" in sys.argv:
     PY_ONLY = True
@@ -114,6 +122,10 @@ if (no_ts_env_var := os.environ.get("NO_TORCHSCRIPT")) is not None:
 if (py_only_env_var := os.environ.get("PYTHON_ONLY")) is not None:
     if py_only_env_var == "1":
         PY_ONLY = True
+
+if (use_rtx_env_var := os.environ.get("USE_TRT_RTX")) is not None:
+    if use_rtx_env_var == "1" or use_rtx_env_var.lower() == "true":
+        USE_TRT_RTX = True
 
 if (release_env_var := os.environ.get("RELEASE")) is not None:
     if release_env_var == "1":
@@ -194,6 +206,10 @@ def build_libtorchtrt_cxx11_abi(
     else:
         cmd.append("--config=linux")
 
+    if USE_TRT_RTX:
+        cmd.append("--config=rtx")
+        print("TensorRT RTX build")
+
     if IS_JETPACK:
         cmd.append("--config=jetpack")
         print("Jetpack build")
@@ -224,6 +240,7 @@ def gen_version_file():
         f.write('__version__ = "' + __version__ + '"\n')
         f.write('__cuda_version__ = "' + __cuda_version__ + '"\n')
         f.write('__tensorrt_version__ = "' + __tensorrt_version__ + '"\n')
+        f.write('__tensorrt_rtx_version__ = "' + __tensorrt_rtx_version__ + '"\n')
 
 
 def copy_libtorchtrt(multilinux=False, rt_only=False):
@@ -397,9 +414,21 @@ class CleanCommand(Command):
                 os.remove(path)
 
 
+_FX_FE_AVAIL = False if USE_TRT_RTX else True
 ext_modules = []
 
-packages = [
+fx_packages = [
+    "torch_tensorrt.fx",
+    "torch_tensorrt.fx.converters",
+    "torch_tensorrt.fx.converters.impl",
+    "torch_tensorrt.fx.passes",
+    "torch_tensorrt.fx.tools",
+    "torch_tensorrt.fx.tracer",
+    "torch_tensorrt.fx.tracer.acc_tracer",
+    "torch_tensorrt.fx.tracer.dispatch_tracer",
+]
+
+dynamo_packages = [
     "torch_tensorrt",
     "torch_tensorrt.dynamo",
     "torch_tensorrt.dynamo.backend",
@@ -418,18 +447,22 @@ packages = [
     "torch_tensorrt.dynamo.partitioning",
     "torch_tensorrt.dynamo.runtime",
     "torch_tensorrt.dynamo.tools",
-    "torch_tensorrt.fx",
-    "torch_tensorrt.fx.converters",
-    "torch_tensorrt.fx.converters.impl",
-    "torch_tensorrt.fx.passes",
-    "torch_tensorrt.fx.tools",
-    "torch_tensorrt.fx.tracer",
-    "torch_tensorrt.fx.tracer.acc_tracer",
-    "torch_tensorrt.fx.tracer.dispatch_tracer",
     "torch_tensorrt.runtime",
 ]
 
-package_dir = {
+fx_package_dir = {
+    "torch_tensorrt.fx": "py/torch_tensorrt/fx",
+    "torch_tensorrt.fx.converters": "py/torch_tensorrt/fx/converters",
+    "torch_tensorrt.fx.converters.impl": "py/torch_tensorrt/fx/converters/impl",
+    "torch_tensorrt.fx.passes": "py/torch_tensorrt/fx/passes",
+    "torch_tensorrt.fx.tools": "py/torch_tensorrt/fx/tools",
+    "torch_tensorrt.fx.tracer": "py/torch_tensorrt/fx/tracer",
+    "torch_tensorrt.fx.tracer.acc_tracer": "py/torch_tensorrt/fx/tracer/acc_tracer",
+    "torch_tensorrt.fx.tracer.dispatch_tracer": "py/torch_tensorrt/fx/tracer/dispatch_tracer",
+}
+
+
+dynamo_package_dir = {
     "torch_tensorrt": "py/torch_tensorrt",
     "torch_tensorrt.dynamo": "py/torch_tensorrt/dynamo",
     "torch_tensorrt.dynamo.backend": "py/torch_tensorrt/dynamo/backend",
@@ -448,16 +481,36 @@ package_dir = {
     "torch_tensorrt.dynamo.partitioning": "py/torch_tensorrt/dynamo/partitioning",
     "torch_tensorrt.dynamo.runtime": "py/torch_tensorrt/dynamo/runtime",
     "torch_tensorrt.dynamo.tools": "py/torch_tensorrt/dynamo/tools",
-    "torch_tensorrt.fx": "py/torch_tensorrt/fx",
-    "torch_tensorrt.fx.converters": "py/torch_tensorrt/fx/converters",
-    "torch_tensorrt.fx.converters.impl": "py/torch_tensorrt/fx/converters/impl",
-    "torch_tensorrt.fx.passes": "py/torch_tensorrt/fx/passes",
-    "torch_tensorrt.fx.tools": "py/torch_tensorrt/fx/tools",
-    "torch_tensorrt.fx.tracer": "py/torch_tensorrt/fx/tracer",
-    "torch_tensorrt.fx.tracer.acc_tracer": "py/torch_tensorrt/fx/tracer/acc_tracer",
-    "torch_tensorrt.fx.tracer.dispatch_tracer": "py/torch_tensorrt/fx/tracer/dispatch_tracer",
     "torch_tensorrt.runtime": "py/torch_tensorrt/runtime",
 }
+
+package_dir = dynamo_package_dir
+packages = dynamo_packages
+exclude_package_data = {
+    "": [
+        "py/torch_tensorrt/csrc/*.cpp",
+        "torch_tensorrt/csrc/*.cpp",
+        "test*",
+        "*.cpp",
+    ],
+    "torch_tensorrt": [
+        "py/torch_tensorrt/csrc/*.cpp",
+        "torch_tensorrt/csrc/*.cpp",
+        "test*",
+        "*.cpp",
+    ],
+}
+
+if _FX_FE_AVAIL:
+    package_dir = package_dir | fx_package_dir
+    packages = packages + fx_packages
+    exclude_package_data["torch_tensorrt.fx"] = ["test/*.py"]
+    exclude_package_data[""].extend(
+        ["py/torch_tensorrt/fx/test*", "torch_tensorrt/fx/test*"]
+    )
+    exclude_package_data["torch_tensorrt"].extend(
+        ["py/torch_tensorrt/fx/test*", "torch_tensorrt/fx/test*"]
+    )
 
 package_data = {}
 
@@ -465,6 +518,15 @@ if not (PY_ONLY or NO_TS):
     tensorrt_x86_64_external_dir = (
         lambda: subprocess.check_output(
             [BAZEL_EXE, "query", "@tensorrt//:nvinfer", "--output", "location"]
+        )
+        .decode("ascii")
+        .strip()
+        .split("/BUILD.bazel")[0]
+    )
+
+    tensorrt_rtx_external_dir = (
+        lambda: subprocess.check_output(
+            [BAZEL_EXE, "query", "@tensorrt_rtx//:nvinfer", "--output", "location"]
         )
         .decode("ascii")
         .strip()
@@ -494,16 +556,35 @@ if not (PY_ONLY or NO_TS):
     elif IS_JETPACK:
         tensorrt_linux_external_dir = tensorrt_jetpack_external_dir
     else:
-        tensorrt_linux_external_dir = tensorrt_x86_64_external_dir
+        if USE_TRT_RTX:
+            tensorrt_linux_external_dir = tensorrt_rtx_external_dir
+        else:
+            tensorrt_linux_external_dir = tensorrt_x86_64_external_dir
 
-    tensorrt_windows_external_dir = (
-        lambda: subprocess.check_output(
-            [BAZEL_EXE, "query", "@tensorrt_win//:nvinfer", "--output", "location"]
+    if USE_TRT_RTX:
+        tensorrt_windows_external_dir = (
+            lambda: subprocess.check_output(
+                [
+                    BAZEL_EXE,
+                    "query",
+                    "@tensorrt_rtx_win//:nvinfer",
+                    "--output",
+                    "location",
+                ]
+            )
+            .decode("ascii")
+            .strip()
+            .split("/BUILD.bazel")[0]
         )
-        .decode("ascii")
-        .strip()
-        .split("/BUILD.bazel")[0]
-    )
+    else:
+        tensorrt_windows_external_dir = (
+            lambda: subprocess.check_output(
+                [BAZEL_EXE, "query", "@tensorrt_win//:nvinfer", "--output", "location"]
+            )
+            .decode("ascii")
+            .strip()
+            .split("/BUILD.bazel")[0]
+        )
 
     ext_modules += [
         CUDAExtension(
@@ -637,6 +718,58 @@ elif NO_TS:
 with open(os.path.join(get_root_dir(), "README.md"), "r", encoding="utf-8") as fh:
     long_description = fh.read()
 
+
+def get_requirements():
+    requirements = [
+        "packaging>=23",
+        "typing-extensions>=4.7.0",
+        "dllist",
+    ]
+
+    if IS_JETPACK:
+        requirements.extend(
+            [
+                "torch>=2.8.0,<2.9.0",
+                "tensorrt>=10.3.0,<10.4.0",
+                "numpy<2.0.0",
+            ]
+        )
+    elif IS_SBSA:
+        requirements.extend(
+            [
+                "torch>=2.9.0.dev,<2.10.0",
+                "tensorrt>=10.12.0,<10.13.0",
+                "tensorrt-cu12>=10.12.0,<10.13.0",
+                "tensorrt-cu12-bindings>=10.12.0,<10.13.0",
+                "tensorrt-cu12-libs>=10.12.0,<10.13.0",
+                "numpy",
+            ]
+        )
+    else:
+        requirements.extend(
+            [
+                "torch>=2.9.0.dev,<2.10.0",
+                "numpy",
+            ]
+        )
+        if USE_TRT_RTX:
+            requirements.extend(
+                [
+                    "tensorrt-rtx>=1.0.0.21",
+                ]
+            )
+        else:
+            requirements.extend(
+                [
+                    "tensorrt>=10.12.0,<10.13.0",
+                    "tensorrt-cu12>=10.12.0,<10.13.0",
+                    "tensorrt-cu12-bindings>=10.12.0,<10.13.0",
+                    "tensorrt-cu12-libs>=10.12.0,<10.13.0",
+                ]
+            )
+    return requirements
+
+
 setup(
     name="torch_tensorrt",
     ext_modules=ext_modules,
@@ -650,28 +783,10 @@ setup(
         "editable_wheel": EditableWheelCommand,
     },
     zip_safe=False,
+    install_requires=get_requirements(),
     packages=packages,
     package_dir=package_dir,
     include_package_data=False,
     package_data=package_data,
-    exclude_package_data={
-        "": [
-            "py/torch_tensorrt/csrc/*.cpp",
-            "py/torch_tensorrt/fx/test*",
-            "torch_tensorrt/csrc/*.cpp",
-            "torch_tensorrt/fx/test*",
-            "test*",
-            "*.cpp",
-        ],
-        "torch_tensorrt": [
-            "py/torch_tensorrt/csrc/*.cpp",
-            "py/torch_tensorrt/fx/test*",
-            "torch_tensorrt/csrc/*.cpp",
-            "torch_tensorrt/fx/test*",
-            "test*",
-            "*.cpp",
-        ],
-        "torch_tensorrt.dynamo": ["test/*.py"],
-        "torch_tensorrt.fx": ["test/*.py"],
-    },
+    exclude_package_data=exclude_package_data,
 )

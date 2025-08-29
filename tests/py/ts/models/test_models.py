@@ -19,6 +19,10 @@ if importlib.util.find_spec("torchvision"):
 @unittest.skipIf(
     not importlib.util.find_spec("torchvision"), "torchvision not installed"
 )
+@unittest.skipIf(
+    torchtrt.ENABLED_FEATURES.tensorrt_rtx,
+    "aten::adaptive_avg_pool2d is implemented via plugins which is not supported for tensorrt_rtx",
+)
 class TestModels(unittest.TestCase):
     def test_resnet18(self):
         self.model = models.resnet18(pretrained=True).eval().to("cuda")

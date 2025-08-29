@@ -1,12 +1,13 @@
 import ctypes
+import logging
 import os
 import platform
 import sys
 from typing import Dict, List
 
+import torch
 from torch_tensorrt._version import (  # noqa: F401
     __cuda_version__,
-    __tensorrt_version__,
     __version__,
 )
 
@@ -17,72 +18,30 @@ if sys.version_info < (3,):
         "Python 2 has reached end-of-life and is not supported by Torch-TensorRT"
     )
 
-
-def _parse_semver(version: str) -> Dict[str, str]:
-    split = version.split(".")
-    if len(split) < 3:
-        split.append("")
-
-    return {"major": split[0], "minor": split[1], "patch": split[2]}
-
-
-def _find_lib(name: str, paths: List[str]) -> str:
-    for path in paths:
-        libpath = os.path.join(path, name)
-        if os.path.isfile(libpath):
-            return libpath
-
-    raise FileNotFoundError(f"Could not find {name}\n  Search paths: {paths}")
-
-
-try:
-    import tensorrt  # noqa: F401
-except ImportError:
-    cuda_version = _parse_semver(__cuda_version__)
-    tensorrt_version = _parse_semver(__tensorrt_version__)
-
-    CUDA_MAJOR = cuda_version["major"]
-    TENSORRT_MAJOR = tensorrt_version["major"]
-
-    if sys.platform.startswith("win"):
-        WIN_LIBS = [
-            "nvinfer.dll",
-            "nvinfer_plugin.dll",
-        ]
-
-        WIN_PATHS = os.environ["PATH"].split(os.path.pathsep)
-
-        for lib in WIN_LIBS:
-            ctypes.CDLL(_find_lib(lib, WIN_PATHS))
-
-    elif sys.platform.startswith("linux"):
-        LINUX_PATHS = ["/usr/local/cuda-12.8/lib64", "/usr/lib", "/usr/lib64"]
-        if "LD_LIBRARY_PATH" in os.environ:
-            LINUX_PATHS += os.environ["LD_LIBRARY_PATH"].split(os.path.pathsep)
-
-        if platform.uname().processor == "x86_64":
-            LINUX_PATHS += [
-                "/usr/lib/x86_64-linux-gnu",
-            ]
-
-        elif platform.uname().processor == "aarch64":
-            LINUX_PATHS += ["/usr/lib/aarch64-linux-gnu"]
-
-        LINUX_LIBS = [
-            f"libnvinfer.so.{TENSORRT_MAJOR}",
-            f"libnvinfer_plugin.so.{TENSORRT_MAJOR}",
-        ]
-
-        for lib in LINUX_LIBS:
-            ctypes.CDLL(_find_lib(lib, LINUX_PATHS))
-
 import logging
 
-import torch
-from torch_tensorrt._features import ENABLED_FEATURES, _enabled_features_str
-
 _LOGGER = logging.getLogger(__name__)
-_LOGGER.debug(_enabled_features_str())
+
+import torch
+
+tensorrt_package_name = ""
+
+try:
+    # note: _TensorRTProxyModule must be imported before any import tensorrt
+
+    from . import _TensorRTProxyModule  # noqa: F401
+
+    tensorrt_package_name = _TensorRTProxyModule.package_name
+    _LOGGER.info(f"You are using {_TensorRTProxyModule.package_name=} ")
+
+except Exception as e:
+    print(f"import error when try to import _TensorRTProxyModule, got error {e}")
+    print(
+        f"make sure tensorrt lib is in the LD_LIBRARY_PATH: {os.environ.get('LD_LIBRARY_PATH')}"
+    )
+    raise Exception(
+        f"import error when try to import _TensorRTProxyModule, got error {e}"
+    )
 
 
 def _register_with_torch() -> None:
@@ -109,6 +68,12 @@ def _register_with_torch() -> None:
     elif os.path.isfile(linked_file_runtime_full_path):
         assert ENABLED_FEATURES.torch_tensorrt_runtime
         torch.ops.load_library(linked_file_runtime_full_path)
+
+
+# note: _TensorRTProxyModule must be imported before enabled features, because enabled features will check tensorrt.plugin availability
+from torch_tensorrt._features import ENABLED_FEATURES, _enabled_features_str
+
+_LOGGER.debug(_enabled_features_str())
 
 
 _register_with_torch()

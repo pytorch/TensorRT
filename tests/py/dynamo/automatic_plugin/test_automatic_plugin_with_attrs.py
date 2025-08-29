@@ -1,3 +1,4 @@
+import unittest
 from typing import Tuple
 
 import torch
@@ -55,12 +56,18 @@ def _(x: torch.Tensor, y: torch.Tensor, b: float = 0.2, a: int = 2) -> torch.Ten
     return x
 
 
-torch_tensorrt.dynamo.conversion.plugins.custom_op(
-    "torchtrt_ex::elementwise_scale_mul", supports_dynamic_shapes=True
+if not torch_tensorrt.ENABLED_FEATURES.tensorrt_rtx:
+    torch_tensorrt.dynamo.conversion.plugins.custom_op(
+        "torchtrt_ex::elementwise_scale_mul", supports_dynamic_shapes=True
+    )
+
+
+@unittest.skipIf(
+    torch_tensorrt.ENABLED_FEATURES.tensorrt_rtx,
+    "TensorRT RTX does not support plugins",
 )
-
-
 class TestAutomaticPlugin(DispatchTestCase):
+
     @parameterized.expand(
         [
             ((64, 64), torch.float),

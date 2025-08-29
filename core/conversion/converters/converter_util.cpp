@@ -220,10 +220,8 @@ nvinfer1::ITensor* castITensor(
     std::ostringstream tensor_id;
     tensor_id << reinterpret_cast<int*>(tensor);
 
-    auto id_layer = ctx->net->addIdentity(*tensor);
-    TORCHTRT_CHECK(id_layer, "Unable to create identity layer for ITensor: " << tensor_id.str());
-    // layer->setOutputType should be used for casting and not manually setting output_tensor->setType()
-    id_layer->setOutputType(0, dtype);
+    auto id_layer = ctx->net->addCast(*tensor, dtype);
+    TORCHTRT_CHECK(id_layer, "Unable to create cast layer for ITensor: " << tensor_id.str());
 
     auto casted_tensor = id_layer->getOutput(0);
     LOG_DEBUG(ctx->logger, "Casting ITensor " << tensor_id.str() << " from " << tensor->getType() << " to " << dtype);

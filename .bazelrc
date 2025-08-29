@@ -39,6 +39,8 @@ build:cxx11_abi --define=abi=cxx11_abi
 
 build:jetpack --//toolchains/dep_collection:compute_libs=jetpack
 
+build:rtx --//toolchains/dep_collection:compute_libs=rtx
+
 build:ci_testing --define=torchtrt_src=prebuilt --cxxopt="-DDISABLE_TEST_IN_CI" --action_env "NVIDIA_TF32_OVERRIDE=0"
 build:use_precompiled_torchtrt --define=torchtrt_src=prebuilt
 

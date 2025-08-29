@@ -12,10 +12,10 @@ if [[ $(uname -m) == "aarch64" ]]; then
   if [[ ${os_name} == "ubuntu" ]]; then
       IS_JETPACK=true
       apt-get update
-      apt-get install -y ninja-build gettext curl libopenblas-dev
+      apt-get install -y ninja-build gettext curl libopenblas-dev zip unzip
   else
       IS_SBSA=true
-      yum install -y ninja-build gettext
+      yum install -y ninja-build gettext zip unzip
   fi
 else
   BAZEL_PLATFORM="amd64"
@@ -75,3 +75,9 @@ fi
 
 cat MODULE.bazel
 export CI_BUILD=1
+
+if [[ ${USE_TRT_RTX} == true ]]; then
+    source .github/scripts/install-tensorrt-rtx.sh
+    install_wheel_or_not=true
+    install_tensorrt_rtx ${install_wheel_or_not}
+fi

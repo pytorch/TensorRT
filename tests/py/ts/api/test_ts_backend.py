@@ -1,10 +1,11 @@
-import unittest
-import torch_tensorrt as torchtrt
-import torch
-import torchvision.models as models
 import copy
+import unittest
 from typing import Dict
-from utils import cosine_similarity, COSINE_THRESHOLD
+
+import torch
+import torch_tensorrt as torchtrt
+import torchvision.models as models
+from utils import COSINE_THRESHOLD, cosine_similarity
 
 
 class TestCompile(unittest.TestCase):
@@ -117,6 +118,10 @@ class TestCompile(unittest.TestCase):
         )
 
 
+@unittest.skipIf(
+    torchtrt.ENABLED_FEATURES.tensorrt_rtx,
+    "aten::adaptive_avg_pool2d is implemented via plugins which is not supported for tensorrt_rtx",
+)
 class TestCheckMethodOpSupport(unittest.TestCase):
     def test_check_support(self):
         module = models.alexnet(pretrained=True).eval().to("cuda")
@@ -139,10 +144,11 @@ class TestModuleIdentification(unittest.TestCase):
             torchtrt._compile._parse_module_type(ts_module),
             torchtrt._compile._ModuleType.ts,
         )
-        self.assertEqual(
-            torchtrt._compile._parse_module_type(fx_module),
-            torchtrt._compile._ModuleType.fx,
-        )
+        if not torchtrt.ENABLED_FEATURES.tensorrt_rtx:
+            self.assertEqual(
+                torchtrt._compile._parse_module_type(fx_module),
+                torchtrt._compile._ModuleType.fx,
+            )
 
 
 if __name__ == "__main__":

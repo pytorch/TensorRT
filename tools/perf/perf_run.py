@@ -11,7 +11,6 @@ from functools import wraps
 
 import numpy as np
 import pandas as pd
-import tensorrt as trt
 
 # Importing supported Backends
 import torch
@@ -436,6 +435,8 @@ def run_tensorrt(
     precision,
     batch_size=1,
 ):
+    import tensorrt as trt
+
     logger = trt.Logger(trt.Logger.WARNING)
     compile_time_s = 0
     if params["is_trt_engine"]:

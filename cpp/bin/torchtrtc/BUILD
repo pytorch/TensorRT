@@ -5,7 +5,7 @@ package(default_visibility = ["//visibility:public"])
 config_setting(
     name = "use_torch_whl",
     flag_values = {
-        "//toolchains/dep_src:torch": "whl"
+        "//toolchains/dep_src:torch": "whl",
     },
 )
 
@@ -15,14 +15,25 @@ config_setting(
         "@platforms//cpu:aarch64",
     ],
     flag_values = {
-        "//toolchains/dep_collection:compute_libs": "jetpack"
+        "//toolchains/dep_collection:compute_libs": "jetpack",
     },
 )
+
 config_setting(
     name = "windows",
     constraint_values = [
         "@platforms//os:windows",
     ],
+)
+
+config_setting(
+    name = "rtx_win",
+    constraint_values = [
+        "@platforms//os:windows",
+    ],
+    flag_values = {
+        "//toolchains/dep_collection:compute_libs": "rtx",
+    },
 )
 
 cc_binary(
@@ -44,17 +55,21 @@ cc_binary(
         "//cpp:torch_tensorrt",
         "//third_party/args",
     ] + select({
-        ":windows": [
+        ":jetpack": [
+            "@torch_l4t//:caffe2",
+            "@torch_l4t//:libtorch",
+        ],
+        ":rtx_win": [
             "@libtorch_win//:caffe2",
-            "@libtorch_win//:libtorch"
+            "@libtorch_win//:libtorch",
         ],
         ":use_torch_whl": [
             "@torch_whl//:caffe2",
-            "@torch_whl//:libtorch"
+            "@torch_whl//:libtorch",
         ],
-        ":jetpack": [
-            "@torch_l4t//:caffe2",
-            "@torch_l4t//:libtorch"
+        ":windows": [
+            "@libtorch_win//:caffe2",
+            "@libtorch_win//:libtorch",
         ],
         "//conditions:default": [
             "@libtorch",

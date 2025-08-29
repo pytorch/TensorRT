@@ -313,6 +313,10 @@ class TestTorchTensorRTModule(unittest.TestCase):
             trt_mod.engine.profile_path_prefix = "/tmp/"
             self.assertTrue(trt_mod.engine.profile_path_prefix == "/tmp/")
 
+    @unittest.skipIf(
+        torchtrt.ENABLED_FEATURES.tensorrt_rtx,
+        "layer info is different for tensorrt_rtx",
+    )
     def test_get_layer_info(self):
         """
         {
