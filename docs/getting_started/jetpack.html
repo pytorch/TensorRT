@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Torch-TensorRT in JetPack &mdash; Torch-TensorRT v2.9.0.dev0+996e33b documentation</title>
+  <title>Torch-TensorRT in JetPack &mdash; Torch-TensorRT v2.9.0.dev0+df76d97 documentation</title>
   
 
   
@@ -293,7 +293,7 @@
               
               
                 <div class="version">
-                  v2.9.0.dev0+996e33b
+                  v2.9.0.dev0+df76d97
                 </div>
               
             
@@ -548,8 +548,13 @@ sudo<span class="w"> </span>cp<span class="w"> </span>-a<span class="w"> </span>
 </ol>
 </section>
 </section>
-<section id="building-torch-tensorrt">
-<h2>Building Torch-TensorRT<a class="headerlink" href="#building-torch-tensorrt" title="Permalink to this heading">¶</a></h2>
+<section id="installation-torch-tensorrt-in-jetpack">
+<h2>Installation Torch-TensorRT in JetPack<a class="headerlink" href="#installation-torch-tensorrt-in-jetpack" title="Permalink to this heading">¶</a></h2>
+<p>You can directly install the torch-tensorrt wheel from the JPL repo which is built specifically for JetPack 6.2.</p>
+</section>
+<section id="building-torch-tensorrt-in-jetpack">
+<h2>Building Torch-TensorRT in JetPack<a class="headerlink" href="#building-torch-tensorrt-in-jetpack" title="Permalink to this heading">¶</a></h2>
+<p>You can also build the torch-tensorrt wheel from the source code on your own.</p>
 <section id="build-environment-setup">
 <h3>Build Environment Setup<a class="headerlink" href="#build-environment-setup" title="Permalink to this heading">¶</a></h3>
 <ol class="arabic">
@@ -576,26 +581,30 @@ python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </sp
 </pre></div>
 </div>
 </li>
+<li><p><strong>Build the Wheel</strong>:</p>
+<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>setup.py<span class="w"> </span>bdist_wheel<span class="w"> </span>--jetpack
+</pre></div>
+</div>
+</li>
+<li><p><strong>Install the Wheel</strong>:</p>
+<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span>
+</pre></div>
+</div>
+<p># you will be able to find the wheel in the dist directory
+cd dist
+python -m pip install torch_tensorrt-2.8.0.dev0+d8318d8fc-cp310-cp310-linux_aarch64.whl</p>
+</li>
+<li><p><strong>Verify installation by importing in Python</strong>:</p></li>
 </ol>
-</section>
-<section id="building-the-wheel">
-<h3>Building the Wheel<a class="headerlink" href="#building-the-wheel" title="Permalink to this heading">¶</a></h3>
-</section>
-<section id="installation">
-<h3>Installation<a class="headerlink" href="#installation" title="Permalink to this heading">¶</a></h3>
-</section>
-<section id="post-installation-verification">
-<h3>Post-Installation Verification<a class="headerlink" href="#post-installation-verification" title="Permalink to this heading">¶</a></h3>
-<p>Verify installation by importing in Python:
-.. code-block:: python</p>
-<blockquote>
-<div><p># verify whether the torch-tensorrt can be imported
-import torch
-import torch_tensorrt
-print(torch_tensorrt.__version__)</p>
-<p># verify whether the examples can be run
-python examples/dynamo/torch_compile_resnet_example.py</p>
-</div></blockquote>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># verify whether the torch-tensorrt can be imported</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch_tensorrt</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">__version__</span><span class="p">)</span>
+
+<span class="c1"># verify whether the examples can be run</span>
+<span class="n">python</span> <span class="n">examples</span><span class="o">/</span><span class="n">dynamo</span><span class="o">/</span><span class="n">torch_compile_resnet_example</span><span class="o">.</span><span class="n">py</span>
+</pre></div>
+</div>
 </section>
 </section>
 </section>
@@ -652,11 +661,9 @@ python examples/dynamo/torch_compile_resnet_example.py</p>
 <li><a class="reference internal" href="#system-preparation">System Preparation</a></li>
 </ul>
 </li>
-<li><a class="reference internal" href="#building-torch-tensorrt">Building Torch-TensorRT</a><ul>
+<li><a class="reference internal" href="#installation-torch-tensorrt-in-jetpack">Installation Torch-TensorRT in JetPack</a></li>
+<li><a class="reference internal" href="#building-torch-tensorrt-in-jetpack">Building Torch-TensorRT in JetPack</a><ul>
 <li><a class="reference internal" href="#build-environment-setup">Build Environment Setup</a></li>
-<li><a class="reference internal" href="#building-the-wheel">Building the Wheel</a></li>
-<li><a class="reference internal" href="#installation">Installation</a></li>
-<li><a class="reference internal" href="#post-installation-verification">Post-Installation Verification</a></li>
 </ul>
 </li>
 </ul>

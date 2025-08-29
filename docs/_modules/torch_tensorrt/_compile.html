@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt._compile &mdash; Torch-TensorRT v2.9.0.dev0+996e33b documentation</title>
+  <title>torch_tensorrt._compile &mdash; Torch-TensorRT v2.9.0.dev0+df76d97 documentation</title>
   
 
   
@@ -290,7 +290,7 @@
               
               
                 <div class="version">
-                  v2.9.0.dev0+996e33b
+                  v2.9.0.dev0+df76d97
                 </div>
               
             
@@ -491,6 +491,7 @@
 <span class="kn">import</span><span class="w"> </span><span class="nn">collections.abc</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">platform</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">warnings</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">enum</span><span class="w"> </span><span class="kn">import</span> <span class="n">Enum</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Callable</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Sequence</span><span class="p">,</span> <span class="n">Set</span><span class="p">,</span> <span class="n">Union</span>
 
@@ -609,6 +610,11 @@
                 <span class="s2">&quot;Requested using the TS frontend but the TS frontend is not available in this build of Torch-TensorRT&quot;</span>
             <span class="p">)</span>
     <span class="k">elif</span> <span class="n">module_is_fxable</span> <span class="ow">and</span> <span class="n">ir_targets_fx</span><span class="p">:</span>
+        <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+            <span class="s2">&quot;FX frontend is deprecated. Please use the Dynamo frontend instead.&quot;</span><span class="p">,</span>
+            <span class="ne">DeprecationWarning</span><span class="p">,</span>
+            <span class="n">stacklevel</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+        <span class="p">)</span>
         <span class="k">if</span> <span class="n">ENABLED_FEATURES</span><span class="o">.</span><span class="n">fx_frontend</span><span class="p">:</span>
             <span class="k">return</span> <span class="n">_IRType</span><span class="o">.</span><span class="n">fx</span>
         <span class="k">else</span><span class="p">:</span>
@@ -725,6 +731,11 @@
         <span class="p">)</span>
         <span class="k">return</span> <span class="n">compiled_ts_module</span>
     <span class="k">elif</span> <span class="n">target_ir</span> <span class="o">==</span> <span class="n">_IRType</span><span class="o">.</span><span class="n">fx</span><span class="p">:</span>
+        <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+            <span class="s2">&quot;FX frontend is deprecated. Please use the Dynamo frontend instead.&quot;</span><span class="p">,</span>
+            <span class="ne">DeprecationWarning</span><span class="p">,</span>
+            <span class="n">stacklevel</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+        <span class="p">)</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="n">ENABLED_FEATURES</span><span class="o">.</span><span class="n">fx_frontend</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
                 <span class="s2">&quot;FX frontend is not enabled, cannot compile with target_ir=fx&quot;</span>
