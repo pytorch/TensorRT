@@ -1,5 +1,5 @@
 load("@rules_cc//cc:defs.bzl", "cc_library")
-load("@rules_pkg//:pkg.bzl", "pkg_tar")
+load("@rules_pkg//:pkg.bzl", "pkg_tar", "pkg_zip")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -109,5 +109,18 @@ pkg_tar(
         "TRTEngineProfiler.h",
         "runtime.h",
     ],
+    package_dir = "core/runtime/",
+)
+
+pkg_zip(
+    name = "include_zip",
+    srcs = [
+        "Platform.h",
+        "RTDevice.h",
+        "TRTEngine.h",
+        "TRTEngineProfiler.h",
+        "runtime.h",
+    ],
+    out = "include.zip",
     package_dir = "core/runtime/",
 )
