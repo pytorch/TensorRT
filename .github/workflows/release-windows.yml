@@ -95,7 +95,7 @@ jobs:
             post-script: packaging/post_build_script.sh
             smoke-test-script: packaging/smoke_test_script.sh
             is-release-tarball: true
-    uses: ./.github/workflows/build_wheels_linux.yml
+    uses: ./.github/workflows/build_wheels_windows.yml
     with:
       repository: ${{ matrix.repository }}
       ref: ""
@@ -123,7 +123,7 @@ jobs:
             smoke-test-script: packaging/smoke_test_windows.py
             package-name: torch_tensorrt
             is-release-wheel: true
-    uses: ./.github/workflows/release-wheel-windows.yml
+    uses: ./.github/workflows/build_wheels_windows.yml
     with:
       repository: ${{ matrix.repository }}
       ref: ""

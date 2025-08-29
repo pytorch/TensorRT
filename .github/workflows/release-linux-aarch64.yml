@@ -75,6 +75,7 @@ jobs:
       smoke-test-script: ${{ matrix.smoke-test-script }}
       trigger-event: ${{ github.event_name }}
       is-release-tarball: true
+      architecture: "aarch64"
 
   generate-release-wheel-matrix:
     needs: [generate-matrix]
@@ -125,6 +126,7 @@ jobs:
       smoke-test-script: ${{ matrix.smoke-test-script }}
       trigger-event: ${{ github.event_name }}
       is-release-wheel: true
+      architecture: "aarch64"
 
 concurrency:
   group: ${{ github.workflow }}-aarch64-${{ github.event.pull_request.number || github.ref_name }}-${{ inputs.repository }}-${{ github.event_name == 'workflow_dispatch' }}-${{ inputs.job-name }}
