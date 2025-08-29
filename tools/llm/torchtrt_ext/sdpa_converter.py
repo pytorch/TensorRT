@@ -27,24 +27,50 @@ def tril(
     name: str,
     row: TRTTensor,
     col: TRTTensor,
+    sliding_window_size: Optional[int] = None,
 ) -> TRTTensor:
     row_arange_tensor = impl.arange.arange(
         ctx, target, source_ir, name + "_arange_row", start=0, end=row, step=1
     )
-    row_reshape_tensor = impl.shuffle.reshape(
-        ctx, target, source_ir, name + "_reshape_row", row_arange_tensor, [row, 1]
-    )
-
     col_arange_tensor = impl.arange.arange(
         ctx, target, source_ir, name + "_arange_col", start=0, end=col, step=1
     )
-    col_reshape_tensor = impl.shuffle.reshape(
-        ctx, target, source_ir, name + "_reshape_col", col_arange_tensor, [1, col]
+    row_arange_tensor = impl.unsqueeze.unsqueeze(
+        ctx, target, source_ir, name + "_unsqueeze_row", row_arange_tensor, -1
     )
+    col_arange_tensor = impl.unsqueeze.unsqueeze(
+        ctx, target, source_ir, name + "_unsqueeze_col", col_arange_tensor, 0
+    )
+    # sub will return the following mask tensor:
+    # [[0, -1, -2, -3],
+    #  [1,  0, -1, -2],
+    #  [2,  1,  0, -1],
+    #  [3,  2,  1,  0]]
+    mask = impl.elementwise.sub(
+        ctx, target, source_ir, name + "_sub", row_arange_tensor, col_arange_tensor
+    )
+    ge_0_mask = impl.elementwise.ge(ctx, target, source_ir, name + "_ge_0", mask, 0.0)
+    if sliding_window_size is None:
+        # return the following lower triangular mask includes the main diagonal:
+        # 0 ■ ⬚ ⬚ ⬚ ⬚     tensor([[[[ True, False, False, False, False],
+        # 1 ■ ■ ⬚ ⬚ ⬚               [ True,  True, False, False, False],
+        # 2 ■ ■ ■ ⬚ ⬚               [ True,  True,  True, False, False],
+        # 3 ■ ■ ■ ■ ⬚               [ True,  True,  True,  True, False],
+        # 4 ■ ■ ■ ■ ■               [ True,  True,  True,  True,  True]]]])
+        return ge_0_mask
 
-    mask = impl.elementwise.ge(
-        ctx, target, source_ir, name + "_ge", row_reshape_tensor, col_reshape_tensor
+    lt_window_mask = impl.elementwise.lt(
+        ctx, target, source_ir, name + "_lt_window_size", mask, sliding_window_size
     )
+    mask = impl.elementwise.logical_and(
+        ctx, target, source_ir, name + "_logical_and", ge_0_mask, lt_window_mask
+    )
+    # return the following mask if sliding_window_size is 3:
+    # 0 ■ ⬚ ⬚ ⬚ ⬚      tensor([[[[ True, False, False, False, False],
+    # 1 ■ ■ ⬚ ⬚ ⬚                [ True,  True, False, False, False],
+    # 2 ■ ■ ■ ⬚ ⬚                [ True,  True,  True, False, False],
+    # 3 ⬚ ■ ■ ■ ⬚                [False,  True,  True,  True, False],
+    # 4 ⬚ ⬚ ■ ■ ■                [False, False,  True,  True,True]]]])
     return mask
 
 
@@ -66,9 +92,13 @@ def scaled_dot_product_attention(
     # TODO: remove this once we have a better way to handle the causal mask
     scale = kwargs.get("scale", None)
     source_ir = SourceIR.ATEN
-    is_causal = True
+
+    assert is_causal == True, "is_causal should be set to True"
+
     # implementation as described here: https://pytorch.org/docs/stable/generated/torch.nn.functional.scaled_dot_product_attention.html
     use_fp32_acc = kwargs.get("use_fp32_acc", False)
+    sliding_window_size = kwargs.get("sliding_window_size", None)
+
     query_dtype = query.dtype
 
     if scale is None:
@@ -136,7 +166,9 @@ def scaled_dot_product_attention(
             S = impl.shape.shape(ctx, target, source_ir, name + "_shape_1", key, 2)
 
         # generate the mask tensor
-        tril_tensor = tril(ctx, target, source_ir, name + "_tril", L, S)
+        tril_tensor = tril(
+            ctx, target, source_ir, name + "_tril", L, S, sliding_window_size
+        )
 
         temp_mask = impl.unary.logical_not(
             ctx, target, source_ir, name + "_logical_not", tril_tensor
@@ -165,11 +197,9 @@ def scaled_dot_product_attention(
         attn_bias = impl.unary.log(
             ctx, target, source_ir, name + "_log", one_minus_temp_mask
         )
-
-    scaled_add_attn_bias = impl.elementwise.add(
-        ctx, target, source_ir, name + "_attn_bias_add", mm, attn_bias
-    )
-
+        scaled_add_attn_bias = impl.elementwise.add(
+            ctx, target, source_ir, name + "_attn_bias_add", mm, attn_bias
+        )
     softmax = impl.normalization.softmax(
         ctx, target, source_ir, name + "_softmax", scaled_add_attn_bias, -1, False
     )
