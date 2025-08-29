@@ -26,20 +26,8 @@ jobs:
       with-rocm: false
       with-cpu: false
 
-  substitute-runner:
-    needs: generate-matrix
-    outputs:
-      matrix: ${{ steps.substitute.outputs.matrix }}
-    runs-on: ubuntu-latest
-    steps:
-      - name: Substitute runner
-        id: substitute
-        run: |
-          echo matrix="$(echo '${{ needs.generate-release-matrix.outputs.matrix }}' | sed -e 's/windows.g4dn.xlarge/windows.g5.4xlarge.nvidia.gpu/g')" >> ${GITHUB_OUTPUT}
-
-
   generate-release-tarball-matrix:
-    needs: [substitute-runner]
+    needs: [generate-matrix]
     outputs:
       matrix: ${{ steps.generate.outputs.matrix }}
     runs-on: ubuntu-latest
@@ -54,13 +42,16 @@ jobs:
         id: generate
         run: |
           set -eou pipefail
-          MATRIX_BLOB=${{ toJSON(needs.substitute-runner.outputs.matrix) }}
+          MATRIX_BLOB=${{ toJSON(needs.generate-matrix.outputs.matrix) }}
           MATRIX_BLOB="$(python3 .github/scripts/generate-release-matrix.py --tarball_matrix "${MATRIX_BLOB}")"
           echo "${MATRIX_BLOB}"
-          echo "matrix=${MATRIX_BLOB}" >> "${GITHUB_OUTPUT}"
+          substitute_matrix="$(echo "${MATRIX_BLOB}" | sed -e 's/windows.g4dn.xlarge/windows.g5.4xlarge.nvidia.gpu/g')"
+
+          echo matrix="$(echo "${substitute_matrix}")" >> ${GITHUB_OUTPUT}
+
 
   generate-release-wheel-matrix:
-    needs: [substitute-runner]
+    needs: [generate-matrix]
     outputs:
       matrix: ${{ steps.generate.outputs.matrix }}
     runs-on: ubuntu-latest
@@ -75,10 +66,15 @@ jobs:
         id: generate
         run: |
           set -eou pipefail
-          MATRIX_BLOB=${{ toJSON(needs.substitute-runner.outputs.matrix) }}
+          MATRIX_BLOB=${{ toJSON(needs.generate-matrix.outputs.matrix) }}
           MATRIX_BLOB="$(python3 .github/scripts/generate-release-matrix.py --wheel_matrix "${MATRIX_BLOB}")"
+          echo "****MATRIX_BLOB****"
           echo "${MATRIX_BLOB}"
-          echo "matrix=${MATRIX_BLOB}" >> "${GITHUB_OUTPUT}"
+
+          substitute_matrix="$(echo "${MATRIX_BLOB}" | sed -e 's/windows.g4dn.xlarge/windows.g5.4xlarge.nvidia.gpu/g')"
+          echo "****substitute_matrix****"
+          echo "${substitute_matrix}"
+          echo "matrix=${substitute_matrix}" >> "${GITHUB_OUTPUT}"
 
 
   release-cxx11-tarball-artifacts:

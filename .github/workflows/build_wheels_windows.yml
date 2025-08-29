@@ -295,8 +295,9 @@ jobs:
               mkdir -p release/tarball
               TRT_VERSION=$(cat dev_dep_versions.yml | grep __tensorrt_version__ | sed 's/__tensorrt_version__: //g' | sed 's/"//g')
               bazel build //:libtorchtrt --compilation_mode opt --config=windows
-              cp bazel-bin/libtorchtrt.tar.gz \
-              release/tarball/libtorchtrt-${BUILD_VERSION}-tensorrt${TRT_VERSION}-cuda${CU_VERSION:2}-libtorch${PYTORCH_VERSION}-x86_64-windows.tar.gz
+              ls -lart bazel-bin/
+              cp bazel-bin/libtorchtrt.zip\
+              release/tarball/libtorchtrt-${BUILD_VERSION}-tensorrt${TRT_VERSION}-cuda${CU_VERSION:2}-libtorch${PYTORCH_VERSION}-x86_64-windows.zip
               return 0
             fi
           fi
@@ -334,7 +335,7 @@ jobs:
           source "${BUILD_ENV_FILE}"
           ${CONDA_RUN} ${ENV_SCRIPT} ${POST_SCRIPT}
       - name: Smoke Test X64
-        if: inputs.architecture == 'x64'
+        if: ${{ inputs.architecture == 'x64' && inputs.is-release-tarball == false }}
         env:
           ENV_SCRIPT: ${{ inputs.env-script }}
           PACKAGE_NAME: ${{ inputs.package-name }}
@@ -421,5 +422,5 @@ jobs:
       architecture: ${{ inputs.architecture }}
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}-${{ inputs.repository }}-${{ github.event_name == 'workflow_dispatch' }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}-${{ inputs.repository }}-${{ inputs.is-release-wheel }}-${{ inputs.is-release-tarball }}-${{ github.event_name == 'workflow_dispatch' }}
   cancel-in-progress: true

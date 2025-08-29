@@ -20,7 +20,7 @@ jobs:
     if: ${{ contains(github.event.pull_request.labels.*.name, 'build-release-artifacts') || startsWith(github.event.ref, 'refs/tags/v') }}
     with:
       package-type: wheel
-      os: linux
+      os: linux-aarch64
       test-infra-repository: pytorch/test-infra
       test-infra-ref: main
       with-rocm: false
