@@ -125,6 +125,17 @@ class TestIndexConverter(DispatchTestCase):
             [input, index0],
         )
 
+    def test_index_zero_two_dim_ITensor_mask(self):
+        class TestModule(nn.Module):
+            def forward(self, x, index0):
+                indices = [None, index0]
+                out = torch.ops.aten.index.Tensor(x, indices)
+                return out
+
+        input = torch.randn(2, 2)
+        index0 = torch.tensor([True, False])
+        self.run_test(TestModule(), [input, index0], enable_passes=True)
+
     def test_index_zero_index_three_dim_ITensor(self):
         class TestModule(nn.Module):
             def forward(self, x, index0):
@@ -135,6 +146,17 @@ class TestIndexConverter(DispatchTestCase):
         input = torch.randn(2, 2, 2)
         index0 = torch.randint(0, 1, (1, 1))
         index0 = index0.to(torch.int32)
+        self.run_test(TestModule(), [input, index0])
+
+    def test_index_zero_index_three_dim_mask_ITensor(self):
+        class TestModule(nn.Module):
+            def forward(self, x, index0):
+                indices = [None, index0, None]
+                out = torch.ops.aten.index.Tensor(x, indices)
+                return out
+
+        input = torch.randn(2, 2, 2)
+        index0 = torch.tensor([True, False])
         self.run_test(TestModule(), [input, index0])
 
 

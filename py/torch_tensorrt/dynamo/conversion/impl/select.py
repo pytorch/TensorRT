@@ -50,16 +50,22 @@ def select(
     return layer.get_output(0)
 
 
-def is_boolean_tensor(tensor: Union[TRTTensor, np.ndarray, torch.Tensor]) -> bool:
-    if isinstance(tensor, (torch.Tensor, np.ndarray, TRTTensor)):
+def is_boolean_tensor(
+    tensor: Union[TRTTensor, np.ndarray, torch.Tensor, torch.fx.Node],
+) -> bool:
+    if isinstance(tensor, torch.Tensor):
         return bool(tensor.dtype == torch.bool)
+    elif isinstance(tensor, np.ndarray):
+        return bool(tensor.dtype == np.bool_)
+    elif isinstance(tensor, TRTTensor):
+        return bool(tensor.dtype == trt.DataType.BOOL)
     # when index is a node
     else:
         val = tensor.meta.get("val")
         if val is not None and val.dtype is torch.bool:
             return True
 
-    return isinstance(tensor, (torch.Tensor, np.ndarray)) and tensor.dtype == torch.bool
+    return False
 
 
 def expand_boolean_indices(
