@@ -26,7 +26,7 @@ jobs:
       with-rocm: false
       with-cpu: false
 
-  generate-release-tarball-matrix:
+  generate-release-zip-matrix:
     needs: [generate-matrix]
     outputs:
       matrix: ${{ steps.generate.outputs.matrix }}
@@ -77,9 +77,9 @@ jobs:
           echo "matrix=${substitute_matrix}" >> "${GITHUB_OUTPUT}"
 
 
-  release-cxx11-tarball-artifacts:
-    needs: [generate-release-tarball-matrix]
-    name: Release torch-tensorrt cxx11 tarball artifacts
+  release-cxx11-zip-artifacts:
+    needs: [generate-release-zip-matrix]
+    name: Release Windows torch-tensorrt cxx11 zip artifacts
     strategy:
       fail-fast: false
       matrix:
@@ -96,7 +96,7 @@ jobs:
       ref: ""
       test-infra-repository: pytorch/test-infra
       test-infra-ref: main
-      build-matrix: ${{ needs.generate-release-tarball-matrix.outputs.matrix }}
+      build-matrix: ${{ needs.generate-release-zip-matrix.outputs.matrix }}
       pre-script: ${{ matrix.pre-script }}
       env-script: ${{ matrix.env-var-script }}
       package-name: ${{ matrix.package-name }}
@@ -105,7 +105,7 @@ jobs:
 
   release-wheel-artifacts:
     needs: [generate-release-wheel-matrix]
-    name: Release torch-tensorrt wheel artifacts
+    name: Release Windows torch-tensorrt wheel artifacts
     strategy:
       fail-fast: false
       matrix:

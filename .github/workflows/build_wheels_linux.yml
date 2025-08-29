@@ -385,12 +385,12 @@ jobs:
         with:
           name: ${{ env.ARTIFACT_NAME }}
           path: ${{ inputs.repository }}/dist/
-      - name: Upload tarball to GitHub
+      - name: Upload cxx11 tarball to GitHub
         if: ${{ inputs.is-release-tarball == true }}
         continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ env.ARTIFACT_NAME }}
+          name: cxx11-tarball-${{ env.PYTHON_VERSION }}-${{ env.CU_VERSION }}
           path: ${{ inputs.repository }}/release/tarball/
 
   upload:

@@ -49,7 +49,7 @@ jobs:
 
   release-cxx11-tarball-artifacts:
     needs: [generate-release-tarball-matrix]
-    name: Release torch-tensorrt cxx11 tarball artifacts
+    name: Release aarch64 torch-tensorrt cxx11 tarball artifacts
     strategy:
       fail-fast: false
       matrix:
@@ -99,7 +99,7 @@ jobs:
           echo "matrix=${MATRIX_BLOB}" >> "${GITHUB_OUTPUT}"
 
   release-wheel-artifacts:
-    name: Release torch-tensorrt wheel artifacts
+    name: Release aarch64 torch-tensorrt wheel artifacts
     needs: [generate-release-wheel-matrix]
     strategy:
       fail-fast: false
