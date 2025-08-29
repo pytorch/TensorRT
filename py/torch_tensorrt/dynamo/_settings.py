@@ -157,6 +157,7 @@ class CompilationSettings:
         self.__dict__.update(state)
 
 
+# TODO: @Evan If changing the setting would affect the behavior of engine compilation, then should be added to this list
 _SETTINGS_TO_BE_ENGINE_INVARIANT = (
     "enabled_precisions",
     "max_aux_streams",
@@ -167,7 +168,6 @@ _SETTINGS_TO_BE_ENGINE_INVARIANT = (
     "engine_capability",
     "hardware_compatible",
     "refit_identical_engine_weights",
-    "strip_engine_weights",  # TODO: @Evan to remove this after implementing caching weight-stripped engines as default?
     "immutable_weights",
     "enable_weight_streaming",
     "tiling_optimization_level",
