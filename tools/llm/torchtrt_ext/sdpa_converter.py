@@ -164,130 +164,42 @@ def scaled_dot_product_attention(
             L = impl.shape.shape(ctx, target, source_ir, name + "_shape_0", query, 2)
         if S < 0:
             S = impl.shape.shape(ctx, target, source_ir, name + "_shape_1", key, 2)
-        if is_causal:
-            # generate the mask tensor
-            tril_tensor = tril(
-                ctx, target, source_ir, name + "_tril", L, S, sliding_window_size
-            )
 
-            temp_mask = impl.unary.logical_not(
-                ctx, target, source_ir, name + "_logical_not", tril_tensor
-            )
+        # generate the mask tensor
+        tril_tensor = tril(
+            ctx, target, source_ir, name + "_tril", L, S, sliding_window_size
+        )
 
-            # This need_mask determines if we want to use the causal mask or not
-            # When KV caching is enabled, L = 1 and != S. In this case, we shouldn't use the causal mask.
-            # So need_mask will be all False values in this case.
-            # TODO: Implement more general case where L != 1 and S != L
-            need_mask = impl.elementwise.eq(ctx, target, source_ir, name + "_eq", L, S)
-            temp_mask = impl.elementwise.logical_and(
-                ctx, target, source_ir, name + "_logical_and", need_mask, temp_mask
-            )
-            temp_mask_casted = cast_trt_tensor(
-                ctx, temp_mask, query_dtype, name + "_casted_bool", target, source_ir
-            )
+        temp_mask = impl.unary.logical_not(
+            ctx, target, source_ir, name + "_logical_not", tril_tensor
+        )
 
-            one_minus_temp_mask = impl.elementwise.sub(
-                ctx,
-                target,
-                source_ir,
-                name + "_one_minus_temp_mask",
-                1.0,
-                temp_mask_casted,
-            )
-            attn_bias = impl.unary.log(
-                ctx, target, source_ir, name + "_log", one_minus_temp_mask
-            )
-            scaled_add_attn_bias = impl.elementwise.add(
-                ctx, target, source_ir, name + "_attn_bias_add", mm, attn_bias
-            )
-        else:
-            use_if_conditional = False
-            if not use_if_conditional:
-                # works in non cache scenario, but in kv cache, got the following error:
-                # ERROR:torch_tensorrt [TensorRT Conversion Context]:IBuilder::buildSerializedNetwork: Error Code 4: Internal Error (kOPT values for profile 0 violate shape constraints: [ELEMENTWISE]-[aten_ops.scaled_dot_product_attention]-[model.layers.0.self_attn/scaled_dot_product_attention_attn_mask_add]: dimensions not compatible for elementwise. Broadcast has incompatible dimensions: 5 != 71 && 5 != 1 && 71 != 1.)
-                scaled_add_attn_bias = impl.elementwise.add(
-                    ctx, target, source_ir, name + "_attn_mask_add", mm, attn_mask
-                )
-            else:
-                if_option = "if_conditional_subgraph"  # if_conditional_subgraph or if_conditional or if_conditional_input
-                if if_option == "if_conditional_subgraph":
-                    # reference: https://gitlab-master.nvidia.com/TensorRT/TensorRT/-/blob/main/documentation/operators/examples/example_if.py#L46
-                    # if_conditional_subgraph is not working, got the following error:
-                    # Internal Error: MyelinCheckException: utils.cpp:694: CHECK(common_bb == cur_call->dds_parent()->parent()) failed. Expect the graph has single block
-                    # ERROR:torch_tensorrt [TensorRT Conversion Context]:IBuilder::buildSerializedNetwork: Error Code 1: Myelin ([myelin_graph.h:attachExceptionMsgToGraph:1139] MyelinCheckException: utils.cpp:694: CHECK(common_bb == cur_call->dds_parent()->parent()) failed. Expect the graph has single block)
+        # This need_mask determines if we want to use the causal mask or not
+        # When KV caching is enabled, L = 1 and != S. In this case, we shouldn't use the causal mask.
+        # So need_mask will be all False values in this case.
+        # TODO: Implement more general case where L != 1 and S != L
+        need_mask = impl.elementwise.eq(ctx, target, source_ir, name + "_eq", L, S)
+        temp_mask = impl.elementwise.logical_and(
+            ctx, target, source_ir, name + "_logical_and", need_mask, temp_mask
+        )
+        temp_mask_casted = cast_trt_tensor(
+            ctx, temp_mask, query_dtype, name + "_casted_bool", target, source_ir
+        )
 
-                    need_mask = impl.elementwise.eq(
-                        ctx, target, source_ir, name + "_eq", L, S
-                    )
-                    # if I do not squeeze, it will throw the error: condition must be a scalar tensor
-                    condition = impl.squeeze.squeeze(
-                        ctx, target, source_ir, name + "_unsqueeze", need_mask, 0
-                    )
-                    if_layer = ctx.net.add_if_conditional()
-                    if_layer.set_condition(condition)
-                    cond_input1 = if_layer.add_input(mm)
-                    cond_input2 = if_layer.add_input(attn_mask)
-
-                    true_input = impl.elementwise.add(
-                        ctx,
-                        target,
-                        source_ir,
-                        name + "_attn_bias_add",
-                        cond_input1.get_output(0),
-                        cond_input2.get_output(0),
-                    )
-                    false_input = cond_input1.get_output(0)
-                    output_layer = if_layer.add_output(true_input, false_input)
-                    scaled_add_attn_bias = output_layer.get_output(0)
-                elif if_option == "if_conditional_input":
-                    # reference: https://gitlab-master.nvidia.com/TensorRT/TensorRT/-/blob/main/documentation/operators/examples/example_if.py#L17
-                    # if_conditional_input is not working, got the following error:
-                    # Internal Error: MyelinCheckException: utils.cpp:694: CHECK(common_bb == cur_call->dds_parent()->parent()) failed. Expect the graph has single block
-                    # ERROR:torch_tensorrt [TensorRT Conversion Context]:IBuilder::buildSerializedNetwork: Error Code 1: Myelin ([myelin_graph.h:attachExceptionMsgToGraph:1139] MyelinCheckException: utils.cpp:694: CHECK(common_bb == cur_call->dds_parent()->parent()) failed. Expect the graph has single block)
-
-                    need_mask = impl.elementwise.eq(
-                        ctx, target, source_ir, name + "_eq", L, S
-                    )
-                    # if I do not squeeze, it will throw the error: condition must be a scalar tensor
-                    condition = impl.squeeze.squeeze(
-                        ctx, target, source_ir, name + "_unsqueeze", need_mask, 0
-                    )
-                    if_layer = ctx.net.add_if_conditional()
-                    if_layer.set_condition(condition)
-                    true_input = impl.elementwise.add(
-                        ctx, target, source_ir, name + "_attn_bias_add", mm, attn_mask
-                    )
-                    false_input = mm
-                    true_cond_input = if_layer.add_input(true_input)
-                    false_cond_input = if_layer.add_input(false_input)
-                    output_layer = if_layer.add_output(
-                        true_cond_input.get_output(0), false_cond_input.get_output(0)
-                    )
-                    scaled_add_attn_bias = output_layer.get_output(0)
-                elif if_option == "if_conditional":
-                    # reference: https://github.com/pytorch/TensorRT/blob/535c6a8341a3258a9c311406a9af50eb3c68c5a6/examples/dynamo/llm/cache_utils.py#L15-L44
-                    # if_conditional is not working, got the following error:
-                    # Internal Error: MyelinCheckException: utils.cpp:694: CHECK(common_bb == cur_call->dds_parent()->parent()) failed. Expect the graph has single block
-                    # ERROR:torch_tensorrt [TensorRT Conversion Context]:IBuilder::buildSerializedNetwork: Error Code 1: Myelin ([myelin_graph.h:attachExceptionMsgToGraph:1139] MyelinCheckException: utils.cpp:694: CHECK(common_bb == cur_call->dds_parent()->parent()) failed. Expect the graph has single block)
-
-                    need_mask = impl.elementwise.eq(
-                        ctx, target, source_ir, name + "_eq", L, S
-                    )
-                    # if I do not squeeze, it will throw the error: condition must be a scalar tensor
-                    condition = impl.squeeze.squeeze(
-                        ctx, target, source_ir, name + "_unsqueeze", need_mask, 0
-                    )
-                    if_layer = ctx.net.add_if_conditional()
-                    if_layer.set_condition(condition)
-                    true_input = impl.elementwise.add(
-                        ctx, target, source_ir, name + "_attn_bias_add", mm, attn_mask
-                    )
-                    false_input = mm
-                    output_layer = if_layer.add_output(
-                        true_input.get_output(0), false_input.get_output(0)
-                    )
-                    scaled_add_attn_bias = output_layer.get_output(0)
-
+        one_minus_temp_mask = impl.elementwise.sub(
+            ctx,
+            target,
+            source_ir,
+            name + "_one_minus_temp_mask",
+            1.0,
+            temp_mask_casted,
+        )
+        attn_bias = impl.unary.log(
+            ctx, target, source_ir, name + "_log", one_minus_temp_mask
+        )
+        scaled_add_attn_bias = impl.elementwise.add(
+            ctx, target, source_ir, name + "_attn_bias_add", mm, attn_bias
+        )
     softmax = impl.normalization.softmax(
         ctx, target, source_ir, name + "_softmax", scaled_add_attn_bias, -1, False
     )
