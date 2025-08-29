@@ -1,7 +1,6 @@
 name: Release Windows wheels artifacts
 
 on:
-  pull_request:
   push:
     tags:
       # NOTE: Binary build pipelines should only get triggered on release candidate builds
@@ -90,10 +89,9 @@ jobs:
         include:
           - repository: pytorch/tensorrt
             package-name: torch_tensorrt
-            pre-script: packaging/pre_build_script.sh
-            env-var-script: packaging/env_vars.txt
-            post-script: packaging/post_build_script.sh
-            smoke-test-script: packaging/smoke_test_script.sh
+            pre-script: packaging/pre_build_script_windows.sh
+            env-script: packaging/vc_env_helper.bat
+            smoke-test-script: packaging/smoke_test_windows.py
             is-release-tarball: true
     uses: ./.github/workflows/build_wheels_windows.yml
     with:
@@ -103,11 +101,9 @@ jobs:
       test-infra-ref: main
       build-matrix: ${{ needs.generate-release-tarball-matrix.outputs.matrix }}
       pre-script: ${{ matrix.pre-script }}
-      env-var-script: ${{ matrix.env-var-script }}
-      post-script: ${{ matrix.post-script }}
+      env-script: ${{ matrix.env-var-script }}
       package-name: ${{ matrix.package-name }}
       smoke-test-script: ${{ matrix.smoke-test-script }}
-      trigger-event: ${{ github.event_name }}
       is-release-tarball: true
 
   release-wheel-artifacts:

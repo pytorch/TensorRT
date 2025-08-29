@@ -1,7 +1,6 @@
 name: Release aarch64 Linux wheels and tarball artifacts
 
 on:
-  pull_request:
   push:
     tags:
       # NOTE: Binary build pipelines should only get triggered on release candidate builds

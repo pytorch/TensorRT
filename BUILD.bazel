@@ -1,4 +1,4 @@
-load("@rules_pkg//:pkg.bzl", "pkg_tar")
+load("@rules_pkg//:pkg.bzl", "pkg_tar", "pkg_zip")
 
 config_setting(
     name = "windows",
@@ -96,8 +96,24 @@ pkg_tar(
     package_dir = "bin/",
 )
 
+# Windows-specific zip target
+pkg_zip(
+    name = "libtorchtrt_zip",
+    srcs = [
+        "//:LICENSE",
+        "//third_party/torch_tensorrt:BUILD",
+    ],
+    package_dir = "torch_tensorrt",
+    deps = [
+        ":include",
+        ":include_core",
+        ":lib",
+    ],
+)
+
+# Non-Windows tar target
 pkg_tar(
-    name = "libtorchtrt",
+    name = "libtorchtrt_tar",
     srcs = [
         "//:LICENSE",
         "//third_party/torch_tensorrt:BUILD",
@@ -105,18 +121,40 @@ pkg_tar(
     extension = "tar.gz",
     package_dir = "torch_tensorrt",
     deps = [
+        ":bin",
         ":include",
         ":include_core",
         ":lib",
-    ] + select({
-        ":rtx_win": [],
-        ":windows": [],
-        "//conditions:default": [":bin"],
+    ],
+)
+
+# Main target that selects between zip and tar based on platform
+alias(
+    name = "libtorchtrt",
+    actual = select({
+        ":rtx_win": ":libtorchtrt_zip",
+        ":windows": ":libtorchtrt_zip",
+        "//conditions:default": ":libtorchtrt_tar",
     }),
 )
 
+# Windows-specific zip target for runtime
+pkg_zip(
+    name = "libtorchtrt_runtime_zip",
+    srcs = [
+        "//:LICENSE",
+        "//third_party/torch_tensorrt:BUILD",
+    ],
+    package_dir = "torch_tensorrt_runtime",
+    deps = [
+        ":include_rt",
+        ":lib_rt",
+    ],
+)
+
+# Non-Windows tar target for runtime
 pkg_tar(
-    name = "libtorchtrt_runtime",
+    name = "libtorchtrt_runtime_tar",
     srcs = [
         "//:LICENSE",
         "//third_party/torch_tensorrt:BUILD",
@@ -127,4 +165,14 @@ pkg_tar(
         ":include_rt",
         ":lib_rt",
     ],
+)
+
+# Main runtime target that selects between zip and tar based on platform
+alias(
+    name = "libtorchtrt_runtime",
+    actual = select({
+        ":rtx_win": ":libtorchtrt_runtime_zip",
+        ":windows": ":libtorchtrt_runtime_zip",
+        "//conditions:default": ":libtorchtrt_runtime_tar",
+    }),
 )
