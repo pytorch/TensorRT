@@ -40,7 +40,7 @@ to_test_models = {
 }
 
 if importlib.util.find_spec("torchvision"):
-    import timm
+    import torch
     import torchvision.models as models
 
     torchvision_models = {

@@ -7,13 +7,19 @@ from importlib import metadata
 import pytest
 import torch
 import torch_tensorrt as torchtrt
-from torch_tensorrt.dynamo.utils import COSINE_THRESHOLD, cosine_similarity
+from torch_tensorrt.dynamo.utils import (
+    COSINE_THRESHOLD,
+    cosine_similarity,
+    is_tegra_platform,
+)
 
 from packaging.version import Version
 
 if importlib.util.find_spec("torchvision"):
-    import timm
     import torchvision.models as models
+
+    if not is_tegra_platform():
+        import timm
 
 assertions = unittest.TestCase()
 
@@ -413,6 +419,7 @@ def test_base_int8(ir, dtype):
     mtq.quantize(model, quant_cfg, forward_loop=calibrate_loop)
     # model has INT8 qdq nodes at this point
     output_pyt = model(input_tensor)
+    breakpoint()
     with torch.no_grad():
         with export_torch_mode():
             exp_program = torch.export.export(model, (input_tensor,), strict=False)
