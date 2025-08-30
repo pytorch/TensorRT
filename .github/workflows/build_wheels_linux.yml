@@ -117,6 +117,16 @@ on:
         required: false
         default: false
         type: boolean
+      is-release-wheel:
+        description: Set to true if the build is for release wheel
+        required: false
+        default: false
+        type: boolean
+      is-release-tarball:
+        description: Set to true if the build is for release tarball
+        required: false
+        default: false
+        type: boolean
     secrets:
       PYPI_API_TOKEN:
         description: An optional token to upload to pypi
@@ -265,22 +275,42 @@ jobs:
           export PYTORCH_VERSION="$(${CONDA_RUN} pip show torch | grep ^Version: | sed 's/Version: *//' | sed 's/+.\+//')"
           ${CONDA_RUN} python setup.py clean
           echo "Successfully ran `python setup.py clean`"
-          if [[ "$BUILD_VERSION" != *"+"${CU_VERSION} ]]; then
-            BUILD_VERSION="${BUILD_VERSION}+${CU_VERSION}"
+          if [[ ${{ inputs.is-release-wheel }} == true || ${{ inputs.is-release-tarball }} == true ]]; then
+              # release version for upload to pypi
+              # BUILD_VERSION example: 2.4.0+cu121, we don't want the +cu121 part, so remove +cu121
+              BUILD_VERSION=${BUILD_VERSION%+*}
+              if [[ ${{ inputs.is-release-tarball }} == true ]]; then
+                  mkdir -p release/tarball
+                  TRT_VERSION=$(cat dev_dep_versions.yml | grep __tensorrt_version__ | sed 's/__tensorrt_version__: //g' | sed 's/"//g')
+                  bazel build //:libtorchtrt --compilation_mode opt --config=linux
+                  cp bazel-bin/libtorchtrt.tar.gz \
+                  release/tarball/libtorchtrt-${BUILD_VERSION}-tensorrt${TRT_VERSION}-cuda${CU_VERSION:2}-libtorch${PYTORCH_VERSION}-x86_64-linux.tar.gz
+                  return 0
+              else
+                  if [[ ${{ inputs.is-release-wheel }} == true ]]; then
+                    param="--release"
+                  fi
+              fi
+          else
+              # release version for upload to pytorch index
+              if [[ "$BUILD_VERSION" != *"+"${CU_VERSION} ]]; then
+                BUILD_VERSION="${BUILD_VERSION}+${CU_VERSION}"
+              fi
           fi
+
           echo "BUILD_VERSION=$BUILD_VERSION"
           echo "USE_TRT_RTX=$USE_TRT_RTX"
           echo "LD_LIBRARY_PATH=$LD_LIBRARY_PATH"
           if [[ ${{ inputs.use-rtx }} == true ]]; then
             echo "Building tensorrt-rtx wheel"
-            ${CONDA_RUN} python setup.py bdist_wheel --use-rtx
+            ${CONDA_RUN} python setup.py bdist_wheel ${param} --use-rtx
           else
             if [[ ${{ inputs.is-jetpack }} == true ]]; then
               echo "Building tensorrt wheel for jetpack"
-              ${CONDA_RUN} python setup.py bdist_wheel --jetpack
+              ${CONDA_RUN} python setup.py bdist_wheel ${param} --jetpack
             else
               echo "Building standard tensorrt wheel"
-              ${CONDA_RUN} python setup.py bdist_wheel
+              ${CONDA_RUN} python setup.py bdist_wheel ${param}
             fi
           fi
       - name: Repair Manylinux_2_28 Wheel
@@ -289,7 +319,7 @@ jobs:
           PACKAGE_NAME: ${{ inputs.package-name }}
           SMOKE_TEST_SCRIPT: ${{ inputs.smoke-test-script }}
         # TODO: lan to verify whether manylinux repair is needed for jetpack
-        #if: ${{ inputs.is-jetpack == true }}
+        if: ${{ inputs.is-release-tarball == false }}
         run: |
           set -euxo pipefail
           source "${BUILD_ENV_FILE}"
@@ -312,6 +342,7 @@ jobs:
         env:
           PACKAGE_NAME: ${{ inputs.package-name }}
           SMOKE_TEST_SCRIPT: ${{ inputs.smoke-test-script }}
+        if: ${{ inputs.is-release-tarball == false }}
         run: |
           set -euxo pipefail
           source "${BUILD_ENV_FILE}"
@@ -348,18 +379,27 @@ jobs:
       # NB: Only upload to GitHub after passing smoke tests
 
       - name: Upload wheel to GitHub
+        if: ${{ inputs.is-release-tarball == false }}
         continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: ${{ env.ARTIFACT_NAME }}
           path: ${{ inputs.repository }}/dist/
+      - name: Upload cxx11 tarball to GitHub
+        if: ${{ inputs.is-release-tarball == true }}
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: cxx11-tarball-${{ env.PYTHON_VERSION }}-${{ env.CU_VERSION }}
+          path: ${{ inputs.repository }}/release/tarball/
 
   upload:
     needs: build
     name: upload-wheel-${{ matrix.python_version }}-${{ matrix.desired_cuda }}-${{ matrix.gpu_arch_type }}-${{ inputs.is-jetpack }}
     uses: pytorch/test-infra/.github/workflows/_binary_upload.yml@main
     #  if it is not jetpack nor rtx, then upload to pytorch index
-    if: ${{ inputs.is-jetpack == false && inputs.use-rtx == false }}
+    # if it is the release wheel or tarball, then skip upload to pytorch index
+    if: ${{ inputs.is-jetpack == false && inputs.use-rtx == false && inputs.is-release-wheel == false && inputs.is-release-tarball == false }}
     with:
       repository: ${{ inputs.repository }}
       ref: ${{ inputs.ref }}
@@ -373,5 +413,5 @@ jobs:
       PYPI_API_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}-${{inputs.use-rtx}}-${{inputs.architecture}}-${{inputs.is-jetpack}}-${{ inputs.repository }}-${{ github.event_name == 'workflow_dispatch' }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}-${{inputs.is-release-wheel}}-${{inputs.is-release-tarball}}-${{inputs.use-rtx}}-${{inputs.architecture}}-${{inputs.is-jetpack}}-${{ inputs.repository }}-${{ github.event_name == 'workflow_dispatch' }}
   cancel-in-progress: true

@@ -1,5 +1,5 @@
 load("@rules_cc//cc:defs.bzl", "cc_library")
-load("@rules_pkg//:pkg.bzl", "pkg_tar")
+load("@rules_pkg//:pkg.bzl", "pkg_tar", "pkg_zip")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -101,5 +101,14 @@ pkg_tar(
     srcs = [
         "compiler.h",
     ],
+    package_dir = "core/",
+)
+
+pkg_zip(
+    name = "include_zip",
+    srcs = [
+        "compiler.h",
+    ],
+    out = "include.zip",
     package_dir = "core/",
 )

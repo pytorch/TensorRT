@@ -35,6 +35,7 @@ cc_library(
         [
             "include/torch/**/*.h",
         ],
+        allow_empty = True,
         exclude = [
             "include/torch/csrc/api/include/**/*.h",
         ],

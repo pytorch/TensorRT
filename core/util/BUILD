@@ -1,5 +1,5 @@
 load("@rules_cc//cc:defs.bzl", "cc_library")
-load("@rules_pkg//:pkg.bzl", "pkg_tar")
+load("@rules_pkg//:pkg.bzl", "pkg_tar", "pkg_zip")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -163,5 +163,19 @@ pkg_tar(
         "//core/util:prelude.h",
         "//core/util:trt_util.h",
     ],
+    package_dir = "core/util/",
+)
+
+pkg_zip(
+    name = "include_zip",
+    srcs = [
+        "//core/util:Exception.h",
+        "//core/util:build_info.h",
+        "//core/util:jit_util.h",
+        "//core/util:macros.h",
+        "//core/util:prelude.h",
+        "//core/util:trt_util.h",
+    ],
+    out = "include.zip",
     package_dir = "core/util/",
 )

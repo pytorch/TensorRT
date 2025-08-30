@@ -1,7 +1,7 @@
 name: Build and test Windows wheels
 
 on:
-  pull_request:
+  #pull_request:
   push:
     branches:
       - main

@@ -89,6 +89,16 @@ on:
         description: 'CPU architecture to build for'
         default: "x64"
         type: string
+      is-release-tarball:
+        description: Set to true if the build is for release tarball
+        required: false
+        default: false
+        type: boolean
+      is-release-wheel:
+        description: Set to true if the build is for release wheel
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   id-token: write
@@ -277,6 +287,20 @@ jobs:
           BUILD_PARAMS: ${{ inputs.wheel-build-params }}
         run: |
           source "${BUILD_ENV_FILE}"
+          if [[ ${{ inputs.is-release-wheel }} == true || ${{ inputs.is-release-tarball }} == true ]]; then
+            # release version for upload to pypi
+            # BUILD_VERSION example: 2.4.0+cu121, we don't want the +cu121 part, so remove +cu121
+            BUILD_VERSION=${BUILD_VERSION%+*}
+            if [[ ${{ inputs.is-release-tarball }} == true ]]; then
+              mkdir -p release/tarball
+              TRT_VERSION=$(cat dev_dep_versions.yml | grep __tensorrt_version__ | sed 's/__tensorrt_version__: //g' | sed 's/"//g')
+              bazel build //:libtorchtrt --compilation_mode opt --config=windows
+              ls -lart bazel-bin/
+              cp bazel-bin/libtorchtrt.zip\
+              release/tarball/libtorchtrt-${BUILD_VERSION}-tensorrt${TRT_VERSION}-cuda${CU_VERSION:2}-libtorch${PYTORCH_VERSION}-x86_64-windows.zip
+              return 0
+            fi
+          fi
           if [[ -z "${ENV_SCRIPT}" ]]; then
             ${CONDA_RUN} python setup.py bdist_wheel
           else
@@ -311,7 +335,7 @@ jobs:
           source "${BUILD_ENV_FILE}"
           ${CONDA_RUN} ${ENV_SCRIPT} ${POST_SCRIPT}
       - name: Smoke Test X64
-        if: inputs.architecture == 'x64'
+        if: ${{ inputs.architecture == 'x64' && inputs.is-release-tarball == false }}
         env:
           ENV_SCRIPT: ${{ inputs.env-script }}
           PACKAGE_NAME: ${{ inputs.package-name }}
@@ -365,11 +389,19 @@ jobs:
         run: |
           echo "ARTIFACT_NAME=${REPOSITORY//\//_}_${REF//\//_}_${PYTHON_VERSION}_${CU_VERSION}_${ARCH}" >> "${GITHUB_ENV}"
       - name: Upload wheel to GitHub
+        if: ${{ inputs.is-release-tarball == false }}
         continue-on-error: true
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: ${{ env.ARTIFACT_NAME }}
           path: ${{ inputs.repository }}/dist/
+      - name: Upload zip artifact to GitHub
+        if: ${{ inputs.is-release-tarball == true }}
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: cxx11-zip-${{ env.PYTHON_VERSION }}-${{ env.CU_VERSION }}
+          path: ${{ inputs.repository }}/release/tarball/
       - uses: ./test-infra/.github/actions/teardown-windows
         if: inputs.architecture == 'x64'
         name: Teardown Windows
@@ -378,7 +410,8 @@ jobs:
     needs: build
     uses: pytorch/test-infra/.github/workflows/_binary_upload.yml@main
     # for tensorrt-rtx build, do not upload to pytorch indexat at all
-    if: ${{ inputs.use-rtx == false }}
+    # if it is the release wheel or tarball, then skip upload to pytorch index(release wheel are uploaded to pypi)
+    if: ${{ inputs.use-rtx == false && inputs.is-release-wheel == false && inputs.is-release-tarball == false }}
     with:
       repository: ${{ inputs.repository }}
       ref: ${{ inputs.ref }}
@@ -389,5 +422,5 @@ jobs:
       architecture: ${{ inputs.architecture }}
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}-${{ inputs.repository }}-${{ github.event_name == 'workflow_dispatch' }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}-${{ inputs.repository }}-${{ inputs.is-release-wheel }}-${{ inputs.is-release-tarball }}-${{ github.event_name == 'workflow_dispatch' }}
   cancel-in-progress: true
