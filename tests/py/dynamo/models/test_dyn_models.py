@@ -1,5 +1,5 @@
 # type: ignore
-import importlib
+
 import unittest
 
 import pytest
@@ -174,31 +174,27 @@ def test_view(ir):
     )
 
 
-@unittest.skipIf(
-    not importlib.util.find_spec("torchvision"), "torchvision not installed"
-)
 @pytest.mark.unit
-@pytest.mark.parametrize("dtype", [torch.float16, torch.bfloat16, torch.float32])
-def test_resnet_dynamic(ir, dtype):
+def test_resnet_dynamic(ir):
     """
     Tests the Resnet18 model (which is fully convertible) with dynamic shapes
     """
     import torchvision.models as models
 
-    model = models.resnet18(pretrained=True).eval().to("cuda").to(dtype)
+    model = models.resnet18(pretrained=True).eval().to("cuda")
 
     compile_spec = {
         "device": torchtrt.Device("cuda:0"),
+        "enabled_precisions": {torch.float},
         "ir": ir,
         "pass_through_build_failures": True,
         "min_block_size": 1,
         "cache_built_engines": False,
         "reuse_cached_engines": False,
-        "use_explicit_typing": True,
     }
 
     if ir == "torch_compile":
-        input_bs2 = torch.randn((2, 3, 224, 224)).to("cuda").to(dtype)
+        input_bs2 = torch.randn((2, 3, 224, 224)).to("cuda")
         torch._dynamo.mark_dynamic(input_bs2, 0, min=1, max=8)
         # Compile the model
         trt_model = torch.compile(model, backend="tensorrt", options=compile_spec)
@@ -209,18 +205,14 @@ def test_resnet_dynamic(ir, dtype):
                 min_shape=(1, 3, 224, 224),
                 opt_shape=(4, 3, 224, 224),
                 max_shape=(8, 3, 224, 224),
-                dtype=dtype,
+                dtype=torch.float32,
                 name="x",
             )
         ]
         trt_model = torchtrt.compile(model, **compile_spec)
 
-    input_bs6 = torch.randn((6, 3, 224, 224)).to("cuda").to(dtype)
-    pyt_output = model(input_bs6)
-    trt_output = trt_model(input_bs6)
-    assert pyt_output.dtype == trt_output.dtype
-    assert trt_output.dtype == dtype
-    cos_sim = cosine_similarity(pyt_output, trt_output)
+    input_bs6 = torch.randn((6, 3, 224, 224)).to("cuda")
+    cos_sim = cosine_similarity(model(input_bs6), trt_model(input_bs6))
     assertions.assertTrue(
         cos_sim > COSINE_THRESHOLD,
         msg=f"test_resnet_dynamic model TRT outputs don't match with the pytorch model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",

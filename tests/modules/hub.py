@@ -5,8 +5,11 @@ import os
 
 import custom_models as cm
 import torch
+import torch_tensorrt
 
 torch.hub._validate_not_a_forked_repo = lambda a, b, c: True
+
+from torch_tensorrt.dynamo.utils import is_tegra_platform
 
 
 torch_version = torch.__version__
@@ -40,7 +43,7 @@ to_test_models = {
 }
 
 if importlib.util.find_spec("torchvision"):
-    import timm
+    import torch
     import torchvision.models as models
 
     torchvision_models = {
@@ -75,15 +78,23 @@ if importlib.util.find_spec("torchvision"):
             ),
             "path": "both",
         },
-        "efficientnet_b0": {
-            "model": timm.create_model("efficientnet_b0", pretrained=True),
-            "path": "script",
-        },
-        "vit": {
-            "model": timm.create_model("vit_base_patch16_224", pretrained=True),
-            "path": "script",
-        },
     }
+        # Conditionally add timm models
+    if not is_tegra_platform():
+        import timm
+
+        timm_models = {
+            "efficientnet_b0": {
+                "model": timm.create_model("efficientnet_b0", pretrained=True),
+                "path": "script",
+            },
+            "vit": {
+                "model": timm.create_model("vit_base_patch16_224", pretrained=True),
+                "path": "script",
+            },
+        }
+        torchvision_models.update(timm_models)
+    
     to_test_models.update(torchvision_models)
 
 

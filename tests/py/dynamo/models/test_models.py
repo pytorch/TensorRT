@@ -9,13 +9,16 @@ from torch_tensorrt.dynamo.utils import (
     COSINE_THRESHOLD,
     cosine_similarity,
     get_model_device,
+    is_tegra_platform,
 )
 
 assertions = unittest.TestCase()
 
 if importlib.util.find_spec("torchvision"):
-    import timm
     import torchvision.models as models
+
+    if not is_tegra_platform():
+        import timm
 
 
 @pytest.mark.unit
