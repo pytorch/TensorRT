@@ -440,16 +440,20 @@ class TestEmbeddingBagConverter(DispatchTestCase):
                 weights=torch.randn((5, 2), dtype=torch.float32),
                 # weights_1 is for inference
                 weights_1=torch.randn((6, 3), dtype=torch.float32),
+                indices=torch.tensor([1, 2, 4, 2, 3, 4], dtype=torch.int32),
+                offsets=torch.tensor([0, 2, 4], dtype=torch.int32),
                 dynamic_shapes={
                     "weights": {
                         0: torch.export.Dim("dyn_dim", min=2, max=8),
                         1: torch.export.Dim("dyn_dim_1", min=1, max=3),
                     },
-                    "indices": {},
-                    "offsets": {},
+                    "indices": {
+                        0: torch.export.Dim("dyn_dim_in", min=2, max=32),
+                    },
+                    "offsets": {
+                        0: torch.export.Dim("dyn_dim_off", min=2, max=32),
+                    },
                 },
-                indices=torch.tensor([1, 2, 4, 2, 3, 4], dtype=torch.int32),
-                offsets=torch.tensor([0, 2, 4], dtype=torch.int32),
                 mode=1,
                 per_sample_weights=None,
             ),
