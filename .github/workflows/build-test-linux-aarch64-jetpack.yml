@@ -1,7 +1,7 @@
 name: Build and test Linux aarch64 wheels for Jetpack
 
 on:
-  #pull_request:
+  pull_request:
   push:
     branches:
       - main
