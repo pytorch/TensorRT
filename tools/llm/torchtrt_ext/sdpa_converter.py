@@ -29,6 +29,66 @@ def tril(
     col: TRTTensor,
     sliding_window_size: Optional[int] = None,
 ) -> TRTTensor:
+    """
+    Create a lower triangular mask tensor for attention mechanisms.
+
+    This function generates a lower triangular mask that can be used in attention
+    operations to enforce causal attention (each position can only attend to itself
+    and previous positions). It optionally supports sliding window attention by
+    limiting the attention span to a specified window size.
+
+    The function creates the mask by:
+    1. Generating row and column index tensors
+    2. Computing the difference between row and column indices
+    3. Creating a mask where row >= col (lower triangular)
+    4. Optionally applying sliding window constraints
+
+    Args:
+        ctx: TensorRT conversion context for managing the conversion process
+        target: Target operation identifier (usually the operation being converted)
+        source_ir: Source IR type (e.g., ATEN, TRT) - can be None
+        name: Base name for generated TensorRT operations (will be extended with suffixes)
+        row: Tensor representing the number of rows (sequence length dimension)
+        col: Tensor representing the number of columns (sequence length dimension)
+        sliding_window_size: Optional sliding window size for attention span limitation.
+                           If None, creates a full lower triangular mask.
+                           If specified, creates a sliding window mask where each position
+                           can only attend to positions within the window.
+
+    Returns:
+        TRTTensor: A boolean mask tensor with shape [batch, heads, seq_len, seq_len]
+                  where True values indicate allowed attention positions.
+
+    Example:
+        # Create a full lower triangular mask for causal attention
+        mask = tril(ctx, target, source_ir, "causal_mask", seq_len, seq_len)
+
+        # Create a sliding window mask with window size 3
+        mask = tril(ctx, target, source_ir, "sliding_mask", seq_len, seq_len, 3)
+
+    Mask Examples:
+        Without sliding window (sliding_window_size=None):
+        For seq_len=5, returns:
+        [[ True, False, False, False, False],
+         [ True,  True, False, False, False],
+         [ True,  True,  True, False, False],
+         [ True,  True,  True,  True, False],
+         [ True,  True,  True,  True,  True]]
+
+        With sliding window (sliding_window_size=3):
+        For seq_len=5, returns:
+        [[ True, False, False, False, False],
+         [ True,  True, False, False, False],
+         [ True,  True,  True, False, False],
+         [False,  True,  True,  True, False],
+         [False, False,  True,  True,  True]]
+
+    Note:
+        This function is specifically designed for attention mechanisms in transformer
+        models and is used internally by the scaled_dot_product_attention converter.
+        The sliding window functionality is particularly useful for models like Gemma3
+        that use sliding window attention to reduce computational complexity.
+    """
     row_arange_tensor = impl.arange.arange(
         ctx, target, source_ir, name + "_arange_row", start=0, end=row, step=1
     )
@@ -86,8 +146,8 @@ def scaled_dot_product_attention(
     kwargs: Dict[str, Any],
     name: str,
 ) -> TRTTensor:
-    # TODO: Handle attn_mask and is_causal arguments in the future
-    query, key, value, attn_mask, dropout_p, is_causal = args
+    # always create our own attn_mask
+    query, key, value, _, dropout_p, is_causal = args
 
     # TODO: remove this once we have a better way to handle the causal mask
     scale = kwargs.get("scale", None)

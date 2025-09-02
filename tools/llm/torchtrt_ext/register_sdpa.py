@@ -46,7 +46,27 @@ def _process_sdpa_node(
     sliding_window_size: Optional[int] = None,
     use_gqa: bool = False,
 ) -> torch.fx.GraphModule:
-    """Helper function to process SDPA nodes with common logic."""
+    """
+    Helper function to process SDPA nodes with common logic.
+
+    This function handles the replacement of various scaled dot product attention operations
+    with the standard torch.nn.functional.scaled_dot_product_attention function. It supports
+    both efficient attention and flash attention variants, and can handle sliding window
+    attention for models like Gemma3.
+
+    Args:
+        gm: The graph module containing the SDPA nodes
+        node: The specific node to process (must be an SDPA operation)
+        settings: TensorRT compilation settings
+        sliding_window_size: Optional sliding window size for models with sliding attention
+        use_gqa: Whether the model uses Grouped Query Attention
+
+    Returns:
+        The modified graph module with SDPA nodes replaced
+
+    Raises:
+        ValueError: If the SDPA node has an unexpected number of arguments
+    """
 
     if node.target == torch.ops.aten._scaled_dot_product_efficient_attention.default:
         if len(node.args) == 7:
@@ -94,7 +114,7 @@ def _process_sdpa_node(
     is_causal = True
     dropout_p = 0.0
 
-    logger.warning(
+    logger.debug(
         f"SDPA converter configuration: attn_mask={attn_mask}, dropout_p={dropout_p}, "
         f"is_causal={is_causal}, sliding_window_size={sliding_window_size}, use_gqa={use_gqa}"
     )
@@ -138,6 +158,27 @@ def _process_sdpa_node(
 
 
 def register_gemma3_sdpa_pass(index: int = 0, model_config: Any = None) -> None:
+    """
+    Register SDPA pass for Gemma3 models with sliding window attention.
+
+    This function creates and registers a specialized SDPA replacement pass for Gemma3 models.
+    The pass handles sliding window attention by extracting the sliding_window and layer_types
+    configuration from the model config and applying appropriate transformations.
+
+    Args:
+        index: Position in the lowering pass list where this pass should be inserted
+        model_config: The model configuration object (should be Gemma3TextConfig)
+
+    Example:
+        from transformers import AutoConfig
+        config = AutoConfig.from_pretrained("google/gemma-3-1b-it")
+        register_gemma3_sdpa_pass(index=0, model_config=config)
+
+    Note:
+        This pass is specifically designed for Gemma3 models and will fall back to
+        default behavior if the model_config is not a Gemma3TextConfig.
+    """
+
     @_aten_lowering_pass(index=index, model_config=model_config)
     def gemma3_sdpa_pass(
         gm: torch.fx.GraphModule, settings: CompilationSettings
@@ -184,6 +225,30 @@ def register_gemma3_sdpa_pass(index: int = 0, model_config: Any = None) -> None:
 
 
 def register_default_sdpa_pass(index: int = 0, model_config: Any = None) -> None:
+    """
+    Register default SDPA pass for models without specific implementations.
+
+    This function creates and registers a default SDPA replacement pass that can be used
+    for any model type. It provides basic SDPA replacement functionality without
+    model-specific optimizations.
+
+    Args:
+        index: Position in the lowering pass list where this pass should be inserted
+        model_config: The model configuration object (optional, for consistency)
+
+    Example:
+        # Register default pass at index 0
+        register_default_sdpa_pass(index=0)
+
+        # Or with model config for consistency
+        config = AutoConfig.from_pretrained("Qwen/Qwen3-0.6B")
+        register_default_sdpa_pass(index=0, model_config=config)
+
+    Note:
+        This is a fallback pass that should be used when no model-specific
+        SDPA pass is available or when you want generic SDPA replacement behavior.
+    """
+
     @_aten_lowering_pass(index=index, model_config=model_config)
     def default_sdpa_pass(
         gm: torch.fx.GraphModule,
