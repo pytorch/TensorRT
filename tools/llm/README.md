@@ -55,8 +55,7 @@ python run_vlm.py --model nvidia/Eagle2-2B --precision FP16 --num_tokens 128 --c
 - `--prompt`: Input prompt for generation.
 - `--image_path`: (Optional) Path to input image file for VLM models. If not provided, will use a sample image.
 - `--precision`: Precision mode (`FP16`, `FP32`).
-- `--qformat`: Quantization format (`fp8`, `nvfp4`) to apply.
-- `--pre_quantized`: Flag to use pre-quantized models from HuggingFace.
+- `--quant_format`: Quantization format (`fp8`, `nvfp4`) to apply.
 - `--num_tokens`: Number of output tokens to generate.
 - `--cache`: KV cache type (`static_v1`, `static_v2`, or empty for no KV caching).
 - `--benchmark`: Enable benchmarking mode.
@@ -71,7 +70,7 @@ Torch-TensorRT supports quantization to reduce model memory footprint and improv
 To use pre-quantized models from HuggingFace:
 
 ```bash
-python run_llm.py --model nvidia/Llama-3.1-8B-Instruct-FP8 --pre_quantized --prompt "What is parallel programming?" --precision FP16 --num_tokens 128
+python run_llm.py --model nvidia/Llama-3.1-8B-Instruct-FP8 --prompt "What is parallel programming?" --precision FP16 --num_tokens 128
 ```
 
 #### Applying quantization by ModelOpt
@@ -79,7 +78,7 @@ python run_llm.py --model nvidia/Llama-3.1-8B-Instruct-FP8 --pre_quantized --pro
 Apply fp8 quantization from HuggingFace:
 
 ```bash
-python run_llm.py --model meta-llama/Llama-3.1-8B --qformat fp8 --prompt "What is parallel programming?" --precision FP16 --num_tokens 128
+python run_llm.py --model meta-llama/Llama-3.1-8B --quant_format fp8 --prompt "What is parallel programming?" --precision FP16 --num_tokens 128
 ```
 
 #### Quantization Requirements
