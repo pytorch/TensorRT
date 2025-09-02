@@ -27,22 +27,22 @@ from safetensors import safe_open
 
 def quantize_model(model, args, tokenizer):
     """
-    Quantize a PyTorch model using ModelOpt quantization.
+    Quantize a PyTorch model using ModelOpt post-training quantization (PTQ).
 
-    This function performs post-training quantization (PTQ) on the model using
-    calibration data from the provided tokenizer. It supports both FP8 and NVFP4
-    quantization formats.
+    This function applies quantization to reduce model precision for faster inference
+    while maintaining acceptable accuracy. It uses calibration data generated from
+    the provided tokenizer to determine optimal quantization parameters.
 
+    Supported quantization formats:
+        - fp8: 8-bit floating point quantization
+        - nvfp4: 4-bit NVIDIA floating point quantization
     Args:
-        model: PyTorch model to quantize
-        args: Arguments containing quantization format and debug settings
-        tokenizer: Tokenizer for creating calibration dataloader
+        model: PyTorch model to quantize. Must be in evaluation mode.
+        args: Command line arguments containing quant_format and debug
+        tokenizer: Hugging Face tokenizer for creating calibration data
 
     Returns:
-        Quantized model with reduced precision weights and activations
-
-    Raises:
-        RuntimeError: If unsupported quantization format is specified
+        Quantized model
     """
     # Create calibration dataloader for quantization
     calib_dataloader = get_dataset_dataloader(
@@ -51,9 +51,9 @@ def quantize_model(model, args, tokenizer):
         num_samples=512,
         device="cuda:0",
     )
-    if args.qformat == "fp8":
+    if args.quant_format == "fp8":
         quant_cfg = mtq.FP8_DEFAULT_CFG
-    elif args.qformat == "nvfp4":
+    elif args.quant_format == "nvfp4":
         quant_cfg = mtq.NVFP4_DEFAULT_CFG
     else:
         raise RuntimeError("Unsupported quantization format")
@@ -108,7 +108,38 @@ class TensorRTQuantizedLinear(torch.nn.Module):
         return torch.nn.functional.linear(input, weight, self.bias)
 
 
-def convert_linear_to_tensorrt_quantized(model, model_name):
+def load_quantization_config(model_name):
+    """
+    Load quantization configuration from a Hugging Face model.
+    Args:
+        model_name (str): Local directory path or model identifier
+    Returns:
+        dict or None: Quantization configuration. None if no config found.
+    """
+    # Determine if model_name is a local directory or needs to be downloaded
+    if os.path.isdir(model_name):
+        model_path = model_name
+    else:
+        # Download model from Hugging Face Hub
+        model_path = snapshot_download(
+            model_name,
+            local_files_only=huggingface_hub.constants.HF_HUB_OFFLINE,
+            ignore_patterns=["original/**/*"],
+            revision=None,
+        )
+    hf_quant_config = None
+    # Load and parse quantization configuration
+    hf_quant_config_path = f"{model_path}/hf_quant_config.json"
+    if os.path.exists(hf_quant_config_path):
+        with open(hf_quant_config_path, "r") as f:
+            hf_quant_config = json.load(f)
+            hf_quant_config = hf_quant_config["quantization"]
+            hf_quant_config["model_path"] = model_path
+
+    return hf_quant_config
+
+
+def convert_linear_to_tensorrt_quantized(model, hf_quant_config):
     """
     Convert linear layers in a model to TensorRT quantized versions from pre-quantized weights.
 
@@ -119,16 +150,15 @@ def convert_linear_to_tensorrt_quantized(model, model_name):
 
     The function:
     1. Loads quantization scales from Hugging Face model files (SafeTensors)
-    2. Parses quantization configuration from hf_quant_config.json
-    3. Replaces standard linear layers with TensorRTQuantizedLinear layers
-    4. Applies appropriate quantization based on the model's quantization format
+    2. Replaces standard linear layers with TensorRTQuantizedLinear layers
+    3. Applies appropriate quantization based on the model's quantization format
 
     Note: This function only quantizes linear operations and is intended for use
     with pre-quantized Hugging Face models that have been quantized using ModelOpt.
 
     Args:
         model: PyTorch model to quantize
-        model_name: Path to Hugging Face model directory or model identifier
+        hf_quant_config: Quantization configuration
 
     Returns:
         Model with quantized linear layers
@@ -136,41 +166,21 @@ def convert_linear_to_tensorrt_quantized(model, model_name):
     Raises:
         RuntimeError: If quantization config is not found or unsupported format
     """
-    # Determine if model_name is a local directory or needs to be downloaded
-    if os.path.isdir(model_name):
-        hf_folder = model_name
-    else:
-        # Download model from Hugging Face Hub
-        hf_folder = snapshot_download(
-            model_name,
-            local_files_only=huggingface_hub.constants.HF_HUB_OFFLINE,
-            ignore_patterns=["original/**/*"],
-            revision=None,
-        )
-
+    model_path = hf_quant_config["model_path"]
     # Load all tensors from SafeTensors files
     tensors = {}
-    for file in os.listdir(hf_folder):
+    for file in os.listdir(model_path):
         if file.endswith(".safetensors"):
             with safe_open(
-                os.path.join(hf_folder, file), framework="pt", device="cpu"
+                os.path.join(model_path, file), framework="pt", device="cpu"
             ) as f:
                 tensor_names = f.keys()
                 for name in tensor_names:
                     tensors[name] = f.get_tensor(name)
 
-    # Load and parse quantization configuration
-    hf_quant_config_path = f"{hf_folder}/hf_quant_config.json"
-    if os.path.exists(hf_quant_config_path):
-        with open(hf_quant_config_path, "r") as f:
-            hf_quant_config = json.load(f)
-            hf_quant_config = hf_quant_config["quantization"]
-
-        hf_quant_algo = hf_quant_config.pop("quant_algo", None)
-        if hf_quant_algo != "FP8" and hf_quant_algo != "NVFP4":
-            raise RuntimeError("Only FP8 or NVFP4 quantization is supported")
-    else:
-        raise RuntimeError("No quantization config found")
+    hf_quant_algo = hf_quant_config.get("quant_algo", None)
+    if hf_quant_algo != "FP8" and hf_quant_algo != "NVFP4":
+        raise RuntimeError("Only FP8 or NVFP4 quantization is supported")
 
     # Iterate through all modules in the model
     for name, module in model.named_modules():
