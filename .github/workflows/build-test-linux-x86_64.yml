@@ -78,6 +78,43 @@ jobs:
       architecture: "x86_64"
       use-rtx: false
 
+  tests-py-torchscript-fe:
+    name: Test torchscript frontend [Python]
+    needs: [filter-matrix, build]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - repository: pytorch/tensorrt
+            package-name: torch_tensorrt
+            pre-script: packaging/pre_build_script.sh
+            post-script: packaging/post_build_script.sh
+            smoke-test-script: packaging/smoke_test_script.sh
+    uses: ./.github/workflows/linux-test.yml
+    with:
+      job-name: tests-py-torchscript-fe
+      repository: "pytorch/tensorrt"
+      ref: ""
+      test-infra-repository: pytorch/test-infra
+      test-infra-ref: main
+      build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
+      pre-script: ${{ matrix.pre-script }}
+      script: |
+        set -euo pipefail
+        export USE_HOST_DEPS=1
+        export CI_BUILD=1
+        export LD_LIBRARY_PATH=/usr/lib64:$LD_LIBRARY_PATH
+        pushd .
+        cd tests/modules
+        python hub.py
+        popd
+        pushd .
+        cd tests/py/ts
+        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/ts_api_test_results.xml api/
+        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/ts_models_test_results.xml models/
+        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/ts_integrations_test_results.xml integrations/
+        popd
+
   tests-py-dynamo-converters:
     name: Test dynamo converters [Python]
     needs: [filter-matrix, build]
