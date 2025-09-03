@@ -43,6 +43,27 @@ config_setting(
     },
 )
 
+config_setting(
+    name = "rtx_x86_64",
+    constraint_values = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:linux",
+    ],
+    flag_values = {
+        "//toolchains/dep_collection:compute_libs": "rtx",
+    },
+)
+
+config_setting(
+    name = "rtx_win",
+    constraint_values = [
+        "@platforms//os:windows",
+    ],
+    flag_values = {
+        "//toolchains/dep_collection:compute_libs": "rtx",
+    },
+)
+
 cc_library(
     name = "util",
     srcs = [
