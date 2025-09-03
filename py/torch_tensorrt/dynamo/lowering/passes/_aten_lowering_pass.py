@@ -1,5 +1,5 @@
 import logging
-from typing import Callable, Optional, Sequence, Union
+from typing import Any, Callable, Optional, Sequence, Union
 
 import torch
 from torch_tensorrt.dynamo._settings import CompilationSettings
@@ -53,20 +53,28 @@ LoweringPassSignature = Callable[
 def _aten_lowering_pass(
     *args: LoweringPassSignature,
     index: Optional[int] = None,
+    **kwargs: Any,
 ) -> Union[
     LoweringPassSignature, Callable[[LoweringPassSignature], LoweringPassSignature]
 ]:
     """Adds a lowering pass to the registry, at a specified index if desired
 
     If no index is specified, the lowering pass is inserted at the end of the list
+
+    Additional keyword arguments can be passed to configure the lowering pass behavior.
+    These will be stored as metadata on the pass function.
     """
 
     def add_lowering_pass(
         lowering_pass: LoweringPassSignature,
     ) -> LoweringPassSignature:
+        # Store additional parameters as metadata on the function
+        if kwargs:
+            lowering_pass._lowering_pass_config = kwargs
+
         ATEN_POST_LOWERING_PASSES.add_pass_with_index(lowering_pass, index)
         logger.debug(
-            f"Added lowering pass {lowering_pass} to list at index {index}, current passlist: {ATEN_POST_LOWERING_PASSES}"
+            f"Added lowering pass {lowering_pass} to list at index {index} with config {kwargs}, current passlist: {ATEN_POST_LOWERING_PASSES}"
         )
         return lowering_pass
 
@@ -81,7 +89,7 @@ def _aten_lowering_pass(
                 f"aten_lowering_pass decorator called with invalid arguments {args} "
                 "To specify an index to insert the pass, use the keyword 'index='"
             )
-    # If no arguments are specified, the decorator was called with an index keyword
+    # If no arguments are specified, the decorator was called with keyword arguments
     else:
         return add_lowering_pass
 
@@ -93,6 +101,18 @@ def _remove_lowering_pass(*, index: int) -> None:
         f"Removed lowering pass at index {index}, current passlist: {ATEN_POST_LOWERING_PASSES}"
     )
     return
+
+
+def get_lowering_pass_config(lowering_pass: LoweringPassSignature) -> dict[str, Any]:
+    """Get the configuration parameters for a lowering pass function
+
+    Args:
+        lowering_pass: The lowering pass function
+
+    Returns:
+        Dictionary containing the configuration parameters, or empty dict if none
+    """
+    return getattr(lowering_pass, "_lowering_pass_config", {})
 
 
 def post_lowering(
