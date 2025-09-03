@@ -153,29 +153,28 @@ cc_library(
     alwayslink = True,
 )
 
+filegroup(
+    name = "include_files",
+    srcs = [
+        "Exception.h",
+        "build_info.h",
+        "jit_util.h",
+        "macros.h",
+        "prelude.h",
+        "trt_util.h",
+    ],
+    visibility = ["//visibility:public"],
+)
+
 pkg_tar(
     name = "include",
-    srcs = [
-        "//core/util:Exception.h",
-        "//core/util:build_info.h",
-        "//core/util:jit_util.h",
-        "//core/util:macros.h",
-        "//core/util:prelude.h",
-        "//core/util:trt_util.h",
-    ],
+    srcs = ["//core/util:include_files"],
     package_dir = "core/util/",
 )
 
 pkg_zip(
     name = "include_zip",
-    srcs = [
-        "//core/util:Exception.h",
-        "//core/util:build_info.h",
-        "//core/util:jit_util.h",
-        "//core/util:macros.h",
-        "//core/util:prelude.h",
-        "//core/util:trt_util.h",
-    ],
+    srcs = ["//core/util:include_files"],
     out = "include.zip",
     package_dir = "core/util/",
 )

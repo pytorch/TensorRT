@@ -115,19 +115,16 @@ cc_library(
     alwayslink = True,
 )
 
-pkg_tar(
-    name = "include",
+filegroup(
+    name = "include_files",
     srcs = ["plugins.h"],
-    package_dir = "core/plugins/",
+    visibility = ["//visibility:public"],
 )
 
 pkg_tar(
-    name = "impl_include",
-    srcs = [
-        "impl/interpolate_plugin.h",
-        "impl/normalize_plugin.h",
-    ],
-    package_dir = "core/plugins/impl",
+    name = "include",
+    srcs = [":include_files"],
+    package_dir = "core/plugins/",
 )
 
 pkg_zip(
@@ -137,12 +134,24 @@ pkg_zip(
     package_dir = "core/plugins/",
 )
 
-pkg_zip(
-    name = "impl_include_zip",
+filegroup(
+    name = "impl_include_files",
     srcs = [
         "impl/interpolate_plugin.h",
         "impl/normalize_plugin.h",
     ],
+    visibility = ["//visibility:public"],
+)
+
+pkg_tar(
+    name = "impl_include",
+    srcs = [":impl_include_files"],
+    package_dir = "core/plugins/impl",
+)
+
+pkg_zip(
+    name = "impl_include_zip",
+    srcs = [":impl_include_files"],
     out = "impl_include.zip",
     package_dir = "core/plugins/impl",
 )
