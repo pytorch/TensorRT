@@ -1,8 +1,11 @@
+import unittest
+
 import pytest
 import torch
 import torch_tensorrt
 from parameterized import parameterized
 from torch.testing._internal.common_utils import TestCase, run_tests
+from torch_tensorrt.dynamo.utils import is_tegra_platform, is_thor
 
 from ..testing_utilities import DECIMALS_OF_AGREEMENT
 
@@ -41,6 +44,10 @@ class DDSModel2(torch.nn.Module):
         return out
 
 
+@unittest.skipIf(
+    is_thor() or is_tegra_platform(),
+    "Skipped on Thor and Tegra platforms",
+)
 class TestOutputAllocatorStaticModel(TestCase):
     @parameterized.expand(
         [
@@ -150,6 +157,10 @@ class TestOutputAllocatorStaticModel(TestCase):
                     out = cudagraphs_module(*inputs)
 
 
+@unittest.skipIf(
+    is_thor() or is_tegra_platform(),
+    "Skipped on Thor and Tegra platforms",
+)
 class TestOutputAllocatorDDSModel(TestCase):
     @parameterized.expand(
         [
@@ -256,6 +267,10 @@ class TestOutputAllocatorDDSModel(TestCase):
                     out = cudagraphs_module(*inputs)
 
 
+@unittest.skipIf(
+    is_thor() or is_tegra_platform(),
+    "Skipped on Thor and Tegra platforms",
+)
 class TestOutputAllocatorDDSOpWithReductionOpModel(TestCase):
     """
     The DDSOpWithReductionOpModel is a model that contains DDS op + reduction op.
@@ -366,6 +381,10 @@ class TestOutputAllocatorDDSOpWithReductionOpModel(TestCase):
                     out = cudagraphs_module(*inputs)
 
 
+@unittest.skipIf(
+    is_thor() or is_tegra_platform(),
+    "Skipped on Thor and Tegra platforms",
+)
 class TestOutputAllocatorDDSModelWithGraphBreak(TestCase):
     @parameterized.expand(
         [
