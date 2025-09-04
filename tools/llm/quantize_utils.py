@@ -4,6 +4,7 @@ import os
 
 import huggingface_hub
 import torch
+import torch_tensorrt
 from huggingface_hub import snapshot_download
 
 logger = logging.getLogger(__name__)
@@ -51,17 +52,11 @@ def quantize_model(model, args, tokenizer):
         num_samples=512,
         device="cuda:0",
     )
-    if args.quant_format == "fp8":
-        quant_cfg = mtq.FP8_DEFAULT_CFG
-    elif args.quant_format == "nvfp4":
-        quant_cfg = mtq.NVFP4_DEFAULT_CFG
-    else:
-        raise RuntimeError("Unsupported quantization format")
-    calibrate_loop = create_forward_loop(dataloader=calib_dataloader)
 
-    model = mtq.quantize(model, quant_cfg, forward_loop=calibrate_loop)
-    if args.debug:
-        mtq.print_quant_summary(model)
+    calibrate_loop = create_forward_loop(dataloader=calib_dataloader)
+    model = torch_tensorrt.dynamo.quantize(
+        model, args.quant_format, calibrate_loop, debug=args.debug
+    )
 
     return model
 
