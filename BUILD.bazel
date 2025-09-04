@@ -1,4 +1,4 @@
-load("@rules_pkg//:pkg.bzl", "pkg_tar")
+load("@rules_pkg//:pkg.bzl", "pkg_tar", "pkg_zip")
 
 config_setting(
     name = "windows",
@@ -43,12 +43,35 @@ pkg_tar(
     ],
 )
 
+pkg_zip(
+    name = "include_core_zip",
+    srcs = [
+        "//core:include_zip",
+        "//core/plugins:impl_include_zip",
+        "//core/plugins:include_zip",
+        "//core/runtime:include_zip",
+        "//core/util:include_zip",
+        "//core/util/logging:include_zip",
+    ],
+    out = "include_core.zip",
+    package_dir = "include/torch_tensorrt",
+)
+
 pkg_tar(
     name = "include_rt",
     package_dir = "include/torch_tensorrt",
     deps = [
         "//core/runtime:include",
     ],
+)
+
+pkg_zip(
+    name = "include_rt_zip",
+    srcs = [
+        "//core/runtime:include",
+    ],
+    out = "include_rt.zip",
+    package_dir = "include/torch_tensorrt",
 )
 
 pkg_tar(
@@ -59,30 +82,49 @@ pkg_tar(
     package_dir = "include/torch_tensorrt/",
 )
 
+pkg_zip(
+    name = "include_zip",
+    srcs = [
+        "//cpp:api_headers",
+    ],
+    out = "include.zip",
+    package_dir = "include/torch_tensorrt/",
+)
+
+# Non-Windows tar target for lib
 pkg_tar(
     name = "lib",
-    srcs = select({
-        ":rtx_win": ["//cpp/lib:torchtrt.dll"],
-        ":windows": ["//cpp/lib:torchtrt.dll"],
-        "//conditions:default": [
-            "//cpp/lib:libtorchtrt.so",
-            "//cpp/lib:libtorchtrt_plugins.so",
-            "//cpp/lib:libtorchtrt_runtime.so",
-        ],
-    }),
+    srcs = [
+        "//cpp/lib:libtorchtrt.so",
+        "//cpp/lib:libtorchtrt_plugins.so",
+        "//cpp/lib:libtorchtrt_runtime.so",
+    ],
     mode = "0755",
     package_dir = "lib/",
 )
 
+# Windows-specific zip target for lib
+pkg_zip(
+    name = "lib_zip",
+    srcs = ["//cpp/lib:torchtrt.dll"],
+    out = "lib.zip",
+    mode = "0755",
+    package_dir = "lib/",
+)
+
+# Non-Windows tar target for lib_rt
 pkg_tar(
     name = "lib_rt",
-    srcs = select({
-        ":rtx_win": ["//cpp/lib:torchtrt_runtime.dll"],
-        ":windows": ["//cpp/lib:torchtrt_runtime.dll"],
-        "//conditions:default": [
-            "//cpp/lib:libtorchtrt_runtime.so",
-        ],
-    }),
+    srcs = ["//cpp/lib:libtorchtrt_runtime.so"],
+    mode = "0755",
+    package_dir = "lib/",
+)
+
+# Windows-specific zip target for lib_rt
+pkg_zip(
+    name = "lib_rt_zip",
+    srcs = ["//cpp/lib:torchtrt_runtime.dll"],
+    out = "lib_rt.zip",
     mode = "0755",
     package_dir = "lib/",
 )
@@ -96,12 +138,28 @@ pkg_tar(
     package_dir = "bin/",
 )
 
+# Windows-specific zip target
+pkg_zip(
+    name = "libtorchtrt_zip",
+    srcs = [
+        ":include_core_zip",
+        ":include_zip",
+        ":lib_zip",
+        "//:LICENSE",
+        "//third_party/torch_tensorrt:BUILD",
+    ],
+    out = "libtorchtrt.zip",
+    package_dir = "torch_tensorrt",
+)
+
+# tar target
 pkg_tar(
-    name = "libtorchtrt",
+    name = "libtorchtrt_tar",
     srcs = [
         "//:LICENSE",
         "//third_party/torch_tensorrt:BUILD",
     ],
+    out = "libtorchtrt.tar.gz",
     extension = "tar.gz",
     package_dir = "torch_tensorrt",
     deps = [
@@ -115,16 +173,51 @@ pkg_tar(
     }),
 )
 
+# Main target that selects between zip and tar based on platform
+alias(
+    name = "libtorchtrt",
+    actual = select({
+        ":rtx_win": ":libtorchtrt_zip",
+        ":windows": ":libtorchtrt_zip",
+        "//conditions:default": ":libtorchtrt_tar",
+    }),
+)
+
+# Windows-specific zip target for runtime
+pkg_zip(
+    name = "libtorchtrt_runtime_zip",
+    srcs = [
+        ":include_rt_zip",
+        ":lib_rt_zip",
+        "//:LICENSE",
+        "//third_party/torch_tensorrt:BUILD",
+    ],
+    out = "libtorchtrt_runtime.zip",
+    package_dir = "torch_tensorrt_runtime",
+)
+
+# Non-Windows tar target for runtime
 pkg_tar(
-    name = "libtorchtrt_runtime",
+    name = "libtorchtrt_runtime_tar",
     srcs = [
         "//:LICENSE",
         "//third_party/torch_tensorrt:BUILD",
     ],
+    out = "libtorchtrt_runtime.tar.gz",
     extension = "tar.gz",
     package_dir = "torch_tensorrt_runtime",
     deps = [
         ":include_rt",
         ":lib_rt",
     ],
+)
+
+# Main target that selects between zip and tar based on platform
+alias(
+    name = "libtorchtrt_runtime",
+    actual = select({
+        ":rtx_win": ":libtorchtrt_runtime_zip",
+        ":windows": ":libtorchtrt_runtime_zip",
+        "//conditions:default": ":libtorchtrt_runtime_tar",
+    }),
 )

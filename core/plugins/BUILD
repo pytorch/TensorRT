@@ -1,5 +1,5 @@
 load("@rules_cc//cc:defs.bzl", "cc_library")
-load("@rules_pkg//:pkg.bzl", "pkg_tar")
+load("@rules_pkg//:pkg.bzl", "pkg_tar", "pkg_zip")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -115,17 +115,43 @@ cc_library(
     alwayslink = True,
 )
 
-pkg_tar(
-    name = "include",
+filegroup(
+    name = "include_files",
     srcs = ["plugins.h"],
-    package_dir = "core/plugins/",
+    visibility = ["//visibility:public"],
 )
 
 pkg_tar(
-    name = "impl_include",
+    name = "include",
+    srcs = [":include_files"],
+    package_dir = "core/plugins/",
+)
+
+pkg_zip(
+    name = "include_zip",
+    srcs = ["plugins.h"],
+    out = "include.zip",
+    package_dir = "core/plugins/",
+)
+
+filegroup(
+    name = "impl_include_files",
     srcs = [
         "impl/interpolate_plugin.h",
         "impl/normalize_plugin.h",
     ],
+    visibility = ["//visibility:public"],
+)
+
+pkg_tar(
+    name = "impl_include",
+    srcs = [":impl_include_files"],
+    package_dir = "core/plugins/impl",
+)
+
+pkg_zip(
+    name = "impl_include_zip",
+    srcs = [":impl_include_files"],
+    out = "impl_include.zip",
     package_dir = "core/plugins/impl",
 )

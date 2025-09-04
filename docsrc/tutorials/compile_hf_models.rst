@@ -59,6 +59,10 @@ We have officially verified support for the following LLM families:
        | Qwen/Qwen2.5-7B-Instruct
      - FP16, FP32
      - Yes
+   * - Gemma 3
+     - | google/gemma-3-1b-it
+     - FP16, FP32
+     - Yes
 
 Getting Started with run_llm.py
 -------------------------------
@@ -185,8 +189,8 @@ The number of key/value cache tensors is equal to the number of attention heads 
 
 Generating Outputs
 ------------------- 
-We use custom `generate <https://github.com/pytorch/TensorRT/blob/main/tools/llm/utils.py#L112>`_ function to generate the outputs. This function performs standard autoregressive decoding without KV caching.
-There is also a `generate_with_static_cache <https://github.com/pytorch/TensorRT/blob/main/tools/llm/utils.py#L141>`_ function that performs autoregressive decoding with KV caching.
+We use custom `generate <https://github.com/pytorch/TensorRT/blob/9241476a868af46169348ab730d18907365a66ee/tools/llm/utils.py#L112>`_ function to generate the outputs. This function performs standard autoregressive decoding without KV caching.
+There is also a `generate_with_static_cache <https://github.com/pytorch/TensorRT/blob/9241476a868af46169348ab730d18907365a66ee/tools/llm/utils.py#L141>`_ function that performs autoregressive decoding with KV caching.
 
 The ``generate_with_static_cache`` function takes care of preparing the inputs to the model compiled with static KV cache.
 The model inputs are ``input_ids``, ``position_ids``, ``key_cache_0``, ``value_cache_0``, ...., ``start_idx``, ``end_idx``.

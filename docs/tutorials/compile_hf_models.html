@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Compiling LLM models from Huggingface &mdash; Torch-TensorRT v2.9.0.dev0+10a57b5 documentation</title>
+  <title>Compiling LLM models from Huggingface &mdash; Torch-TensorRT v2.9.0.dev0+4bf66af documentation</title>
   
 
   
@@ -293,7 +293,7 @@
               
               
                 <div class="version">
-                  v2.9.0.dev0+10a57b5
+                  v2.9.0.dev0+4bf66af
                 </div>
               
             
@@ -566,6 +566,14 @@ The code is available in the <a class="reference external" href="https://github.
 <td><p>FP16, FP32</p></td>
 <td><p>Yes</p></td>
 </tr>
+<tr class="row-odd"><td><p>Gemma 3</p></td>
+<td><div class="line-block">
+<div class="line">google/gemma-3-1b-it</div>
+</div>
+</td>
+<td><p>FP16, FP32</p></td>
+<td><p>Yes</p></td>
+</tr>
 </tbody>
 </table>
 </section>
@@ -683,8 +691,8 @@ The number of key/value cache tensors is equal to the number of attention heads 
 </section>
 <section id="generating-outputs">
 <h2>Generating Outputs<a class="headerlink" href="#generating-outputs" title="Permalink to this heading">¶</a></h2>
-<p>We use custom <a class="reference external" href="https://github.com/pytorch/TensorRT/blob/main/tools/llm/utils.py#L112">generate</a> function to generate the outputs. This function performs standard autoregressive decoding without KV caching.
-There is also a <a class="reference external" href="https://github.com/pytorch/TensorRT/blob/main/tools/llm/utils.py#L141">generate_with_static_cache</a> function that performs autoregressive decoding with KV caching.</p>
+<p>We use custom <a class="reference external" href="https://github.com/pytorch/TensorRT/blob/9241476a868af46169348ab730d18907365a66ee/tools/llm/utils.py#L112">generate</a> function to generate the outputs. This function performs standard autoregressive decoding without KV caching.
+There is also a <a class="reference external" href="https://github.com/pytorch/TensorRT/blob/9241476a868af46169348ab730d18907365a66ee/tools/llm/utils.py#L141">generate_with_static_cache</a> function that performs autoregressive decoding with KV caching.</p>
 <p>The <code class="docutils literal notranslate"><span class="pre">generate_with_static_cache</span></code> function takes care of preparing the inputs to the model compiled with static KV cache.
 The model inputs are <code class="docutils literal notranslate"><span class="pre">input_ids</span></code>, <code class="docutils literal notranslate"><span class="pre">position_ids</span></code>, <code class="docutils literal notranslate"><span class="pre">key_cache_0</span></code>, <code class="docutils literal notranslate"><span class="pre">value_cache_0</span></code>, …., <code class="docutils literal notranslate"><span class="pre">start_idx</span></code>, <code class="docutils literal notranslate"><span class="pre">end_idx</span></code>.
 We initialize the key/value cache tensors with zeros and for every token generated, the new key/value cache tensors are the outputs of the model.</p>

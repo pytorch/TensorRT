@@ -1,4 +1,4 @@
-name: Release Linux wheels and tarball artifacts
+name: Release aarch64 Linux wheels and tarball artifacts
 
 on:
   push:
@@ -19,7 +19,7 @@ jobs:
     if: ${{ contains(github.event.pull_request.labels.*.name, 'build-release-artifacts') || startsWith(github.event.ref, 'refs/tags/v') }}
     with:
       package-type: wheel
-      os: linux
+      os: linux-aarch64
       test-infra-repository: pytorch/test-infra
       test-infra-ref: main
       with-rocm: false
@@ -48,7 +48,7 @@ jobs:
 
   release-cxx11-tarball-artifacts:
     needs: [generate-release-tarball-matrix]
-    name: Release torch-tensorrt cxx11 tarball artifacts
+    name: Release aarch64 torch-tensorrt cxx11 tarball artifacts
     strategy:
       fail-fast: false
       matrix:
@@ -59,8 +59,8 @@ jobs:
             env-var-script: packaging/env_vars.txt
             post-script: packaging/post_build_script.sh
             smoke-test-script: packaging/smoke_test_script.sh
-            cxx11-tarball-release: "true"
-    uses: ./.github/workflows/release-wheel-linux.yml
+            is-release-tarball: "true"
+    uses: ./.github/workflows/build_linux.yml
     with:
       repository: ${{ matrix.repository }}
       ref: ""
@@ -73,7 +73,8 @@ jobs:
       package-name: ${{ matrix.package-name }}
       smoke-test-script: ${{ matrix.smoke-test-script }}
       trigger-event: ${{ github.event_name }}
-      cxx11-tarball-release: "true"
+      is-release-tarball: true
+      architecture: "aarch64"
 
   generate-release-wheel-matrix:
     needs: [generate-matrix]
@@ -97,7 +98,7 @@ jobs:
           echo "matrix=${MATRIX_BLOB}" >> "${GITHUB_OUTPUT}"
 
   release-wheel-artifacts:
-    name: Release torch-tensorrt wheel artifacts
+    name: Release aarch64 torch-tensorrt wheel artifacts
     needs: [generate-release-wheel-matrix]
     strategy:
       fail-fast: false
@@ -109,8 +110,8 @@ jobs:
             env-var-script: packaging/env_vars.txt
             post-script: packaging/post_build_script.sh
             smoke-test-script: packaging/smoke_test_script.sh
-            cxx11-tarball-release: "true"
-    uses: ./.github/workflows/release-wheel-linux.yml
+            is-release-wheel:  true
+    uses: ./.github/workflows/build_linux.yml
     with:
       repository: ${{ matrix.repository }}
       ref: ""
@@ -123,8 +124,9 @@ jobs:
       package-name: ${{ matrix.package-name }}
       smoke-test-script: ${{ matrix.smoke-test-script }}
       trigger-event: ${{ github.event_name }}
-      cxx11-tarball-release: "false"
+      is-release-wheel: true
+      architecture: "aarch64"
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref_name }}-${{ inputs.repository }}-${{ github.event_name == 'workflow_dispatch' }}-${{ inputs.job-name }}
+  group: ${{ github.workflow }}-aarch64-${{ github.event.pull_request.number || github.ref_name }}-${{ inputs.repository }}-${{ github.event_name == 'workflow_dispatch' }}-${{ inputs.job-name }}
   cancel-in-progress: true
