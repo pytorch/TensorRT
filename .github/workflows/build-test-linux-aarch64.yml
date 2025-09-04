@@ -63,7 +63,7 @@ jobs:
             smoke-test-script: packaging/smoke_test_script.sh
             package-name: torch_tensorrt
     name: Build torch-tensorrt whl package for SBSA
-    uses: ./.github/workflows/build_wheels_linux.yml
+    uses: ./.github/workflows/build_linux.yml
     with:
       repository: ${{ matrix.repository }}
       ref: ""
