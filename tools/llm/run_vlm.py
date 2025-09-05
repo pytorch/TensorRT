@@ -37,15 +37,10 @@ from typing import Tuple
 import requests
 import torch
 import torch_tensorrt
-
-# we "monkey-patch" the global attention function map for Qwen2.
-# This ensures that any part of the code (including torch.export) requesting
-# "flash_attention_2" will receive the "sdpa" implementation instead.
-# This patch is global for the script's execution context.
-import transformers.models.qwen2.modeling_qwen2 as mq
 from PIL import Image
-from torchtrt_ext import register_sdpa
-from transformers import AutoConfig, AutoModel, AutoProcessor
+from transformers import AutoModel, AutoProcessor
+from transformers.models.qwen2 import modeling_qwen2 as mq
+from transformers.models.siglip import modeling_siglip as ms
 from utils import (
     export_llm,
     generate_mm,
@@ -59,8 +54,7 @@ from utils import (
 # Eagle2's language model (Qwen2) implicitly defaults to "flash_attention_2"
 # due to settings in its remote code and config.json. This prevents direct
 # compilation with SDPA. To work around this without modifying the library,
-
-
+ms.ALL_ATTENTION_FUNCTIONS["flash_attention_2"] = ms.ALL_ATTENTION_FUNCTIONS["sdpa"]
 mq.ALL_ATTENTION_FUNCTIONS["flash_attention_2"] = mq.ALL_ATTENTION_FUNCTIONS["sdpa"]
 # --- END WORKAROUND ---
 
@@ -258,8 +252,6 @@ def _compile_lm(
 
     seq_len = torch.export.Dim("seq", min=1, max=max_seq_len)
     position_ids = torch.arange(input_embeds.shape[1]).unsqueeze(0).to(device)
-
-    dyn_shapes = {"inputs_embeds": {1: seq_len}, "position_ids": {1: seq_len}}
 
     use_fp32_acc = False
     use_explicit_typing = False
@@ -594,6 +586,9 @@ if __name__ == "__main__":
     # -------------------------------------------------------------------------#
     # Register static cache lowering passes if requested
     # Cache is not applied to vision model.
+    print("--- Registering SDPA lowering pass locally for LM compilation ---")
+    from torchtrt_ext import register_sdpa
+
     if args.cache == "static_v1":
         import static_cache_v1  # noqa: F401
     elif args.cache not in ("", None):
