@@ -257,7 +257,6 @@ def _compile_lm(
     use_explicit_typing = False
     if args.precision == "FP16":
         enabled_precisions = {torch.float32}
-        use_fp32_acc = True
         use_explicit_typing = True
     else:  # FP32
         enabled_precisions = {torch.float32}
