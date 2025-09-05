@@ -1,12 +1,19 @@
+import unittest
+
 import torch
 import torch.nn as nn
 import torch_tensorrt
 from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
+from torch_tensorrt.dynamo.utils import is_tegra_platform, is_thor
 
 from .harness import DispatchTestCase
 
 
+@unittest.skipIf(
+    is_thor() or is_tegra_platform(),
+    "Skipped on Thor and Tegra platforms",
+)
 class TestArangeConverter(DispatchTestCase):
     @parameterized.expand(
         [
