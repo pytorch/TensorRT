@@ -679,26 +679,358 @@ def generate_mm_with_static_cache_timing(
 
 def time_generate_mm(
     generate_fn,
-    model,
-    pixel_values,
-    input_ids,
-    output_seq_length,
-    eos_token_id,
-    emb_layer,
     iterations=10,
-    device="cuda:0",
+    **kwargs,
 ):
     """
-    Measure the time for generating a sentence over certain number of iterations
+    Measure the time for generating a sentence over certain number of iterations.
+    Accepts generation function arguments via kwargs.
     """
     timings = []
     for _ in range(iterations):
         start_time = timeit.default_timer()
-        _ = generate_fn(
-            model, pixel_values, input_ids, output_seq_length, eos_token_id, emb_layer
-        )
+        _ = generate_fn(**kwargs)
         torch.cuda.synchronize()
         end_time = timeit.default_timer()
         timings.append(end_time - start_time)
 
     return timings
+
+
+def generate_mm_qwen2_5_vl(
+    model,
+    pixel_values: torch.Tensor | None,
+    input_ids: torch.Tensor,
+    image_grid_thw: torch.Tensor,
+    max_output_seq_length: int,
+    eos_token_id: int,
+    emb_layer: torch.nn.Embedding,
+):
+    """
+    Custom generation function for the Qwen2_5_VLForConditionalGeneration model.
+    Performs greedy decoding without caching, using inputs_embeds instead of input_ids.
+    """
+    # 1. Calculate image embeddings (if pixel_values are provided)
+    image_embeds = None
+    if pixel_values is not None:
+        image_embeds = model.visual(pixel_values, image_grid_thw)
+
+    # 2. Create initial sequence embeddings
+    seq_tokens = input_ids.clone()
+    seq_embeds = emb_layer(seq_tokens)
+
+    # 3. Insert image embeddings at image token positions
+    if image_embeds is not None:
+        mask = seq_tokens == model.config.image_token_id
+        num_image_tokens = mask.sum().item()
+        if num_image_tokens != image_embeds.shape[0]:
+            raise ValueError(
+                f"Number of image tokens ({num_image_tokens}) does not match number of image embeddings ({image_embeds.shape[0]})."
+            )
+        mask_expanded = mask.unsqueeze(-1).expand_as(seq_embeds)
+        seq_embeds = seq_embeds.masked_scatter(
+            mask_expanded, image_embeds.to(seq_embeds.dtype)
+        )
+
+    # 5. Greedy generation loop
+    generated = 0
+    while generated < max_output_seq_length:
+        # 5.1. Calculate position_ids
+        position_ids = (
+            torch.arange(
+                0, seq_tokens.size(1), dtype=torch.long, device=seq_tokens.device
+            )
+            .unsqueeze(0)
+            .expand(seq_embeds.size(0), seq_embeds.size(1))
+        )
+
+        # 5.2. Call the language model
+        with torch.no_grad():
+            outputs = model.model(
+                inputs_embeds=seq_embeds,
+                position_ids=position_ids,
+            )
+            hidden_states = (
+                outputs
+                if isinstance(outputs, torch.Tensor)
+                else outputs.last_hidden_state
+            )
+
+        # 5.3. Calculate logits for the last token
+        logits = model.lm_head(hidden_states[:, -1, :])
+
+        # 5.4. Select the next token (greedy decoding)
+        next_tok = torch.argmax(logits, dim=-1)
+
+        # 5.5. Append token and embedding to the sequence
+        seq_tokens = torch.cat([seq_tokens, next_tok[:, None]], dim=1)
+        next_emb = emb_layer(next_tok)[:, None, :]
+        seq_embeds = torch.cat([seq_embeds, next_emb], dim=1)
+
+        generated += 1
+        if (next_tok == eos_token_id).all():
+            break
+
+    # 6. Return generated tokens (only the part after the prompt)
+    return seq_tokens[:, input_ids.shape[1] :]
+
+
+def generate_mm_qwen2_5_vl_with_static_cache(
+    model,
+    pixel_values: torch.Tensor | None,
+    input_ids: torch.Tensor,
+    image_grid_thw: torch.Tensor,
+    max_output_seq_length: int,
+    eos_token_id: int,
+    emb_layer: torch.nn.Embedding,
+    device: str = "cuda:0",
+) -> torch.LongTensor:
+    """
+    Greedy Decoder for Qwen-2.5-VL using static KV-cache.
+    Identical to `generate_mm_with_static_cache` but adapted for Qwen-2.5-VL's
+    specific architecture (e.g., separate visual encoder call, lm_head).
+    """
+    # 1. Vision encoding
+    image_embeds = None
+    if pixel_values is not None:
+        image_embeds = model.visual(pixel_values, image_grid_thw)
+
+    # 2. Text embedding & image token replacement
+    seq_tokens = input_ids.clone()
+    seq_embeds = emb_layer(seq_tokens)
+
+    if image_embeds is not None:
+        mask = seq_tokens == model.config.image_token_id
+        num_image_tokens = mask.sum().item()
+        if num_image_tokens != image_embeds.shape[0]:
+            raise ValueError(
+                f"Number of image tokens ({num_image_tokens}) does not match "
+                f"number of image embeddings ({image_embeds.shape[0]})."
+            )
+        mask_expanded = mask.unsqueeze(-1).expand_as(seq_embeds)
+        seq_embeds = seq_embeds.masked_scatter(
+            mask_expanded, image_embeds.to(seq_embeds.dtype)
+        )
+
+    # 3. KV-cache initialization
+    kv_cache = get_zeroed_static_cache_inputs(model.model)
+    start_idx = 0
+    end_idx = seq_embeds.size(1)
+    generated = 0
+    max_total_len = max_output_seq_length
+    output_tokens = seq_tokens.clone()
+
+    # 4. Greedy loop
+    while output_tokens.size(1) < max_total_len:
+        cur_embeds = seq_embeds if generated == 0 else seq_embeds[:, -1:, :]
+
+        if generated == 0:
+            position_ids = (
+                torch.arange(cur_embeds.shape[1]).unsqueeze(0).to(cur_embeds.device)
+            )
+            # For the prefill step, the relevant logit is the very last one.
+            logit_pos = -1
+        else:
+            # --- RUNTIME PADDING FIX for KV Cache Decode ---
+            # The compiled TensorRT engine has a minimum sequence length requirement (e.g., 16),
+            # as determined by its optimization profile. The decode step uses a sequence length
+            # of 1, which violates this profile.
+            # To resolve this, we manually pad the input tensors to the minimum length (16)
+            # at runtime before feeding them to the engine.
+            pad_len = 15  # Pad from 1 to 16 (1 + 15)
+
+            # Pad cur_embeds tensor
+            padding_tensor_embeds = torch.zeros(
+                cur_embeds.size(0),
+                pad_len,
+                cur_embeds.size(2),
+                dtype=cur_embeds.dtype,
+                device=cur_embeds.device,
+            )
+            cur_embeds = torch.cat([cur_embeds, padding_tensor_embeds], dim=1)
+
+            # Pad position_ids tensor
+            position_ids = torch.tensor([[start_idx]], dtype=torch.int64).to(
+                cur_embeds.device
+            )
+            padding_tensor_ids = torch.zeros(
+                position_ids.size(0),
+                pad_len,
+                dtype=position_ids.dtype,
+                device=position_ids.device,
+            )
+            position_ids = torch.cat([position_ids, padding_tensor_ids], dim=1)
+
+            # Since we padded the sequence, the logit for our actual token is now at position 0.
+            logit_pos = 0
+
+        input_signature = (
+            cur_embeds,
+            position_ids,
+            *kv_cache,
+            start_idx,
+            end_idx,
+        )
+
+        outputs_and_kv = model.model(*input_signature)
+        # With the fix in static_cache_v1.py, the model output is now clean:
+        # (hidden_state, updated_kv_cache[72])
+        hidden_states, kv_cache = outputs_and_kv[0], outputs_and_kv[1:]
+
+        # Use logit_pos to get the correct logit based on whether we padded or not.
+        logits = model.lm_head(hidden_states[:, logit_pos, :])
+
+        next_tok = logits.argmax(dim=-1)
+        output_tokens = torch.cat([output_tokens, next_tok[:, None]], dim=-1)
+
+        next_embed = emb_layer(next_tok)[:, None, :]
+        seq_embeds = next_embed
+
+        generated += 1
+        start_idx = end_idx
+        end_idx += 1
+
+        if (next_tok == eos_token_id).all():
+            break
+
+    return output_tokens
+
+
+def generate_mm_paligemma(
+    model,
+    pixel_values: torch.Tensor | None,
+    input_ids: torch.Tensor,
+    max_output_seq_length: int,
+    eos_token_id: int,
+    emb_layer: torch.nn.Embedding,
+):
+    vit_embeds = None
+    if pixel_values is not None:
+        vit_out = model.vision_tower(pixel_values)
+        vit_embeds = model.multi_modal_projector(vit_out.last_hidden_state)
+        vit_embeds = vit_embeds / (model.config.text_config.hidden_size**0.5)
+
+    seq_tokens = input_ids.clone()
+    seq_embeds = emb_layer(seq_tokens)
+
+    if vit_embeds is not None:
+        B, N, C = seq_embeds.shape
+        flat = seq_embeds.view(B * N, C)
+        mask = seq_tokens.view(B * N) == model.config.image_token_index
+        flat[mask] = vit_embeds.reshape(-1, C).to(flat.dtype)[: mask.sum()]
+        seq_embeds = flat.view(B, N, C)
+
+    B = seq_tokens.size(0)
+    cache_position = torch.arange(seq_tokens.size(1), device=seq_tokens.device)
+    position_ids = cache_position.unsqueeze(0) + 1
+
+    generated = 0
+    while generated < max_output_seq_length:
+        causal_mask = model.model._update_causal_mask(
+            attention_mask=None,
+            token_type_ids=None,
+            past_key_values=None,
+            cache_position=cache_position,
+            input_tensor=seq_embeds,
+            is_training=False,
+        )
+
+        with torch.no_grad():
+            out = model.language_model(
+                inputs_embeds=seq_embeds,
+                position_ids=position_ids,
+                attention_mask=causal_mask,
+                use_cache=False,
+            )
+            logits = out.last_hidden_state if hasattr(out, "last_hidden_state") else out
+
+        next_tok = torch.argmax(logits[:, -1, :], dim=-1)
+        seq_tokens = torch.cat([seq_tokens, next_tok[:, None]], dim=1)
+        seq_embeds = torch.cat([seq_embeds, emb_layer(next_tok)[:, None, :]], dim=1)
+
+        position_ids = torch.cat([position_ids, position_ids[:, -1:] + 1], dim=1)
+        cache_position = torch.arange(seq_tokens.size(1), device=seq_tokens.device)
+
+        generated += 1
+        if (next_tok == eos_token_id).all():
+            break
+
+    return seq_tokens
+
+
+@torch.inference_mode()
+def generate_mm_paligemma_with_static_cache(
+    model,
+    pixel_values: torch.Tensor | None,
+    input_ids: torch.Tensor,
+    max_output_seq_length: int,
+    eos_token_id: int,
+    emb_layer: torch.nn.Embedding,
+    device: str = "cuda:0",
+) -> torch.LongTensor:
+    vit_embeds = None
+    if pixel_values is not None:
+        vit_latent = model.vision_tower(pixel_values)
+        vit_embeds = (
+            vit_latent.last_hidden_state
+            if hasattr(vit_latent, "last_hidden_state")
+            else vit_latent
+        )
+        vit_embeds = model.multi_modal_projector(vit_embeds)
+        vit_embeds = vit_embeds / (model.config.text_config.hidden_size**0.5)
+
+    seq_tokens = input_ids.clone()
+    seq_embeds = emb_layer(seq_tokens)
+
+    if vit_embeds is not None:
+        B, N, C = seq_embeds.shape
+        flat = seq_embeds.view(B * N, C)
+        mask = seq_tokens.view(B * N) == model.image_token_index
+        flat[mask] = vit_embeds.reshape(-1, C).to(flat.dtype)[: mask.sum()]
+        seq_embeds = flat.view(B, N, C)
+
+    kv_cache = get_zeroed_static_cache_inputs(model.language_model, device=device)
+    start_idx = 0
+    end_idx = seq_embeds.size(1)
+    generated = 0
+    max_total_len = max_output_seq_length
+    output_tokens = seq_tokens.clone()
+
+    while output_tokens.size(1) < max_total_len:
+        cur_embeds = seq_embeds if generated == 0 else seq_embeds[:, -1:, :]
+        if generated == 0:
+            position_ids = (
+                torch.arange(cur_embeds.shape[1]).unsqueeze(0).to(cur_embeds.device)
+            )
+        else:
+            position_ids = torch.tensor([[start_idx]], dtype=torch.int64).to(
+                cur_embeds.device
+            )
+        is_causal = True if cur_embeds.shape[1] > 1 else False
+        input_signature = (
+            cur_embeds,
+            position_ids,
+            *kv_cache,
+            start_idx,
+            end_idx,
+            is_causal,
+        )
+
+        logits_and_kv = model.language_model(*input_signature)
+        logits, kv_cache = logits_and_kv[0], logits_and_kv[1:]
+
+        next_tok = logits[:, -1, :].argmax(dim=-1)
+        output_tokens = torch.cat([output_tokens, next_tok[:, None]], dim=-1)
+
+        next_embed = emb_layer(next_tok)[:, None, :]
+        seq_embeds = next_embed
+
+        generated += 1
+        start_idx = end_idx
+        end_idx += 1
+        is_causal = True
+
+        if (next_tok == eos_token_id).all():
+            break
+
+    return output_tokens

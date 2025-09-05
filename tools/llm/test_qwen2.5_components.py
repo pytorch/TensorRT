@@ -16,7 +16,7 @@ from transformers.models.llama.configuration_llama import LlamaConfig
 
 # Register SDPA as a standalone operator. Converter and lowering pass are defined in register_sdpa.py
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
-from register_sdpa import *
+from torchtrt_ext import register_sdpa
 
 ATOL = 1e-5
 RTOL = 1e-5
