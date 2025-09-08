@@ -1,4 +1,5 @@
 import torch
+import torch_tensorrt as torchtrt
 from parameterized import param, parameterized
 from torch.testing._internal.common_utils import run_tests
 
@@ -243,6 +244,57 @@ class TestIndexPutConverter(DispatchTestCase):
             enable_passes=True,
             use_dynamo_tracer=True,
         )
+
+    def test_index_add_dynamic_shape(self):
+
+        class Model(torch.nn.Module):
+            def forward(self, x, y, z, a, b):
+                x.index_add_(0, y, z)
+                x.index_add_(0, a, b)
+                return x
+
+        dim = 10
+        model = Model().cuda()
+        inputs = [
+            torch.ones((12, dim)).half().cuda(),
+            torch.tensor([0, 1]).cuda(),
+            torch.randn((2, dim)).half().cuda(),
+            torch.tensor([2, 9, 11]).cuda(),
+            torch.randn((3, dim)).half().cuda(),
+        ]
+        torch_output = model.cuda().forward(*inputs)
+        seq_len1 = torch.export.Dim("seq_len1", min=1, max=128)
+        seq_len2 = torch.export.Dim("seq_len2", min=1, max=128)
+        seq_len3 = torch.export.Dim("seq_len3", min=1, max=128)
+
+        ep = torch.export.export(
+            model,
+            tuple(inputs),
+            dynamic_shapes=(
+                {0: seq_len1},
+                {0: seq_len2},
+                {0: seq_len2},
+                {0: seq_len3},
+                {0: seq_len3},
+            ),
+        )
+        with torchtrt.dynamo.Debugger(
+            log_level="debug",
+            capture_fx_graph_after=["remove_num_users_is_0_nodes"],
+            logging_dir="/home/profile/logging/moe",
+            engine_builder_monitor=False,
+        ):
+            trt_mod = torchtrt.dynamo.compile(
+                ep,
+                inputs,
+                enabled_precisions={torch.float16},
+                min_block_size=1,
+                use_explicit_typing=False,
+                use_fp32_acc=False,
+                disable_tf32=True,
+            )
+        result = trt_mod(*inputs)
+        assert torch.allclose(result, torch_output, atol=1e-4, rtol=1e-4)
 
 
 if __name__ == "__main__":
