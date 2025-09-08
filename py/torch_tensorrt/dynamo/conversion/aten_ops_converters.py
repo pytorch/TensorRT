@@ -883,6 +883,7 @@ def aten_ops_select(
 
 @dynamo_tensorrt_converter(
     torch.ops.aten.index_put.default,
+    supports_dynamic_shapes=True,
 )
 @enforce_tensor_types(
     {
@@ -3163,7 +3164,9 @@ def aten_ops_upsample_bicubic2d(
 
 
 @dynamo_tensorrt_converter(
-    torch.ops.aten.topk.default, capability_validator=topk_validator
+    torch.ops.aten.topk.default,
+    capability_validator=topk_validator,
+    supports_dynamic_shapes=True,
 )
 @enforce_tensor_types(
     {

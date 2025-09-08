@@ -49,15 +49,11 @@ def get_model(args):
             moved to CUDA device with the specified precision
     """
     with torch.no_grad():
-        model = (
-            AutoModelForCausalLM.from_pretrained(
-                args.model,
-                use_cache=False,
-                attn_implementation="sdpa",
-            )
-            .eval()
-            .cuda()
-        )
+        model = AutoModelForCausalLM.from_pretrained(
+            args.model,
+            use_cache=False,
+            attn_implementation="sdpa",
+        ).eval()
 
     if args.precision == "FP16":
         model = model.to(torch.float16)
@@ -66,7 +62,7 @@ def get_model(args):
     else:
         model = model.to(torch.float32)
 
-    return model
+    return model.cuda()
 
 
 def compile_torchtrt(model, input_ids, args):
