@@ -556,7 +556,7 @@
         <span class="n">use_python_runtime</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">USE_PYTHON_RUNTIME</span><span class="p">,</span>
         <span class="n">immutable_weights</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
         <span class="n">strict</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
-        <span class="n">allow_complex_guards_as_runtime_asserts</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="n">prefer_deferred_runtime_asserts_over_guards</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
         <span class="n">weight_streaming_budget</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">enabled_precisions</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Set</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">dtype</span><span class="p">]]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
@@ -622,8 +622,8 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">kwarg_inputs</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">additional_settings</span> <span class="o">=</span> <span class="n">kwargs</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">strict</span> <span class="o">=</span> <span class="n">strict</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">allow_complex_guards_as_runtime_asserts</span> <span class="o">=</span> <span class="p">(</span>
-            <span class="n">allow_complex_guards_as_runtime_asserts</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">prefer_deferred_runtime_asserts_over_guards</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">prefer_deferred_runtime_asserts_over_guards</span>
         <span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">use_python_runtime</span> <span class="o">=</span> <span class="n">use_python_runtime</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">trt_device</span> <span class="o">=</span> <span class="n">to_torch_tensorrt_device</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
@@ -800,14 +800,14 @@
     <span class="k">def</span><span class="w"> </span><span class="nf">get_exported_program</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">ExportedProgram</span><span class="p">:</span>
 
         <span class="k">def</span><span class="w"> </span><span class="nf">export_fn</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">ExportedProgram</span><span class="p">:</span>
-            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">allow_complex_guards_as_runtime_asserts</span><span class="p">:</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">prefer_deferred_runtime_asserts_over_guards</span><span class="p">:</span>
                 <span class="k">return</span> <span class="n">_export</span><span class="p">(</span>
                     <span class="bp">self</span><span class="o">.</span><span class="n">original_model</span><span class="p">,</span>
                     <span class="bp">self</span><span class="o">.</span><span class="n">arg_inputs</span><span class="p">,</span>
                     <span class="n">kwargs</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">kwarg_inputs</span><span class="p">,</span>
                     <span class="n">dynamic_shapes</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_get_total_dynamic_shapes</span><span class="p">(),</span>
                     <span class="n">strict</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">strict</span><span class="p">,</span>
-                    <span class="n">allow_complex_guards_as_runtime_asserts</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">allow_complex_guards_as_runtime_asserts</span><span class="p">,</span>
+                    <span class="n">prefer_deferred_runtime_asserts_over_guards</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">prefer_deferred_runtime_asserts_over_guards</span><span class="p">,</span>
                 <span class="p">)</span>
             <span class="k">else</span><span class="p">:</span>
                 <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">export</span><span class="p">(</span>
