@@ -23,7 +23,8 @@ def remove_num_users_is_0_nodes(
             and len(node.all_input_nodes) > 0
         ):
             gm.graph.erase_node(node)
-            gm = clean_up_graph_after_modifications(gm)
+
+    gm = clean_up_graph_after_modifications(gm)
 
     logger.debug(f"Removed ops that [num_users=0] nodes:\n{gm.graph}")
 
