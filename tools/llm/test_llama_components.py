@@ -79,7 +79,7 @@ def test_llama_attention(args):
         args=(hidden_states, position_embeddings, None),
         dynamic_shapes=dynamic_shapes,
         strict=False,
-        allow_complex_guards_as_runtime_asserts=True,
+        prefer_deferred_runtime_asserts_over_guards=True,
     )
 
     with torch_tensorrt.logging.debug() if args.debug else nullcontext():
@@ -463,7 +463,7 @@ def test_llama_model(args):
         kwargs=kwarg_inputs,
         dynamic_shapes=dynamic_shapes,
         strict=False,
-        allow_complex_guards_as_runtime_asserts=True,
+        prefer_deferred_runtime_asserts_over_guards=True,
     )
 
     with torch_tensorrt.logging.debug() if args.debug else nullcontext():
