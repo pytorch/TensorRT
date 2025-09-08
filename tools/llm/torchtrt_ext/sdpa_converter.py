@@ -257,9 +257,10 @@ def scaled_dot_product_attention(
         attn_bias = impl.unary.log(
             ctx, target, source_ir, name + "_log", one_minus_temp_mask
         )
-        scaled_add_attn_bias = impl.elementwise.add(
-            ctx, target, source_ir, name + "_attn_bias_add", mm, attn_bias
-        )
+
+    scaled_add_attn_bias = impl.elementwise.add(
+        ctx, target, source_ir, name + "_attn_bias_add", mm, attn_bias
+    )
     softmax = impl.normalization.softmax(
         ctx, target, source_ir, name + "_softmax", scaled_add_attn_bias, -1, False
     )
