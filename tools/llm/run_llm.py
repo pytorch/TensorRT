@@ -71,7 +71,7 @@ def get_model(args):
     else:
         model = model.to(torch.float32)
 
-    return model
+    return model.cuda()
 
 
 def compile_torchtrt(model, input_ids, args):
