@@ -15,13 +15,13 @@ from torchtrt_ext import register_sdpa
 
 @pytest.mark.unit
 @pytest.mark.parametrize("precision", ["FP16", "BF16", "FP32"])
-def test_gemma3_decoder_layer(precision):
+def test_llm_decoder_layer(precision):
 
     with torch.inference_mode():
         args = argparse.Namespace()
         args.debug = False
         args.num_tokens = 128
-        args.model = "google/gemma-3-1b-it"
+        args.model = "Qwen/Qwen2.5-0.5B-Instruct"
         args.precision = precision
         args.min_block_size = 1
         args.prompt = "What is parallel programming ?"
@@ -44,7 +44,10 @@ def test_gemma3_decoder_layer(precision):
             .to("cuda")
         )
 
-        register_sdpa._SDPA_MAPPING[args.model](model_config=model.config)
+        if register_sdpa._SDPA_MAPPING.get(args.model, None) is not None:
+            register_sdpa._SDPA_MAPPING[args.model](model_config=model.config)
+        else:
+            register_sdpa._SDPA_MAPPING["default"](model_config=model.config)
         model = model.to(dtype)
         # use randint will generate nan values in the logits, use a fixed input_ids for now
         # input_ids = torch.randint(0, model.config.vocab_size, (1, args.num_tokens)).to("cuda")
