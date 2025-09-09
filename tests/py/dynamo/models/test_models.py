@@ -181,7 +181,6 @@ def test_mobilenet_v2(ir, dtype):
     "timm or torchvision not installed",
 )
 def test_efficientnet_b0(ir, dtype):
-    breakpoint()
     if torchtrt.ENABLED_FEATURES.tensorrt_rtx and dtype == torch.bfloat16:
         pytest.skip("TensorRT-RTX does not support bfloat16")
 
