@@ -266,7 +266,7 @@ def _compile_lm(
         lm_wrap, input_embeds, min_seq_len=1, max_seq_len=2560
     )
 
-    with torch_tensorrt.logging.debug() if args.debug else nullcontext():
+    with torch_tensorrt.dynamo.Debugger() if args.debug else nullcontext():
         trt_mod = torch_tensorrt.dynamo.compile(
             exported_program,
             inputs=[input_embeds, position_ids],
@@ -348,7 +348,7 @@ def _compile_eagle2_vision(
             strict=False,
         )
 
-    with torch_tensorrt.logging.debug() if args.debug else nullcontext():
+    with torch_tensorrt.dynamo.Debugger() if args.debug else nullcontext():
         trt_mod = torch_tensorrt.dynamo.compile(
             exported_program,
             inputs=[example_pixel_values],
