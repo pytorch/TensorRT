@@ -76,6 +76,7 @@ This codebase can be extended to
 ## Limitations
 - We do not currently support sliding window attention (used in Gemma3 and Qwen 3 models) yet.
 - **Flash Attention Limitation**: Some models (e.g., Eagle2-2B) internally use flash attention operations (`torch.ops.flash_attn._flash_attn_forward.default`) which require the `flash-attn` package to be installed. Without flash-attn, these models will fail to load or run properly.
+- **Eagle2 FP16 Precision Output Differences**: When compiling Eagle2 models with FP16 precision, minor token-level differences may occur between PyTorch and TensorRT outputs. While the overall context and meaning remain consistent, specific word choices or phrasing may vary slightly. This is expected behavior due to numerical precision differences in FP16 computation and does not affect the model's core functionality or accuracy.
 
 ## Requirements
 
