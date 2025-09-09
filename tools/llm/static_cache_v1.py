@@ -201,26 +201,12 @@ def insert_kv_slicing_before_sdpa(
                     args=(slice_7, 3),
                     kwargs={},
                 )
-                # =============================================== #
-                # This prevents the cache tensor from growing when padded inputs are used.
-                update_window_size = gm.graph.create_node(
-                    "call_function",
-                    torch.ops.aten.sub.Tensor,
-                    args=(end_idx_input, start_idx_input),
-                    kwargs={},
-                )
-                sliced_new_kv = gm.graph.create_node(
-                    "call_function",
-                    torch.ops.aten.slice.Tensor,
-                    args=(current_key_or_value_node, 2, 0, update_window_size),
-                    kwargs={},
-                )
 
                 # Concatenate the sliced tensors to build KV cache
                 cat = gm.graph.create_node(
                     "call_function",
                     torch.ops.aten.cat.default,
-                    args=([slice_4, sliced_new_kv, slice_8], 2),
+                    args=([slice_4, current_key_or_value_node, slice_8], 2),
                     kwargs={},
                 )
                 # Update the metadata of the newly built KV cache node with the metadata of the input KV cache node to the graph
