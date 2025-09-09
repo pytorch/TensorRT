@@ -44,10 +44,7 @@ def test_llm_decoder_layer(precision):
             .to("cuda")
         )
 
-        if register_sdpa._SDPA_MAPPING.get(args.model, None) is not None:
-            register_sdpa._SDPA_MAPPING[args.model](model_config=model.config)
-        else:
-            register_sdpa._SDPA_MAPPING["default"](model_config=model.config)
+        register_sdpa.enable_sdpa_converter(args.model, model.config)
         model = model.to(dtype)
         # use randint will generate nan values in the logits, use a fixed input_ids for now
         # input_ids = torch.randint(0, model.config.vocab_size, (1, args.num_tokens)).to("cuda")
