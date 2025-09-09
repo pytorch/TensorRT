@@ -1,10 +1,11 @@
 # Optimizing LLMs in Torch-TensorRT
 
-This directory provides utilities and scripts for compiling, optimizing, and benchmarking Large Language Models (LLMs) using Torch-TensorRT, with a focus on efficient inference on NVIDIA GPUs. The main entry point is `run_llm.py`, which demonstrates how to export, compile, and run LLMs with various caching strategies and precision modes. Note that this is an **experimental release** and APIs may change in future versions.
+This directory provides utilities and scripts for compiling, optimizing, and benchmarking Large Language Models (LLMs) and Visual Language Models (VLMs) using Torch-TensorRT, with a focus on efficient inference on NVIDIA GPUs. The main entry points are `run_llm.py` for text-only LLMs and `run_vlm.py` for vision-language models. Note that this is an **experimental release** and APIs may change in future versions.
 
 ### Key Features
 
 - **Model Support:** Works with popular LLMs such as Llama-3, Qwen2.5, etc.
+- **VLM Support:** Supports Visual Language Models like Qwen2.5-VL and Eagle2.
 - **Precision Modes:** Supports FP16, BF16, and FP32.
 - **KV Cache:** Supports static and dynamic KV cache for efficient autoregressive decoding.
 - **Benchmarking:** Measures and compares throughput and latency for PyTorch and TensorRT backends.
@@ -25,20 +26,33 @@ We have officially verified support for the following models:
 | Qwen 3 | Qwen/Qwen3-0.6B<br>Qwen/Qwen3-1.7B<br>Qwen/Qwen3-4B<br>Qwen/Qwen3-8B | FP16, FP32 | Yes |
 | Gemma 3 | google/gemma-3-1b-it | FP16, FP32 | Yes |
 
+### Supported VLM Models
+
+| Model Series | HF Model Card | Precision | KV Cache Supported ? |
+|--------------|---------------|-----------|-------------------|
+| Qwen 2.5 VL | Qwen/Qwen2.5-VL-3B-Instruct | FP16, FP32 | Yes |
+| Eagle2 | nvidia/Eagle2-2B | FP16, FP32 | Yes |
 
 ### Usage
 
-The main entry point is : `run_llm.py`
+#### Text-only LLMs: `run_llm.py`
 
 ```bash
 python run_llm.py --model meta-llama/Llama-3.2-1B-Instruct --prompt "What is parallel programming?" --precision FP16 --num_tokens 128 --cache static_v2 --benchmark
 ```
 
+#### Vision Language Models: `run_vlm.py`
+
+```bash
+python run_vlm.py --model Qwen/Qwen2.5-VL-3B-Instruct --precision FP16 --num_tokens 128 --cache static_v1 --enable_pytorch_run --benchmark
+```
+
 #### Key Arguments
 
-- `--model`: Name or path of the HuggingFace LLM.
+- `--model`: Name or path of the HuggingFace LLM/VLM.
 - `--tokenizer`: (Optional) Tokenizer name; defaults to model.
 - `--prompt`: Input prompt for generation.
+- `--image_path`: (Optional) Path to input image file for VLM models. If not provided, will use a sample image.
 - `--precision`: Precision mode (`FP16`, `FP32`).
 - `--num_tokens`: Number of output tokens to generate.
 - `--cache`: KV cache type (`static_v1`, `static_v2`, or empty for no KV caching).
@@ -66,3 +80,6 @@ This codebase can be extended to
 
 - Torch-TensorRT 2.8.0
 - Transformers v4.52.3
+- For VLM models (run_vlm.py):
+  - `pip install qwen-vl-utils` (for Qwen2.5-VL-3B-Instruct model)
+  - `pip install flash-attn --no-build-isolation -v` (for Eagle2-2B model)

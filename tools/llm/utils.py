@@ -47,7 +47,7 @@ def export_llm(model, inputs, min_seq_len=1, max_seq_len=16):
     return ep
 
 
-def get_zeroed_static_cache_inputs(model: torch.fx.GraphModule):
+def get_zeroed_static_cache_inputs(model: torch.fx.GraphModule, device: str = "cuda:0"):
     """
     Extracts and returns zeroed static KV cache tensors from a torch.fx.GraphModule. This should only be used for static cache_v1 and static cache_v2.
 
@@ -71,7 +71,7 @@ def get_zeroed_static_cache_inputs(model: torch.fx.GraphModule):
             torch.zeros(
                 input.meta["val"].shape,
                 dtype=input.meta["val"].dtype,
-                device=torch.device("cuda:0"),
+                device=torch.device(device),
             )
         )
 
@@ -386,7 +386,7 @@ def generate_mm_with_static_cache(
         seq_embeds = flat.view(B, N, C)
 
     # ───────────────────── KV-cache initialization ─────────────────────
-    kv_cache = get_zeroed_static_cache_inputs(model.language_model)
+    kv_cache = get_zeroed_static_cache_inputs(model.language_model, device=device)
     start_idx = 0  # First token index
     end_idx = seq_embeds.size(1)  # Prompt length
     generated = 0
@@ -608,7 +608,7 @@ def generate_mm_with_static_cache_timing(
         seq_embeds = flat.view(B, N, C)
 
     # ───────────────────── KV-cache initialization ─────────────────────
-    kv_cache = get_zeroed_static_cache_inputs(model.language_model)
+    kv_cache = get_zeroed_static_cache_inputs(model.language_model, device=device)
     start_idx = 0  # First token index
     end_idx = seq_embeds.size(1)  # Prompt length
     generated = 0
@@ -810,7 +810,7 @@ def generate_mm_qwen2_5_vl_with_static_cache(
         )
 
     # 3. KV-cache initialization
-    kv_cache = get_zeroed_static_cache_inputs(model.model)
+    kv_cache = get_zeroed_static_cache_inputs(model.model, device=device)
     start_idx = 0
     end_idx = seq_embeds.size(1)
     generated = 0

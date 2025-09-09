@@ -18,6 +18,7 @@ Overview of tools/llm Directory
 The ``tools/llm`` directory provides the following tools to compile LLM models from Huggingface:
 
 * **run_llm.py**: Main entry point for model compilation, generating outputs, and benchmarking
+* **run_vlm.py**: Entry point for compiling and benchmarking Visual Language Models (VLMs)
 * **Static Cache Utilities**: ``static_cache_v1.py`` and ``static_cache_v2.py`` for KV cache optimization
 * **SDPA Attention**: ``sdpa_converter.py`` and ``register_sdpa.py`` for registering scaled dot-product attention converter and lowering pass.
 * **Testing Components**: Model-specific test files for validation
@@ -63,6 +64,30 @@ We have officially verified support for the following LLM families:
      - | google/gemma-3-1b-it
      - FP16, FP32
      - Yes
+
+Supported VLM Models
+--------------------
+We have officially verified support for the following Visual Language Models (VLMs):
+
+.. list-table::
+   :widths: 20 40 20 20 20
+   :header-rows: 1
+
+   * - Model Series
+     - HuggingFace Model Card
+     - Precision
+     - KV Cache Support ?
+     - Component Support
+   * - Qwen 2.5 VL
+     - Qwen/Qwen2.5-VL-3B-Instruct
+     - FP16, FP32
+     - Yes (static_v1 only)
+     - Language Model only (Image Encoder not supported)
+   * - Eagle2
+     - nvidia/Eagle2-2B
+     - FP16, FP32
+     - Yes (static_v1 only)
+     - Language Model and Image Encoder both supported
 
 Getting Started with run_llm.py
 -------------------------------
@@ -116,6 +141,36 @@ Other Usage Examples
    python tools/llm/run_llm.py --model Qwen/Qwen2.5-1.5B-Instruct --precision FP32 --benchmark
 
 
+Getting Started with run_vlm.py
+-------------------------------
+
+For Visual Language Models (VLMs), use ``run_vlm.py`` to compile and benchmark models that process both text and images.
+
+Basic Usage
+^^^^^^^^^^^
+
+.. code-block:: bash
+
+   python tools/llm/run_vlm.py \
+     --model Qwen/Qwen2.5-VL-3B-Instruct \
+     --precision FP16 \
+     --num_tokens 128 \
+     --cache static_v1 \
+     --enable_pytorch_run \
+     --benchmark
+
+Key Arguments
+^^^^^^^^^^^^^
+
+* ``--model``: Name or path of the HuggingFace VLM
+* ``--prompt``: Input prompt for generation
+* ``--image_path``: (Optional) Path to input image file. If not provided, will use a sample image
+* ``--precision``: Precision mode (``FP16``, ``FP32``)
+* ``--num_tokens``: Number of output tokens to generate
+* ``--cache``: KV cache type (``static_v1`` or empty for no KV caching)
+* ``--benchmark``: Enable benchmarking mode
+* ``--enable_pytorch_run``: Also run and compare PyTorch baseline
+
 KV Caching in Torch-TensorRT
 ---------------------------------
 
@@ -126,7 +181,7 @@ The length of KV cache = input sequence length + output sequence length (specifi
 Static Cache v1
 ^^^^^^^^^^^^^^^^
 
-The ``static_cache_v1.py`` implements KV cache  in the model graph as follows: 
+The ``static_cache_v1.py`` implements KV cache in the model graph as follows: 
 
 .. code-block:: python
 
@@ -214,9 +269,13 @@ Limitations and Known Issues
 
 * Sliding window attention (used in Gemma3 and Qwen 3 models) is not yet supported
 * Some model architectures (e.g. Phi-4) have issues with exporting the torch model.
+* For VLMs, Qwen2.5-VL image encoder compilation is not supported due to dynamic operations incompatible with torch.export.
 
 Requirements
 ^^^^^^^^^^^^
 
 * Torch-TensorRT 2.8.0 or later
 * Transformers v4.52.3
+* For VLM models (run_vlm.py):
+  - ``pip install qwen-vl-utils`` (for Qwen2.5-VL-3B-Instruct model)
+  - ``pip install flash-attn --no-build-isolation -v`` (for Eagle2-2B model)
