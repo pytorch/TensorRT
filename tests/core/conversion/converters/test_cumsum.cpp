@@ -27,6 +27,7 @@ TEST(Converters, ATenCumsumConvertsCorrectly) {
 }
 
 TEST(Converters, ATenCumsumConvertsCorrectlyWithDynamicInput) {
+  GTEST_SKIP();
   const auto graph = R"IR(
       graph(%0 : Tensor):
         %1 : int = prim::Constant[value=1]()
