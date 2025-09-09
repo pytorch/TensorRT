@@ -121,7 +121,7 @@ def compile_model(
 
     settings = {
         "strict": False,
-        "allow_complex_guards_as_runtime_asserts": True,
+        "prefer_deferred_runtime_asserts_over_guards": True,
         "enabled_precisions": enabled_precisions,
         "truncate_double": True,
         "min_block_size": 1,
