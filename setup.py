@@ -36,14 +36,7 @@ IS_DLFW_CI = os.environ.get("CI_PIPELINE_ID") is not None
 
 
 def get_root_dir() -> Path:
-    try:
-        return Path(
-            subprocess.check_output(["git", "rev-parse", "--show-toplevel"])
-            .decode("ascii")
-            .strip()
-        )
-    except:
-        return Path(__file__).parent.absolute()
+    return Path(__file__).parent.absolute()
 
 
 def get_git_revision_short_hash() -> str:
@@ -55,8 +48,9 @@ def get_git_revision_short_hash() -> str:
             .strip()
         )
     except:
-        print("WARNING: Could not get git revision short hash, using default 000000000")
-        return "000000000"
+        print("WARNING: Could not get git revision short hash, using default one")
+        # 25.10 pytorch commit hash
+        return "8667ef9"
 
 
 def get_base_version() -> str:
