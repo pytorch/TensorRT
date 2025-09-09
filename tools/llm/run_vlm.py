@@ -589,6 +589,8 @@ if __name__ == "__main__":
     print("--- Registering SDPA lowering pass locally for LM compilation ---")
     from torchtrt_ext import register_sdpa
 
+    register_sdpa.enable_sdpa_converter(args.model, model.config)
+
     if args.cache == "static_v1":
         import static_cache_v1  # noqa: F401
     elif args.cache not in ("", None):
