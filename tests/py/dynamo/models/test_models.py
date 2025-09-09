@@ -14,8 +14,9 @@ from torch_tensorrt.dynamo.utils import (
 assertions = unittest.TestCase()
 
 if importlib.util.find_spec("torchvision"):
-    import timm
     import torchvision.models as models
+if importlib.util.find_spec("timm"):
+    import timm
 
 
 @pytest.mark.unit
@@ -132,11 +133,11 @@ def test_resnet18_torch_exec_ops(ir):
 
 
 @pytest.mark.unit
+@pytest.mark.parametrize("dtype", [torch.float16, torch.bfloat16, torch.float32])
 @unittest.skipIf(
     not importlib.util.find_spec("torchvision"),
     "torchvision is not installed",
 )
-@pytest.mark.parametrize("dtype", [torch.float16, torch.bfloat16, torch.float32])
 def test_mobilenet_v2(ir, dtype):
     if torchtrt.ENABLED_FEATURES.tensorrt_rtx and dtype == torch.bfloat16:
         pytest.skip("TensorRT-RTX does not support bfloat16")
@@ -174,12 +175,13 @@ def test_mobilenet_v2(ir, dtype):
 
 
 @pytest.mark.unit
+@pytest.mark.parametrize("dtype", [torch.float16, torch.bfloat16, torch.float32])
 @unittest.skipIf(
     not importlib.util.find_spec("timm") or not importlib.util.find_spec("torchvision"),
     "timm or torchvision not installed",
 )
-@pytest.mark.parametrize("dtype", [torch.float16, torch.bfloat16, torch.float32])
 def test_efficientnet_b0(ir, dtype):
+    breakpoint()
     if torchtrt.ENABLED_FEATURES.tensorrt_rtx and dtype == torch.bfloat16:
         pytest.skip("TensorRT-RTX does not support bfloat16")
 
@@ -221,11 +223,11 @@ def test_efficientnet_b0(ir, dtype):
 
 
 @pytest.mark.unit
+@pytest.mark.parametrize("dtype", [torch.float16, torch.bfloat16, torch.float32])
 @unittest.skipIf(
     not importlib.util.find_spec("transformers"),
     "transformers is required to run this test",
 )
-@pytest.mark.parametrize("dtype", [torch.float16, torch.bfloat16, torch.float32])
 def test_bert_base_uncased(ir, dtype):
     if torchtrt.ENABLED_FEATURES.tensorrt_rtx and dtype == torch.bfloat16:
         pytest.skip("TensorRT-RTX does not support bfloat16")

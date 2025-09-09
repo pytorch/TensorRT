@@ -7,6 +7,7 @@ import re
 import subprocess
 import sys
 import warnings
+from ast import Return
 from dataclasses import dataclass
 from datetime import datetime
 from distutils.cmd import Command
@@ -31,22 +32,32 @@ __tensorrt_version__: str = "0.0"
 __tensorrt_rtx_version__: str = "0.0"
 
 LEGACY_BASE_VERSION_SUFFIX_PATTERN = re.compile("a0$")
+# CI_PIPELINE_ID is the environment variable set by DLFW ci build
+IS_DLFW_CI = os.environ.get("CI_PIPELINE_ID") is not None
 
 
 def get_root_dir() -> Path:
-    return Path(
-        subprocess.check_output(["git", "rev-parse", "--show-toplevel"])
-        .decode("ascii")
-        .strip()
-    )
+    try:
+        return Path(
+            subprocess.check_output(["git", "rev-parse", "--show-toplevel"])
+            .decode("ascii")
+            .strip()
+        )
+    except:
+        return Path(__file__).parent.absolute()
 
 
 def get_git_revision_short_hash() -> str:
-    return (
-        subprocess.check_output(["git", "rev-parse", "--short", "HEAD"])
-        .decode("ascii")
-        .strip()
-    )
+    # DLFW ci build does not have git
+    try:
+        return (
+            subprocess.check_output(["git", "rev-parse", "--short", "HEAD"])
+            .decode("ascii")
+            .strip()
+        )
+    except:
+        print("WARNING: Could not get git revision short hash, using default 000000000")
+        return "000000000"
 
 
 def get_base_version() -> str:
@@ -718,56 +729,56 @@ elif NO_TS:
 with open(os.path.join(get_root_dir(), "README.md"), "r", encoding="utf-8") as fh:
     long_description = fh.read()
 
+base_requirements = [
+    "packaging>=23",
+    "typing-extensions>=4.7.0",
+    "dllist",
+]
+
 
 def get_requirements():
-    requirements = [
-        "packaging>=23",
-        "typing-extensions>=4.7.0",
-        "dllist",
-    ]
-
     if IS_JETPACK:
-        requirements.extend(
-            [
-                "torch>=2.8.0,<2.9.0",
-                "tensorrt>=10.3.0,<10.4.0",
-                "numpy<2.0.0",
-            ]
-        )
+        requirements = get_jetpack_requirements()
     elif IS_SBSA:
-        requirements.extend(
-            [
-                "torch>=2.9.0.dev,<2.10.0",
-                "tensorrt>=10.12.0,<10.13.0",
-                "tensorrt-cu12>=10.12.0,<10.13.0",
-                "tensorrt-cu12-bindings>=10.12.0,<10.13.0",
-                "tensorrt-cu12-libs>=10.12.0,<10.13.0",
-                "numpy",
-            ]
-        )
+        requirements = get_sbsa_requirements()
     else:
-        requirements.extend(
-            [
-                "torch>=2.9.0.dev,<2.10.0",
-                "numpy",
-            ]
-        )
-        if USE_TRT_RTX:
-            requirements.extend(
-                [
-                    "tensorrt-rtx>=1.0.0.21",
+        # standard linux and windows requirements
+        requirements = base_requirements + ["numpy"]
+        if not IS_DLFW_CI:
+            requirements = requirements + ["torch>=2.9.0.dev,<2.10.0"]
+            if USE_TRT_RTX:
+                requirements = requirements + [
+                    "tensorrt_rtx>=1.0.0.21",
                 ]
-            )
-        else:
-            requirements.extend(
-                [
+            else:
+                requirements = requirements + [
                     "tensorrt>=10.12.0,<10.13.0",
                     "tensorrt-cu12>=10.12.0,<10.13.0",
                     "tensorrt-cu12-bindings>=10.12.0,<10.13.0",
                     "tensorrt-cu12-libs>=10.12.0,<10.13.0",
                 ]
-            )
+    print(f"got {requirements=}")
     return requirements
+
+
+def get_jetpack_requirements():
+    jetpack_requirements = base_requirements + ["numpy<2.0.0"]
+    if IS_DLFW_CI:
+        return jetpack_requirements
+    return jetpack_requirements + ["torch>=2.8.0,<2.9.0", "tensorrt>=10.3.0,<10.4.0"]
+
+
+def get_sbsa_requirements():
+    sbsa_requirements = base_requirements + ["numpy"]
+    if IS_DLFW_CI:
+        return sbsa_requirements
+    return sbsa_requirements + [
+        "torch>=2.9.0.dev,<2.10.0",
+        "tensorrt>=10.12.0,<10.13.0",
+        "tensorrt-cu12>=10.12.0,<10.13.0",
+        "tensorrt-cu12-bindings>=10.12.0,<10.13.0",
+        "tensorrt-cu12-libs>=10.12.0,<10.13.0",
+    ]
 
 
 setup(
