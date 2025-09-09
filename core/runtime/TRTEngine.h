@@ -105,7 +105,7 @@ struct TRTEngine : torch::CustomClassHolder {
   std::pair<uint64_t, uint64_t> num_io;
   uint64_t io_size;
   std::map<std::string, bool> isShapeInferenceIO;
-  bool requires_new_output_tensor = false;
+  bool unowned_output_tensor = false;
   std::string name;
   RTDevice device_info;
 
@@ -162,8 +162,8 @@ struct TRTEngine : torch::CustomClassHolder {
   int64_t get_automatic_device_memory_budget();
   std::vector<at::Tensor> infer_outputs(std::vector<std::vector<int64_t>> input_shapes);
   void set_pre_allocated_outputs(bool enable);
-  void set_requires_new_output_tensor(bool enable);
-  bool get_requires_new_output_tensor();
+  void set_unowned_output_tensor(bool enable);
+  bool is_unowned_output_tensor();
   TorchTRTRuntimeStates runtime_states;
   friend std::ostream& operator<<(std::ostream& os, const TRTEngine& engine);
   static const char BINDING_DELIM = '%';

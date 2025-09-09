@@ -249,8 +249,7 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
       if (can_use_pre_allocated_outputs) {
         outputs = compiled_engine->pre_allocated_outputs;
       } else {
-        if (compiled_engine->allocated_outputs.size() == 0 or compiled_engine->requires_new_output_tensor or
-            shape_changed) {
+        if (compiled_engine->allocated_outputs.size() == 0 or compiled_engine->unowned_output_tensor or shape_changed) {
           compiled_engine->allocated_outputs = create_output_tensors(compiled_engine);
           new_outputs = true;
         }

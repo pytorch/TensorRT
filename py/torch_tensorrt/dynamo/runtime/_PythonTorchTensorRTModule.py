@@ -221,7 +221,8 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         self.use_output_allocator_outputs = False
         self.device = torch.cuda.current_device()
         self.cudagraphs_enabled = torch_tensorrt.runtime.get_cudagraphs_mode()
-        self.requires_new_output_tensor = False
+        # If the output tensor is not owned by the engine (unowned_output_tensor=True), we need to create a new output tensor in each forward pass
+        self.unowned_output_tensor = False
         if self.serialized_engine is not None and not self.settings.lazy_engine_init:
             self.setup_engine()
         self.is_shape_inference_io = {
@@ -229,8 +230,19 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
             for input_name in self.input_names
         }
 
-    def set_requires_new_output_tensor(self, enabled: bool) -> None:
-        self.requires_new_output_tensor = enabled
+    def set_unowned_output_tensor(self, enabled: bool) -> None:
+        """
+        Set the flag to indicate if the output tensor is unowned by the engine.
+        If self.unowned_output_tensor=True, the engine will create a new output tensor in each forward pass.
+        This would be slower but is required when users need to manipulate the output tensor after each forward pass.
+        Therefore, this should be set to True only for the last module in a graph and leave to False for intermediate modules,
+        which users don't have access to.
+        Args:
+            enabled: bool
+                Whether to set the flag to True.
+
+        """
+        self.unowned_output_tensor = enabled
 
     def get_streamable_device_memory_budget(self) -> Any:
         return self.engine.streamable_weights_size
@@ -520,7 +532,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                         )
                     if (
                         self.output_tensors is None
-                        or self.requires_new_output_tensor
+                        or self.unowned_output_tensor
                         or shape_changed
                     ):
                         self.output_tensors = self.create_output_tensors()
