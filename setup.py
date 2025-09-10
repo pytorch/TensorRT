@@ -49,8 +49,8 @@ def get_git_revision_short_hash() -> str:
         )
     except:
         print("WARNING: Could not get git revision short hash, using default one")
-        # 25.10 pytorch commit hash
-        return "8667ef9"
+        # in release/ngc/25.10 branch this is the commit hash of the pytorch commit that is used for dlfw package
+        return "0000000"
 
 
 def get_base_version() -> str:
