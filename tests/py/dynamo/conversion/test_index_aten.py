@@ -71,6 +71,27 @@ class TestIndexConstantConverter(DispatchTestCase):
                 [None, torch.tensor([0, 0, 1, 1]), None, torch.tensor([0, 0, 1, 1])],
                 torch.randn(2, 4, 4, 2),
             ),
+            (
+                "mask_index_three_dim",
+                [None, torch.tensor([True, False]), None],
+                torch.randn(2, 2, 2),
+            ),
+            (
+                "mask_index_two_dim",
+                [torch.tensor([True, False])],
+                torch.randn(2, 2),
+            ),
+            (
+                # covers multi axis and discontinuous indices
+                "mask_index_multi_axis",
+                [
+                    None,
+                    torch.tensor([True, False]),  # axis 1
+                    None,
+                    torch.tensor([True, False]),  # axis 3
+                ],
+                torch.randn(2, 2, 2, 2),
+            ),
         ]
     )
     def test_index_constant(self, _, index, input):
@@ -104,6 +125,17 @@ class TestIndexConverter(DispatchTestCase):
             [input, index0],
         )
 
+    def test_index_zero_two_dim_ITensor_mask(self):
+        class TestModule(nn.Module):
+            def forward(self, x, index0):
+                indices = [None, index0]
+                out = torch.ops.aten.index.Tensor(x, indices)
+                return out
+
+        input = torch.randn(2, 2)
+        index0 = torch.tensor([True, False])
+        self.run_test(TestModule(), [input, index0], enable_passes=True)
+
     def test_index_zero_index_three_dim_ITensor(self):
         class TestModule(nn.Module):
             def forward(self, x, index0):
@@ -114,6 +146,17 @@ class TestIndexConverter(DispatchTestCase):
         input = torch.randn(2, 2, 2)
         index0 = torch.randint(0, 1, (1, 1))
         index0 = index0.to(torch.int32)
+        self.run_test(TestModule(), [input, index0])
+
+    def test_index_zero_index_three_dim_mask_ITensor(self):
+        class TestModule(nn.Module):
+            def forward(self, x, index0):
+                indices = [None, index0, None]
+                out = torch.ops.aten.index.Tensor(x, indices)
+                return out
+
+        input = torch.randn(2, 2, 2)
+        index0 = torch.tensor([True, False])
         self.run_test(TestModule(), [input, index0])
 
 
@@ -168,7 +211,31 @@ class TestIndexDynamicConstantConverter(DispatchTestCase):
                 dtype=torch.float32,
             ),
         ]
-        self.run_test_with_dynamic_shape(TestModule(), input_specs)
+        self.run_test_with_dynamic_shape(
+            TestModule(), input_specs, use_dynamo_tracer=True
+        )
+
+
+class TestIndexDynamicInputNonDynamicIndexConverter(DispatchTestCase):
+    def test_index_input_non_dynamic_index_dynamic(self):
+        class TestIndexWithRuntimeIndex(torch.nn.Module):
+            def forward(self, x):
+                mask = x > 0
+                idx = torch.nonzero(mask, as_tuple=True)
+                return torch.ops.aten.index.Tensor(x, idx)
+
+        input_specs = [
+            Input(
+                min_shape=(2, 2),
+                opt_shape=(2, 2),
+                max_shape=(8, 8),
+                dtype=torch.float32,
+            ),
+        ]
+        # In this case the index args[1] gets itself converted to a List of TRTTensors with use_dynamo_tracer=True
+        self.run_test_with_dynamic_shape(
+            TestIndexWithRuntimeIndex(), input_specs, use_dynamo_tracer=True
+        )
 
 
 if __name__ == "__main__":
