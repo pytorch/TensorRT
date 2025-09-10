@@ -12,8 +12,10 @@ from torch_tensorrt.dynamo.utils import COSINE_THRESHOLD, cosine_similarity
 from packaging.version import Version
 
 if importlib.util.find_spec("torchvision"):
-    import timm
     import torchvision.models as models
+
+if importlib.util.find_spec("timm"):
+    import timm
 
 assertions = unittest.TestCase()
 
