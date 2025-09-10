@@ -750,7 +750,6 @@ def get_requirements():
                     "tensorrt-cu12-bindings>=10.12.0,<10.13.0",
                     "tensorrt-cu12-libs>=10.12.0,<10.13.0",
                 ]
-    print(f"got {requirements=}")
     return requirements
 
 
