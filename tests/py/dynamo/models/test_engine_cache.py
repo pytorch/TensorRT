@@ -856,7 +856,7 @@ class TestEngineCache(TestCase):
                         (inputs,),
                         dynamic_shapes=({1: seq_len},),
                         strict=False,
-                        allow_complex_guards_as_runtime_asserts=True,
+                        prefer_deferred_runtime_asserts_over_guards=True,
                     )
 
             return ep

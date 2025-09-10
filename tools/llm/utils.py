@@ -41,7 +41,7 @@ def export_llm(model, inputs, min_seq_len=1, max_seq_len=16):
                 kwargs={"position_ids": position_ids},
                 dynamic_shapes=({1: seq_len}, {1: seq_len}),
                 strict=False,
-                allow_complex_guards_as_runtime_asserts=True,
+                prefer_deferred_runtime_asserts_over_guards=True,
             )
 
     return ep
