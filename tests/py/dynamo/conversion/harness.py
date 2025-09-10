@@ -434,7 +434,11 @@ class DispatchTestCase(TRTTestCase):
             propagate_shapes=propagate_shapes,
             settings=compilation_settings,
         )
+        from torch_tensorrt.dynamo.lowering.passes.remove_num_users_is_0_nodes import (
+            remove_num_users_is_0_nodes,
+        )
 
+        mod = remove_num_users_is_0_nodes(mod, compilation_settings)
         num_inputs = len(inputs)
         trt_inputs = inputs
         dtype_to_change = []
