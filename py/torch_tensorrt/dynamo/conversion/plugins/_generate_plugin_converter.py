@@ -89,9 +89,8 @@ def _generate_plugin_converter(
         non_tensor_args = args[len(tensor_inputs) :]
         non_tensor_kwargs = dict(zip(list(non_tensor_inputs.keys()), non_tensor_args))
 
-        for k, v in kwargs.items():
-            if k in non_tensor_kwargs:
-                kwargs[k] = non_tensor_kwargs[k]
+        # Update kwargs with non_tensor_kwargs, adding new keys or overwriting existing ones
+        kwargs.update(non_tensor_kwargs)
 
         for k, v in kwargs.items():
             if isinstance(v, torch.fx.immutable_collections.immutable_list):
