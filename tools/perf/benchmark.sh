@@ -7,8 +7,8 @@ python hub.py
 
 batch_sizes=(1 2 4 8 16 32 64 128 256)
 large_model_batch_sizes=(1 2 4 8 16 32 64)
-backends=("torch" "ts_trt" "dynamo" "torch_compile" "inductor" "tensorrt")
-backends_no_torchscript=("torch" "dynamo" "torch_compile" "inductor" "tensorrt")
+backends=("torch" "ts_trt" "dynamo" "torch_compile" "inductor" "onnx_trt")
+backends_no_torchscript=("torch" "dynamo" "torch_compile" "inductor" "onnx_trt")
 
 
 # Benchmark VGG16 model
@@ -107,18 +107,48 @@ do
   done
 done
 
-# Benchmark Stable Diffusion UNet model
-echo "Benchmarking SD UNet model"
+# Benchmark Stable Diffusion v1.4 UNet model
+echo "Benchmarking SD-v1.4 UNet model"
 for bs in ${large_model_batch_sizes[@]}
 do
   for backend in ${backends_no_torchscript[@]}
   do
-    python perf_run.py --model_torch sd_unet \
+    python perf_run.py --model_torch sd1.4_unet \
                        --precision fp16 --inputs="(${bs}, 4, 64, 64);(${bs});(${bs}, 1, 768)" \
                        --batch_size ${bs} \
                        --truncate \
                        --backends ${backend} \
-                       --report "sd_unet_perf_bs${bs}_backend_${backend}.csv"
+                       --report "sd1.4_unet_perf_bs${bs}_backend_${backend}.csv"
+  done
+done
+
+# Benchmark Stable Diffusion v2.1 UNet model
+echo "Benchmarking SD-v2.1 UNet model"
+for bs in ${large_model_batch_sizes[@]}
+do
+  for backend in ${backends_no_torchscript[@]}
+  do
+    python perf_run.py --model_torch sd2.1_unet \
+                       --precision fp16 --inputs="(${bs}, 4, 64, 64);(${bs});(${bs}, 1, 1024)" \
+                       --batch_size ${bs} \
+                       --truncate \
+                       --backends ${backend} \
+                       --report "sd2.1_unet_perf_bs${bs}_backend_${backend}.csv"
+  done
+done
+
+# Benchmark Stable Diffusion v2.1 VAE decoder model
+echo "Benchmarking SD-v2.1 VAE decoder model"
+for bs in ${large_model_batch_sizes[@]}
+do
+  for backend in ${backends_no_torchscript[@]}
+  do
+    python perf_run.py --model_torch sd2.1_vae_decoder \
+                       --precision fp16 --inputs="(${bs}, 4, 64, 64)" \
+                       --batch_size ${bs} \
+                       --truncate \
+                       --backends ${backend} \
+                       --report "sd2.1_vae_decoder_perf_bs${bs}_backend_${backend}.csv"
   done
 done
 

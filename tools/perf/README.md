@@ -6,7 +6,8 @@ This is a comprehensive Python benchmark suite to run perf runs using different 
 2. Torch-TensorRT [Torchscript]
 3. Torch-TensorRT [Dynamo]
 4. Torch-TensorRT [torch_compile]
-5. TensorRT
+5. Torch Inductor
+6. ONNX-TensorRT
 
 
 ## Prerequisite
@@ -42,7 +43,7 @@ Benchmark scripts depends on following Python packages in addition to requiremen
 
 Here are the list of `CompileSpec` options that can be provided directly to compile the pytorch module
 
-* `--backends` : Comma separated string of backends. Eg: torch, torch_compile, dynamo, tensorrt
+* `--backends` : Comma separated string of backends. Eg: torch, ts_trt, dynamo, torch_compile, inductor, onnx_trt
 * `--model` : Name of the model file (Can be a torchscript module or a tensorrt engine (ending in `.plan` extension)). If the backend is `dynamo` or `torch_compile`, the input should be a Pytorch module (instead of a torchscript module).
 * `--model_torch` : Name of the PyTorch model file (optional, only necessary if `dynamo` or `torch_compile` is a chosen backend)
 * `--onnx` : ONNX model file which helps bypass the step of exporting ONNX from `model_torch`. If this argument is provided, the ONNX will be directly converted to TRT engine
