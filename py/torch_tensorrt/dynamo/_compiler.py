@@ -53,7 +53,7 @@ from torch_tensorrt.dynamo.utils import (
 logger = logging.getLogger(__name__)
 
 
-@needs_cross_compile
+@needs_cross_compile  # type: ignore
 def cross_compile_for_windows(
     exported_program: ExportedProgram,
     inputs: Optional[Sequence[Sequence[Any]]] = None,
@@ -141,7 +141,7 @@ def cross_compile_for_windows(
         assume_dynamic_shape_support (bool): Setting this to true enables the converters work for both dynamic and static shapes. Default: False
         sparse_weights (bool): Enable sparsity for convolution and fully connected layers.
         enabled_precision (Set(Union(torch.dtype, torch_tensorrt.dtype))): The set of datatypes that TensorRT can use when selecting kernels
-        capability (torch_tensorrt.EngineCapability): Restrict kernel selection to safe gpu kernels or safe dla kernels
+        engine_capability (torch_tensorrt.EngineCapability): Restrict kernel selection to safe gpu kernels or safe dla kernels
         num_avg_timing_iters (int): Number of averaging timing iterations used to select kernels
         workspace_size (int): Maximum size of workspace given to TensorRT
         dla_sram_size (int): Fast software managed RAM used by DLA to communicate within a layer.
@@ -479,7 +479,7 @@ def compile(
         assume_dynamic_shape_support (bool): Setting this to true enables the converters work for both dynamic and static shapes. Default: False
         sparse_weights (bool): Enable sparsity for convolution and fully connected layers.
         enabled_precision (Set(Union(torch.dtype, torch_tensorrt.dtype))): The set of datatypes that TensorRT can use when selecting kernels
-        capability (torch_tensorrt.EngineCapability): Restrict kernel selection to safe gpu kernels or safe dla kernels
+        engine_capability (torch_tensorrt.EngineCapability): Restrict kernel selection to safe gpu kernels or safe dla kernels
         num_avg_timing_iters (int): Number of averaging timing iterations used to select kernels
         workspace_size (int): Maximum size of workspace given to TensorRT
         dla_sram_size (int): Fast software managed RAM used by DLA to communicate within a layer.
@@ -723,7 +723,7 @@ def compile(
     return trt_gm
 
 
-@fn_supports_debugger
+@fn_supports_debugger  # type: ignore
 def compile_module(
     gm: torch.fx.GraphModule,
     sample_arg_inputs: Sequence[Input],
@@ -1289,7 +1289,7 @@ def convert_exported_program_to_serialized_trt_engine(
     return serialized_engine
 
 
-@needs_cross_compile
+@needs_cross_compile  # type: ignore
 def save_cross_compiled_exported_program(
     gm: torch.fx.GraphModule,
     file_path: str,
