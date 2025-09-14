@@ -82,12 +82,6 @@ http_archive(
 #    urls = ["https://download.pytorch.org/whl/nightly/cu128/torch-2.8.0.dev20250415%2Bcu128-cp310-cp310-manylinux_2_28_aarch64.whl"],
 #)
 
-http_archive(
-    name = "libtorch_win",
-    build_file = "@//third_party/libtorch:BUILD",
-    strip_prefix = "libtorch",
-    urls = ["https://download.pytorch.org/libtorch/nightly/cu129/libtorch-win-shared-with-deps-latest.zip"],
-)
 
 http_archive(
     name = "torch_l4t",
@@ -146,29 +140,23 @@ http_archive(
     ],
 )
 
-http_archive(
-    name = "tensorrt_rtx_win",
-    build_file = "@//third_party/tensorrt_rtx/archive:BUILD",
-    strip_prefix = "TensorRT-RTX-1.0.0.21",
-    urls = [
-        "https://developer.nvidia.com/downloads/trt/rtx_sdk/secure/1.0/TensorRT-RTX-1.0.0.21.Windows.win10.cuda-12.9.zip",
-    ],
-)
+
 ####################################################################################
 # Locally installed dependencies (use in cases of custom dependencies or aarch64)
 ####################################################################################
 
 # NOTE: If you are using a local build of torch, just point the Libtorch dep to that path.
 
-#new_local_repository(
-#    name = "libtorch",
+new_local_repository(
+    name = "libtorch_win",
 # please modify this path according to your local python wheel path
-#    path = "/usr/local/lib/python3.11/dist-packages/torch",
-#    build_file = "third_party/libtorch/BUILD"
-#)
+    path = "c:/users/local-lanl/git/venv_py310/lib/site-packages/torch",
+    build_file = "third_party/libtorch/BUILD"
+)
 
-#new_local_repository(
-#   name = "tensorrt",
-#   path = "/usr/",
-#   build_file = "@//third_party/tensorrt/local:BUILD"
-#)
+new_local_repository(
+   name = "tensorrt_rtx_win",
+   path = "c:/users/local-lanl/git/venv_py310/lib/site-packages/tensorrt_rtx",
+   build_file = "@//third_party/tensorrt_rtx/local:BUILD"
+)
+
