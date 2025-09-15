@@ -41,6 +41,9 @@ def get_root_dir() -> Path:
 
 def get_git_revision_short_hash() -> str:
     # DLFW ci build does not have git
+    if IS_DLFW_CI:
+        # 25.10 dlfw branch pytorch short commit hash
+        return "145a3a7"
     try:
         return (
             subprocess.check_output(["git", "rev-parse", "--short", "HEAD"])
@@ -48,9 +51,10 @@ def get_git_revision_short_hash() -> str:
             .strip()
         )
     except:
-        print("WARNING: Could not get git revision short hash, using default one")
-        # 25.10 dlfw branch pytorch short commit hash
-        return "145a3a7"
+        print(
+            "WARNING: Could not get git revision short hash, using default one: 0000000"
+        )
+        return "0000000"
 
 
 def get_base_version() -> str:
