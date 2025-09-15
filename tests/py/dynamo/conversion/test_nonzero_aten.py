@@ -6,12 +6,13 @@ import torch_tensorrt
 from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
 from torch_tensorrt import Input
+from torch_tensorrt.dynamo.utils import is_tegra_platform, is_thor
 
 from .harness import DispatchTestCase
 
 
 @unittest.skipIf(
-    torch_tensorrt.ENABLED_FEATURES.tensorrt_rtx,
+    torch_tensorrt.ENABLED_FEATURES.tensorrt_rtx or is_thor() or is_tegra_platform(),
     "nonzero is not supported for tensorrt_rtx",
 )
 class TestNonZeroConverter(DispatchTestCase):
