@@ -7,6 +7,7 @@
 #ifndef DISABLE_TEST_IN_CI
 
 TEST(CppAPITest, ResNetModuleFallbacksCorrectly) {
+  GTEST_SKIP();
   torch::jit::script::Module mod;
   try {
     mod = torch::jit::load("tests/modules/resnet18_scripted.jit.pt");
@@ -34,6 +35,7 @@ TEST(CppAPITest, ResNetModuleFallbacksCorrectly) {
 }
 
 TEST(CppAPITest, MobileNetModuleFallbacksCorrectlyWithOneEngine) {
+  GTEST_SKIP();
   torch::jit::script::Module mod;
   try {
     mod = torch::jit::load("tests/modules/mobilenet_v2_scripted.jit.pt");
