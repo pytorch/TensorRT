@@ -533,6 +533,9 @@ class DispatchTestCase(TRTTestCase):
             settings=compilation_settings,
         )
 
+        for pass_func in post_lowering_pass_list_for_converter_test:
+            mod = pass_func(mod, compilation_settings)
+
         interp = TRTInterpreter(
             mod,
             Input.from_tensors(inputs),
@@ -578,6 +581,8 @@ class DispatchTestCase(TRTTestCase):
             settings=compilation_settings,
             torch_export_dynamic_shapes=torch_export_dynamic_shapes,
         )
+        for pass_func in post_lowering_pass_list_for_converter_test:
+            mod = pass_func(mod, compilation_settings)
 
         if check_dtype:
             if use_dynamo_tracer:
