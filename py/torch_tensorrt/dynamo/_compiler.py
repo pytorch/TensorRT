@@ -568,7 +568,7 @@ def compile(
         and kwargs["enable_cross_compile_for_windows"]
     ):
         raise ValueError(
-            "Please use cross_compile_for_windows() api if you want to cross compile the module in Linux for inferencing in Windows."
+            "Please use torch_tensorrt.dynamo.cross_compile_for_windows() if you want to cross compile the module in Linux for inferencing in Windows."
         )
 
     engine_capability = EngineCapability._from(engine_capability)
@@ -1180,7 +1180,7 @@ def convert_exported_program_to_serialized_trt_engine(
         and kwargs["enable_cross_compile_for_windows"]
     ):
         raise ValueError(
-            "Please use cross_compile_for_windows() api if you want to cross compile the module in Linux for inferencing in Windows."
+            "Please use torch_tensorrt.dynamo.cross_compile_for_windows() if you want to cross compile the module in Linux for inferencing in Windows."
         )
 
     engine_capability = EngineCapability._from(engine_capability)
