@@ -513,7 +513,7 @@ def compile(
 
     if kwargs.get("debug", False):
         warnings.warn(
-            "`debug` is deprecated. Please use `with torch_tensorrt.dynamo.Debugger(...)` to wrap your compilation call to enable debugging functionality",
+            "`debug` is deprecated. Please use `with torch_tensorrt.dynamo.Debugger(...)` to wrap your compilation call to enable debugging functionality.",
             DeprecationWarning,
             stacklevel=2,
         )
@@ -1122,6 +1122,7 @@ def convert_exported_program_to_serialized_trt_engine(
     Returns:
         bytes: Serialized TensorRT engine, can either be saved to a file or deserialized via TensorRT APIs
     """
+
     if kwargs.get("debug", False):
         warnings.warn(
             "`debug` is deprecated. Please use `with torch_tensorrt.dynamo.Debugger(...)` to wrap your compilation call to enable debugging functionality.",

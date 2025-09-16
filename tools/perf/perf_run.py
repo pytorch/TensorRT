@@ -480,7 +480,15 @@ def run_onnx_trt(
             onnx_path = params["onnx"]
         else:
             onnx_path = f"{params['model_torch']}-onnx-trt.onnx"
-            torch.onnx.export(model, tuple(input_tensors), onnx_path, dynamo=True)
+            len_output = len(model(*input_tensors))
+            # to match the output names with Torch-TRT engine's
+            torch.onnx.export(
+                model,
+                tuple(input_tensors),
+                onnx_path,
+                dynamo=True,
+                output_names=[f"output{i}" for i in range(len_output)],
+            )
         start_compile = timeit.default_timer()
         builder = trt.Builder(logger)
         network = builder.create_network(
