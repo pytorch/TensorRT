@@ -713,7 +713,7 @@ def index_put_converter(
     for dim in range(rank):
         unique_suffix = f"{dim}_{i_idx if dim in I else f_idx}"
         if dim in I:
-            idx_tensor = I_combined[i]
+            idx_tensor = I_combined[i_idx]
             ii_list.append(idx_tensor)
             i_idx += 1
         else:
@@ -771,7 +771,12 @@ def index_put_converter(
         )
     else:  # Non-scalar case
         values_shape = list(values.shape)
-        if K > 0 and N in values_shape:
+        if (
+            K > 0
+            and N in values_shape
+            and (len(F) > 1 and max(F) - min(F) + 1 == len(F))
+        ):
+            # Continuous case
             n_idx = values_shape.index(N)
             permute_order = [n_idx] + [
                 i for i in range(len(values_shape)) if i != n_idx
@@ -817,6 +822,7 @@ def index_put_converter(
                 tuple(broadcast_shape),
             )
         else:
+            # Discontinuous case
             values_shape_padded = [1] * (
                 len(expected_shape) - len(values.shape)
             ) + list(values.shape)
@@ -828,20 +834,20 @@ def index_put_converter(
                     raise ValueError(
                         f"Cannot broadcast {values.shape} to {expected_shape}"
                     )
-            values_reshaped = impl.shuffle.reshape(
-                ctx,
-                target,
-                source_ir,
-                f"{name}_reshape_values",
-                values,
-                tuple(broadcast_shape),
-            )
+            # values_reshaped = impl.shuffle.reshape(
+            #     ctx,
+            #     target,
+            #     source_ir,
+            #     f"{name}_reshape_values",
+            #     values,
+            #     tuple(broadcast_shape),
+            # )
             values_expanded = impl.slice.expand(
                 ctx,
                 target,
                 source_ir,
                 f"{name}_expand_values",
-                values_reshaped,
+                values,
                 expected_shape,
             )
 
