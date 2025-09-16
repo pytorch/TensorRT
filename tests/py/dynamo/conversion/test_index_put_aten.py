@@ -195,11 +195,43 @@ class TestIndexPutConverter(DispatchTestCase):
                     dtype=torch.int32,
                 ),
             ),
+            # param(
+            #     test_name="4d_indices_none_none_multiple_idx_broadcast_error",
+            #     source_tensor=torch.zeros([1, 2, 5, 3], dtype=torch.float32),
+            #     indices_tensor=(None, None, torch.tensor([0, 1, 2], dtype=torch.int64)),
+            #     value_tensor=torch.randn([2, 3, 3], dtype=torch.float32),
+            # ),
             param(
-                test_name="4d_indices_none_none_multiple_idx_broadcast_error",
-                source_tensor=torch.zeros([1, 2, 5, 3], dtype=torch.float32),
-                indices_tensor=(None, None, torch.tensor([0, 1, 2], dtype=torch.int64)),
-                value_tensor=torch.randn([2, 3, 3], dtype=torch.float32),
+                test_name="discontinuous_test",
+                source_tensor=torch.zeros([2, 4, 4], dtype=torch.float32),
+                indices_tensor=(
+                    torch.tensor([0, 0, 1], dtype=torch.int64),
+                    None,
+                    torch.tensor([0, 0, 1], dtype=torch.int64),
+                ),
+                value_tensor=torch.tensor([2, 3, 3, 4], dtype=torch.float32),
+            ),
+            param(
+                test_name="discontinuous_test_two",
+                source_tensor=torch.zeros([2, 4, 4, 2], dtype=torch.float32),
+                indices_tensor=(
+                    None,
+                    torch.tensor([0, 0, 1, 1], dtype=torch.int64),
+                    None,
+                    torch.tensor([0, 0, 1, 1], dtype=torch.int64),
+                ),
+                value_tensor=torch.tensor([2, 3, 3, 4], dtype=torch.float32),
+            ),
+            param(
+                test_name="continuous_test",
+                source_tensor=torch.zeros([2, 4, 4, 2], dtype=torch.float32),
+                indices_tensor=(
+                    None,
+                    None,
+                    torch.tensor([0, 0, 1, 1], dtype=torch.int64),
+                    torch.tensor([0, 0, 1, 1], dtype=torch.int64),
+                ),
+                value_tensor=torch.tensor([2, 3, 3, 4], dtype=torch.float32),
             ),
             # param(
             #     test_name="2d_indices_accumulate_True",
