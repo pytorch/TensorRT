@@ -59,10 +59,7 @@ def get_model(args):
             .cuda()
         )
         # register SDPA variant for the model
-        if register_sdpa._SDPA_MAPPING.get(args.model, None) is not None:
-            register_sdpa._SDPA_MAPPING[args.model](model_config=model.config)
-        else:
-            register_sdpa._SDPA_MAPPING["default"](model_config=model.config)
+        register_sdpa.enable_sdpa_converter(args.model, model.config)
 
     if args.precision == "FP16":
         model = model.to(torch.float16)

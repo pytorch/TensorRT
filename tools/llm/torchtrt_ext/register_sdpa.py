@@ -19,15 +19,26 @@ from .sdpa_converter import *
 
 logger = logging.getLogger(__name__)
 
-# Remove decompositions for aten.scaled_dot_product_attention, aten._scaled_dot_product_efficient_attention, aten._scaled_dot_product_flash_attention
-# This is because we want to have SDPA as a standalone operator in the graph and invoke the custom converter for it.
-TORCH_TRT_DECOMPOSITIONS.pop(torch.ops.aten.scaled_dot_product_attention.default, None)
-TORCH_TRT_DECOMPOSITIONS.pop(
-    torch.ops.aten._scaled_dot_product_efficient_attention.default, None
+_SDPA_OPS_TO_REMOVE = (
+    torch.ops.aten.scaled_dot_product_attention.default,
+    torch.ops.aten._scaled_dot_product_efficient_attention.default,
+    torch.ops.aten._scaled_dot_product_flash_attention.default,
 )
-TORCH_TRT_DECOMPOSITIONS.pop(
-    torch.ops.aten._scaled_dot_product_flash_attention.default, None
-)
+
+
+def _remove_decompositions():
+    """
+    Remove decompositions for SDPA operators.
+
+    This function is idempotent. It ensures that the SDPA operators are removed
+    from the decomposition table, allowing a custom converter to be used.
+    """
+    # Check if any of the decompositions still exist before proceeding
+    if any(op in TORCH_TRT_DECOMPOSITIONS for op in _SDPA_OPS_TO_REMOVE):
+        logger.debug("Removing SDPA decompositions to enable custom converter.")
+        for op in _SDPA_OPS_TO_REMOVE:
+            TORCH_TRT_DECOMPOSITIONS.pop(op, None)
+
 
 REPLACEABLE_ATEN_OPS = {
     torch.ops.aten._scaled_dot_product_efficient_attention.default,
@@ -271,3 +282,35 @@ _SDPA_MAPPING: Dict[str, Callable] = {
     "google/gemma-3-1b-it": register_gemma3_sdpa_pass,
     "default": register_default_sdpa_pass,
 }
+
+
+def enable_sdpa_converter(model_name: str, model_config: Any) -> None:
+    """
+    Enables the custom SDPA converter for a given model.
+
+    This function performs two main actions:
+    1. Removes the default PyTorch SDPA decompositions from Torch-TensorRT's
+       lowering registry. This is necessary to prevent them from being used
+       instead of our custom converter.
+    2. Registers a model-specific or default lowering pass that replaces the
+       standard SDPA operators with a version optimized for TensorRT conversion.
+
+    Args:
+        model_name (str): The name of the model (e.g., from Hugging Face).
+        model_config (Any): The model's configuration object. This is used to
+                            extract parameters for model-specific optimizations,
+                            like sliding window attention.
+    """
+    _remove_decompositions()
+
+    pass_registrator = _SDPA_MAPPING.get(model_name)
+
+    if pass_registrator:
+        logger.info(f"Registering specific SDPA lowering pass for model: {model_name}")
+        pass_registrator(model_config=model_config)
+    else:
+        logger.info(
+            f"No specific SDPA lowering pass for model '{model_name}'. "
+            "Using default SDPA pass."
+        )
+        _SDPA_MAPPING["default"](model_config=model_config)
