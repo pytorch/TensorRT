@@ -34,7 +34,7 @@ def compile_model(
         enabled_precisions = {torch.float4_e2m1fn_x2}
         ptq_config = mtq.NVFP4_DEFAULT_CFG
         if args.fp4_mha:
-            from modelopt.core.torch.quantization.config import NVFP4_FP8_MHA_CONFIG
+            from modelopt.torch.quantization.config import NVFP4_FP8_MHA_CONFIG
 
             ptq_config = NVFP4_FP8_MHA_CONFIG
 
