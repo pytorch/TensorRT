@@ -515,9 +515,9 @@ def generate_mm_with_static_cache(
         overall_end.record()
         torch.cuda.synchronize()
         overall_time = overall_start.elapsed_time(overall_end)
-        return output_tokens, step_times, overall_time, vision_time, mlp_time
+        return output_tokens[:, input_ids.shape[1]:], step_times, overall_time, vision_time, mlp_time
     else:
-        return output_tokens
+        return output_tokens[:, input_ids.shape[1]:]
 
 
 def _prepare_qwen_mm_inputs(
@@ -762,9 +762,9 @@ def generate_mm_qwen2_5_vl_with_static_cache(
         torch.cuda.synchronize()
         overall_time = overall_start.elapsed_time(overall_end)
         # For Qwen, there is no separate MLP part like in Eagle, so mlp_time is 0.
-        return output_tokens, step_times, overall_time, vision_time, 0.0
+        return output_tokens[:, input_ids.shape[1]:], step_times, overall_time, vision_time, 0.0
     else:
-        return output_tokens
+        return output_tokens[:, input_ids.shape[1]:]
 
 
 @torch.inference_mode()
