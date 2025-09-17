@@ -270,6 +270,7 @@ Limitations and Known Issues
 * Sliding window attention (used in Gemma3 and Qwen 3 models) is not yet supported
 * Some model architectures (e.g. Phi-4) have issues with exporting the torch model.
 * For VLMs, Qwen2.5-VL image encoder compilation is not supported due to dynamic operations incompatible with torch.export.
+* **Eagle2 FP16 Precision Output Differences**: When compiling Eagle2 models with FP16 precision, minor token-level differences may occur between PyTorch and TensorRT outputs. While the overall context and meaning remain consistent, specific word choices or phrasing may vary slightly. This is expected behavior due to numerical precision differences in FP16 computation and does not affect the model's core functionality or accuracy.
 
 Requirements
 ^^^^^^^^^^^^
