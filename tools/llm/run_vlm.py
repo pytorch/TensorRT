@@ -38,6 +38,8 @@ from torchtrt_ext import register_sdpa
 from transformers import AutoConfig, AutoModel, AutoProcessor
 from utils import (
     generate_mm,
+    generate_mm_qwen2_5_vl,
+    generate_mm_qwen2_5_vl_with_static_cache,
     generate_mm_with_static_cache,
     record_stats,
     time_generate_mm,
@@ -69,7 +71,12 @@ MODEL_CONSTANTS = {
         "EXAMPLE_SEQLEN": 2560,  # A fixed sequence length for creating the example tensor for TRT compilation.
         "IMAGE_TOKENS": 1792,  # Number of special tokens used to represent the image patch embeddings in the input sequence for Eagle2-2B VLM.
         "PROMPT_WRAPPER_TOKENS": 26,  # The number of special/processing tokens added by the processor's chat template in benchmark mode.
-    }
+    },
+    "Qwen/Qwen2.5-VL-3B-Instruct": {
+        "EXAMPLE_SEQLEN": 2560,
+        "IMAGE_TOKENS": 391,
+        "PROMPT_WRAPPER_TOKENS": 21,
+    },
 }
 # --- END Model-specific constants ---
 
@@ -110,15 +117,30 @@ def _load_eagle2(device: torch.device, torch_dtype: torch.dtype):
     return model, processor, emb_layer
 
 
+def _load_qwen2_5_vl(device, torch_dtype: torch.dtype):
+    """
+    Load Qwen2.5-VL model and processor.
+    """
+    from transformers import AutoProcessor, Qwen2_5_VLForConditionalGeneration
+
+    model_id = "Qwen/Qwen2.5-VL-3B-Instruct"
+    model = Qwen2_5_VLForConditionalGeneration.from_pretrained(
+        model_id, torch_dtype=torch_dtype, device_map=device
+    ).eval()
+    processor = AutoProcessor.from_pretrained(model_id)
+    emb_layer = model.model.get_input_embeddings().to(torch_dtype).to(device)
+    return model, processor, emb_layer
+
+
 def load_model(
     model_name: str, device: torch.device, torch_dtype: torch.dtype
 ) -> Tuple[torch.nn.Module, AutoProcessor, torch.nn.Embedding]:
     """Dispatch helper for supported VLMs."""
     if model_name == "nvidia/Eagle2-2B":
         return _load_eagle2(device, torch_dtype)
-    msg = (
-        f"Unsupported model: '{model_name}'. Supported models are: ['nvidia/Eagle2-2B']"
-    )
+    elif model_name == "Qwen/Qwen2.5-VL-3B-Instruct":
+        return _load_qwen2_5_vl(device, torch_dtype)
+    msg = f"Unsupported model: '{model_name}'. Supported models are: ['nvidia/Eagle2-2B', 'Qwen/Qwen2.5-VL-3B-Instruct']"
     raise ValueError(msg)
 
 
@@ -127,11 +149,11 @@ def load_model(
 # -----------------------------------------------------------------------------#
 
 
-def _load_inputs_eagle2(args: argparse.Namespace, processor, device: torch.device):
+def load_inputs(args: argparse.Namespace, processor, device: torch.device):
     """
-    Loads the input dictionary for the Eagle2 model.
+    Loads and constructs the input dictionary for the specified VLM model.
     """
-    url = "https://cdn.pixabay.com/photo/2019/08/08/23/33/car-4393990_1280.jpg"
+    url = "https://huggingface.co/datasets/huggingface/documentation-images/resolve/main/transformers/tasks/car.jpg"
     image = Image.open(requests.get(url, stream=True).raw)
 
     if args.benchmark:
@@ -142,7 +164,7 @@ def _load_inputs_eagle2(args: argparse.Namespace, processor, device: torch.devic
         prompt_len = args.isl - image_tokens - wrapper_tokens
         prompt_txt = " ".join(["token"] * max(prompt_len, 0))
     else:
-        prompt_txt = args.prompt
+        prompt_txt = args.prompt or "Describe this image."
 
     messages = [
         {
@@ -154,25 +176,28 @@ def _load_inputs_eagle2(args: argparse.Namespace, processor, device: torch.devic
         }
     ]
 
-    txt = [
+    text = [
         processor.apply_chat_template(
             messages, tokenize=False, add_generation_prompt=True
         )
     ]
-    img_in, vid_in = processor.process_vision_info(messages)
+
+    # --- Model-specific vision processing ---
+    if "qwen" in args.model.lower():
+        from qwen_vl_utils import process_vision_info
+
+        image_inputs, video_inputs = process_vision_info(messages)
+    else:  # eagle2
+        image_inputs, video_inputs = processor.process_vision_info(messages)
+
     inputs = processor(
-        text=txt, images=img_in, videos=vid_in, return_tensors="pt", padding=True
+        text=text,
+        images=image_inputs,
+        videos=video_inputs,
+        padding=True,
+        return_tensors="pt",
     ).to(device)
     return inputs
-
-
-def load_inputs(args: argparse.Namespace, processor, device: torch.device):
-    """Dispatch helper for input loading for supported VLMs."""
-    if args.model == "nvidia/Eagle2-2B":
-        return _load_inputs_eagle2(args, processor, device)
-
-    msg = f"Unsupported model for input loading: '{args.model}'. Supported models are: ['nvidia/Eagle2-2B']"
-    raise ValueError(msg)
 
 
 # -----------------------------------------------------------------------------#
@@ -191,28 +216,39 @@ class _LMNoCache(torch.nn.Module):
 
     def forward(self, inputs_embeds, position_ids):
         out = self.lm(inputs_embeds=inputs_embeds, position_ids=position_ids)
-        return out.logits if hasattr(out, "logits") else out
+        return (
+            out.logits
+            if hasattr(out, "logits")
+            else out.last_hidden_state if hasattr(out, "last_hidden_state") else out
+        )
 
 
-def _compile_eagle2_lm(
+def _compile_lm(
     language_model: torch.nn.Module,
     input_embeds: torch.Tensor,
     args: argparse.Namespace,
 ) -> torch.nn.Module:
     """
-    Compile Eagle2 language model with Torch-TensorRT.
-
-    The function follows the same precision-specific flag logic used in
-    *run_llm.py* for consistency.
+    Compile the language model component of a VLM with Torch-TensorRT
     """
     lm_wrap = _LMNoCache(language_model).to(DEVICE).eval()
     max_seq_len = input_embeds.shape[1] + args.num_tokens
 
-    seq_len = torch.export.Dim("seq", min=1, max=max_seq_len)
-    position_ids = torch.arange(input_embeds.shape[1]).unsqueeze(0).to(DEVICE)
+    # --- Model-specific dynamic shape definition ---
+    if "qwen" in args.model.lower():
+        _seq = torch.export.Dim("_seq", min=1, max=512)
+        seq_len = 8 * _seq
+        position_ids = (
+            torch.arange(input_embeds.shape[1], device=DEVICE, dtype=torch.long)
+            .unsqueeze(0)
+            .expand(input_embeds.size(0), input_embeds.size(1))
+        )
+    else:  # eagle2
+        seq_len = torch.export.Dim("seq", min=1, max=max_seq_len)
+        position_ids = torch.arange(input_embeds.shape[1]).unsqueeze(0).to(DEVICE)
+
     dyn_shapes = {"inputs_embeds": {1: seq_len}, "position_ids": {1: seq_len}}
 
-    # Precision-specific flags --------------------------------------------------#
     use_fp32_acc = False
     use_explicit_typing = False
     if args.precision == "FP16":
@@ -254,33 +290,33 @@ def compile_lm_torchtrt(
 ) -> torch.nn.Module:
     """
     Compiles the Language Model (LLM) component of the VLM using Torch-TensorRT.
-
-    This function acts as a dispatcher, delegating to the appropriate routine
-    (e.g., `_compile_eagle2_lm`) based on the target model.
     """
     torch_dtype = {
         "FP16": torch.float16,
         "BF16": torch.bfloat16,
     }.get(args.precision, torch.float32)
 
-    model_constants = MODEL_CONSTANTS[args.model]
+    lm_model = model.model if "qwen" in args.model.lower() else model.language_model
+
+    model_constants = MODEL_CONSTANTS.get(
+        args.model, {"EXAMPLE_SEQLEN": args.num_tokens}
+    )
     example_seq_len = model_constants["EXAMPLE_SEQLEN"]
 
     example_embeds = torch.randn(
-        1,
+        args.batch_size,
         example_seq_len,
-        model.language_model.config.hidden_size,
+        lm_model.config.hidden_size,
         dtype=torch_dtype,
         device=DEVICE,
     )
 
-    if args.model == "nvidia/Eagle2-2B":
-        return _compile_eagle2_lm(model.language_model, example_embeds, args)
-
-    msg = (
-        f"Unsupported model: '{args.model}'. Supported models are: ['nvidia/Eagle2-2B']"
-    )
-    raise ValueError(msg)
+    # All supported models use the same compilation helper.
+    if args.model in ["nvidia/Eagle2-2B", "Qwen/Qwen2.5-VL-3B-Instruct"]:
+        return _compile_lm(lm_model, example_embeds, args)
+    else:
+        msg = f"Unsupported model: '{args.model}'. Supported models are: ['nvidia/Eagle2-2B', 'Qwen/Qwen2.5-VL-3B-Instruct']"
+        raise ValueError(msg)
 
 
 def _compile_eagle2_vision(
@@ -337,6 +373,13 @@ def compile_vision_torchtrt(
     """
     if args.model == "nvidia/Eagle2-2B":
         return _compile_eagle2_vision(model.vision_model, example_pixel_values, args)
+    elif args.model == "Qwen/Qwen2.5-VL-3B-Instruct":
+        # TODO: Vision model compilation for Qwen2.5-VL is currently skipped.
+        # The model's `get_window_index` method uses dynamic Python list operations
+        # (e.g., .tolist(), .extend()) to process variable-sized image grids for
+        # windowed attention. These operations are incompatible with torch.export's
+        # static graph tracing, preventing successful compilation.
+        return model.visual
     else:
         raise ValueError(f"Unsupported model: {args.model}")
 
@@ -363,7 +406,12 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Run VLM inference (PyTorch & TensorRT back-ends)"
     )
-    parser.add_argument("--model", default="nvidia/Eagle2-2B", help="VLM model name")
+    parser.add_argument(
+        "--model",
+        default="Qwen/Qwen2.5-VL-3B-Instruct",
+        choices=["nvidia/Eagle2-2B", "Qwen/Qwen2.5-VL-3B-Instruct"],
+        help="VLM model name",
+    )
     parser.add_argument("--prompt", default="Describe this image.", help="Prompt text")
     parser.add_argument(
         "--precision",
@@ -418,25 +466,46 @@ if __name__ == "__main__":
     # -------------------------------------------------------------------------#
     pyt_gen_tokens = pyt_timings = pyt_stats = None
     if args.enable_pytorch_run:
-        pyt_gen_tokens = generate_mm(
-            model,
-            inputs["pixel_values"],
-            inputs["input_ids"],
-            max_output_len,
-            processor.tokenizer.eos_token_id,
-            emb_layer,
-        )
-        print_outputs("PyTorch", pyt_gen_tokens, processor.tokenizer)
-        if args.benchmark:
-            pyt_timings = time_generate_mm(
-                generate_mm,
+        if "qwen" in args.model.lower():
+            pyt_gen_tokens = generate_mm_qwen2_5_vl(
                 model,
-                inputs["pixel_values"].clone(),
-                inputs["input_ids"].clone(),
+                inputs["pixel_values"],
+                inputs["input_ids"],
+                inputs["image_grid_thw"],
                 max_output_len,
                 processor.tokenizer.eos_token_id,
                 emb_layer,
-                iterations=args.iterations,
+            )
+        else:  # eagle2
+            pyt_gen_tokens = generate_mm(
+                model,
+                inputs["pixel_values"],
+                inputs["input_ids"],
+                max_output_len,
+                processor.tokenizer.eos_token_id,
+                emb_layer,
+            )
+        print_outputs("PyTorch", pyt_gen_tokens, processor.tokenizer)
+        if args.benchmark:
+            # Prepare args for the timing function
+            time_generate_args = {
+                "model": model,
+                "pixel_values": inputs["pixel_values"].clone(),
+                "input_ids": inputs["input_ids"].clone(),
+                "max_output_seq_length": max_output_len,
+                "eos_token_id": processor.tokenizer.eos_token_id,
+                "emb_layer": emb_layer,
+            }
+
+            # Select the correct generation function and add model-specific args
+            if "qwen" in args.model.lower():
+                generate_fn_for_timing = generate_mm_qwen2_5_vl
+                time_generate_args["image_grid_thw"] = inputs["image_grid_thw"]
+            else:  # eagle2
+                generate_fn_for_timing = generate_mm
+
+            pyt_timings = time_generate_mm(
+                generate_fn_for_timing, iterations=args.iterations, **time_generate_args
             )
             pyt_stats = record_stats(
                 "PyTorch",
@@ -455,7 +524,10 @@ if __name__ == "__main__":
     # --- Add vision model compilation --- #
     example_pixel_values = inputs["pixel_values"]
     trt_vision = compile_vision_torchtrt(model, args, example_pixel_values)
-    trt_model.vision_model = trt_vision
+    if "qwen" in args.model.lower():
+        trt_model.visual = trt_vision
+    else:
+        trt_model.vision_model = trt_vision
 
     # -------------------------------------------------------------------------#
     # 4.2. Language model compilation
@@ -466,36 +538,63 @@ if __name__ == "__main__":
         import static_cache_v1  # noqa: F401
 
     trt_lm = compile_lm_torchtrt(model, args)
-    trt_model.language_model = trt_lm
+    if "qwen" in args.model.lower():
+        trt_model.model = trt_lm
+    else:
+        trt_model.language_model = trt_lm
 
     emb_layer = emb_layer.to(DEVICE)
+    if "qwen" in args.model.lower():
+        trt_model.lm_head = trt_model.lm_head.to(DEVICE)
 
     if args.cache == "static_v1":
-        trt_generate = generate_mm_with_static_cache
+        if "qwen" in args.model.lower():
+            trt_generate = generate_mm_qwen2_5_vl_with_static_cache
+        else:  # eagle2
+            trt_generate = generate_mm_with_static_cache
     else:
-        trt_generate = generate_mm
+        if "qwen" in args.model.lower():
+            trt_generate = generate_mm_qwen2_5_vl
+        else:  # eagle2
+            trt_generate = generate_mm
 
-    trt_gen_tokens = trt_generate(
-        trt_model,
-        inputs["pixel_values"],
-        inputs["input_ids"],
-        max_output_len,
-        processor.tokenizer.eos_token_id,
-        emb_layer,
-        DEVICE if args.cache == "static_v1" else None,  # device arg only for static_v1
-    )
+    # Prepare args for generate function
+    generate_args = {
+        "model": trt_model,
+        "pixel_values": inputs["pixel_values"],
+        "input_ids": inputs["input_ids"],
+        "max_output_seq_length": max_output_len,
+        "eos_token_id": processor.tokenizer.eos_token_id,
+        "emb_layer": emb_layer,
+    }
+    if "qwen" in args.model.lower():
+        generate_args["image_grid_thw"] = inputs["image_grid_thw"]
+    if args.cache == "static_v1":
+        generate_args["device"] = DEVICE
+
+    trt_gen_tokens = trt_generate(**generate_args)
 
     if args.benchmark:
+        # Prepare args for the timing function
+        time_generate_args = {
+            "model": trt_model,
+            "pixel_values": inputs["pixel_values"].clone(),
+            "input_ids": inputs["input_ids"].clone(),
+            "max_output_seq_length": max_output_len,
+            "eos_token_id": processor.tokenizer.eos_token_id,
+            "emb_layer": emb_layer,
+        }
+
+        # Add model-specific args
+        if "qwen" in args.model.lower():
+            time_generate_args["image_grid_thw"] = inputs["image_grid_thw"]
+        if args.cache == "static_v1":
+            time_generate_args["device"] = DEVICE
+
         trt_timings = time_generate_mm(
             trt_generate,
-            trt_model,
-            inputs["pixel_values"].clone(),
-            inputs["input_ids"].clone(),
-            max_output_len,
-            processor.tokenizer.eos_token_id,
-            emb_layer,
             iterations=args.iterations,
-            device=DEVICE if args.cache == "static_v1" else None,
+            **time_generate_args,
         )
         trt_stats = record_stats(
             "TensorRT",
