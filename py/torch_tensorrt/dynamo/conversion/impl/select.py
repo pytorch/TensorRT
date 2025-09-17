@@ -550,6 +550,9 @@ def index_put_converter(
     accumulate: bool = False,
 ) -> TRTTensor:
     # Convert 'input_indices' to TRT tensors (or keep None as is)
+    input_indices = expand_boolean_indices(
+        ctx, target, source_ir, name, input_tensor, input_indices
+    )
     indices: List[Optional[Union[TRTTensor, None]]] = []
     for i, idx in enumerate(input_indices):
         if idx is None:
@@ -828,20 +831,15 @@ def index_put_converter(
             ) + list(values.shape)
             broadcast_shape = []
             for exp_dim, val_dim in zip(expected_shape, values_shape_padded):
-                if val_dim == 1 or exp_dim == val_dim:
+                if val_dim == DYNAMIC_DIM or exp_dim == DYNAMIC_DIM:
+                    broadcast_shape.append(-1)
+                elif val_dim == 1 or exp_dim == val_dim:
                     broadcast_shape.append(exp_dim)
                 else:
                     raise ValueError(
                         f"Cannot broadcast {values.shape} to {expected_shape}"
                     )
-            # values_reshaped = impl.shuffle.reshape(
-            #     ctx,
-            #     target,
-            #     source_ir,
-            #     f"{name}_reshape_values",
-            #     values,
-            #     tuple(broadcast_shape),
-            # )
+
             values_expanded = impl.slice.expand(
                 ctx,
                 target,
