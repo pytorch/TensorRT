@@ -209,7 +209,7 @@ if is_tensorrt_version_supported("10.8.0"):
             quantized data tensor in fp4
         """
 
-        import modelopt.core.torch.quantization.qtensor.nvfp4_tensor as nvfp4_tensor
+        import modelopt.torch.quantization.qtensor.nvfp4_tensor as nvfp4_tensor
 
         if weights_tensor.dtype == torch.float16:
             original_dtype = trt.DataType.HALF
