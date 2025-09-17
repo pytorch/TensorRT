@@ -53,7 +53,6 @@ from utils import (
     generate_mm_qwen2_5_vl_with_static_cache,
     generate_mm_with_static_cache,
     record_stats,
-    time_generate_mm,
 )
 
 # --- WORKAROUND FOR EAGLE2 SDPA COMPILATION ---
@@ -513,54 +512,68 @@ if __name__ == "__main__":
     # -------------------------------------------------------------------------#
     pyt_gen_tokens = pyt_timings = pyt_stats = None
     if args.enable_pytorch_run:
-        if args.model == "Qwen/Qwen2.5-VL-3B-Instruct":
-            pyt_gen_tokens = generate_mm_qwen2_5_vl(
-                model,
-                inputs["pixel_values"],
-                inputs["input_ids"],
-                inputs["image_grid_thw"],
-                max_output_len,
-                processor.tokenizer.eos_token_id,
-                emb_layer,
-            )
-        else:  # eagle2
-            pyt_gen_tokens = generate_mm(
-                model,
-                inputs["pixel_values"],
-                inputs["input_ids"],
-                max_output_len,
-                processor.tokenizer.eos_token_id,
-                emb_layer,
-            )
-
+        # For benchmarking, we run the generation with timing enabled.
+        # For regular runs, we run without timing for a single output.
         if args.benchmark:
-            # Prepare args for the timing function
-            time_generate_args = {
-                "model": model,
-                "pixel_values": inputs["pixel_values"].clone(),
-                "input_ids": inputs["input_ids"].clone(),
-                "max_output_seq_length": max_output_len,
-                "eos_token_id": processor.tokenizer.eos_token_id,
-                "emb_layer": emb_layer,
-            }
-
-            # Select the correct generation function and add model-specific args
             if args.model == "Qwen/Qwen2.5-VL-3B-Instruct":
-                generate_fn_for_timing = generate_mm_qwen2_5_vl
-                time_generate_args["image_grid_thw"] = inputs["image_grid_thw"]
+                (
+                    pyt_gen_tokens,
+                    _,
+                    overall_time,
+                    _,
+                    _,
+                ) = generate_mm_qwen2_5_vl(
+                    model,
+                    inputs["pixel_values"],
+                    inputs["input_ids"],
+                    inputs["image_grid_thw"],
+                    processor.tokenizer.eos_token_id,
+                    emb_layer,
+                    max_new_tokens=args.num_tokens,
+                    with_timing=True,
+                )
             else:  # eagle2
-                generate_fn_for_timing = generate_mm
-
-            pyt_timings = time_generate_mm(
-                generate_fn_for_timing, iterations=args.iterations, **time_generate_args
-            )
+                (
+                    pyt_gen_tokens,
+                    _,
+                    overall_time,
+                    _,
+                    _,
+                ) = generate_mm(
+                    model,
+                    inputs["pixel_values"],
+                    inputs["input_ids"],
+                    processor.tokenizer.eos_token_id,
+                    emb_layer,
+                    max_new_tokens=args.num_tokens,
+                    with_timing=True,
+                )
             pyt_stats = record_stats(
                 "PyTorch",
-                pyt_timings,
+                [overall_time / 1000],  # time_generate returns seconds
                 args.precision,
                 batch_size=args.batch_size,
-                compile_time_s=None,
             )
+        else:
+            if args.model == "Qwen/Qwen2.5-VL-3B-Instruct":
+                pyt_gen_tokens = generate_mm_qwen2_5_vl(
+                    model,
+                    inputs["pixel_values"],
+                    inputs["input_ids"],
+                    inputs["image_grid_thw"],
+                    processor.tokenizer.eos_token_id,
+                    emb_layer,
+                    max_new_tokens=args.num_tokens,
+                )
+            else:  # eagle2
+                pyt_gen_tokens = generate_mm(
+                    model,
+                    inputs["pixel_values"],
+                    inputs["input_ids"],
+                    processor.tokenizer.eos_token_id,
+                    emb_layer,
+                    max_new_tokens=args.num_tokens,
+                )
 
     # -------------------------------------------------------------------------#
     # 4. Torch-TensorRT compile & run
@@ -614,46 +627,33 @@ if __name__ == "__main__":
         "model": trt_model,
         "pixel_values": inputs["pixel_values"],
         "input_ids": inputs["input_ids"],
-        "max_output_seq_length": max_output_len,
         "eos_token_id": processor.tokenizer.eos_token_id,
         "emb_layer": emb_layer,
+        "max_new_tokens": args.num_tokens,
     }
     if args.model == "Qwen/Qwen2.5-VL-3B-Instruct":
         generate_args["image_grid_thw"] = inputs["image_grid_thw"]
+
+    if args.cache == "static_v1" or args.benchmark:
+        generate_args["with_timing"] = True
+
     if args.cache == "static_v1":
         generate_args["device"] = device
 
-    trt_gen_tokens = trt_generate(**generate_args)
+    # Run TRT generation
+    trt_output = trt_generate(**generate_args)
 
-    if args.benchmark:
-        # Prepare args for the timing function
-        time_generate_args = {
-            "model": trt_model,
-            "pixel_values": inputs["pixel_values"].clone(),
-            "input_ids": inputs["input_ids"].clone(),
-            "max_output_seq_length": max_output_len,
-            "eos_token_id": processor.tokenizer.eos_token_id,
-            "emb_layer": emb_layer,
-        }
-
-        # Add model-specific args
-        if args.model == "Qwen/Qwen2.5-VL-3B-Instruct":
-            time_generate_args["image_grid_thw"] = inputs["image_grid_thw"]
-        if args.cache == "static_v1":
-            time_generate_args["device"] = device
-
-        trt_timings = time_generate_mm(
-            trt_generate,
-            iterations=args.iterations,
-            **time_generate_args,
-        )
+    # Unpack results
+    if args.benchmark or args.cache == "static_v1":
+        trt_gen_tokens, _, overall_time, _, _ = trt_output
         trt_stats = record_stats(
             "TensorRT",
-            trt_timings,
+            [overall_time / 1000],  # time is in ms, convert to s
             args.precision,
             batch_size=args.batch_size,
-            compile_time_s=None,
         )
+    else:
+        trt_gen_tokens = trt_output
 
     # -------------------------------------------------------------------------#
     # 5. Reporting
