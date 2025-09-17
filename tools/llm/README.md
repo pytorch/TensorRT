@@ -44,7 +44,7 @@ python run_llm.py --model meta-llama/Llama-3.2-1B-Instruct --prompt "What is par
 #### Vision Language Models: `run_vlm.py`
 
 ```bash
-python run_vlm.py --model Qwen/Qwen2.5-VL-3B-Instruct --precision FP16 --num_tokens 128 --cache static_v1 --enable_pytorch_run --benchmark
+python run_vlm.py --model nvidia/Eagle2-2B --precision FP16 --num_tokens 128 --cache static_v1 --enable_pytorch_run --benchmark
 ```
 
 #### Key Arguments
@@ -76,7 +76,7 @@ This codebase can be extended to
 ## Limitations
 - We do not currently support sliding window attention (used in Gemma3 and Qwen 3 models) yet.
 - **Flash Attention Limitation**: Some models (e.g., Eagle2-2B) internally use flash attention operations (`torch.ops.flash_attn._flash_attn_forward.default`) which require the `flash-attn` package to be installed. Without flash-attn, these models will fail to load or run properly.
-- **Eagle2 FP16 Precision Output Differences**: When compiling Eagle2 models with FP16 precision, minor token-level differences may occur between PyTorch and TensorRT outputs. While the overall context and meaning remain consistent, specific word choices or phrasing may vary slightly. This is expected behavior due to numerical precision differences in FP16 computation and does not affect the model's core functionality or accuracy.
+- **Qwen2.5‑VL vision is not compiled (LLM-only)**: We only compile the language model for Qwen2.5‑VL. The vision encoder is skipped because its `get_window_index` relies on dynamic Python operations.
 
 ## Requirements
 

@@ -277,13 +277,6 @@ def register_default_sdpa_pass(index: int = 0, model_config: Any = None) -> None
         return gm
 
 
-# Global registry for SDPA passes
-_SDPA_MAPPING: Dict[str, Callable] = {
-    "google/gemma-3-1b-it": register_gemma3_sdpa_pass,
-    "default": register_default_sdpa_pass,
-}
-
-
 def enable_sdpa_converter(model_name: str, model_config: Any) -> None:
     """
     Enables the custom SDPA converter for a given model.
@@ -314,3 +307,10 @@ def enable_sdpa_converter(model_name: str, model_config: Any) -> None:
             "Using default SDPA pass."
         )
         _SDPA_MAPPING["default"](model_config=model_config)
+
+
+# Global registry for SDPA passes
+_SDPA_MAPPING: Dict[str, Callable] = {
+    "google/gemma-3-1b-it": register_gemma3_sdpa_pass,
+    "default": register_default_sdpa_pass,
+}
