@@ -37,6 +37,7 @@ from PIL import Image
 from torchtrt_ext import register_sdpa
 from transformers import AutoConfig, AutoModel, AutoProcessor
 from utils import (
+    export_llm,
     generate_mm,
     generate_mm_qwen2_5_vl,
     generate_mm_qwen2_5_vl_with_static_cache,
@@ -74,7 +75,7 @@ MODEL_CONSTANTS = {
     },
     "Qwen/Qwen2.5-VL-3B-Instruct": {
         "EXAMPLE_SEQLEN": 2560,
-        "IMAGE_TOKENS": 391,
+        "IMAGE_TOKENS": 1426,
         "PROMPT_WRAPPER_TOKENS": 21,
     },
 }
@@ -153,7 +154,7 @@ def load_inputs(args: argparse.Namespace, processor, device: torch.device):
     """
     Loads and constructs the input dictionary for the specified VLM model.
     """
-    url = "https://huggingface.co/datasets/huggingface/documentation-images/resolve/main/transformers/tasks/car.jpg"
+    url = "https://www.ilankelman.org/stopsigns/australia.jpg"
     image = Image.open(requests.get(url, stream=True).raw)
 
     if args.benchmark:
@@ -197,6 +198,7 @@ def load_inputs(args: argparse.Namespace, processor, device: torch.device):
         padding=True,
         return_tensors="pt",
     ).to(device)
+
     return inputs
 
 
@@ -234,18 +236,8 @@ def _compile_lm(
     lm_wrap = _LMNoCache(language_model).to(DEVICE).eval()
     max_seq_len = input_embeds.shape[1] + args.num_tokens
 
-    # --- Model-specific dynamic shape definition ---
-    if "qwen" in args.model.lower():
-        _seq = torch.export.Dim("_seq", min=1, max=512)
-        seq_len = 8 * _seq
-        position_ids = (
-            torch.arange(input_embeds.shape[1], device=DEVICE, dtype=torch.long)
-            .unsqueeze(0)
-            .expand(input_embeds.size(0), input_embeds.size(1))
-        )
-    else:  # eagle2
-        seq_len = torch.export.Dim("seq", min=1, max=max_seq_len)
-        position_ids = torch.arange(input_embeds.shape[1]).unsqueeze(0).to(DEVICE)
+    seq_len = torch.export.Dim("seq", min=1, max=max_seq_len)
+    position_ids = torch.arange(input_embeds.shape[1]).unsqueeze(0).to(DEVICE)
 
     dyn_shapes = {"inputs_embeds": {1: seq_len}, "position_ids": {1: seq_len}}
 
@@ -260,13 +252,9 @@ def _compile_lm(
     else:  # FP32
         enabled_precisions = {torch.float32}
 
-    with torch.inference_mode():
-        exported_program = torch.export.export(
-            lm_wrap,
-            (input_embeds, position_ids),
-            dynamic_shapes=dyn_shapes,
-            strict=False,
-        )
+    exported_program = export_llm(
+        lm_wrap, input_embeds, min_seq_len=1, max_seq_len=2560
+    )
 
     with torch_tensorrt.logging.debug() if args.debug else nullcontext():
         trt_mod = torch_tensorrt.dynamo.compile(
