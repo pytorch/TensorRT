@@ -75,6 +75,7 @@ This codebase can be extended to
 
 ## Limitations
 - We do not currently support sliding window attention (used in Gemma3 and Qwen 3 models) yet.
+- **Flash Attention Limitation**: Some models (e.g., Eagle2-2B) internally use flash attention operations (`torch.ops.flash_attn._flash_attn_forward.default`) which require the `flash-attn` package to be installed. Without flash-attn, these models will fail to load or run properly.
 
 ## Requirements
 
@@ -82,4 +83,6 @@ This codebase can be extended to
 - Transformers v4.52.3
 - For VLM models (run_vlm.py):
   - `pip install qwen-vl-utils` (for Qwen2.5-VL-3B-Instruct model)
-  - `pip install flash-attn --no-build-isolation -v` (for Eagle2-2B model)
+  - **Flash Attention**: For models using flash attention operations (e.g., Eagle2-2B), install one of the following:
+    - **Fast installation (recommended)**: `pip install flash-attn==2.8.1` (pre-built wheel, should work)
+    - **Source build (slow)**: `pip install flash-attn --no-build-isolation -v` (fallback if pre-built wheels fail)

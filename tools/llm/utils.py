@@ -47,7 +47,45 @@ def export_llm(model, inputs, min_seq_len=1, max_seq_len=16):
     return ep
 
 
-def get_zeroed_static_cache_inputs(model: torch.fx.GraphModule, device: str = "cuda:0"):
+def export_llm_no_position_ids(model, inputs, min_seq_len=1, max_seq_len=16):
+    """
+    Exports the LLM model into an ExportedProgram with dynamic shapes.
+    In the case of guard failures due to some PyTorch kernel implements, we also
+    try to re-export the graph by expressing them as runtime assert nodes
+    """
+    with torch.no_grad():
+        # max=1024 has contraint violation error. https://github.com/pytorch/pytorch/issues/125604
+        seq_len = torch.export.Dim("seq_len", min=min_seq_len, max=max_seq_len)
+        try:
+            print("Trying to export the model using torch.export.export()..")
+            # strict=False only enables aotautograd tracing and excludes dynamo.
+            ep = torch.export.export(
+                model,
+                args=(inputs,),
+                dynamic_shapes=({1: seq_len},),
+                strict=False,
+            )
+        except:
+            print(
+                "Trying torch.export._trace._export to trace the graph since torch.export.export() failed"
+            )
+            # This API is used to express the constraint violation guards as asserts in the graph.
+            ep = torch.export._trace._export(
+                model,
+                args=(inputs,),
+                dynamic_shapes=({1: seq_len},),
+                strict=False,
+                allow_complex_guards_as_runtime_asserts=True,
+            )
+
+    return ep
+
+
+def get_zeroed_static_cache_inputs(
+    model: "torch.fx.GraphModule",
+    device: str = "cuda:0",
+    has_position_ids: bool = True,
+):
     """
     Extracts and returns zeroed static KV cache tensors from a torch.fx.GraphModule. This should only be used for static cache_v1 and static cache_v2.
 
@@ -56,15 +94,26 @@ def get_zeroed_static_cache_inputs(model: torch.fx.GraphModule, device: str = "c
 
     Args:
         model (torch.fx.GraphModule): The exported model graph containing KV cache placeholders
+        device (str): Device to create the zeroed tensors on.
+        has_position_ids (bool): Whether position_ids is present as an input. Default: True
 
     Returns:
         tuple: A tuple of zeroed tensors corresponding to the KV cache placeholders in the graph
     """
     # placeholder nodes are expected to be in the following order:
-    # input_ids, kv_cache_key, kv_cache_value, start_idx, end_idx
+    # input_ids, position_ids, kv_cache_key, kv_cache_value, ..., start_idx, end_idx
     placeholder_nodes = [node for node in model.graph.nodes if node.op == "placeholder"]
-    # The first two inputs are input_ids, position_ids. The last two inputs are start_idx, end_idx. In between are the KV cache tensors.
-    kv_cache_inputs = placeholder_nodes[2:-2]
+
+    # By default, assume input_ids and position_ids are present as the first two inputs.
+    # If has_position_ids is False, only input_ids is present.
+    if has_position_ids:
+        kv_start = 2
+    else:
+        kv_start = 1
+    # The last two inputs are start_idx, end_idx.
+    kv_end = -2
+
+    kv_cache_inputs = placeholder_nodes[kv_start:kv_end]
     zeroed_kv_cache_inputs = []
     for input in kv_cache_inputs:
         zeroed_kv_cache_inputs.append(
@@ -458,7 +507,9 @@ def generate_mm_with_static_cache(
         )
 
     # ───────────────────── KV-cache initialization ─────────────────────
-    kv_cache = get_zeroed_static_cache_inputs(model.language_model, device=device)
+    kv_cache = get_zeroed_static_cache_inputs(
+        model.language_model, device=device, has_position_ids=True
+    )
     start_idx = 0
     end_idx = seq_embeds.size(1)
     generated = 0
@@ -710,7 +761,9 @@ def generate_mm_qwen2_5_vl_with_static_cache(
             with_timing=False,
         )
 
-    kv_cache = get_zeroed_static_cache_inputs(model.model, device=device)
+    kv_cache = get_zeroed_static_cache_inputs(
+        model.model, device=device, has_position_ids=True
+    )
     start_idx = 0
     end_idx = seq_embeds.size(1)
     generated = 0
