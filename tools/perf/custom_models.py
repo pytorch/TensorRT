@@ -26,7 +26,7 @@ def BertInputs():
     return [tokens_tensor, segments_tensors]
 
 
-def StableDiffusionUnet():
+def StableDiffusion1_4_Unet():
     from diffusers import DiffusionPipeline
 
     pipe = DiffusionPipeline.from_pretrained(
@@ -35,7 +35,25 @@ def StableDiffusionUnet():
     return pipe.unet
 
 
-def UNet():
+def StableDiffusion2_1_Unet():
+    from diffusers import StableDiffusionPipeline
+
+    pipe = StableDiffusionPipeline.from_pretrained(
+        "stabilityai/stable-diffusion-2-1", torch_dtype=torch.float16
+    )
+    return pipe.unet
+
+
+def StableDiffusion2_1_VaeDecoder():
+    from diffusers import StableDiffusionPipeline
+
+    pipe = StableDiffusionPipeline.from_pretrained(
+        "stabilityai/stable-diffusion-2-1", torch_dtype=torch.float16
+    )
+    return pipe.vae.decoder
+
+
+def MonaiUNet():
     from monai.networks.nets import UNet
 
     model = UNet(
@@ -46,4 +64,13 @@ def UNet():
         strides=(2, 2),
         num_res_units=2,
     )
-    return model.eval().cuda()
+    return model
+
+
+def GoogleViTForImageClassification():
+    from transformers import ViTForImageClassification
+
+    model = ViTForImageClassification.from_pretrained(
+        "google/vit-base-patch16-224", torch_dtype=torch.float16
+    )
+    return model
