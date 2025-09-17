@@ -1,11 +1,26 @@
 """
 .. _run_vlm:
 
-Running VLM inference with Torch-TensorRT
+Benchmarking VLM Inference with Torch-TensorRT
 ==========================================================
 
-This script mirrors the style and structure of *run_llm.py*, illustrating a
-Torch-TensorRT (dynamo backend) workflow for Visual-Language Models (VLMs).
+This script provides a framework for benchmarking the performance of Visual-Language
+Models (VLMs). It optimizes the two most computationally intensive components of a
+VLM—the language model and the vision model (image feature extraction)—using
+the Torch-TensorRT dynamo backend.
+
+Key Features:
+- **Component-wise Optimization**: Compiles both the language and vision models
+  separately with Torch-TensorRT to accelerate inference.
+- **Performance Benchmarking**: Runs the model for multiple iterations to
+  measure and compare inference latency against the PyTorch baseline.
+- **Output Verification**: Checks for token-level consistency between the optimized
+  TensorRT model and the original PyTorch model to ensure correctness.
+- **KV Cache Testing**: Includes options to test inference with and without
+  KV caching to evaluate its impact on performance.
+
+This tool mirrors the style and structure of `run_llm.py`, providing a clear
+workflow for VLM optimization and analysis.
 """
 
 import argparse
@@ -20,7 +35,7 @@ import torch
 import torch_tensorrt
 from PIL import Image
 from torchtrt_ext import register_sdpa
-from transformers import AutoModel, AutoProcessor
+from transformers import AutoConfig, AutoModel, AutoProcessor
 from utils import (
     generate_mm,
     generate_mm_with_static_cache,
@@ -33,11 +48,30 @@ from utils import (
 # -----------------------------------------------------------------------------#
 DEVICE = torch.device("cuda:0")
 
-# Register SDPA as a standalone operator.  Converter & lowering pass are defined
-sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
-import transformers.models.qwen2.modeling_qwen2 as mq  # noqa: E402
+# --- WORKAROUND FOR EAGLE2 SDPA COMPILATION ---
+# Eagle2's language model (Qwen2) implicitly defaults to "flash_attention_2"
+# due to settings in its remote code and config.json. This prevents direct
+# compilation with SDPA. To work around this without modifying the library,
+
+# we "monkey-patch" the global attention function map for Qwen2.
+# This ensures that any part of the code (including torch.export) requesting
+# "flash_attention_2" will receive the "sdpa" implementation instead.
+# This patch is global for the script's execution context.
+import transformers.models.qwen2.modeling_qwen2 as mq
 
 mq.ALL_ATTENTION_FUNCTIONS["flash_attention_2"] = mq.ALL_ATTENTION_FUNCTIONS["sdpa"]
+# --- END WORKAROUND ---
+
+# --- Model-specific constants for benchmark and compilation ---
+# Centralizing these values improves readability and maintainability.
+MODEL_CONSTANTS = {
+    "nvidia/Eagle2-2B": {
+        "EXAMPLE_SEQLEN": 2560,  # A fixed sequence length for creating the example tensor for TRT compilation.
+        "IMAGE_TOKENS": 1792,  # Number of special tokens used to represent the image patch embeddings in the input sequence for Eagle2-2B VLM.
+        "PROMPT_WRAPPER_TOKENS": 26,  # The number of special/processing tokens added by the processor's chat template in benchmark mode.
+    }
+}
+# --- END Model-specific constants ---
 
 # -----------------------------------------------------------------------------#
 # Model loading helpers
@@ -46,7 +80,7 @@ mq.ALL_ATTENTION_FUNCTIONS["flash_attention_2"] = mq.ALL_ATTENTION_FUNCTIONS["sd
 
 def _load_eagle2(device: torch.device, torch_dtype: torch.dtype):
     """
-    Load Eagle2 model and processor.
+    Load nvidia/Eagle2-2B model and processor, ensuring the language model uses SDPA.
 
     Returns
     -------
@@ -57,7 +91,10 @@ def _load_eagle2(device: torch.device, torch_dtype: torch.dtype):
     with torch.no_grad():
         model = (
             AutoModel.from_pretrained(
-                model_id, trust_remote_code=True, torch_dtype=torch_dtype
+                model_id,
+                trust_remote_code=True,
+                torch_dtype=torch_dtype,
+                # attn_implementation="sdpa" is ignored due to the model's remote code.
             )
             .eval()
             .to(device)
@@ -73,13 +110,68 @@ def _load_eagle2(device: torch.device, torch_dtype: torch.dtype):
     return model, processor, emb_layer
 
 
-def _load_model(
+def load_model(
     model_name: str, device: torch.device, torch_dtype: torch.dtype
 ) -> Tuple[torch.nn.Module, AutoProcessor, torch.nn.Embedding]:
     """Dispatch helper for supported VLMs."""
-    if model_name.lower() == "eagle2":
+    if model_name == "nvidia/Eagle2-2B":
         return _load_eagle2(device, torch_dtype)
-    msg = f"Unsupported model: {model_name}"
+    msg = (
+        f"Unsupported model: '{model_name}'. Supported models are: ['nvidia/Eagle2-2B']"
+    )
+    raise ValueError(msg)
+
+
+# -----------------------------------------------------------------------------#
+# Input loading helpers
+# -----------------------------------------------------------------------------#
+
+
+def _load_inputs_eagle2(args: argparse.Namespace, processor, device: torch.device):
+    """
+    Loads the input dictionary for the Eagle2 model.
+    """
+    url = "https://cdn.pixabay.com/photo/2019/08/08/23/33/car-4393990_1280.jpg"
+    image = Image.open(requests.get(url, stream=True).raw)
+
+    if args.benchmark:
+        model_constants = MODEL_CONSTANTS[args.model]
+        image_tokens = model_constants["IMAGE_TOKENS"]
+        wrapper_tokens = model_constants["PROMPT_WRAPPER_TOKENS"]
+
+        prompt_len = args.isl - image_tokens - wrapper_tokens
+        prompt_txt = " ".join(["token"] * max(prompt_len, 0))
+    else:
+        prompt_txt = args.prompt
+
+    messages = [
+        {
+            "role": "user",
+            "content": [
+                {"type": "image", "image": image},
+                {"type": "text", "text": prompt_txt},
+            ],
+        }
+    ]
+
+    txt = [
+        processor.apply_chat_template(
+            messages, tokenize=False, add_generation_prompt=True
+        )
+    ]
+    img_in, vid_in = processor.process_vision_info(messages)
+    inputs = processor(
+        text=txt, images=img_in, videos=vid_in, return_tensors="pt", padding=True
+    ).to(device)
+    return inputs
+
+
+def load_inputs(args: argparse.Namespace, processor, device: torch.device):
+    """Dispatch helper for input loading for supported VLMs."""
+    if args.model == "nvidia/Eagle2-2B":
+        return _load_inputs_eagle2(args, processor, device)
+
+    msg = f"Unsupported model for input loading: '{args.model}'. Supported models are: ['nvidia/Eagle2-2B']"
     raise ValueError(msg)
 
 
@@ -116,9 +208,9 @@ def _compile_eagle2_lm(
     lm_wrap = _LMNoCache(language_model).to(DEVICE).eval()
     max_seq_len = input_embeds.shape[1] + args.num_tokens
 
-    S = torch.export.Dim("seq", min=1, max=max_seq_len)
+    seq_len = torch.export.Dim("seq", min=1, max=max_seq_len)
     position_ids = torch.arange(input_embeds.shape[1]).unsqueeze(0).to(DEVICE)
-    dyn_shapes = {"inputs_embeds": {1: S}, "position_ids": {1: S}}
+    dyn_shapes = {"inputs_embeds": {1: seq_len}, "position_ids": {1: seq_len}}
 
     # Precision-specific flags --------------------------------------------------#
     use_fp32_acc = False
@@ -133,7 +225,7 @@ def _compile_eagle2_lm(
         enabled_precisions = {torch.float32}
 
     with torch.inference_mode():
-        exported = torch.export.export(
+        exported_program = torch.export.export(
             lm_wrap,
             (input_embeds, position_ids),
             dynamic_shapes=dyn_shapes,
@@ -142,7 +234,7 @@ def _compile_eagle2_lm(
 
     with torch_tensorrt.logging.debug() if args.debug else nullcontext():
         trt_mod = torch_tensorrt.dynamo.compile(
-            exported,
+            exported_program,
             inputs=[input_embeds, position_ids],
             enabled_precisions=enabled_precisions,
             use_explicit_typing=use_explicit_typing,
@@ -157,31 +249,37 @@ def _compile_eagle2_lm(
     return trt_mod
 
 
-def compile_torchtrt(
+def compile_lm_torchtrt(
     model: torch.nn.Module, args: argparse.Namespace
 ) -> torch.nn.Module:
     """
-    Front-end dispatcher mirroring *run_llm.py*’s `compile_torchtrt`.
+    Compiles the Language Model (LLM) component of the VLM using Torch-TensorRT.
 
-    Depending on the target VLM, delegates to the appropriate compile routine.
+    This function acts as a dispatcher, delegating to the appropriate routine
+    (e.g., `_compile_eagle2_lm`) based on the target model.
     """
     torch_dtype = {
         "FP16": torch.float16,
         "BF16": torch.bfloat16,
     }.get(args.precision, torch.float32)
 
+    model_constants = MODEL_CONSTANTS[args.model]
+    example_seq_len = model_constants["EXAMPLE_SEQLEN"]
+
     example_embeds = torch.randn(
         1,
-        2560,
+        example_seq_len,
         model.language_model.config.hidden_size,
         dtype=torch_dtype,
         device=DEVICE,
     )
 
-    if args.model.lower() == "eagle2":
+    if args.model == "nvidia/Eagle2-2B":
         return _compile_eagle2_lm(model.language_model, example_embeds, args)
 
-    msg = f"Unsupported model for compilation: {args.model}"
+    msg = (
+        f"Unsupported model: '{args.model}'. Supported models are: ['nvidia/Eagle2-2B']"
+    )
     raise ValueError(msg)
 
 
@@ -206,7 +304,7 @@ def _compile_eagle2_vision(
         enabled_precisions = {torch.float32}
 
     with torch.inference_mode():
-        exported = torch.export.export(
+        exported_program = torch.export.export(
             vision_model,
             (example_pixel_values,),
             strict=False,
@@ -214,7 +312,7 @@ def _compile_eagle2_vision(
 
     with torch_tensorrt.logging.debug() if args.debug else nullcontext():
         trt_mod = torch_tensorrt.dynamo.compile(
-            exported,
+            exported_program,
             inputs=[example_pixel_values],
             enabled_precisions=enabled_precisions,
             use_explicit_typing=use_explicit_typing,
@@ -237,7 +335,7 @@ def compile_vision_torchtrt(
     """
     Dispatcher function for vision model compilation.
     """
-    if args.model.lower() == "eagle2":
+    if args.model == "nvidia/Eagle2-2B":
         return _compile_eagle2_vision(model.vision_model, example_pixel_values, args)
     else:
         raise ValueError(f"Unsupported model: {args.model}")
@@ -265,7 +363,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Run VLM inference (PyTorch & TensorRT back-ends)"
     )
-    parser.add_argument("--model", default="eagle2", help="VLM model name")
+    parser.add_argument("--model", default="nvidia/Eagle2-2B", help="VLM model name")
     parser.add_argument("--prompt", default="Describe this image.", help="Prompt text")
     parser.add_argument(
         "--precision",
@@ -306,39 +404,12 @@ if __name__ == "__main__":
         "BF16": torch.bfloat16,
     }.get(args.precision, torch.float32)
 
-    model, processor, emb_layer = _load_model(args.model, DEVICE, dtype)
+    model, processor, emb_layer = load_model(args.model, DEVICE, dtype)
 
     # -------------------------------------------------------------------------#
     # 2. Input construction (image + text prompt)
     # -------------------------------------------------------------------------#
-    url = "https://cdn.pixabay.com/photo/2019/08/08/23/33/car-4393990_1280.jpg"
-    image = Image.open(requests.get(url, stream=True).raw)
-
-    if args.benchmark:
-        prompt_len = args.isl - 1792 - 26
-        prompt_txt = " ".join(["token"] * max(prompt_len, 0))
-    else:
-        prompt_txt = args.prompt
-
-    messages = [
-        {
-            "role": "user",
-            "content": [
-                {"type": "image", "image": image},
-                {"type": "text", "text": prompt_txt},
-            ],
-        }
-    ]
-
-    txt = [
-        processor.apply_chat_template(
-            messages, tokenize=False, add_generation_prompt=True
-        )
-    ]
-    img_in, vid_in = processor.process_vision_info(messages)
-    inputs = processor(
-        text=txt, images=img_in, videos=vid_in, return_tensors="pt", padding=True
-    ).to(DEVICE)
+    inputs = load_inputs(args, processor, DEVICE)
 
     max_output_len = inputs["input_ids"].shape[1] + args.num_tokens
 
@@ -394,7 +465,7 @@ if __name__ == "__main__":
     if args.cache == "static_v1":
         import static_cache_v1  # noqa: F401
 
-    trt_lm = compile_torchtrt(model, args)
+    trt_lm = compile_lm_torchtrt(model, args)
     trt_model.language_model = trt_lm
 
     emb_layer = emb_layer.to(DEVICE)
