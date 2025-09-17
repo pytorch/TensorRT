@@ -123,6 +123,10 @@ if "--release" in sys.argv:
     RELEASE = True
     sys.argv.remove("--release")
 
+if "--dlfw" in sys.argv:
+    IS_DLFW_CI = True
+    sys.argv.remove("--dlfw")
+
 if (no_ts_env_var := os.environ.get("NO_TORCHSCRIPT")) is not None:
     if no_ts_env_var == "1":
         NO_TS = True
