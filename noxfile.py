@@ -473,8 +473,7 @@ def run_l1_dynamo_tests(session):
     if not USE_HOST_DEPS:
         install_deps(session)
         install_torch_trt(session)
-    # SKIP hub.py download model failure on CI
-    # run_dynamo_model_tests(session)
+    run_dynamo_model_tests(session)
     run_dynamo_partitioning_tests(session)
     run_dynamo_runtime_tests(session)
     cleanup(session)
