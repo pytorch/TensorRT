@@ -3,6 +3,7 @@
 expecttest==0.1.6
 networkx==2.8.8
 numpy
+setuptools
 parameterized>=0.2.0
 pytest>=8.2.1
 pytest-xdist>=3.6.1
