@@ -15,7 +15,7 @@ model_configs=(
     "bert_base_uncased|128|(128, 128)@int32;(128, 128)@int32|fp16"
     "sd2.1_unet|32|(32, 4, 64, 64)@fp16;(32)@fp16;(32, 1, 1024)@fp16|fp16"
     "sd2.1_vae_decoder|32|(32, 4, 64, 64)@fp16|fp16"
-    "google-vit-base-patch16-224|32|(32, 3, 224, 224)@fp16|fp16"
+    "google_vit|32|(32, 3, 224, 224)@fp16|fp16"
 )
 
 for model_config in "${model_configs[@]}"
@@ -63,7 +63,7 @@ done
 model_graph_break_configs=(
     "sd2.1_unet|32"
     "sd2.1_vae_decoder|32"
-    "google-vit-base-patch16-224|32"
+    "google_vit|32"
 )
 
 for model_config in "${model_graph_break_configs[@]}"

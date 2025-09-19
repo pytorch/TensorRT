@@ -3,6 +3,7 @@ import os
 import timeit
 from typing import Any, Callable
 
+import custom_models as cm
 import pandas as pd
 import tensorrt as trt
 import torch
@@ -48,12 +49,7 @@ def multi_backend_test(
 
     # Create model
     if model_name == "sd2.1_unet":
-        from diffusers import StableDiffusionPipeline
-
-        pipe = StableDiffusionPipeline.from_pretrained(
-            "./models/stable-diffusion-2-1", torch_dtype=torch.float16
-        )
-        model = pipe.unet.cuda()
+        model = cm.StableDiffusion2_1_Unet().cuda()
         latent_sample = torch.randn((batch_size, 4, 64, 64), dtype=torch.float16).cuda()
         timestep = torch.randint(0, 1000, (batch_size,), dtype=torch.float16).cuda()
         encoder_hidden_states = torch.randn(
@@ -61,20 +57,11 @@ def multi_backend_test(
         ).cuda()
         inputs = (latent_sample, timestep, encoder_hidden_states)
     elif model_name == "sd2.1_vae_decoder":
-        from diffusers import StableDiffusionPipeline
-
-        pipe = StableDiffusionPipeline.from_pretrained(
-            "./models/stable-diffusion-2-1", torch_dtype=torch.float16
-        )
-        model = pipe.vae.decoder.cuda()
+        model = cm.StableDiffusion2_1_VaeDecoder().cuda()
         latent_sample = torch.randn((batch_size, 4, 64, 64), dtype=torch.float16).cuda()
         inputs = (latent_sample,)
-    elif model_name == "google-vit-base-patch16-224":
-        from transformers import ViTForImageClassification
-
-        model = ViTForImageClassification.from_pretrained(
-            "./models/google-vit-base-patch16-224", torch_dtype=torch.float16
-        ).cuda()
+    elif model_name == "google_vit":
+        model = cm.GoogleViTForImageClassification().cuda()
         inputs = (torch.randn((batch_size, 3, 224, 224), dtype=torch.float16).cuda(),)
     else:
         raise ValueError(f"Unknown model name: {model_name}")
