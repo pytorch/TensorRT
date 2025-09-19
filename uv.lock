@@ -42,7 +42,7 @@ version = "1.7.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "huggingface-hub", marker = "sys_platform == 'linux' or sys_platform == 'windows'" },
-    { name = "numpy", version = "1.26.4", source = { registry = "https://download.pytorch.org/whl/nightly/cu129" }, marker = "(python_full_version < '3.10' and sys_platform == 'linux') or (python_full_version < '3.10' and sys_platform == 'windows') or ('tegra' in platform_release and sys_platform == 'linux') or ('tegra' in platform_release and sys_platform == 'windows')" },
+    { name = "numpy", version = "1.26.4", source = { registry = "https://download.pytorch.org/whl/nightly/cu130" }, marker = "(python_full_version < '3.10' and sys_platform == 'linux') or (python_full_version < '3.10' and sys_platform == 'windows') or ('tegra' in platform_release and sys_platform == 'linux') or ('tegra' in platform_release and sys_platform == 'windows')" },
     { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version >= '3.10' and 'tegra' not in platform_release and sys_platform == 'linux') or (python_full_version >= '3.10' and 'tegra' not in platform_release and sys_platform == 'windows')" },
     { name = "packaging", marker = "sys_platform == 'linux' or sys_platform == 'windows'" },
     { name = "psutil", marker = "sys_platform == 'linux' or sys_platform == 'windows'" },

@@ -83,7 +83,7 @@ http_archive(
     name = "libtorch_win",
     build_file = "@//third_party/libtorch:BUILD",
     strip_prefix = "libtorch",
-    urls = ["https://download.pytorch.org/libtorch/nightly/cu129/libtorch-win-shared-with-deps-latest.zip"],
+    urls = ["https://download.pytorch.org/libtorch/nightly/cu130/libtorch-win-shared-with-deps-latest.zip"],
 )
 
 http_archive(

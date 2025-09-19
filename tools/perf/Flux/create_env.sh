@@ -14,10 +14,10 @@ apt install bazel
 bazel
 cd /home/TensorRT
 
-python -m pip install --pre -e . --extra-index-url https://download.pytorch.org/whl/nightly/cu128
-pip install tensorrt==10.9.0.34 --force-reinstall
+python -m pip install --pre -e . --extra-index-url https://download.pytorch.org/whl/nightly/cu130
+pip install tensorrt==10.13.2.6 --force-reinstall
 
-pip3 install --pre  torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cu128
+pip3 install --pre  torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cu130
 
 
 pip install sentencepiece=="0.2.0" transformers=="4.48.2" accelerate=="1.3.0" diffusers=="0.32.2" protobuf=="5.29.3"
