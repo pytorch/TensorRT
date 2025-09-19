@@ -241,6 +241,7 @@ jobs:
         env:
           ENV_SCRIPT: ${{ inputs.env-script }}
         run: |
+          set -x
           source "${BUILD_ENV_FILE}"
           if [[ -z "${ENV_SCRIPT}" ]]; then
             ${CONDA_RUN} python setup.py clean

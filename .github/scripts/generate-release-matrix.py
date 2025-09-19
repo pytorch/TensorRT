@@ -5,8 +5,8 @@ import json
 import sys
 
 RELEASE_CUDA_VERSION = {
-    "wheel": ["cu129"],
-    "tarball": ["cu129"],
+    "wheel": ["cu130"],
+    "tarball": ["cu130"],
 }
 RELEASE_PYTHON_VERSION = {
     "wheel": ["3.10", "3.11", "3.12", "3.13"],
@@ -15,7 +15,7 @@ RELEASE_PYTHON_VERSION = {
 sbsa_container_image: str = "quay.io/pypa/manylinux_2_34_aarch64"
 
 CXX11_TARBALL_CONTAINER_IMAGE = {
-    "cu129": "pytorch/libtorch-cxx11-builder:cuda12.9-main",
+    "cu130": "pytorch/libtorch-cxx11-builder:cuda13.0-main",
 }
 
 
