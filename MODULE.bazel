@@ -108,6 +108,15 @@ http_archive(
 )
 
 http_archive(
+    name = "tensorrt_rtx",
+    build_file = "@//third_party/tensorrt_rtx/archive:BUILD",
+    strip_prefix = "TensorRT-RTX-1.0.0.21",
+    urls = [
+        "https://developer.nvidia.com/downloads/trt/rtx_sdk/secure/1.0/TensorRT-RTX-1.0.0.21.Linux.x86_64-gnu.cuda-12.9.tar.gz",
+    ],
+)
+
+http_archive(
     name = "tensorrt_sbsa",
     build_file = "@//third_party/tensorrt/archive:BUILD",
     strip_prefix = "TensorRT-10.13.2.6",
@@ -134,6 +143,14 @@ http_archive(
     ],
 )
 
+http_archive(
+    name = "tensorrt_rtx_win",
+    build_file = "@//third_party/tensorrt_rtx/archive:BUILD",
+    strip_prefix = "TensorRT-RTX-1.0.0.21",
+    urls = [
+        "https://developer.nvidia.com/downloads/trt/rtx_sdk/secure/1.0/TensorRT-RTX-1.0.0.21.Windows.win10.cuda-12.9.zip",
+    ],
+)
 ####################################################################################
 # Locally installed dependencies (use in cases of custom dependencies or aarch64)
 ####################################################################################

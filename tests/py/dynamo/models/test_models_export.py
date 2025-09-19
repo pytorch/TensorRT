@@ -12,8 +12,10 @@ from torch_tensorrt.dynamo.utils import COSINE_THRESHOLD, cosine_similarity
 from packaging.version import Version
 
 if importlib.util.find_spec("torchvision"):
-    import timm
     import torchvision.models as models
+
+if importlib.util.find_spec("timm"):
+    import timm
 
 assertions = unittest.TestCase()
 
@@ -283,7 +285,7 @@ def test_base_fp4_static_shapes(ir):
     import modelopt.torch.quantization as mtq
     from modelopt.torch.quantization.utils import export_torch_mode
 
-    dtype = torch.bfloat16
+    dtype = torch.float16
 
     class SimpleNetwork(torch.nn.Module):
         def __init__(self):
@@ -391,6 +393,9 @@ def test_base_int8(ir, dtype):
     import modelopt.torch.quantization as mtq
     from modelopt.torch.quantization.utils import export_torch_mode
 
+    if torchtrt.ENABLED_FEATURES.tensorrt_rtx and dtype == torch.bfloat16:
+        pytest.skip("TensorRT-RTX does not support bfloat16")
+
     class SimpleNetwork(torch.nn.Module):
         def __init__(self):
             super(SimpleNetwork, self).__init__()
@@ -410,6 +415,9 @@ def test_base_int8(ir, dtype):
     input_tensor = torch.randn(1, 10).cuda().to(dtype)
     model = SimpleNetwork().eval().cuda().to(dtype)
     quant_cfg = mtq.INT8_DEFAULT_CFG
+    # RTX does not support INT8 default quantization(weights+activations), only support INT8 weights only quantization
+    if torchtrt.ENABLED_FEATURES.tensorrt_rtx:
+        quant_cfg["quant_cfg"]["*input_quantizer"] = {"enable": False}
     mtq.quantize(model, quant_cfg, forward_loop=calibrate_loop)
     # model has INT8 qdq nodes at this point
     output_pyt = model(input_tensor)
@@ -444,6 +452,9 @@ def test_base_int8_dynamic_shape(ir, dtype):
     import modelopt.torch.quantization as mtq
     from modelopt.torch.quantization.utils import export_torch_mode
 
+    if torchtrt.ENABLED_FEATURES.tensorrt_rtx and dtype == torch.bfloat16:
+        pytest.skip("TensorRT-RTX does not support bfloat16")
+
     class SimpleNetwork(torch.nn.Module):
         def __init__(self):
             super(SimpleNetwork, self).__init__()
@@ -463,6 +474,9 @@ def test_base_int8_dynamic_shape(ir, dtype):
     model = SimpleNetwork().eval().cuda().to(dtype)
 
     quant_cfg = mtq.INT8_DEFAULT_CFG
+    # RTX does not support INT8 default quantization(weights+activations), only support INT8 weights only quantization
+    if torchtrt.tensorrt_package_name == "tensorrt_rtx":
+        quant_cfg["quant_cfg"]["*input_quantizer"] = {"enable": False}
     mtq.quantize(model, quant_cfg, forward_loop=calibrate_loop)
 
     # model has INT8 qdq nodes at this point

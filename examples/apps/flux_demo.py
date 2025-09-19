@@ -34,7 +34,7 @@ def compile_model(
         enabled_precisions = {torch.float4_e2m1fn_x2}
         ptq_config = mtq.NVFP4_DEFAULT_CFG
         if args.fp4_mha:
-            from modelopt.core.torch.quantization.config import NVFP4_FP8_MHA_CONFIG
+            from modelopt.torch.quantization.config import NVFP4_FP8_MHA_CONFIG
 
             ptq_config = NVFP4_FP8_MHA_CONFIG
 
@@ -52,8 +52,13 @@ def compile_model(
 
     print(f"\nUsing {args.dtype}")
 
-    pipe = FluxPipeline.from_pretrained(
+    if args.model not in [
         "black-forest-labs/FLUX.1-dev",
+        "black-forest-labs/FLUX.1-Kontext-dev",
+    ]:
+        raise ValueError(f"Model {args.model} is not supported")
+    pipe = FluxPipeline.from_pretrained(
+        args.model,
         torch_dtype=torch.float16,
     ).to(torch.float16)
 
@@ -116,7 +121,7 @@ def compile_model(
 
     settings = {
         "strict": False,
-        "allow_complex_guards_as_runtime_asserts": True,
+        "prefer_deferred_runtime_asserts_over_guards": True,
         "enabled_precisions": enabled_precisions,
         "truncate_double": True,
         "min_block_size": 1,
@@ -261,6 +266,11 @@ def main(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Run Flux quantization with different dtypes"
+    )
+    parser.add_argument(
+        "--model",
+        default="black-forest-labs/FLUX.1-dev",
+        help="Model to use",
     )
     parser.add_argument(
         "--use_sdpa",

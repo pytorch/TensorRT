@@ -197,6 +197,10 @@ class Test64BitSupport(TestCase):
     ),
     "Platform does not have BF16 support",
 )
+@unittest.skipIf(
+    torch_tensorrt.ENABLED_FEATURES.tensorrt_rtx,
+    "bf16 is not supported for tensorrt_rtx",
+)
 class TestBF16Support(TestCase):
     @unittest.skipIf(
         not torch_tensorrt.ENABLED_FEATURES.torch_tensorrt_runtime,

@@ -13,6 +13,7 @@ on:
       - v[0-9]+.[0-9]+.[0-9]+-rc[0-9]+
   workflow_dispatch:
 
+
 jobs:
   generate-matrix:
     uses: pytorch/test-infra/.github/workflows/generate_binary_build_matrix.yml@main
@@ -60,8 +61,8 @@ jobs:
             post-script: packaging/post_build_script.sh
             smoke-test-script: packaging/smoke_test_script.sh
             package-name: torch_tensorrt
-    name: Build torch-tensorrt whl package
-    uses: pytorch/test-infra/.github/workflows/build_wheels_linux.yml@main
+    name: Build torch-tensorrt whl package for Linux x86_64
+    uses: ./.github/workflows/build_linux.yml
     with:
       repository: ${{ matrix.repository }}
       ref: ""
@@ -74,6 +75,8 @@ jobs:
       package-name: ${{ matrix.package-name }}
       smoke-test-script: ${{ matrix.smoke-test-script }}
       trigger-event: ${{ github.event_name }}
+      architecture: "x86_64"
+      use-rtx: false
 
   tests-py-torchscript-fe:
     name: Test torchscript frontend [Python]
@@ -338,5 +341,5 @@ jobs:
         popd
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref_name }}-${{ inputs.repository }}-${{ github.event_name == 'workflow_dispatch' }}-${{ inputs.job-name }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref_name }}-tensorrt-${{ inputs.repository }}-${{ github.event_name == 'workflow_dispatch' }}-${{ inputs.job-name }}
   cancel-in-progress: true

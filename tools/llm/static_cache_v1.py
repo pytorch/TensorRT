@@ -39,12 +39,12 @@ def add_kv_as_outputs(gm, kv_cache_for_graph: List[Tuple[torch.Tensor, torch.Ten
     # Get the current output args (typically a tuple)
     current_outputs = output_node.args[0]
 
-    # If the current output is a tuple, extend it with our new outputs
-    if isinstance(current_outputs, tuple):
-        new_outputs = current_outputs + tuple(kv_cache_for_graph)
-    else:
-        # If there's only one output or it's not a tuple, create a new tuple
-        new_outputs = (current_outputs,) + tuple(kv_cache_for_graph)
+    # Ensure the original output is always treated as a tuple to avoid ambiguity
+    if not isinstance(current_outputs, tuple):
+        current_outputs = (current_outputs,)
+
+    # Extend the tuple with our new outputs
+    new_outputs = current_outputs + tuple(kv_cache_for_graph)
 
     gm.graph.output(new_outputs)
     gm.graph.erase_node(output_node)
@@ -98,7 +98,7 @@ def add_kv_cache_inputs(gm, fixed_kv: bool = True):
     start_idx_input = _add_graph_input(gm, "start_idx", torch.tensor(0))
     end_idx_input = _add_graph_input(gm, "end_idx", torch.tensor(1))
 
-    # Get the max sequence length from the first key_cache node. The order of nodes is: input_ids, is_causal, key_cache1, value_cache1, key_cache2, value_cache2, ..
+    # Get the max sequence length from the first key_cache node. The order of nodes is: input_ids, position_ids, key_cache1, value_cache1, ...
     input_nodes = [node for node in gm.graph.nodes if node.op == "placeholder"]
     input_ids_meta = input_nodes[0].meta["val"]
     seq_len = input_ids_meta.shape[1]
@@ -201,7 +201,7 @@ def insert_kv_slicing_before_sdpa(
                     args=(slice_7, 3),
                     kwargs={},
                 )
-                # =============================================== #
+
                 # Concatenate the sliced tensors to build KV cache
                 cat = gm.graph.create_node(
                     "call_function",

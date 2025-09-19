@@ -8,6 +8,7 @@ from typing import Any, Dict, List
 
 # currently we don't support python 3.13t due to tensorrt does not support 3.13t
 disabled_python_versions: List[str] = ["3.13t", "3.14", "3.14t"]
+disabled_cuda_versions: List[str] = ["cu130"]
 
 # jetpack 6.2 only officially supports python 3.10 and cu126
 jetpack_python_versions: List[str] = ["3.10"]
@@ -36,7 +37,9 @@ def filter_matrix_item(
     if item["python_version"] in disabled_python_versions:
         # Skipping disabled Python version
         return False
-
+    if item["desired_cuda"] in disabled_cuda_versions:
+        # Skipping disabled CUDA version
+        return False
     if is_jetpack:
         if limit_pr_builds:
             # pr build,matrix passed from test-infra is cu128, python 3.9, change to cu126, python 3.10

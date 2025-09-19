@@ -8,7 +8,7 @@
 
 namespace nvinfer1 {
 
-#if NV_TENSORRT_MAJOR < 8
+#if !defined(TRT_MAJOR_RTX) && (NV_TENSORRT_MAJOR < 8)
 
 #define TRT_ENGINE_CAPABILITY_STANDARD nvinfer1::EngineCapability::kDEFAULT
 #define TRT_ENGINE_CAPABILITY_SAFETY nvinfer1::EngineCapability::kSAFE_GPU

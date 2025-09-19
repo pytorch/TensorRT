@@ -3,11 +3,11 @@ from __future__ import annotations
 import collections.abc
 import logging
 import platform
+import warnings
 from enum import Enum
 from typing import Any, Callable, List, Optional, Sequence, Set, Union
 
 import torch
-import torch.fx
 from torch_tensorrt._enums import dtype
 from torch_tensorrt._features import ENABLED_FEATURES, needs_cross_compile
 from torch_tensorrt._Input import Input
@@ -15,10 +15,17 @@ from torch_tensorrt.dynamo import _defaults
 from torch_tensorrt.dynamo.runtime._CudaGraphsTorchTensorRTModule import (
     CudaGraphsTorchTensorRTModule,
 )
-from torch_tensorrt.fx import InputTensorSpec
-from torch_tensorrt.fx.lower import compile as fx_compile
-from torch_tensorrt.fx.utils import LowerPrecision
 from typing_extensions import TypeGuard
+
+if ENABLED_FEATURES.fx_frontend:
+    import torch.fx
+    from torch_tensorrt.fx import InputTensorSpec
+    from torch_tensorrt.fx.lower import compile as fx_compile
+    from torch_tensorrt.fx.utils import LowerPrecision
+
+    InputType = Union[Input, torch.Tensor, InputTensorSpec]
+else:
+    InputType = Union[Input, torch.Tensor]
 
 if ENABLED_FEATURES.torchscript_frontend:
     import torch_tensorrt.ts
@@ -57,15 +64,9 @@ __all__ = [
 
 
 def _non_fx_input_interface(
-    inputs: Sequence[Input | torch.Tensor | InputTensorSpec],
+    inputs: Sequence[Input | torch.Tensor],
 ) -> TypeGuard[List[Input | torch.Tensor]]:
     return all(isinstance(i, (torch.Tensor, Input)) for i in inputs)
-
-
-def _fx_input_interface(
-    inputs: Sequence[Input | torch.Tensor | InputTensorSpec],
-) -> TypeGuard[List[InputTensorSpec | torch.Tensor]]:
-    return all(isinstance(i, (torch.Tensor, InputTensorSpec)) for i in inputs)
 
 
 class _IRType(Enum):
@@ -121,6 +122,11 @@ def _get_target_fe(module_type: _ModuleType, ir: str) -> _IRType:
                 "Requested using the TS frontend but the TS frontend is not available in this build of Torch-TensorRT"
             )
     elif module_is_fxable and ir_targets_fx:
+        warnings.warn(
+            "FX frontend is deprecated. Please use the Dynamo frontend instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         if ENABLED_FEATURES.fx_frontend:
             return _IRType.fx
         else:
@@ -167,7 +173,7 @@ def _get_target_fe(module_type: _ModuleType, ir: str) -> _IRType:
 def compile(
     module: Any,
     ir: str = "default",
-    inputs: Optional[Sequence[Input | torch.Tensor | InputTensorSpec]] = None,
+    inputs: Optional[Sequence[InputType]] = None,
     arg_inputs: Optional[Sequence[Sequence[Any]]] = None,
     kwarg_inputs: Optional[dict[Any, Any]] = None,
     enabled_precisions: Optional[Set[Union[torch.dtype, dtype]]] = None,
@@ -237,6 +243,16 @@ def compile(
         )
         return compiled_ts_module
     elif target_ir == _IRType.fx:
+        warnings.warn(
+            "FX frontend is deprecated. Please use the Dynamo frontend instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        if not ENABLED_FEATURES.fx_frontend:
+            raise RuntimeError(
+                "FX frontend is not enabled, cannot compile with target_ir=fx"
+            )
+
         if (
             torch.float16 in enabled_precisions_set
             or torch_tensorrt.dtype.half in enabled_precisions_set
@@ -249,6 +265,11 @@ def compile(
             lower_precision = LowerPrecision.FP32
         else:
             raise ValueError(f"Precision {enabled_precisions_set} not supported on FX")
+
+        def _fx_input_interface(
+            inputs: Sequence[Input | torch.Tensor | InputTensorSpec],
+        ) -> TypeGuard[List[InputTensorSpec | torch.Tensor]]:
+            return all(isinstance(i, (torch.Tensor, InputTensorSpec)) for i in inputs)
 
         assert _fx_input_interface(input_list)
         compiled_fx_module: torch.nn.Module = fx_compile(
@@ -420,7 +441,7 @@ def torch_compile(module: torch.nn.Module, **kwargs: Any) -> Any:
 def convert_method_to_trt_engine(
     module: Any,
     method_name: str = "forward",
-    inputs: Optional[Sequence[Input | torch.Tensor | InputTensorSpec]] = None,
+    inputs: Optional[Sequence[Input | torch.Tensor]] = None,
     arg_inputs: Optional[Sequence[Sequence[Any]]] = None,
     kwarg_inputs: Optional[dict[Any, Any]] = None,
     ir: str = "default",
@@ -667,7 +688,7 @@ def save(
                     inductor_configs = kwargs["inductor_configs"]
 
                 torch._inductor.aoti_compile_and_package(
-                    exp_program,
+                    module,
                     inductor_configs=inductor_configs,
                     package_path=file_path,
                 )

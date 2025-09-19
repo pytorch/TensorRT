@@ -11,11 +11,11 @@ from functools import wraps
 
 import numpy as np
 import pandas as pd
-import tensorrt as trt
 
 # Importing supported Backends
 import torch
 import torch_tensorrt as torchtrt
+from torch_tensorrt.dynamo import convert_exported_program_to_serialized_trt_engine
 from utils import (
     BENCHMARK_MODELS,
     export_llm,
@@ -30,6 +30,15 @@ from utils import (
 
 WARMUP_ITER = 10
 results = []
+SUPPORTED_BACKENDS = [
+    "all",
+    "torch",
+    "ts_trt",
+    "dynamo",
+    "torch_compile",
+    "inductor",
+    "onnx_trt",
+]
 
 
 def run_with_try_except(func):
@@ -88,8 +97,8 @@ def record_llm_perf(
     # We only support single input (B x seq_len) for LLMs now
     input_seq = input_tensors[0]
     with torch.no_grad():
-        # Warm up for 3 iterations
-        _ = time_generate(model, input_seq, output_seq_length, iterations=iterations)
+        # Warm up
+        _ = time_generate(model, input_seq, output_seq_length, iterations=WARMUP_ITER)
 
         torch.cuda.synchronize()
 
@@ -142,7 +151,7 @@ def record_perf(
 def run_torch(model, input_tensors, params, precision, batch_size):
     print("Running Torch for precision: ", precision, " batch_size : ", batch_size)
     iters = params.get("iterations", 20)
-    model = model.to("cuda:0")
+
     if params["is_text_llm"]:
         output_seq_length = params["output_sequence_length"]
         return record_llm_perf(
@@ -174,7 +183,6 @@ def run_ts_trt(model, input_tensors, params, precision, batch_size):
     compile_settings = {
         "inputs": input_tensors,
         "enabled_precisions": {precision_to_dtype(precision)},
-        "truncate_double": params.get("truncate", False),
     }
 
     if precision == "int8":
@@ -208,24 +216,39 @@ def run_hf_dynamo(model, input_tensors, params, precision, batch_size):
     """
     Compile the huggingface model using Torch-TensorRT dynamo frontend and record performance stats
     """
-
     osl = params["output_sequence_length"]
     iters = params.get("iterations", 20)
-    # Move the model and inputs to cpu and trace it.
-    model = model.to("cpu")
-    inputs_cpu = [tensor.clone().cpu() for tensor in input_tensors]
-    exp_program = export_llm(model, inputs_cpu, min_seq_len=1, max_seq_len=osl)
-    start_compile = timeit.default_timer()
 
+    compilation_options = {
+        "enabled_precisions": {precision_to_dtype(precision)},
+        "min_block_size": params.get("min_block_size", 1),
+        "truncate_double": params.get("truncate", False),
+        "immutable_weights": params.get("immutable_weights", True),
+        "strip_engine_weights": params.get("strip_engine_weights", False),
+        "refit_identical_engine_weights": params.get(
+            "refit_identical_engine_weights", False
+        ),
+        "cache_built_engines": params.get("cache_built_engines", False),
+        "reuse_cached_engines": params.get("reuse_cached_engines", False),
+        "use_python_runtime": params.get("use_python_runtime", False),
+        "optimization_level": params.get("optimization_level", 3),
+    }
+    start_compile = timeit.default_timer()
+    exp_program = export_llm(model, input_tensors, min_seq_len=1, max_seq_len=osl)
     trt_model = torchtrt.dynamo.compile(
-        exp_program,
-        inputs=input_tensors,
-        enabled_precisions={precision_to_dtype(precision)},
-        truncate_double=params.get("truncate", False),
-        use_python_runtime=params.get("use_python_runtime", False),
+        exp_program, inputs=input_tensors, **compilation_options
     )
     end_compile = timeit.default_timer()
     compile_time_s = end_compile - start_compile
+
+    if params.get("save_dynamo_trt_engine", False):
+        serialized_engine = convert_exported_program_to_serialized_trt_engine(
+            exp_program,
+            arg_inputs=input_tensors,
+            **compilation_options,
+        )
+        with open(f"{params['model_torch']}-dynamo-trt-engine.trt", "wb") as f:
+            f.write(serialized_engine)
 
     if params.get("enable_cuda_graph", False):
         with torchtrt.runtime.enable_cudagraphs(trt_model) as cudagraphs_module:
@@ -266,27 +289,37 @@ def run_dynamo(model, input_tensors, params, precision, batch_size):
     if params["is_text_llm"]:
         return run_hf_dynamo(model, input_tensors, params, precision, batch_size)
 
-    start_compile = timeit.default_timer()
-    model = torchtrt.compile(
-        model,
-        inputs=input_tensors,
-        ir="dynamo",
-        enabled_precisions={precision_to_dtype(precision)},
-        min_block_size=params.get("min_block_size", 1),
-        truncate_double=params.get("truncate", False),
-        immutable_weights=params.get("immutable_weights", True),
-        strip_engine_weights=params.get("strip_engine_weights", False),
-        refit_identical_engine_weights=params.get(
+    compilation_options = {
+        "enabled_precisions": {precision_to_dtype(precision)},
+        "min_block_size": params.get("min_block_size", 1),
+        "truncate_double": params.get("truncate", False),
+        "immutable_weights": params.get("immutable_weights", True),
+        "strip_engine_weights": params.get("strip_engine_weights", False),
+        "refit_identical_engine_weights": params.get(
             "refit_identical_engine_weights", False
         ),
-        cache_built_engines=params.get("cache_built_engines", False),
-        reuse_cached_engines=params.get("reuse_cached_engines", False),
-        use_python_runtime=params.get("use_python_runtime", False),
-        optimization_level=params.get("optimization_level", 3),
+        "cache_built_engines": params.get("cache_built_engines", False),
+        "reuse_cached_engines": params.get("reuse_cached_engines", False),
+        "use_python_runtime": params.get("use_python_runtime", False),
+        "optimization_level": params.get("optimization_level", 3),
+    }
+    start_compile = timeit.default_timer()
+    exp_program = torch.export.export(model, input_tensors)
+    model = torchtrt.dynamo.compile(
+        exp_program, inputs=input_tensors, **compilation_options
     )
     end_compile = timeit.default_timer()
     compile_time_s = end_compile - start_compile
     iters = params.get("iterations", 20)
+
+    if params.get("save_dynamo_trt_engine", False):
+        serialized_engine = convert_exported_program_to_serialized_trt_engine(
+            exp_program,
+            arg_inputs=input_tensors,
+            **compilation_options,
+        )
+        with open(f"{params['model_torch']}-dynamo-trt-engine.trt", "wb") as f:
+            f.write(serialized_engine)
 
     if params.get("enable_cuda_graph", False):
         with torchtrt.runtime.enable_cudagraphs(model) as cudagraphs_module:
@@ -310,8 +343,6 @@ def run_torch_compile(model, input_tensors, params, precision, batch_size):
     """
     Compile the given model using Torch-TensorRT torch.compile frontend and record performance stats
     """
-    # Move the model to GPU
-    model = model.to("cuda:0")
     torch._dynamo.reset()
 
     print(
@@ -362,6 +393,8 @@ def run_hf_inductor(model, input_tensors, params, precision, batch_size):
     """
     Compile the huggingface model using torch inductor and record performance stats
     """
+    torch._dynamo.reset()
+
     osl = params["output_sequence_length"]
     # Mark dynamic shapes for input sequence
     input_seq = input_tensors[0]
@@ -396,7 +429,7 @@ def run_inductor(model, input_tensors, params, precision, batch_size):
     Compile the given model using torch inductor and record performance stats
     """
     torch._dynamo.reset()
-    model = model.to("cuda:0")
+
     print(
         "Running Torch [inductor] for precision: ",
         precision,
@@ -429,13 +462,15 @@ def run_inductor(model, input_tensors, params, precision, batch_size):
 
 
 @run_with_try_except
-def run_tensorrt(
+def run_onnx_trt(
     model,
     input_tensors,
     params,
     precision,
     batch_size=1,
 ):
+    import tensorrt as trt
+
     logger = trt.Logger(trt.Logger.WARNING)
     compile_time_s = 0
     if params["is_trt_engine"]:
@@ -444,8 +479,17 @@ def run_tensorrt(
         if params["onnx"]:
             onnx_path = params["onnx"]
         else:
-            onnx_path = "./onnx-trt.onnx"
-            torch.onnx.export(model, tuple(input_tensors), onnx_path, dynamo=True)
+            onnx_path = f"{params['model_torch']}-onnx-trt.onnx"
+            len_output = len(model(*input_tensors))
+            # to match the output names with Torch-TRT engine's
+            torch.onnx.export(
+                model,
+                tuple(input_tensors),
+                onnx_path,
+                dynamo=True,
+                output_names=[f"output{i}" for i in range(len_output)],
+            )
+        start_compile = timeit.default_timer()
         builder = trt.Builder(logger)
         network = builder.create_network(
             1 << int(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH)
@@ -459,18 +503,24 @@ def run_tensorrt(
         if precision == "fp16":
             config.set_flag(trt.BuilderFlag.FP16)
         config.builder_optimization_level = params.get("optimization_level", 3)
-        start_compile = timeit.default_timer()
         serialized_engine = builder.build_serialized_network(network, config)
         end_compile = timeit.default_timer()
         compile_time_s = end_compile - start_compile
+
     # Deserialize the TensorRT engine
     with trt.Runtime(logger) as runtime:
         engine = runtime.deserialize_cuda_engine(serialized_engine)
 
-    print("Running TensorRT for precision: ", precision, " batch_size : ", batch_size)
+    # save the generated TRT engine
+    if params.get("save_onnx_trt_engine", False):
+        with open(f"{params['model_torch']}-onnx-trt-engine.trt", "wb") as f:
+            f.write(serialized_engine)
+
+    print(
+        "Running ONNX-TensorRT for precision: ", precision, " batch_size : ", batch_size
+    )
     iters = params.get("iterations", 20)
 
-    start_time = timeit.default_timer()
     # Get I/O tensor information using TensorRT 10 API
     input_names = []
     output_names = []
@@ -510,8 +560,6 @@ def run_tensorrt(
         dedicated_stream = torch.cuda.Stream()
         current_stream = torch.cuda.current_stream()
 
-        setup_time = timeit.default_timer()
-
         # Warm up
         for i in range(WARMUP_ITER):
             # Wait for current stream to finish
@@ -521,23 +569,19 @@ def run_tensorrt(
             current_stream.wait_stream(dedicated_stream)
             torch.cuda.synchronize()
 
-        infer_start_time = timeit.default_timer()
         # Performance measurement
         for i in range(iters):
+            infer_start_time = timeit.default_timer()
             # Wait for current stream to finish
             dedicated_stream.wait_stream(current_stream)
             context.execute_async_v3(dedicated_stream.cuda_stream)
             # Wait for TensorRT stream to finish
             current_stream.wait_stream(dedicated_stream)
             torch.cuda.synchronize()
+            infer_end_time = timeit.default_timer()
+            timings.append(infer_end_time - infer_start_time)
 
-        end_time = timeit.default_timer()
-
-    # to compare against torch-trt dynamo apples to apples
-    infer_time = (end_time - infer_start_time + setup_time - start_time) / iters
-    timings.append(infer_time)
-
-    recordStats("TensorRT", timings, precision, batch_size, compile_time_s)
+    recordStats("ONNX-TensorRT", timings, precision, batch_size, compile_time_s)
 
 
 # Deploys inference run for different backend configurations
@@ -589,7 +633,7 @@ def run(
                 precision,
                 batch_size,
             )
-            run_tensorrt(
+            run_onnx_trt(
                 model_torch,
                 input_tensors,
                 params,
@@ -609,8 +653,8 @@ def run(
                 precision,
                 batch_size,
             )
-        elif backend == "tensorrt":
-            run_tensorrt(
+        elif backend == "onnx_trt":
+            run_onnx_trt(
                 model_torch,
                 input_tensors,
                 params,
@@ -635,7 +679,7 @@ if __name__ == "__main__":
     arg_parser.add_argument(
         "--backends",
         type=str,
-        help="Comma separated string of backends. Eg: torch, ts_trt, dynamo, torch_compile, inductor, tensorrt",
+        help="Comma separated string of backends. Eg: torch, ts_trt, dynamo, torch_compile, inductor, onnx_trt",
     )
     arg_parser.add_argument(
         "--model", type=str, default="", help="Name of torchscript model file"
@@ -742,6 +786,16 @@ if __name__ == "__main__":
         action="store_true",
         help="Whether to load the compiled TRT engines from storage.",
     )
+    arg_parser.add_argument(
+        "--save_onnx_trt_engine",
+        action="store_true",
+        help="Whether to save the ONNX-TRT backend generated TRT engine.",
+    )
+    arg_parser.add_argument(
+        "--save_dynamo_trt_engine",
+        action="store_true",
+        help="Whether to save the Torch-TRT Dynamo backend generated TRT engine.",
+    )
     args = arg_parser.parse_args()
 
     # Create random input tensor of certain size
@@ -778,12 +832,17 @@ if __name__ == "__main__":
         )
 
     backends = parse_backends(params["backends"])
-    if any(
-        backend in ["dynamo", "torch_compile", "tensorrt"] for backend in backends
-    ) and (model_torch is None):
-        raise ValueError(
-            "No Pytorch model (nn.Module) is provided for torchdynamo compilation. Please provide a pytorch model using --model_torch argument"
-        )
+    for backend in backends:
+        if backend not in SUPPORTED_BACKENDS:
+            raise ValueError(
+                f"Backend {backend} is not supported. Please provide a valid backend."
+            )
+        if backend in ["dynamo", "torch_compile", "onnx_trt", "all"] and (
+            model_torch is None
+        ):
+            raise ValueError(
+                "No Pytorch model (nn.Module) is provided for torchdynamo compilation. Please provide a pytorch model using --model_torch argument"
+            )
 
     batch_size = params["batch_size"]
     is_trt_engine = params["is_trt_engine"]

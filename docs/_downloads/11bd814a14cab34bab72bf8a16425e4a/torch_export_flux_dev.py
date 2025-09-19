@@ -92,7 +92,7 @@ ep = _export(
     kwargs=dummy_inputs,
     dynamic_shapes=dynamic_shapes,
     strict=False,
-    allow_complex_guards_as_runtime_asserts=True,
+    prefer_deferred_runtime_asserts_over_guards=True,
 )
 
 # %%

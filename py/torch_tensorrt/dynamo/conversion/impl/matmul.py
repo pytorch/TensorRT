@@ -48,17 +48,30 @@ def matrix_multiply(
     input, other = broadcast(
         ctx, input, other, f"{name}_input", f"{name}_other", preset_diff
     )
-    if ctx.net.get_flag(trt.NetworkDefinitionCreationFlag.STRONGLY_TYPED):
-        promoted_type = _enums.dtype._from(
-            torch.promote_types(
-                _enums.dtype._from(input.dtype).to(torch.dtype),
-                _enums.dtype._from(other.dtype).to(torch.dtype),
-            )
-        )
-        trt_promoted_type = promoted_type.to(trt.DataType)
-        input = cast_trt_tensor(ctx, input, trt_promoted_type, f"{name}_input_casted")
-        other = cast_trt_tensor(ctx, other, trt_promoted_type, f"{name}_other_casted")
+    # Get the original input dtype
+    input_dtype = _enums.dtype._from(input.dtype).to(torch.dtype)
 
-    layer = ctx.net.add_matrix_multiply(input, input_matrix_op, other, other_matrix_op)
-    set_layer_name(layer, target, name, source_ir)
-    return layer.get_output(0)
+    if (
+        ctx.net.get_flag(trt.NetworkDefinitionCreationFlag.STRONGLY_TYPED)
+        and ctx.compilation_settings.use_fp32_acc
+        and input_dtype == torch.float16
+    ):
+        input = cast_trt_tensor(ctx, input, torch.float32, f"{name}_input_casted")
+        other = cast_trt_tensor(ctx, other, torch.float32, f"{name}_other_casted")
+
+    matmul_layer = ctx.net.add_matrix_multiply(
+        input, input_matrix_op, other, other_matrix_op
+    )
+    matmul_output = matmul_layer.get_output(0)
+
+    if (
+        ctx.net.get_flag(trt.NetworkDefinitionCreationFlag.STRONGLY_TYPED)
+        and ctx.compilation_settings.use_fp32_acc
+        and input_dtype == torch.float16
+    ):
+        matmul_output = cast_trt_tensor(
+            ctx, matmul_output, input_dtype, f"{name}_output_casted"
+        )
+
+    set_layer_name(matmul_layer, target, name, source_ir)
+    return matmul_output

@@ -278,9 +278,8 @@ auto select_registrations TORCHTRT_UNUSED =
                auto embeddingTensor = args[0].ITensorOrFreeze(ctx);
                auto indicesTensor = args[1].ITensorOrFreeze(ctx);
                // Set datatype for indices tensor to INT32
-               auto identity = ctx->net->addIdentity(*indicesTensor);
-               identity->setOutputType(0, nvinfer1::DataType::kINT32);
-               indicesTensor = identity->getOutput(0);
+               auto cast = ctx->net->addCast(*indicesTensor, nvinfer1::DataType::kINT32);
+               indicesTensor = cast->getOutput(0);
 
                // IGatherLayer takes in input tensor, the indices, and the axis of input tensor to take indices from
                auto gather_layer = ctx->net->addGather(*embeddingTensor, *indicesTensor, 0);
@@ -337,9 +336,8 @@ auto select_registrations TORCHTRT_UNUSED =
                      adv_idx_indices.push_back(i);
                      auto cont = t.toCustomClass<TensorContainer>();
                      // Set datatype for indices tensor to INT32
-                     auto identity = ctx->net->addIdentity(*cont->tensor());
-                     identity->setOutputType(0, nvinfer1::DataType::kINT32);
-                     tensors.push_back(identity->getOutput(0));
+                     auto cast = ctx->net->addCast(*cont->tensor(), nvinfer1::DataType::kINT32);
+                     tensors.push_back(cast->getOutput(0));
                    }
                  }
                }
@@ -351,9 +349,8 @@ auto select_registrations TORCHTRT_UNUSED =
                } else if (tensors.size() == 1) {
                  auto indicesTensor = tensors[0];
                  // Set datatype for indices tensor to INT32
-                 auto identity = ctx->net->addIdentity(*indicesTensor);
-                 identity->setOutputType(0, nvinfer1::DataType::kINT32);
-                 indicesTensor = identity->getOutput(0);
+                 auto cast = ctx->net->addCast(*indicesTensor, nvinfer1::DataType::kINT32);
+                 indicesTensor = cast->getOutput(0);
 
                  // IGatherLayer takes in input tensor, the indices, and the axis of input tensor to take indices
                  // from

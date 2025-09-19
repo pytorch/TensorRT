@@ -6,7 +6,7 @@ import torch
 import torch_tensorrt as torchtrt
 from parameterized import parameterized
 from torch.testing._internal.common_utils import TestCase, run_tests
-from torch_tensorrt.dynamo.utils import prepare_inputs
+from torch_tensorrt.dynamo.utils import is_tegra_platform, prepare_inputs
 
 INPUT_SIZE = (64, 100)
 
@@ -31,6 +31,10 @@ class SampleModel(torch.nn.Module):
         return out
 
 
+@unittest.skipIf(
+    is_tegra_platform(),
+    "Skipped on Tegra platforms",
+)
 class TestWeightStreamingPython(TestCase):
     @parameterized.expand(
         [
@@ -290,6 +294,9 @@ class TestWeightStreamingPython(TestCase):
             ("python_runtime", True),
             ("cpp_runtime", False),
         ]
+    )
+    @unittest.skipIf(
+        torchtrt.ENABLED_FEATURES.tensorrt_rtx, "TensorRT-RTX has bug on cudagraphs"
     )
     def test_runtime_state_change(self, _, use_python_runtime):
         class SampleModel(torch.nn.Module):

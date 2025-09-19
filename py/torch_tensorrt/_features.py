@@ -4,6 +4,7 @@ import sys
 from collections import namedtuple
 from typing import Any, Callable, Dict, List, Optional, Type, TypeVar
 
+import tensorrt
 from torch_tensorrt._utils import (
     check_cross_compile_trt_win_lib,
     sanitized_torch_version,
@@ -21,6 +22,7 @@ FeatureSet = namedtuple(
         "refit",
         "qdp_plugin",
         "windows_cross_compile",
+        "tensorrt_rtx",
     ],
 )
 
@@ -39,10 +41,11 @@ linked_file_runtime = os.path.join(
 linked_file_full_path = os.path.join(trtorch_dir, linked_file)
 linked_file_runtime_full_path = os.path.join(trtorch_dir, linked_file_runtime)
 
+_TENSORRT_RTX = tensorrt._package_name == "tensorrt_rtx"
 _TS_FE_AVAIL = os.path.isfile(linked_file_full_path)
 _TORCHTRT_RT_AVAIL = _TS_FE_AVAIL or os.path.isfile(linked_file_runtime_full_path)
 _DYNAMO_FE_AVAIL = version.parse(sanitized_torch_version()) >= version.parse("2.1.dev")
-_FX_FE_AVAIL = True
+_FX_FE_AVAIL = False if _TENSORRT_RTX else True
 _REFIT_AVAIL = True
 _WINDOWS_CROSS_COMPILE = check_cross_compile_trt_win_lib()
 
@@ -59,6 +62,7 @@ ENABLED_FEATURES = FeatureSet(
     _REFIT_AVAIL,
     _QDP_PLUGIN_AVAIL,
     _WINDOWS_CROSS_COMPILE,
+    _TENSORRT_RTX,
 )
 
 T = TypeVar("T")
@@ -66,8 +70,30 @@ T = TypeVar("T")
 
 def _enabled_features_str() -> str:
     enabled = lambda x: "ENABLED" if x else "DISABLED"
-    out_str: str = f"Enabled Features:\n - Dynamo Frontend: {enabled(_DYNAMO_FE_AVAIL)}\n - Torch-TensorRT Runtime: {enabled(_TORCHTRT_RT_AVAIL)}\n - FX Frontend: {enabled(_FX_FE_AVAIL)}\n - TorchScript Frontend: {enabled(_TS_FE_AVAIL)}\n - Refit: {enabled(_REFIT_AVAIL)}\n - QDP Plugin: {enabled(_QDP_PLUGIN_AVAIL)}\n"  # type: ignore[no-untyped-call]
+    out_str: str = f"Enabled Features:\n - Dynamo Frontend: {enabled(_DYNAMO_FE_AVAIL)}\n - Torch-TensorRT Runtime: {enabled(_TORCHTRT_RT_AVAIL)}\n - FX Frontend: {enabled(_FX_FE_AVAIL)}\n - TorchScript Frontend: {enabled(_TS_FE_AVAIL)}\n - Refit: {enabled(_REFIT_AVAIL)}\n - QDP Plugin: {enabled(_QDP_PLUGIN_AVAIL)} \n - TensorRT-RTX: {enabled(_TENSORRT_RTX)}\n"  # type: ignore[no-untyped-call]
     return out_str
+
+
+def needs_tensorrt_rtx(f: Callable[..., Any]) -> Callable[..., Any]:
+    def wrapper(*args: List[Any], **kwargs: Dict[str, Any]) -> Any:
+        if ENABLED_FEATURES.tensorrt_rtx:
+            return f(*args, **kwargs)
+        else:
+            raise NotImplementedError("TensorRT-RTX is not available")
+
+    return wrapper
+
+
+def needs_not_tensorrt_rtx(f: Callable[..., Any]) -> Callable[..., Any]:
+    def wrapper(*args: List[Any], **kwargs: Dict[str, Any]) -> Any:
+        if not ENABLED_FEATURES.tensorrt_rtx:
+            return f(*args, **kwargs)
+        else:
+            raise NotImplementedError(
+                "This is only available in non TensorRT-RTX environments, currently running in TensorRT-RTX"
+            )
+
+    return wrapper
 
 
 def needs_torch_tensorrt_runtime(f: Callable[..., Any]) -> Callable[..., Any]:

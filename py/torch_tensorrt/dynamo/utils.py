@@ -17,6 +17,7 @@ from torch_tensorrt._Device import Device
 from torch_tensorrt._enums import dtype
 from torch_tensorrt._features import ENABLED_FEATURES
 from torch_tensorrt._Input import Input
+from torch_tensorrt._utils import is_tensorrt_version_supported
 from torch_tensorrt.dynamo import _defaults
 from torch_tensorrt.dynamo._defaults import default_device
 from torch_tensorrt.dynamo._engine_cache import BaseEngineCache
@@ -76,7 +77,7 @@ DataTypeEquivalence: Dict[
     },
 }
 
-if trt.__version__ >= "7.0":
+if is_tensorrt_version_supported("7.0"):
     DataTypeEquivalence[trt.bool] = {
         Frameworks.NUMPY: np.bool_,
         Frameworks.TORCH: torch.bool,
@@ -849,5 +850,11 @@ def get_output_dtypes(output: Any, truncate_doulbe: bool = False) -> List[dtype]
 
 def is_tegra_platform() -> bool:
     if torch.cuda.get_device_capability() in [(8, 7), (7, 2)]:
+        return True
+    return False
+
+
+def is_thor() -> bool:
+    if torch.cuda.get_device_capability() in [(11, 0)]:
         return True
     return False

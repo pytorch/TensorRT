@@ -26,10 +26,16 @@ from torch_tensorrt.dynamo.lowering import (
     post_lowering,
     pre_export_lowering,
 )
+from torch_tensorrt.dynamo.lowering.passes import remove_num_users_is_0_nodes
 from torch_tensorrt.dynamo.runtime import PythonTorchTensorRTModule
 from torch_tensorrt.dynamo.utils import ATOL, RTOL, get_model_device, get_torch_inputs
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
+
+# this is the post lowering pass list for the converter test
+post_lowering_pass_list_for_converter_test = [
+    remove_num_users_is_0_nodes,
+]
 
 
 # this method is only used in our converter test to infer the module output dtypes via dummy inference
@@ -435,6 +441,8 @@ class DispatchTestCase(TRTTestCase):
             settings=compilation_settings,
         )
 
+        for pass_func in post_lowering_pass_list_for_converter_test:
+            mod = pass_func(mod, compilation_settings)
         num_inputs = len(inputs)
         trt_inputs = inputs
         dtype_to_change = []
@@ -525,6 +533,9 @@ class DispatchTestCase(TRTTestCase):
             settings=compilation_settings,
         )
 
+        for pass_func in post_lowering_pass_list_for_converter_test:
+            mod = pass_func(mod, compilation_settings)
+
         interp = TRTInterpreter(
             mod,
             Input.from_tensors(inputs),
@@ -570,6 +581,8 @@ class DispatchTestCase(TRTTestCase):
             settings=compilation_settings,
             torch_export_dynamic_shapes=torch_export_dynamic_shapes,
         )
+        for pass_func in post_lowering_pass_list_for_converter_test:
+            mod = pass_func(mod, compilation_settings)
 
         if check_dtype:
             if use_dynamo_tracer:

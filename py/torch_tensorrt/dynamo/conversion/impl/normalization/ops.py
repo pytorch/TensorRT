@@ -6,6 +6,7 @@ import tensorrt as trt
 import torch
 from torch._subclasses.fake_tensor import unset_fake_temporarily
 from torch.fx.node import Target
+from torch_tensorrt import ENABLED_FEATURES
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion import impl
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
@@ -52,7 +53,9 @@ def batch_norm(
     # We perform constant folding for batch norm when the weight, bias, running_mean, and running_var are all tensors.
     # Batch norm operation can be fused into a single layer, which is more efficient than the original implementation.
     # In this way, the batch norm layer will be fused with the Convolution layer and get a performance boost.
-    if any(
+    # TODO: lanl: to remove this once we have solved the batchnorm constant folding issue in RTX
+    # https://github.com/pytorch/TensorRT/issues/3699
+    if ENABLED_FEATURES.tensorrt_rtx or any(
         [
             isinstance(weight, trt.ITensor),
             isinstance(bias, trt.ITensor),
@@ -322,8 +325,9 @@ def native_group_norm(
 
     shape = [1, group] + [1] * (rank - 2)
 
-    weight_torch = torch.ones(shape)
-    bias_torch = torch.zeros(shape)
+    with unset_fake_temporarily():
+        weight_torch = torch.ones(shape)
+        bias_torch = torch.zeros(shape)
 
     weight_one = get_trt_tensor(ctx, weight_torch, f"{name}_weight_one", input.dtype)
     bias_zero = get_trt_tensor(ctx, bias_torch, f"{name}_bias_zero", input.dtype)

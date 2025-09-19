@@ -1,0 +1,130 @@
+name: Release x86_64 Linux wheels and tarball artifacts
+
+on:
+  push:
+    tags:
+      # NOTE: Binary build pipelines should only get triggered on release candidate builds
+      # Release candidate tags look like: v1.11.0-rc1
+      - v[0-9]+.[0-9]+.[0-9]+-rc[0-9]+
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+  packages: write
+
+jobs:
+  generate-matrix:
+    uses: pytorch/test-infra/.github/workflows/generate_binary_build_matrix.yml@main
+    if: ${{ contains(github.event.pull_request.labels.*.name, 'build-release-artifacts') || startsWith(github.event.ref, 'refs/tags/v') }}
+    with:
+      package-type: wheel
+      os: linux
+      test-infra-repository: pytorch/test-infra
+      test-infra-ref: main
+      with-rocm: false
+      with-cpu: false
+
+  generate-release-tarball-matrix:
+    needs: [generate-matrix]
+    outputs:
+      matrix: ${{ steps.generate.outputs.matrix }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/checkout@v4
+        with:
+          repository: pytorch/tensorrt
+      - name: Generate release matrix
+        id: generate
+        run: |
+          set -eou pipefail
+          MATRIX_BLOB=${{ toJSON(needs.generate-matrix.outputs.matrix) }}
+          MATRIX_BLOB="$(python3 .github/scripts/generate-release-matrix.py --tarball_matrix "${MATRIX_BLOB}")"
+          echo "${MATRIX_BLOB}"
+          echo "matrix=${MATRIX_BLOB}" >> "${GITHUB_OUTPUT}"
+
+  release-cxx11-tarball-artifacts:
+    needs: [generate-release-tarball-matrix]
+    name: Release x86_64 torch-tensorrt cxx11 tarball artifacts
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - repository: pytorch/tensorrt
+            package-name: torch_tensorrt
+            pre-script: packaging/pre_build_script.sh
+            env-var-script: packaging/env_vars.txt
+            post-script: packaging/post_build_script.sh
+            smoke-test-script: packaging/smoke_test_script.sh
+            is-release-tarball: "true"
+    uses: ./.github/workflows/build_linux.yml
+    with:
+      repository: ${{ matrix.repository }}
+      ref: ""
+      test-infra-repository: pytorch/test-infra
+      test-infra-ref: main
+      build-matrix: ${{ needs.generate-release-tarball-matrix.outputs.matrix }}
+      pre-script: ${{ matrix.pre-script }}
+      env-var-script: ${{ matrix.env-var-script }}
+      post-script: ${{ matrix.post-script }}
+      package-name: ${{ matrix.package-name }}
+      smoke-test-script: ${{ matrix.smoke-test-script }}
+      trigger-event: ${{ github.event_name }}
+      is-release-tarball: true
+
+  generate-release-wheel-matrix:
+    needs: [generate-matrix]
+    outputs:
+      matrix: ${{ steps.generate.outputs.matrix }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/checkout@v4
+        with:
+          repository: pytorch/tensorrt
+      - name: Generate release matrix
+        id: generate
+        run: |
+          set -eou pipefail
+          MATRIX_BLOB=${{ toJSON(needs.generate-matrix.outputs.matrix) }}
+          MATRIX_BLOB="$(python3 .github/scripts/generate-release-matrix.py --wheel_matrix "${MATRIX_BLOB}")"
+          echo "${MATRIX_BLOB}"
+          echo "matrix=${MATRIX_BLOB}" >> "${GITHUB_OUTPUT}"
+
+  release-wheel-artifacts:
+    name: Release x86_64 torch-tensorrt wheel artifacts
+    needs: [generate-release-wheel-matrix]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - repository: pytorch/tensorrt
+            package-name: torch_tensorrt
+            pre-script: packaging/pre_build_script.sh
+            env-var-script: packaging/env_vars.txt
+            post-script: packaging/post_build_script.sh
+            smoke-test-script: packaging/smoke_test_script.sh
+            is-release-wheel:  true
+    uses: ./.github/workflows/build_linux.yml
+    with:
+      repository: ${{ matrix.repository }}
+      ref: ""
+      test-infra-repository: pytorch/test-infra
+      test-infra-ref: main
+      build-matrix: ${{ needs.generate-release-wheel-matrix.outputs.matrix }}
+      pre-script: ${{ matrix.pre-script }}
+      env-var-script: ${{ matrix.env-var-script }}
+      post-script: ${{ matrix.post-script }}
+      package-name: ${{ matrix.package-name }}
+      smoke-test-script: ${{ matrix.smoke-test-script }}
+      trigger-event: ${{ github.event_name }}
+      is-release-wheel: true
+
+concurrency:
+  group: ${{ github.workflow }}-x86_64-${{ github.event.pull_request.number || github.ref_name }}-${{ inputs.repository }}-${{ github.event_name == 'workflow_dispatch' }}-${{ inputs.job-name }}
+  cancel-in-progress: true

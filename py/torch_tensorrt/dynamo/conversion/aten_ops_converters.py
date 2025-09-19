@@ -8,6 +8,7 @@ import numpy as np
 import torch
 from tensorrt import ITensor as TRTTensor
 from torch.fx.node import Argument, Node, Target
+from torch_tensorrt._features import needs_not_tensorrt_rtx
 from torch_tensorrt._utils import is_tensorrt_version_supported
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo._SourceIR import SourceIR
@@ -414,13 +415,20 @@ def index_dtype_validator(
     for ind in index:
         if ind is not None:
             val = ind.meta.get("val")
-            if val is not None and val.dtype not in (torch.int32, torch.int64):
+            if val is not None and val.dtype not in (
+                torch.int32,
+                torch.int64,
+                torch.bool,
+            ):
                 return False
     return True
 
 
 @dynamo_tensorrt_converter(
-    torch.ops.aten.index.Tensor, capability_validator=index_dtype_validator
+    torch.ops.aten.index.Tensor,
+    capability_validator=index_dtype_validator,
+    supports_dynamic_shapes=True,
+    requires_output_allocator=True,
 )
 @enforce_tensor_types(
     {
@@ -3590,11 +3598,14 @@ def aten_ops_full(
     )
 
 
+# currently nonzero is not supported for tensorrt_rtx
+# TODO: lan to add the nonzero support once tensorrt_rtx team has added the support
 @dynamo_tensorrt_converter(
     torch.ops.aten.nonzero.default,
     supports_dynamic_shapes=True,
     requires_output_allocator=True,
 )
+@needs_not_tensorrt_rtx
 def aten_ops_nonzero(
     ctx: ConversionContext,
     target: Target,

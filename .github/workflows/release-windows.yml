@@ -25,7 +25,7 @@ jobs:
       with-rocm: false
       with-cpu: false
 
-  generate-release-matrix:
+  generate-release-zip-matrix:
     needs: [generate-matrix]
     outputs:
       matrix: ${{ steps.generate.outputs.matrix }}
@@ -37,29 +37,74 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: pytorch/tensorrt
-      - name: Generate release matrix
+      - name: Generate release tarball matrix
+        id: generate
+        run: |
+          set -eou pipefail
+          MATRIX_BLOB=${{ toJSON(needs.generate-matrix.outputs.matrix) }}
+          MATRIX_BLOB="$(python3 .github/scripts/generate-release-matrix.py --tarball_matrix "${MATRIX_BLOB}")"
+          echo "${MATRIX_BLOB}"
+          substitute_matrix="$(echo "${MATRIX_BLOB}" | sed -e 's/windows.g4dn.xlarge/windows.g5.4xlarge.nvidia.gpu/g')"
+
+          echo matrix="$(echo "${substitute_matrix}")" >> ${GITHUB_OUTPUT}
+
+
+  generate-release-wheel-matrix:
+    needs: [generate-matrix]
+    outputs:
+      matrix: ${{ steps.generate.outputs.matrix }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/checkout@v4
+        with:
+          repository: pytorch/tensorrt
+      - name: Generate release wheel matrix
         id: generate
         run: |
           set -eou pipefail
           MATRIX_BLOB=${{ toJSON(needs.generate-matrix.outputs.matrix) }}
           MATRIX_BLOB="$(python3 .github/scripts/generate-release-matrix.py --wheel_matrix "${MATRIX_BLOB}")"
+          echo "****MATRIX_BLOB****"
           echo "${MATRIX_BLOB}"
-          echo "matrix=${MATRIX_BLOB}" >> "${GITHUB_OUTPUT}"
 
-  substitute-runner:
-    needs: generate-release-matrix
-    outputs:
-      matrix: ${{ steps.substitute.outputs.matrix }}
-    runs-on: ubuntu-latest
-    steps:
-      - name: Substitute runner
-        id: substitute
-        run: |
-          echo matrix="$(echo '${{ needs.generate-release-matrix.outputs.matrix }}' | sed -e 's/windows.g4dn.xlarge/windows.g5.4xlarge.nvidia.gpu/g')" >> ${GITHUB_OUTPUT}
+          substitute_matrix="$(echo "${MATRIX_BLOB}" | sed -e 's/windows.g4dn.xlarge/windows.g5.4xlarge.nvidia.gpu/g')"
+          echo "****substitute_matrix****"
+          echo "${substitute_matrix}"
+          echo "matrix=${substitute_matrix}" >> "${GITHUB_OUTPUT}"
+
+
+  release-cxx11-zip-artifacts:
+    needs: [generate-release-zip-matrix]
+    name: Release Windows torch-tensorrt cxx11 zip artifacts
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - repository: pytorch/tensorrt
+            package-name: torch_tensorrt
+            pre-script: packaging/pre_build_script_windows.sh
+            env-script: packaging/vc_env_helper.bat
+            smoke-test-script: packaging/smoke_test_windows.py
+            is-release-tarball: true
+    uses: ./.github/workflows/build_windows.yml
+    with:
+      repository: ${{ matrix.repository }}
+      ref: ""
+      test-infra-repository: pytorch/test-infra
+      test-infra-ref: main
+      build-matrix: ${{ needs.generate-release-zip-matrix.outputs.matrix }}
+      pre-script: ${{ matrix.pre-script }}
+      env-script: ${{ matrix.env-var-script }}
+      package-name: ${{ matrix.package-name }}
+      smoke-test-script: ${{ matrix.smoke-test-script }}
+      is-release-tarball: true
 
   release-wheel-artifacts:
-    needs: substitute-runner
-    name: Release torch-tensorrt wheel artifacts
+    needs: [generate-release-wheel-matrix]
+    name: Release Windows torch-tensorrt wheel artifacts
     strategy:
       fail-fast: false
       matrix:
@@ -69,17 +114,19 @@ jobs:
             env-script: packaging/vc_env_helper.bat
             smoke-test-script: packaging/smoke_test_windows.py
             package-name: torch_tensorrt
-    uses: ./.github/workflows/release-wheel-windows.yml
+            is-release-wheel: true
+    uses: ./.github/workflows/build_windows.yml
     with:
       repository: ${{ matrix.repository }}
       ref: ""
       test-infra-repository: pytorch/test-infra
       test-infra-ref: main
-      build-matrix: ${{ needs.substitute-runner.outputs.matrix }}
+      build-matrix: ${{ needs.generate-release-wheel-matrix.outputs.matrix }}
       pre-script: ${{ matrix.pre-script }}
       env-script: ${{ matrix.env-script }}
       smoke-test-script: ${{ matrix.smoke-test-script }}
       package-name: ${{ matrix.package-name }}
+      is-release-wheel: true
 
 
 concurrency:

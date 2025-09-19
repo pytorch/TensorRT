@@ -68,7 +68,7 @@ class MutableTorchTensorRTModule(object):
         use_python_runtime: bool = _defaults.USE_PYTHON_RUNTIME,
         immutable_weights: bool = False,
         strict: bool = True,
-        allow_complex_guards_as_runtime_asserts: bool = False,
+        prefer_deferred_runtime_asserts_over_guards: bool = False,
         weight_streaming_budget: Optional[int] = None,
         enabled_precisions: Optional[Set[Union[torch.dtype, dtype]]] = None,
         **kwargs: Any,
@@ -134,8 +134,8 @@ class MutableTorchTensorRTModule(object):
         self.kwarg_inputs: dict[str, Any] = {}
         self.additional_settings = kwargs
         self.strict = strict
-        self.allow_complex_guards_as_runtime_asserts = (
-            allow_complex_guards_as_runtime_asserts
+        self.prefer_deferred_runtime_asserts_over_guards = (
+            prefer_deferred_runtime_asserts_over_guards
         )
         self.use_python_runtime = use_python_runtime
         self.trt_device = to_torch_tensorrt_device(device)
@@ -312,14 +312,14 @@ class MutableTorchTensorRTModule(object):
     def get_exported_program(self) -> torch.export.ExportedProgram:
 
         def export_fn() -> torch.export.ExportedProgram:
-            if self.allow_complex_guards_as_runtime_asserts:
+            if self.prefer_deferred_runtime_asserts_over_guards:
                 return _export(
                     self.original_model,
                     self.arg_inputs,
                     kwargs=self.kwarg_inputs,
                     dynamic_shapes=self._get_total_dynamic_shapes(),
                     strict=self.strict,
-                    allow_complex_guards_as_runtime_asserts=self.allow_complex_guards_as_runtime_asserts,
+                    prefer_deferred_runtime_asserts_over_guards=self.prefer_deferred_runtime_asserts_over_guards,
                 )
             else:
                 return torch.export.export(
@@ -367,7 +367,8 @@ class MutableTorchTensorRTModule(object):
             enabled_precisions=self.enabled_precisions,
             **self.additional_settings,
         )
-        deallocate_module(self.original_model, delete_module=False)
+        if self.additional_settings.get("offload_module_to_cpu", False):
+            deallocate_module(self.original_model, delete_module=False)
         if self.enable_weight_streaming:
             self.set_weight_streaming_ctx(self.weight_streaming_budget)
 

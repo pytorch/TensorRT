@@ -16,8 +16,11 @@ BENCHMARK_MODEL_NAMES = {
     "efficientnet_b0",
     "vit",
     "vit_large",
+    "google_vit",
     "bert_base_uncased",
-    "sd_unet",
+    "sd1.4_unet",
+    "sd2.1_unet",
+    "sd2.1_vae_decoder",
     "meta-llama/Llama-2-7b-chat-hf",
     "gpt2",
     "meta-llama/Meta-Llama-3-8B",
@@ -25,7 +28,7 @@ BENCHMARK_MODEL_NAMES = {
     "apple/DCLM-7B",
     "mistralai/Mistral-7B-Instruct-v0.3",
     "microsoft/Phi-3-mini-4k-instruct",
-    "monai/unet",
+    "monai_unet",
 }
 
 
@@ -78,15 +81,30 @@ class ModelStorage:
                 "model": timm.create_model("vit_giant_patch14_224", pretrained=False),
                 "path": ["script", "pytorch"],
             }
+        elif name == "google_vit":
+            return {
+                "model": cm.GoogleViTForImageClassification(),
+                "path": "pytorch",
+            }
         elif name == "bert_base_uncased":
             return {
                 "model": cm.BertModule(),
                 "inputs": cm.BertInputs(),
                 "path": ["trace", "pytorch"],
             }
-        elif name == "sd_unet":
+        elif name == "sd1.4_unet":
             return {
-                "model": cm.StableDiffusionUnet(),
+                "model": cm.StableDiffusion1_4_Unet(),
+                "path": "pytorch",
+            }
+        elif name == "sd2.1_unet":
+            return {
+                "model": cm.StableDiffusion2_1_Unet(),
+                "path": "pytorch",
+            }
+        elif name == "sd2.1_vae_decoder":
+            return {
+                "model": cm.StableDiffusion2_1_VaeDecoder(),
                 "path": "pytorch",
             }
         elif name in [
@@ -109,9 +127,9 @@ class ModelStorage:
                 "model": hf_artifact["model"],
                 "path": "pytorch",
             }
-        elif name == "monai/unet":
+        elif name == "monai_unet":
             return {
-                "model": cm.UNet(),
+                "model": cm.MonaiUNet(),
                 "path": "pytorch",
             }
         else:
@@ -164,7 +182,7 @@ def parse_inputs(user_inputs, dtype):
         else:
             torchtrt_inputs.append(torch.Tensor([1.0]).cuda())
 
-    return torchtrt_inputs
+    return tuple(torchtrt_inputs)
 
 
 def parse_backends(backends):
@@ -228,7 +246,7 @@ def export_llm(model, inputs, min_seq_len=1, max_seq_len=16):
                 (inputs,),
                 dynamic_shapes=({1: seq_len},),
                 strict=False,
-                allow_complex_guards_as_runtime_asserts=True,
+                prefer_deferred_runtime_asserts_over_guards=True,
             )
 
     return ep

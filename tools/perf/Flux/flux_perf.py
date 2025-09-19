@@ -54,7 +54,7 @@ def main(args):
     else:
         pipe = (
             FluxPipeline.from_pretrained(
-                "black-forest-labs/FLUX.1-dev",
+                args.model,
                 torch_dtype=torch.float16,
             )
             .to(torch.float16)
@@ -67,6 +67,11 @@ def main(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Run Flux quantization with different dtypes"
+    )
+    parser.add_argument(
+        "--model",
+        default="black-forest-labs/FLUX.1-dev",
+        help="Model to use",
     )
     parser.add_argument(
         "--use_sdpa",

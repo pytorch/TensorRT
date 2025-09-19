@@ -271,6 +271,11 @@ class TestEngineCache(TestCase):
     @unittest.skipIf(
         not importlib.util.find_spec("torchvision"), "torchvision not installed"
     )
+    @unittest.skipIf(
+        torch_trt.ENABLED_FEATURES.tensorrt_rtx,
+        # TODO: need to fix this https://github.com/pytorch/TensorRT/issues/3752
+        "There is bug in refit, so we skip the test for now",
+    )
     def test_dynamo_compile_with_custom_engine_cache(self):
         model = models.resnet18(pretrained=True).eval().to("cuda")
 
@@ -340,6 +345,11 @@ class TestEngineCache(TestCase):
     )
     @unittest.skipIf(
         not importlib.util.find_spec("torchvision"), "torchvision not installed"
+    )
+    @unittest.skipIf(
+        torch_trt.ENABLED_FEATURES.tensorrt_rtx,
+        # TODO: need to fix this https://github.com/pytorch/TensorRT/issues/3752
+        "There is bug in refit, so we skip the test for now",
     )
     def test_dynamo_compile_change_input_shape(self):
         """Runs compilation 3 times, the cache should miss each time"""
@@ -657,6 +667,11 @@ class TestEngineCache(TestCase):
     @unittest.skipIf(
         not importlib.util.find_spec("torchvision"), "torchvision not installed"
     )
+    @unittest.skipIf(
+        torch_trt.ENABLED_FEATURES.tensorrt_rtx,
+        # TODO: need to fix this https://github.com/pytorch/TensorRT/issues/3752
+        "There is bug in refit, so we skip the test for now",
+    )
     def test_caching_small_model(self):
         from torch_tensorrt.dynamo._refit import refit_module_weights
 
@@ -841,7 +856,7 @@ class TestEngineCache(TestCase):
                         (inputs,),
                         dynamic_shapes=({1: seq_len},),
                         strict=False,
-                        allow_complex_guards_as_runtime_asserts=True,
+                        prefer_deferred_runtime_asserts_over_guards=True,
                     )
 
             return ep
