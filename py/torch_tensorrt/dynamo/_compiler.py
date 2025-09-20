@@ -732,6 +732,10 @@ def compile_module(
     Returns:
         Compiled FX GraphModule
     """
+    if any(v.requires_grad for v in gm.state_dict().values()):
+        logger.warning(
+            "The model may be in training mode, which may affect the performance of the compiled model!"
+        )
     dryrun_tracker = DryRunTracker()
     if sample_kwarg_inputs is None:
         sample_kwarg_inputs = {}
