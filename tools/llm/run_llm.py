@@ -71,12 +71,20 @@ def get_model(args):
 
     hf_quant_config = load_quantization_config(args.model)
     if hf_quant_config:
-        model = convert_linear_to_tensorrt_quantized(model, hf_quant_config).cuda()
-        print(f"Model converted to TensorRT quantized")
+        model = convert_linear_to_tensorrt_quantized(
+            model, args.model_precision, hf_quant_config
+        ).cuda()
+        print(
+            f"Model is {hf_quant_config['quant_algo']} pre-quantized hf model. Quantized linear layers are applied"
+        )
+        if args.quant_format:
+            raise RuntimeError(
+                f"Quantization cannot be applied for pre-quantized hf model"
+            )
 
-    if args.precision == "FP16":
+    if args.model_precision == "FP16":
         model = model.to(torch.float16)
-    elif args.precision == "BF16":
+    elif args.model_precision == "BF16":
         model = model.to(torch.bfloat16)
     else:
         model = model.to(torch.float32)
@@ -112,11 +120,11 @@ def compile_torchtrt(model, input_ids, args):
     # Set precision specific flags
     use_fp32_acc = False
     use_explicit_typing = False
-    if args.precision == "FP16":
+    if args.model_precision == "FP16":
         enabled_precisions = {torch.float32}
         use_fp32_acc = True
         use_explicit_typing = True
-    elif args.precision == "BF16":
+    elif args.model_precision == "BF16":
         enabled_precisions = {torch.bfloat16}
         use_fp32_acc = False
     else:
@@ -204,7 +212,7 @@ if __name__ == "__main__":
         "--prompt", type=str, default="What is parallel programming ?", help="Prompt"
     )
     arg_parser.add_argument(
-        "--precision",
+        "--model_precision",
         type=str,
         default="FP16",
         help="Precision to use in the model. Options: FP16, BF16, FP32",
@@ -299,7 +307,7 @@ if __name__ == "__main__":
                 pyt_stats = record_stats(
                     "PyTorch",
                     pyt_timings,
-                    args.precision,
+                    args.model_precision,
                     batch_size=args.batch_size,
                     compile_time_s=None,
                 )
@@ -357,7 +365,7 @@ if __name__ == "__main__":
             trt_stats = record_stats(
                 "TensorRT",
                 trt_timings,
-                args.precision,
+                args.model_precision,
                 batch_size=args.batch_size,
                 compile_time_s=None,
             )
