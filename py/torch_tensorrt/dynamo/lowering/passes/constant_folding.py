@@ -37,7 +37,9 @@ def constant_fold(
     # For TRT INetwork construction the constants are moved to CPU in get_attr call.
     for node, constant in cf.node_replacements.items():
         replace_node_with_constant(
-            gm, node, torch.nn.Parameter(constant, requires_grad=False)
+            gm,
+            node,
+            torch.nn.Parameter(constant.cpu().contiguous(), requires_grad=False),
         )
 
     erased_params = []
