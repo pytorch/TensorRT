@@ -15,7 +15,6 @@ if version.parse(sanitized_torch_version()) >= version.parse("2.1.dev"):
         save_cross_compiled_exported_program,
     )
     from ._exporter import export
-    from ._quantization import quantize
     from ._refit import refit_module_weights
     from ._settings import CompilationSettings
     from ._SourceIR import SourceIR
