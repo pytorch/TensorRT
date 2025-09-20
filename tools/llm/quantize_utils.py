@@ -4,7 +4,6 @@ import os
 
 import huggingface_hub
 import torch
-import torch_tensorrt
 from huggingface_hub import snapshot_download
 
 logger = logging.getLogger(__name__)
@@ -24,6 +23,11 @@ from modelopt.torch.utils.dataset_utils import (
     get_dataset_dataloader,
 )
 from safetensors import safe_open
+
+# FP8 E4M3 format has a maximum representable value of 448.0
+MAX_BOUND_FP8 = 448.0
+# Additional scaling factor for NVFP4
+MAX_BOUND_NVFP4 = 6.0
 
 
 def quantize_model(model, args, tokenizer):
@@ -52,11 +56,17 @@ def quantize_model(model, args, tokenizer):
         num_samples=512,
         device="cuda:0",
     )
-
+    if args.quant_format == "fp8":
+        quant_cfg = mtq.FP8_DEFAULT_CFG
+    elif args.quant_format == "nvfp4":
+        quant_cfg = mtq.NVFP4_DEFAULT_CFG
+    else:
+        raise RuntimeError("Unsupported quantization format")
     calibrate_loop = create_forward_loop(dataloader=calib_dataloader)
-    model = torch_tensorrt.dynamo.quantize(
-        model, args.quant_format, calibrate_loop, debug=args.debug
-    )
+
+    model = mtq.quantize(model, quant_cfg, forward_loop=calibrate_loop)
+    if args.debug:
+        mtq.print_quant_summary(model)
 
     return model
 
@@ -83,12 +93,6 @@ class TensorRTQuantizedLinear(torch.nn.Module):
         # Store reference to original linear layer for weight access
         self.original_linear = original_linear
 
-        # Copy bias from original layer if it exists
-        if original_linear.bias is not None:
-            self.bias = torch.nn.Parameter(original_linear.bias.clone()).cuda()
-        else:
-            self.bias = None
-
         # Create quantizers for input and weight tensors
         self.input_quantizer = TensorQuantizer(
             quant_attribute_cfg=quant_cfg, amax=input_amax
@@ -100,7 +104,7 @@ class TensorRTQuantizedLinear(torch.nn.Module):
     def forward(self, input):
         input = self.input_quantizer(input)
         weight = self.weight_quantizer(self.original_linear.weight)
-        return torch.nn.functional.linear(input, weight, self.bias)
+        return torch.nn.functional.linear(input, weight, self.original_linear.bias)
 
 
 def load_quantization_config(model_name):
@@ -134,7 +138,7 @@ def load_quantization_config(model_name):
     return hf_quant_config
 
 
-def convert_linear_to_tensorrt_quantized(model, hf_quant_config):
+def convert_linear_to_tensorrt_quantized(model, model_precision, hf_quant_config):
     """
     Convert linear layers in a model to TensorRT quantized versions from pre-quantized weights.
 
@@ -177,6 +181,13 @@ def convert_linear_to_tensorrt_quantized(model, hf_quant_config):
     if hf_quant_algo != "FP8" and hf_quant_algo != "NVFP4":
         raise RuntimeError("Only FP8 or NVFP4 quantization is supported")
 
+    if model_precision == "FP16":
+        weight_dtype = torch.float16
+    elif model_precision == "BF16":
+        weight_dtype = torch.bfloat16
+    else:
+        weight_dtype = torch.float32
+
     # Iterate through all modules in the model
     for name, module in model.named_modules():
         # Check if the module is a linear layer
@@ -195,14 +206,13 @@ def convert_linear_to_tensorrt_quantized(model, hf_quant_config):
                 continue
 
             if hf_quant_algo == "FP8":
-                # FP8 E4M3 format has a maximum representable value of 448.0
                 # Scale the quantization parameters accordingly
                 weight_scale = tensors.pop(weight_scale_name)
-                weight_amax = weight_scale * 448.0
-                input_amax = tensors.pop(input_scale_name) * 448.0
+                weight_amax = weight_scale * MAX_BOUND_FP8
+                input_amax = tensors.pop(input_scale_name) * MAX_BOUND_FP8
 
                 # Dequantize the weight using the scale factor
-                dequantized_weight_data = module.weight.to(torch.float32) * weight_scale
+                dequantized_weight_data = module.weight.to(weight_dtype) * weight_scale
 
                 # Configure quantizer for FP8 format (4 exponent bits, 3 mantissa bits)
                 quantizer_attribute_config = QuantizerAttributeConfig(
@@ -218,15 +228,15 @@ def convert_linear_to_tensorrt_quantized(model, hf_quant_config):
                 weight_scale2 = tensors.pop(weight_scale2_name)
 
                 # Calculate amax values with additional scaling factor for NVFP4
-                input_amax = input_scale * 448.0 * 6.0
-                weight_amax = weight_scale2 * 448.0 * 6.0
+                input_amax = input_scale * MAX_BOUND_FP8 * MAX_BOUND_NVFP4
+                weight_amax = weight_scale2 * MAX_BOUND_FP8 * MAX_BOUND_NVFP4
 
                 # Handle NVFP4 tensor format
                 weight_data = tensors.pop(weight_name)
                 original_shape = list(weight_data.shape)
                 original_shape[-1] *= 2  # NVFP4 packs 2 values per element
                 nvfp4_tensor = NVFP4QTensor(
-                    torch.Size(original_shape), torch.float32, weight_data
+                    torch.Size(original_shape), weight_dtype, weight_data
                 )
 
                 # Dequantize using both scales and block size configuration
