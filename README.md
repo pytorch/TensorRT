@@ -5,9 +5,9 @@ Torch-TensorRT
 <h4> Easily achieve the best inference performance for any PyTorch model on the NVIDIA platform. </h4>
 
 [![Documentation](https://img.shields.io/badge/docs-master-brightgreen)](https://nvidia.github.io/Torch-TensorRT/)
-[![pytorch](https://img.shields.io/badge/PyTorch-2.8-green)](https://download.pytorch.org/whl/nightly/cu128)
-[![cuda](https://img.shields.io/badge/CUDA-12.8-green)](https://developer.nvidia.com/cuda-downloads)
-[![trt](https://img.shields.io/badge/TensorRT-10.12.0-green)](https://github.com/nvidia/tensorrt-llm)
+[![pytorch](https://img.shields.io/badge/PyTorch-2.9-green)](https://download.pytorch.org/whl/nightly/cu130)
+[![cuda](https://img.shields.io/badge/CUDA-13.0-green)](https://developer.nvidia.com/cuda-downloads)
+[![trt](https://img.shields.io/badge/TensorRT-10.12.0-green)](https://github.com/nvidia/tensorrt)
 [![license](https://img.shields.io/badge/license-BSD--3--Clause-blue)](./LICENSE)
 [![Linux x86-64 Nightly Wheels](https://github.com/pytorch/TensorRT/actions/workflows/build-test-linux-x86_64.yml/badge.svg?branch=nightly)](https://github.com/pytorch/TensorRT/actions/workflows/build-test-linux-x86_64.yml)
 [![Linux SBSA Nightly Wheels](https://github.com/pytorch/TensorRT/actions/workflows/build-test-linux-aarch64.yml/badge.svg?branch=nightly)](https://github.com/pytorch/TensorRT/actions/workflows/build-test-linux-aarch64.yml)
@@ -27,7 +27,7 @@ pip install torch-tensorrt
 
 Nightly versions of Torch-TensorRT are published on the PyTorch package index
 ```bash
-pip install --pre torch-tensorrt --index-url https://download.pytorch.org/whl/nightly/cu128
+pip install --pre torch-tensorrt --index-url https://download.pytorch.org/whl/nightly/cu130
 ```
 
 Torch-TensorRT is also distributed in the ready-to-run [NVIDIA NGC PyTorch Container](https://catalog.ngc.nvidia.com/orgs/nvidia/containers/pytorch) which has all dependencies with the proper versions and example notebooks included.
@@ -123,7 +123,7 @@ These are the following dependencies used to verify the testcases. Torch-TensorR
 - Bazel 8.1.1
 - Libtorch 2.10.0.dev (latest nightly)
 - CUDA 12.8 (CUDA 12.6 on Jetson)
-- TensorRT 10.12 (TensorRT 10.3 on Jetson)
+- TensorRT 10.13.2.6 (TensorRT 10.3 on Jetson)
 
 ## Deprecation Policy
 

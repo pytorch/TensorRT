@@ -749,10 +749,10 @@ def get_requirements():
                 ]
             else:
                 requirements = requirements + [
-                    "tensorrt>=10.12.0,<10.13.0",
-                    "tensorrt-cu12>=10.12.0,<10.13.0",
-                    "tensorrt-cu12-bindings>=10.12.0,<10.13.0",
-                    "tensorrt-cu12-libs>=10.12.0,<10.13.0",
+                    "tensorrt>=10.13.0,<10.14.0",
+                    "tensorrt-cu12>=10.13.0,<10.14.0",
+                    "tensorrt-cu12-bindings>=10.13.0,<10.14.0",
+                    "tensorrt-cu12-libs>=10.13.0,<10.14.0",
                 ]
     return requirements
 
@@ -770,10 +770,10 @@ def get_sbsa_requirements():
         return sbsa_requirements
     return sbsa_requirements + [
         "torch>=2.10.0.dev,<2.11.0",
-        "tensorrt>=10.12.0,<10.13.0",
-        "tensorrt-cu12>=10.12.0,<10.13.0",
-        "tensorrt-cu12-bindings>=10.12.0,<10.13.0",
-        "tensorrt-cu12-libs>=10.12.0,<10.13.0",
+        "tensorrt>=10.13.0,<10.14.0",
+        "tensorrt-cu12>=10.13.0,<10.14.0",
+        "tensorrt-cu12-bindings>=10.13.0,<10.14.0",
+        "tensorrt-cu12-libs>=10.13.0,<10.14.0",
     ]
 
 
