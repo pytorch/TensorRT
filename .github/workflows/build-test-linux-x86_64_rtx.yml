@@ -1,7 +1,7 @@
 name: RTX - Build and test Linux x86_64 wheels
 
 on:
-  pull_request:
+  #pull_request:
   push:
     branches:
       - main
@@ -60,7 +60,7 @@ jobs:
             post-script: packaging/post_build_script.sh
             smoke-test-script: packaging/smoke_test_script.sh
             package-name: torch_tensorrt
-    name: RTX - Build torch-tensorrt-rtx whl package for Linux x86_64
+    name: RTX - Build Linux x86_64 torch-tensorrt whl package
     uses: ./.github/workflows/build_linux.yml
     with:
       repository: ${{ matrix.repository }}
