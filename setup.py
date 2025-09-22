@@ -119,6 +119,10 @@ if "--release" in sys.argv:
     RELEASE = True
     sys.argv.remove("--release")
 
+if "--dlfw" in sys.argv:
+    IS_DLFW_CI = True
+    sys.argv.remove("--dlfw")
+
 if (no_ts_env_var := os.environ.get("NO_TORCHSCRIPT")) is not None:
     if no_ts_env_var == "1":
         NO_TS = True
@@ -745,10 +749,10 @@ def get_requirements():
                 ]
             else:
                 requirements = requirements + [
-                    "tensorrt>=10.12.0,<10.13.0",
-                    "tensorrt-cu12>=10.12.0,<10.13.0",
-                    "tensorrt-cu12-bindings>=10.12.0,<10.13.0",
-                    "tensorrt-cu12-libs>=10.12.0,<10.13.0",
+                    "tensorrt>=10.13.0,<10.14.0",
+                    "tensorrt-cu12>=10.13.0,<10.14.0",
+                    "tensorrt-cu12-bindings>=10.13.0,<10.14.0",
+                    "tensorrt-cu12-libs>=10.13.0,<10.14.0",
                 ]
     return requirements
 
@@ -766,10 +770,10 @@ def get_sbsa_requirements():
         return sbsa_requirements
     return sbsa_requirements + [
         "torch>=2.9.0.dev,<2.10.0",
-        "tensorrt>=10.12.0,<10.13.0",
-        "tensorrt-cu12>=10.12.0,<10.13.0",
-        "tensorrt-cu12-bindings>=10.12.0,<10.13.0",
-        "tensorrt-cu12-libs>=10.12.0,<10.13.0",
+        "tensorrt>=10.13.0,<10.14.0",
+        "tensorrt-cu12>=10.13.0,<10.14.0",
+        "tensorrt-cu12-bindings>=10.13.0,<10.14.0",
+        "tensorrt-cu12-libs>=10.13.0,<10.14.0",
     ]
 
 

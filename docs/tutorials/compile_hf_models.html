@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Compiling LLM models from Huggingface &mdash; Torch-TensorRT v2.9.0.dev0+f566fc1 documentation</title>
+  <title>Compiling LLM models from Huggingface &mdash; Torch-TensorRT v2.9.0.dev0+e590eb5 documentation</title>
   
 
   
@@ -293,7 +293,7 @@
               
               
                 <div class="version">
-                  v2.9.0.dev0+f566fc1
+                  v2.9.0.dev0+e590eb5
                 </div>
               
             
@@ -507,6 +507,7 @@ The code is available in the <a class="reference external" href="https://github.
 <p>The <code class="docutils literal notranslate"><span class="pre">tools/llm</span></code> directory provides the following tools to compile LLM models from Huggingface:</p>
 <ul class="simple">
 <li><p><strong>run_llm.py</strong>: Main entry point for model compilation, generating outputs, and benchmarking</p></li>
+<li><p><strong>run_vlm.py</strong>: Entry point for compiling and benchmarking Visual Language Models (VLMs)</p></li>
 <li><p><strong>Static Cache Utilities</strong>: <code class="docutils literal notranslate"><span class="pre">static_cache_v1.py</span></code> and <code class="docutils literal notranslate"><span class="pre">static_cache_v2.py</span></code> for KV cache optimization</p></li>
 <li><p><strong>SDPA Attention</strong>: <code class="docutils literal notranslate"><span class="pre">sdpa_converter.py</span></code> and <code class="docutils literal notranslate"><span class="pre">register_sdpa.py</span></code> for registering scaled dot-product attention converter and lowering pass.</p></li>
 <li><p><strong>Testing Components</strong>: Model-specific test files for validation</p></li>
@@ -577,6 +578,41 @@ The code is available in the <a class="reference external" href="https://github.
 </tbody>
 </table>
 </section>
+<section id="supported-vlm-models">
+<h2>Supported VLM Models<a class="headerlink" href="#supported-vlm-models" title="Permalink to this heading">¶</a></h2>
+<p>We have officially verified support for the following Visual Language Models (VLMs):</p>
+<table class="colwidths-given docutils align-default">
+<colgroup>
+<col style="width: 17%" />
+<col style="width: 33%" />
+<col style="width: 17%" />
+<col style="width: 17%" />
+<col style="width: 17%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Model Series</p></th>
+<th class="head"><p>HuggingFace Model Card</p></th>
+<th class="head"><p>Precision</p></th>
+<th class="head"><p>KV Cache Support ?</p></th>
+<th class="head"><p>Component Support</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Qwen 2.5 VL</p></td>
+<td><p>Qwen/Qwen2.5-VL-3B-Instruct</p></td>
+<td><p>FP16, FP32</p></td>
+<td><p>Yes (static_v1 only)</p></td>
+<td><p>Language Model only (Image Encoder not supported)</p></td>
+</tr>
+<tr class="row-odd"><td><p>Eagle2</p></td>
+<td><p>nvidia/Eagle2-2B</p></td>
+<td><p>FP16, FP32</p></td>
+<td><p>Yes (static_v1 only)</p></td>
+<td><p>Language Model and Image Encoder both supported</p></td>
+</tr>
+</tbody>
+</table>
+</section>
 <section id="getting-started-with-run-llm-py">
 <h2>Getting Started with run_llm.py<a class="headerlink" href="#getting-started-with-run-llm-py" title="Permalink to this heading">¶</a></h2>
 <p>The main entry point is <code class="docutils literal notranslate"><span class="pre">run_llm.py</span></code>, which provides a complete workflow for model compilation and benchmarking.</p>
@@ -626,14 +662,43 @@ python<span class="w"> </span>tools/llm/run_llm.py<span class="w"> </span>--mode
 </div>
 </section>
 </section>
+<section id="getting-started-with-run-vlm-py">
+<h2>Getting Started with run_vlm.py<a class="headerlink" href="#getting-started-with-run-vlm-py" title="Permalink to this heading">¶</a></h2>
+<p>For Visual Language Models (VLMs), use <code class="docutils literal notranslate"><span class="pre">run_vlm.py</span></code> to compile and benchmark models that process both text and images.</p>
+<section id="id2">
+<h3>Basic Usage<a class="headerlink" href="#id2" title="Permalink to this heading">¶</a></h3>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>tools/llm/run_vlm.py<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--model<span class="w"> </span>Qwen/Qwen2.5-VL-3B-Instruct<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--precision<span class="w"> </span>FP16<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--num_tokens<span class="w"> </span><span class="m">128</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--cache<span class="w"> </span>static_v1<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--enable_pytorch_run<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--benchmark
+</pre></div>
+</div>
+</section>
+<section id="id3">
+<h3>Key Arguments<a class="headerlink" href="#id3" title="Permalink to this heading">¶</a></h3>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">--model</span></code>: Name or path of the HuggingFace VLM</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--prompt</span></code>: Input prompt for generation</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--image_path</span></code>: (Optional) Path to input image file. If not provided, will use a sample image</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--precision</span></code>: Precision mode (<code class="docutils literal notranslate"><span class="pre">FP16</span></code>, <code class="docutils literal notranslate"><span class="pre">FP32</span></code>)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--num_tokens</span></code>: Number of output tokens to generate</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--cache</span></code>: KV cache type (<code class="docutils literal notranslate"><span class="pre">static_v1</span></code> or empty for no KV caching)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--benchmark</span></code>: Enable benchmarking mode</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--enable_pytorch_run</span></code>: Also run and compare PyTorch baseline</p></li>
+</ul>
+</section>
+</section>
 <section id="kv-caching-in-torch-tensorrt">
 <h2>KV Caching in Torch-TensorRT<a class="headerlink" href="#kv-caching-in-torch-tensorrt" title="Permalink to this heading">¶</a></h2>
 <p>We provide two versions of static KV caching: <a class="reference external" href="https://github.com/pytorch/TensorRT/blob/main/tools/llm/static_cache_v1.py">static_cache_v1</a> and <a class="reference external" href="https://github.com/pytorch/TensorRT/blob/main/tools/llm/static_cache_v2.py">static_cache_v2</a>.
 In both implementations, we add static KV cache tensors as model inputs/outputs without storing them as external memory.
 The length of KV cache = input sequence length + output sequence length (specified by <code class="docutils literal notranslate"><span class="pre">--num_tokens</span></code>). The number of heads and head dimension are determined by the model config.</p>
-<section id="id2">
-<h3>Static Cache v1<a class="headerlink" href="#id2" title="Permalink to this heading">¶</a></h3>
-<p>The <code class="docutils literal notranslate"><span class="pre">static_cache_v1.py</span></code> implements KV cache  in the model graph as follows:</p>
+<section id="id4">
+<h3>Static Cache v1<a class="headerlink" href="#id4" title="Permalink to this heading">¶</a></h3>
+<p>The <code class="docutils literal notranslate"><span class="pre">static_cache_v1.py</span></code> implements KV cache in the model graph as follows:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">StaticCacheV1Model</span><span class="p">(</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
@@ -663,8 +728,8 @@ The above code is actually implemented as a FX graph transformation pass. We reg
 For decode phase, <code class="docutils literal notranslate"><span class="pre">start_idx</span></code> begins at the input sequence length and <code class="docutils literal notranslate"><span class="pre">end_idx</span></code> equals <code class="docutils literal notranslate"><span class="pre">start_idx</span> <span class="pre">+</span> <span class="pre">1</span></code>. The <code class="docutils literal notranslate"><span class="pre">start_idx</span></code> is incremented by 1 until the end of the sequence or we reach the maximum number of tokens to generate.</p>
 </div>
 </section>
-<section id="id3">
-<h3>Static Cache v2<a class="headerlink" href="#id3" title="Permalink to this heading">¶</a></h3>
+<section id="id5">
+<h3>Static Cache v2<a class="headerlink" href="#id5" title="Permalink to this heading">¶</a></h3>
 <p>The <code class="docutils literal notranslate"><span class="pre">static_cache_v2.py</span></code> is similar to <code class="docutils literal notranslate"><span class="pre">static_cache_v1.py</span></code> but it uses less number of slice operations. It implements KV cache in the model graph as follows:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">StaticCacheV2Model</span><span class="p">(</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
@@ -716,12 +781,16 @@ We initialize the key/value cache tensors with zeros and for every token generat
 <ul class="simple">
 <li><p>Sliding window attention (used in Gemma3 and Qwen 3 models) is not yet supported</p></li>
 <li><p>Some model architectures (e.g. Phi-4) have issues with exporting the torch model.</p></li>
+<li><p>For VLMs, Qwen2.5-VL image encoder compilation is not supported due to dynamic operations incompatible with torch.export.</p></li>
 </ul>
 <section id="requirements">
 <h3>Requirements<a class="headerlink" href="#requirements" title="Permalink to this heading">¶</a></h3>
 <ul class="simple">
 <li><p>Torch-TensorRT 2.8.0 or later</p></li>
 <li><p>Transformers v4.52.3</p></li>
+<li><p>For VLM models (run_vlm.py):
+- <code class="docutils literal notranslate"><span class="pre">pip</span> <span class="pre">install</span> <span class="pre">qwen-vl-utils</span></code> (for Qwen2.5-VL-3B-Instruct model)
+- <code class="docutils literal notranslate"><span class="pre">pip</span> <span class="pre">install</span> <span class="pre">flash-attn</span> <span class="pre">--no-build-isolation</span> <span class="pre">-v</span></code> (for Eagle2-2B model)</p></li>
 </ul>
 </section>
 </section>
@@ -773,15 +842,21 @@ We initialize the key/value cache tensors with zeros and for every token generat
 <li><a class="reference internal" href="#">Compiling LLM models from Huggingface</a><ul>
 <li><a class="reference internal" href="#overview-of-tools-llm-directory">Overview of tools/llm Directory</a></li>
 <li><a class="reference internal" href="#supported-models">Supported Models</a></li>
+<li><a class="reference internal" href="#supported-vlm-models">Supported VLM Models</a></li>
 <li><a class="reference internal" href="#getting-started-with-run-llm-py">Getting Started with run_llm.py</a><ul>
 <li><a class="reference internal" href="#basic-usage">Basic Usage</a></li>
 <li><a class="reference internal" href="#key-arguments">Key Arguments</a></li>
 <li><a class="reference internal" href="#other-usage-examples">Other Usage Examples</a></li>
 </ul>
 </li>
+<li><a class="reference internal" href="#getting-started-with-run-vlm-py">Getting Started with run_vlm.py</a><ul>
+<li><a class="reference internal" href="#id2">Basic Usage</a></li>
+<li><a class="reference internal" href="#id3">Key Arguments</a></li>
+</ul>
+</li>
 <li><a class="reference internal" href="#kv-caching-in-torch-tensorrt">KV Caching in Torch-TensorRT</a><ul>
-<li><a class="reference internal" href="#id2">Static Cache v1</a></li>
-<li><a class="reference internal" href="#id3">Static Cache v2</a></li>
+<li><a class="reference internal" href="#id4">Static Cache v1</a></li>
+<li><a class="reference internal" href="#id5">Static Cache v2</a></li>
 </ul>
 </li>
 <li><a class="reference internal" href="#generating-outputs">Generating Outputs</a><ul>

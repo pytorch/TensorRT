@@ -325,8 +325,9 @@ def native_group_norm(
 
     shape = [1, group] + [1] * (rank - 2)
 
-    weight_torch = torch.ones(shape)
-    bias_torch = torch.zeros(shape)
+    with unset_fake_temporarily():
+        weight_torch = torch.ones(shape)
+        bias_torch = torch.zeros(shape)
 
     weight_one = get_trt_tensor(ctx, weight_torch, f"{name}_weight_one", input.dtype)
     bias_zero = get_trt_tensor(ctx, bias_torch, f"{name}_bias_zero", input.dtype)

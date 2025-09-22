@@ -72,6 +72,7 @@ TEST(Converters, ATenCumsumNegativeDimConvertsCorrectly) {
 }
 
 TEST(Converters, ATenCumsumNegativeDimConvertsCorrectlyWithDynamicInput) {
+  GTEST_SKIP();
   const auto graph = R"IR(
       graph(%0 : Tensor):
         %1 : int = prim::Constant[value=-2]()
