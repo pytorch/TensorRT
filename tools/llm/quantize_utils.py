@@ -15,9 +15,9 @@ try:
 except Exception:
     logger.warning("Unable to import quantization op. Please install modelopt library")
 
-from modelopt.core.torch.quantization.qtensor.nvfp4_tensor import NVFP4QTensor
 from modelopt.torch.quantization.config import QuantizerAttributeConfig
 from modelopt.torch.quantization.nn.modules.tensor_quantizer import TensorQuantizer
+from modelopt.torch.quantization.qtensor.nvfp4_tensor import NVFP4QTensor
 from modelopt.torch.utils.dataset_utils import (
     create_forward_loop,
     get_dataset_dataloader,
