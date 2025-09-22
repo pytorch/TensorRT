@@ -15,7 +15,6 @@ from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.debug._DebuggerConfig import DebuggerConfig
 from torch_tensorrt.dynamo.debug._supports_debugger import cls_supports_debugger
 from torch_tensorrt.dynamo.utils import DYNAMIC_DIM
-from torch_tensorrt.logging import TRT_LOGGER
 from torch_tensorrt.runtime._utils import (
     _is_switch_required,
     _select_rt_device,
@@ -123,7 +122,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
 
     def __init__(
         self,
-        serialized_engine: Optional[bytes] = None,
+        cuda_engine: trt.ICudaEngine = None,
         input_binding_names: Optional[List[str]] = None,
         output_binding_names: Optional[List[str]] = None,
         *,
@@ -182,7 +181,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         # Unused currently - to be used by Dynamic Shape support implementation
         self.memory_pool = None
 
-        self.serialized_engine = serialized_engine
+        self.engine = cuda_engine
         self.input_names = (
             input_binding_names if input_binding_names is not None else []
         )
@@ -204,7 +203,6 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
             else False
         )
         self.settings = settings
-        self.engine = None
         self.weight_name_map = weight_name_map
         self.target_platform = Platform.current_platform()
         self.runtime_states = TorchTRTRuntimeStates(
@@ -219,7 +217,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         self.output_allocator: Optional[DynamicOutputAllocator] = None
         self.use_output_allocator_outputs = False
 
-        if self.serialized_engine is not None and not self.settings.lazy_engine_init:
+        if self.engine is not None and not self.settings.lazy_engine_init:
             self.setup_engine()
 
     def get_streamable_device_memory_budget(self) -> Any:
@@ -265,8 +263,6 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         ), f"TensorRT engine was not built to target current platform (target: {self.target_platform}, current: {Platform.current_platform()})"
 
         self.initialized = True
-        runtime = trt.Runtime(TRT_LOGGER)
-        self.engine = runtime.deserialize_cuda_engine(self.serialized_engine)
         if self.settings.enable_weight_streaming:
             self.set_default_device_memory_budget()
         self.context = self.engine.create_execution_context()

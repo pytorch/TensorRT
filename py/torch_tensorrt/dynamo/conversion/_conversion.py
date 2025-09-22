@@ -89,12 +89,18 @@ def convert_module(
         module, inputs, settings, engine_cache=engine_cache
     )
 
-    rt_cls = PythonTorchTensorRTModule
-
     if ENABLED_FEATURES.torch_tensorrt_runtime and not settings.use_python_runtime:
         from torch_tensorrt.dynamo.runtime import TorchTensorRTModule
 
-        rt_cls = TorchTensorRTModule
+        return TorchTensorRTModule(
+            serialized_engine=interpreter_result.engine,
+            input_binding_names=list(interpreter_result.input_names),
+            output_binding_names=list(interpreter_result.output_names),
+            name=name,
+            settings=settings,
+            weight_name_map=interpreter_result.weight_name_map,
+            requires_output_allocator=interpreter_result.requires_output_allocator,
+        )
 
     elif (
         not ENABLED_FEATURES.torch_tensorrt_runtime and not settings.use_python_runtime
@@ -103,8 +109,8 @@ def convert_module(
             "Since Torch-TensorRT runtime is not available, using Python Runtime, some features may not be available"
         )
 
-    return rt_cls(
-        serialized_engine=interpreter_result.serialized_engine,
+    return PythonTorchTensorRTModule(
+        cuda_engine=interpreter_result.engine,
         input_binding_names=list(interpreter_result.input_names),
         output_binding_names=list(interpreter_result.output_names),
         name=name,
