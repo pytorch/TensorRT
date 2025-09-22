@@ -285,7 +285,7 @@ jobs:
 
   L1-torch-script-tests:
     name: L1 torch script tests
-    needs: [filter-matrix, build, L0-dynamo-core-tests, L0-dynamo-compile-tests, L0-dynamo-converter-tests, L0-torch-compile-tests, L0-torch-script-tests]
+    needs: [filter-matrix, build, L0-dynamo-core-tests, L0-dynamo-converter-tests, L0-py-core-tests, L0-torch-script-tests]
     strategy:
       fail-fast: false
       matrix:
