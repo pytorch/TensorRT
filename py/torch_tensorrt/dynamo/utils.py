@@ -886,6 +886,7 @@ def is_platform_supported_for_trtllm() -> bool:
     Unsupported:
         - Windows platforms
         - Jetson/Orin/Xavier (aarch64 architecture + 'tegra' in platform release)
+        - CUDA 13 not supported
     """
     system = platform.system().lower()
     machine = platform.machine().lower()
@@ -901,6 +902,23 @@ def is_platform_supported_for_trtllm() -> bool:
         logger.info(
             "TensorRT-LLM plugins for NCCL backend are not supported on Jetson/Orin/Xavier (Tegra) devices."
         )
+        return False
+
+    try:
+        cuda_version = torch.version.cuda  # e.g., "12.4" or "13.0"
+        if cuda_version is None:
+            logger.warning("No CUDA runtime detected — TRT-LLM plugins unavailable.")
+            return False
+
+        major, minor = map(int, cuda_version.split("."))
+        if major != 12:
+            logger.warning("CUDA 13 is not supported for TRT-LLM plugins.")
+            return False
+
+        return True
+
+    except Exception as e:
+        logger.warning(f"Failed to detect CUDA version: {e}")
         return False
 
     return True
