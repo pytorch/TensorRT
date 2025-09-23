@@ -44,7 +44,7 @@ class DistributedReduceScatterModel(nn.Module):
 class TestNcclOpsConverter(DispatchTestCase):
     @unittest.skipIf(
         not is_platform_supported_for_trtllm(),
-        "Skipped on Windows, Jetson: NCCL backend is not supported.",
+        "Skipped on Windows, Jetson and CUDA13: NCCL backend is not supported.",
     )
     @classmethod
     def setUpClass(cls):
