@@ -742,7 +742,7 @@ def get_requirements():
         # standard linux and windows requirements
         requirements = base_requirements + ["numpy"]
         if not IS_DLFW_CI:
-            requirements = requirements + ["torch>=2.9.0.dev,<2.10.0"]
+            requirements = requirements + ["torch>=2.9.0,<2.10.0"]
             if USE_TRT_RTX:
                 requirements = requirements + [
                     "tensorrt_rtx>=1.0.0.21",
@@ -769,7 +769,7 @@ def get_sbsa_requirements():
     if IS_DLFW_CI:
         return sbsa_requirements
     return sbsa_requirements + [
-        "torch>=2.9.0.dev,<2.10.0",
+        "torch>=2.9.0,<2.10.0",
         "tensorrt>=10.13.0,<10.14.0",
         "tensorrt-cu12>=10.13.0,<10.14.0",
         "tensorrt-cu12-bindings>=10.13.0,<10.14.0",
