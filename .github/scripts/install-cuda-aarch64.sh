@@ -8,11 +8,20 @@ install_cuda_aarch64() {
     # CUDA_MAJOR_VERSION: cu128 --> 12
     CUDA_MAJOR_VERSION=${CU_VERSION:2:2}
     dnf config-manager --add-repo https://developer.download.nvidia.com/compute/cuda/repos/rhel8/sbsa/cuda-rhel8.repo
-    # nccl version must match libtorch_cuda.so was built with https://github.com/pytorch/pytorch/blob/main/.ci/docker/ci_commit_pins/nccl-cu12.txt
+
+    # nccl version must match libtorch_cuda.so was built with
+    if [[ ${CU_VERSION:0:4} == "cu12" ]]; then
+        # cu12: https://github.com/pytorch/pytorch/blob/main/.ci/docker/ci_commit_pins/nccl-cu12.txt
+        nccl_version="2.27.5-1"
+    elif [[ ${CU_VERSION:0:4} == "cu13" ]]; then
+        # cu13: https://github.com/pytorch/pytorch/blob/main/.ci/docker/ci_commit_pins/nccl-cu13.txt
+        nccl_version="2.27.7-1"
+    fi
+
     dnf -y install cuda-compiler-${CU_VER}.aarch64 \
                    cuda-libraries-${CU_VER}.aarch64 \
                    cuda-libraries-devel-${CU_VER}.aarch64 \
-                   libnccl-2.27.3-1+cuda${CU_DOT_VER} libnccl-devel-2.27.3-1+cuda${CU_DOT_VER} libnccl-static-2.27.3-1+cuda${CU_DOT_VER}
+                   libnccl-${nccl_version}+cuda${CU_DOT_VER} libnccl-devel-${nccl_version}+cuda${CU_DOT_VER} libnccl-static-${nccl_version}+cuda${CU_DOT_VER}
     dnf clean all
 
     nvshmem_version=3.3.9

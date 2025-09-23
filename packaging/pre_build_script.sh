@@ -19,6 +19,7 @@ if [[ $(uname -m) == "aarch64" ]]; then
   fi
 else
   BAZEL_PLATFORM="amd64"
+  yum install -y fmt-devel
 fi
 
 
@@ -43,6 +44,8 @@ pip uninstall -y torch torchvision
 
 if [[ ${IS_JETPACK} == true ]]; then
     # install torch 2.8 for jp6.2
+    source .github/scripts/install-cuda-dss.sh
+    install_cuda_dss_aarch64
     pip install torch==2.8.0 --index-url=https://pypi.jetson-ai-lab.io/jp6/cu126/
 else
     TORCH=$(grep "^torch>" py/requirements.txt)
