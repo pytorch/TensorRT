@@ -62,10 +62,6 @@ def compile_model(
         torch_dtype=torch.float16,
     ).to(torch.float16)
 
-    # pipe.transformer = FluxTransformer2DModel(
-    #     num_layers=28, num_single_layers=12, guidance_embeds=True
-    # ).to(torch.float16)
-
     if args.low_vram_mode:
         pipe.enable_model_cpu_offload()
     else:

@@ -591,13 +591,11 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         torch.cuda.empty_cache()
 
     @needs_refit  # type: ignore[misc]
-    def _insert_engine_to_cache(self, hash_val: str, serialized_engine: bytes) -> None:
+    def _insert_engine_to_cache(self, hash_val: str, engine: bytes) -> None:
+        serialized_engine = engine.serialize()
         # TODO: @Evan is waiting for TRT's feature to cache the weight-stripped engine
         # if not self.compilation_settings.strip_engine_weights:
         #     # set EXCLUDE_WEIGHTS flag to strip weights
-        #     runtime = trt.Runtime(TRT_LOGGER)
-        #     engine = runtime.deserialize_cuda_engine(serialized_engine)
-
         #     serialization_config = engine.create_serialization_config()
         #     serialization_config.set_flag(trt.SerializationFlag.EXCLUDE_WEIGHTS)
         #     serialized_engine = engine.serialize_with_config(
@@ -731,10 +729,6 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                     if interpreter_result is not None:  # hit the cache
                         return interpreter_result  # type: ignore[no-any-return]
 
-        import psutil
-
-        print(psutil.Process().memory_info().rss / 1024 / 1024, "MB")
-        # breakpoint()
         self._construct_trt_network_def()
 
         if not self.compilation_settings.immutable_weights:
@@ -753,14 +747,11 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         self._create_timing_cache(
             builder_config, self.compilation_settings.timing_cache_path
         )
-        import psutil
-
-        print(psutil.Process().memory_info().rss / 1024 / 1024, "MB")
-        # breakpoint()
 
         cuda_engine = self.builder.build_engine_with_config(
             self.ctx.net, builder_config
         )
+        assert cuda_engine
 
         _LOGGER.info(
             f"Build TRT engine elapsed time: {datetime.now() - build_engine_start_time}"
@@ -772,17 +763,13 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         )
 
         # Engine caching only for refittable engines
-        # if (
-        #     not self.compilation_settings.immutable_weights
-        #     and self.compilation_settings.cache_built_engines
-        #     and self.engine_cache is not None
-        # ):
-        #     self._insert_engine_to_cache(hash_val, serialized_engine)
+        if (
+            not self.compilation_settings.immutable_weights
+            and self.compilation_settings.cache_built_engines
+            and self.engine_cache is not None
+        ):
+            self._insert_engine_to_cache(hash_val, cuda_engine)
 
-        print("After build_engine_with_config")
-        print(psutil.Process().memory_info().rss / 1024 / 1024, "MB")
-        # breakpoint()
-        assert cuda_engine
         if self.compilation_settings.use_python_runtime:
             return TRTInterpreterResult(
                 cuda_engine,
@@ -792,16 +779,13 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                 self.ctx.requires_output_allocator,
             )
         else:
-            print(psutil.Process().memory_info().rss / 1024 / 1024, "MB")
-            # breakpoint()
             serialized_engine = cuda_engine.serialize()
             _LOGGER.info(f"TRT Engine uses: {serialized_engine.nbytes} bytes of Memory")
 
             with io.BytesIO() as engine_bytes:
                 engine_bytes.write(serialized_engine)
                 engine_str = engine_bytes.getvalue()
-            print(psutil.Process().memory_info().rss / 1024 / 1024, "MB")
-            # breakpoint()
+
             return TRTInterpreterResult(
                 engine_str,
                 self._input_names,
