@@ -344,9 +344,14 @@ jobs:
           SMOKE_TEST_SCRIPT: ${{ inputs.smoke-test-script }}
         run: |
           source "${BUILD_ENV_FILE}"
+          set -x
           WHEEL_NAME=$(ls "${{ inputs.repository }}/dist/")
           echo "$WHEEL_NAME"
+          nvidia-smi
+          nvcc --version
           ${CONDA_RUN} pip install "${{ inputs.repository }}/dist/$WHEEL_NAME"
+          ${CONDA_RUN} python -m pip list
+
           if [[ $USE_TRT_RTX == true ]]; then
             # TODO: lan to remove this once we have a better way to do a smoke test
             echo "Smoke test for TensorRT-RTX is not skipped for now"
