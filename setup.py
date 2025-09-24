@@ -732,6 +732,14 @@ base_requirements = [
     "dllist",
 ]
 
+cuda_version = torch.version.cuda
+if cuda_version.startswith("12"):
+    tensorrt_prefix = "tensorrt-cu12"
+elif cuda_version.startswith("13"):
+    tensorrt_prefix = "tensorrt-cu13"
+else:
+    raise ValueError(f"Unsupported CUDA version: {cuda_version}")
+
 
 def get_requirements():
     if IS_JETPACK:
@@ -750,9 +758,9 @@ def get_requirements():
             else:
                 requirements = requirements + [
                     "tensorrt>=10.13.0,<10.14.0",
-                    "tensorrt-cu12>=10.13.0,<10.14.0",
-                    "tensorrt-cu12-bindings>=10.13.0,<10.14.0",
-                    "tensorrt-cu12-libs>=10.13.0,<10.14.0",
+                    f"{tensorrt_prefix}>=10.13.0,<10.14.0",
+                    f"{tensorrt_prefix}-bindings>=10.13.0,<10.14.0",
+                    f"{tensorrt_prefix}-libs>=10.13.0,<10.14.0",
                 ]
     return requirements
 
@@ -771,9 +779,9 @@ def get_sbsa_requirements():
     return sbsa_requirements + [
         "torch>=2.9.0,<2.10.0",
         "tensorrt>=10.13.0,<10.14.0",
-        "tensorrt-cu12>=10.13.0,<10.14.0",
-        "tensorrt-cu12-bindings>=10.13.0,<10.14.0",
-        "tensorrt-cu12-libs>=10.13.0,<10.14.0",
+        f"{tensorrt_prefix}>=10.13.0,<10.14.0",
+        f"{tensorrt_prefix}-bindings>=10.13.0,<10.14.0",
+        f"{tensorrt_prefix}-libs>=10.13.0,<10.14.0",
     ]
 
 
