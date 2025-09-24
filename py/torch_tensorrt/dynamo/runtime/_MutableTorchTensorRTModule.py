@@ -611,7 +611,8 @@ class MutableTorchTensorRTModule(object):
         elif isinstance(input1, dict):
             if input1.keys() != input2.keys():
                 return False
-            for (ka, va), vb in zip(input1.items(), input2.values()):
+            for ka, va in input1.items():
+                vb = input2[ka]
                 if type(va) != type(vb):
                     return False
                 if isinstance(va, bool) and va != vb:
@@ -650,7 +651,7 @@ class MutableTorchTensorRTModule(object):
                 dyn = dynamic_shape[i]
                 if axis_1 > dyn.max or axis_1 < dyn.min:
                     raise DynamicShapeOutOfRangeException(
-                        f"The input size ({axis_1}) of dimension ({i}) is not in dynamic shape range [{dyn.max}, {dyn.max}]!"
+                        f"The input size ({axis_1}) of dimension ({i}) of tensor2 with shape {t2.shape} is not in dynamic shape range [{dyn.min}, {dyn.max}]!"
                     )
 
         return True
