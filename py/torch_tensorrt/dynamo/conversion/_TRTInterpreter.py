@@ -65,7 +65,7 @@ class UnsupportedOperatorException(RuntimeError):
 
 
 class TRTInterpreterResult(NamedTuple):
-    engine: trt.ICudaEngine | bytes
+    engine: trt.ICudaEngine
     input_names: Sequence[str]
     output_names: Sequence[str]
     weight_name_map: Optional[dict[Any, Any]]
@@ -770,29 +770,13 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         ):
             self._insert_engine_to_cache(hash_val, cuda_engine)
 
-        if self.compilation_settings.use_python_runtime:
-            return TRTInterpreterResult(
-                cuda_engine,
-                self._input_names,
-                self._output_names,
-                self.weight_name_map,
-                self.ctx.requires_output_allocator,
-            )
-        else:
-            serialized_engine = cuda_engine.serialize()
-            _LOGGER.info(f"TRT Engine uses: {serialized_engine.nbytes} bytes of Memory")
-
-            with io.BytesIO() as engine_bytes:
-                engine_bytes.write(serialized_engine)
-                engine_str = engine_bytes.getvalue()
-
-            return TRTInterpreterResult(
-                engine_str,
-                self._input_names,
-                self._output_names,
-                self.weight_name_map,
-                self.ctx.requires_output_allocator,
-            )
+        return TRTInterpreterResult(
+            cuda_engine,
+            self._input_names,
+            self._output_names,
+            self.weight_name_map,
+            self.ctx.requires_output_allocator,
+        )
 
     def run_node(self, n: torch.fx.Node) -> torch.fx.Node:
         self._cur_node_name = get_node_name(n)
