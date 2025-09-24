@@ -243,6 +243,7 @@ class TestHierarchicalAdjacencyPartitioning(TestCase):
         )
         from torch_tensorrt.dynamo.lowering import (
             get_decompositions,
+            post_lowering,
             pre_export_lowering,
         )
 
@@ -253,6 +254,7 @@ class TestHierarchicalAdjacencyPartitioning(TestCase):
         exported_program = pre_export_lowering(exported_program)
         exported_program = exported_program.run_decompositions(get_decompositions())
         gm = exported_program.module()
+        gm = post_lowering(gm)
 
         partitioned_graph, _ = partitioning.hierarchical_adjacency_partition(
             gm,
