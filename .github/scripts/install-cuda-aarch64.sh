@@ -19,7 +19,7 @@ install_cuda_aarch64() {
         nccl_version="2.27.7-1"
     fi
 
-    dnf -y install cuda-compiler-${CU_VER}.aarch64 \
+    dnf --nogpgcheck -y install cuda-compiler-${CU_VER}.aarch64 \
                    cuda-libraries-${CU_VER}.aarch64 \
                    cuda-libraries-devel-${CU_VER}.aarch64 \
                    libnccl-${nccl_version}+cuda${CU_DOT_VER} libnccl-devel-${nccl_version}+cuda${CU_DOT_VER} libnccl-static-${nccl_version}+cuda${CU_DOT_VER}
@@ -36,6 +36,7 @@ install_cuda_aarch64() {
     rm -rf nvshmem.tar.xz ${nvshmem_prefix}
     echo "nvshmem ${nvshmem_version} for cuda ${CUDA_MAJOR_VERSION} installed successfully"
 
+    export PATH=/usr/local/cuda/bin:$PATH
     export LD_LIBRARY_PATH=/usr/local/cuda/lib64:/usr/local/cuda/include:/usr/lib64:$LD_LIBRARY_PATH
     ls -lart /usr/local/
     nvcc --version
