@@ -15,7 +15,7 @@ jetpack_python_versions: List[str] = ["3.10"]
 jetpack_cuda_versions: List[str] = ["cu126"]
 
 jetpack_container_image: str = "nvcr.io/nvidia/l4t-jetpack:r36.4.0"
-sbsa_container_image: str = "quay.io/pypa/manylinux_2_34_aarch64"
+sbsa_container_image: str = "quay.io/pypa/manylinux_2_39_aarch64"
 
 
 def validate_matrix(matrix_dict: Dict[str, Any]) -> None:
@@ -41,19 +41,15 @@ def filter_matrix_item(
         # Skipping disabled CUDA version
         return False
     if is_jetpack:
-        if limit_pr_builds:
-            # pr build,matrix passed from test-infra is cu128, python 3.9, change to cu126, python 3.10
-            item["desired_cuda"] = "cu126"
-            item["python_version"] = "3.10"
+        # pr build,matrix passed from test-infra is cu126,cu128 and cu130, python 3.10, filter to cu126, python 3.10
+        # nightly/main build, matrix passed from test-infra is cu126, cu128 and cu130, all python versions, filter to cu126, python 3.10
+        if (
+            item["python_version"] in jetpack_python_versions
+            and item["desired_cuda"] in jetpack_cuda_versions
+        ):
             item["container_image"] = jetpack_container_image
             return True
-        else:
-            # nightly/main build, matrix passed from test-infra is cu128, all python versions, change to cu126, python 3.10
-            if item["python_version"] in jetpack_python_versions:
-                item["desired_cuda"] = "cu126"
-                item["container_image"] = jetpack_container_image
-                return True
-            return False
+        return False
     else:
         if item["gpu_arch_type"] == "cuda-aarch64":
             # pytorch image:pytorch/manylinuxaarch64-builder:cuda12.8 comes with glibc2.28
