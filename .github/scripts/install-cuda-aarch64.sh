@@ -1,6 +1,7 @@
 
 install_cuda_aarch64() {
     echo "install cuda ${CU_VERSION}"
+    set -x
     # CU_VERSION: cu128 --> CU_VER: 12-8
     CU_VER=${CU_VERSION:2:2}-${CU_VERSION:4:1}
     # CU_VERSION: cu129 --> CU_DOT_VER: 12.9
@@ -23,15 +24,16 @@ install_cuda_aarch64() {
                    cuda-libraries-devel-${CU_VER}.aarch64 \
                    libnccl-${nccl_version}+cuda${CU_DOT_VER} libnccl-devel-${nccl_version}+cuda${CU_DOT_VER} libnccl-static-${nccl_version}+cuda${CU_DOT_VER}
     dnf clean all
-
-    nvshmem_version=3.3.9
+    # nvshmem version is from https://github.com/pytorch/pytorch/blob/f9fa138a3910bd1de1e7acb95265fa040672a952/.ci/docker/common/install_cuda.sh#L67
+    nvshmem_version=3.3.24
     nvshmem_path="https://developer.download.nvidia.com/compute/redist/nvshmem/${nvshmem_version}/builds/cuda${CUDA_MAJOR_VERSION}/txz/agnostic/aarch64"
-    nvshmem_filename="libnvshmem_cuda12-linux-sbsa-${nvshmem_version}.tar.gz"
-    curl -L ${nvshmem_path}/${nvshmem_filename} -o nvshmem.tar.gz
-    tar -xzf nvshmem.tar.gz
-    cp -a libnvshmem/lib/* /usr/local/cuda/lib64/
-    cp -a libnvshmem/include/* /usr/local/cuda/include/
-    rm -rf nvshmem.tar.gz nvshmem
+    nvshmem_prefix="libnvshmem-linux-sbsa-${nvshmem_version}_cuda${CUDA_MAJOR_VERSION}-archive"
+    nvshmem_tarname="${nvshmem_prefix}.tar.xz"
+    curl -L ${nvshmem_path}/${nvshmem_tarname} -o nvshmem.tar.xz
+    tar -xJf nvshmem.tar.xz
+    cp -a ${nvshmem_prefix}/lib/* /usr/local/cuda/lib64/
+    cp -a ${nvshmem_prefix}/include/* /usr/local/cuda/include/
+    rm -rf nvshmem.tar.xz ${nvshmem_prefix}
     echo "nvshmem ${nvshmem_version} for cuda ${CUDA_MAJOR_VERSION} installed successfully"
 
     export LD_LIBRARY_PATH=/usr/local/cuda/lib64:/usr/local/cuda/include:/usr/lib64:$LD_LIBRARY_PATH

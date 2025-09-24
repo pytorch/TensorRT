@@ -15,7 +15,7 @@ jetpack_python_versions: List[str] = ["3.10"]
 jetpack_cuda_versions: List[str] = ["cu126"]
 
 jetpack_container_image: str = "nvcr.io/nvidia/l4t-jetpack:r36.4.0"
-sbsa_container_image: str = "quay.io/pypa/manylinux_2_34_aarch64"
+sbsa_container_image: str = "quay.io/pypa/manylinux_2_39_aarch64"
 
 
 def validate_matrix(matrix_dict: Dict[str, Any]) -> None:
