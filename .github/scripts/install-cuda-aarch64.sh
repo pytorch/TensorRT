@@ -12,9 +12,9 @@ install_cuda_aarch64() {
     # nccl version must match libtorch_cuda.so was built with
     if [[ ${CU_VERSION:0:4} == "cu12" ]]; then
         # cu12: https://github.com/pytorch/pytorch/blob/main/.ci/docker/ci_commit_pins/nccl-cu12.txt
-        if [[ ${CU_VERSION:0:4} == "cu128" ]]; then
+        if [[ ${CU_VERSION} == "cu128" ]]; then
             nccl_version="2.26.2-1"
-        elif [[ ${CU_VERSION:0:4} == "cu126" ]]; then
+        elif [[ ${CU_VERSION} == "cu126" ]]; then
             nccl_version="2.24.3-1"
         else
             # removed cu129 support from pytorch upstream
