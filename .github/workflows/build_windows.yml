@@ -346,6 +346,11 @@ jobs:
           source "${BUILD_ENV_FILE}"
           WHEEL_NAME=$(ls "${{ inputs.repository }}/dist/")
           echo "$WHEEL_NAME"
+          set -x
+          nvidia-smi
+          nvcc --version
+          ${CONDA_RUN} python -m pip list
+
           ${CONDA_RUN} pip install "${{ inputs.repository }}/dist/$WHEEL_NAME"
           if [[ $USE_TRT_RTX == true ]]; then
             # TODO: lan to remove this once we have a better way to do a smoke test
