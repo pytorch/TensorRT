@@ -651,7 +651,7 @@ class MutableTorchTensorRTModule(object):
                 dyn = dynamic_shape[i]
                 if axis_1 > dyn.max or axis_1 < dyn.min:
                     raise DynamicShapeOutOfRangeException(
-                        f"The input size ({axis_1}) of dimension ({i}) of tensor2 with shape {t2.shape} is not in dynamic shape range [{dyn.min}, {dyn.max}]!"
+                        f"The input size ({axis_1}) of dimension ({i}) of t2 with shape {t2.shape} is not in dynamic shape range [{dyn.min}, {dyn.max}]!"
                     )
 
         return True
