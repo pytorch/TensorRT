@@ -9,37 +9,12 @@ from pathlib import Path
 from typing import Optional
 
 import torch
-import torch.distributed as dist
 from torch.distributed._tensor.device_mesh import DeviceMesh, init_device_mesh
 from torch_tensorrt._version import __tensorrt_llm_version__
 
 _WHL_CPYTHON_VERSION = "cp310"
 
 logger = logging.getLogger(__name__)
-
-
-def initialize_distributed_env(
-    rank: int = 0, world_size: int = 1, port: int = 29500
-) -> None:
-    local_rank = int(
-        os.environ.get("OMPI_COMM_WORLD_LOCAL_RANK", rank % torch.cuda.device_count())
-    )
-    world_size = int(os.environ.get("OMPI_COMM_WORLD_SIZE", world_size))
-
-    # Set up environment variable to run with mpirun
-    os.environ["RANK"] = str(local_rank)
-    os.environ["WORLD_SIZE"] = str(world_size)
-    os.environ["MASTER_ADDR"] = "127.0.0.1"
-    os.environ["MASTER_PORT"] = str(port)
-
-    # Necessary to assign a device to each rank.
-    torch.cuda.set_device(local_rank)
-
-    # We use nccl backend
-    dist.init_process_group("nccl")
-
-    # set a manual seed for reproducibility
-    torch.manual_seed(1111)
 
 
 def check_tensor_parallel_device_number(world_size: int) -> None:
@@ -74,12 +49,6 @@ def initialize_logger(rank: int, logger_file_name: str) -> logging.Logger:
     fh.setLevel(logging.INFO)
     logger.addHandler(fh)
     return logger
-
-
-def cleanup_distributed_env() -> None:
-    """Clean up distributed process group to prevent resource leaks."""
-    if dist.is_initialized():
-        dist.destroy_process_group()
 
 
 def is_platform_supported_for_trtllm() -> bool:
@@ -126,7 +95,6 @@ def is_platform_supported_for_trtllm() -> bool:
     except Exception as e:
         logger.warning(f"Failed to detect CUDA version: {e}")
         return False
-
 
     return True
 
