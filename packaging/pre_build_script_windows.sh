@@ -29,9 +29,9 @@ export TORCH_INSTALL_PATH="$(python -c "import torch, os; print(os.path.dirname(
 
 # CU_UPPERBOUND eg:13.0 or 12.9
 if [[ ${CU_VERSION:2:2} == "13" ]]; then
-    CU_UPPERBOUND="13.0"
+    export CU_UPPERBOUND="13.0"
 else:
-    CU_UPPERBOUND="12.9"
+    export CU_UPPERBOUND="12.9"
 fi
 cat toolchains/ci_workspaces/MODULE.bazel.tmpl | envsubst > MODULE.bazel
 
