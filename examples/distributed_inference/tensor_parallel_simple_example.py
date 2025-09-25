@@ -25,11 +25,14 @@ import tensorrt as trt
 import torch
 import torch.distributed as dist
 import torch.nn as nn
-import torch_tensorrt
 from tensor_parallel_initialize_dist import (
     cleanup_distributed_env,
     initialize_distributed_env,
 )
+
+if not dist.is_initialized():
+    initialize_distributed_env()
+import torch_tensorrt
 from torch.distributed._tensor import Shard
 from torch.distributed.tensor.parallel import (
     ColwiseParallel,
@@ -37,14 +40,9 @@ from torch.distributed.tensor.parallel import (
     parallelize_module,
 )
 from torch_tensorrt.dynamo.distributed.utils import (
-    cleanup_distributed_env,
     get_tensor_parallel_device_mesh,
-    initialize_distributed_env,
     initialize_logger,
 )
-
-if not dist.is_initialized():
-    initialize_distributed_env()
 
 device_mesh, _world_size, _rank = get_tensor_parallel_device_mesh()
 logger = initialize_logger(_rank, "tensor_parallel_simple_example")
