@@ -27,6 +27,12 @@ pip install --force-reinstall --pre ${TORCH} --index-url ${INDEX_URL}
 export CUDA_HOME="$(echo ${CUDA_PATH} | sed -e 's#\\#\/#g')"
 export TORCH_INSTALL_PATH="$(python -c "import torch, os; print(os.path.dirname(torch.__file__))" | sed -e 's#\\#\/#g')"
 
+# CU_UPPERBOUND eg:13.0 or 12.9
+if [[ ${CU_VERSION:2:2} == "13" ]]; then
+    CU_UPPERBOUND="13.0"
+else:
+    CU_UPPERBOUND="12.9"
+fi
 cat toolchains/ci_workspaces/MODULE.bazel.tmpl | envsubst > MODULE.bazel
 
 if [[ ${TENSORRT_VERSION} != "" ]]; then
