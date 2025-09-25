@@ -348,8 +348,8 @@ jobs:
           source "${BUILD_ENV_FILE}"
           WHEEL_NAME=$(ls "${{ inputs.repository }}/dist/")
           echo "$WHEEL_NAME"
-          if [[ ${{ inputs.is-jetpack }} == true ]]; then
-            echo "Skipping smoke test for jetpack, since it is not the actual jetpack environment"
+          if [[ ${{ inputs.architecture }} == "aarch64" ]]; then
+            echo "Skipping smoke test for aarch64, since it is not an actual gpu runner"
           else
             ${CONDA_RUN} pip install "${{ inputs.repository }}/dist/$WHEEL_NAME"
             # Checking that we have a pinned version of torch in our dependency tree

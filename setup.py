@@ -85,7 +85,7 @@ load_dep_info()
 
 dir_path = os.path.join(str(get_root_dir()), "py")
 
-IS_AARCH64 = platform.uname().processor == "aarch64"
+IS_AARCH64 = platform.machine() == "aarch64"
 IS_JETPACK = False
 
 PY_ONLY = False
