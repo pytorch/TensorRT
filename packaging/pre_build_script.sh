@@ -60,9 +60,11 @@ export TORCH_BUILD_NUMBER=$(python -c "import torch, urllib.parse as ul; print(u
 export TORCH_INSTALL_PATH=$(python -c "import torch, os; print(os.path.dirname(torch.__file__))")
 
 # CU_UPPERBOUND eg:13.0 or 12.9
+# tensorrt tar for linux and windows are different across cuda version
+# for sbsa it is the same tar across cuda version
 if [[ ${CU_VERSION:2:2} == "13" ]]; then
     export CU_UPPERBOUND="13.0"
-else:
+else
     export CU_UPPERBOUND="12.9"
 fi
 
