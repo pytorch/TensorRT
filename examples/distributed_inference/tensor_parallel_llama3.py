@@ -5,26 +5,30 @@ import os
 import time
 
 import torch
-import torch_tensorrt
+import torch.distributed as dist
 from llama3_model import ModelArgs, ParallelTransformer
+from tensor_parallel_initialize_dist import (
+    cleanup_distributed_env,
+    initialize_distributed_env,
+)
 from torch.distributed._composable.fsdp import MixedPrecisionPolicy
 from torch.distributed._composable.fsdp.fully_shard import fully_shard
 from torch.distributed._tensor import Replicate, Shard
 from torch.distributed.algorithms._checkpoint.checkpoint_wrapper import (
     checkpoint_wrapper,
 )
-from torch_tensorrt.dynamo.distributed.utils import (
-    cleanup_distributed_env,
-    get_tensor_parallel_device_mesh,
-    initialize_distributed_env,
-    initialize_logger,
-)
 
 if not dist.is_initialized():
     initialize_distributed_env()
 
+import torch_tensorrt
+from torch_tensorrt.dynamo.distributed.utils import (
+    get_tensor_parallel_device_mesh,
+    initialize_logger,
+)
+
 device_mesh, _world_size, _rank = get_tensor_parallel_device_mesh()
-logger = initialize_logger(_rank, "tensor_parallel_simple_example")
+logger = initialize_logger(_rank, "tensor_parallel_llama3")
 
 logger.info(f"Starting PyTorch TP example on rank {_rank}.")
 assert (
