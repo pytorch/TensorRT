@@ -1,8 +1,17 @@
 set -x
 
-pip install -U numpy packaging pyyaml setuptools wheel
+pip install -U numpy packaging pyyaml setuptools wheel fmt
 
 choco install bazelisk -y
+
+conda update -n base -c defaults conda
+conda install -c conda-forge fmt -y
+conda list fmt
+echo "----------conda list fmt --files begin-------------------"
+conda list fmt --files
+echo "------------conda list fmt --files end-------------------"
+echo "path: $PATH"
+
 
 echo TENSORRT_VERSION=${TENSORRT_VERSION}
 
@@ -26,6 +35,12 @@ pip install --force-reinstall --pre ${TORCH} --index-url ${INDEX_URL}
 
 export CUDA_HOME="$(echo ${CUDA_PATH} | sed -e 's#\\#\/#g')"
 export TORCH_INSTALL_PATH="$(python -c "import torch, os; print(os.path.dirname(torch.__file__))" | sed -e 's#\\#\/#g')"
+
+curl -L -o fmt.zip https://github.com/fmtlib/fmt/releases/download/12.0.0/fmt-12.0.0.zip
+unzip fmt.zip
+cp -r fmt-12.0.0/include/fmt/ $TORCH_INSTALL_PATH/include/
+
+ls -lart $TORCH_INSTALL_PATH/include/fmt/
 
 # CU_UPPERBOUND eg:13.0 or 12.9
 # tensorrt tar for linux and windows are different across cuda version

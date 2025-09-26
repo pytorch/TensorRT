@@ -288,13 +288,14 @@ jobs:
           BUILD_PARAMS: ${{ inputs.wheel-build-params }}
         run: |
           source "${BUILD_ENV_FILE}"
-          conda update -n base -c defaults conda
-          conda install -c conda-forge fmt -y
-          conda list fmt
-          echo "path: $PATH"
-          echo "conda_prefix: $CONDA_PREFIX"
-          echo "include: $INCLUDE"
-          ls -lart $CONDA_PREFIX/include
+          # conda update -n base -c defaults conda
+          # conda install -c conda-forge fmt -y
+          # conda list fmt
+          # echo "----------conda list fmt --files begin-------------------"
+          # conda list fmt --files
+          # echo "------------conda list fmt --files end-------------------"
+          # echo "path: $PATH"
+
           ${CONDA_RUN} python -m pip install fmt
           if [[ ${{ inputs.is-release-wheel }} == true || ${{ inputs.is-release-tarball }} == true ]]; then
             # release version for upload to pypi
