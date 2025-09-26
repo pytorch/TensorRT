@@ -365,9 +365,11 @@ jobs:
             # TODO: lan to remove this once we have a better way to do a smoke test
             echo "Smoke test for TensorRT-RTX is not skipped for now"
           else
-            # TODO: lan to remove this once we have cu130 windows driver updated.
-            echo "smoken test skipped in windows"
-            return 0
+            # upgrade windows driver to support cu130
+            call ${{ inputs.repository }}/packaging/driver_upgrade.bat
+            nvidia-smi
+            nvcc --version
+
             if [[ ! -f "${{ inputs.repository }}"/${SMOKE_TEST_SCRIPT} ]]; then
               echo "${{ inputs.repository }}/${SMOKE_TEST_SCRIPT} not found"
               ${CONDA_RUN} "${{ inputs.repository }}/${ENV_SCRIPT}" python -c "import ${PACKAGE_NAME}; print('package version is ', ${PACKAGE_NAME}.__version__)"
