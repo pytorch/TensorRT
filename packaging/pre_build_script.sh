@@ -12,13 +12,15 @@ if [[ $(uname -m) == "aarch64" ]]; then
   if [[ ${os_name} == "ubuntu" ]]; then
       IS_JETPACK=true
       apt-get update
-      apt-get install -y ninja-build gettext curl libopenblas-dev zip unzip
+      apt-get install -y ninja-build gettext curl libopenblas-dev zip unzip libfmt-dev
   else
       IS_SBSA=true
       yum install -y ninja-build gettext zip unzip
+      yum install -y fmt-devel
   fi
 else
   BAZEL_PLATFORM="amd64"
+  yum install -y fmt-devel
 fi
 
 
@@ -43,6 +45,8 @@ pip uninstall -y torch torchvision
 
 if [[ ${IS_JETPACK} == true ]]; then
     # install torch 2.8 for jp6.2
+    source .github/scripts/install-cuda-dss.sh
+    install_cuda_dss_aarch64
     pip install torch==2.8.0 --index-url=https://pypi.jetson-ai-lab.io/jp6/cu126/
 else
     TORCH=$(grep "^torch>" py/requirements.txt)
@@ -55,15 +59,13 @@ fi
 export TORCH_BUILD_NUMBER=$(python -c "import torch, urllib.parse as ul; print(ul.quote_plus(torch.__version__))")
 export TORCH_INSTALL_PATH=$(python -c "import torch, os; print(os.path.dirname(torch.__file__))")
 
-if [[ ${TENSORRT_VERSION} != "" ]]; then
-  # Replace dependencies in the original pyproject.toml with the current TensorRT version. It is used for CI tests of different TensorRT versions.
-  # For example, if the current testing TensorRT version is 10.7.0, but the pyproject.toml tensorrt>=10.8.0,<10.9.0, then the following sed command
-  # will replace tensorrt>=10.8.0,<10.9.0 with tensorrt==10.7.0
-  sed -i -e "s/tensorrt>=.*,<.*\"/tensorrt>=${TENSORRT_VERSION},<$(echo "${TENSORRT_VERSION}" | awk -F. '{print $1"."$2+1".0"}')\"/g" \
-         -e "s/tensorrt-cu12>=.*,<.*\"/tensorrt-cu12>=${TENSORRT_VERSION},<$(echo "${TENSORRT_VERSION}" | awk -F. '{print $1"."$2+1".0"}')\"/g" \
-         -e "s/tensorrt-cu12-bindings>=.*,<.*\"/tensorrt-cu12-bindings>=${TENSORRT_VERSION},<$(echo "${TENSORRT_VERSION}" | awk -F. '{print $1"."$2+1".0"}')\"/g" \
-         -e "s/tensorrt-cu12-libs>=.*,<.*\"/tensorrt-cu12-libs>=${TENSORRT_VERSION},<$(echo "${TENSORRT_VERSION}" | awk -F. '{print $1"."$2+1".0"}')\"/g" \
-         pyproject.toml
+# CU_UPPERBOUND eg:13.0 or 12.9
+# tensorrt tar for linux and windows are different across cuda version
+# for sbsa it is the same tar across cuda version
+if [[ ${CU_VERSION:2:2} == "13" ]]; then
+    export CU_UPPERBOUND="13.0"
+else
+    export CU_UPPERBOUND="12.9"
 fi
 
 cat toolchains/ci_workspaces/MODULE.bazel.tmpl | envsubst > MODULE.bazel
