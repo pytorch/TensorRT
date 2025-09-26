@@ -1,6 +1,6 @@
 set -x
 
-pip install -U numpy packaging pyyaml setuptools wheel
+pip install -U numpy packaging pyyaml setuptools wheel fmt
 
 choco install bazelisk -y
 
@@ -27,6 +27,22 @@ pip install --force-reinstall --pre ${TORCH} --index-url ${INDEX_URL}
 export CUDA_HOME="$(echo ${CUDA_PATH} | sed -e 's#\\#\/#g')"
 export TORCH_INSTALL_PATH="$(python -c "import torch, os; print(os.path.dirname(torch.__file__))" | sed -e 's#\\#\/#g')"
 
+# tried with conda install -c conda-forge fmt -y, but build still failed in windows with the following error:
+# C:\actions-runner\_work\_temp\conda_environment_18042354682\lib\site-packages\torch\include\torch/csrc/utils/python_arg_parser.h(42): fatal error C1083: Cannot open include file: 'fmt/format.h': No such file or directory
+# workaround: download fmt from github and copy to torch include path
+curl -L -o fmt.zip https://github.com/fmtlib/fmt/releases/download/12.0.0/fmt-12.0.0.zip
+unzip fmt.zip
+cp -r fmt-12.0.0/include/fmt/ $TORCH_INSTALL_PATH/include/
+ls -lart $TORCH_INSTALL_PATH/include/fmt/
+
+# CU_UPPERBOUND eg:13.0 or 12.9
+# tensorrt tar for linux and windows are different across cuda version
+# for sbsa it is the same tar across cuda version
+if [[ ${CU_VERSION:2:2} == "13" ]]; then
+    export CU_UPPERBOUND="13.0"
+else
+    export CU_UPPERBOUND="12.9"
+fi
 cat toolchains/ci_workspaces/MODULE.bazel.tmpl | envsubst > MODULE.bazel
 
 if [[ ${TENSORRT_VERSION} != "" ]]; then
