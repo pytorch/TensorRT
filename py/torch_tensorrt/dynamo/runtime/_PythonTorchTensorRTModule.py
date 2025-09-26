@@ -359,10 +359,8 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         need_cudagraphs_record: bool,
     ) -> None:
         for i, input_name in enumerate(self.input_names):
+            contiguous_inputs[i] = complex_to_ri_stacked_tensor(contiguous_inputs[i])
             if not contiguous_inputs[i].is_cuda:
-                contiguous_inputs[i] = complex_to_ri_stacked_tensor(
-                    contiguous_inputs[i]
-                )
                 logger.warning(
                     f"Detected input {input_name} of engine {self.engine.name} is not on a cuda device. "
                     "This tensor is being moved by the runtime but for performance considerations, "
