@@ -173,7 +173,7 @@ jobs:
             package-name: torch_tensorrt
     uses: ./.github/workflows/windows-test.yml
     with:
-      job-name: L0-dynamo-converter-tests
+      job-name: L0-torchscript-tests
       repository: ${{ matrix.repository }}
       ref: ""
       test-infra-repository: pytorch/test-infra
