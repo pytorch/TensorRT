@@ -143,6 +143,7 @@ jobs:
         cd tests/py
         cd dynamo
         python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/dyn_models_export.xml --ir dynamo models/
+        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/dyn_models_llm.xml llm/
         popd
 
   tests-py-dynamo-serde:
