@@ -191,6 +191,30 @@ jobs:
         python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l0_ts_api_tests_results.xml -n auto  api/
         popd
 
+  L1-dynamo-core-tests:
+    name: L1 dynamo core tests
+    needs: [substitute-runner, build, L0-dynamo-converter-tests, L0-dynamo-core-tests, L0-py-core-tests, L0-torchscript-tests]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - repository: pytorch/tensorrt
+            package-name: torch_tensorrt
+    uses: ./.github/workflows/windows-test.yml
+    with:
+      job-name: L1-dynamo-core-tests
+      repository: ${{ matrix.repository }}
+      ref: ""
+      test-infra-repository: pytorch/test-infra
+      test-infra-ref: main
+      build-matrix: ${{ needs.substitute-runner.outputs.matrix }}
+      pre-script: packaging/driver_upgrade.bat
+      script: |
+        set -euo pipefail
+        pushd .
+        cd tests/py/dynamo
+        python -m pytest -ra -n auto --junitxml=${RUNNER_TEST_RESULTS_DIR}/l1_dynamo_core_tests_results.xml runtime/test_001_*
+        popd
 
   L1-dynamo-compile-tests:
     name: L1 dynamo compile tests
