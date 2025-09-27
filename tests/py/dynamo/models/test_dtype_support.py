@@ -12,6 +12,7 @@ from torch.testing._internal.common_utils import TestCase, run_tests
 from ..testing_utilities import DECIMALS_OF_AGREEMENT, lower_graph_testing
 
 
+@pytest.mark.critical
 class Test64BitSupport(TestCase):
     @unittest.skipIf(
         not torch_tensorrt.ENABLED_FEATURES.torch_tensorrt_runtime,
@@ -189,6 +190,7 @@ class Test64BitSupport(TestCase):
         )
 
 
+@pytest.mark.critical
 @unittest.skipIf(
     torch.cuda.get_device_properties(torch.cuda.current_device()).major < 8
     or (

@@ -18,6 +18,7 @@ trt_ep_path = os.path.join(tempfile.gettempdir(), "trt.ep")
 
 
 @pytest.mark.unit
+@pytest.mark.critical
 def test_base_full_compile(ir):
     """
     This tests export serde functionality on a base model
@@ -74,6 +75,7 @@ def test_base_full_compile(ir):
 
 
 @pytest.mark.unit
+@pytest.mark.critical
 def test_base_full_compile_multiple_outputs(ir):
     """
     This tests export serde functionality on a base model
@@ -136,6 +138,7 @@ def test_base_full_compile_multiple_outputs(ir):
 
 
 @pytest.mark.unit
+@pytest.mark.critical
 def test_no_compile(ir):
     """
     This tests export serde functionality on a model

@@ -14,6 +14,7 @@ assertions = unittest.TestCase()
 
 
 @pytest.mark.unit
+@pytest.mark.critical
 def test_base_dynamic(ir):
     """
     Tests the model (which is fully convertible) with dynamic shapes
@@ -68,6 +69,7 @@ def test_base_dynamic(ir):
 
 
 @pytest.mark.unit
+@pytest.mark.critical
 def test_base_dynamic_fallback(ir):
     """
     Tests the model with dynamic shapes where torch.abs op is forced to run in PyTorch
@@ -125,6 +127,7 @@ def test_base_dynamic_fallback(ir):
 
 
 @pytest.mark.unit
+@pytest.mark.critical
 def test_view(ir):
     """
     Tests the model (which is fully convertible) with dynamic shapes
@@ -234,6 +237,7 @@ def test_resnet_dynamic(ir, dtype):
 
 
 @pytest.mark.unit
+@pytest.mark.critical
 def test_view(ir):
     """
     Tests the model (which is fully convertible) with dynamic shapes
@@ -280,6 +284,7 @@ def test_view(ir):
 
 
 @pytest.mark.unit
+@pytest.mark.critical
 def test_linear(ir):
     """
     Tests the model with linear op and operator.mul (added internally by PyTorch)
@@ -332,6 +337,7 @@ def test_linear(ir):
 
 
 @pytest.mark.unit
+@pytest.mark.critical
 def test_dynamic_with_fallback_shape_tensor_pass_through(ir):
     class MyModule(torch.nn.Module):
         def __init__(self):

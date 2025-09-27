@@ -102,6 +102,7 @@ def test_mapping():
     "torchvision is not installed",
 )
 @pytest.mark.unit
+@pytest.mark.critical
 def test_conv_refit_with_weightmap():
     class net(nn.Module):
         def __init__(self):

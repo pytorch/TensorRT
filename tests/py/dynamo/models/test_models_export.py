@@ -219,6 +219,7 @@ def test_resnet18_half(ir):
     "ModelOpt is required to run this test",
 )
 @pytest.mark.unit
+@pytest.mark.critical
 def test_base_fp4_dynamic_shapes(ir):
     import modelopt.torch.quantization as mtq
     from modelopt.torch.quantization.utils import export_torch_mode
@@ -281,6 +282,7 @@ def test_base_fp4_dynamic_shapes(ir):
     "ModelOpt is required to run this test",
 )
 @pytest.mark.unit
+@pytest.mark.critical
 def test_base_fp4_static_shapes(ir):
     import modelopt.torch.quantization as mtq
     from modelopt.torch.quantization.utils import export_torch_mode
@@ -338,6 +340,7 @@ def test_base_fp4_static_shapes(ir):
     "ModelOpt is required to run this test",
 )
 @pytest.mark.unit
+@pytest.mark.critical
 def test_base_fp8(ir):
     import modelopt.torch.quantization as mtq
     from modelopt.torch.quantization.utils import export_torch_mode
@@ -388,6 +391,7 @@ def test_base_fp8(ir):
     "modelopt 0.17.0 or later is required, Int8 quantization is supported in modelopt since 0.17.0 or later for linux",
 )
 @pytest.mark.unit
+@pytest.mark.critical
 @pytest.mark.parametrize("dtype", [torch.float16, torch.bfloat16, torch.float32])
 def test_base_int8(ir, dtype):
     import modelopt.torch.quantization as mtq
@@ -447,6 +451,7 @@ def test_base_int8(ir, dtype):
     "modelopt 0.17.0 or later is required, Int8 quantization is supported in modelopt since 0.17.0 or later for linux",
 )
 @pytest.mark.unit
+@pytest.mark.critical
 @pytest.mark.parametrize("dtype", [torch.float16, torch.bfloat16, torch.float32])
 def test_base_int8_dynamic_shape(ir, dtype):
     import modelopt.torch.quantization as mtq
