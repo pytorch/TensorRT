@@ -370,6 +370,7 @@ jobs:
         pushd .
         cd tests/py/dynamo/
         python -m pytest -m "not critical" -ra -n auto --junitxml=${RUNNER_TEST_RESULTS_DIR}/l2_dynamo_compile_tests_results.xml models/
+        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l2_dynamo_compile_llm_tests_results.xml llm/
         popd
 
   L2-dynamo-core-tests:
