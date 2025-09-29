@@ -3,6 +3,7 @@
 import math
 import unittest
 
+import pytest
 import torch
 import torch_tensorrt
 from torch import nn
