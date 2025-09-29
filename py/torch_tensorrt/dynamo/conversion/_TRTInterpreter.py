@@ -50,7 +50,12 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
 from torch_tensorrt.dynamo.debug._DebuggerConfig import DebuggerConfig
 from torch_tensorrt.dynamo.debug._supports_debugger import cls_supports_debugger
 from torch_tensorrt.dynamo.observer import Observer
-from torch_tensorrt.dynamo.utils import DYNAMIC_DIM, deallocate_module, to_torch_device
+from torch_tensorrt.dynamo.utils import (
+    DYNAMIC_DIM,
+    deallocate_module,
+    get_cpu_memory_usage,
+    to_torch_device,
+)
 from torch_tensorrt.logging import TRT_LOGGER
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
@@ -729,7 +734,13 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                     if interpreter_result is not None:  # hit the cache
                         return interpreter_result  # type: ignore[no-any-return]
 
+        _LOGGER.debug(
+            f"CPU memory usage before network construction: {get_cpu_memory_usage()} MB"
+        )
         self._construct_trt_network_def()
+        _LOGGER.debug(
+            f"CPU memory usage after network construction: {get_cpu_memory_usage()} MB"
+        )
 
         if not self.compilation_settings.immutable_weights:
             self._save_weight_mapping()
@@ -747,12 +758,16 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         self._create_timing_cache(
             builder_config, self.compilation_settings.timing_cache_path
         )
-
+        _LOGGER.debug(
+            f"CPU memory usage before engine building: {get_cpu_memory_usage()} MB"
+        )
         cuda_engine = self.builder.build_engine_with_config(
             self.ctx.net, builder_config
         )
         assert cuda_engine
-
+        _LOGGER.debug(
+            f"CPU memory usage after engine building: {get_cpu_memory_usage()} MB"
+        )
         _LOGGER.info(
             f"Build TRT engine elapsed time: {datetime.now() - build_engine_start_time}"
         )

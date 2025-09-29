@@ -14,7 +14,11 @@ from torch_tensorrt.dynamo.conversion._TRTInterpreter import (
     TRTInterpreterResult,
 )
 from torch_tensorrt.dynamo.runtime import PythonTorchTensorRTModule, TorchTensorRTModule
-from torch_tensorrt.dynamo.utils import get_output_dtypes
+from torch_tensorrt.dynamo.utils import (
+    get_cpu_memory_usage,
+    get_output_dtypes,
+    trim_memory,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +33,7 @@ def infer_module_output_dtypes(
     """
     outputs = [node for node in module.graph.nodes if node.op == "output"]
     outputs = outputs[0].args
-    return get_output_dtypes(outputs, truncate_double)  # type: ignore[no-any-return]
+    return get_output_dtypes(outputs, truncate_double)
 
 
 def interpret_module_to_result(
@@ -102,6 +106,13 @@ def convert_module(
         logger.info(
             "Since Torch-TensorRT runtime is not available, using Python Runtime, some features may not be available"
         )
+
+    # Delete the frozen parameters from the module to release CPU memory
+    [delattr(module, attr) for attr in dir(module) if attr.startswith("_frozen_param")]
+    trim_memory()
+    logger.debug(
+        f"CPU memory usage after clearing frozen parameters and building memory: {get_cpu_memory_usage()} MB"
+    )
 
     return rt_cls(
         cuda_engine=interpreter_result.engine,

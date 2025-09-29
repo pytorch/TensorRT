@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ctypes
 import gc
 import logging
 import warnings
@@ -8,6 +9,7 @@ from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 import numpy as np
+import psutil
 import sympy
 import tensorrt as trt
 import torch
@@ -858,3 +860,12 @@ def is_thor() -> bool:
     if torch.cuda.get_device_capability() in [(11, 0)]:
         return True
     return False
+
+
+def get_cpu_memory_usage() -> Any:
+    return psutil.Process().memory_info().rss / 1024 / 1024
+
+
+def trim_memory() -> Any:
+    libc = ctypes.CDLL("libc.so.6")
+    return libc.malloc_trim(0)
