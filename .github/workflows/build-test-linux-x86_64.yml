@@ -415,7 +415,7 @@ jobs:
             smoke-test-script: packaging/smoke_test_script.sh
     uses: ./.github/workflows/linux-test.yml
     with:
-      job-name: L2-dynamo-core-tests
+      job-name: L2-dynamo-plugin-tests
       repository: "pytorch/tensorrt"
       ref: ""
       test-infra-repository: pytorch/test-infra
