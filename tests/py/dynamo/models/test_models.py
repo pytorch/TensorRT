@@ -54,6 +54,52 @@ def test_resnet18(ir):
     torch._dynamo.reset()
 
 
+def compile_one(idx: int, ir: str):
+    model = models.resnet18(pretrained=True).eval().to("cuda")
+    input = torch.randn((idx + 1, 3, 224, 224)).to("cuda")
+
+    compile_spec = {
+        "inputs": [
+            torchtrt.Input(
+                input.shape, dtype=torch.float, format=torch.contiguous_format
+            )
+        ],
+        "device": torchtrt.Device("cuda:0"),
+        "enabled_precisions": {torch.float},
+        "ir": ir,
+        "pass_through_build_failures": True,
+        "optimization_level": 1,
+        "cache_built_engines": False,
+        "reuse_cached_engines": False,
+    }
+
+    trt_mod = torchtrt.compile(model, **compile_spec)
+    cos_sim = cosine_similarity(model(input), trt_mod(input))
+    assertions.assertTrue(
+        cos_sim > COSINE_THRESHOLD,
+        msg=f"In multiprocess compilation test, process {idx} failed: Resnet18 TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
+    )
+
+
+@pytest.mark.unit
+@unittest.skipIf(
+    not importlib.util.find_spec("torchvision"),
+    "torchvision is not installed",
+)
+def test_resnet18_multiprocess(ir):
+    import torch.multiprocessing as mp
+
+    mp.set_start_method("spawn", force=True)
+    procs = []
+    for i in range(3):
+        p = mp.Process(target=compile_one, args=(i, ir))
+        p.start()
+        procs.append(p)
+    for p in procs:
+        p.join()
+    torch._dynamo.reset()
+
+
 @pytest.mark.unit
 @unittest.skipIf(
     not importlib.util.find_spec("torchvision"),

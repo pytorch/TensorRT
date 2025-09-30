@@ -17,7 +17,7 @@ from torch_tensorrt.dynamo.runtime import PythonTorchTensorRTModule, TorchTensor
 from torch_tensorrt.dynamo.utils import (
     get_cpu_memory_usage,
     get_output_dtypes,
-    trim_memory,
+    release_memory,
 )
 
 logger = logging.getLogger(__name__)
@@ -108,8 +108,10 @@ def convert_module(
         )
 
     # Delete the frozen parameters from the module to release CPU memory
-    [delattr(module, attr) for attr in dir(module) if attr.startswith("_frozen_param")]
-    trim_memory()
+    for attr in dir(module):
+        if attr.startswith("_frozen_param"):
+            delattr(module, attr)
+    release_memory()
     logger.debug(
         f"CPU memory usage after clearing frozen parameters and building memory: {get_cpu_memory_usage()} MB"
     )

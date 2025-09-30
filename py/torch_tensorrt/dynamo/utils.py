@@ -3,6 +3,7 @@ from __future__ import annotations
 import ctypes
 import gc
 import logging
+import platform
 import warnings
 from dataclasses import fields, replace
 from enum import Enum
@@ -866,6 +867,17 @@ def get_cpu_memory_usage() -> Any:
     return psutil.Process().memory_info().rss / 1024 / 1024
 
 
-def trim_memory() -> Any:
-    libc = ctypes.CDLL("libc.so.6")
-    return libc.malloc_trim(0)
+def release_memory() -> None:
+    if torch.cuda.is_available():
+        torch.cuda.synchronize()
+        torch.cuda.empty_cache()
+        torch.cuda.ipc_collect()
+        torch.cuda.synchronize()
+
+    if platform.system() == "Linux":
+        try:
+            libc = ctypes.CDLL("libc.so.6")
+            if libc.malloc_trim(0) != 1:
+                logger.warning("Failed to release CPU memory.")
+        except Exception:
+            logger.warning("Failed to release CPU memory.")

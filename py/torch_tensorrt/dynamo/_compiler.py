@@ -864,7 +864,9 @@ def compile_module(
 
     # Here we delete the frozen parameters from the graph module. Note this does not affect the submodules. We are going to delete the frozen parameters from the submodules in the convert_module function.
     # This is done to release CPU memory.
-    [delattr(gm, attr) for attr in dir(gm) if attr.startswith("_frozen_param")]
+    for attr in dir(gm):
+        if attr.startswith("_frozen_param"):
+            delattr(gm, attr)
     for name, _ in partitioned_module.named_children():
         submodule = getattr(partitioned_module, name)
         # filter on the GraphModule
@@ -1238,7 +1240,7 @@ def convert_exported_program_to_serialized_trt_engine(
 
     # Prepare torch_trt inputs
     trt_arg_inputs: Sequence[Input] = prepare_inputs(arg_inputs)
-    trt_kwarg_inputs: Optional[dict[Any, Any]] = prepare_inputs(kwarg_inputs)
+    trt_kwarg_inputs: Optional[dict[str, Any]] = prepare_inputs(kwarg_inputs)
     device = to_torch_tensorrt_device(device)
     enabled_precisions = {dtype._from(p) for p in enabled_precisions}
 
