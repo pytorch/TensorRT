@@ -907,12 +907,16 @@ def is_platform_supported_for_trtllm() -> bool:
     try:
         cuda_version = torch.version.cuda  # e.g., "12.4" or "13.0"
         if cuda_version is None:
-            logger.warning("No CUDA runtime detected — TRT-LLM plugins unavailable.")
+            logger.error(
+                "This pytorch build does not support CUDA, please reinstall pytorch with CUDA support"
+            )
             return False
 
         major, minor = map(int, cuda_version.split("."))
         if major != 12:
-            logger.warning("CUDA 13 is not supported for TRT-LLM plugins.")
+            logger.error(
+                "CUDA 13 is not supported for TRT-LLM plugins. Please install pytorch with CUDA 12.x support"
+            )
             return False
 
         return True

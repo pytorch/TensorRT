@@ -9,6 +9,7 @@ from torch_tensorrt._utils import (
     check_cross_compile_trt_win_lib,
     sanitized_torch_version,
 )
+from torch_tensorrt.dynamo.utils import load_tensorrt_llm_for_nccl
 
 from packaging import version
 
@@ -23,6 +24,7 @@ FeatureSet = namedtuple(
         "qdp_plugin",
         "windows_cross_compile",
         "tensorrt_rtx",
+        "trtllm_for_nccl",
     ],
 )
 
@@ -48,6 +50,7 @@ _DYNAMO_FE_AVAIL = version.parse(sanitized_torch_version()) >= version.parse("2.
 _FX_FE_AVAIL = False if _TENSORRT_RTX else True
 _REFIT_AVAIL = True
 _WINDOWS_CROSS_COMPILE = check_cross_compile_trt_win_lib()
+_TRTLLM_AVAIL = load_tensorrt_llm_for_nccl()
 
 if importlib.util.find_spec("tensorrt.plugin"):
     _QDP_PLUGIN_AVAIL = True
@@ -63,6 +66,7 @@ ENABLED_FEATURES = FeatureSet(
     _QDP_PLUGIN_AVAIL,
     _WINDOWS_CROSS_COMPILE,
     _TENSORRT_RTX,
+    _TRTLLM_AVAIL,
 )
 
 T = TypeVar("T")
@@ -154,6 +158,18 @@ def needs_cross_compile(f: Callable[..., Any]) -> Callable[..., Any]:
                 )
 
             return not_implemented(*args, **kwargs)
+
+    return wrapper
+
+
+def needs_trtllm_for_nccl(f: Callable[..., Any]) -> Callable[..., Any]:
+    def wrapper(*args: List[Any], **kwargs: Dict[str, Any]) -> Any:
+        if ENABLED_FEATURES.trtllm_for_nccl:
+            return f(*args, **kwargs)
+        else:
+            raise NotImplementedError(
+                "TensorRT-LLM plugins for NCCL backend could not be loaded"
+            )
 
     return wrapper
 
