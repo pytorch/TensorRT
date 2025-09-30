@@ -36,7 +36,7 @@ def test_lan_1_resnet18_torch_exec_ops(ir):
             )
         ],
         "ir": ir,
-        "enabled_precisions": {torch.float32, torch.float16},
+        "enabled_precisions": {torch.float32},
         "min_block_size": 1,
         "output_format": "exported_program",
         "cache_built_engines": True,
@@ -72,11 +72,11 @@ def test_lan_2_resnet18_torch_exec_ops(ir):
             )
         ],
         "ir": ir,
-        "enabled_precisions": {torch.float32},
+        "enabled_precisions": {torch.float32, torch.float16},
         "min_block_size": 1,
         "output_format": "exported_program",
-        "cache_built_engines": False,
-        "reuse_cached_engines": False,
+        "cache_built_engines": True,
+        "reuse_cached_engines": True,
         "torch_executed_ops": {torch.ops.aten.matmul, "torch.ops.aten.add"},
     }
 
@@ -108,8 +108,9 @@ def test_lan_3_resnet18_torch_exec_ops(ir):
             )
         ],
         "ir": ir,
-        "enabled_precisions": {torch.float32},
+        "enabled_precisions": {torch.float32, torch.float16},
         "min_block_size": 1,
+        "output_format": "exported_program",
         "cache_built_engines": False,
         "reuse_cached_engines": False,
         "torch_executed_ops": {torch.ops.aten.matmul, "torch.ops.aten.add"},
