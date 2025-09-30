@@ -372,6 +372,7 @@ def test_resnet18_half(ir):
     torchtrt.ENABLED_FEATURES.tensorrt_rtx,
     "bf16 is not supported for tensorrt_rtx",
 )
+@pytest.mark.critical
 def test_bf16_model(ir):
     class MyModule(torch.nn.Module):
         def __init__(self):
@@ -420,6 +421,7 @@ def test_bf16_model(ir):
     torchtrt.ENABLED_FEATURES.tensorrt_rtx,
     "bf16 is not supported for tensorrt_rtx",
 )
+@pytest.mark.critical
 def test_bf16_fallback_model(ir):
     class MyModule(torch.nn.Module):
         def __init__(self):

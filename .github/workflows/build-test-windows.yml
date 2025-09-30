@@ -70,7 +70,7 @@ jobs:
             env-script: packaging/vc_env_helper.bat
             smoke-test-script: packaging/smoke_test_windows.py
             package-name: torch_tensorrt
-    name: Build torch-tensorrt whl package for Windows
+    name: Build Windows torch-tensorrt whl package
     uses: ./.github/workflows/build_windows.yml
     with:
       repository: ${{ matrix.repository }}
@@ -85,8 +85,8 @@ jobs:
       trigger-event: ${{ github.event_name }}
       timeout: 120
 
-  tests-py-torchscript-fe:
-    name: Test torchscript frontend [Python]
+  L0-dynamo-converter-tests:
+    name: L0 dynamo converter tests
     needs: [substitute-runner, build]
     strategy:
       fail-fast: false
@@ -96,7 +96,7 @@ jobs:
             package-name: torch_tensorrt
     uses: ./.github/workflows/windows-test.yml
     with:
-      job-name: tests-py-torchscript-fe
+      job-name: L0-dynamo-converter-tests
       repository: ${{ matrix.repository }}
       ref: ""
       test-infra-repository: pytorch/test-infra
@@ -105,22 +105,95 @@ jobs:
       pre-script: packaging/driver_upgrade.bat
       script: |
         set -euo pipefail
-        export USE_HOST_DEPS=1
-        export CI_BUILD=1
+        pushd .
+        cd tests/py/dynamo
+        ../../../packaging/vc_env_helper.bat python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l0_dynamo_converter_tests_results.xml -n auto --dist=loadscope --maxfail=20 conversion/
+        popd
+
+  L0-dynamo-core-tests:
+    name: L0 dynamo core tests
+    needs: [substitute-runner, build]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - repository: pytorch/tensorrt
+            package-name: torch_tensorrt
+    uses: ./.github/workflows/windows-test.yml
+    with:
+      job-name: L0-dynamo-core-tests
+      repository: ${{ matrix.repository }}
+      ref: ""
+      test-infra-repository: pytorch/test-infra
+      test-infra-ref: main
+      build-matrix: ${{ needs.substitute-runner.outputs.matrix }}
+      pre-script: packaging/driver_upgrade.bat
+      script: |
+        set -euo pipefail
+        pushd .
+        cd tests/py/dynamo
+        ../../../packaging/vc_env_helper.bat python -m pytest -ra -n auto --junitxml=${RUNNER_TEST_RESULTS_DIR}/l0_dynamo_core_runtime_tests_results.xml runtime/test_000_*
+        ../../../packaging/vc_env_helper.bat python -m pytest -ra -n auto --junitxml=${RUNNER_TEST_RESULTS_DIR}/l0_dynamo_core_partitioning_tests_results.xml partitioning/
+        ../../../packaging/vc_env_helper.bat python -m pytest -ra -n auto --junitxml=${RUNNER_TEST_RESULTS_DIR}/l0_dynamo_core_lowering_tests_results.xml lowering/
+        popd
+
+  L0-py-core-tests:
+    name: L0 core python tests
+    needs: [substitute-runner, build]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - repository: pytorch/tensorrt
+            package-name: torch_tensorrt
+    uses: ./.github/workflows/windows-test.yml
+    with:
+      job-name: L0-core-python-tests
+      repository: ${{ matrix.repository }}
+      ref: ""
+      test-infra-repository: pytorch/test-infra
+      test-infra-ref: main
+      build-matrix: ${{ needs.substitute-runner.outputs.matrix }}
+      pre-script: packaging/driver_upgrade.bat
+      script: |
+        set -euo pipefail
+        pushd .
+        cd tests/py/core
+        ../../../packaging/vc_env_helper.bat python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l0_py_core_tests_results.xml -n auto .
+        popd
+
+  L0-torchscript-tests:
+    name: L0 torchscript tests
+    needs: [substitute-runner, build]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - repository: pytorch/tensorrt
+            package-name: torch_tensorrt
+    uses: ./.github/workflows/windows-test.yml
+    with:
+      job-name: L0-torchscript-tests
+      repository: ${{ matrix.repository }}
+      ref: ""
+      test-infra-repository: pytorch/test-infra
+      test-infra-ref: main
+      build-matrix: ${{ needs.substitute-runner.outputs.matrix }}
+      pre-script: packaging/driver_upgrade.bat
+      script: |
+        set -euo pipefail
         pushd .
         cd tests/modules
         python hub.py
         popd
         pushd .
         cd tests/py/ts
-        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/ts_api_test_results.xml api/
-        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/ts_models_test_results.xml models/
-        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/ts_integrations_test_results.xml integrations/
+        ../../../packaging/vc_env_helper.bat python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l0_ts_api_tests_results.xml -n auto  api/
         popd
 
-  tests-py-dynamo-converters:
-    name: Test dynamo converters [Python]
-    needs: [substitute-runner, build]
+  L1-dynamo-core-tests:
+    name: L1 dynamo core tests
+    needs: [substitute-runner, build, L0-dynamo-converter-tests, L0-dynamo-core-tests, L0-py-core-tests, L0-torchscript-tests]
     strategy:
       fail-fast: false
       matrix:
@@ -129,7 +202,7 @@ jobs:
             package-name: torch_tensorrt
     uses: ./.github/workflows/windows-test.yml
     with:
-      job-name: tests-py-dynamo-converters
+      job-name: L1-dynamo-core-tests
       repository: ${{ matrix.repository }}
       ref: ""
       test-infra-repository: pytorch/test-infra
@@ -138,17 +211,14 @@ jobs:
       pre-script: packaging/driver_upgrade.bat
       script: |
         set -euo pipefail
-        export USE_HOST_DEPS=1
-        export CI_BUILD=1
         pushd .
-        cd tests/py
-        cd dynamo
-        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/dynamo_converters_test_results.xml -n 4 conversion/
+        cd tests/py/dynamo
+        ../../../packaging/vc_env_helper.bat python -m pytest -ra -n auto --junitxml=${RUNNER_TEST_RESULTS_DIR}/l1_dynamo_core_tests_results.xml runtime/test_001_*
         popd
 
-  tests-py-dynamo-fe:
-    name: Test dynamo frontend [Python]
-    needs: [substitute-runner, build]
+  L1-dynamo-compile-tests:
+    name: L1 dynamo compile tests
+    needs: [substitute-runner, build, L0-dynamo-converter-tests, L0-dynamo-core-tests, L0-py-core-tests, L0-torchscript-tests]
     strategy:
       fail-fast: false
       matrix:
@@ -157,7 +227,7 @@ jobs:
             package-name: torch_tensorrt
     uses: ./.github/workflows/windows-test.yml
     with:
-      job-name: tests-py-dynamo-fe
+      job-name: L1-dynamo-compile-tests
       repository: ${{ matrix.repository }}
       ref: ""
       test-infra-repository: pytorch/test-infra
@@ -166,18 +236,14 @@ jobs:
       pre-script: packaging/driver_upgrade.bat
       script: |
         set -euo pipefail
-        export USE_HOST_DEPS=1
-        export CI_BUILD=1
         pushd .
-        cd tests/py
-        cd dynamo
-        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/dyn_models_export.xml --ir dynamo models/
-        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/dyn_models_llm.xml llm/
+        cd tests/py/dynamo/
+        ../../../packaging/vc_env_helper.bat python -m pytest -m critical -ra -n auto --junitxml=${RUNNER_TEST_RESULTS_DIR}/l1_dynamo_compile_tests_results.xml models/
         popd
 
-  tests-py-dynamo-serde:
-    name: Test dynamo export serde [Python]
-    needs: [substitute-runner, build]
+  L1-torch-compile-tests:
+    name: L1 torch compile tests
+    needs: [substitute-runner, build, L0-dynamo-converter-tests, L0-dynamo-core-tests, L0-py-core-tests, L0-torchscript-tests]
     strategy:
       fail-fast: false
       matrix:
@@ -186,7 +252,7 @@ jobs:
             package-name: torch_tensorrt
     uses: ./.github/workflows/windows-test.yml
     with:
-      job-name: tests-py-dynamo-serde
+      job-name: L1-torch-compile-tests
       repository: ${{ matrix.repository }}
       ref: ""
       test-infra-repository: pytorch/test-infra
@@ -195,18 +261,16 @@ jobs:
       pre-script: packaging/driver_upgrade.bat
       script: |
         set -euo pipefail
-        export USE_HOST_DEPS=1
-        export CI_BUILD=1
         pushd .
-        cd tests/py
-        cd dynamo
-        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/export_serde_test_results.xml --ir dynamo models/test_export_serde.py
-        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/reexport_test_results.xml --ir dynamo models/test_reexport.py
+        cd tests/py/dynamo/
+        ../../../packaging/vc_env_helper.bat python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l1_torch_compile_be_tests_results.xml -n auto backend/
+        ../../../packaging/vc_env_helper.bat python -m pytest -m critical -ra -n auto --junitxml=${RUNNER_TEST_RESULTS_DIR}/l1_torch_compile_models_tests_results.xml --ir torch_compile models/test_models.py
+        ../../../packaging/vc_env_helper.bat python -m pytest -m critical -ra -n auto --junitxml=${RUNNER_TEST_RESULTS_DIR}/l1_torch_compile_dyn_models_tests_results.xml --ir torch_compile models/test_dyn_models.py
         popd
 
-  tests-py-torch-compile-be:
-    name: Test torch compile backend [Python]
-    needs: [substitute-runner, build]
+  L1-torchscript-tests:
+    name: L1 torchscript tests
+    needs: [substitute-runner, build, L0-dynamo-converter-tests, L0-dynamo-core-tests, L0-py-core-tests, L0-torchscript-tests]
     strategy:
       fail-fast: false
       matrix:
@@ -215,7 +279,7 @@ jobs:
             package-name: torch_tensorrt
     uses: ./.github/workflows/windows-test.yml
     with:
-      job-name: tests-py-torch-compile-be
+      job-name: L1-torchscript-tests
       repository: ${{ matrix.repository }}
       ref: ""
       test-infra-repository: pytorch/test-infra
@@ -224,19 +288,18 @@ jobs:
       pre-script: packaging/driver_upgrade.bat
       script: |
         set -euo pipefail
-        export USE_HOST_DEPS=1
-        export CI_BUILD=1
         pushd .
-        cd tests/py
-        cd dynamo
-        python -m pytest -ra -n 10 --junitxml=${RUNNER_TEST_RESULTS_DIR}/torch_compile_be_test_results.xml backend/
-        python -m pytest -ra -n 4 --junitxml=${RUNNER_TEST_RESULTS_DIR}/torch_complete_be_e2e_test_results.xml --ir torch_compile models/test_models.py
-        ../../../packaging/vc_env_helper.bat python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/torch_compile_dyn_models_export.xml --ir torch_compile models/test_dyn_models.py
+        cd tests/modules
+        python hub.py
+        popd
+        pushd .
+        cd tests/py/ts
+        ../../../packaging/vc_env_helper.bat python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l1_ts_models_tests_results.xml -n auto  models/
         popd
 
-  tests-py-dynamo-core:
-    name: Test dynamo core [Python]
-    needs: [substitute-runner, build]
+  L2-torch-compile-tests:
+    name: L2 torch compile tests
+    needs: [substitute-runner, build, L1-torch-compile-tests, L1-dynamo-compile-tests, L1-dynamo-core-tests, L1-torchscript-tests]
     strategy:
       fail-fast: false
       matrix:
@@ -245,7 +308,7 @@ jobs:
             package-name: torch_tensorrt
     uses: ./.github/workflows/windows-test.yml
     with:
-      job-name: tests-py-dynamo-core
+      job-name: L2-torch-compile-tests
       repository: ${{ matrix.repository }}
       ref: ""
       test-infra-repository: pytorch/test-infra
@@ -254,19 +317,15 @@ jobs:
       pre-script: packaging/driver_upgrade.bat
       script: |
         set -euo pipefail
-        export USE_HOST_DEPS=1
-        export CI_BUILD=1
         pushd .
-        cd tests/py
-        cd dynamo
-        ../../../packaging/vc_env_helper.bat python -m pytest -ra -n 4 --junitxml=${RUNNER_TEST_RESULTS_DIR}/tests_py_dynamo_core_runtime_test_results.xml --ignore runtime/test_002_cudagraphs_py.py --ignore runtime/test_002_cudagraphs_cpp.py runtime/
-        python -m pytest -ra -n 4 --junitxml=${RUNNER_TEST_RESULTS_DIR}/tests_py_dynamo_core_partitioning_test_results.xml partitioning/
-        ../../../packaging/vc_env_helper.bat python -m pytest -ra -n 4 --junitxml=${RUNNER_TEST_RESULTS_DIR}/tests_py_dynamo_core_lowering_test_results.xml lowering/
+        cd tests/py/dynamo/
+        ../../../packaging/vc_env_helper.bat python -m pytest -m "not critical" -ra -n auto --junitxml=${RUNNER_TEST_RESULTS_DIR}/l2_torch_compile_models_tests_results.xml --ir torch_compile models/test_models.py
+        ../../../packaging/vc_env_helper.bat python -m pytest -m "not critical" -ra -n auto --junitxml=${RUNNER_TEST_RESULTS_DIR}/l2_torch_compile_dyn_models_tests_results.xml --ir torch_compile models/test_dyn_models.py
         popd
 
-  tests-py-dynamo-cudagraphs:
-    name: Test dynamo cudagraphs [Python]
-    needs: [substitute-runner, build]
+  L2-dynamo-compile-tests:
+    name: L2 dynamo compile tests
+    needs: [substitute-runner, build, L1-torch-compile-tests, L1-dynamo-compile-tests, L1-dynamo-core-tests, L1-torchscript-tests]
     strategy:
       fail-fast: false
       matrix:
@@ -275,7 +334,7 @@ jobs:
             package-name: torch_tensorrt
     uses: ./.github/workflows/windows-test.yml
     with:
-      job-name: tests-py-dynamo-cudagraphs
+      job-name: L2-dynamo-compile-tests
       repository: ${{ matrix.repository }}
       ref: ""
       test-infra-repository: pytorch/test-infra
@@ -284,18 +343,15 @@ jobs:
       pre-script: packaging/driver_upgrade.bat
       script: |
         set -euo pipefail
-        export USE_HOST_DEPS=1
-        export CI_BUILD=1
         pushd .
-        cd tests/py
-        cd dynamo
-        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/tests_py_dynamo_core_runtime_cudagraphs_cpp_test_results.xml runtime/test_002_cudagraphs_cpp.py
-        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/tests_py_dynamo_core_runtime_cudagraphs_py_test_results.xml runtime/test_002_cudagraphs_py.py
+        cd tests/py/dynamo/
+        ../../../packaging/vc_env_helper.bat python -m pytest -m "not critical" -ra -n auto --junitxml=${RUNNER_TEST_RESULTS_DIR}/l2_dynamo_compile_tests_results.xml models/
+        ../../../packaging/vc_env_helper.bat python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l2_dynamo_compile_llm_tests_results.xml llm/
         popd
 
-  tests-py-core:
-    name: Test core [Python]
-    needs: [substitute-runner, build]
+  L2-dynamo-core-tests:
+    name: L2 dynamo core tests
+    needs: [substitute-runner, build, L1-torch-compile-tests, L1-dynamo-compile-tests, L1-dynamo-core-tests, L1-torchscript-tests]
     strategy:
       fail-fast: false
       matrix:
@@ -304,7 +360,7 @@ jobs:
             package-name: torch_tensorrt
     uses: ./.github/workflows/windows-test.yml
     with:
-      job-name: tests-py-core
+      job-name: L2-dynamo-core-tests
       repository: ${{ matrix.repository }}
       ref: ""
       test-infra-repository: pytorch/test-infra
@@ -313,11 +369,63 @@ jobs:
       pre-script: packaging/driver_upgrade.bat
       script: |
         set -euo pipefail
-        export USE_HOST_DEPS=1
-        export CI_BUILD=1
         pushd .
-        cd tests/py/core
-        python -m pytest -ra -n 4 --junitxml=${RUNNER_TEST_RESULTS_DIR}/tests_py_core_test_results.xml .
+        cd tests/py/dynamo
+        ../../../packaging/vc_env_helper.bat python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l2_dynamo_core_tests_results.xml -n auto --ignore runtime/test_001_* --ignore runtime/test_000_* runtime/*
+        popd
+
+  L2-dynamo-plugin-tests:
+    name: L2 dynamo plugin tests
+    needs: [substitute-runner, build, L1-torch-compile-tests, L1-dynamo-compile-tests, L1-dynamo-core-tests, L1-torchscript-tests]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - repository: pytorch/tensorrt
+            package-name: torch_tensorrt
+    uses: ./.github/workflows/windows-test.yml
+    with:
+      job-name: L2-dynamo-plugin-tests
+      repository: ${{ matrix.repository }}
+      ref: ""
+      test-infra-repository: pytorch/test-infra
+      test-infra-ref: main
+      build-matrix: ${{ needs.substitute-runner.outputs.matrix }}
+      pre-script: packaging/driver_upgrade.bat
+      script: |
+        set -euo pipefail
+        pushd .
+        cd tests/py/dynamo
+        ../../../packaging/vc_env_helper.bat python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l2_dynamo_plugins_tests_results.xml -n auto --ignore automatic_plugin/
+        popd
+
+  L2-torchscript-tests:
+    name: L2 torchscript tests
+    needs: [substitute-runner, build, L1-torch-compile-tests, L1-dynamo-compile-tests, L1-dynamo-core-tests, L1-torchscript-tests]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - repository: pytorch/tensorrt
+            package-name: torch_tensorrt
+    uses: ./.github/workflows/windows-test.yml
+    with:
+      job-name: L2-torchscript-tests
+      repository: ${{ matrix.repository }}
+      ref: ""
+      test-infra-repository: pytorch/test-infra
+      test-infra-ref: main
+      build-matrix: ${{ needs.substitute-runner.outputs.matrix }}
+      pre-script: packaging/driver_upgrade.bat
+      script: |
+        set -euo pipefail
+        pushd .
+        cd tests/modules
+        python hub.py
+        popd
+        pushd .
+        cd tests/py/ts
+        ../../../packaging/vc_env_helper.bat python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l2_ts_integrations_tests_results.xml -n auto  integrations/
         popd
 
 concurrency:
