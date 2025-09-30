@@ -227,6 +227,7 @@ def compile(
 
     module_type = _parse_module_type(module)
     target_ir = _get_target_fe(module_type, ir)
+    print(f"lan added {target_ir=}")
     if target_ir == _IRType.ts:
         ts_mod = module
         if module_type == _ModuleType.nn:
@@ -307,6 +308,7 @@ def compile(
         exp_program = dynamo_trace(
             module, torchtrt_arg_inputs, kwarg_inputs=torchtrt_kwarg_inputs, **kwargs
         )
+        print(f"lan added {str(exp_program.graph)=}")
         trt_graph_module = dynamo_compile(
             exp_program,
             arg_inputs=torchtrt_arg_inputs,

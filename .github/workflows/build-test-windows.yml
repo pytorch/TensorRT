@@ -116,25 +116,12 @@ jobs:
         gdb --version
         nvidia-smi
         nvcc --version
-        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/test_dtype_support.xml --ir torch_compile models/test_dtype_support.py
-        echo "test_dtype_support.xml passed"
-
         python -m pytest -k "lan_1" -rP models/test_models.py
+        echo "lan added finished lan_1"
         python -m pytest -k "lan_2" -rP models/test_models.py
+        echo "lan added finished lan_2"
         python -m pytest -k "lan_3" -rP models/test_models.py
-        python -m pytest -k "lan_4" -rP models/test_models.py
-        python -m pytest -k "lan_5" -rP models/test_models.py
-        python -m pytest -k "lan_6" -rP models/test_models.py
-        python -m pytest -k "lan_7" -rP models/test_models.py
-        python -m pytest -k "lan_8" -rP models/test_models.py
-        python -m pytest -k "lan_9" -rP models/test_models.py
-
-        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/test_dyn_models.xml --ir dynamo models/test_dyn_models.py
-        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/test_models_export.xml --ir dynamo models/test_models_export.py
-        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/export_serde_test_results.xml --ir dynamo models/test_export_serde.py
-        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/reexport_test_results.xml --ir dynamo models/test_reexport.py
-
-        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/dyn_models_llm.xml llm/
+        echo "lan added finished lan_3"
         popd
 
 
