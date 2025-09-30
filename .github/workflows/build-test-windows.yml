@@ -119,7 +119,15 @@ jobs:
         python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/test_dtype_support.xml --ir torch_compile models/test_dtype_support.py
         echo "test_dtype_support.xml passed"
 
-        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/test_models.xml  --ir dynamo models/test_models.py
+        python -m pytest -k "lan_1" -rP models/test_models.py
+        python -m pytest -k "lan_2" -rP models/test_models.py
+        python -m pytest -k "lan_3" -rP models/test_models.py
+        python -m pytest -k "lan_4" -rP models/test_models.py
+        python -m pytest -k "lan_5" -rP models/test_models.py
+        python -m pytest -k "lan_6" -rP models/test_models.py
+        python -m pytest -k "lan_7" -rP models/test_models.py
+        python -m pytest -k "lan_8" -rP models/test_models.py
+        python -m pytest -k "lan_9" -rP models/test_models.py
 
         python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/test_dyn_models.xml --ir dynamo models/test_dyn_models.py
         python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/test_models_export.xml --ir dynamo models/test_models_export.py
