@@ -5,6 +5,7 @@ import logging
 import os
 import platform
 import warnings
+from functools import total_ordering
 from typing import Any, Collection, List, Optional, Sequence, Set, Tuple, Union
 
 import torch
@@ -809,6 +810,7 @@ def compile_module(
 
     # Partition module into components that can be TRT-accelerated
     fast_partitioner_failed = False
+    print(f"lan added {str(gm.graph)=}")
     # If specified, try using the fast partitioner and fall back to the global one on failure
     if settings.use_fast_partitioner:
         try:
@@ -847,10 +849,14 @@ def compile_module(
         dryrun_tracker.to_run_in_torch.extend(parse_non_trt_nodes(partitioned_module))
 
     submodule_node_dict = {}
+    print(f"lan added {list(partitioned_module.graph.nodes)=}")
+    print(f"lan added {total_ops=} {num_supported_ops=}")
     for node in partitioned_module.graph.nodes:
         if "_run_on_acc" not in node.name:
+            print(f"lan added skipped node{node.name=}")
             continue
         submodule_node_dict[node.name] = node
+        print(f"lan added added submodule{node.name=}")
 
     preserve_module_specs(original_in_spec, original_out_spec, partitioned_module)
     # Store TRT replicas of Torch subgraphs
