@@ -15,8 +15,9 @@ from torch_tensorrt.dynamo.utils import (
 
 assertions = unittest.TestCase()
 
+
 @pytest.mark.unit
-def test_save_load_ts(ir):
+def test_save_load_ts(tmp_path):
     """
     This tests save/load API on Torchscript format (model still compiled using ts workflow)
     """
@@ -41,14 +42,13 @@ def test_save_load_ts(ir):
         ir="ts",
         inputs=[input],
         min_block_size=1,
-        cache_built_engines=False,
-        reuse_cached_engines=False,
     )
     outputs_trt = trt_gm(input)
     # Save it as torchscript representation
-    torchtrt.save(trt_gm, "./trt.ts", output_format="torchscript", inputs=[input])
+    trt_file = tmp_path / "trt.ts"
+    torchtrt.save(trt_gm, trt_file, output_format="torchscript", inputs=[input])
 
-    trt_ts_module = torchtrt.load("./trt.ts")
+    trt_ts_module = torchtrt.load(trt_file)
     outputs_trt_deser = trt_ts_module(input)
 
     cos_sim = cosine_similarity(outputs_trt, outputs_trt_deser)
