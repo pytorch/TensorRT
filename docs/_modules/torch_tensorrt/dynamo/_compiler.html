@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt.dynamo._compiler &mdash; Torch-TensorRT v2.10.0.dev0+d8401f1 documentation</title>
+  <title>torch_tensorrt.dynamo._compiler &mdash; Torch-TensorRT v2.10.0.dev0+f1e8c01 documentation</title>
   
 
   
@@ -290,7 +290,7 @@
               
               
                 <div class="version">
-                  v2.10.0.dev0+d8401f1
+                  v2.10.0.dev0+f1e8c01
                 </div>
               
             
@@ -1220,6 +1220,10 @@
 <span class="sd">    Returns:</span>
 <span class="sd">        Compiled FX GraphModule</span>
 <span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="nb">any</span><span class="p">(</span><span class="n">v</span><span class="o">.</span><span class="n">requires_grad</span> <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">gm</span><span class="o">.</span><span class="n">state_dict</span><span class="p">()</span><span class="o">.</span><span class="n">values</span><span class="p">()):</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+            <span class="s2">&quot;The model may be in training mode, which may affect the performance of the compiled model!&quot;</span>
+        <span class="p">)</span>
     <span class="n">dryrun_tracker</span> <span class="o">=</span> <span class="n">DryRunTracker</span><span class="p">()</span>
     <span class="k">if</span> <span class="n">sample_kwarg_inputs</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">sample_kwarg_inputs</span> <span class="o">=</span> <span class="p">{}</span>
