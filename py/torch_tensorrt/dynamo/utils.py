@@ -898,9 +898,9 @@ def is_platform_supported_for_trtllm() -> bool:
         )
         return False
 
-    if machine == "aarch64" and "tegra" in release:
+    if machine == "aarch64" and "tegra" in release or is_thor():
         logger.info(
-            "TensorRT-LLM plugins for NCCL backend are not supported on Jetson/Orin/Xavier (Tegra) devices."
+            "TensorRT-LLM plugins for NCCL backend are not supported on Jetson/Orin/Xavier (Tegra) or Thor devices."
         )
         return False
 
