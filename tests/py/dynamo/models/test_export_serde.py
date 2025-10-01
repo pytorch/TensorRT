@@ -21,6 +21,7 @@ trt_ep_path = os.path.join(tempfile.gettempdir(), "trt.ep")
 
 
 @pytest.mark.unit
+@pytest.mark.critical
 def test_base_full_compile(ir):
     """
     This tests export serde functionality on a base model
@@ -74,6 +75,7 @@ def test_base_full_compile(ir):
 
 
 @pytest.mark.unit
+@pytest.mark.critical
 def test_base_full_compile_multiple_outputs(ir):
     """
     This tests export serde functionality on a base model
@@ -133,6 +135,7 @@ def test_base_full_compile_multiple_outputs(ir):
 
 
 @pytest.mark.unit
+@pytest.mark.critical
 def test_no_compile(ir):
     """
     This tests export serde functionality on a model
@@ -191,6 +194,7 @@ def test_no_compile(ir):
 
 
 @pytest.mark.unit
+@pytest.mark.critical
 def test_hybrid_relu_fallback(ir):
     """
     This tests export save and load functionality on a hybrid
@@ -421,6 +425,7 @@ def test_resnet18_torch_exec_ops_serde(ir):
 
 
 @pytest.mark.unit
+@pytest.mark.critical
 def test_hybrid_conv_fallback(ir):
     """
     This tests export save and load functionality on a hybrid
@@ -481,6 +486,7 @@ def test_hybrid_conv_fallback(ir):
 
 
 @pytest.mark.unit
+@pytest.mark.critical
 def test_hybrid_conv_fallback_cpu_offload(ir):
     """
     This tests export save and load functionality on a hybrid
@@ -542,6 +548,7 @@ def test_hybrid_conv_fallback_cpu_offload(ir):
 
 
 @pytest.mark.unit
+@pytest.mark.critical
 def test_arange_export(ir):
     """
     This tests export save and load functionality on a arange static graph
