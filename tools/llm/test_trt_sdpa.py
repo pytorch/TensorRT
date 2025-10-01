@@ -25,9 +25,10 @@ with torch_tensorrt.dynamo.Debugger():
     trt_gm = torch_tensorrt.dynamo.compile(
         ep,
         inputs=(q, k, v),
-        enabled_precisions={torch.float16},
+        enabled_precisions={torch.float32},
         min_block_size=1,
         disable_tf32=True,
+        use_explicit_typing=True,
     )
 
 trt_outputs = trt_gm(q, k, v)
