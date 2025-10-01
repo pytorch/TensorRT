@@ -149,9 +149,9 @@ def scaled_dot_product_attention(
 
     # always create our own attn_mask
     query, key, value, _, dropout_p, is_causal = args
-    breakpoint()
+
     attention_layer = ctx.net.add_attention(
         query, key, value, trt.AttentionNormalizationOp.SOFTMAX, False
     )
-    breakpoint()
+
     return attention_layer.get_output(0)
