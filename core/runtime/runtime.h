@@ -16,7 +16,7 @@ namespace core {
 namespace runtime {
 
 using EngineID = int64_t;
-const std::string ABI_VERSION = "7";
+const std::string ABI_VERSION = "8";
 extern bool MULTI_DEVICE_SAFE_MODE;
 
 typedef enum {
@@ -45,9 +45,6 @@ typedef enum {
 std::string base64_encode(const std::string& in);
 std::string base64_decode(const std::string& in);
 std::string serialize_bindings(const std::vector<std::string>& bindings);
-
-std::string resource_allocation_strategy_to_string(TRTEngine::ResourceAllocationStrategy strategy);
-TRTEngine::ResourceAllocationStrategy resource_allocation_strategy_from_string(const std::string& str);
 
 c10::optional<RTDevice> get_most_compatible_device(
     const RTDevice& target_device,
