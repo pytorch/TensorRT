@@ -734,11 +734,8 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                     if interpreter_result is not None:  # hit the cache
                         return interpreter_result  # type: ignore[no-any-return]
 
-        _LOGGER.debug(
-            f"CPU memory usage before network construction: {get_cpu_memory_usage()} MB"
-        )
         self._construct_trt_network_def()
-        _LOGGER.debug(
+        _LOGGER.info(
             f"CPU memory usage after network construction: {get_cpu_memory_usage()} MB"
         )
 
@@ -758,16 +755,16 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         self._create_timing_cache(
             builder_config, self.compilation_settings.timing_cache_path
         )
-        _LOGGER.debug(
-            f"CPU memory usage before engine building: {get_cpu_memory_usage()} MB"
-        )
+
         cuda_engine = self.builder.build_engine_with_config(
             self.ctx.net, builder_config
         )
         assert cuda_engine
+
         _LOGGER.debug(
             f"CPU memory usage after engine building: {get_cpu_memory_usage()} MB"
         )
+
         _LOGGER.info(
             f"Build TRT engine elapsed time: {datetime.now() - build_engine_start_time}"
         )

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import io
 import logging
 from typing import Any, List, Optional, Sequence
 
@@ -33,7 +34,7 @@ def infer_module_output_dtypes(
     """
     outputs = [node for node in module.graph.nodes if node.op == "output"]
     outputs = outputs[0].args
-    return get_output_dtypes(outputs, truncate_double)
+    return get_output_dtypes(outputs, truncate_double)  # type: ignore[no-any-return]
 
 
 def interpret_module_to_result(
@@ -113,11 +114,16 @@ def convert_module(
             delattr(module, attr)
     release_memory()
     logger.debug(
-        f"CPU memory usage after clearing frozen parameters and building memory: {get_cpu_memory_usage()} MB"
+        f"CPU memory usage after clearing frozen parameters and building memory in conversion: {get_cpu_memory_usage()} MB"
     )
 
+    serialized_engine = interpreter_result.engine.serialize()
+    with io.BytesIO() as engine_bytes:
+        engine_bytes.write(serialized_engine)
+        serialized_engine = engine_bytes.getvalue()
+    breakpoint()
     return rt_cls(
-        cuda_engine=interpreter_result.engine,
+        serialized_engine=serialized_engine,
         input_binding_names=list(interpreter_result.input_names),
         output_binding_names=list(interpreter_result.output_names),
         name=name,

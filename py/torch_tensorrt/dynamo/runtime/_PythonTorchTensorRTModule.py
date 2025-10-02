@@ -123,7 +123,6 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
 
     def __init__(
         self,
-        cuda_engine: trt.ICudaEngine = None,
         serialized_engine: Optional[bytes] = None,
         input_binding_names: Optional[List[str]] = None,
         output_binding_names: Optional[List[str]] = None,
@@ -183,19 +182,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         # Unused currently - to be used by Dynamic Shape support implementation
         self.memory_pool = None
 
-        if cuda_engine:
-            assert isinstance(
-                cuda_engine, trt.ICudaEngine
-            ), "Cuda engine must be a trt.ICudaEngine object"
-            self.engine = cuda_engine
-        elif serialized_engine:
-            assert isinstance(
-                serialized_engine, bytes
-            ), "Serialized engine must be a bytes object"
-            self.engine = serialized_engine
-        else:
-            raise ValueError("Serialized engine or cuda engine must be provided")
-
+        self.serialized_engine = serialized_engine
         self.input_names = (
             input_binding_names if input_binding_names is not None else []
         )
@@ -217,6 +204,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
             else False
         )
         self.settings = settings
+        self.engine = None
         self.weight_name_map = weight_name_map
         self.target_platform = Platform.current_platform()
         self.runtime_states = TorchTRTRuntimeStates(
@@ -231,7 +219,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         self.output_allocator: Optional[DynamicOutputAllocator] = None
         self.use_output_allocator_outputs = False
 
-        if self.engine and not self.settings.lazy_engine_init:
+        if self.serialized_engine is not None and not self.settings.lazy_engine_init:
             self.setup_engine()
 
     def get_streamable_device_memory_budget(self) -> Any:
@@ -272,22 +260,13 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         return self._set_device_memory_budget(budget_bytes)
 
     def setup_engine(self) -> None:
-
-        if isinstance(self.engine, trt.ICudaEngine):
-            pass
-        elif isinstance(self.engine, bytes):
-            runtime = trt.Runtime(TRT_LOGGER)
-            self.engine = runtime.deserialize_cuda_engine(self.engine)
-        else:
-            raise ValueError(
-                "Expected engine as trt.ICudaEngine or serialized engine as bytes"
-            )
-
         assert (
             self.target_platform == Platform.current_platform()
         ), f"TensorRT engine was not built to target current platform (target: {self.target_platform}, current: {Platform.current_platform()})"
 
         self.initialized = True
+        runtime = trt.Runtime(TRT_LOGGER)
+        self.engine = runtime.deserialize_cuda_engine(self.serialized_engine)
         if self.settings.enable_weight_streaming:
             self.set_default_device_memory_budget()
         self.context = self.engine.create_execution_context()
@@ -323,7 +302,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
             raise RuntimeError("PythonTorchTensorRTModule is not initialized.")
 
     def _on_state_dict(self, state_dict: Dict[str, Any], prefix: str, _: Any) -> None:
-        state_dict[prefix + "engine"] = self.engine
+        state_dict[prefix + "engine"] = self.serialized_engine
         state_dict[prefix + "input_names"] = self.input_names
         state_dict[prefix + "output_names"] = self.output_names
         state_dict[prefix + "platform"] = self.target_platform
@@ -338,7 +317,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         unexpected_keys: Any,
         error_msgs: Any,
     ) -> None:
-        self.engine = state_dict[prefix + "engine"]
+        self.serialized_engine = state_dict[prefix + "engine"]
         self.input_names = state_dict[prefix + "input_names"]
         self.output_names = state_dict[prefix + "output_names"]
         self.target_platform = state_dict[prefix + "platform"]

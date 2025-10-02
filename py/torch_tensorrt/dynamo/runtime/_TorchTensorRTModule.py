@@ -2,12 +2,10 @@ from __future__ import annotations
 
 import base64
 import copy
-import io
 import logging
 import pickle
 from typing import Any, List, Optional, Tuple, Union
 
-import tensorrt as trt
 import torch
 from torch_tensorrt._Device import Device
 from torch_tensorrt._enums import Platform
@@ -78,7 +76,6 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
 
     def __init__(
         self,
-        cuda_engine: Optional[trt.ICudaEngine | bytes] = None,
         serialized_engine: Optional[bytes] = None,
         input_binding_names: Optional[List[str]] = None,
         output_binding_names: Optional[List[str]] = None,
@@ -126,22 +123,8 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         """
         super(TorchTensorRTModule, self).__init__()
 
-        if serialized_engine:
-            assert isinstance(
-                serialized_engine, bytes
-            ), "Serialized engine must be a bytes object"
-            self.serialized_engine = serialized_engine
-
-        elif cuda_engine:
-            assert isinstance(
-                cuda_engine, trt.ICudaEngine
-            ), "Cuda engine must be a trt.ICudaEngine object"
-            serialized_engine = cuda_engine.serialize()
-            with io.BytesIO() as engine_bytes:
-                engine_bytes.write(serialized_engine)  # type: ignore
-                self.serialized_engine = engine_bytes.getvalue()
-        else:
-            raise ValueError("Serialized engine or cuda engine must be provided")
+        if not isinstance(serialized_engine, bytearray):
+            ValueError("Expected serialized engine as bytearray")
 
         self.input_binding_names = (
             input_binding_names if input_binding_names is not None else []
@@ -153,11 +136,12 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         self.hardware_compatible = settings.hardware_compatible
         self.settings = copy.deepcopy(settings)
         self.weight_name_map = weight_name_map
+        self.serialized_engine = serialized_engine
         self.engine = None
         self.requires_output_allocator = requires_output_allocator
 
         if (
-            self.serialized_engine
+            serialized_engine
             and not self.settings.lazy_engine_init
             and not self.settings.enable_cross_compile_for_windows
         ):
