@@ -8,7 +8,7 @@ from conversion.harness import DispatchTestCase
 from distributed_utils import set_environment_variables_pytest
 from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
-from torch_tensorrt.dynamo.utils import is_platform_supported_for_trtllm
+from torch_tensorrt._utils import is_platform_supported_for_trtllm
 
 
 class DistributedGatherModel(nn.Module):

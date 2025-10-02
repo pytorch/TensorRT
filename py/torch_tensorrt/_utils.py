@@ -15,7 +15,7 @@ import torch
 logger = logging.getLogger(__name__)
 
 _WHL_CPYTHON_VERSION = "cp310"
-_TENSORRT_LLM_VERSION = "0.17.0.post1"
+_TENSORRT_LLM_VERSION_ = "0.17.0.post1"
 
 
 def sanitized_torch_version() -> Any:
@@ -132,7 +132,7 @@ def _extracted_dir_trtllm(platform_system: str, platform_machine: str) -> Path:
     return (
         _cache_root()
         / "trtllm"
-        / f"{__TENSORRT_LLM_VERSION__}_{platform_system}_{platform_machine}"
+        / f"{_TENSORRT_LLM_VERSION_}_{platform_system}_{platform_machine}"
     )
 
 
@@ -149,7 +149,7 @@ def download_and_get_plugin_lib_path() -> Optional[str]:
     platform_system = platform.system().lower()
     platform_machine = platform.machine().lower()
     wheel_filename = (
-        f"tensorrt_llm-{__TENSORRT_LLM_VERSION__}-{_WHL_CPYTHON_VERSION}-"
+        f"tensorrt_llm-{_TENSORRT_LLM_VERSION_}-{_WHL_CPYTHON_VERSION}-"
         f"{_WHL_CPYTHON_VERSION}-{platform_system}_{platform_machine}.whl"
     )
     wheel_path = _cache_root() / wheel_filename
