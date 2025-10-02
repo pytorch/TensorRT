@@ -7,9 +7,9 @@ from typing import Any, Callable, Dict, List, Optional, Type, TypeVar
 import tensorrt
 from torch_tensorrt._utils import (
     check_cross_compile_trt_win_lib,
+    load_tensorrt_llm_for_nccl,
     sanitized_torch_version,
 )
-from torch_tensorrt.dynamo.utils import load_tensorrt_llm_for_nccl
 
 from packaging import version
 
@@ -167,9 +167,13 @@ def needs_trtllm_for_nccl(f: Callable[..., Any]) -> Callable[..., Any]:
         if ENABLED_FEATURES.trtllm_for_nccl:
             return f(*args, **kwargs)
         else:
-            raise NotImplementedError(
-                "TensorRT-LLM plugins for NCCL backend could not be loaded"
-            )
+
+            def not_implemented(*args: List[Any], **kwargs: Dict[str, Any]) -> Any:
+                raise NotImplementedError(
+                    "Refit feature is currently not available in Python 3.13 or higher"
+                )
+
+            return not_implemented(*args, **kwargs)
 
     return wrapper
 
