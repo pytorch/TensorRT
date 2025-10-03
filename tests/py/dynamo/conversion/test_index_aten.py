@@ -75,6 +75,21 @@ class TestIndexConstantConverter(DispatchTestCase):
                 [None, torch.tensor([0, 0, 1, 1]), None, torch.tensor([0, 0, 1, 1])],
                 torch.randn(2, 4, 4, 2),
             ),
+        ]
+    )
+    def test_index_constant(self, _, index, input):
+        class TestModule(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+
+            def forward(self, input):
+                return torch.ops.aten.index.Tensor(input, index)
+
+        inputs = [input]
+        self.run_test(TestModule(), inputs)
+
+    @parameterized.expand(
+        [
             (
                 "mask_index_three_dim",
                 [None, torch.tensor([True, False]), None],
@@ -98,7 +113,11 @@ class TestIndexConstantConverter(DispatchTestCase):
             ),
         ]
     )
-    def test_index_constant(self, _, index, input):
+    @unittest.skipIf(
+        is_thor(),
+        "Skipped on Thor due to nonzero not supported",
+    )
+    def test_index_constant_bool_mask(self, _, index, input):
         class TestModule(torch.nn.Module):
             def __init__(self):
                 super().__init__()
@@ -140,6 +159,10 @@ class TestIndexConverter(DispatchTestCase):
         index0 = torch.tensor([True, False])
         self.run_test(TestModule(), [input, index0], enable_passes=True)
 
+    @unittest.skipIf(
+        is_thor(),
+        "Skipped on Thor due to nonzero not supported",
+    )
     def test_index_zero_index_three_dim_ITensor(self):
         class TestModule(nn.Module):
             def forward(self, x, index0):
@@ -152,6 +175,10 @@ class TestIndexConverter(DispatchTestCase):
         index0 = index0.to(torch.int32)
         self.run_test(TestModule(), [input, index0])
 
+    @unittest.skipIf(
+        is_thor(),
+        "Skipped on Thor due to nonzero not supported",
+    )
     def test_index_zero_index_three_dim_mask_ITensor(self):
         class TestModule(nn.Module):
             def forward(self, x, index0):
