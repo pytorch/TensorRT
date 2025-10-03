@@ -1,13 +1,16 @@
 from __future__ import annotations
 
+import ctypes
 import gc
 import logging
+import platform
 import warnings
 from dataclasses import fields, replace
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 import numpy as np
+import psutil
 import sympy
 import tensorrt as trt
 import torch
@@ -858,3 +861,53 @@ def is_thor() -> bool:
     if torch.cuda.get_device_capability() in [(11, 0)]:
         return True
     return False
+
+
+def get_cpu_memory_usage() -> Any:
+    return psutil.Process().memory_info().rss / 1024 / 1024
+
+
+def release_memory() -> None:
+    gc.collect()
+    if torch.cuda.is_available():
+        torch.cuda.synchronize()
+        torch.cuda.empty_cache()
+        torch.cuda.ipc_collect()
+        torch.cuda.synchronize()
+
+    if platform.system() == "Linux":
+        try:
+            libc = ctypes.CDLL("libc.so.6")
+            if libc.malloc_trim(0) != 1:
+                logger.warning("Failed to release CPU memory.")
+        except Exception:
+            logger.warning("Failed to release CPU memory.")
+
+    elif platform.system() == "Windows":
+        from ctypes import wintypes
+
+        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        psapi = ctypes.WinDLL("psapi", use_last_error=True)
+
+        GetCurrentProcess = kernel32.GetCurrentProcess
+        GetCurrentProcess.restype = wintypes.HANDLE
+        hproc = GetCurrentProcess()
+
+        HeapSetInformation = kernel32.HeapSetInformation
+        HeapSetInformation.argtypes = [
+            wintypes.HANDLE,
+            ctypes.c_int,
+            ctypes.c_void_p,
+            ctypes.c_size_t,
+        ]
+        HeapSetInformation.restype = wintypes.BOOL
+        GetProcessHeap = kernel32.GetProcessHeap
+        GetProcessHeap.restype = wintypes.HANDLE
+        ok = False
+        try:
+            HeapOptimizeResources = 3
+            hheap = GetProcessHeap()
+            if HeapSetInformation(hheap, HeapOptimizeResources, None, 0):
+                ok = True
+        except Exception:
+            logger.warning("Failed to release CPU memory.")
