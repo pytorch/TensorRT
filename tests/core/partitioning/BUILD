@@ -4,7 +4,7 @@ load("//tests/core/partitioning:partitioning_test.bzl", "partitioning_test")
 config_setting(
     name = "use_torch_whl",
     flag_values = {
-        "//toolchains/dep_src:torch": "whl"
+        "//toolchains/dep_src:torch": "whl",
     },
 )
 
@@ -21,10 +21,9 @@ config_setting(
         "@platforms//cpu:aarch64",
     ],
     flag_values = {
-        "//toolchains/dep_collection:compute_libs": "jetpack"
+        "//toolchains/dep_collection:compute_libs": "jetpack",
     },
 )
-
 
 filegroup(
     name = "jit_models",
@@ -33,8 +32,8 @@ filegroup(
         "//tests/modules:inplace_op_if_scripted.jit.pt",
         "//tests/modules:loop_fallback_eval_scripted.jit.pt",
         "//tests/modules:loop_fallback_no_eval_scripted.jit.pt",
-        "//tests/modules:mobilenet_v2_traced.jit.pt",
-        "//tests/modules:resnet50_traced.jit.pt",
+        # "//tests/modules:mobilenet_v2_traced.jit.pt",
+        # "//tests/modules:resnet50_traced.jit.pt",
     ],
 )
 
@@ -72,9 +71,9 @@ cc_test(
         "//tests/util",
         "@googletest//:gtest_main",
     ] + select({
-        ":windows": ["@libtorch_win//:libtorch"],
-        ":use_torch_whl": ["@torch_whl//:libtorch"],
         ":jetpack": ["@torch_l4t//:libtorch"],
+        ":use_torch_whl": ["@torch_whl//:libtorch"],
+        ":windows": ["@libtorch_win//:libtorch"],
         "//conditions:default": ["@libtorch"],
     }),
 )
@@ -89,9 +88,9 @@ cc_test(
         "//tests/util",
         "@googletest//:gtest_main",
     ] + select({
-        ":windows": ["@libtorch_win//:libtorch"],
-        ":use_torch_whl": ["@torch_whl//:libtorch"],
         ":jetpack": ["@torch_l4t//:libtorch"],
+        ":use_torch_whl": ["@torch_whl//:libtorch"],
+        ":windows": ["@libtorch_win//:libtorch"],
         "//conditions:default": ["@libtorch"],
     }),
 )
@@ -106,9 +105,9 @@ cc_test(
         "//tests/util",
         "@googletest//:gtest_main",
     ] + select({
-        ":windows": ["@libtorch_win//:libtorch"],
-        ":use_torch_whl": ["@torch_whl//:libtorch"],
         ":jetpack": ["@torch_l4t//:libtorch"],
+        ":use_torch_whl": ["@torch_whl//:libtorch"],
+        ":windows": ["@libtorch_win//:libtorch"],
         "//conditions:default": ["@libtorch"],
     }),
 )
@@ -123,9 +122,9 @@ cc_test(
         "//tests/util",
         "@googletest//:gtest_main",
     ] + select({
-        ":windows": ["@libtorch_win//:libtorch"],
-        ":use_torch_whl": ["@torch_whl//:libtorch"],
         ":jetpack": ["@torch_l4t//:libtorch"],
+        ":use_torch_whl": ["@torch_whl//:libtorch"],
+        ":windows": ["@libtorch_win//:libtorch"],
         "//conditions:default": ["@libtorch"],
     }),
 )

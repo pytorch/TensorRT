@@ -1,5 +1,6 @@
 # type: ignore
 import importlib
+import platform
 import unittest
 
 import pytest
@@ -96,8 +97,14 @@ def test_resnet18_cpu_offload(ir):
     torch._dynamo.reset()
 
 
+# TODO: remove this skip in windows once the access violation issue is fixed
+# nvbug: https://nvbugspro.nvidia.com/bug/5555263
 @unittest.skipIf(
     not importlib.util.find_spec("torchvision"), "torchvision not installed"
+)
+@unittest.skipIf(
+    platform.system().lower().startswith("windows"),
+    "Windows cu130 has access violation issue with this test case, skip it for now",
 )
 def test_resnet18_torch_exec_ops(ir):
     model = models.resnet18(pretrained=True).eval().to("cuda")

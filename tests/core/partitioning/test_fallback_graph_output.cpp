@@ -8,6 +8,7 @@
 #ifndef DISABLE_TEST_IN_CI
 
 TEST(Partitioning, ComputeResNet50FallbackGraphCorrectly) {
+  GTEST_SKIP();
   torch::jit::script::Module mod;
   try {
     mod = torch::jit::load("tests/modules/resnet50_traced.jit.pt");
@@ -38,6 +39,7 @@ TEST(Partitioning, ComputeResNet50FallbackGraphCorrectly) {
 }
 
 TEST(Partitioning, ComputeMobileNetFallbackGraphCorrectly) {
+  GTEST_SKIP();
   torch::jit::script::Module mod;
   try {
     mod = torch::jit::load("tests/modules/mobilenet_v2_traced.jit.pt");

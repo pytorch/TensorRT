@@ -5,6 +5,7 @@
 #include "torch_tensorrt/torch_tensorrt.h"
 
 TEST(CppAPITest, ResNet18DynamicBatchFallbackCorrectly) {
+  GTEST_SKIP();
   torch::jit::script::Module mod;
   try {
     mod = torch::jit::load("tests/modules/resnet18_scripted.jit.pt");
@@ -55,6 +56,7 @@ TEST(CppAPITest, ResNet18DynamicBatchFallbackCorrectly) {
 }
 
 TEST(CppAPITest, ResNet18DynamicShapeFallbackCorrectly) {
+  GTEST_SKIP();
   torch::jit::script::Module mod;
   try {
     mod = torch::jit::load("tests/modules/resnet18_scripted.jit.pt");

@@ -1,0 +1,13 @@
+# This file is specifically to install correct version of libraries during CI testing.
+# networkx library issue: https://discuss.pytorch.org/t/installing-pytorch-under-python-3-8-question-about-networkx-version/196740
+expecttest
+networkx
+numpy
+setuptools
+parameterized>=0.2.0
+pytest>=8.2.1
+pytest-xdist>=3.6.1
+pyyaml
+transformers==4.53.1
+timm
+# torchvision nvidia-modelopt should use the one already installed inside the dlfw docker container

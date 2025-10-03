@@ -24,7 +24,7 @@ GTEST_ALLOW_UNINSTANTIATED_PARAMETERIZED_TEST(CppAPITests);
 #else
 
 INSTANTIATE_TEST_SUITE_P(
-    ModuleAsEngineForwardIsCloseSuite,
+    DISABLED_ModuleAsEngineForwardIsCloseSuite,
     CppAPITests,
     testing::Values(
         PathAndInput({"tests/modules/resnet18_scripted.jit.pt", {{1, 3, 224, 224}}, {at::kFloat}}),

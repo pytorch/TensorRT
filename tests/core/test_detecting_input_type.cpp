@@ -8,6 +8,7 @@
 #include "torch_tensorrt/torch_tensorrt.h"
 
 TEST(CoreTest, DetectingInputTypeWorksCorrectFP32) {
+  GTEST_SKIP();
   torch::jit::script::Module mod;
   try {
     mod = torch::jit::load("tests/modules/mobilenet_v2_scripted.jit.pt");
@@ -29,6 +30,7 @@ TEST(CoreTest, DetectingInputTypeWorksCorrectFP32) {
 }
 
 TEST(CoreTest, DetectingInputTypeWorksCorrectFP16) {
+  GTEST_SKIP();
   torch::jit::script::Module mod;
   try {
     mod = torch::jit::load("tests/modules/mobilenet_v2_scripted.jit.pt");

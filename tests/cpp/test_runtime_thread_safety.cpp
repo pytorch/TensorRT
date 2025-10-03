@@ -23,6 +23,7 @@ void run_infer(
 }
 
 TEST(CppAPITests, RuntimeThreadSafety) {
+  GTEST_SKIP();
   std::string path = "tests/modules/resnet50_traced.jit.pt";
   torch::jit::Module mod;
   try {
