@@ -103,6 +103,7 @@ def cross_compile_for_windows(
     tiling_optimization_level: str = _defaults.TILING_OPTIMIZATION_LEVEL,
     l2_limit_for_tiling: int = _defaults.L2_LIMIT_FOR_TILING,
     offload_module_to_cpu: bool = _defaults.OFFLOAD_MODULE_TO_CPU,
+    use_distributed_mode_trace: bool = _defaults.USE_DISTRIBUTED_MODE_TRACE,
     **kwargs: Any,
 ) -> torch.fx.GraphModule:
     """Compile an ExportedProgram module using TensorRT in Linux for Inference in Windows
@@ -176,6 +177,7 @@ def cross_compile_for_windows(
         enable_weight_streaming (bool): Enable weight streaming.
         tiling_optimization_level (str): The optimization level of tiling strategies. A higher level allows TensorRT to spend more time searching for better tiling strategy. We currently support ["none", "fast", "moderate", "full"].
         l2_limit_for_tiling (int): The target L2 cache usage limit (in bytes) for tiling optimization (default is -1 which means no limit).
+        use_distributed_mode_trace (bool):  Using aot_autograd to trace the graph. This is enabled when DTensors or distributed tensors are present in distributed model
         **kwargs: Any,
     Returns:
         torch.fx.GraphModule: Compiled FX Module, when run it will execute via TensorRT
@@ -330,6 +332,7 @@ def cross_compile_for_windows(
         "enable_weight_streaming": enable_weight_streaming,
         "tiling_optimization_level": tiling_optimization_level,
         "l2_limit_for_tiling": l2_limit_for_tiling,
+        "use_distributed_mode_trace": use_distributed_mode_trace,
     }
 
     # disable the following settings is not supported for cross compilation for windows feature
@@ -430,6 +433,7 @@ def compile(
     tiling_optimization_level: str = _defaults.TILING_OPTIMIZATION_LEVEL,
     l2_limit_for_tiling: int = _defaults.L2_LIMIT_FOR_TILING,
     offload_module_to_cpu: bool = _defaults.OFFLOAD_MODULE_TO_CPU,
+    use_distributed_mode_trace: bool = _defaults.USE_DISTRIBUTED_MODE_TRACE,
     **kwargs: Any,
 ) -> torch.fx.GraphModule:
     """Compile an ExportedProgram module for NVIDIA GPUs using TensorRT
@@ -506,6 +510,7 @@ def compile(
         tiling_optimization_level (str): The optimization level of tiling strategies. A higher level allows TensorRT to spend more time searching for better tiling strategy. We currently support ["none", "fast", "moderate", "full"].
         l2_limit_for_tiling (int): The target L2 cache usage limit (in bytes) for tiling optimization (default is -1 which means no limit).
         offload_module_to_cpu (bool): Offload the module to CPU. This is useful when we need to minimize GPU memory usage.
+        use_distributed_mode_trace (bool):  Using aot_autograd to trace the graph. This is enabled when DTensors or distributed tensors are present in distributed model
         **kwargs: Any,
     Returns:
         torch.fx.GraphModule: Compiled FX Module, when run it will execute via TensorRT
@@ -674,6 +679,7 @@ def compile(
         "tiling_optimization_level": tiling_optimization_level,
         "l2_limit_for_tiling": l2_limit_for_tiling,
         "offload_module_to_cpu": offload_module_to_cpu,
+        "use_distributed_mode_trace": use_distributed_mode_trace,
     }
 
     settings = CompilationSettings(**compilation_options)
@@ -1049,6 +1055,7 @@ def convert_exported_program_to_serialized_trt_engine(
     tiling_optimization_level: str = _defaults.TILING_OPTIMIZATION_LEVEL,
     l2_limit_for_tiling: int = _defaults.L2_LIMIT_FOR_TILING,
     offload_module_to_cpu: bool = _defaults.OFFLOAD_MODULE_TO_CPU,
+    use_distributed_mode_trace: bool = _defaults.USE_DISTRIBUTED_MODE_TRACE,
     **kwargs: Any,
 ) -> bytes:
     """Convert an ExportedProgram to a serialized TensorRT engine
@@ -1122,6 +1129,7 @@ def convert_exported_program_to_serialized_trt_engine(
         tiling_optimization_level (str): The optimization level of tiling strategies. A higher level allows TensorRT to spend more time searching for better tiling strategy. We currently support ["none", "fast", "moderate", "full"].
         l2_limit_for_tiling (int): The target L2 cache usage limit (in bytes) for tiling optimization (default is -1 which means no limit).
         offload_module_to_cpu (bool): Offload the module to CPU. This is useful when we need to minimize GPU memory usage.
+        use_distributed_mode_trace (bool):  Using aot_autograd to trace the graph. This is enabled when DTensors or distributed tensors are present in distributed model.
         **kwargs: Any,
     Returns:
         bytes: Serialized TensorRT engine, can either be saved to a file or deserialized via TensorRT APIs
@@ -1290,6 +1298,7 @@ def convert_exported_program_to_serialized_trt_engine(
         "tiling_optimization_level": tiling_optimization_level,
         "l2_limit_for_tiling": l2_limit_for_tiling,
         "offload_module_to_cpu": offload_module_to_cpu,
+        "use_distributed_mode_trace": use_distributed_mode_trace,
     }
 
     settings = CompilationSettings(**compilation_options)

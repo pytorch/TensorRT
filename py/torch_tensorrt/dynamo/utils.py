@@ -5,7 +5,16 @@ import logging
 import warnings
 from dataclasses import fields, replace
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    List,
+    Optional,
+    Sequence,
+    Tuple,
+    Union,
+)
 
 import numpy as np
 import sympy
@@ -90,11 +99,9 @@ def unified_dtype_converter(
 ) -> Union[np.dtype, torch.dtype, TRTDataType]:
     """
     Convert TensorRT, Numpy, or Torch data types to any other of those data types.
-
     Args:
         dtype (TRTDataType, torch.dtype, np.dtype): A TensorRT, Numpy, or Torch data type.
         to (Frameworks): The framework to convert the data type to.
-
     Returns:
         The equivalent data type in the requested framework.
     """
@@ -850,11 +857,5 @@ def get_output_dtypes(output: Any, truncate_doulbe: bool = False) -> List[dtype]
 
 def is_tegra_platform() -> bool:
     if torch.cuda.get_device_capability() in [(8, 7), (7, 2)]:
-        return True
-    return False
-
-
-def is_thor() -> bool:
-    if torch.cuda.get_device_capability() in [(11, 0)]:
         return True
     return False

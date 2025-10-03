@@ -1,3 +1,4 @@
 __cuda_version__: "12.8"
 __tensorrt_version__: "10.13.3"
 __tensorrt_rtx_version__: "1.0.0"
+__tensorrt_llm_version__: "0.17.0.post1"
