@@ -81,6 +81,7 @@ def is_platform_supported_for_trtllm() -> bool:
     Unsupported:
         - Windows platforms
         - Jetson/Orin/Xavier (aarch64 architecture + 'tegra' in platform release)
+        - Thor devices
         - CUDA 13 not supported
     """
     system = platform.system().lower()
@@ -110,7 +111,7 @@ def is_platform_supported_for_trtllm() -> bool:
         major, minor = map(int, cuda_version.split("."))
         if major != 12:
             logger.error(
-                "CUDA 13 is not supported for TRT-LLM plugins. Please install pytorch with CUDA 12.x support"
+                "CUDA 13 is not currently supported for TRT-LLM plugins. Please install pytorch with CUDA 12.x support"
             )
             return False
 
