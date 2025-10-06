@@ -218,8 +218,11 @@ def test_resnet18_half(ir):
     not importlib.util.find_spec("modelopt"),
     "ModelOpt is required to run this test",
 )
+@unittest.skipIf(
+    platform.system() != "Linux",
+    "modelopt is only supported on Linux",
+)
 @pytest.mark.unit
-@pytest.mark.critical
 def test_base_fp4_dynamic_shapes(ir):
     import modelopt.torch.quantization as mtq
     from modelopt.torch.quantization.utils import export_torch_mode
@@ -281,8 +284,11 @@ def test_base_fp4_dynamic_shapes(ir):
     not importlib.util.find_spec("modelopt"),
     "ModelOpt is required to run this test",
 )
+@unittest.skipIf(
+    platform.system() != "Linux",
+    "modelopt is only supported on Linux",
+)
 @pytest.mark.unit
-@pytest.mark.critical
 def test_base_fp4_static_shapes(ir):
     import modelopt.torch.quantization as mtq
     from modelopt.torch.quantization.utils import export_torch_mode
@@ -339,8 +345,11 @@ def test_base_fp4_static_shapes(ir):
     not importlib.util.find_spec("modelopt"),
     "ModelOpt is required to run this test",
 )
+@unittest.skipIf(
+    platform.system() != "Linux",
+    "modelopt is only supported on Linux",
+)
 @pytest.mark.unit
-@pytest.mark.critical
 def test_base_fp8(ir):
     import modelopt.torch.quantization as mtq
     from modelopt.torch.quantization.utils import export_torch_mode
@@ -384,15 +393,16 @@ def test_base_fp8(ir):
             assert torch.allclose(output_pyt, outputs_trt, rtol=5e-3, atol=1e-2)
 
 
-@unittest.skipIf(
-    platform.system() != "Linux"
-    or not importlib.util.find_spec("modelopt")
-    or Version(metadata.version("nvidia-modelopt")) < Version("0.17.0"),
-    "modelopt 0.17.0 or later is required, Int8 quantization is supported in modelopt since 0.17.0 or later for linux",
-)
 @pytest.mark.unit
-@pytest.mark.critical
 @pytest.mark.parametrize("dtype", [torch.float16, torch.bfloat16, torch.float32])
+@unittest.skipIf(
+    not importlib.util.find_spec("modelopt"),
+    "ModelOpt is required to run this test",
+)
+@unittest.skipIf(
+    platform.system() != "Linux",
+    "modelopt is only supported on Linux",
+)
 def test_base_int8(ir, dtype):
     import modelopt.torch.quantization as mtq
     from modelopt.torch.quantization.utils import export_torch_mode
@@ -444,15 +454,16 @@ def test_base_int8(ir, dtype):
             assert torch.allclose(output_pyt, outputs_trt, rtol=5e-3, atol=1e-2)
 
 
-@unittest.skipIf(
-    platform.system() != "Linux"
-    or not importlib.util.find_spec("modelopt")
-    or Version(metadata.version("nvidia-modelopt")) < Version("0.17.0"),
-    "modelopt 0.17.0 or later is required, Int8 quantization is supported in modelopt since 0.17.0 or later for linux",
-)
 @pytest.mark.unit
-@pytest.mark.critical
 @pytest.mark.parametrize("dtype", [torch.float16, torch.bfloat16, torch.float32])
+@unittest.skipIf(
+    not importlib.util.find_spec("modelopt"),
+    "ModelOpt is required to run this test",
+)
+@unittest.skipIf(
+    platform.system() != "Linux",
+    "modelopt is only supported on Linux",
+)
 def test_base_int8_dynamic_shape(ir, dtype):
     import modelopt.torch.quantization as mtq
     from modelopt.torch.quantization.utils import export_torch_mode
