@@ -882,32 +882,3 @@ def release_memory() -> None:
                 logger.warning("Failed to release CPU memory.")
         except Exception:
             logger.warning("Failed to release CPU memory.")
-
-    elif platform.system() == "Windows":
-        from ctypes import wintypes
-
-        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
-        psapi = ctypes.WinDLL("psapi", use_last_error=True)
-
-        GetCurrentProcess = kernel32.GetCurrentProcess
-        GetCurrentProcess.restype = wintypes.HANDLE
-        hproc = GetCurrentProcess()
-
-        HeapSetInformation = kernel32.HeapSetInformation
-        HeapSetInformation.argtypes = [
-            wintypes.HANDLE,
-            ctypes.c_int,
-            ctypes.c_void_p,
-            ctypes.c_size_t,
-        ]
-        HeapSetInformation.restype = wintypes.BOOL
-        GetProcessHeap = kernel32.GetProcessHeap
-        GetProcessHeap.restype = wintypes.HANDLE
-        ok = False
-        try:
-            HeapOptimizeResources = 3
-            hheap = GetProcessHeap()
-            if HeapSetInformation(hheap, HeapOptimizeResources, None, 0):
-                ok = True
-        except Exception:
-            logger.warning("Failed to release CPU memory.")

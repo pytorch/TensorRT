@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import io
 import logging
-from typing import Any, List, Optional, Sequence
+from typing import Any, List, NamedTuple, Optional, Sequence
 
 import torch
 from torch_tensorrt._enums import dtype
@@ -10,10 +10,7 @@ from torch_tensorrt._features import ENABLED_FEATURES
 from torch_tensorrt._Input import Input
 from torch_tensorrt.dynamo._engine_cache import BaseEngineCache
 from torch_tensorrt.dynamo._settings import CompilationSettings
-from torch_tensorrt.dynamo.conversion._TRTInterpreter import (
-    TRTInterpreter,
-    TRTInterpreterResult,
-)
+from torch_tensorrt.dynamo.conversion._TRTInterpreter import TRTInterpreter
 from torch_tensorrt.dynamo.runtime import PythonTorchTensorRTModule, TorchTensorRTModule
 from torch_tensorrt.dynamo.utils import (
     get_cpu_memory_usage,
@@ -22,6 +19,14 @@ from torch_tensorrt.dynamo.utils import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+class SerializedInterpreterResult(NamedTuple):
+    serialized_engine: bytes
+    input_names: Sequence[str]
+    output_names: Sequence[str]
+    weight_name_map: Optional[dict[Any, Any]]
+    requires_output_allocator: bool
 
 
 def infer_module_output_dtypes(
@@ -34,7 +39,7 @@ def infer_module_output_dtypes(
     """
     outputs = [node for node in module.graph.nodes if node.op == "output"]
     outputs = outputs[0].args
-    return get_output_dtypes(outputs, truncate_double)
+    return get_output_dtypes(outputs, truncate_double)  # type: ignore
 
 
 def interpret_module_to_result(
@@ -44,7 +49,7 @@ def interpret_module_to_result(
     arg_inputs: Optional[Sequence[Input]] = None,
     kwarg_inputs: Optional[dict[str, Any]] = None,
     engine_cache: Optional[BaseEngineCache] = None,
-) -> TRTInterpreterResult:
+) -> SerializedInterpreterResult:
     """Interpret an FX module to a TRTInterpreterResult
     Args:
         module: FX GraphModule to interpret
@@ -84,16 +89,18 @@ def interpret_module_to_result(
     with io.BytesIO() as engine_bytes:
         engine_bytes.write(serialized_engine)
         serialized_engine = engine_bytes.getvalue()
-
-    interpreter_result = TRTInterpreterResult(
-        engine=serialized_engine,
+        logger.debug(
+            f"CPU memory usage after serializing engine: {get_cpu_memory_usage()} MB"
+        )
+    serialized_interpreter_result = SerializedInterpreterResult(
+        serialized_engine=serialized_engine,
         input_names=interpreter_result.input_names,
         output_names=interpreter_result.output_names,
         weight_name_map=interpreter_result.weight_name_map,
         requires_output_allocator=interpreter_result.requires_output_allocator,
     )
 
-    return interpreter_result
+    return serialized_interpreter_result
 
 
 def convert_module(
@@ -132,7 +139,7 @@ def convert_module(
         )
 
     return rt_cls(
-        serialized_engine=interpreter_result.engine,
+        serialized_engine=interpreter_result.serialized_engine,
         input_binding_names=list(interpreter_result.input_names),
         output_binding_names=list(interpreter_result.output_names),
         name=name,

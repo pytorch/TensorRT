@@ -596,7 +596,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         torch.cuda.empty_cache()
 
     @needs_refit  # type: ignore[misc]
-    def _insert_engine_to_cache(self, hash_val: str, engine: bytes) -> None:
+    def _insert_engine_to_cache(self, hash_val: str, engine: trt.ICudaEngine) -> None:
         serialized_engine = engine.serialize()
         # TODO: @Evan is waiting for TRT's feature to cache the weight-stripped engine
         # if not self.compilation_settings.strip_engine_weights:
@@ -735,7 +735,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                         return interpreter_result  # type: ignore[no-any-return]
 
         self._construct_trt_network_def()
-        _LOGGER.info(
+        _LOGGER.debug(
             f"CPU memory usage after network construction: {get_cpu_memory_usage()} MB"
         )
 
