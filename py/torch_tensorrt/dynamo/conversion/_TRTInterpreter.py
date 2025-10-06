@@ -70,7 +70,7 @@ class UnsupportedOperatorException(RuntimeError):
 
 
 class TRTInterpreterResult(NamedTuple):
-    engine: trt.ICudaEngine
+    engine: trt.ICudaEngine | bytes
     input_names: Sequence[str]
     output_names: Sequence[str]
     weight_name_map: Optional[dict[Any, Any]]
@@ -596,7 +596,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         torch.cuda.empty_cache()
 
     @needs_refit  # type: ignore[misc]
-    def _insert_engine_to_cache(self, hash_val: str, engine: bytes) -> None:
+    def _insert_engine_to_cache(self, hash_val: str, engine: trt.ICudaEngine) -> None:
         serialized_engine = engine.serialize()
         # TODO: @Evan is waiting for TRT's feature to cache the weight-stripped engine
         # if not self.compilation_settings.strip_engine_weights:
