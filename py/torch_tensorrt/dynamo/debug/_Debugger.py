@@ -171,7 +171,6 @@ class Debugger:
         ]
 
         if self.cfg.capture_shim:
-            self.original_environ_dict = {}
             shim_lib_name = "libtensorrt_shim.so"
             nvinfer_lib_name = "libnvinfer.so"
 
@@ -189,43 +188,31 @@ class Debugger:
                         f"TRT_SHIM_NVINFER_LIB_NAME is not set, please add the {nvinfer_lib_name} with full path to the TRT_SHIM_NVINFER_LIB_NAME environment variable"
                     )
                     is_valid = False
+                if os.environ.get("TRT_SHIM_OUTPUT_JSON_FILE") is None:
+                    _LOGGER.error(
+                        "TRT_SHIM_OUTPUT_JSON_FILE is not set, please add the shim output json file name with full path to the TRT_SHIM_OUTPUT_JSON_FILE environment variable"
+                    )
+                    is_valid = False
+                else:
+                    shim_output_json_file = os.environ["TRT_SHIM_OUTPUT_JSON_FILE"]
+                    shim_output_dir = os.path.dirname(shim_output_json_file)
+                    if len(shim_output_dir) > 0 and not os.path.exists(shim_output_dir):
+                        _LOGGER.debug(
+                            f"shim output directory {shim_output_dir} does not exist, creating it now"
+                        )
+                        os.makedirs(shim_output_dir)
                 return is_valid
 
             if not validate_setting():
                 return
-
-            self.original_environ_dict["TRT_SHIM_OUTPUT_JSON_FILE"] = os.environ.get(
-                "TRT_SHIM_OUTPUT_JSON_FILE"
+            json_file_name = os.environ["TRT_SHIM_OUTPUT_JSON_FILE"]
+            _LOGGER.info(
+                f"capture_shim feature is enabled, shim output file is set to {json_file_name}"
             )
-            if os.environ.get("TRT_SHIM_OUTPUT_JSON_FILE") is None:
-                # TRT_SHIM_OUTPUT_JSON_FILE is not set, set it to the default shim json file path
-                shim_output_dir = os.path.join(self.cfg.logging_dir, "shim")
-                shim_output_json_file = os.path.join(shim_output_dir, "shim.json")
-            else:
-                shim_output_json_file = os.environ["TRT_SHIM_OUTPUT_JSON_FILE"]
-                # validate the shim_output_dir
-                # split the path from the full path of shim_output_dir
-                shim_output_dir = os.path.dirname(shim_output_json_file)
-                if len(shim_output_dir) == 0:
-                    shim_output_dir = os.path.join(self.cfg.logging_dir, "shim")
-                    shim_output_json_file = os.path.join(shim_output_dir, "shim.json")
-
-            if not os.path.exists(shim_output_dir):
-                os.makedirs(shim_output_dir, exist_ok=True)
-            # if file alaredy exists, delete it first, so that we can create a fresh new one
-            if os.path.exists(shim_output_json_file):
-                os.remove(shim_output_json_file)
-            os.environ["TRT_SHIM_OUTPUT_JSON_FILE"] = shim_output_json_file
 
     def __exit__(self, exc_type: Any, exc_value: Any, exc_tb: Any) -> None:
 
         dictConfig(self.get_logging_config(None))
-        if self.cfg.capture_shim:
-            for k, v in self.original_environ_dict.items():
-                if v is None:
-                    os.environ.pop(k, None)
-                else:
-                    os.environ[k] = v
         if ENABLED_FEATURES.torch_tensorrt_runtime:
             torch.ops.tensorrt.set_logging_level(self.rt_level)
         if self.capture_fx_graph_before or self.capture_fx_graph_after:
