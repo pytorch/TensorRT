@@ -371,7 +371,7 @@ jobs:
         set -euo pipefail
         pushd .
         cd tests/py/dynamo
-        ../../../packaging/vc_env_helper.bat python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l2_dynamo_core_tests_results.xml --ignore runtime/test_000_* --ignore runtime/gen_hw_compat*  --ignore runtime/test_001_* --ignore runtime/test_000_* runtime/*
+        ../../../packaging/vc_env_helper.bat python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l2_dynamo_core_tests_results.xml --ignore runtime/test_000_* --ignore runtime/gen_hw_compat*  --ignore runtime/test_001_* runtime/*
         popd
 
   L2-dynamo-plugin-tests:
@@ -396,7 +396,7 @@ jobs:
         set -euo pipefail
         pushd .
         cd tests/py/dynamo
-        ../../../packaging/vc_env_helper.bat python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l2_dynamo_plugins_tests_results.xml  --ignore automatic_plugin/
+        ../../../packaging/vc_env_helper.bat python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l2_dynamo_plugins_tests_results.xml automatic_plugin/
         popd
 
   L2-torchscript-tests:
