@@ -197,6 +197,7 @@ class Debugger:
                 "class": "logging.FileHandler",
                 "filename": f"{self.cfg.logging_dir}/torch_tensorrt_logging.log",
                 "formatter": "standard",
+                "mode": "w",  # This will clear the previous content
             }
             config["loggers"][""]["handlers"].append("file")
         return config

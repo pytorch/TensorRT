@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import io
 import logging
 from typing import Any, List, Optional, Sequence
 
@@ -14,7 +15,11 @@ from torch_tensorrt.dynamo.conversion._TRTInterpreter import (
     TRTInterpreterResult,
 )
 from torch_tensorrt.dynamo.runtime import PythonTorchTensorRTModule, TorchTensorRTModule
-from torch_tensorrt.dynamo.utils import get_output_dtypes
+from torch_tensorrt.dynamo.utils import (
+    get_cpu_memory_usage,
+    get_output_dtypes,
+    release_memory,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +34,7 @@ def infer_module_output_dtypes(
     """
     outputs = [node for node in module.graph.nodes if node.op == "output"]
     outputs = outputs[0].args
-    return get_output_dtypes(outputs, truncate_double)  # type: ignore[no-any-return]
+    return get_output_dtypes(outputs, truncate_double)
 
 
 def interpret_module_to_result(
@@ -65,6 +70,29 @@ def interpret_module_to_result(
     )
 
     interpreter_result = interpreter.run()
+    # Delete the frozen parameters from the module to release CPU memory
+    del interpreter
+    for attr in dir(module):
+        if attr.startswith("_frozen_param"):
+            delattr(module, attr)
+    release_memory()
+    logger.debug(
+        f"CPU memory usage after clearing frozen parameters and building memory in conversion: {get_cpu_memory_usage()} MB"
+    )
+
+    serialized_engine = interpreter_result.engine.serialize()
+    with io.BytesIO() as engine_bytes:
+        engine_bytes.write(serialized_engine)
+        serialized_engine = engine_bytes.getvalue()
+
+    interpreter_result = TRTInterpreterResult(
+        engine=serialized_engine,
+        input_names=interpreter_result.input_names,
+        output_names=interpreter_result.output_names,
+        weight_name_map=interpreter_result.weight_name_map,
+        requires_output_allocator=interpreter_result.requires_output_allocator,
+    )
+
     return interpreter_result
 
 
@@ -104,7 +132,7 @@ def convert_module(
         )
 
     return rt_cls(
-        serialized_engine=interpreter_result.serialized_engine,
+        serialized_engine=interpreter_result.engine,
         input_binding_names=list(interpreter_result.input_names),
         output_binding_names=list(interpreter_result.output_names),
         name=name,
