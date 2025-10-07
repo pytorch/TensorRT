@@ -52,7 +52,7 @@ class Debugger:
                 after execution of a lowering pass. Defaults to None.
             save_engine_profile (bool): Whether to save TensorRT engine profiling information.
                 Defaults to False.
-            capture_shim (bool): Whether to save shim information. The directory to the shim output file are the logging_dir/shim/
+            capture_shim (bool): Whether to enable the capture shim feature. It is part of the TensorRT capture and replay feature, the captured output will be able to replay for debug purpose.
                 Defaults to False.
             profile_format (str): Format for profiling data. Choose from 'perfetto', 'trex', 'cudagraph'.
                 If you need to generate engine graph using the profiling files, set it to 'trex' and use the C++ runtime.
@@ -67,7 +67,6 @@ class Debugger:
         """
 
         os.makedirs(logging_dir, exist_ok=True)
-
         self.cfg = DebuggerConfig(
             log_level=log_level,
             save_engine_profile=save_engine_profile,
@@ -102,19 +101,19 @@ class Debugger:
         if self.cfg.capture_shim:
             if not sys.platform.startswith("linux"):
                 _LOGGER.warning(
-                    "capture_shim featureis only supported on linux, will not be enabled"
+                    "capture_shim featureis only supported on linux, will disable it"
                 )
                 self.cfg.capture_shim = False
                 return
             if ENABLED_FEATURES.tensorrt_rtx:
-                raise ValueError(
-                    "capture_shim feature is not supported on TensorRT-RTX, will not be enabled"
+                _LOGGER.warning(
+                    "capture_shim feature is not supported on TensorRT-RTX, will disable it"
                 )
                 self.cfg.capture_shim = False
                 return
             if not is_tensorrt_version_supported("10.13.0"):
                 _LOGGER.warning(
-                    "capture_shim feature is only supported on TensorRT 10.13 and above, will not be enabled"
+                    "capture_shim feature is only supported on TensorRT 10.13 and above, will disable it"
                 )
                 self.cfg.capture_shim = False
                 return
