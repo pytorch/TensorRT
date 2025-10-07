@@ -2,6 +2,7 @@ import contextlib
 import functools
 import logging
 import os
+import sys
 import tempfile
 from logging.config import dictConfig
 from typing import Any, List, Optional
@@ -9,6 +10,7 @@ from unittest import mock
 
 import torch
 from torch_tensorrt._features import ENABLED_FEATURES
+from torch_tensorrt._utils import is_tensorrt_version_supported
 from torch_tensorrt.dynamo._defaults import DEBUG_LOGGING_DIR
 from torch_tensorrt.dynamo.debug._DebuggerConfig import DebuggerConfig
 from torch_tensorrt.dynamo.debug._supports_debugger import (
@@ -32,6 +34,7 @@ class Debugger:
         capture_fx_graph_before: Optional[List[str]] = None,
         capture_fx_graph_after: Optional[List[str]] = None,
         save_engine_profile: bool = False,
+        capture_shim: bool = False,
         profile_format: str = "perfetto",
         engine_builder_monitor: bool = True,
         logging_dir: str = DEBUG_LOGGING_DIR,
@@ -49,6 +52,8 @@ class Debugger:
                 after execution of a lowering pass. Defaults to None.
             save_engine_profile (bool): Whether to save TensorRT engine profiling information.
                 Defaults to False.
+            capture_shim (bool): Whether to save shim information. The directory to the shim output file are the logging_dir/shim/
+                Defaults to False.
             profile_format (str): Format for profiling data. Choose from 'perfetto', 'trex', 'cudagraph'.
                 If you need to generate engine graph using the profiling files, set it to 'trex' and use the C++ runtime.
                 If you need to generate cudagraph visualization, set it to 'cudagraph'.
@@ -62,9 +67,11 @@ class Debugger:
         """
 
         os.makedirs(logging_dir, exist_ok=True)
+
         self.cfg = DebuggerConfig(
             log_level=log_level,
             save_engine_profile=save_engine_profile,
+            capture_shim=capture_shim,
             engine_builder_monitor=engine_builder_monitor,
             logging_dir=logging_dir,
             profile_format=profile_format,
@@ -91,6 +98,26 @@ class Debugger:
 
         self.capture_fx_graph_before = capture_fx_graph_before
         self.capture_fx_graph_after = capture_fx_graph_after
+
+        if self.cfg.capture_shim:
+            if not sys.platform.startswith("linux"):
+                _LOGGER.warning(
+                    "capture_shim featureis only supported on linux, will not be enabled"
+                )
+                self.cfg.capture_shim = False
+                return
+            if ENABLED_FEATURES.tensorrt_rtx:
+                raise ValueError(
+                    "capture_shim feature is not supported on TensorRT-RTX, will not be enabled"
+                )
+                self.cfg.capture_shim = False
+                return
+            if not is_tensorrt_version_supported("10.13.0"):
+                _LOGGER.warning(
+                    "capture_shim feature is only supported on TensorRT 10.13 and above, will not be enabled"
+                )
+                self.cfg.capture_shim = False
+                return
 
     def __enter__(self) -> None:
         self.original_lvl = _LOGGER.getEffectiveLevel()
@@ -143,9 +170,62 @@ class Debugger:
             for c in _DEBUG_ENABLED_CLS
         ]
 
+        if self.cfg.capture_shim:
+            self.original_environ_dict = {}
+            shim_lib_name = "libtensorrt_shim.so"
+            nvinfer_lib_name = "libnvinfer.so"
+
+            def validate_setting() -> bool:
+                is_valid = True
+                # LD_PRELOAD and TRT_SHIM_NVINFER_LIB_NAME only read at exec-time; setting it during a running process won’t interpose already-loaded libs.
+                # so, must set them before the tensorrt is loaded, cannot set during the Debugger.__enter__
+                if os.environ.get("LD_PRELOAD") is None:
+                    _LOGGER.error(
+                        f"LD_PRELOAD is not set, please add the {shim_lib_name} with full path to the LD_PRELOAD environment variable"
+                    )
+                    is_valid = False
+                if os.environ.get("TRT_SHIM_NVINFER_LIB_NAME") is None:
+                    _LOGGER.error(
+                        f"TRT_SHIM_NVINFER_LIB_NAME is not set, please add the {nvinfer_lib_name} with full path to the TRT_SHIM_NVINFER_LIB_NAME environment variable"
+                    )
+                    is_valid = False
+                return is_valid
+
+            if not validate_setting():
+                return
+
+            self.original_environ_dict["TRT_SHIM_OUTPUT_JSON_FILE"] = os.environ.get(
+                "TRT_SHIM_OUTPUT_JSON_FILE"
+            )
+            if os.environ.get("TRT_SHIM_OUTPUT_JSON_FILE") is None:
+                # TRT_SHIM_OUTPUT_JSON_FILE is not set, set it to the default shim json file path
+                shim_output_dir = os.path.join(self.cfg.logging_dir, "shim")
+                shim_output_json_file = os.path.join(shim_output_dir, "shim.json")
+            else:
+                shim_output_json_file = os.environ["TRT_SHIM_OUTPUT_JSON_FILE"]
+                # validate the shim_output_dir
+                # split the path from the full path of shim_output_dir
+                shim_output_dir = os.path.dirname(shim_output_json_file)
+                if len(shim_output_dir) == 0:
+                    shim_output_dir = os.path.join(self.cfg.logging_dir, "shim")
+                    shim_output_json_file = os.path.join(shim_output_dir, "shim.json")
+
+            if not os.path.exists(shim_output_dir):
+                os.makedirs(shim_output_dir, exist_ok=True)
+            # if file alaredy exists, delete it first, so that we can create a fresh new one
+            if os.path.exists(shim_output_json_file):
+                os.remove(shim_output_json_file)
+            os.environ["TRT_SHIM_OUTPUT_JSON_FILE"] = shim_output_json_file
+
     def __exit__(self, exc_type: Any, exc_value: Any, exc_tb: Any) -> None:
 
         dictConfig(self.get_logging_config(None))
+        if self.cfg.capture_shim:
+            for k, v in self.original_environ_dict.items():
+                if v is None:
+                    os.environ.pop(k, None)
+                else:
+                    os.environ[k] = v
         if ENABLED_FEATURES.torch_tensorrt_runtime:
             torch.ops.tensorrt.set_logging_level(self.rt_level)
         if self.capture_fx_graph_before or self.capture_fx_graph_after:
