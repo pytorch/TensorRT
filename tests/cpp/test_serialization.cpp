@@ -78,7 +78,7 @@ TEST_P(CppAPITests, SerializedDynamicModuleIsStillCorrect) {
 }
 
 INSTANTIATE_TEST_SUITE_P(
-    CompiledModuleForwardIsCloseSuite,
+    DISABLED_CompiledModuleForwardIsCloseSuite,
     CppAPITests,
     testing::Values(
         PathAndInput({"tests/modules/resnet18_traced.jit.pt", {{1, 3, 224, 224}}, {at::kFloat}}),

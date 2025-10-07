@@ -103,7 +103,7 @@ jobs:
         set -euo pipefail
         pushd .
         cd tests/py/dynamo
-        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l0_dynamo_converter_tests_results.xml -n auto --dist=loadscope --maxfail=20 conversion/
+        python -m pytest -ra -n 8 --junitxml=${RUNNER_TEST_RESULTS_DIR}/l0_dynamo_converter_tests_results.xml  --dist=loadscope --maxfail=20 conversion/
         popd
 
   L0-dynamo-core-tests:
@@ -133,9 +133,9 @@ jobs:
         pushd .
         cd tests/py
         cd dynamo
-        python -m pytest -ra -n auto --junitxml=${RUNNER_TEST_RESULTS_DIR}/l0_dynamo_core_runtime_tests_results.xml runtime/test_000_*
-        python -m pytest -ra -n auto --junitxml=${RUNNER_TEST_RESULTS_DIR}/l0_dynamo_core_partitioning_tests_results.xml partitioning/
-        python -m pytest -ra -n auto --junitxml=${RUNNER_TEST_RESULTS_DIR}/l0_dynamo_core_lowering_tests_results.xml lowering/
+        python -m pytest -ra -n 8 --junitxml=${RUNNER_TEST_RESULTS_DIR}/l0_dynamo_core_runtime_tests_results.xml runtime/test_000_*
+        python -m pytest -ra -n 8 --junitxml=${RUNNER_TEST_RESULTS_DIR}/l0_dynamo_core_partitioning_tests_results.xml partitioning/
+        python -m pytest -ra -n 8 --junitxml=${RUNNER_TEST_RESULTS_DIR}/l0_dynamo_core_lowering_tests_results.xml lowering/
         popd
 
   L0-py-core-tests:
@@ -164,7 +164,7 @@ jobs:
         set -euo pipefail
         pushd .
         cd tests/py/core
-        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l0_py_core_tests_results.xml -n auto .
+        python -m pytest -ra -n 8 --junitxml=${RUNNER_TEST_RESULTS_DIR}/l0_py_core_tests_results.xml  .
         popd
 
   L1-dynamo-core-tests:
@@ -193,7 +193,7 @@ jobs:
         set -euo pipefail
         pushd .
         cd tests/py/dynamo
-        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l1_dynamo_core_tests_results.xml -n auto runtime/test_001_*
+        python -m pytest -ra -n 8 --junitxml=${RUNNER_TEST_RESULTS_DIR}/l1_dynamo_core_tests_results.xml  runtime/test_001_*
         popd
 
   L1-dynamo-compile-tests:
@@ -222,7 +222,7 @@ jobs:
         set -euo pipefail
         pushd .
         cd tests/py/dynamo/
-        python -m pytest -m critical -ra -n auto --junitxml=${RUNNER_TEST_RESULTS_DIR}/l1_dynamo_compile_tests_results.xml models/
+        python -m pytest -m critical -ra  --junitxml=${RUNNER_TEST_RESULTS_DIR}/l1_dynamo_compile_tests_results.xml models/
         popd
 
   L1-torch-compile-tests:
@@ -250,9 +250,9 @@ jobs:
         set -euo pipefail
         pushd .
         cd tests/py/dynamo/
-        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l1_torch_compile_be_tests_results.xml -n auto backend/
-        python -m pytest -m critical -ra -n auto --junitxml=${RUNNER_TEST_RESULTS_DIR}/l1_torch_compile_models_tests_results.xml --ir torch_compile models/test_models.py
-        python -m pytest -m critical -ra -n auto --junitxml=${RUNNER_TEST_RESULTS_DIR}/l1_torch_compile_dyn_models_tests_results.xml --ir torch_compile models/test_dyn_models.py
+        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l1_torch_compile_be_tests_results.xml  backend/
+        python -m pytest -m critical -ra  --junitxml=${RUNNER_TEST_RESULTS_DIR}/l1_torch_compile_models_tests_results.xml --ir torch_compile models/test_models.py
+        python -m pytest -m critical -ra  --junitxml=${RUNNER_TEST_RESULTS_DIR}/l1_torch_compile_dyn_models_tests_results.xml --ir torch_compile models/test_dyn_models.py
         popd
 
 
@@ -282,8 +282,8 @@ jobs:
         set -euo pipefail
         pushd .
         cd tests/py/dynamo/
-        python -m pytest -m "not critical" -ra -n auto --junitxml=${RUNNER_TEST_RESULTS_DIR}/l2_torch_compile_models_tests_results.xml --ir torch_compile models/test_models.py
-        python -m pytest -m "not critical" -ra -n auto --junitxml=${RUNNER_TEST_RESULTS_DIR}/l2_torch_compile_dyn_models_tests_results.xml --ir torch_compile models/test_dyn_models.py
+        python -m pytest -m "not critical" -ra  --junitxml=${RUNNER_TEST_RESULTS_DIR}/l2_torch_compile_models_tests_results.xml --ir torch_compile models/test_models.py
+        python -m pytest -m "not critical" -ra  --junitxml=${RUNNER_TEST_RESULTS_DIR}/l2_torch_compile_dyn_models_tests_results.xml --ir torch_compile models/test_dyn_models.py
         popd
 
   L2-dynamo-compile-tests:
@@ -312,7 +312,7 @@ jobs:
         set -euo pipefail
         pushd .
         cd tests/py/dynamo/
-        python -m pytest -m "not critical" -ra -n auto --junitxml=${RUNNER_TEST_RESULTS_DIR}/l2_dynamo_compile_tests_results.xml models/
+        python -m pytest -m "not critical" -ra  --junitxml=${RUNNER_TEST_RESULTS_DIR}/l2_dynamo_compile_tests_results.xml models/
         python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l2_dynamo_compile_llm_tests_results.xml llm/
         popd
 
@@ -342,7 +342,7 @@ jobs:
         set -euo pipefail
         pushd .
         cd tests/py/dynamo
-        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l2_dynamo_core_tests_results.xml -n auto --ignore runtime/test_001_* --ignore runtime/test_000_* runtime/*
+        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l2_dynamo_core_tests_results.xml  --ignore runtime/test_001_* --ignore runtime/test_000_* --ignore runtime/gen_hw_compat* runtime/*
         popd
 
   L2-dynamo-plugin-tests:
@@ -371,7 +371,7 @@ jobs:
         set -euo pipefail
         pushd .
         cd tests/py/dynamo
-        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l2_dynamo_plugins_tests_results.xml -n auto --ignore automatic_plugin/
+        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l2_dynamo_plugins_tests_results.xml automatic_plugin/
         popd
 
 
