@@ -36,7 +36,7 @@ compile_spec = {
     "inputs": [torchtrt.Input(min_shape=(1, 3, 3), opt_shape=(2, 3, 3), max_shape=(3, 3, 3), dtype=torch.float32)],
 }
 
-with torchtrt.dynamo.Debugger("graphs", logging_dir="debuglogs", capture_shim=True):
+with torchtrt.dynamo.Debugger(capture_shim=True):
     trt_mod = torchtrt.compile(model, **compile_spec)
 ```
 
