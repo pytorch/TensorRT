@@ -258,16 +258,15 @@ def index(
             else:
                 dim_tensor_shape_mult_d1 = transpose_tensor_shape[i]
 
-            if isinstance(dim_tensor_shape_mult_d1, TRTTensor):
-                mult_d1 = convert_binary_elementwise(
-                    ctx,
-                    target,
-                    source_ir,
-                    name + f"_shape_{i}",
-                    trt.ElementWiseOperation.PROD,
-                    mult_d1,
-                    dim_tensor_shape_mult_d1,
-                )
+            mult_d1 = convert_binary_elementwise(
+                ctx,
+                target,
+                source_ir,
+                name + f"_shape_{i}",
+                trt.ElementWiseOperation.PROD,
+                mult_d1,
+                dim_tensor_shape_mult_d1,
+            )
 
         concat_tensor_layer = ctx.net.add_concatenation(
             [

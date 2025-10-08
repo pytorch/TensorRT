@@ -310,21 +310,16 @@ class TestIndexPutConverter(DispatchTestCase):
                 {0: seq_len3},
             ),
         )
-        with torchtrt.dynamo.Debugger(
-            log_level="debug",
-            capture_fx_graph_after=["remove_num_users_is_0_nodes"],
-            logging_dir="/home/profile/logging/moe",
-            engine_builder_monitor=False,
-        ):
-            trt_mod = torchtrt.dynamo.compile(
-                ep,
-                inputs,
-                enabled_precisions={torch.float16},
-                min_block_size=1,
-                use_explicit_typing=False,
-                use_fp32_acc=False,
-                disable_tf32=True,
-            )
+
+        trt_mod = torchtrt.dynamo.compile(
+            ep,
+            inputs,
+            enabled_precisions={torch.float16},
+            min_block_size=1,
+            use_explicit_typing=False,
+            use_fp32_acc=False,
+            disable_tf32=True,
+        )
         result = trt_mod(*inputs)
         assert torch.allclose(result, torch_output, atol=1e-4, rtol=1e-4)
 
@@ -350,17 +345,16 @@ class TestIndexPutConverter(DispatchTestCase):
             (source_tensor, indices_tensor, value_tensor),
             dynamic_shapes=({0: dim1}, {0: dim1}, {0: dim2}),
         )
-        with torchtrt.dynamo.Debugger(log_level="debug"):
-            trt_engine = torchtrt.dynamo.compile(
-                ep,
-                inputs=(source_tensor, indices_tensor, value_tensor),
-                enabled_precisions={torch.float32},
-                min_block_size=1,
-                use_explicit_typing=False,
-                use_fp32_acc=False,
-                disable_tf32=True,
-                use_python_runtime=True,
-            )
+        trt_engine = torchtrt.dynamo.compile(
+            ep,
+            inputs=(source_tensor, indices_tensor, value_tensor),
+            enabled_precisions={torch.float32},
+            min_block_size=1,
+            use_explicit_typing=False,
+            use_fp32_acc=False,
+            disable_tf32=True,
+            use_python_runtime=True,
+        )
         result = trt_engine(source_tensor, indices_tensor, value_tensor)
 
         torch.allclose(result, torch_output, atol=1e-4, rtol=1e-4)
