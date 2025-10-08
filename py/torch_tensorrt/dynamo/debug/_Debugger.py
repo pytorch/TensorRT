@@ -33,7 +33,6 @@ class Debugger:
         capture_fx_graph_after: Optional[List[str]] = None,
         save_engine_profile: bool = False,
         capture_tensorrt_api_recording: bool = False,
-        capture_tensorrt_api_recording_dir: Optional[str] = None,
         profile_format: str = "perfetto",
         engine_builder_monitor: bool = True,
         logging_dir: str = DEBUG_LOGGING_DIR,
