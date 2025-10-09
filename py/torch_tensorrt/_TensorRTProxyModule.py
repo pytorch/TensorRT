@@ -66,7 +66,7 @@ def enable_capture_tensorrt_api_recording() -> None:
                 continue
 
     if tensorrt_lib_path is None:
-        _LOGGER.error(
+        _LOGGER.warning(
             "Capturing TensorRT API calls is enabled, but libtensorrt_shim.so is not found, make sure TensorRT lib is in the LD_LIBRARY_PATH, therefore ignoring the capture_tensorrt_api_recording setting"
         )
         os.environ.pop("TORCHTRT_ENABLE_TENSORRT_API_CAPTURE")

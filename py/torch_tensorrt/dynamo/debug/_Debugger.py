@@ -99,16 +99,21 @@ class Debugger:
         self.capture_fx_graph_after = capture_fx_graph_after
 
         if self.cfg.capture_tensorrt_api_recording:
-            env_flag = os.environ.get("TORCHTRT_ENABLE_TENSORRT_API_CAPTURE", None)
-            if env_flag is None or (env_flag != "1" and env_flag.lower() != "true"):
-                # currently this feature is only supported for TensorRT on Linux platform
-                if (
-                    sys.platform.startswith("linux")
-                    and not ENABLED_FEATURES.tensorrt_rtx
-                ):
+            if not sys.platform.startswith("linux"):
+                _LOGGER.warning(
+                    f"Capturing TensorRT API calls is only supported on Linux, therefore ignoring the capture_tensorrt_api_recording setting for {sys.platform}"
+                )
+            elif ENABLED_FEATURES.tensorrt_rtx:
+                _LOGGER.warning(
+                    "Capturing TensorRT API calls is not supported for TensorRT-RTX, therefore ignoring the capture_tensorrt_api_recording setting"
+                )
+            else:
+                env_flag = os.environ.get("TORCHTRT_ENABLE_TENSORRT_API_CAPTURE", None)
+                if env_flag is None or (env_flag != "1" and env_flag.lower() != "true"):
                     _LOGGER.warning(
                         "In order to capture TensorRT API calls, please invoke the script with environment variable TORCHTRT_ENABLE_TENSORRT_API_CAPTURE=1"
                     )
+                _LOGGER.info("Capturing TensorRT API calls feature is enabled")
 
     def __enter__(self) -> None:
         self.original_lvl = _LOGGER.getEffectiveLevel()
