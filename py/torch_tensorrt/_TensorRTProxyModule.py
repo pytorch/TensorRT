@@ -87,8 +87,8 @@ def enable_capture_tensorrt_api_recording() -> None:
             os.remove(json_file_name)
         if os.path.exists(bin_file_name):
             os.remove(bin_file_name)
-        _LOGGER.debug(
-            f"capture_shim feature is enabled and the captured output is in the {shim_temp_dir} directory"
+        _LOGGER.info(
+            f"Capturing TensorRT API calls feature is enabled and the captured output is in the {shim_temp_dir} directory"
         )
 
 
