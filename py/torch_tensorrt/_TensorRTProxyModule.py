@@ -96,7 +96,6 @@ def enable_capture_tensorrt_api_recording() -> None:
 # since tensorrt-rtx is the drop-in replacement for tensorrt, we can use the same interface to use tensorrt-rtx
 class TensorRTProxyModule(ModuleType):
     def __init__(self, target_module: ModuleType) -> None:
-        breakpoint()
         spec = importlib.util.spec_from_loader("tensorrt", loader=None)
         self.__spec__ = spec
         self.__package__ = target_module.__package__
