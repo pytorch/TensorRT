@@ -2,6 +2,7 @@ import contextlib
 import functools
 import logging
 import os
+import sys
 import tempfile
 from logging.config import dictConfig
 from typing import Any, List, Optional
@@ -96,10 +97,18 @@ class Debugger:
 
         self.capture_fx_graph_before = capture_fx_graph_before
         self.capture_fx_graph_after = capture_fx_graph_after
-        if os.environ.get("TORCHTRT_ENABLE_TENSORRT_API_CAPTURE") == "1":
-            self.cfg.capture_tensorrt_api_recording = True
-        else:
-            self.cfg.capture_tensorrt_api_recording = False
+
+        if self.cfg.capture_tensorrt_api_recording:
+            env_flag = os.environ.get("TORCHTRT_ENABLE_TENSORRT_API_CAPTURE", None)
+            if env_flag is None or (env_flag != "1" and env_flag.lower() != "true"):
+                # currently this feature is only supported for TensorRT on Linux platform
+                if (
+                    sys.platform.startswith("linux")
+                    and not ENABLED_FEATURES.tensorrt_rtx
+                ):
+                    _LOGGER.warning(
+                        "In order to capture TensorRT API calls, please invoke the script with environment variable TORCHTRT_ENABLE_TENSORRT_API_CAPTURE=1"
+                    )
 
     def __enter__(self) -> None:
         self.original_lvl = _LOGGER.getEffectiveLevel()

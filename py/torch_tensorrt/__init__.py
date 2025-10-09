@@ -2,9 +2,7 @@ import ctypes
 import logging
 import os
 import platform
-import pwd
 import sys
-import tempfile
 from typing import Dict, List
 
 import torch
@@ -25,69 +23,6 @@ import logging
 _LOGGER = logging.getLogger(__name__)
 
 import torch
-
-
-def is_capture_tensorrt_api_recording_enabled() -> bool:
-    if os.environ.get("TORCHTRT_ENABLE_TENSORRT_API_CAPTURE") != "1":
-        return False
-    if not sys.platform.startswith("linux"):
-        _LOGGER.warning(
-            f"Capturing TensorRT API calls is only supported on Linux, therefore ignoring the capture_tensorrt_api_recording setting for {sys.platform}"
-        )
-        os.environ.pop("TORCHTRT_ENABLE_TENSORRT_API_CAPTURE")
-        return False
-    if os.environ.get("USE_TRT_RTX", "False").lower() == "true":
-        _LOGGER.warning(
-            "Capturing TensorRT API calls is only supported on TensorRT, therefore ignoring the capture_tensorrt_api_recording setting for TensorRT-RTX"
-        )
-        os.environ.pop("TORCHTRT_ENABLE_TENSORRT_API_CAPTURE")
-        return False
-    return True
-
-
-if is_capture_tensorrt_api_recording_enabled():
-    linux_lib_path = []
-    if "LD_LIBRARY_PATH" in os.environ:
-        linux_lib_path.extend(os.environ["LD_LIBRARY_PATH"].split(os.path.pathsep))
-
-    if platform.uname().processor == "x86_64":
-        linux_lib_path.append("/usr/lib/x86_64-linux-gnu")
-    elif platform.uname().processor == "aarch64":
-        linux_lib_path.append("/usr/lib/aarch64-linux-gnu")
-
-    tensorrt_lib_path = None
-    for path in linux_lib_path:
-        try:
-            ctypes.CDLL(
-                os.path.join(path, "libtensorrt_shim.so"), mode=ctypes.RTLD_GLOBAL
-            )
-            tensorrt_lib_path = path
-            break
-        except Exception as e:
-            continue
-
-    if tensorrt_lib_path is None:
-        _LOGGER.error(
-            "Capturing TensorRT API calls is enabled, but libtensorrt_shim.so is not found, make sure TensorRT lib is in the LD_LIBRARY_PATH, therefore ignoring the capture_tensorrt_api_recording setting"
-        )
-        os.environ.pop("TORCHTRT_ENABLE_TENSORRT_API_CAPTURE")
-    else:
-        os.environ["TRT_SHIM_NVINFER_LIB_NAME"] = os.path.join(
-            tensorrt_lib_path, "libnvinfer.so"
-        )
-        current_user = pwd.getpwuid(os.getuid())[0]
-        shim_temp_dir = os.path.join(
-            tempfile.gettempdir(), f"torch_tensorrt_{current_user}/shim"
-        )
-        os.makedirs(shim_temp_dir, exist_ok=True)
-        os.environ["TRT_SHIM_OUTPUT_JSON_FILE"] = os.path.join(
-            shim_temp_dir, "shim.json"
-        )
-        _LOGGER.debug(
-            f"capture_shim feature is enabled and the captured output is in the {shim_temp_dir} directory"
-        )
-else:
-    _LOGGER.info("capture_shim feature is disabled")
 
 tensorrt_package_name = ""
 

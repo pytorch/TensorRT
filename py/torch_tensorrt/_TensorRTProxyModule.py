@@ -1,12 +1,16 @@
 import ctypes
 import importlib
 import importlib.util
+import logging
 import os
 import platform
+import pwd
 import sys
+import tempfile
 from types import ModuleType
 from typing import Any, Dict, List
 
+_LOGGER = logging.getLogger(__name__)
 package_imported = False
 package_name = ""
 
@@ -28,10 +32,71 @@ def _find_lib(name: str, paths: List[str]) -> str:
     raise FileNotFoundError(f"Could not find {name}\n  Search paths: {paths}")
 
 
+def enable_capture_tensorrt_api_recording() -> None:
+
+    os_env_flag = os.environ.get("TORCHTRT_ENABLE_TENSORRT_API_CAPTURE", None)
+    if os_env_flag is None or (os_env_flag != "1" and os_env_flag.lower() != "true"):
+        _LOGGER.debug("Capturing TensorRT API calls is not enabled")
+        return
+    if not sys.platform.startswith("linux"):
+        _LOGGER.warning(
+            f"Capturing TensorRT API calls is only supported on Linux, therefore ignoring the capture_tensorrt_api_recording setting for {sys.platform}"
+        )
+        os.environ.pop("TORCHTRT_ENABLE_TENSORRT_API_CAPTURE")
+        return
+
+    linux_lib_path = []
+    if "LD_LIBRARY_PATH" in os.environ:
+        linux_lib_path.extend(os.environ["LD_LIBRARY_PATH"].split(os.path.pathsep))
+
+    if platform.uname().processor == "x86_64":
+        linux_lib_path.append("/usr/lib/x86_64-linux-gnu")
+    elif platform.uname().processor == "aarch64":
+        linux_lib_path.append("/usr/lib/aarch64-linux-gnu")
+
+    for path in linux_lib_path:
+        if os.path.isfile(os.path.join(path, "libtensorrt_shim.so")):
+            try:
+                ctypes.CDLL(
+                    os.path.join(path, "libtensorrt_shim.so"), mode=ctypes.RTLD_GLOBAL
+                )
+                tensorrt_lib_path = path
+                break
+            except Exception as e:
+                continue
+
+    if tensorrt_lib_path is None:
+        _LOGGER.error(
+            "Capturing TensorRT API calls is enabled, but libtensorrt_shim.so is not found, make sure TensorRT lib is in the LD_LIBRARY_PATH, therefore ignoring the capture_tensorrt_api_recording setting"
+        )
+        os.environ.pop("TORCHTRT_ENABLE_TENSORRT_API_CAPTURE")
+    else:
+        os.environ["TRT_SHIM_NVINFER_LIB_NAME"] = os.path.join(
+            tensorrt_lib_path, "libnvinfer.so"
+        )
+        current_user = pwd.getpwuid(os.getuid())[0]
+        shim_temp_dir = os.path.join(
+            tempfile.gettempdir(), f"torch_tensorrt_{current_user}/shim"
+        )
+        os.makedirs(shim_temp_dir, exist_ok=True)
+        json_file_name = os.path.join(shim_temp_dir, "shim.json")
+        os.environ["TRT_SHIM_OUTPUT_JSON_FILE"] = json_file_name
+        bin_file_name = os.path.join(shim_temp_dir, "shim.bin")
+        # if exists, delete the file, so that we can capture the new one
+        if os.path.exists(json_file_name):
+            os.remove(json_file_name)
+        if os.path.exists(bin_file_name):
+            os.remove(bin_file_name)
+        _LOGGER.debug(
+            f"capture_shim feature is enabled and the captured output is in the {shim_temp_dir} directory"
+        )
+
+
 # TensorRTProxyModule is a proxy module that allows us to register the tensorrt or tensorrt-rtx package
 # since tensorrt-rtx is the drop-in replacement for tensorrt, we can use the same interface to use tensorrt-rtx
 class TensorRTProxyModule(ModuleType):
     def __init__(self, target_module: ModuleType) -> None:
+        breakpoint()
         spec = importlib.util.spec_from_loader("tensorrt", loader=None)
         self.__spec__ = spec
         self.__package__ = target_module.__package__
@@ -86,6 +151,11 @@ def alias_tensorrt() -> None:
         if use_rtx_env_var.lower() == "true":
             use_rtx = True
     package_name = "tensorrt_rtx" if use_rtx else "tensorrt"
+
+    if not use_rtx:
+        # enable capture tensorrt api recording has to be done before importing the tensorrt library
+        enable_capture_tensorrt_api_recording()
+
     # Import the appropriate package
     try:
         target_module = importlib.import_module(package_name)
