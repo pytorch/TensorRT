@@ -6,7 +6,7 @@ import torch_tensorrt
 from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
 from torch_tensorrt import Input
-from torch_tensorrt.dynamo.utils import is_tegra_platform, is_thor
+from torch_tensorrt.utils import is_tegra_platform, is_thor
 
 from .harness import DispatchTestCase
 

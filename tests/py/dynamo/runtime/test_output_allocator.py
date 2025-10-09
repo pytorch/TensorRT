@@ -5,7 +5,7 @@ import torch
 import torch_tensorrt
 from parameterized import parameterized
 from torch.testing._internal.common_utils import TestCase, run_tests
-from torch_tensorrt.dynamo.utils import is_tegra_platform, is_thor
+from torch_tensorrt.utils import is_tegra_platform, is_thor
 
 from ..testing_utilities import DECIMALS_OF_AGREEMENT
 
