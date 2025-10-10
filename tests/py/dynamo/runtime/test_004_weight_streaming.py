@@ -6,7 +6,8 @@ import torch
 import torch_tensorrt as torchtrt
 from parameterized import parameterized
 from torch.testing._internal.common_utils import TestCase, run_tests
-from torch_tensorrt.dynamo.utils import is_tegra_platform, prepare_inputs
+from torch_tensorrt._utils import is_tegra_platform
+from torch_tensorrt.dynamo.utils import prepare_inputs
 
 INPUT_SIZE = (64, 100)
 

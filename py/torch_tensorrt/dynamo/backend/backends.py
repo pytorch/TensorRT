@@ -10,6 +10,7 @@ import torch._dynamo as td
 from torch._dynamo.backends.common import aot_autograd
 from torch._dynamo.utils import detect_fake_mode
 from torch._functorch.aot_autograd import aot_export_joint_simple
+from torch_tensorrt._utils import is_tegra_platform
 from torch_tensorrt.dynamo import CompilationSettings
 from torch_tensorrt.dynamo._compiler import compile_module
 from torch_tensorrt.dynamo.lowering import (
@@ -20,7 +21,6 @@ from torch_tensorrt.dynamo.lowering import (
     repair_input_aliasing,
 )
 from torch_tensorrt.dynamo.utils import (
-    is_tegra_platform,
     parse_dynamo_kwargs,
     prepare_inputs,
     set_log_level,
