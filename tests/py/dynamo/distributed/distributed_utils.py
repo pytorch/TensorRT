@@ -13,7 +13,6 @@ def set_environment_variables_pytest():
     os.environ["RANK"] = str(0)
     os.environ["MASTER_ADDR"] = "127.0.0.1"
     os.environ["MASTER_PORT"] = str(29500)
-    os.environ["USE_TRTLLM_PLUGINS"] = "1"
 
 
 def initialize_logger(rank, logger_file_name):

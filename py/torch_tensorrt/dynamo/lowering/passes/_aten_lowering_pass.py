@@ -2,8 +2,8 @@ import logging
 from typing import Any, Callable, Optional, Sequence, Union
 
 import torch
+from torch_tensorrt._utils import is_tegra_platform
 from torch_tensorrt.dynamo._settings import CompilationSettings
-from torch_tensorrt.dynamo.utils import is_tegra_platform
 
 from .complex_graph_rewrite import complex_graph_detection
 from .constant_folding import constant_fold
