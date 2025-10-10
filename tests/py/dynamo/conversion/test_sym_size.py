@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
-from torch_tensorrt.dynamo.utils import is_thor
+from torch_tensorrt._utils import is_thor
 
 from .harness import DispatchTestCase
 
