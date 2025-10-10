@@ -4,8 +4,7 @@ from importlib import metadata
 import torch
 import torch_tensorrt
 from torch.testing._internal.common_utils import TestCase, run_tests
-from torch_tensorrt._utils import is_tensorrt_version_supported
-from torch_tensorrt.dynamo.utils import is_tegra_platform
+from torch_tensorrt._utils import is_tegra_platform, is_tensorrt_version_supported
 
 from packaging.version import Version
 
