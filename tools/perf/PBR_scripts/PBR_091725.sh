@@ -77,10 +77,14 @@ do
     # Torch-TRT w/o Graph break + CppRuntime
     python multi_backend_benchmark.py --model_name="${model_name}" --batch_size="${batch_size}" --iterations="${iterations}" --optimization_level="${optimization_level}" --output_folder="$OUTPUT_FOLDER"
     # Torch-TRT w/ Graph break (SDPA in inductor, rest in TRT) + CppRuntime
-    python multi_backend_benchmark.py --model_name="${model_name}" --batch_size="${batch_size}" --iterations="${iterations}" --optimization_level="${optimization_level}" --output_folder="$OUTPUT_FOLDER" --sdpa_in_inductor
+    python multi_backend_benchmark.py --model_name="${model_name}" --batch_size="${batch_size}" --iterations="${iterations}" --optimization_level="${optimization_level}" --output_folder="$OUTPUT_FOLDER" --sdpa_backend="inductor"
+    # Torch-TRT w/ Graph break (SDPA in torch_eager, rest in TRT) + CppRuntime
+    python multi_backend_benchmark.py --model_name="${model_name}" --batch_size="${batch_size}" --iterations="${iterations}" --optimization_level="${optimization_level}" --output_folder="$OUTPUT_FOLDER" --sdpa_backend="torch_eager"
 
     # Torch-TRT w/o Graph break + PythonRuntime
     python multi_backend_benchmark.py --model_name="${model_name}" --batch_size="${batch_size}" --iterations="${iterations}" --optimization_level="${optimization_level}" --use_python_runtime --output_folder="$OUTPUT_FOLDER"
     # Torch-TRT w/ Graph break (SDPA in inductor, rest in TRT) + PythonRuntime
-    python multi_backend_benchmark.py --model_name="${model_name}" --batch_size="${batch_size}" --iterations="${iterations}" --optimization_level="${optimization_level}" --use_python_runtime --output_folder="$OUTPUT_FOLDER" --sdpa_in_inductor
+    python multi_backend_benchmark.py --model_name="${model_name}" --batch_size="${batch_size}" --iterations="${iterations}" --optimization_level="${optimization_level}" --use_python_runtime --output_folder="$OUTPUT_FOLDER" --sdpa_backend="inductor"
+    # Torch-TRT w/ Graph break (SDPA in torch_eager, rest in TRT) + PythonRuntime
+    python multi_backend_benchmark.py --model_name="${model_name}" --batch_size="${batch_size}" --iterations="${iterations}" --optimization_level="${optimization_level}" --use_python_runtime --output_folder="$OUTPUT_FOLDER" --sdpa_backend="torch_eager"
 done

@@ -33,7 +33,7 @@ def multi_backend_test(
     iterations,
     optimization_level,
     use_python_runtime,
-    sdpa_in_inductor,
+    sdpa_backend,
     enable_cuda_graph,
     output_folder,
 ):
@@ -96,7 +96,9 @@ def multi_backend_test(
     partitioned_model, op_support = hierarchical_adjacency_partition(
         gm,
         min_block_size=1,
-        backend_priority=["inductor", "tensorrt"] if sdpa_in_inductor else ["tensorrt"],
+        backend_priority=(
+            ["inductor", "tensorrt"] if sdpa_backend == "inductor" else ["tensorrt"]
+        ),
         backend_support_map={
             "inductor": {
                 "torch.ops.aten.scaled_dot_product_attention.default",
@@ -104,6 +106,11 @@ def multi_backend_test(
             "tensorrt": CONVERTERS.keys(),
         },
         require_full_compilation=False,
+        torch_executed_ops=(
+            {"torch.ops.aten.scaled_dot_product_attention.default"}
+            if sdpa_backend == "torch_eager"
+            else set()
+        ),
         skip_fusion=True,
     )
 
@@ -192,7 +199,7 @@ def multi_backend_test(
         ) as cudagraphs_partitioned_model:
             result = record_perf(
                 cudagraphs_partitioned_model,
-                "Graph break (SDPA in inductor, rest in TRT)",
+                f"SDPA in {sdpa_backend}, rest in TRT",
                 inputs,
                 "fp16",
                 iterations,
@@ -202,7 +209,7 @@ def multi_backend_test(
     else:
         result = record_perf(
             partitioned_model,
-            "Graph break (SDPA in inductor, rest in TRT)",
+            f"SDPA in {sdpa_backend}, rest in TRT",
             inputs,
             "fp16",
             iterations,
@@ -218,11 +225,11 @@ def multi_backend_test(
     )
     print(summary)
     runtime_type = "python_runtime" if use_python_runtime else "cpp_runtime"
-    graph_break_type = (
-        "with_graph_break_sdpa_in_inductor_rest_in_trt"
-        if sdpa_in_inductor
-        else "without_graph_break"
-    )
+    if sdpa_backend == "tensorrt":
+        graph_break_type = "without_graph_break"
+    else:
+        graph_break_type = f"with_graph_break_sdpa_in_{sdpa_backend}"
+
     log_name = os.path.join(
         output_folder,
         f"{model_name}_{graph_break_type}_bs{batch_size}_fp16_optlevel{optimization_level}_{runtime_type}.csv",
@@ -237,10 +244,21 @@ if __name__ == "__main__":
     parser.add_argument("--iterations", type=int, default=20)
     parser.add_argument("--use_python_runtime", action="store_true")
     parser.add_argument("--enable_cuda_graph", action="store_true")
-    parser.add_argument("--sdpa_in_inductor", action="store_true")
+    # default to be tensorrt
+    parser.add_argument(
+        "--sdpa_backend",
+        type=str,
+        choices=["tensorrt", "inductor", "torch_eager"],
+        default="tensorrt",
+    )
     parser.add_argument("--optimization_level", type=int)
     parser.add_argument("--output_folder", type=str, required=True)
     args = parser.parse_args()
+
+    if args.sdpa_backend not in ["tensorrt", "inductor", "torch_eager"]:
+        raise ValueError(
+            f"Invalid SDPA backend: {args.sdpa_backend}. Valid choices are: tensorrt, inductor, torch_eager"
+        )
 
     multi_backend_test(
         args.model_name,
@@ -248,7 +266,7 @@ if __name__ == "__main__":
         args.iterations,
         args.optimization_level,
         args.use_python_runtime,
-        args.sdpa_in_inductor,
+        args.sdpa_backend,
         args.enable_cuda_graph,
         args.output_folder,
     )
