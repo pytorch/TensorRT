@@ -58,10 +58,10 @@ def trace(
     """
 
     # Set log level at the top of compilation (torch_tensorrt.dynamo)
-    if not arg_inputs and not inputs:
+    if arg_inputs is None and inputs is None:
         raise AssertionError("'arg_inputs' and 'inputs' should not both be None.")
 
-    elif arg_inputs and inputs:
+    elif arg_inputs is not None and inputs is not None:
         raise AssertionError(
             "'arg_inputs' and 'inputs' should not be used at the same time."
         )
