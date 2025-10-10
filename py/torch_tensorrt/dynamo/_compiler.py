@@ -867,6 +867,7 @@ def compile_module(
     for attr in dir(gm):
         if attr.startswith("_frozen_param"):
             delattr(gm, attr)
+    trt_module = None
     for name, _ in partitioned_module.named_children():
         submodule = getattr(partitioned_module, name)
         # filter on the GraphModule
@@ -986,6 +987,10 @@ def compile_module(
                         "w",
                     ) as f:
                         f.write(trt_module.get_layer_info())
+
+    # Only set the requires_unique_output flag for the last TRT Module when user has access to the output tensor
+    if trt_module:
+        trt_module.set_unowned_output_tensor(True)
 
     # Parse the graph I/O and store it in dryrun tracker
     parse_graph_io(gm, dryrun_tracker)
