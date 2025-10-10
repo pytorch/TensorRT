@@ -15,8 +15,9 @@ from torch_tensorrt.dynamo.utils import (
 
 assertions = unittest.TestCase()
 
+
 @pytest.mark.unit
-def test_save_load_ts(ir):
+def test_save_load_ts():
     """
     This tests save/load API on Torchscript format (model still compiled using ts workflow)
     """
