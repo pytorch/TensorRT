@@ -10,13 +10,13 @@ import torch_tensorrt as torchtrt
 from torch_tensorrt.dynamo.utils import (
     COSINE_THRESHOLD,
     cosine_similarity,
-    get_model_device,
 )
 
 assertions = unittest.TestCase()
 
+
 @pytest.mark.unit
-def test_save_load_ts(ir):
+def test_save_load_ts():
     """
     This tests save/load API on Torchscript format (model still compiled using ts workflow)
     """
@@ -41,8 +41,6 @@ def test_save_load_ts(ir):
         ir="ts",
         inputs=[input],
         min_block_size=1,
-        cache_built_engines=False,
-        reuse_cached_engines=False,
     )
     outputs_trt = trt_gm(input)
     # Save it as torchscript representation
