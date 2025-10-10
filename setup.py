@@ -192,10 +192,10 @@ def build_libtorchtrt_cxx11_abi(
     else:
         cmd.append("//:libtorchtrt")
 
-    if develop:
-        cmd.append("--compilation_mode=dbg")
-    else:
-        cmd.append("--compilation_mode=opt")
+    # if develop:
+    #     cmd.append("--compilation_mode=dbg")
+    # else:
+    cmd.append("--compilation_mode=opt")
     if use_dist_dir:
         if IS_AARCH64:
             cmd.append("--distdir=third_party/dist_dir/aarch64-linux-gnu")
