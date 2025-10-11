@@ -2,6 +2,7 @@ import contextlib
 import functools
 import logging
 import os
+import sys
 import tempfile
 from logging.config import dictConfig
 from typing import Any, List, Optional
@@ -32,6 +33,7 @@ class Debugger:
         capture_fx_graph_before: Optional[List[str]] = None,
         capture_fx_graph_after: Optional[List[str]] = None,
         save_engine_profile: bool = False,
+        capture_tensorrt_api_recording: bool = False,
         profile_format: str = "perfetto",
         engine_builder_monitor: bool = True,
         logging_dir: str = DEBUG_LOGGING_DIR,
@@ -49,6 +51,9 @@ class Debugger:
                 after execution of a lowering pass. Defaults to None.
             save_engine_profile (bool): Whether to save TensorRT engine profiling information.
                 Defaults to False.
+            capture_tensorrt_api_recording (bool): Whether to enable the capture TensorRT API recording feature, when this is enabled, it will output the catputure TensorRT API recording in the /tmp/torch_tensorrt_{current_user}/shim directory.
+                It is part of the TensorRT capture and replay feature, the captured output will be able to replay for debug purpose.
+                Defaults to False.
             profile_format (str): Format for profiling data. Choose from 'perfetto', 'trex', 'cudagraph'.
                 If you need to generate engine graph using the profiling files, set it to 'trex' and use the C++ runtime.
                 If you need to generate cudagraph visualization, set it to 'cudagraph'.
@@ -65,6 +70,7 @@ class Debugger:
         self.cfg = DebuggerConfig(
             log_level=log_level,
             save_engine_profile=save_engine_profile,
+            capture_tensorrt_api_recording=capture_tensorrt_api_recording,
             engine_builder_monitor=engine_builder_monitor,
             logging_dir=logging_dir,
             profile_format=profile_format,
@@ -91,6 +97,23 @@ class Debugger:
 
         self.capture_fx_graph_before = capture_fx_graph_before
         self.capture_fx_graph_after = capture_fx_graph_after
+
+        if self.cfg.capture_tensorrt_api_recording:
+            if not sys.platform.startswith("linux"):
+                _LOGGER.warning(
+                    f"Capturing TensorRT API calls is only supported on Linux, therefore ignoring the capture_tensorrt_api_recording setting for {sys.platform}"
+                )
+            elif ENABLED_FEATURES.tensorrt_rtx:
+                _LOGGER.warning(
+                    "Capturing TensorRT API calls is not supported for TensorRT-RTX, therefore ignoring the capture_tensorrt_api_recording setting"
+                )
+            else:
+                env_flag = os.environ.get("TORCHTRT_ENABLE_TENSORRT_API_CAPTURE", None)
+                if env_flag is None or (env_flag != "1" and env_flag.lower() != "true"):
+                    _LOGGER.warning(
+                        "In order to capture TensorRT API calls, please invoke the script with environment variable TORCHTRT_ENABLE_TENSORRT_API_CAPTURE=1"
+                    )
+                _LOGGER.info("Capturing TensorRT API calls feature is enabled")
 
     def __enter__(self) -> None:
         self.original_lvl = _LOGGER.getEffectiveLevel()
