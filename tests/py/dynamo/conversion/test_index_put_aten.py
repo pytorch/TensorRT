@@ -1,4 +1,5 @@
 import torch
+import torch_tensorrt as torchtrt
 from parameterized import param, parameterized
 from torch.testing._internal.common_utils import run_tests
 
@@ -194,11 +195,43 @@ class TestIndexPutConverter(DispatchTestCase):
                     dtype=torch.int32,
                 ),
             ),
+            # param(
+            #     test_name="4d_indices_none_none_multiple_idx_broadcast_error",
+            #     source_tensor=torch.zeros([1, 2, 5, 3], dtype=torch.float32),
+            #     indices_tensor=(None, None, torch.tensor([0, 1, 2], dtype=torch.int64)),
+            #     value_tensor=torch.randn([2, 3, 3], dtype=torch.float32),
+            # ),
             param(
-                test_name="4d_indices_none_none_multiple_idx_broadcast_error",
-                source_tensor=torch.zeros([1, 2, 5, 3], dtype=torch.float32),
-                indices_tensor=(None, None, torch.tensor([0, 1, 2], dtype=torch.int64)),
-                value_tensor=torch.randn([2, 3, 3], dtype=torch.float32),
+                test_name="discontinuous_test",
+                source_tensor=torch.zeros([2, 4, 4], dtype=torch.float32),
+                indices_tensor=(
+                    torch.tensor([0, 0, 1], dtype=torch.int64),
+                    None,
+                    torch.tensor([0, 0, 1], dtype=torch.int64),
+                ),
+                value_tensor=torch.tensor([2, 3, 3, 4], dtype=torch.float32),
+            ),
+            param(
+                test_name="discontinuous_test_two",
+                source_tensor=torch.zeros([2, 4, 4, 2], dtype=torch.float32),
+                indices_tensor=(
+                    None,
+                    torch.tensor([0, 0, 1, 1], dtype=torch.int64),
+                    None,
+                    torch.tensor([0, 0, 1, 1], dtype=torch.int64),
+                ),
+                value_tensor=torch.tensor([2, 3, 3, 4], dtype=torch.float32),
+            ),
+            param(
+                test_name="continuous_test",
+                source_tensor=torch.zeros([2, 4, 4, 2], dtype=torch.float32),
+                indices_tensor=(
+                    None,
+                    None,
+                    torch.tensor([0, 0, 1, 1], dtype=torch.int64),
+                    torch.tensor([0, 0, 1, 1], dtype=torch.int64),
+                ),
+                value_tensor=torch.tensor([2, 3, 3, 4], dtype=torch.float32),
             ),
             # param(
             #     test_name="2d_indices_accumulate_True",
@@ -243,6 +276,88 @@ class TestIndexPutConverter(DispatchTestCase):
             enable_passes=True,
             use_dynamo_tracer=True,
         )
+
+    def test_index_add_dynamic_shape(self):
+
+        class Model(torch.nn.Module):
+            def forward(self, x, y, z, a, b):
+                x.index_add_(0, y, z)
+                x.index_add_(0, a, b)
+                return x
+
+        dim = 10
+        model = Model().cuda()
+        inputs = [
+            torch.ones((12, dim)).half().cuda(),
+            torch.tensor([0, 1]).cuda(),
+            torch.randn((2, dim)).half().cuda(),
+            torch.tensor([2, 9, 11]).cuda(),
+            torch.randn((3, dim)).half().cuda(),
+        ]
+        torch_output = model.cuda().forward(*inputs)
+        seq_len1 = torch.export.Dim("seq_len1", min=1, max=128)
+        seq_len2 = torch.export.Dim("seq_len2", min=1, max=128)
+        seq_len3 = torch.export.Dim("seq_len3", min=1, max=128)
+
+        ep = torch.export.export(
+            model,
+            tuple(inputs),
+            dynamic_shapes=(
+                {0: seq_len1},
+                {0: seq_len2},
+                {0: seq_len2},
+                {0: seq_len3},
+                {0: seq_len3},
+            ),
+        )
+
+        trt_mod = torchtrt.dynamo.compile(
+            ep,
+            inputs,
+            enabled_precisions={torch.float16},
+            min_block_size=1,
+            use_explicit_typing=False,
+            use_fp32_acc=False,
+            disable_tf32=True,
+        )
+        result = trt_mod(*inputs)
+        assert torch.allclose(result, torch_output, atol=1e-4, rtol=1e-4)
+
+    def test_bool_mask_test(self):
+
+        source_tensor = torch.ones([5, 10], dtype=torch.float32).cuda()
+        indices_tensor = torch.tensor([False, False, True, False, True])
+        value_tensor = torch.zeros([2, 10], dtype=torch.float32).cuda()
+
+        dim1 = torch.export.Dim("dim1", min=1, max=5)
+        dim2 = torch.export.Dim("dim2", min=1, max=5)
+
+        class TestIndexPut(torch.nn.Module):
+            def forward(self, source_tensor, indices_tensor, value_tensor):
+                source_tensor[indices_tensor] = value_tensor
+                return source_tensor
+
+        model = TestIndexPut()
+        torch_output = model.forward(source_tensor, indices_tensor, value_tensor)
+
+        ep = torch.export.export(
+            model,
+            (source_tensor, indices_tensor, value_tensor),
+            dynamic_shapes=({0: dim1}, {0: dim1}, {0: dim2}),
+        )
+        trt_engine = torchtrt.dynamo.compile(
+            ep,
+            inputs=(source_tensor, indices_tensor, value_tensor),
+            enabled_precisions={torch.float32},
+            min_block_size=1,
+            use_explicit_typing=False,
+            use_fp32_acc=False,
+            disable_tf32=True,
+            use_python_runtime=True,
+        )
+        result = trt_engine(source_tensor, indices_tensor, value_tensor)
+
+        torch.allclose(result, torch_output, atol=1e-4, rtol=1e-4)
 
 
 if __name__ == "__main__":
