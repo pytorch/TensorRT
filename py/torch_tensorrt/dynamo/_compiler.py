@@ -268,12 +268,12 @@ def cross_compile_for_windows(
             "When enable_weight_streaming is enabled, it requires use_explicit_typing to be set to True"
         )
     # Aliasing inputs to arg_inputs for better understanding
-    if not arg_inputs and not kwarg_inputs and not inputs:
+    if arg_inputs is None and kwarg_inputs is None and inputs is None:
         raise AssertionError(
             "'arg_inputs', 'kwarg_inputs' and 'inputs' should not all be None."
         )
 
-    elif arg_inputs and inputs:
+    elif arg_inputs is not None and inputs is not None:
         raise AssertionError(
             "'arg_inputs' and 'inputs' should not be used at the same time."
         )
@@ -604,12 +604,12 @@ def compile(
             "When enable_weight_streaming is enabled, it requires use_explicit_typing to be set to True"
         )
     # Aliasing inputs to arg_inputs for better understanding
-    if not arg_inputs and not kwarg_inputs and not inputs:
+    if arg_inputs is None and kwarg_inputs is None and inputs is None:
         raise AssertionError(
             "'arg_inputs', 'kwarg_inputs' and 'inputs' should not all be None."
         )
 
-    elif arg_inputs and inputs:
+    elif arg_inputs is not None and inputs is not None:
         raise AssertionError(
             "'arg_inputs' and 'inputs' should not be used at the same time."
         )
@@ -1223,12 +1223,12 @@ def convert_exported_program_to_serialized_trt_engine(
             "When enable_weight_streaming is enabled, it requires use_explicit_typing to be set to True"
         )
     # Aliasing inputs to arg_inputs for better understanding
-    if not arg_inputs and not kwarg_inputs and not inputs:
+    if arg_inputs is None and kwarg_inputs is None and inputs is None:
         raise AssertionError(
             "'arg_inputs', 'kwarg_inputs' and 'inputs' should not all be None."
         )
 
-    elif arg_inputs and inputs:
+    elif arg_inputs is not None and inputs is not None:
         raise AssertionError(
             "'arg_inputs' and 'inputs' should not be used at the same time."
         )

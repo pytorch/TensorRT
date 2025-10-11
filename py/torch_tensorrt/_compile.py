@@ -283,14 +283,15 @@ def compile(
         return compiled_fx_module
     elif target_ir == _IRType.dynamo:
         # Prepare torch and torchtrt inputs
-        if not arg_inputs and not inputs:
+        if arg_inputs is None and inputs is None:
             raise AssertionError("'arg_inputs' and 'inputs' should not both be None.")
 
-        elif arg_inputs and inputs:
+        elif arg_inputs is not None and inputs is not None:
             raise AssertionError(
                 "'arg_inputs' and 'inputs' should not be used at the same time."
             )
-        arg_inputs = inputs or arg_inputs
+        if inputs is not None:
+            arg_inputs = inputs
 
         if kwarg_inputs is None:
             kwarg_inputs = {}
@@ -383,10 +384,10 @@ def cross_compile_for_windows(
     )
 
     # Prepare torch and torchtrt inputs
-    if not arg_inputs and not inputs:
+    if arg_inputs is None and inputs is None:
         raise AssertionError("'arg_inputs' and 'inputs' should not both be None.")
 
-    elif arg_inputs and inputs:
+    elif arg_inputs is not None and inputs is not None:
         raise AssertionError(
             "'arg_inputs' and 'inputs' should not be used at the same time."
         )
@@ -484,10 +485,10 @@ def convert_method_to_trt_engine(
         enabled_precisions if enabled_precisions is not None else {torch.float}
     )
 
-    if not arg_inputs and not inputs:
+    if arg_inputs is None and inputs is None:
         raise AssertionError("'arg_inputs' and 'inputs' should not both be None.")
 
-    elif arg_inputs and inputs:
+    elif arg_inputs is not None and inputs is not None:
         raise AssertionError(
             "'arg_inputs' and 'inputs' should not be used at the same time."
         )

@@ -398,7 +398,7 @@ jobs:
         set -euo pipefail
         pushd .
         cd tests/py/dynamo
-        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l2_dynamo_core_tests_results.xml  --ignore runtime/test_000_* --ignore runtime/test_001_* --ignore runtime/gen_hw_compat* runtime/*
+        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l2_dynamo_core_tests_results.xml  -k "not test_000_ and not test_001_" runtime/*
         popd
 
   L2-dynamo-plugin-tests:
