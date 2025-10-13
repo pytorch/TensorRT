@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torchtrtc &mdash; Torch-TensorRT v2.10.0.dev0+3932533 documentation</title>
+  <title>Introduction &mdash; Torch-TensorRT v2.10.0.dev0+3932533 documentation</title>
   
 
   
@@ -39,8 +39,8 @@
   <link rel="stylesheet" href="../_static/css/custom.css" type="text/css" />
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="System Overview" href="../contributors/system_overview.html" />
-    <link rel="prev" title="Define XSTR" href="../_cpp_api/define_macros_8h_1abe87b341f562fd1cf40b7672e4d759da.html" />
+    <link rel="next" title="Torch-TensorRT Explained" href="../user_guide/torch_tensorrt_explained.html" />
+    <link rel="prev" title="Torch-TensorRT-RTX" href="tensorrt_rtx.html" />
   <!-- Google Tag Manager -->
     <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
     new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
@@ -322,12 +322,12 @@
             
             
               <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
-<ul>
-<li class="toctree-l1"><a class="reference internal" href="../getting_started/installation.html">Installation</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../getting_started/jetpack.html">Torch-TensorRT in JetPack</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../getting_started/quick_start.html">Quick Start</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../getting_started/tensorrt_rtx.html">Torch-TensorRT-RTX</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../getting_started/capture_and_replay.html">Introduction</a></li>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="jetpack.html">Torch-TensorRT in JetPack</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quick_start.html">Quick Start</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tensorrt_rtx.html">Torch-TensorRT-RTX</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Introduction</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">User Guide</span></p>
 <ul>
@@ -401,8 +401,8 @@
 <li class="toctree-l1"><a class="reference internal" href="../_cpp_api/namespace_torch_tensorrt__torchscript.html">Namespace torch_tensorrt::torchscript</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">CLI Documentation</span></p>
-<ul class="current">
-<li class="toctree-l1 current"><a class="current reference internal" href="#">torchtrtc</a></li>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../cli/torchtrtc.html">torchtrtc</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Contributor Documentation</span></p>
 <ul>
@@ -455,13 +455,13 @@
       </li>
 
         
-      <li>torchtrtc</li>
+      <li>Introduction</li>
     
     
       <li class="pytorch-breadcrumbs-aside">
         
             
-            <a href="../_sources/cli/torchtrtc.rst.txt" rel="nofollow"><img src="../_static/images/view-page-source-icon.svg"></a>
+            <a href="../_sources/getting_started/capture_and_replay.rst.txt" rel="nofollow"><img src="../_static/images/view-page-source-icon.svg"></a>
           
         
       </li>
@@ -491,147 +491,47 @@
             <div role="main" class="main-content" itemscope="itemscope" itemtype="http://schema.org/Article">
              <article itemprop="articleBody" id="pytorch-article" class="pytorch-article">
               
-  <section id="torchtrtc">
-<span id="id1"></span><h1>torchtrtc<a class="headerlink" href="#torchtrtc" title="Permalink to this heading">¶</a></h1>
-<p><code class="docutils literal notranslate"><span class="pre">torchtrtc</span></code> is a CLI application for using the Torch-TensorRT compiler. It serves as an easy way to compile a
-TorchScript Module with Torch-TensorRT from the command-line to quickly check support or as part of
-a deployment pipeline. All basic features of the compiler are supported including post training
-quantization (though you must already have a calibration cache file to use the PTQ feature). The compiler can
-output two formats, either a TorchScript program with the TensorRT engine embedded or
-the TensorRT engine itself as a PLAN file.</p>
-<p>All that is required to run the program after compilation is for C++ linking against <code class="docutils literal notranslate"><span class="pre">libtorchtrt.so</span></code>
-or in Python importing the torch_tensorrt package. All other aspects of using compiled modules are identical
-to standard TorchScript. Load with <code class="docutils literal notranslate"><span class="pre">torch.jit.load()</span></code> and run like you would run any other module.</p>
-<div class="highlight-txt notranslate"><div class="highlight"><pre><span></span>torchtrtc [input_file_path] [output_file_path]
-  [input_specs...] {OPTIONS}
-
-  torchtrtc is a compiler for TorchScript, it will compile and optimize
-  TorchScript programs to run on NVIDIA GPUs using TensorRT
-
-OPTIONS:
-
-    -h, --help                        Display this help menu
-    Verbiosity of the compiler
-      -v, --verbose                     Dumps debugging information about the
-                                        compilation process onto the console
-      -w, --warnings                    Disables warnings generated during
-                                        compilation onto the console (warnings
-                                        are on by default)
-      --i, --info                       Dumps info messages generated during
-                                        compilation onto the console
-    --build-debuggable-engine         Creates a debuggable engine
-    --allow-gpu-fallback              (Only used when targeting DLA
-                                      (device-type)) Lets engine run layers on
-                                      GPU if they are not supported on DLA
-    --require-full-compilation        Require that the model should be fully
-                                      compiled to TensorRT or throw an error
-    --check-method-support=[method_name]
-                                      Check the support for end to end
-                                      compilation of a specified method in the
-                                      TorchScript module
-    --disable-tf32                    Prevent Float32 layers from using the
-                                      TF32 data format
-    --sparse-weights                  Enable sparsity for weights of conv and
-                                      FC layers
-    -p[precision...],
-    --enable-precision=[precision...] (Repeatable) Enabling an operating
-                                      precision for kernels to use when
-                                      building the engine (Int8 requires a
-                                      calibration-cache argument) [ float |
-                                      float32 | f32 | fp32 | half | float16 |
-                                      f16 | fp16 | int8 | i8 | char ]
-                                      (default: float)
-    -d[type], --device-type=[type]    The type of device the engine should be
-                                      built for [ gpu | dla ] (default: gpu)
-    --gpu-id=[gpu_id]                 GPU id if running on multi-GPU platform
-                                      (defaults to 0)
-    --dla-core=[dla_core]             DLACore id if running on available DLA
-                                      (defaults to 0)
-    --engine-capability=[capability]  The type of device the engine should be
-                                      built for [ standard | safety |
-                                      dla_standalone ]
-    --calibration-cache-file=[file_path]
-                                      Path to calibration cache file to use
-                                      for post training quantization
-    --teo=[op_name...],
-    --torch-executed-op=[op_name...]  (Repeatable) Operator in the graph that
-                                      should always be run in PyTorch for
-                                      execution (partial compilation must be
-                                      enabled)
-    --tem=[module_name...],
-    --torch-executed-mod=[module_name...]
-                                      (Repeatable) Module that should always
-                                      be run in Pytorch for execution (partial
-                                      compilation must be enabled)
-    --mbs=[num_ops],
-    --min-block-size=[num_ops]        Minimum number of contiguous TensorRT
-                                      supported ops to compile a subgraph to
-                                      TensorRT
-    --embed-engine                    Whether to treat input file as a
-                                      serialized TensorRT engine and embed it
-                                      into a TorchScript module (device spec
-                                      must be provided)
-    --num-avg-timing-iters=[num_iters]
-                                      Number of averaging timing iterations
-                                      used to select kernels
-    --workspace-size=[workspace_size] Maximum size of workspace given to
-                                      TensorRT
-    --dla-sram-size=[dla_sram_size]   Fast software managed RAM used by DLA
-                                      to communicate within a layer.
-    --dla-local-dram-size=[dla_local_dram_size]  Host RAM used by DLA to share
-                                      intermediate tensor data across operations.
-    --dla-global-dram-size=[dla_global_dram_size] Host RAM used by DLA to store
-                                      weights and metadata for execution
-    --atol=[atol]                     Absolute tolerance threshold for acceptable
-                                      numerical deviation from standard torchscript
-                                      output (default 1e-8)
-    --rtol=[rtol]                     Relative tolerance threshold for acceptable
-                                      numerical deviation from standard torchscript
-                                      output  (default 1e-5)
-    --no-threshold-check              Skip checking threshold compliance
-    --truncate-long-double,
-    --truncate, --truncate-64bit      Truncate weights that are provided in
-                                      64bit to 32bit (Long, Double to Int,
-                                      Float)
-    --save-engine                     Instead of compiling a full a
-                                      TorchScript program, save the created
-                                      engine to the path specified as the
-                                      output path
-    --custom-torch-ops                (repeatable) Shared object/DLL containing custom torch operators
-    --custom-converters               (repeatable) Shared object/DLL containing custom converters
-    input_file_path                   Path to input TorchScript file
-    output_file_path                  Path for compiled TorchScript (or
-                                      TensorRT engine) file
-    input_specs...                    Specs for inputs to engine, can either
-                                      be a single size or a range defined by
-                                      Min, Optimal, Max sizes, e.g.
-                                      &quot;(N,..,C,H,W)&quot;
-                                      &quot;[(MIN_N,..,MIN_C,MIN_H,MIN_W);(OPT_N,..,OPT_C,OPT_H,OPT_W);(MAX_N,..,MAX_C,MAX_H,MAX_W)]&quot;.
-                                      Data Type and format can be specified by
-                                      adding an &quot;@&quot; followed by dtype and &quot;%&quot;
-                                      followed by format to the end of the
-                                      shape spec. e.g. &quot;(3, 3, 32,
-                                      32)@f16%NHWC&quot;
-    &quot;--&quot; can be used to terminate flag options and force all following
-    arguments to be treated as positional options
-</pre></div>
-</div>
-<p>e.g.</p>
-<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>torchtrtc<span class="w"> </span>tests/modules/ssd_traced.jit.pt<span class="w"> </span>ssd_trt.ts<span class="w"> </span><span class="s2">&quot;[(1,3,300,300); (1,3,512,512); (1, 3, 1024, 1024)]@f16%contiguous&quot;</span><span class="w"> </span>-p<span class="w"> </span>f16
-</pre></div>
-</div>
+  <section id="introduction">
+<h1>Introduction<a class="headerlink" href="#introduction" title="Permalink to this heading">¶</a></h1>
+<p>This toolchain captures TensorRT network creation and build parameters at runtime via a shim, then deterministically replays them to reproduce an engine build. Use it to debug or reproduce builds independent of the originating framework.</p>
+<section id="prerequisites">
+<h2>Prerequisites<a class="headerlink" href="#prerequisites" title="Permalink to this heading">¶</a></h2>
 <ul class="simple">
-<li><p>To include a set of custom operators</p></li>
+<li><p>TensorRT installed (ensure you know the absolute path to its <code class="docutils literal notranslate"><span class="pre">lib</span></code> and <code class="docutils literal notranslate"><span class="pre">bin</span></code> directories)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">libtensorrt_shim.so</span></code> available in your TensorRT <code class="docutils literal notranslate"><span class="pre">lib</span></code> directory</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">tensorrt_player</span></code> available in your TensorRT <code class="docutils literal notranslate"><span class="pre">bin</span></code> directory</p></li>
 </ul>
-<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>torchtrtc<span class="w"> </span>tests/modules/ssd_traced.jit.pt<span class="w"> </span>ssd_trt.ts<span class="w"> </span>--custom-torch-ops<span class="o">=</span>&lt;path<span class="w"> </span>to<span class="w"> </span>custom<span class="w"> </span>library<span class="w"> </span>.so<span class="w"> </span>file&gt;<span class="w"> </span><span class="s2">&quot;[(1,3,300,300); (1,3,512,512); (1, 3, 1024, 1024)]@fp16%contiguous&quot;</span><span class="w"> </span>-p<span class="w"> </span>f16
+</section>
+<section id="quick-start-capture">
+<h2>Quick start: Capture<a class="headerlink" href="#quick-start-capture" title="Permalink to this heading">¶</a></h2>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nv">TORCHTRT_ENABLE_TENSORRT_API_CAPTURE</span><span class="o">=</span><span class="m">1</span><span class="w"> </span>python<span class="w"> </span>test.py
 </pre></div>
 </div>
+<p>You should see <code class="docutils literal notranslate"><span class="pre">shim.json</span></code> and <code class="docutils literal notranslate"><span class="pre">shim.bin</span></code> generated in <code class="docutils literal notranslate"><span class="pre">/tmp/torch_tensorrt_{current_user}/shim</span></code>.</p>
+</section>
+<section id="replay-build-the-engine-from-the-capture">
+<h2>Replay: Build the engine from the capture<a class="headerlink" href="#replay-build-the-engine-from-the-capture" title="Permalink to this heading">¶</a></h2>
+<p>Use <code class="docutils literal notranslate"><span class="pre">tensorrt_player</span></code> to replay the captured build without the original framework:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>tensorrt_player<span class="w"> </span>-j<span class="w"> </span>/absolute/path/to/shim.json<span class="w"> </span>-o<span class="w"> </span>/absolute/path/to/output_engine
+</pre></div>
+</div>
+<p>This produces a serialized TensorRT engine at <code class="docutils literal notranslate"><span class="pre">output_engine</span></code>.</p>
+</section>
+<section id="validate-the-engine">
+<h2>Validate the engine<a class="headerlink" href="#validate-the-engine" title="Permalink to this heading">¶</a></h2>
+<p>Run the engine with <code class="docutils literal notranslate"><span class="pre">trtexec</span></code>:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>trtexec<span class="w"> </span>--loadEngine<span class="o">=</span>/absolute/path/to/output_engine
+</pre></div>
+</div>
+</section>
+<section id="notes">
+<h2>Notes<a class="headerlink" href="#notes" title="Permalink to this heading">¶</a></h2>
 <ul class="simple">
-<li><p>To include a set of custom converters</p></li>
+<li><p>Ensure the <code class="docutils literal notranslate"><span class="pre">libnvinfer.so</span></code> used by the shim matches the TensorRT version in your environment.</p></li>
+<li><p>If multiple TensorRT versions are installed, prefer absolute paths as shown above.</p></li>
+<li><p>Currently, it is not supported to capture multiple engines, in case of graph break, only the first engine will be captured.</p></li>
 </ul>
-<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>torchtrtc<span class="w"> </span>tests/modules/ssd_traced.jit.pt<span class="w"> </span>ssd_trt.ts<span class="w"> </span>--custom-converters<span class="o">=</span>&lt;path<span class="w"> </span>to<span class="w"> </span>custom<span class="w"> </span>library<span class="w"> </span>.so<span class="w"> </span>file&gt;<span class="w"> </span><span class="s2">&quot;[(1,3,300,300); (1,3,512,512); (1, 3, 1024, 1024)]@fp16%contiguous&quot;</span><span class="w"> </span>-p<span class="w"> </span>f16
-</pre></div>
-</div>
+</section>
 </section>
 
 
@@ -642,10 +542,10 @@ OPTIONS:
   
     <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
       
-        <a href="../contributors/system_overview.html" class="btn btn-neutral float-right" title="System Overview" accesskey="n" rel="next">Next <img src="../_static/images/chevron-right-orange.svg" class="next-page"></a>
+        <a href="../user_guide/torch_tensorrt_explained.html" class="btn btn-neutral float-right" title="Torch-TensorRT Explained" accesskey="n" rel="next">Next <img src="../_static/images/chevron-right-orange.svg" class="next-page"></a>
       
       
-        <a href="../_cpp_api/define_macros_8h_1abe87b341f562fd1cf40b7672e4d759da.html" class="btn btn-neutral" title="Define XSTR" accesskey="p" rel="prev"><img src="../_static/images/chevron-right-orange.svg" class="previous-page"> Previous</a>
+        <a href="tensorrt_rtx.html" class="btn btn-neutral" title="Torch-TensorRT-RTX" accesskey="p" rel="prev"><img src="../_static/images/chevron-right-orange.svg" class="previous-page"> Previous</a>
       
     </div>
   
@@ -677,7 +577,14 @@ OPTIONS:
           <div class="pytorch-right-menu" id="pytorch-right-menu">
             <div class="pytorch-side-scroll" id="pytorch-side-scroll-right">
               <ul>
-<li><a class="reference internal" href="#">torchtrtc</a></li>
+<li><a class="reference internal" href="#">Introduction</a><ul>
+<li><a class="reference internal" href="#prerequisites">Prerequisites</a></li>
+<li><a class="reference internal" href="#quick-start-capture">Quick start: Capture</a></li>
+<li><a class="reference internal" href="#replay-build-the-engine-from-the-capture">Replay: Build the engine from the capture</a></li>
+<li><a class="reference internal" href="#validate-the-engine">Validate the engine</a></li>
+<li><a class="reference internal" href="#notes">Notes</a></li>
+</ul>
+</li>
 </ul>
 
             </div>
