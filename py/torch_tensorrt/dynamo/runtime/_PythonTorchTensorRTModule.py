@@ -172,8 +172,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         self._input_buffers: List[torch.Tensor] = []
         self._output_buffers: List[torch.Tensor] = []
         self.cudagraph: Optional[torch.cuda.CUDAGraph] = None
-        self._caller_stream: Optional[torch.cuda.Stream] = None
-        self._engine_stream: Optional[torch.cuda.Stream] = None
+        self._engine_stream: torch.cuda.Stream = torch.cuda.current_stream()
         self.output_tensors: Optional[List[torch.Tensor]] = None
         self.sync_stream = True
 
@@ -288,13 +287,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         ), f"TensorRT engine was not built to target current platform (target: {self.target_platform}, current: {Platform.current_platform()})"
         # Stream handling: if the caller stream is the pytorch default stream, create a new engine stream
         # otherwise, use the caller stream and disable stream synchronization
-        self._caller_stream = torch.cuda.current_stream()
-        if self._caller_stream == torch.cuda.default_stream():
-            self._engine_stream = torch.cuda.Stream()
-            self.sync_stream = True
-        else:
-            self._engine_stream = self._caller_stream
-            self.sync_stream = False
+        self._engine_stream = torch.cuda.current_stream()
 
         self.initialized = True
         runtime = trt.Runtime(TRT_LOGGER)
@@ -561,9 +554,6 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                 else nullcontext()
             ):
 
-                if self.sync_stream:
-                    self._engine_stream.wait_stream(self._caller_stream)
-
                 if self.cudagraphs_enabled:
                     if need_cudagraphs_record:
                         self.cudagraph = torch.cuda.CUDAGraph()
@@ -593,10 +583,16 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                     self.cudagraph.replay()  # type: ignore
 
                 else:
-                    self.context.execute_async_v3(self._engine_stream.cuda_stream)
+                    import warnings
 
-                if self.sync_stream:
-                    self._caller_stream.wait_stream(self._engine_stream)
+                    with warnings.catch_warnings():
+                        try:
+                            self.context.execute_async_v3(
+                                self._engine_stream.cuda_stream
+                            )
+                        except Warning as e:
+                            breakpoint()
+                            print("warning ignored")
 
             if self.use_pre_allocated_outputs:
                 self.pre_allocated_outputs = self.create_output_tensors()
@@ -651,21 +647,11 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                 if self.profiling_enabled
                 else nullcontext()
             ):
-                self._caller_stream = torch.cuda.current_stream()
-                if (
-                    self._engine_stream == torch.cuda.default_stream()
-                    or self._engine_stream is None
-                ):
-                    self._engine_stream = torch.cuda.Stream()
-
-                self._engine_stream.wait_stream(self._caller_stream)
 
                 with torch.cuda.stream(self._engine_stream):
                     self.context.execute_async_v3(
                         self._engine_stream.cuda_stream
                     )  # The OutputAllocator is called by execute_async_v3()
-
-                self._caller_stream.wait_stream(self._engine_stream)
 
             with (
                 torch.autograd.profiler.record_function(
