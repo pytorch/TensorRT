@@ -2,18 +2,29 @@ import importlib
 import unittest
 
 import torch
+import torch.nn.functional as F
 import torch_tensorrt as torch_trt
+from torch import nn
 from torch.testing._internal.common_utils import TestCase
 from torch_tensorrt.dynamo.utils import COSINE_THRESHOLD, cosine_similarity
 
 assertions = unittest.TestCase()
 
-if importlib.util.find_spec("torchvision"):
-    import torchvision.models as models
-
 
 class TestDynamicAllocation(TestCase):
     def test_dynamic_allocation(self):
+
+        class net(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.conv1 = nn.Conv2d(3, 6, 3, 1)
+                self.conv2 = nn.Conv2d(6, 16, 3, 1)
+
+            def forward(self, x):
+                x = F.relu(self.conv1(x))
+                x = F.relu(self.conv2(x))
+                return x
+
         inputs = [torch.rand((100, 3, 224, 224)).to("cuda")]
 
         settings = {
@@ -25,7 +36,7 @@ class TestDynamicAllocation(TestCase):
             "dynamically_allocate_resources": True,
         }
 
-        model = models.resnet152(pretrained=True).eval().to("cuda")
+        model = net().eval().to("cuda")
         compiled_module = torch_trt.compile(model, inputs=inputs, **settings)
         compiled_module(*inputs)
 
