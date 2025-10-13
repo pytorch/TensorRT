@@ -9,6 +9,8 @@ import torch.distributed as dist
 from torch.distributed._tensor.device_mesh import init_device_mesh
 
 
+# the below two functions are used to set the environment variables for the pytest single and multi process
+# this is for the github CI where we use pytest
 def set_environment_variables_pytest_single_process():
     port = 29500 + random.randint(1, 1000)
     os.environ["WORLD_SIZE"] = str(1)
