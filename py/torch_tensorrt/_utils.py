@@ -148,13 +148,55 @@ def _extracted_dir_trtllm(platform_system: str, platform_machine: str) -> Path:
     )
 
 
+def extract_wheel_file(wheel_path: Path, extract_dir: Path) -> None:
+    # this will not be encountered in case of platforms not supporting torch distributed/nccl/TRT-LLM
+    from torch.distributed import barrier, get_rank, is_initialized
+
+    if not is_initialized():
+        # Single process case, just unzip
+        is_master = True
+    else:
+        is_master = get_rank() == 0  # only rank 0 does the unzip
+
+    if is_master:
+        try:
+            import zipfile
+        except ImportError as e:
+            raise ImportError(
+                "zipfile module is required but not found. Please install zipfile"
+            )
+        try:
+            with zipfile.ZipFile(wheel_path) as zip_ref:
+                zip_ref.extractall(extract_dir)
+                logger.debug(f"Extracted wheel to {extract_dir}")
+
+        except FileNotFoundError as e:
+            # This should capture the errors in the download failure above
+            logger.error(f"Wheel file not found at {wheel_path}: {e}")
+            raise RuntimeError(
+                f"Failed to find downloaded wheel file at {wheel_path}"
+            ) from e
+        except zipfile.BadZipFile as e:
+            logger.error(f"Invalid or corrupted wheel file: {e}")
+            raise RuntimeError(
+                "Downloaded wheel file is corrupted or not a valid zip archive"
+            ) from e
+        except Exception as e:
+            logger.error(f"Unexpected error while extracting wheel: {e}")
+            raise RuntimeError(
+                "Unexpected error during extraction of TensorRT-LLM wheel"
+            ) from e
+
+    # Make sure others wait until unzip is done
+    if is_initialized():
+        barrier()
+
+
 def download_and_get_plugin_lib_path() -> Optional[str]:
     """
     Returns the path to the TensorRT‑LLM shared library, downloading and extracting if necessary.
-
     Args:
         platform (str): Platform identifier (e.g., 'linux_x86_64')
-
     Returns:
         Optional[str]: Path to shared library or None if operation fails.
     """
@@ -199,32 +241,7 @@ def download_and_get_plugin_lib_path() -> Optional[str]:
         except OSError as e:
             logger.error(f"Local file write error: {e}")
 
-    try:
-        import zipfile
-    except ImportError as e:
-        raise ImportError(
-            "zipfile module is required but not found. Please install zipfile"
-        )
-    try:
-        with zipfile.ZipFile(wheel_path) as zip_ref:
-            zip_ref.extractall(extract_dir)
-            logger.debug(f"Extracted wheel to {extract_dir}")
-    except FileNotFoundError as e:
-        # This should capture the errors in the download failure above
-        logger.error(f"Wheel file not found at {wheel_path}: {e}")
-        raise RuntimeError(
-            f"Failed to find downloaded wheel file at {wheel_path}"
-        ) from e
-    except zipfile.BadZipFile as e:
-        logger.error(f"Invalid or corrupted wheel file: {e}")
-        raise RuntimeError(
-            "Downloaded wheel file is corrupted or not a valid zip archive"
-        ) from e
-    except Exception as e:
-        logger.error(f"Unexpected error while extracting wheel: {e}")
-        raise RuntimeError(
-            "Unexpected error during extraction of TensorRT-LLM wheel"
-        ) from e
+    extract_wheel_file(wheel_path, extract_dir)
 
     try:
         wheel_path.unlink(missing_ok=True)
@@ -243,10 +260,8 @@ def download_and_get_plugin_lib_path() -> Optional[str]:
 def load_and_initialize_trtllm_plugin(plugin_lib_path: str) -> bool:
     """
     Loads and initializes the TensorRT-LLM plugin from the given shared library path.
-
     Args:
         plugin_lib_path (str): Path to the shared TensorRT-LLM plugin library.
-
     Returns:
         bool: True if successful, False otherwise.
     """
@@ -298,7 +313,6 @@ def load_tensorrt_llm_for_nccl() -> bool:
     Attempts to load the TensorRT-LLM plugin and initialize it.
     Either the env variable TRTLLM_PLUGINS_PATH can specify the path
     Or the user can specify USE_TRTLLM_PLUGINS as either of (1, true, yes, on) to download the TRT-LLM distribution and load it
-
     Returns:
         bool: True if the plugin was successfully loaded and initialized, False otherwise.
     """
