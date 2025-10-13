@@ -24,11 +24,11 @@ if not dist.is_initialized():
 import torch_tensorrt
 from torch_tensorrt.dynamo.distributed.utils import (
     get_tensor_parallel_device_mesh,
-    initialize_logger,
+    initialize_distributed_logger,
 )
 
 device_mesh, _world_size, _rank = get_tensor_parallel_device_mesh()
-logger = initialize_logger(_rank, "tensor_parallel_llama3")
+logger = initialize_distributed_logger(_rank, "tensor_parallel_llama3")
 
 logger.info(f"Starting PyTorch TP example on rank {_rank}.")
 assert (
