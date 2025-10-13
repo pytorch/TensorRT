@@ -26,17 +26,18 @@ if not dist.is_initialized():
 import torch_tensorrt
 from torch_tensorrt.dynamo.distributed.utils import (
     get_tensor_parallel_device_mesh,
-    initialize_logger,
+    initialize_distributed_logger,
 )
 
 device_mesh, _world_size, _rank = get_tensor_parallel_device_mesh()
-logger = initialize_logger(_rank, "tensor_parallel_rotary_embedding")
+logger = initialize_distributed_logger(_rank, "tensor_parallel_rotary_embedding")
 
 from rotary_embedding import RotaryAttention, parallel_rotary_block
 
 """
 This example covers the rotary embedding in Llama3 model and is derived from https://lightning.ai/lightning-ai/studios/tensor-parallelism-supercharging-large-model-training-with-pytorch-lightning
 Command to run with single GPU: mpirun -n 1 --allow-run-as-root python tensor_parallel_rotary_embedding.py
+Command to run with 2 GPUs: mpirun -n 2 --allow-run-as-root python tensor_parallel_rotary_embedding.py
 """
 
 BATCH = 2

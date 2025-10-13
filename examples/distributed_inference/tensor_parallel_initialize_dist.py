@@ -17,6 +17,7 @@ import torch.distributed as dist
 from torch.distributed._tensor.device_mesh import init_device_mesh
 
 
+# this is kept at the application level, when mpirun is used to run the application
 def initialize_distributed_env(rank=0, world_size=1, port=29500):
     local_rank = int(
         os.environ.get("OMPI_COMM_WORLD_LOCAL_RANK", rank % torch.cuda.device_count())
