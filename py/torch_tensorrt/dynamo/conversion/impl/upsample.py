@@ -32,16 +32,19 @@ def upsample(
         layer.scales = [1.0, 1.0] + list(scale_factor)
     else:
         shape = list(input.shape)[:2]
-    if size is not None:
-        shape += list(size)
+        if size is not None:
+            shape += list(size)
         if has_dynamic_shape(shape):
             shape = get_shape_with_dynamic_shape(
                 ctx, target, source_ir, name, shape, input
             )
             layer.set_input(1, shape)
         else:
-            layer.shape = to_trt_shape_tensor(ctx, target, name, shape)
-            layer.set_input(1, layer.shape)
+            trt_shape = to_trt_shape_tensor(ctx, target, name, shape)
+            if isinstance(trt_shape, list):
+                layer.shape = trt_shape
+            else:
+                layer.set_input(1, trt_shape)
 
     if mode == "nearest":
         layer.resize_mode = trt.InterpolationMode.NEAREST
