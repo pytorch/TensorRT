@@ -1,5 +1,5 @@
 load("@rules_cc//cc:defs.bzl", "cc_binary")
-
+load("@rules_pkg//pkg:mappings.bzl", "pkg_files")
 package(default_visibility = ["//visibility:public"])
 
 cc_binary(
@@ -52,4 +52,12 @@ cc_binary(
         "//core/plugins:torch_tensorrt_plugins",
         "//core/runtime",
     ],
+)
+
+
+pkg_files(
+    name = "lib_pkg_files",
+    srcs = ["torchtrt.dll"],
+    visibility = ["//visibility:public"],
+    prefix = "lib/",
 )
