@@ -143,7 +143,7 @@ def to_trt_shape_tensor(
     trt_tensors = []
 
     for i, s in enumerate(shape_list):
-        if isinstance(s, int):
+        if isinstance(s, (int, torch.Tensor)):
             const = ctx.net.add_constant((1,), np.array([s], dtype=np.int32))
             set_layer_name(const, target, f"{name}_dim{i}_const")
             trt_tensors.append(const.get_output(0))
