@@ -132,8 +132,8 @@ def to_trt_shape_tensor(
     Convert a mixed shape list (ints + ITensors) into a single ITensor.
 
     Args:
-        ctx: ConversionContext
-        target: fx node target (used for naming).
+        ctx (ConversionContext): TensorRT ConversionContext object.
+        target (Target): Target of fx node.
         name (str): base name for layer naming.
         shape_list (list[int | ITensor]): list containing static ints and/or ITensors.
 
@@ -148,16 +148,14 @@ def to_trt_shape_tensor(
             set_layer_name(const, target, f"{name}_dim{i}_const")
             trt_tensors.append(const.get_output(0))
         else:
-            # Assume it's already an ITensor
             trt_tensors.append(s)
 
-    if trt_tensors:
-        if any(not isinstance(s, int) for s in shape_list):
-            # Concatenate everything into a single ITensor
-            concat_layer = ctx.net.add_concatenation(trt_tensors)
-            concat_layer.axis = 0
-            set_layer_name(concat_layer, target, f"{name}_shape_concat")
-            return concat_layer.get_output(0)
+    if any(not isinstance(s, int) for s in shape_list):
+        # Concatenate everything into a single ITensor if there are any ITensors/Tensors
+        concat_layer = ctx.net.add_concatenation(trt_tensors)
+        concat_layer.axis = 0
+        set_layer_name(concat_layer, target, f"{name}_shape_concat")
+        return concat_layer.get_output(0)
 
     # If no ITensor found, return plain list of ints
     return shape_list
