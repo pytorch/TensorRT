@@ -4,7 +4,6 @@ import importlib.util
 import logging
 import os
 import platform
-import pwd
 import sys
 import tempfile
 from types import ModuleType
@@ -74,6 +73,8 @@ def enable_capture_tensorrt_api_recording() -> None:
         os.environ["TRT_SHIM_NVINFER_LIB_NAME"] = os.path.join(
             tensorrt_lib_path, "libnvinfer.so"
         )
+        import pwd
+
         current_user = pwd.getpwuid(os.getuid())[0]
         shim_temp_dir = os.path.join(
             tempfile.gettempdir(), f"torch_tensorrt_{current_user}/shim"
