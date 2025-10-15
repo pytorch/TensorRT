@@ -43,19 +43,6 @@ pkg_tar(
     ],
 )
 
-pkg_zip(
-    name = "include_core_zip",
-    srcs = [
-        "//core:include_zip",
-        "//core/plugins:impl_include_zip",
-        "//core/plugins:include_zip",
-        "//core/runtime:include_zip",
-        "//core/util:include_zip",
-        "//core/util/logging:include_zip",
-    ],
-    out = "include_core.zip",
-    package_dir = "include/torch_tensorrt",
-)
 
 pkg_tar(
     name = "include_rt",
@@ -65,29 +52,11 @@ pkg_tar(
     ],
 )
 
-pkg_zip(
-    name = "include_rt_zip",
-    srcs = [
-        "//core/runtime:include",
-    ],
-    out = "include_rt.zip",
-    package_dir = "include/torch_tensorrt",
-)
-
 pkg_tar(
     name = "include",
     srcs = [
         "//cpp:api_headers",
     ],
-    package_dir = "include/torch_tensorrt/",
-)
-
-pkg_zip(
-    name = "include_zip",
-    srcs = [
-        "//cpp:api_headers",
-    ],
-    out = "include.zip",
     package_dir = "include/torch_tensorrt/",
 )
 
@@ -103,28 +72,10 @@ pkg_tar(
     package_dir = "lib/",
 )
 
-# Windows-specific zip target for lib
-pkg_zip(
-    name = "lib_zip",
-    srcs = ["//cpp/lib:torchtrt.dll"],
-    out = "lib.zip",
-    mode = "0755",
-    package_dir = "lib/",
-)
-
 # Non-Windows tar target for lib_rt
 pkg_tar(
     name = "lib_rt",
     srcs = ["//cpp/lib:libtorchtrt_runtime.so"],
-    mode = "0755",
-    package_dir = "lib/",
-)
-
-# Windows-specific zip target for lib_rt
-pkg_zip(
-    name = "lib_rt_zip",
-    srcs = ["//cpp/lib:torchtrt_runtime.dll"],
-    out = "lib_rt.zip",
     mode = "0755",
     package_dir = "lib/",
 )
@@ -142,9 +93,12 @@ pkg_tar(
 pkg_zip(
     name = "libtorchtrt_zip",
     srcs = [
-        ":include_core_zip",
-        ":include_zip",
-        ":lib_zip",
+        "//core/plugins:impl_include_pkg_files",
+        "//core:include_pkg_files",
+        "//core/runtime:include_pkg_files",
+        "//core/util:include_pkg_files",
+        "//core/util/logging:include_pkg_files",
+        "//cpp/lib:lib_pkg_files",
         "//:LICENSE",
         "//third_party/torch_tensorrt:BUILD",
     ],
@@ -181,19 +135,6 @@ alias(
         ":windows": ":libtorchtrt_zip",
         "//conditions:default": ":libtorchtrt_tar",
     }),
-)
-
-# Windows-specific zip target for runtime
-pkg_zip(
-    name = "libtorchtrt_runtime_zip",
-    srcs = [
-        ":include_rt_zip",
-        ":lib_rt_zip",
-        "//:LICENSE",
-        "//third_party/torch_tensorrt:BUILD",
-    ],
-    out = "libtorchtrt_runtime.zip",
-    package_dir = "torch_tensorrt_runtime",
 )
 
 # Non-Windows tar target for runtime
