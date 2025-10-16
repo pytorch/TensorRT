@@ -218,7 +218,7 @@ def aten_ops_native_group_norm(
 
 
 def cat_validator(node: Node, settings: Optional[CompilationSettings] = None) -> bool:
-    # Validate only one user, which is a getitem node that accesses the first element in the list
+    # empty tensor in cat input as ITensor leads to [RemoveDeadLayers] Input Tensor y is unused or used only at compile-time, but is not being removed.
     for each_input in node.args[0]:
         if isinstance(each_input, TRTTensor) and any(s == 0 for s in each_input.shape):
             return False
@@ -226,7 +226,9 @@ def cat_validator(node: Node, settings: Optional[CompilationSettings] = None) ->
 
 
 @dynamo_tensorrt_converter(
-    torch.ops.aten.cat.default, supports_dynamic_shapes=True, validator=cat_validator
+    torch.ops.aten.cat.default,
+    capability_validator=cat_validator,
+    supports_dynamic_shapes=True,
 )
 def aten_ops_cat(
     ctx: ConversionContext,
