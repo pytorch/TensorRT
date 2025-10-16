@@ -107,7 +107,7 @@ jobs:
         set -euo pipefail
         pushd .
         cd tests/py/dynamo
-        ../../../packaging/vc_env_helper.bat python -m pytest -ra -n 8--junitxml=${RUNNER_TEST_RESULTS_DIR}/l0_dynamo_converter_tests_results.xml  --dist=loadscope --maxfail=20 conversion/
+        ../../../packaging/vc_env_helper.bat python -m pytest -ra -n 8 --junitxml=${RUNNER_TEST_RESULTS_DIR}/l0_dynamo_converter_tests_results.xml  --dist=loadscope --maxfail=20 conversion/
         popd
 
   L0-dynamo-core-tests:
