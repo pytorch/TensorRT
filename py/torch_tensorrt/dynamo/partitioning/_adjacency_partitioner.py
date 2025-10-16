@@ -1,6 +1,7 @@
 import logging
 from typing import Collection, Dict, List, Optional, Tuple
 
+import psutil
 import torch
 import torch.fx.passes.operator_support as ops
 from torch.fx.node import Target
@@ -225,12 +226,79 @@ class TRTPartitioner(_SplitterBase):  # type: ignore
         # Remove segments smaller than the block size (with exceptions)
         subgraphs = self.remove_small_acc_subgraphs(subgraphs)
 
+        num_of_break = self.calculate_num_of_break(subgraphs)
+        subgraphs = self.break_subgraphs(subgraphs, num_of_break=num_of_break)
+
         # Set the number of TRT engines to be generated
         self.num_trt_accelerated_subgraphs = len([s for s in subgraphs if s.is_acc])
 
         # Tag the accelerated nodes and split the graph accordingly
         self.tag(subgraphs)
         return self.split()
+
+    def calculate_num_of_break(self, subgraphs: List[Subgraph]) -> int:
+        """
+        This function calculates the break period based on the number of subgraphs.
+        """
+        rss = psutil.Process().memory_info().rss
+        available_rss = psutil.virtual_memory().available
+        num_of_graphs = len(subgraphs)
+        if rss < available_rss * 0.3:
+            num_of_graphs = 1
+        elif rss < available_rss * 0.5:
+            num_of_graphs = 2
+        elif rss < available_rss:
+            num_of_graphs = 4
+        elif rss < available_rss * 1.5:
+            num_of_graphs = 8
+        elif rss < available_rss * 2:
+            num_of_graphs = 16
+        else:
+            num_of_graphs = 32
+
+        return max(
+            1, num_of_graphs // ((len(subgraphs) + 1) // 2)
+        )  # If there are already graph breaks, for each TRT subgraph, we break for a few times.
+
+    def break_subgraphs(
+        self, subgraphs: List[Subgraph], num_of_break: int = 1
+    ) -> List[Subgraph]:
+        """
+        This function breaks the subgraphs into smaller subgraphs at the specified frequency to save CPU memory.
+        """
+
+        num_of_sdpa_node = len(
+            [node for node in self.acc_nodes if "scaled_dot" in str(node.target)]
+        )
+        break_period = num_of_sdpa_node // num_of_break + 1
+        current_break_idx = 0
+        current_num_break = 0
+        new_subgraphs = []
+        for subgraph in subgraphs:
+            if subgraph.is_acc:
+                for i, node in enumerate(subgraph.nodes):
+                    if "scaled_dot" in str(node.target):
+                        current_num_break += 1
+                        if current_num_break % break_period != 0:
+                            continue
+                        new_subgraphs.append(
+                            Subgraph(
+                                is_acc=True,
+                                nodes=subgraph.nodes[current_break_idx : i + 1],
+                                device_ordinal=subgraph.device_ordinal,
+                            )
+                        )
+                        current_break_idx = i + 1
+                new_subgraphs.append(
+                    Subgraph(
+                        is_acc=True,
+                        nodes=subgraph.nodes[current_break_idx:],
+                        device_ordinal=subgraph.device_ordinal,
+                    )
+                )
+            else:
+                new_subgraphs.append(subgraph)
+        return new_subgraphs
 
     def starter_nodes(self) -> Tuple[NodeSet, NodeSet]:
         """Generates starter nodes for partitioning + segmentation"""
