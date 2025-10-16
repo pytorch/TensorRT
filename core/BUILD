@@ -1,6 +1,6 @@
 load("@rules_cc//cc:defs.bzl", "cc_library")
-load("@rules_pkg//:pkg.bzl", "pkg_tar", "pkg_zip")
-
+load("@rules_pkg//:pkg.bzl", "pkg_tar")
+load("@rules_pkg//pkg:mappings.bzl", "pkg_files")
 package(default_visibility = ["//visibility:public"])
 
 config_setting(
@@ -104,11 +104,11 @@ pkg_tar(
     package_dir = "core/",
 )
 
-pkg_zip(
-    name = "include_zip",
+pkg_files(
+    name = "include_pkg_files",
     srcs = [
         "compiler.h",
     ],
-    out = "include.zip",
-    package_dir = "core/",
+    visibility = ["//visibility:public"],
+    prefix = "include/torch_tensorrt/core/",
 )

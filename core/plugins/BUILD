@@ -1,6 +1,6 @@
 load("@rules_cc//cc:defs.bzl", "cc_library")
-load("@rules_pkg//:pkg.bzl", "pkg_tar", "pkg_zip")
-
+load("@rules_pkg//:pkg.bzl", "pkg_tar")
+load("@rules_pkg//pkg:mappings.bzl", "pkg_files")
 package(default_visibility = ["//visibility:public"])
 
 config_setting(
@@ -127,13 +127,6 @@ pkg_tar(
     package_dir = "core/plugins/",
 )
 
-pkg_zip(
-    name = "include_zip",
-    srcs = ["plugins.h"],
-    out = "include.zip",
-    package_dir = "core/plugins/",
-)
-
 filegroup(
     name = "impl_include_files",
     srcs = [
@@ -143,15 +136,15 @@ filegroup(
     visibility = ["//visibility:public"],
 )
 
+pkg_files(
+    name = "impl_include_pkg_files",
+    srcs = [":impl_include_files"],
+    visibility = ["//visibility:public"],
+    prefix = "include/torch_tensorrt/core/plugins/impl",
+)
+
 pkg_tar(
     name = "impl_include",
     srcs = [":impl_include_files"],
-    package_dir = "core/plugins/impl",
-)
-
-pkg_zip(
-    name = "impl_include_zip",
-    srcs = [":impl_include_files"],
-    out = "impl_include.zip",
     package_dir = "core/plugins/impl",
 )
