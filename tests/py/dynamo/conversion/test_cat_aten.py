@@ -27,6 +27,60 @@ class TestCatConverter(DispatchTestCase):
 
     @parameterized.expand(
         [
+            ("pos", 0),
+            ("neg", -3),
+        ]
+    )
+    def test_cat_with_scalar_inputs(self, _, dim):
+        # Ensure scalar tensor wrap works
+        class Cat(nn.Module):
+            def forward(self, x, y):
+                # y is a scalar, x is a tensor
+                return torch.ops.aten.cat.default((x, y), dim)
+
+        x = torch.randn(1, 2, 3, device="cuda")
+        y = torch.ones_like(x) * 5.0  # simulate scalar broadcast
+        inputs = [x, y]
+        self.run_test(Cat(), inputs)
+
+    @parameterized.expand(
+        [
+            ("pos", 0),
+            ("neg", -3),
+        ]
+    )
+    def test_cat_with_empty_tensor(self, _, dim):
+        # Handle empty tensor in concat
+        class Cat(nn.Module):
+            def forward(self, x):
+                y = torch.empty(0, 2, 3, device="cuda")
+                return torch.ops.aten.cat.default((x, y), dim)
+
+        inputs = [
+            torch.randn(1, 2, 3, device="cuda"),
+        ]
+        self.run_test(Cat(), inputs)
+
+    @parameterized.expand(
+        [
+            ("pos", 2),
+            ("neg", -1),
+        ]
+    )
+    def test_cat_with_different_dtypes(self, _, dim):
+        # check dtype promotion path in concat
+        class Cat(nn.Module):
+            def forward(self, x, y):
+                return torch.ops.aten.cat.default((x, y), dim)
+
+        inputs = [
+            torch.ones(1, 2, 3, dtype=torch.float32, device="cuda"),
+            torch.ones(1, 2, 3, dtype=torch.float16, device="cuda"),
+        ]
+        self.run_test(Cat(), inputs)
+
+    @parameterized.expand(
+        [
             ("pos", 1),
             ("neg", -2),
         ]

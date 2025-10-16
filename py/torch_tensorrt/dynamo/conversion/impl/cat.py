@@ -14,6 +14,8 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     set_layer_name,
 )
 
+logger = logging.getLogger(__name__)
+
 
 def unify_and_concat_trt_tensors(
     ctx: ConversionContext,
