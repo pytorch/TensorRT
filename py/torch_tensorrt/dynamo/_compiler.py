@@ -42,6 +42,7 @@ from torch_tensorrt.dynamo.lowering import (
 )
 from torch_tensorrt.dynamo.utils import (
     deallocate_module,
+    get_cpu_memory_usage,
     get_flat_args_with_check,
     get_output_metadata,
     parse_graph_io,
@@ -675,7 +676,7 @@ def compile(
         "l2_limit_for_tiling": l2_limit_for_tiling,
         "offload_module_to_cpu": offload_module_to_cpu,
     }
-
+    logger.debug(f"CPU memory usage before lowering: {get_cpu_memory_usage()} MB")
     settings = CompilationSettings(**compilation_options)
     logger.info("Compilation Settings: %s\n", settings)
     exported_program = pre_export_lowering(exported_program, settings)
@@ -689,14 +690,17 @@ def compile(
 
     # Apply lowering on the graph module
     gm = post_lowering(gm, settings)
+    logger.debug(f"CPU memory usage after post_lowering: {get_cpu_memory_usage()} MB")
     logger.debug("Lowered Input graph: " + str(gm.graph))
 
     # Move the weights in the state_dict to CPU
     if offload_module_to_cpu:
+        deallocate_module(gm, delete_module=False)
         deallocate_module(exported_program.module(), delete_module=False)
         logger.info(
             "The PyTorch model was moved to the CPU to allocate all GPU memory to TensorRT. To retain the model on the GPU, set offload_module_to_cpu=False"
         )
+        logger.debug(f"CPU memory usage after CPU offload: {get_cpu_memory_usage()} MB")
     else:
         remaining_memory, total_memory = torch.cuda.mem_get_info()
         if remaining_memory < total_memory // 2:
@@ -858,6 +862,11 @@ def compile_module(
     # Iterate over all components that can be accelerated
     # Generate the corresponding TRT Module for those
 
+    # Here we delete the frozen parameters from the graph module. Note this does not affect the submodules. We are going to delete the frozen parameters from the submodules in the convert_module function.
+    # This is done to release CPU memory.
+    for attr in dir(gm):
+        if attr.startswith("_frozen_param"):
+            delattr(gm, attr)
     for name, _ in partitioned_module.named_children():
         submodule = getattr(partitioned_module, name)
         # filter on the GraphModule
@@ -1231,7 +1240,7 @@ def convert_exported_program_to_serialized_trt_engine(
 
     # Prepare torch_trt inputs
     trt_arg_inputs: Sequence[Input] = prepare_inputs(arg_inputs)
-    trt_kwarg_inputs: Optional[dict[Any, Any]] = prepare_inputs(kwarg_inputs)
+    trt_kwarg_inputs: Optional[dict[str, Any]] = prepare_inputs(kwarg_inputs)
     device = to_torch_tensorrt_device(device)
     enabled_precisions = {dtype._from(p) for p in enabled_precisions}
 
@@ -1317,7 +1326,7 @@ def convert_exported_program_to_serialized_trt_engine(
             )
 
     flattened_input_list = get_flat_args_with_check(
-        exported_program, list(trt_arg_inputs), trt_kwarg_inputs
+        exported_program, list(trt_arg_inputs), trt_kwarg_inputs  # type: ignore
     )[0]
 
     try:

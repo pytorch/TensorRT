@@ -26,12 +26,16 @@ TORCH_TRT_DECOMPOSITIONS.pop(
     torch.ops.aten._scaled_dot_product_efficient_attention.default, None
 )
 TORCH_TRT_DECOMPOSITIONS.pop(
+    torch.ops.aten._scaled_dot_product_cudnn_attention.default, None
+)
+TORCH_TRT_DECOMPOSITIONS.pop(
     torch.ops.aten._scaled_dot_product_flash_attention.default, None
 )
 
 REPLACEABLE_ATEN_OPS = {
     torch.ops.aten._scaled_dot_product_efficient_attention.default,
     torch.ops.aten._scaled_dot_product_flash_attention.default,
+    torch.ops.aten._scaled_dot_product_cudnn_attention.default,
 }
 
 from torch_tensorrt.dynamo.lowering.passes._aten_lowering_pass import (
@@ -68,7 +72,10 @@ def _process_sdpa_node(
         ValueError: If the SDPA node has an unexpected number of arguments
     """
 
-    if node.target == torch.ops.aten._scaled_dot_product_efficient_attention.default:
+    if node.target in [
+        torch.ops.aten._scaled_dot_product_efficient_attention.default,
+        torch.ops.aten._scaled_dot_product_cudnn_attention.default,
+    ]:
         if len(node.args) == 7:
             (
                 query,
