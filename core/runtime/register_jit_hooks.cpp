@@ -111,7 +111,10 @@ static auto TORCHTRT_UNUSED TRTEngineTSRegistrtion =
             [](const c10::intrusive_ptr<TRTEngine>& self) -> std::vector<std::string> { return self->serialize(); },
             [](std::vector<std::string> serialized_info) -> c10::intrusive_ptr<TRTEngine> {
               serialized_info[ENGINE_IDX] = base64_decode(serialized_info[ENGINE_IDX]);
-              LOG_DEBUG("Deserialized resource allocation strategy: " << (static_cast<bool>(std::stoi(serialized_info[RESOURCE_ALLOCATION_STRATEGY_IDX])) ? "Dynamic" : "Static"));
+              LOG_DEBUG(
+                  "Deserialized resource allocation strategy: "
+                  << (static_cast<bool>(std::stoi(serialized_info[RESOURCE_ALLOCATION_STRATEGY_IDX])) ? "Dynamic"
+                                                                                                      : "Static"));
               TRTEngine::verify_serialization_fmt(serialized_info);
               return c10::make_intrusive<TRTEngine>(serialized_info);
             });

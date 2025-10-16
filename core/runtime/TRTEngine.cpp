@@ -86,7 +86,9 @@ TRTEngine::TRTEngine(std::vector<std::string> serialized_info)
           static_cast<bool>(std::stoi(serialized_info[HW_COMPATIBLE_IDX])),
           static_cast<bool>(std::stoi(serialized_info[REQUIRES_OUTPUT_ALLOCATOR_IDX])),
           serialized_info[SERIALIZED_METADATA_IDX],
-          (static_cast<bool>(std::stoi(serialized_info[RESOURCE_ALLOCATION_STRATEGY_IDX])) ? ResourceAllocationStrategy::kDynamic : ResourceAllocationStrategy::kStatic)) {}
+          (static_cast<bool>(std::stoi(serialized_info[RESOURCE_ALLOCATION_STRATEGY_IDX]))
+               ? ResourceAllocationStrategy::kDynamic
+               : ResourceAllocationStrategy::kStatic)) {}
 
 TRTEngine::TRTEngine(
     const std::string& mod_name,
@@ -129,7 +131,9 @@ TRTEngine::TRTEngine(
   }
 
   this->resource_allocation_strategy = resource_allocation_strategy;
-  LOG_DEBUG("Resource allocation strategy: " << (this->resource_allocation_strategy == ResourceAllocationStrategy::kDynamic ? "Dynamic" : "Static"));
+  LOG_DEBUG(
+      "Resource allocation strategy: "
+      << (this->resource_allocation_strategy == ResourceAllocationStrategy::kDynamic ? "Dynamic" : "Static"));
   if (this->resource_allocation_strategy == ResourceAllocationStrategy::kDynamic) {
     this->exec_ctx =
         make_trt(cuda_engine->createExecutionContext(nvinfer1::ExecutionContextAllocationStrategy::kUSER_MANAGED));
@@ -480,7 +484,8 @@ std::vector<std::string> TRTEngine::serialize() {
   serialized_info[REQUIRES_OUTPUT_ALLOCATOR_IDX] = this->requires_output_allocator ? "1" : "0";
   serialized_info[SERIALIZED_METADATA_IDX] = this->serialized_metadata;
   serialized_info[TARGET_PLATFORM_IDX] = this->target_platform.serialize();
-  serialized_info[RESOURCE_ALLOCATION_STRATEGY_IDX] = this->resource_allocation_strategy == ResourceAllocationStrategy::kDynamic ? "1" : "0";
+  serialized_info[RESOURCE_ALLOCATION_STRATEGY_IDX] =
+      this->resource_allocation_strategy == ResourceAllocationStrategy::kDynamic ? "1" : "0";
 
   return serialized_info;
 }
@@ -494,11 +499,11 @@ void TRTEngine::set_resource_allocation_strategy(TRTEngine::ResourceAllocationSt
     this->resource_allocation_strategy = new_strategy;
     if (this->resource_allocation_strategy == TRTEngine::ResourceAllocationStrategy::kDynamic) {
       LOG_DEBUG("Setting resource allocation strategy to dynamic");
-      this->exec_ctx = make_trt(cuda_engine->createExecutionContext(nvinfer1::ExecutionContextAllocationStrategy::kUSER_MANAGED));
+      this->exec_ctx =
+          make_trt(cuda_engine->createExecutionContext(nvinfer1::ExecutionContextAllocationStrategy::kUSER_MANAGED));
     } else {
       LOG_DEBUG("Setting resource allocation strategy to static");
-      this->exec_ctx = make_trt(
-          cuda_engine->createExecutionContext());
+      this->exec_ctx = make_trt(cuda_engine->createExecutionContext());
     }
   }
 }
