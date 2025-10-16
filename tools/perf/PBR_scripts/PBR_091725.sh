@@ -1,8 +1,8 @@
 #!/bin/bash
 
 OPT_LEVEL=5
-WARMUP_ITER=10
-ITERATIONS=20
+WARMUP_ITER=20
+ITERATIONS=50
 OUTPUT_FOLDER="outputs"
 
 mkdir -p $OUTPUT_FOLDER
@@ -34,6 +34,7 @@ do
                     --inputs="${inputs}" \
                     --precision="${precision}" \
                     --optimization_level="${optimization_level}" \
+                    --immutable_weights \
                     --enable_cuda_graph \
                     --save_onnx_trt_engine \
                     --save_dynamo_trt_engine \

@@ -17,6 +17,7 @@ from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
 )
 from torch_tensorrt.dynamo.lowering import (
     get_decompositions,
+    post_lowering,
     pre_export_lowering,
 )
 from torch_tensorrt.dynamo.partitioning._hierarchical_partitioner import (
@@ -91,6 +92,8 @@ def multi_backend_test(
         "use_python_runtime": use_python_runtime,
     }
     settings = torch_tensorrt.dynamo.CompilationSettings(**compilation_options)
+
+    gm = post_lowering(gm, settings)
 
     # 1. Partition the model into blocks that can be executed by different backends
     partitioned_model, op_support = hierarchical_adjacency_partition(

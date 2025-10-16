@@ -301,7 +301,7 @@ def run_dynamo(model, input_tensors, params, precision, batch_size):
         "cache_built_engines": params.get("cache_built_engines", False),
         "reuse_cached_engines": params.get("reuse_cached_engines", False),
         "use_python_runtime": params.get("use_python_runtime", False),
-        "optimization_level": params.get("optimization_level", 3),
+        "optimization_level": params.get("optimization_level", None),
     }
     start_compile = timeit.default_timer()
     exp_program = torch.export.export(model, input_tensors)
@@ -503,6 +503,23 @@ def run_onnx_trt(
         if precision == "fp16":
             config.set_flag(trt.BuilderFlag.FP16)
         config.builder_optimization_level = params.get("optimization_level", 3)
+
+        if params.get("immutable_weights", True):
+            # non-refittable engine
+            if params.get("strip_engine_weights", False):
+                warnings.warn("strip_engine_weights will be ignored.")
+            if params.get("refit_identical_engine_weights", False):
+                warnings.warn("refit_identical_engine_weights will be ignored.")
+        else:
+            # refittable engine
+            if params.get("refit_identical_engine_weights", False):
+                config.set_flag(trt.BuilderFlag.REFIT_IDENTICAL)
+            else:
+                config.set_flag(trt.BuilderFlag.REFIT)
+
+            if params.get("strip_engine_weights", False):
+                config.set_flag(trt.BuilderFlag.STRIP_PLAN)
+
         serialized_engine = builder.build_serialized_network(network, config)
         end_compile = timeit.default_timer()
         compile_time_s = end_compile - start_compile
