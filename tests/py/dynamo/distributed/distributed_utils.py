@@ -1,5 +1,6 @@
 import logging
 import os
+import random
 
 import numpy as np
 import tensorrt as trt
@@ -8,24 +9,21 @@ import torch.distributed as dist
 from torch.distributed._tensor.device_mesh import init_device_mesh
 
 
-def set_environment_variables_pytest():
+# the below two functions are used to set the environment variables for the pytest single and multi process
+# this is for the github CI where we use pytest
+def set_environment_variables_pytest_single_process():
+    port = 29500 + random.randint(1, 1000)
     os.environ["WORLD_SIZE"] = str(1)
     os.environ["RANK"] = str(0)
     os.environ["MASTER_ADDR"] = "127.0.0.1"
-    os.environ["MASTER_PORT"] = str(29500)
+    os.environ["MASTER_PORT"] = str(port)
 
 
-def initialize_logger(rank, logger_file_name):
-    logger = logging.getLogger()
-    logger.setLevel(logging.INFO)
-    fh = logging.FileHandler(logger_file_name + f"_{rank}.log", mode="w")
-    fh.setLevel(logging.INFO)
-    logger.addHandler(fh)
-    return logger
-
-
-# This is required for env initialization since we use mpirun
-def initialize_distributed_env(logger_file_name, rank=0, world_size=1, port=29500):
+def set_environment_variables_pytest_multi_process(
+    rank: int = 0, world_size: int = 1
+) -> None:
+    port = 29500 + random.randint(1, 1000)
+    # these variables are set by mpirun -n 2
     local_rank = int(
         os.environ.get("OMPI_COMM_WORLD_LOCAL_RANK", rank % torch.cuda.device_count())
     )
@@ -36,7 +34,6 @@ def initialize_distributed_env(logger_file_name, rank=0, world_size=1, port=2950
     os.environ["WORLD_SIZE"] = str(world_size)
     os.environ["MASTER_ADDR"] = "127.0.0.1"
     os.environ["MASTER_PORT"] = str(port)
-    os.environ["TRTLLM_PLUGINS_PATH"] = "./tmp/lib/libnvinfer_plugin_tensorrt_llm.so"
 
     # Necessary to assign a device to each rank.
     torch.cuda.set_device(local_rank)
@@ -46,14 +43,3 @@ def initialize_distributed_env(logger_file_name, rank=0, world_size=1, port=2950
 
     # set a manual seed for reproducibility
     torch.manual_seed(1111)
-
-    device_mesh = init_device_mesh(device_type="cuda", mesh_shape=(world_size,))
-    rank = device_mesh.get_rank()
-    assert rank == local_rank
-    logger = initialize_logger(rank, logger_file_name)
-    device_id = (
-        rank % torch.cuda.device_count()
-    )  # Ensure each rank gets a unique device
-    torch.cuda.set_device(device_id)
-
-    return device_mesh, world_size, rank, logger
