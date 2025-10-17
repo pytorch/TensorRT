@@ -450,7 +450,6 @@ dynamo_packages = [
     "torch_tensorrt.dynamo.conversion.impl.unary",
     "torch_tensorrt.dynamo.conversion.plugins",
     "torch_tensorrt.dynamo.debug",
-    "torch_tensorrt.dynamo.distributed",
     "torch_tensorrt.dynamo.lowering",
     "torch_tensorrt.dynamo.lowering.passes",
     "torch_tensorrt.dynamo.partitioning",
