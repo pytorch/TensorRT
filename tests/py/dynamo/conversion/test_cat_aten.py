@@ -27,6 +27,23 @@ class TestCatConverter(DispatchTestCase):
 
     @parameterized.expand(
         [
+            ("pos", 1),
+            ("neg", -2),
+        ]
+    )
+    def test_cat_dim_in_kwargs(self, _, dim):
+        class Cat(nn.Module):
+            def forward(self, x, y, z):
+                return torch.ops.aten.cat.default((x, y, z), dim=dim)
+
+        inputs = [torch.randn(1, 2, 3), torch.randn(1, 1, 3), torch.randn(1, 3, 3)]
+        self.run_test(
+            Cat(),
+            inputs,
+        )
+
+    @parameterized.expand(
+        [
             ("pos", 0),
             ("neg", -3),
         ]

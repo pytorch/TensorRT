@@ -2,7 +2,7 @@
 
 import logging
 import operator
-from typing import Callable, Dict, Optional, Sequence, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 import numpy as np
 import torch
@@ -217,9 +217,42 @@ def aten_ops_native_group_norm(
     )
 
 
+def parse_cat_args(
+    args: Tuple[Argument, ...], kwargs: Dict[str, Any]
+) -> Tuple[List[Any], int]:
+    """
+    Process inputs for torch.ops.aten.cat.default.
+
+    Handles these valid patterns:
+      1. args = ((t1, t2, ...), dim)
+      2. args = ((t1, t2, ...),), kwargs = {dim: X} with optional dim in kwargs
+
+    Returns:
+        (input_tensors, dim)
+        input_tensors: tuple of tensor arguments
+        dim: integer concatenation dimension (default 0)
+    """
+
+    if len(args) > 1 and isinstance(args[0], (list, tuple)):
+        input_tensors = list(args[0])
+        dim = args_bounds_check(args, 1, 0)
+
+    else:
+        # If single arg is itself a tuple/list, unwrap it
+        if len(args) == 1 and isinstance(args[0], (list, tuple)):
+            input_tensors = list(args[0])
+        else:
+            input_tensors = list(args)
+
+        dim = kwargs.get("dim", 0)
+
+    return input_tensors, dim
+
+
 def cat_validator(node: Node, settings: Optional[CompilationSettings] = None) -> bool:
     # empty tensor in cat input as ITensor leads to [RemoveDeadLayers] Input Tensor y is unused or used only at compile-time, but is not being removed.
-    for each_input in node.args[0]:
+    inputs, _ = parse_cat_args(node.args, node.kwargs)
+    for each_input in inputs:
         if isinstance(each_input, TRTTensor) and any(s == 0 for s in each_input.shape):
             return False
     return True
@@ -227,8 +260,8 @@ def cat_validator(node: Node, settings: Optional[CompilationSettings] = None) ->
 
 @dynamo_tensorrt_converter(
     torch.ops.aten.cat.default,
-    capability_validator=cat_validator,
     supports_dynamic_shapes=True,
+    capability_validator=cat_validator,
 )
 def aten_ops_cat(
     ctx: ConversionContext,
@@ -237,13 +270,14 @@ def aten_ops_cat(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    inputs, dim = parse_cat_args(args, kwargs)
     return impl.cat.cat(
         ctx,
         target,
         SourceIR.ATEN,
         name,
-        input=args[0],
-        dim=args_bounds_check(args, 1, 0),
+        input=inputs,
+        dim=dim,
     )
 
 
