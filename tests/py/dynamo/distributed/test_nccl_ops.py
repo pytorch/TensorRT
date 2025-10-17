@@ -6,7 +6,6 @@ import torch.distributed as dist
 import torch.nn as nn
 from conversion.harness import DispatchTestCase
 
-# The distributed env initialization has to be before import of torchTRT, since it uses barrier for installation
 from distributed_utils import (
     set_environment_variables_pytest_multi_process,
     set_environment_variables_pytest_single_process,
