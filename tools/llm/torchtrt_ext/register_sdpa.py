@@ -168,6 +168,120 @@ def _process_sdpa_node(
     return gm
 
 
+def _process_cutile_sdpa_node(
+    gm: torch.fx.GraphModule,
+    node: torch.fx.Node,
+    settings: CompilationSettings,
+    sliding_window_size: Optional[int] = None,
+    use_gqa: bool = False,
+) -> torch.fx.GraphModule:
+    """
+    Helper function to process SDPA nodes with common logic.
+
+    This function handles the replacement of various scaled dot product attention operations
+    with the standard torch.nn.functional.scaled_dot_product_attention function. It supports
+    both efficient attention and flash attention variants, and can handle sliding window
+    attention for models like Gemma3.
+
+    Args:
+        gm: The graph module containing the SDPA nodes
+        node: The specific node to process (must be an SDPA operation)
+        settings: TensorRT compilation settings
+        sliding_window_size: Optional sliding window size for models with sliding attention
+        use_gqa: Whether the model uses Grouped Query Attention
+
+    Returns:
+        The modified graph module with SDPA nodes replaced
+
+    Raises:
+        ValueError: If the SDPA node has an unexpected number of arguments
+    """
+
+    if node.target == torch.ops.aten._scaled_dot_product_efficient_attention.default:
+        if len(node.args) == 7:
+            (
+                query,
+                key,
+                value,
+                attn_mask,
+                compute_log_sumexp,
+                dropout_p,
+                is_causal,
+            ) = node.args
+        elif len(node.args) == 5:
+            query, key, value, attn_mask, is_causal = node.args
+            dropout_p = 0.0
+        else:
+            raise ValueError(
+                f"Unexpected number of arguments for {node.target} in the graph"
+            )
+    elif node.target == torch.ops.aten._scaled_dot_product_flash_attention.default:
+        if len(node.args) == 6:
+            (
+                query,
+                key,
+                value,
+                dropout_p,
+                is_causal,
+                return_debug_mask,
+            ) = node.args
+        elif len(node.args) == 5:
+            query, key, value, dropout_p, is_causal = node.args
+        elif len(node.args) == 3:
+            query, key, value = node.args
+            dropout_p = 0.0
+            is_causal = True
+        else:
+            raise ValueError(
+                f"Unexpected number of arguments for {node.target} in the graph"
+            )
+    else:
+        return gm
+
+    # Always set causal to True and generate attn_mask inside the sdpa operator
+    attn_mask = None
+    is_causal = True
+    dropout_p = 0.0
+
+    logger.debug(
+        f"SDPA converter configuration: attn_mask={attn_mask}, dropout_p={dropout_p}, "
+        f"is_causal={is_causal}, sliding_window_size={sliding_window_size}, use_gqa={use_gqa}"
+    )
+
+    modified_input_args = (
+        query,
+        key,
+        value,
+        is_causal,
+    )
+
+    # Create a new node with torch.nn.functional.scaled_dot_product_attention
+    with gm.graph.inserting_after(node):
+        new_node = gm.graph.call_function(
+            torch.ops.cutile.flash_attention.default,
+            args=modified_input_args,
+            kwargs={
+                "scale": node.kwargs.get("scale", None),
+                "use_fp32_acc": settings.use_fp32_acc,
+            },
+        )
+
+        # Deep copy encounters RuntimeError: Cannot access data pointer of Tensor (e.g. FakeTensor, FunctionalTensor). So we use copy instead.
+        new_node.meta = copy.copy(node.meta)
+        # Check if there's a getitem node following this attention node
+        for user in list(node.users):
+            if user.op == "call_function" and user.target == operator.getitem:
+                # If the getitem is extracting the first element (the output tensor)
+                if user.args[1] == 0:
+                    # Replace all uses of the getitem with the new attention node
+                    user.replace_all_uses_with(new_node)
+                    new_node.meta["val"] = new_node.meta["val"][0]
+        # Replace all uses of the original node with the new node
+        node.replace_all_uses_with(new_node)
+    gm.graph.erase_node(node)
+    return gm
+
+
 def register_gemma3_sdpa_pass(index: int = 0, model_config: Any = None) -> None:
     """
     Register SDPA pass for Gemma3 models with sliding window attention.
@@ -277,6 +391,111 @@ def register_default_sdpa_pass(index: int = 0, model_config: Any = None) -> None
         return gm
 
 
+def register_cutile_sdpa_pass(index: int = 0, model_config: Any = None) -> None:
+    """
+    Register cutile SDPA pass for models without specific implementations.
+
+    This function creates and registers a default SDPA replacement pass that can be used
+    for any model type. It provides basic SDPA replacement functionality without
+    model-specific optimizations.
+
+    Args:
+        index: Position in the lowering pass list where this pass should be inserted
+        model_config: The model configuration object (optional, for consistency)
+
+    Example:
+        # Register default pass at index 0
+        register_cutile_sdpa_pass(index=0)
+
+        # Or with model config for consistency
+        config = AutoConfig.from_pretrained("Qwen/Qwen2.5-0.5B-Instruct")
+        register_cutile_sdpa_pass(index=0, model_config=config)
+
+    Note:
+        This is a fallback pass that should be used when no model-specific
+        SDPA pass is available or when you want generic SDPA replacement behavior.
+    """
+    import math
+
+    import cuda.tile as ct
+
+    from .attention import fmha_kernel
+
+    @torch.library.custom_op("cutile::flash_attention", mutates_args=())  # type: ignore[misc]
+    def cutile_flash_attention(
+        Q: torch.Tensor,  # (batch_size, q_heads, q_len, hidden_size)
+        K: torch.Tensor,  # (batch_size, k_heads, k_len, hidden_size)
+        V: torch.Tensor,  # (batch_size, k_heads, k_len, hidden_size)
+        is_causal: bool = False,
+        tile_size_m: int = 8,
+        tile_size_n: int = 16,
+    ) -> torch.Tensor:
+        TILE_M, TILE_N = tile_size_m, tile_size_n
+        batch_size, q_heads, q_len, hidden_size = Q.shape
+        _, k_heads, k_len, _ = K.shape
+        query_group_size = q_heads // k_heads
+        qk_scale = 1 / math.sqrt(hidden_size)
+        O = torch.zeros_like(Q)
+        EVEN_K = (k_len % TILE_N) == 0
+        grid = (math.ceil(q_len / TILE_M), batch_size * q_heads, 1)
+        input_pos = (
+            0  # TODO: figure out how to use the input_pos, for now do not use, set to 0
+        )
+        ct.launch(
+            torch.cuda.current_stream(),
+            grid,
+            fmha_kernel,
+            (
+                Q,
+                K,
+                V,
+                O,
+                qk_scale,
+                input_pos,
+                hidden_size,
+                q_heads,
+                TILE_M,
+                TILE_N,
+                query_group_size,
+                is_causal,
+                EVEN_K,
+            ),
+        )
+        return O
+
+    @torch.library.register_fake("cutile::flash_attention")
+    def _(
+        Q: torch.Tensor,
+        K: torch.Tensor,
+        V: torch.Tensor,
+        is_causal: bool = False,
+        tile_size_m: int = 8,
+        tile_size_n: int = 16,
+    ) -> torch.Tensor:
+        return Q
+
+    torch_tensorrt.dynamo.conversion.plugins.custom_op(
+        "cutile::flash_attention", supports_dynamic_shapes=True
+    )
+
+    @_aten_lowering_pass(index=index, model_config=model_config)
+    def cutile_sdpa_pass(
+        gm: torch.fx.GraphModule,
+        settings: CompilationSettings,
+    ) -> torch.fx.GraphModule:
+        """cutile SDPA pass for models without specific implementations."""
+
+        for node in gm.graph.nodes:
+            if node.op == "call_function" and node.target in REPLACEABLE_ATEN_OPS:
+                # Process the node with default logic
+                gm = _process_cutile_sdpa_node(gm, node, settings)
+
+        clean_up_graph_after_modifications(gm)
+        breakpoint()
+        logger.debug("Applied default SDPA replacement")
+        return gm
+
+
 def enable_sdpa_converter(model_name: str, model_config: Any) -> None:
     """
     Enables the custom SDPA converter for a given model.
@@ -295,9 +514,7 @@ def enable_sdpa_converter(model_name: str, model_config: Any) -> None:
                             like sliding window attention.
     """
     _remove_decompositions()
-
     pass_registrator = _SDPA_MAPPING.get(model_name)
-
     if pass_registrator:
         logger.info(f"Registering specific SDPA lowering pass for model: {model_name}")
         pass_registrator(model_config=model_config)
@@ -312,5 +529,6 @@ def enable_sdpa_converter(model_name: str, model_config: Any) -> None:
 # Global registry for SDPA passes
 _SDPA_MAPPING: Dict[str, Callable] = {
     "google/gemma-3-1b-it": register_gemma3_sdpa_pass,
+    "Qwen/Qwen2.5-0.5B-Instruct": register_cutile_sdpa_pass,
     "default": register_default_sdpa_pass,
 }

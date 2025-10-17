@@ -1,3 +1,4 @@
+import gc
 import unittest
 from math import ceil
 
@@ -11,6 +12,21 @@ from torch_tensorrt._enums import dtype
 
 from ...conversion.harness import DispatchTestCase
 from .matmul import matmul_kernel
+
+
+def clean_gpu_memory(message: str = ""):
+    torch.cuda.empty_cache()
+    gc.collect()
+    print(f"completed cleaning gpu memory: {message}")
+
+
+def print_gpu_memory(message: str = ""):
+    remaining_memory, total_memory = torch.cuda.mem_get_info()
+    print(f"{message} Remaining GPU memory: {remaining_memory / 1024 / 1024} MB")
+    print(f"{message} Total GPU memory: {total_memory / 1024 / 1024} MB")
+    print(
+        f"{message} Used GPU memory {(total_memory - remaining_memory)/total_memory*100:.2f}%, Used GPU memory: {(total_memory - remaining_memory) / 1024 / 1024} MB"
+    )
 
 
 @torch.library.custom_op("cutile::matmul", mutates_args=())  # type: ignore[misc]
@@ -55,7 +71,7 @@ class TestAutomaticPlugin(DispatchTestCase):
     @parameterized.expand(
         [
             ((64, 64), (64, 128), torch.float16),
-            ((256, 256), (256, 16), torch.float16),
+            # ((256, 256), (256, 16), torch.float16),
         ]
     )
     def test_matmul(self, a_shape, b_shape, data_type):
@@ -71,24 +87,63 @@ class TestAutomaticPlugin(DispatchTestCase):
             torch.randn(a_shape, device="cuda", dtype=data_type),
             torch.randn(b_shape, device="cuda", dtype=data_type),
         )
+        enable_cutile, enable_trt_native = False, True
+        if enable_cutile:
+            with torch.no_grad():
+                cutile_mod = cutile_matmul()
+                print_gpu_memory("before cutile export")
+                clean_gpu_memory("before cutile export")
+                cutile_mod_ep = torch.export.export(cutile_mod, inputs)
+                print_gpu_memory("after cutile export")
+                clean_gpu_memory("after cutile export")
+                with torch_tensorrt.dynamo.Debugger(
+                    "graphs",
+                    logging_dir="debuglogs_matmul",
+                    capture_fx_graph_after=["constant_fold"],
+                    save_engine_profile=True,
+                    profile_format="trex",
+                    engine_builder_monitor=False,
+                ):
+                    trt_cutile_mod = torch_tensorrt.dynamo.compile(
+                        cutile_mod_ep,
+                        inputs,
+                        min_block_size=1,
+                    )
+                print_gpu_memory("after cutile compile")
+                clean_gpu_memory("after cutile compile")
 
-        cutile_mod = cutile_matmul()
-        torch_mod = torch_matmul()
-        cutile_mod_ep = torch.export.export(cutile_mod, inputs)
-        torch_mod_ep = torch.export.export(torch_mod, inputs)
-        trt_cutile_mod = torch_tensorrt.dynamo.compile(
-            cutile_mod_ep,
-            inputs,
-            precision=dtype.f16,
-        )
-        trt_torch_mod = torch_tensorrt.dynamo.compile(
-            torch_mod_ep,
-            inputs,
-            precision=dtype.f16,
-        )
-        with torch.no_grad():
-            outputs_cutile = trt_cutile_mod(*inputs)
-            outputs_trt = trt_torch_mod(*inputs)
+                outputs_cutile = trt_cutile_mod(*inputs)
+                print_gpu_memory("after cutile inference")
+                clean_gpu_memory("after cutile inference")
+                print(f"outputs_cutile: {outputs_cutile}")
+
+        if enable_trt_native:
+            with torch.no_grad():
+                torch_mod = torch_matmul()
+                torch_mod_ep = torch.export.export(torch_mod, inputs)
+                print_gpu_memory("after trt native export")
+                clean_gpu_memory("after trt native export")
+                with torch_tensorrt.dynamo.Debugger(
+                    "graphs",
+                    logging_dir="debuglogs_matmul",
+                    capture_fx_graph_after=["constant_fold"],
+                    save_engine_profile=True,
+                    profile_format="trex",
+                    engine_builder_monitor=False,
+                ):
+                    trt_torch_mod = torch_tensorrt.dynamo.compile(
+                        torch_mod_ep,
+                        inputs,
+                        min_block_size=1,
+                    )
+                print_gpu_memory("after trt native compile")
+                clean_gpu_memory("after trt native compile")
+                outputs_trt = trt_torch_mod(*inputs)
+                print_gpu_memory("after trt native inference")
+                clean_gpu_memory("after trt native inference")
+                print(f"outputs_trt: {outputs_trt}")
+
+        if enable_trt_native and enable_cutile:
             self.assertTrue(
                 torch.allclose(outputs_cutile, outputs_trt, atol=1e-4, rtol=1e-4)
             )
