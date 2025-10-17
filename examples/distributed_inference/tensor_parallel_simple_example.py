@@ -16,7 +16,7 @@ Usage
 -----
 .. code-block:: bash
 
-    mpirun -n 2 --allow-run-as-root python tensor_parallel_simple_example.py
+    USE_TRTLLM_PLUGINS=1 mpirun -n 2 --allow-run-as-root python tensor_parallel_simple_example.py
 """
 
 import time
@@ -27,7 +27,9 @@ import torch.distributed as dist
 import torch.nn as nn
 from tensor_parallel_initialize_dist import (
     cleanup_distributed_env,
+    get_tensor_parallel_device_mesh,
     initialize_distributed_env,
+    initialize_distributed_logger,
 )
 
 if not dist.is_initialized():
