@@ -491,8 +491,7 @@ def register_cutile_sdpa_pass(index: int = 0, model_config: Any = None) -> None:
                 gm = _process_cutile_sdpa_node(gm, node, settings)
 
         clean_up_graph_after_modifications(gm)
-        breakpoint()
-        logger.debug("Applied default SDPA replacement")
+        logger.debug("Applied cutile SDPA replacement")
         return gm
 
 
