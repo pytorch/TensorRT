@@ -14,6 +14,7 @@ from torch_tensorrt.dynamo._defaults import DEBUG_LOGGING_DIR
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.debug._DebuggerConfig import DebuggerConfig
 from torch_tensorrt.dynamo.debug._supports_debugger import cls_supports_debugger
+from torch_tensorrt.dynamo.runtime.utils import complex_to_ri_stacked_tensor
 from torch_tensorrt.dynamo.utils import DYNAMIC_DIM
 from torch_tensorrt.logging import TRT_LOGGER
 from torch_tensorrt.runtime._utils import (
@@ -358,6 +359,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         need_cudagraphs_record: bool,
     ) -> None:
         for i, input_name in enumerate(self.input_names):
+            contiguous_inputs[i] = complex_to_ri_stacked_tensor(contiguous_inputs[i])
             if not contiguous_inputs[i].is_cuda:
                 logger.warning(
                     f"Detected input {input_name} of engine {self.engine.name} is not on a cuda device. "

@@ -108,6 +108,7 @@ class ComplexGraphRewriter:
     def __init__(self, gm: GraphModule, truncate_double: bool = False) -> None:
         self.gm = gm
         self.truncate_double = truncate_double
+        self.processed_input_nodes = set()
 
     def extract_shape_dtype_device(
         self, input_node: Node
@@ -185,8 +186,12 @@ class ComplexGraphRewriter:
         for subgraph in subgraphs:
             for input_node in subgraph.input_nodes:
                 logger.debug(f"Input node rewrite: {input_node.name}")
+                if input_node in self.processed_input_nodes:
+                    logger.debug(f"Skipping {input_node.name}, already processed.")
+                    continue
                 if input_node.op not in ("call_function"):
                     self.replace_input_node(input_node)
+                    self.processed_input_nodes.add(input_node)
             for node in subgraph.subgraph_nodes:
                 logger.debug(f"Subgraph Node rewrite: {node.name}")
                 if node.target == torch.ops.aten.view_as_complex.default:
@@ -230,6 +235,17 @@ class ComplexGraphRewriter:
                 elif node.target == torch.ops.aten.view_as_real.default:
                     node.replace_all_uses_with(node.args[0])
                     self.gm.graph.erase_node(node)
+                elif node.target == torch.ops.aten._reshape_copy.default:
+                    old_shape = node.args[1]
+                    if isinstance(old_shape, (list, tuple)) and all(
+                        isinstance(x, int) for x in old_shape
+                    ):
+                        new_shape = list(old_shape) + [2]
+                        node.args = (node.args[0], new_shape)
+                        logger.debug(
+                            f"Updated reshape {node.name} from {old_shape} to {new_shape}"
+                        )
+                        modified = True
                 else:
                     logger.debug(f"Unsupported node target: {node.target}")
                     logger.debug(
