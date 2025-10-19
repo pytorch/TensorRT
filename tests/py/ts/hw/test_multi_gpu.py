@@ -1,14 +1,20 @@
+import importlib.util
 import unittest
 
 import torch
 import torch_tensorrt as torchtrt
-import torchvision.models as models
 from model_test_case import ModelTestCase
+
+if importlib.util.find_spec("torchvision"):
+    import torchvision.models as models
 
 
 @unittest.skipIf(
     not torchtrt.ENABLED_FEATURES.torchscript_frontend,
     "TorchScript Frontend is not available",
+)
+@unittest.skipIf(
+    not importlib.util.find_spec("torchvision"), "torchvision not installed"
 )
 class TestMultiGpuSwitching(ModelTestCase):
     def setUp(self):
@@ -72,6 +78,9 @@ class TestMultiGpuSwitching(ModelTestCase):
 @unittest.skipIf(
     not torchtrt.ENABLED_FEATURES.torchscript_frontend,
     "TorchScript Frontend is not available",
+)
+@unittest.skipIf(
+    not importlib.util.find_spec("torchvision"), "torchvision not installed"
 )
 class TestMultiGpuSerializeDeserializeSwitching(ModelTestCase):
     def setUp(self):
@@ -148,9 +157,10 @@ def test_suite():
     return suite
 
 
-suite = test_suite()
+if importlib.util.find_spec("torchvision"):
+    suite = test_suite()
 
-runner = unittest.TextTestRunner()
-result = runner.run(suite)
+    runner = unittest.TextTestRunner()
+    result = runner.run(suite)
 
-exit(int(not result.wasSuccessful()))
+    exit(int(not result.wasSuccessful()))

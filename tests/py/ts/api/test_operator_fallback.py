@@ -1,16 +1,20 @@
-import copy
+import importlib.util
 import unittest
-from typing import Dict
 
 import torch
 import torch_tensorrt as torchtrt
-import torchvision.models as models
 from utils import COSINE_THRESHOLD, cosine_similarity
+
+if importlib.util.find_spec("torchvision"):
+    import torchvision.models as models
 
 
 @unittest.skipIf(
     torchtrt.ENABLED_FEATURES.tensorrt_rtx,
     "aten::adaptive_avg_pool2d is implemented via plugins which is not supported for tensorrt_rtx",
+)
+@unittest.skipIf(
+    not importlib.util.find_spec("torchvision"), "torchvision not installed"
 )
 class TestFallbackModels(unittest.TestCase):
     def test_fallback_resnet18(self):

@@ -1,18 +1,25 @@
 import copy
+import importlib.util
 import unittest
 from typing import Dict
 
 import torch
 import torch_tensorrt as torchtrt
-import torchvision.models as models
 from utils import same_output_format
+
+if importlib.util.find_spec("torchvision"):
+    import torchvision.models as models
 
 
 @unittest.skipIf(
     torchtrt.ENABLED_FEATURES.tensorrt_rtx,
     "aten::adaptive_avg_pool2d is implemented via plugins which is not supported for tensorrt_rtx",
 )
+@unittest.skipIf(
+    not importlib.util.find_spec("torchvision"), "torchvision not installed"
+)
 class TestInputTypeDefaultsFP32Model(unittest.TestCase):
+
     def test_input_use_default_fp32(self):
         self.model = models.resnet18(pretrained=True).eval().to("cuda")
         self.input = torch.randn((1, 3, 224, 224)).to("cuda")
@@ -60,6 +67,9 @@ class TestInputTypeDefaultsFP16Model(unittest.TestCase):
         torchtrt.ENABLED_FEATURES.tensorrt_rtx,
         "aten::adaptive_avg_pool2d is implemented via plugins which is not supported for tensorrt_rtx",
     )
+    @unittest.skipIf(
+        not importlib.util.find_spec("torchvision"), "torchvision not installed"
+    )
     def test_input_use_default_fp16(self):
         self.model = models.resnet18(pretrained=True).eval().to("cuda")
         self.input = torch.randn((1, 3, 224, 224)).to("cuda")
@@ -78,6 +88,9 @@ class TestInputTypeDefaultsFP16Model(unittest.TestCase):
         torchtrt.ENABLED_FEATURES.tensorrt_rtx,
         "aten::adaptive_avg_pool2d is implemented via plugins which is not supported for tensorrt_rtx",
     )
+    @unittest.skipIf(
+        not importlib.util.find_spec("torchvision"), "torchvision not installed"
+    )
     def test_input_use_default_fp16_without_fp16_enabled(self):
         self.model = models.resnet18(pretrained=True).eval().to("cuda")
         self.input = torch.randn((1, 3, 224, 224)).to("cuda")
@@ -93,6 +106,9 @@ class TestInputTypeDefaultsFP16Model(unittest.TestCase):
     @unittest.skipIf(
         torchtrt.ENABLED_FEATURES.tensorrt_rtx,
         "aten::adaptive_avg_pool2d is implemented via plugins which is not supported for tensorrt_rtx",
+    )
+    @unittest.skipIf(
+        not importlib.util.find_spec("torchvision"), "torchvision not installed"
     )
     def test_input_respect_user_setting_fp16_weights_fp32_in(self):
         self.model = models.resnet18(pretrained=True).eval().to("cuda")
@@ -112,6 +128,9 @@ class TestInputTypeDefaultsFP16Model(unittest.TestCase):
     @unittest.skipIf(
         torchtrt.ENABLED_FEATURES.tensorrt_rtx,
         "aten::adaptive_avg_pool2d is implemented via plugins which is not supported for tensorrt_rtx",
+    )
+    @unittest.skipIf(
+        not importlib.util.find_spec("torchvision"), "torchvision not installed"
     )
     def test_input_respect_user_setting_fp16_weights_fp32_in_non_constuctor(self):
         self.model = models.resnet18(pretrained=True).eval().to("cuda")
