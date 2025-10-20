@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import List, Optional, Sequence, Tuple, Union
+from typing import List, Optional, Tuple
 
 import numpy as np
 import tensorrt as trt
@@ -123,88 +123,3 @@ def get_shape_with_dynamic_shape(
     select_layer = ctx.net.add_select(condition_val, input_shape, scale_res)
     set_layer_name(select_layer, target, f"{name}_select")
     return select_layer.get_output(0)
-
-
-def to_trt_shape_tensor(
-    ctx: ConversionContext, target: Target, name: str, shape_list: List[int | TRTTensor]
-) -> TRTTensor:
-    """
-    Convert a mixed shape list (ints + ITensors) into a single ITensor.
-
-    Args:
-        ctx (ConversionContext): TensorRT ConversionContext object.
-        target (Target): Target of fx node.
-        name (str): base name for layer naming.
-        shape_list (list[int | ITensor]): list containing static ints and/or ITensors.
-
-    Returns:
-        ITensor if shape_list contains any ITensors, else plain Python list of ints.
-    """
-    trt_tensors = []
-
-    for i, s in enumerate(shape_list):
-        if isinstance(s, (int, torch.Tensor)):
-            const = ctx.net.add_constant((1,), np.array([s], dtype=np.int32))
-            set_layer_name(const, target, f"{name}_dim{i}_const")
-            trt_tensors.append(const.get_output(0))
-        else:
-            trt_tensors.append(s)
-
-    if any(not isinstance(s, int) for s in shape_list):
-        # Concatenate everything into a single ITensor if there are any ITensors/Tensors
-        concat_layer = ctx.net.add_concatenation(trt_tensors)
-        concat_layer.axis = 0
-        set_layer_name(concat_layer, target, f"{name}_shape_concat")
-        return concat_layer.get_output(0)
-
-    # If no ITensor found, return plain list of ints
-    return shape_list
-
-
-def collect_and_concat_trt_inputs(
-    ctx: ConversionContext,
-    target: Target,
-    name: str,
-    inputs: Sequence[Union[int, TRTTensor, torch.Tensor, np.ndarray]],
-    concat_axis: int = 0,
-    allow_static_return: bool = False,
-) -> Union[TRTTensor, List[int]]:
-    """
-    Normalize a sequence of values into TRT ITensors and concatenate them.
-    If `allow_static_return=True` and all inputs are ints, return a Python
-    list of ints instead of creating any TRT layers.
-    """
-    trt_tensors = []
-    has_dynamic = False
-
-    for i, x in enumerate(inputs):
-        if isinstance(x, TRTTensor):
-            trt_tensors.append(x)
-            has_dynamic = True
-
-        elif isinstance(x, (int, np.integer)):
-            # keep raw for now, convert only if dynamic found
-            trt_tensors.append(int(x))
-
-        else:
-            # torch/np tensor -> TRT tensor
-            t = get_trt_tensor(ctx, x, f"{name}_tensor_{i}")
-            trt_tensors.append(t)
-            has_dynamic = True
-
-    # fully static shape case
-    if not has_dynamic and allow_static_return:
-        return [int(v) for v in trt_tensors]
-
-    # promote remaining ints to TRT constants
-    for i, v in enumerate(trt_tensors):
-        if isinstance(v, int):
-            const = ctx.net.add_constant((1,), np.array([v], dtype=np.int32))
-            set_layer_name(const, target, f"{name}_static_dim{i}_const")
-            trt_tensors[i] = const.get_output(0)
-
-    # concatenate
-    concat = ctx.net.add_concatenation(trt_tensors)
-    concat.axis = concat_axis
-    set_layer_name(concat, target, f"{name}_concat")
-    return concat.get_output(0)

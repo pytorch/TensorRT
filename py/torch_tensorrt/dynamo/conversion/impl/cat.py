@@ -16,7 +16,7 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
 )
 
 
-def unify_trt_tensors(
+def unify_and_concat_trt_tensors(
     ctx: ConversionContext,
     target: Target,
     name: str,
@@ -30,12 +30,12 @@ def unify_trt_tensors(
 
     Args:
         ctx: TensorRT conversion context.
-        target: FX target for naming.
-        name: Base name for layers.
+        target: Operation Target.
+        name: Operation Name.
         inputs: Sequence of ints / numpy arrays / torch tensors / TRT tensors.
         concat_axis: Axis along which to concatenate tensors if dynamic.
         cast_dtype: Optional target dtype for casting TRT tensors.
-        force_trt_output: If True, return TRT tensor even if all inputs are static ints.
+        force_trt_output: If True, return TRT tensor even if all inputs are static ints. (True for concat operations)
     """
     has_dynamic = any(not isinstance(x, int) for x in inputs)
     trt_tensors = []
@@ -115,7 +115,7 @@ def cat(
         trt_promoted_type = None
 
     dim = get_positive_dim(dim, len(trt_inputs[0].shape))
-    return unify_trt_tensors(
+    return unify_and_concat_trt_tensors(
         ctx,
         target,
         name,

@@ -10,7 +10,7 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     set_layer_name,
 )
 from torch_tensorrt.dynamo.conversion.impl.cat import (
-    unify_trt_tensors as unify_trt_shape_tensors,
+    unify_and_concat_trt_tensors as unify_trt_shape_tensors,
 )
 from torch_tensorrt.dynamo.conversion.impl.shape import (
     get_shape_with_dynamic_shape,
