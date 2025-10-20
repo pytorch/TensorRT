@@ -9,9 +9,11 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     has_dynamic_shape,
     set_layer_name,
 )
+from torch_tensorrt.dynamo.conversion.impl.cat import (
+    unify_trt_tensors as unify_trt_shape_tensors,
+)
 from torch_tensorrt.dynamo.conversion.impl.shape import (
     get_shape_with_dynamic_shape,
-    to_trt_shape_tensor,
 )
 
 
@@ -40,7 +42,9 @@ def upsample(
             )
             layer.set_input(1, shape)
         else:
-            trt_shape = to_trt_shape_tensor(ctx, target, name, shape)
+            trt_shape = unify_trt_shape_tensors(
+                ctx, target, name, shape, concat_axis=0, force_trt_output=False
+            )
             if isinstance(trt_shape, list):
                 layer.shape = trt_shape
             else:

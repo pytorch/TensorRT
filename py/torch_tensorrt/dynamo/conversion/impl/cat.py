@@ -1,4 +1,4 @@
-from typing import Optional, Sequence, Union
+from typing import List, Optional, Sequence, Union
 
 import numpy as np
 import tensorrt as trt
@@ -14,6 +14,63 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     get_trt_tensor,
     set_layer_name,
 )
+
+
+def unify_trt_tensors(
+    ctx: ConversionContext,
+    target: Target,
+    name: str,
+    inputs: Sequence[Union[int, np.ndarray, torch.Tensor, TRTTensor]],
+    concat_axis: int,
+    cast_dtype: Union[_enums.dtype, trt.DataType, np.dtype] = None,
+    force_trt_output: bool = False,
+) -> Union[TRTTensor, List[int]]:
+    """
+    Normalize all inputs to TRT tensors if needed, optionally cast, and concat if any dynamic.
+
+    Args:
+        ctx: TensorRT conversion context.
+        target: FX target for naming.
+        name: Base name for layers.
+        inputs: Sequence of ints / numpy arrays / torch tensors / TRT tensors.
+        concat_axis: Axis along which to concatenate tensors if dynamic.
+        cast_dtype: Optional target dtype for casting TRT tensors.
+        force_trt_output: If True, return TRT tensor even if all inputs are static ints.
+    """
+    has_dynamic = any(not isinstance(x, int) for x in inputs)
+    trt_tensors = []
+
+    for i, x in enumerate(inputs):
+        # convert to TRTTensor
+        if isinstance(x, TRTTensor):
+            t = x
+        elif isinstance(x, int) and not has_dynamic and not force_trt_output:
+            t = x  # pure static path
+        else:
+            t = ctx.net.add_constant((1,), np.array([x], dtype=np.int32))
+            set_layer_name(t, target, f"{name}_dim{i}_const")
+            t = t.get_output(0)
+
+        # optional cast
+        if cast_dtype and isinstance(t, TRTTensor):
+            t = cast_trt_tensor(ctx, t, cast_dtype, f"{name}_cast_{i}")
+
+        trt_tensors.append(t)
+
+    if not has_dynamic and not force_trt_output:
+        return trt_tensors  # all ints
+
+    # promote remaining ints to TRT consts before concat
+    for i, t in enumerate(trt_tensors):
+        if isinstance(t, int):
+            const = ctx.net.add_constant((1,), np.array([t], dtype=np.int32))
+            set_layer_name(const, target, f"{name}_static_{i}_const")
+            trt_tensors[i] = const.get_output(0)
+
+    concat = ctx.net.add_concatenation(trt_tensors)
+    concat.axis = concat_axis
+    set_layer_name(concat, target, f"{name}_concat")
+    return concat.get_output(0)
 
 
 def cat(
@@ -54,9 +111,16 @@ def cat(
             )
             trt_casted_inputs.append(casted_input)
         trt_inputs = trt_casted_inputs
+    else:
+        trt_promoted_type = None
 
-    concat_layer = ctx.net.add_concatenation(trt_inputs)
     dim = get_positive_dim(dim, len(trt_inputs[0].shape))
-    concat_layer.axis = dim
-    set_layer_name(concat_layer, target, f"{name}_gather", source_ir)
-    return concat_layer.get_output(0)
+    return unify_trt_tensors(
+        ctx,
+        target,
+        name,
+        trt_inputs,
+        concat_axis=dim,
+        cast_dtype=trt_promoted_type,
+        force_trt_output=True,
+    )
