@@ -1,10 +1,6 @@
-import copy
 import unittest
-from typing import Dict
 
-import torch
 import torch_tensorrt as torchtrt
-import torchvision.models as models
 
 
 @unittest.skipIf(

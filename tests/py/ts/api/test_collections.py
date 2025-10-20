@@ -5,7 +5,6 @@ import unittest
 
 import torch
 import torch_tensorrt as torchtrt
-import torchvision.models as models
 from utils import COSINE_THRESHOLD, cosine_similarity
 
 
