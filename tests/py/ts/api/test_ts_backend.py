@@ -1,13 +1,19 @@
 import copy
+import importlib.util
 import unittest
 from typing import Dict
 
 import torch
 import torch_tensorrt as torchtrt
-import torchvision.models as models
 from utils import COSINE_THRESHOLD, cosine_similarity
 
+if importlib.util.find_spec("torchvision"):
+    import torchvision.models as models
 
+
+@unittest.skipIf(
+    not importlib.util.find_spec("torchvision"), "torchvision not installed"
+)
 class TestCompile(unittest.TestCase):
     def test_compile_traced(self):
         self.model = models.vgg16(pretrained=True).eval().to("cuda")
@@ -121,6 +127,9 @@ class TestCompile(unittest.TestCase):
 @unittest.skipIf(
     torchtrt.ENABLED_FEATURES.tensorrt_rtx,
     "aten::adaptive_avg_pool2d is implemented via plugins which is not supported for tensorrt_rtx",
+)
+@unittest.skipIf(
+    not importlib.util.find_spec("torchvision"), "torchvision not installed"
 )
 class TestCheckMethodOpSupport(unittest.TestCase):
     def test_check_support(self):

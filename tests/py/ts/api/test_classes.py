@@ -4,7 +4,6 @@ from typing import Dict
 
 import torch
 import torch_tensorrt as torchtrt
-import torchvision.models as models
 from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import TorchTensorRTModule
 
 

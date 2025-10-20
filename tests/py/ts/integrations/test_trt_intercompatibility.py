@@ -1,9 +1,12 @@
+import importlib.util
 import unittest
 
 import torch
 import torch_tensorrt as torchtrt
-import torchvision.models as models
 from utils import COSINE_THRESHOLD, cosine_similarity
+
+if importlib.util.find_spec("torchvision"):
+    import torchvision.models as models
 
 
 @unittest.skipIf(
@@ -13,6 +16,9 @@ from utils import COSINE_THRESHOLD, cosine_similarity
 @unittest.skipIf(
     torchtrt.ENABLED_FEATURES.tensorrt_rtx,
     "aten::adaptive_avg_pool2d is implemented via plugins which is not supported for tensorrt_rtx",
+)
+@unittest.skipIf(
+    not importlib.util.find_spec("torchvision"), "torchvision not installed"
 )
 class TestPyTorchToTRTEngine(unittest.TestCase):
     def test_pt_to_trt(self):
