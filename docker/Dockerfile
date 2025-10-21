@@ -55,9 +55,9 @@ FROM base as torch-tensorrt-builder-base
 ARG ARCH="x86_64"
 ARG TARGETARCH="amd64"
 
-RUN apt-get update
-RUN apt-get install -y python3-setuptools
-RUN apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/3bf863cc.pub
+RUN apt-get update && \
+    apt-get install -y python3-setuptools && \
+    apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/3bf863cc.pub
 
 RUN apt-get update &&\
     apt-get install -y --no-install-recommends locales ninja-build &&\
