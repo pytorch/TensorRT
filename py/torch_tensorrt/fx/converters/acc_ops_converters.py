@@ -143,7 +143,9 @@ def acc_ops_conv_transposend(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    input_val = kwargs["input"]
+    input_val = kwargs.get("input", None)
+    if input_val is None:
+        raise ValueError(f"conv_transpose received input as None")
 
     if not isinstance(input_val, TRTTensor):
         raise RuntimeError(
@@ -159,12 +161,17 @@ def acc_ops_conv_transposend(
     # for now we'll assume bias is constant Tensor or None,
     # and bias being ITensor is not supported in TensorRT api
     # right now
-    if kwargs["bias"] is not None and not isinstance(kwargs["bias"], torch.Tensor):
+    if kwargs.get("bias", None) is not None and not isinstance(
+        kwargs["bias"], torch.Tensor
+    ):
         raise RuntimeError(
             f"ConvTranspose {name} has bias of type {type(kwargs['bias'])}, Expect Optional[Tensor]"
         )
-    bias = to_numpy(kwargs["bias"])  # type: ignore[arg-type]
-
+    bias = to_numpy(kwargs.get("bias", None))  # type: ignore[arg-type]
+    if kwargs.get("weight", None) is None:
+        raise ValueError(f"conv_transpose received weight as None")
+    if kwargs.get("groups", None) is None:
+        raise ValueError(f"conv_transpose received groups as None")
     if network.has_explicit_precision or isinstance(kwargs["weight"], TRTTensor):
         weight = get_trt_tensor(network, kwargs["weight"], f"{name}_weight")
         weight_shape = tuple(kwargs["weight"].shape)  # type: ignore[union-attr]
@@ -201,8 +208,7 @@ def acc_ops_conv_transposend(
     layer.stride_nd = kwargs["stride"]
     layer.padding_nd = kwargs["padding"]
     layer.dilation_nd = kwargs["dilation"]
-    if kwargs["groups"] is not None:
-        layer.num_groups = kwargs["groups"]
+    layer.num_groups = kwargs["groups"]
 
     return layer.get_output(0)
 
@@ -215,10 +221,13 @@ def acc_ops_pad_with_padding_layer(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    input_val = kwargs["input"]
-    pad = cast(Sequence[int], kwargs["pad"])
-    mode = kwargs["mode"]
-    value = kwargs["value"] if kwargs["value"] is not None else 0
+
+    input_val = kwargs.get("input", None)
+    if input_val is None:
+        raise ValueError(f"pad received input as None")
+    pad = cast(Sequence[int], kwargs.get("pad", 0))
+    mode = kwargs.get("mode", None)
+    value = kwargs.get("value", 0)
     rank = len(input_val.shape)  # type: ignore[union-attr]
 
     if not isinstance(input_val, TRTTensor):
