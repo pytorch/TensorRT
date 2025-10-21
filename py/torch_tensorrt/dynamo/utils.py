@@ -826,13 +826,13 @@ def get_output_metadata(
     return [node.meta for node in nodes]
 
 
-def get_output_dtypes(output: Any, truncate_doulbe: bool = False) -> List[dtype]:
+def get_output_dtypes(output: Any, truncate_double: bool = False) -> List[dtype]:
     output_dtypes = []
     if isinstance(output, torch.fx.node.Node):
         if "val" in output.meta:
             output_meta = output.meta["val"]
             if isinstance(output_meta, (FakeTensor, torch.Tensor)):
-                if truncate_doulbe and output_meta.dtype == torch.float64:
+                if truncate_double and output_meta.dtype == torch.float64:
                     output_dtypes.append(dtype.float32)
                 else:
                     output_dtypes.append(dtype._from(output_meta.dtype))

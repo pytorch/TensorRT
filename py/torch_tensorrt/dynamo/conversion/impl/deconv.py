@@ -116,6 +116,7 @@ def deconvNd(
         kernel=trt.Weights() if isinstance(weight, TRTTensor) else weight,
         bias=trt.Weights() if isinstance(bias, TRTTensor) else bias,
     )
+    assert deconv_layer is not None, "Deconvolution layer is None"
     set_layer_name(deconv_layer, target, name, source_ir)
 
     # If the weight is a TRTTensor, set it as an input of the layer
@@ -156,19 +157,20 @@ def deconvNd(
     if groups is not None:
         deconv_layer.num_groups = groups
 
-    ndims = len(padding)
-    pre_padding_values = []
-    post_padding_values = []
+    if padding is not None:
+        ndims = len(padding)
+        pre_padding_values = []
+        post_padding_values = []
 
-    for dim in range(ndims):
-        pre_padding = padding[dim]
-        post_padding = padding[dim] - output_padding[dim]
+        for dim in range(ndims):
+            pre_padding = padding[dim]
+            post_padding = padding[dim] - output_padding[dim]
 
-        pre_padding_values.append(pre_padding)
-        post_padding_values.append(post_padding)
+            pre_padding_values.append(pre_padding)
+            post_padding_values.append(post_padding)
 
-    deconv_layer.pre_padding = tuple(pre_padding_values)
-    deconv_layer.post_padding = tuple(post_padding_values)
+        deconv_layer.pre_padding = tuple(pre_padding_values)
+        deconv_layer.post_padding = tuple(post_padding_values)
 
     result = deconv_layer.get_output(0)
 
