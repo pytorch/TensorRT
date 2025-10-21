@@ -5,7 +5,7 @@ import logging
 import platform
 import warnings
 from enum import Enum
-from typing import Any, Callable, List, Optional, Sequence, Set, Union
+from typing import Any, Callable, List, Optional, Sequence, Set, Union, Literal
 
 import torch
 from torch_tensorrt._enums import dtype
@@ -602,7 +602,9 @@ def save(
     module: Any,
     file_path: str = "",
     *,
-    output_format: str = "exported_program",
+    output_format: Literal[
+        "exported_program", "torchscript", "aot_inductor"
+    ] = "exported_program",
     inputs: Optional[Sequence[torch.Tensor]] = None,
     arg_inputs: Optional[Sequence[torch.Tensor]] = None,
     kwarg_inputs: Optional[dict[str, Any]] = None,
@@ -661,7 +663,7 @@ def save(
             "Input model is of type nn.Module. Saving nn.Module directly is not supported. Supported model types torch.jit.ScriptModule | torch.fx.GraphModule | torch.export.ExportedProgram."
         )
     elif module_type == _ModuleType.ts:
-        if not all([output_format == f for f in ["exported_program", "aot_inductor"]]):
+        if output_format != "torchscript":
             raise ValueError(
                 "Provided model is a torch.jit.ScriptModule but the output_format specified is not torchscript. Other output formats are not supported"
             )
