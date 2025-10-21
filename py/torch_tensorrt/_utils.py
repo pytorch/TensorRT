@@ -5,6 +5,7 @@ import os
 import platform
 import sys
 import tempfile
+import time
 import urllib.request
 from pathlib import Path
 from typing import Any, Optional
@@ -143,13 +144,65 @@ def _extracted_dir_trtllm(platform_system: str, platform_machine: str) -> Path:
     )
 
 
+def extract_wheel_file(wheel_path: Path, extract_dir: Path) -> None:
+    """
+    Safely extract a wheel file to a directory with a lock to prevent concurrent extraction.
+    """
+    rank = int(os.environ.get("OMPI_COMM_WORLD_RANK", 0))  # MPI rank from OpenMPI
+    torch.cuda.set_device(rank)
+    lock_file = extract_dir / ".extracting"
+
+    # Rank 0 performs extraction
+    if rank == 0:
+        logger.debug(
+            f"[Rank {rank}] Starting extraction of {wheel_path} to {extract_dir}"
+        )
+        try:
+            import zipfile
+        except ImportError as e:
+            raise ImportError(
+                "zipfile module is required but not found. Please install zipfile"
+            )
+        # Create lock file to signal extraction in progress
+        extract_dir.mkdir(parents=True, exist_ok=False)
+        lock_file.touch(exist_ok=False)
+        try:
+            with zipfile.ZipFile(wheel_path) as zip_ref:
+                zip_ref.extractall(extract_dir)
+            logger.debug(f"[Rank {rank}] Extraction complete: {extract_dir}")
+        except FileNotFoundError as e:
+            logger.error(f"[Rank {rank}] Wheel file not found at {wheel_path}: {e}")
+            raise RuntimeError(
+                f"Failed to find downloaded wheel file at {wheel_path}"
+            ) from e
+        except zipfile.BadZipFile as e:
+            logger.error(f"[Rank {rank}] Invalid or corrupted wheel file: {e}")
+            raise RuntimeError(
+                "Downloaded wheel file is corrupted or not a valid zip archive"
+            ) from e
+        except Exception as e:
+            logger.error(f"[Rank {rank}] Unexpected error while extracting wheel: {e}")
+            raise RuntimeError(
+                "Unexpected error during extraction of TensorRT-LLM wheel"
+            ) from e
+        finally:
+            # Remove lock file to signal completion
+            lock_file.unlink(missing_ok=True)
+
+    else:
+        # Other ranks wait for extraction to complete
+        while lock_file.exists():
+            logger.debug(
+                f"[Rank {rank}] Waiting for extraction to finish at {extract_dir}..."
+            )
+            time.sleep(0.5)
+
+
 def download_and_get_plugin_lib_path() -> Optional[str]:
     """
     Returns the path to the TensorRT‑LLM shared library, downloading and extracting if necessary.
-
     Args:
         platform (str): Platform identifier (e.g., 'linux_x86_64')
-
     Returns:
         Optional[str]: Path to shared library or None if operation fails.
     """
@@ -174,7 +227,6 @@ def download_and_get_plugin_lib_path() -> Optional[str]:
         return str(plugin_lib_path)
 
     wheel_path.parent.mkdir(parents=True, exist_ok=True)
-    extract_dir.mkdir(parents=True, exist_ok=True)
 
     if not wheel_path.exists():
         base_url = "https://pypi.nvidia.com/tensorrt-llm/"
@@ -194,32 +246,7 @@ def download_and_get_plugin_lib_path() -> Optional[str]:
         except OSError as e:
             logger.error(f"Local file write error: {e}")
 
-    try:
-        import zipfile
-    except ImportError as e:
-        raise ImportError(
-            "zipfile module is required but not found. Please install zipfile"
-        )
-    try:
-        with zipfile.ZipFile(wheel_path) as zip_ref:
-            zip_ref.extractall(extract_dir)
-            logger.debug(f"Extracted wheel to {extract_dir}")
-    except FileNotFoundError as e:
-        # This should capture the errors in the download failure above
-        logger.error(f"Wheel file not found at {wheel_path}: {e}")
-        raise RuntimeError(
-            f"Failed to find downloaded wheel file at {wheel_path}"
-        ) from e
-    except zipfile.BadZipFile as e:
-        logger.error(f"Invalid or corrupted wheel file: {e}")
-        raise RuntimeError(
-            "Downloaded wheel file is corrupted or not a valid zip archive"
-        ) from e
-    except Exception as e:
-        logger.error(f"Unexpected error while extracting wheel: {e}")
-        raise RuntimeError(
-            "Unexpected error during extraction of TensorRT-LLM wheel"
-        ) from e
+    extract_wheel_file(wheel_path, extract_dir)
 
     try:
         wheel_path.unlink(missing_ok=True)
@@ -238,10 +265,8 @@ def download_and_get_plugin_lib_path() -> Optional[str]:
 def load_and_initialize_trtllm_plugin(plugin_lib_path: str) -> bool:
     """
     Loads and initializes the TensorRT-LLM plugin from the given shared library path.
-
     Args:
         plugin_lib_path (str): Path to the shared TensorRT-LLM plugin library.
-
     Returns:
         bool: True if successful, False otherwise.
     """
@@ -293,7 +318,6 @@ def load_tensorrt_llm_for_nccl() -> bool:
     Attempts to load the TensorRT-LLM plugin and initialize it.
     Either the env variable TRTLLM_PLUGINS_PATH can specify the path
     Or the user can specify USE_TRTLLM_PLUGINS as either of (1, true, yes, on) to download the TRT-LLM distribution and load it
-
     Returns:
         bool: True if the plugin was successfully loaded and initialized, False otherwise.
     """
