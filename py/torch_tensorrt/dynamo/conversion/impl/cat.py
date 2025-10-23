@@ -11,7 +11,6 @@ from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContex
 from torch_tensorrt.dynamo.conversion.converter_utils import (
     cast_trt_tensor,
     get_positive_dim,
-    get_trt_tensor,
     set_layer_name,
 )
 
@@ -60,12 +59,46 @@ def unify_and_concat_trt_tensors(
     if not has_dynamic and not force_trt_output:
         return trt_tensors  # all ints
 
+    final_dtype = None
+    if cast_dtype:
+        # Explicit cast requested
+        if isinstance(cast_dtype, _enums.dtype):
+            final_dtype = cast_dtype.to(trt.DataType)
+        elif isinstance(cast_dtype, np.dtype):
+            final_dtype = _enums.dtype._from(cast_dtype).to(trt.DataType)
+        else:
+            final_dtype = cast_dtype  # already trt.DataType
+    else:
+        # Automatic promotion
+        promoted_type = None
+        for t in trt_tensors:
+            if isinstance(t, TRTTensor):
+                if promoted_type is None:
+                    promoted_type = t.dtype
+                else:
+                    promoted_type = _enums.dtype._from(
+                        torch.promote_types(
+                            _enums.dtype._from(promoted_type).to(torch.dtype),
+                            _enums.dtype._from(t.dtype).to(torch.dtype),
+                        )
+                    ).to(trt.DataType)
+        final_dtype = promoted_type
+
     # promote remaining ints to TRT consts before concat
     for i, t in enumerate(trt_tensors):
         if isinstance(t, int):
             const = ctx.net.add_constant((1,), np.array([t], dtype=np.int32))
             set_layer_name(const, target, f"{name}_static_{i}_const")
             trt_tensors[i] = const.get_output(0)
+
+    # final cast
+    if final_dtype is not None:
+        casted = []
+        for i, t in enumerate(trt_tensors):
+            if isinstance(t, TRTTensor):
+                t = cast_trt_tensor(ctx, t, final_dtype, f"{name}_cast_{i}")
+            casted.append(t)
+        trt_tensors = casted
 
     concat = ctx.net.add_concatenation(trt_tensors)
     concat.axis = concat_axis
@@ -82,45 +115,17 @@ def cat(
     dim: int,
     cast_dtype: Union[_enums.dtype, trt.DataType, np.dtype] = None,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    trt_inputs = []
-    for i, each_input in enumerate(input):
-        if not isinstance(each_input, TRTTensor):
-            each_input = get_trt_tensor(ctx, each_input, f"{name}_tensor_{i}")
-        if cast_dtype:
-            each_input = cast_trt_tensor(
-                ctx, each_input, cast_dtype, f"{name}_tensor_int32_cast_{i}"
-            )
-        trt_inputs.append(each_input)
-
-    if len(trt_inputs) > 1:
-        # Cast to promoted type for all inputs
-        promoted_type = trt_inputs[0].dtype
-        for each_input in trt_inputs[1:]:
-            promoted_type = _enums.dtype._from(
-                torch.promote_types(
-                    _enums.dtype._from(promoted_type).to(torch.dtype),
-                    _enums.dtype._from(each_input.dtype).to(torch.dtype),
-                )
-            )
-        trt_promoted_type = promoted_type.to(trt.DataType)
-
-        trt_casted_inputs = []
-        for i, each_input in enumerate(trt_inputs):
-            casted_input = cast_trt_tensor(
-                ctx, each_input, trt_promoted_type, f"{name}_input_casted_{i}"
-            )
-            trt_casted_inputs.append(casted_input)
-        trt_inputs = trt_casted_inputs
+    # int is only when cat called in other ops like pad
+    if not isinstance(input[0], int):
+        dim = get_positive_dim(dim, len(input[0].shape))
     else:
-        trt_promoted_type = None
-
-    dim = get_positive_dim(dim, len(trt_inputs[0].shape))
+        dim = 0
     return unify_and_concat_trt_tensors(
         ctx,
         target,
         name,
-        trt_inputs,
+        input,
         concat_axis=dim,
-        cast_dtype=trt_promoted_type,
+        cast_dtype=cast_dtype,
         force_trt_output=True,
     )
