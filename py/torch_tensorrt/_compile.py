@@ -606,7 +606,7 @@ def save(
     inputs: Optional[Sequence[torch.Tensor]] = None,
     arg_inputs: Optional[Sequence[torch.Tensor]] = None,
     kwarg_inputs: Optional[dict[str, Any]] = None,
-    retrace: bool = False,
+    retrace: bool = True,
     pickle_protocol: int = 2,
     **kwargs: Any,
 ) -> None:
@@ -661,7 +661,7 @@ def save(
             "Input model is of type nn.Module. Saving nn.Module directly is not supported. Supported model types torch.jit.ScriptModule | torch.fx.GraphModule | torch.export.ExportedProgram."
         )
     elif module_type == _ModuleType.ts:
-        if not all([output_format == f for f in ["exported_program", "aot_inductor"]]):
+        if not all(output_format == f for f in ["exported_program", "aot_inductor"]):
             raise ValueError(
                 "Provided model is a torch.jit.ScriptModule but the output_format specified is not torchscript. Other output formats are not supported"
             )

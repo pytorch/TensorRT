@@ -56,7 +56,7 @@ def test_base_full_compile(ir):
 
     exp_program = torchtrt.dynamo.trace(model, **compile_spec)
     trt_module = torchtrt.dynamo.compile(exp_program, **compile_spec)
-    torchtrt.save(trt_module, trt_ep_path)
+    torchtrt.save(trt_module, trt_ep_path, retrace=False)
 
     deser_trt_module = torchtrt.load(trt_ep_path).module()
     # Check Pyt and TRT exported program outputs
@@ -111,7 +111,7 @@ def test_base_full_compile_multiple_outputs(ir):
 
     exp_program = torchtrt.dynamo.trace(model, **compile_spec)
     trt_module = torchtrt.dynamo.compile(exp_program, **compile_spec)
-    torchtrt.save(trt_module, trt_ep_path)
+    torchtrt.save(trt_module, trt_ep_path, retrace=False)
 
     deser_trt_module = torchtrt.load(trt_ep_path).module()
     # Check Pyt and TRT exported program outputs
@@ -170,7 +170,7 @@ def test_no_compile(ir):
 
     exp_program = torchtrt.dynamo.trace(model, **compile_spec)
     trt_module = torchtrt.dynamo.compile(exp_program, **compile_spec)
-    torchtrt.save(trt_module, trt_ep_path)
+    torchtrt.save(trt_module, trt_ep_path, retrace=False)
 
     deser_trt_module = torchtrt.load(trt_ep_path).module()
     # Check Pyt and TRT exported program outputs
@@ -232,7 +232,7 @@ def test_hybrid_relu_fallback(ir):
 
     exp_program = torchtrt.dynamo.trace(model, **compile_spec)
     trt_module = torchtrt.dynamo.compile(exp_program, **compile_spec)
-    torchtrt.save(trt_module, trt_ep_path)
+    torchtrt.save(trt_module, trt_ep_path, retrace=False)
 
     deser_trt_module = torchtrt.load(trt_ep_path).module()
     outputs_pyt = model(input)
@@ -331,7 +331,7 @@ def test_resnet18_cpu_offload(ir):
             msg="Model should be offloaded to CPU",
         )
         model.cuda()
-    torchtrt.save(trt_module, trt_ep_path)
+    torchtrt.save(trt_module, trt_ep_path, retrace=False)
 
     deser_trt_module = torchtrt.load(trt_ep_path).module()
     outputs_pyt = model(input)
@@ -380,7 +380,7 @@ def test_resnet18_dynamic(ir):
 
     exp_program = torchtrt.dynamo.trace(model, **compile_spec)
     trt_module = torchtrt.dynamo.compile(exp_program, **compile_spec)
-    torchtrt.save(trt_module, trt_ep_path)
+    torchtrt.save(trt_module, trt_ep_path, retrace=False)
     # TODO: Enable this serialization issues are fixed
     # deser_trt_module = torchtrt.load(trt_ep_path).module()
     outputs_pyt = model(input)
@@ -413,7 +413,7 @@ def test_resnet18_torch_exec_ops_serde(ir):
 
     exp_program = torchtrt.dynamo.trace(model, **compile_spec)
     trt_module = torchtrt.dynamo.compile(exp_program, **compile_spec)
-    torchtrt.save(trt_module, trt_ep_path)
+    torchtrt.save(trt_module, trt_ep_path, retrace=False)
     deser_trt_module = torchtrt.load(trt_ep_path).module()
     outputs_pyt = deser_trt_module(input)
     outputs_trt = trt_module(input)
@@ -463,7 +463,7 @@ def test_hybrid_conv_fallback(ir):
     exp_program = torchtrt.dynamo.trace(model, **compile_spec)
     trt_module = torchtrt.dynamo.compile(exp_program, **compile_spec)
 
-    torchtrt.save(trt_module, trt_ep_path)
+    torchtrt.save(trt_module, trt_ep_path, retrace=False)
 
     deser_trt_module = torchtrt.load(trt_ep_path).module()
     outputs_pyt = model(input)
@@ -525,7 +525,7 @@ def test_hybrid_conv_fallback_cpu_offload(ir):
     exp_program = torchtrt.dynamo.trace(model, **compile_spec)
     trt_module = torchtrt.dynamo.compile(exp_program, **compile_spec)
     model.cuda()
-    torchtrt.save(trt_module, trt_ep_path)
+    torchtrt.save(trt_module, trt_ep_path, retrace=False)
 
     deser_trt_module = torchtrt.load(trt_ep_path).module()
     outputs_pyt = model(input)
@@ -584,7 +584,7 @@ def test_arange_export(ir):
     exp_program = torchtrt.dynamo.trace(model, **compile_spec)
     trt_module = torchtrt.dynamo.compile(exp_program, **compile_spec)
 
-    torchtrt.save(trt_module, trt_ep_path)
+    torchtrt.save(trt_module, trt_ep_path, retrace=False)
 
     deser_trt_module = torchtrt.load(trt_ep_path).module()
     outputs_pyt = model(input)
