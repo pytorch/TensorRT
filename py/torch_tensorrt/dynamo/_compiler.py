@@ -868,6 +868,15 @@ def compile_module(
     # Iterate over all components that can be accelerated
     # Generate the corresponding TRT Module for those
 
+    from torch_tensorrt.dynamo.utils import merge_submodules
+
+    breakpoint()
+    partitioned_module = merge_submodules(partitioned_module)
+    from torch_tensorrt.dynamo.conversion._ConverterRegistry import DYNAMO_CONVERTERS
+
+    DYNAMO_CONVERTERS.disallowed_targets = set()
+    breakpoint()
+
     for name, _ in partitioned_module.named_children():
         submodule = getattr(partitioned_module, name)
         # filter on the GraphModule

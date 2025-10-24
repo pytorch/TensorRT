@@ -94,6 +94,104 @@ if is_tensorrt_version_supported("7.0"):
     }
 
 
+def merge_submodules(module: torch.fx.GraphModule) -> torch.fx.GraphModule:
+    """
+    Merge all the submodules of the given module into a single module.
+    """
+    # Get all nodes in the graph
+    nodes_to_remove = []
+
+    # Iterate through the graph to find _run_on_gpu nodes
+    for node in module.graph.nodes:
+        if node.op == "call_module" and "_run_on_gpu" in node.name:
+            # Find the target submodule
+            gpu_submodule = module.get_submodule(node.target)
+
+            # Find the preceding _run_on_acc node
+            prev_node = None
+            for n in module.graph.nodes:
+                if n.next == node and n.op == "call_module" and "_run_on_acc" in n.name:
+                    prev_node = n
+                    break
+
+            if prev_node is not None:
+                # Get the preceding submodule
+                acc_submodule = module.get_submodule(prev_node.target)
+
+                # Merge gpu_submodule into acc_submodule
+                # Copy all nodes from gpu_submodule to acc_submodule
+                value_remap = {}
+
+                # Map gpu_submodule inputs to acc_submodule outputs
+                gpu_input_nodes = [
+                    n for n in gpu_submodule.graph.nodes if n.op == "placeholder"
+                ]
+                acc_output_node = [
+                    n for n in acc_submodule.graph.nodes if n.op == "output"
+                ][0]
+
+                # Get the output values from acc_submodule
+                acc_outputs = acc_output_node.args[0]
+                if not isinstance(acc_outputs, (list, tuple)):
+                    acc_outputs = [acc_outputs]
+
+                # Map gpu inputs to acc outputs
+                for i, gpu_input in enumerate(gpu_input_nodes):
+                    if i < len(acc_outputs):
+                        value_remap[gpu_input] = acc_outputs[i]
+
+                # Remove the output node from acc_submodule temporarily
+                acc_submodule.graph.erase_node(acc_output_node)
+
+                # Copy nodes from gpu_submodule to acc_submodule
+                for gpu_node in gpu_submodule.graph.nodes:
+                    if gpu_node.op == "placeholder":
+                        continue
+                    elif gpu_node.op == "output":
+                        # Create new output node in acc_submodule
+                        new_args = []
+                        for arg in (
+                            gpu_node.args[0]
+                            if isinstance(gpu_node.args[0], (list, tuple))
+                            else [gpu_node.args[0]]
+                        ):
+                            new_args.append(value_remap.get(arg, arg))
+                        acc_submodule.graph.output(
+                            tuple(new_args) if len(new_args) > 1 else new_args[0]
+                        )
+                    else:
+                        # Copy the node
+                        new_args = []
+                        for arg in gpu_node.args:
+                            new_args.append(value_remap.get(arg, arg))
+                        new_kwargs = {}
+                        for k, v in gpu_node.kwargs.items():
+                            new_kwargs[k] = value_remap.get(v, v)
+
+                        new_node = acc_submodule.graph.node_copy(
+                            gpu_node, lambda x: value_remap.get(x, x)
+                        )
+                        value_remap[gpu_node] = new_node
+
+                # Recompile acc_submodule
+                acc_submodule.recompile()
+
+                # Replace uses of gpu node with acc node in parent graph
+                node.replace_all_uses_with(prev_node)
+                nodes_to_remove.append(node)
+
+    # Remove the gpu nodes from the graph
+    for node in nodes_to_remove:
+        module.graph.erase_node(node)
+        # Also delete the submodule
+        if hasattr(module, node.target):
+            delattr(module, node.target)
+
+    # Recompile the module
+    module.recompile()
+    return module
+
+
 def unified_dtype_converter(
     dtype: Union[TRTDataType, torch.dtype, np.dtype], to: Frameworks
 ) -> Union[np.dtype, torch.dtype, TRTDataType]:
