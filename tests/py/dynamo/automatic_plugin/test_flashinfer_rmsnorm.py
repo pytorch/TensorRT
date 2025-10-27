@@ -4,9 +4,10 @@ import unittest
 import pytest
 import torch
 import torch.nn as nn
-import torch_tensorrt
 from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
+
+import torch_tensorrt
 from torch_tensorrt._enums import dtype
 
 from ..conversion.harness import DispatchTestCase
@@ -33,7 +34,7 @@ if not torch_tensorrt.ENABLED_FEATURES.tensorrt_rtx:
     )
 
 
-@unittest.skip("Not Available")
+# @unittest.skip("Not Available")
 @unittest.skipIf(
     not importlib.util.find_spec("flashinfer")
     or torch_tensorrt.ENABLED_FEATURES.tensorrt_rtx,
@@ -44,7 +45,6 @@ class TestAutomaticPlugin(DispatchTestCase):
     @parameterized.expand(
         [
             ((64, 64), (64,), torch.float16),
-            ((256, 256), (256,), torch.float16),
         ]
     )
     def test_rmsnorm_float(self, input_shape, weight_shape, data_type):

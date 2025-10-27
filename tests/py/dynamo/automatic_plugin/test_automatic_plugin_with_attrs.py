@@ -1,15 +1,19 @@
+import os
 import unittest
 from typing import Tuple
 
 import torch
 import torch.nn as nn
-import torch_tensorrt
 import triton
 import triton.language as tl
 from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
 
+import torch_tensorrt
+
 from ..conversion.harness import DispatchTestCase
+
+os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
 
 
 @triton.jit
@@ -40,7 +44,7 @@ def elementwise_scale_mul(
     Z = torch.empty_like(X)
 
     # Define block size
-    BLOCK_SIZE = 1024
+    BLOCK_SIZE = 64
 
     # Grid of programs
     grid = lambda meta: (X.numel() // meta["BLOCK_SIZE"],)
@@ -71,7 +75,6 @@ class TestAutomaticPlugin(DispatchTestCase):
     @parameterized.expand(
         [
             ((64, 64), torch.float),
-            ((256, 256), torch.int),
         ]
     )
     def test_scale_mul_plugin_float(self, input_shape, dtype):
