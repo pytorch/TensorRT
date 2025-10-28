@@ -46,7 +46,7 @@ def unify_and_concat_trt_tensors(
         elif isinstance(x, int) and not has_dynamic and not force_trt_output:
             t = x  # pure static path
         else:
-            t = ctx.net.add_constant((1,), np.array([x], dtype=np.int32))
+            t = ctx.net.add_constant((x.numel(),), np.array([x], dtype=np.int32))
             set_layer_name(t, target, f"{name}_dim{i}_const")
             t = t.get_output(0)
 
