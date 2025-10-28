@@ -1,3 +1,4 @@
+from ast import Assert
 import logging
 from typing import Collection, Dict, List, Optional, Tuple
 
@@ -226,16 +227,26 @@ class TRTPartitioner(_SplitterBase):  # type: ignore
         # Remove segments smaller than the block size (with exceptions)
         subgraphs = self.remove_small_acc_subgraphs(subgraphs)
 
-        num_of_break = self.calculate_num_of_break(subgraphs)
-        subgraphs = self.break_subgraphs(subgraphs, num_of_break=num_of_break)
+        # num_of_break = self.calculate_num_of_break(subgraphs)
+        subgraphs = self.break_subgraphs_by_node(subgraphs, num_of_break=5)
 
         # Set the number of TRT engines to be generated
         self.num_trt_accelerated_subgraphs = len([s for s in subgraphs if s.is_acc])
 
         # Tag the accelerated nodes and split the graph accordingly
+        print([len(s.nodes) for s in subgraphs])
         self.tag(subgraphs)
-        return self.split()
 
+        for s in subgraphs:
+            print(s.nodes)
+
+        gm = self.split()
+        self.weight_visited_nodes = set()
+        [self.size_of_subgraph(s) for s in subgraphs]
+        
+
+        return gm
+    
     def calculate_num_of_break(self, subgraphs: List[Subgraph]) -> int:
         """
         This function calculates the break period based on the number of subgraphs.
@@ -260,15 +271,16 @@ class TRTPartitioner(_SplitterBase):  # type: ignore
             1, num_of_graphs // ((len(subgraphs) + 1) // 2)
         )  # If there are already graph breaks, for each TRT subgraph, we break for a few times.
 
-    def break_subgraphs(
+
+    def break_subgraphs_by_node(
         self, subgraphs: List[Subgraph], num_of_break: int = 1
     ) -> List[Subgraph]:
         """
         This function breaks the subgraphs into smaller subgraphs at the specified frequency to save CPU memory.
         """
-
+        op_to_break = "add."
         num_of_sdpa_node = len(
-            [node for node in self.acc_nodes if "scaled_dot" in str(node.target)]
+            [node for node in self.acc_nodes if op_to_break in str(node.target)]
         )
         break_period = num_of_sdpa_node // num_of_break + 1
         current_break_idx = 0
@@ -277,7 +289,7 @@ class TRTPartitioner(_SplitterBase):  # type: ignore
         for subgraph in subgraphs:
             if subgraph.is_acc:
                 for i, node in enumerate(subgraph.nodes):
-                    if "scaled_dot" in str(node.target):
+                    if op_to_break in str(node.target):
                         current_num_break += 1
                         if current_num_break % break_period != 0:
                             continue
@@ -298,7 +310,109 @@ class TRTPartitioner(_SplitterBase):  # type: ignore
                 )
             else:
                 new_subgraphs.append(subgraph)
+
+        new_subgraphs = self.validate_and_correct_subgraphs(new_subgraphs)
+        
         return new_subgraphs
+
+    def break_subgraphs(
+        self, subgraphs: List[Subgraph], num_of_break: int = 1
+    ) -> List[Subgraph]:
+        """
+        This function breaks the subgraphs into smaller subgraphs at the specified frequency to save CPU memory.
+        """
+        break_pos = [0, 100, 200, 300, 400]
+        current_break_idx = 0
+        new_subgraphs = []
+        for subgraph in subgraphs:
+            if subgraph.is_acc:
+                for i, node in enumerate(subgraph.nodes):
+                    if i in break_pos:
+
+                        new_subgraphs.append(
+                            Subgraph(
+                                is_acc=True,
+                                nodes=subgraph.nodes[current_break_idx : i + 1],
+                                device_ordinal=subgraph.device_ordinal,
+                            )
+                        )
+                        current_break_idx = i + 1
+                new_subgraphs.append(
+                    Subgraph(
+                        is_acc=True,
+                        nodes=subgraph.nodes[current_break_idx:],
+                        device_ordinal=subgraph.device_ordinal,
+                    )
+                )
+            else:
+                new_subgraphs.append(subgraph)
+
+        new_subgraphs = self.validate_and_correct_subgraphs(new_subgraphs)
+        return new_subgraphs
+
+    def size_of_subgraph(self, subgraph: Subgraph) -> int:
+        """
+        This function calculates the size of the subgraph.
+        """
+        stack = subgraph.nodes.copy()
+        size = 0
+        while stack:
+            node = stack.pop()
+            if node in self.weight_visited_nodes:
+                continue
+            self.weight_visited_nodes.add(node)
+            if node.op == "get_attr":
+                weight = self.module.state_dict()[node.target]
+                size += weight.numel() * weight.element_size()
+                self.weight_visited_nodes.add(node)
+                continue
+            for input_node in node._input_nodes: 
+                if input_node not in self.weight_visited_nodes:
+                    stack.append(input_node)
+        print(size)
+        return size
+
+    def validate_and_correct_subgraphs(self, subgraphs: List[Subgraph]) -> List[Subgraph]:
+        """
+        This function validates the subgraphs by checking if the subgraphs are valid, and corrects the subgraphs if they are not valid.
+        """
+        visited_nodes = {}
+        print([len(s.nodes) for s in subgraphs])
+        for i, subgraph in enumerate(subgraphs):
+            if i == 0:
+                for node in subgraph.nodes:
+                    visited_nodes[node] = i
+                visited_nodes[subgraph.nodes[-1]] = i + 1
+                continue
+
+
+            elif not subgraph.is_acc:
+                for node in subgraph.nodes:
+                    visited_nodes[subgraph.nodes[-1]] = i + 1
+                continue
+
+            else:
+                to_remove_nodes = []
+                for j, node in enumerate(subgraph.nodes):
+                    if j == len(subgraph.nodes) - 1:
+                        visited_nodes[node] = i + 1
+                        continue
+                    subgraph_idx = 0
+                    for dep in self.deps[node]:
+                        if dep in visited_nodes:
+                            subgraph_idx = max(subgraph_idx, visited_nodes[dep])
+                        else:
+                            raise ValueError(f"Node {node} have a dependency that is not covered in the previous subgraphs. This is caused by a invalid subgraph segmentation.")
+                    if subgraph_idx != i:
+                        subgraphs[subgraph_idx].nodes.append(node)
+                        to_remove_nodes.append(node)
+                    visited_nodes[node] = subgraph_idx
+                for node in to_remove_nodes:
+                    subgraph.nodes.remove(node)
+        
+        return subgraphs
+                    
+                    
 
     def starter_nodes(self) -> Tuple[NodeSet, NodeSet]:
         """Generates starter nodes for partitioning + segmentation"""

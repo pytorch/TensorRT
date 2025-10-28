@@ -861,10 +861,10 @@ def compile_module(
         dryrun_tracker.to_run_in_torch.extend(parse_non_trt_nodes(partitioned_module))
 
     submodule_node_dict = {}
-    for node in partitioned_module.graph.nodes:
-        if "_run_on_acc" not in node.name:
+    for name, node in partitioned_module.named_children():
+        if "_run_on_acc" not in name:
             continue
-        submodule_node_dict[node.name] = node
+        submodule_node_dict[name] = node
 
     preserve_module_specs(original_in_spec, original_out_spec, partitioned_module)
     # Store TRT replicas of Torch subgraphs
@@ -877,6 +877,12 @@ def compile_module(
     for attr in dir(gm):
         if attr.startswith("_frozen_param"):
             delattr(gm, attr)
+
+
+
+    from torch_tensorrt.dynamo.conversion._ConverterRegistry import DYNAMO_CONVERTERS
+    DYNAMO_CONVERTERS.disallowed_targets = set()
+    
     for name, _ in partitioned_module.named_children():
         submodule = getattr(partitioned_module, name)
         # filter on the GraphModule
