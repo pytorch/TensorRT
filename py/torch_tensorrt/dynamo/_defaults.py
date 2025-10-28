@@ -57,6 +57,7 @@ TILING_OPTIMIZATION_LEVEL = "none"
 L2_LIMIT_FOR_TILING = -1
 USE_DISTRIBUTED_MODE_TRACE = False
 OFFLOAD_MODULE_TO_CPU = False
+DYNAMICALLY_ALLOCATE_RESOURCES = False
 
 if platform.system() == "Linux":
     import pwd
