@@ -434,6 +434,13 @@ def compile(
     l2_limit_for_tiling: int = _defaults.L2_LIMIT_FOR_TILING,
     offload_module_to_cpu: bool = _defaults.OFFLOAD_MODULE_TO_CPU,
     use_distributed_mode_trace: bool = _defaults.USE_DISTRIBUTED_MODE_TRACE,
+    low_precision_type: Optional[
+        Union[torch.dtype, dtype]
+    ] = _defaults.LOW_PRECISION_TYPE,
+    nodes_to_exclude: Collection[str] = _defaults.NODES_TO_EXCLUDE,
+    targets_to_exclude: Collection[Target] = _defaults.TARGETS_TO_EXCLUDE,
+    data_max: float = _defaults.DATA_MAX,
+    max_depth_of_reduction: Optional[int] = _defaults.MAX_DEPTH_OF_REDUCTION,
     **kwargs: Any,
 ) -> torch.fx.GraphModule:
     """Compile an ExportedProgram module for NVIDIA GPUs using TensorRT
@@ -511,6 +518,11 @@ def compile(
         l2_limit_for_tiling (int): The target L2 cache usage limit (in bytes) for tiling optimization (default is -1 which means no limit).
         offload_module_to_cpu (bool): Offload the module to CPU. This is useful when we need to minimize GPU memory usage.
         use_distributed_mode_trace (bool):  Using aot_autograd to trace the graph. This is enabled when DTensors or distributed tensors are present in distributed model
+        low_precision_type (Optional[Union[torch.dtype, dtype]]): The precision to reduce to. We currently support torch.float16 and torch.bfloat16. Default is None, which means no low precision is used.
+        nodes_to_exclude (Collection[str]): The set of regex patterns to match node names that should remain in FP32. Default is [].
+        targets_to_exclude (Collection[Target]): The set of targets (ATen ops) that should remain in FP32. Default is [].
+        data_max (float): Maximum absolute value for node outputs, nodes with outputs greater than this value will remain in FP32. Default is 512.
+        max_depth_of_reduction (Optional[int]): Maximum depth of reduction allowed in low precision. Nodes with higher reduction depths will remain in FP32. If not provided, infinity will be used. Default is None.
         **kwargs: Any,
     Returns:
         torch.fx.GraphModule: Compiled FX Module, when run it will execute via TensorRT
@@ -593,6 +605,19 @@ def compile(
                 f"use_explicit_typing was set to True, however found that enabled_precisions was also specified (saw: {enabled_precisions}, expected: dtype.f32, dtype.f4). enabled_precisions should not be used when use_explicit_typing=True"
             )
 
+    if low_precision_type is not None:
+        if not isinstance(low_precision_type, (torch.dtype, dtype)):
+            raise ValueError(
+                f"low_precision_type must be a torch.dtype or dtype, got {type(low_precision_type)}"
+            )
+        if low_precision_type not in {
+            torch.float16,
+            torch.bfloat16,
+        } and low_precision_type not in {dtype.f16, dtype.bf16}:
+            raise ValueError(
+                f"low_precision_type must be one of torch.float16, torch.bfloat16, dtype.f16, dtype.bf16, got {low_precision_type}"
+            )
+
     if use_fp32_acc:
         logger.debug(
             "FP32 accumulation for matmul layers is enabled. This option should only be enabled if the model already has FP16 weights and has no effect if it has FP32 weights. \
@@ -621,6 +646,38 @@ def compile(
 
     if not isinstance(arg_inputs, collections.abc.Sequence):
         arg_inputs = [arg_inputs]  # type: ignore
+
+    # save intermediate outputs of each node for Autocast
+    intermediate_node_outputs = {}
+    if not use_explicit_typing:
+
+        class DumpInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
+            """Dump intermediate outputs of each node"""
+
+            def run_node(self, n: torch.fx.Node) -> Any:
+                if (
+                    n.op == "call_function"
+                    and n.target != torch.ops.higher_order.wrap_with_autocast
+                ):
+                    out = super().run_node(n)
+                    if not isinstance(out, torch.Tensor):
+                        raise ValueError(
+                            f"Please file a bug with Torch-TensorRT because it expects a torch.Tensor but got {type(out)} for node {n.name}."
+                        )
+                    intermediate_node_outputs[n.name] = out
+                    return out
+                return super().run_node(n)
+
+        def _materialize(x: Input | torch.Tensor) -> torch.Tensor:
+            """Materialize an Input object to a tensor"""
+            if isinstance(x, Input):
+                return x.torch_tensor
+            return x
+
+        with torch.no_grad():
+            mat_args = tuple(_materialize(a) for a in arg_inputs)
+            mat_kwargs = {k: _materialize(v) for k, v in kwarg_inputs.items()}
+            DumpInterpreter(exported_program.module()).run(*mat_args, **mat_kwargs)
 
     # Prepare torch_trt inputs
     trt_arg_inputs: Sequence[Input] = prepare_inputs(arg_inputs)
@@ -680,6 +737,12 @@ def compile(
         "l2_limit_for_tiling": l2_limit_for_tiling,
         "offload_module_to_cpu": offload_module_to_cpu,
         "use_distributed_mode_trace": use_distributed_mode_trace,
+        "low_precision_type": low_precision_type,
+        "nodes_to_exclude": nodes_to_exclude,
+        "targets_to_exclude": targets_to_exclude,
+        "data_max": data_max,
+        "max_depth_of_reduction": max_depth_of_reduction,
+        "intermediate_node_outputs": intermediate_node_outputs,
     }
 
     settings = CompilationSettings(**compilation_options)

@@ -57,6 +57,11 @@ TILING_OPTIMIZATION_LEVEL = "none"
 L2_LIMIT_FOR_TILING = -1
 USE_DISTRIBUTED_MODE_TRACE = False
 OFFLOAD_MODULE_TO_CPU = False
+LOW_PRECISION_TYPE = None
+NODES_TO_EXCLUDE = set[str]()
+TARGETS_TO_EXCLUDE = set[torch.fx.node.Target]()
+DATA_MAX = 512
+MAX_DEPTH_OF_REDUCTION = None
 
 if platform.system() == "Linux":
     import pwd

@@ -1,12 +1,14 @@
 from dataclasses import dataclass, field
 from typing import Any, Collection, Optional, Set, Tuple, Union
 
+import torch
 from torch.fx.node import Target
 from torch_tensorrt._Device import Device
 from torch_tensorrt._enums import EngineCapability, dtype
 from torch_tensorrt.dynamo._defaults import (
     ASSUME_DYNAMIC_SHAPE_SUPPORT,
     CACHE_BUILT_ENGINES,
+    DATA_MAX,
     DISABLE_TF32,
     DLA_GLOBAL_DRAM_SIZE,
     DLA_LOCAL_DRAM_SIZE,
@@ -21,8 +23,11 @@ from torch_tensorrt.dynamo._defaults import (
     IMMUTABLE_WEIGHTS,
     L2_LIMIT_FOR_TILING,
     LAZY_ENGINE_INIT,
+    LOW_PRECISION_TYPE,
     MAX_AUX_STREAMS,
+    MAX_DEPTH_OF_REDUCTION,
     MIN_BLOCK_SIZE,
+    NODES_TO_EXCLUDE,
     NUM_AVG_TIMING_ITERS,
     OFFLOAD_MODULE_TO_CPU,
     OPTIMIZATION_LEVEL,
@@ -32,6 +37,7 @@ from torch_tensorrt.dynamo._defaults import (
     REUSE_CACHED_ENGINES,
     SPARSE_WEIGHTS,
     STRIP_ENGINE_WEIGHTS,
+    TARGETS_TO_EXCLUDE,
     TILING_OPTIMIZATION_LEVEL,
     TIMING_CACHE_PATH,
     TRUNCATE_DOUBLE,
@@ -97,6 +103,12 @@ class CompilationSettings:
         tiling_optimization_level (str): The optimization level of tiling strategies. A higher level allows TensorRT to spend more time searching for better tiling strategy. We currently support ["none", "fast", "moderate", "full"].
         l2_limit_for_tiling (int): The target L2 cache usage limit (in bytes) for tiling optimization (default is -1 which means no limit).
         use_distributed_mode_trace (bool):  Using aot_autograd to trace the graph. This is enabled when DTensors or distributed tensors are present in distributed model
+        low_precision_type (Optional[Union[torch.dtype, dtype]]): The precision to reduce to. We currently support torch.float16 and torch.bfloat16. Default is None, which means no low precision is used.
+        nodes_to_exclude (Collection[str]): The set of regex patterns to match node names that should remain in FP32. Default is [].
+        targets_to_exclude (Collection[Target]): The set of targets (ATen ops) that should remain in FP32. Default is [].
+        data_max (float): Maximum absolute value for node outputs, nodes with outputs greater than this value will remain in FP32. Default is 512.
+        max_depth_of_reduction (Optional[int]): Maximum depth of reduction allowed in low precision. Nodes with higher reduction depths will remain in FP32. If not provided, infinity will be used. Default is None.
+        intermediate_node_outputs (dict[str, torch.Tensor]): The intermediate node outputs of the graph. Default is {}.
     """
 
     enabled_precisions: Set[dtype] = field(default_factory=lambda: ENABLED_PRECISIONS)
@@ -140,6 +152,16 @@ class CompilationSettings:
     l2_limit_for_tiling: int = L2_LIMIT_FOR_TILING
     use_distributed_mode_trace: bool = USE_DISTRIBUTED_MODE_TRACE
     offload_module_to_cpu: bool = OFFLOAD_MODULE_TO_CPU
+    low_precision_type: Optional[dtype] = LOW_PRECISION_TYPE
+    nodes_to_exclude: Collection[str] = field(default_factory=lambda: NODES_TO_EXCLUDE)
+    targets_to_exclude: Collection[Target] = field(
+        default_factory=lambda: TARGETS_TO_EXCLUDE
+    )
+    data_max: float = DATA_MAX
+    max_depth_of_reduction: Optional[int] = MAX_DEPTH_OF_REDUCTION
+    intermediate_node_outputs: dict[str, torch.Tensor] = field(
+        default_factory=lambda: {}
+    )
 
     def __getstate__(self) -> dict[str, Any]:
         from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
