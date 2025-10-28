@@ -109,9 +109,11 @@ def deconvNd(
     assert len(kernel_shape) > 0, "Deconvolution kernel shape must be non-empty"
 
     # add deconv layer
+    if groups is not None:
+        num_output_maps = num_output_maps * groups
     deconv_layer = ctx.net.add_deconvolution_nd(
         input=input,
-        num_output_maps=num_output_maps * groups,
+        num_output_maps=num_output_maps,
         kernel_shape=kernel_shape,
         kernel=trt.Weights() if isinstance(weight, TRTTensor) else weight,
         bias=trt.Weights() if isinstance(bias, TRTTensor) else bias,
