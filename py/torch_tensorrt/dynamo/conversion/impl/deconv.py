@@ -133,6 +133,8 @@ def deconvNd(
     padding = (padding,) if isinstance(padding, int) else padding
     stride = (stride,) if isinstance(stride, int) else stride
     dilation = (dilation,) if isinstance(dilation, int) else dilation
+    if output_padding is None:
+        output_padding = 0
     output_padding = (
         (output_padding,) if isinstance(output_padding, int) else output_padding
     )
