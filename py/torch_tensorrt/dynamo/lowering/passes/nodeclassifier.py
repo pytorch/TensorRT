@@ -169,7 +169,7 @@ class DepthOfReductionRule(NodeRuleBase):
             return False
         self.reduction_depth = 0
         if node.target in [
-            torch.ops.aten.scaled_dot_product_attention,
+            torch.ops.aten.scaled_dot_product_attention.default,
         ]:
             # Attention: input (batch_size, sequence_length, hidden_size)
             # or (batch_size, kv_num_heads, total_sequence_length, head_size)
@@ -181,10 +181,10 @@ class DepthOfReductionRule(NodeRuleBase):
             )
             self.reduction_depth = hidden_size
         elif node.target in [
-            torch.ops.aten.convolution,
-            torch.ops.aten.conv1d,
-            torch.ops.aten.conv2d,
-            torch.ops.aten.conv3d,
+            torch.ops.aten.convolution.default,
+            torch.ops.aten.conv1d.default,
+            torch.ops.aten.conv2d.default,
+            torch.ops.aten.conv3d.default,
         ]:
             # Conv: input (N x C x D1 x D2 ... x Dn)
             # weight (out_channels, in_channels, kD1, kD2, ... kDn)
@@ -201,10 +201,11 @@ class DepthOfReductionRule(NodeRuleBase):
             self.reduction_depth = in_channels * kernel_volume
         elif node.target in [
             torch.ops.aten.matmul,
-            torch.ops.aten.dot,
-            torch.ops.aten.mm,
-            torch.ops.aten.mv,
-            torch.ops.aten.bmm,
+            torch.ops.aten.matmul.default,
+            torch.ops.aten.dot.default,
+            torch.ops.aten.mm.default,
+            torch.ops.aten.mv.default,
+            torch.ops.aten.bmm.default,
         ]:
             # GEMM: A (M, K) @ B (K, N) = C (M, N)
             self.reduction_depth = input_0_dims[-1]
