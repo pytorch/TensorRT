@@ -145,12 +145,7 @@ def deconvNd(
         # stride in deconv1d is (2,) -> need to change to (2, 1) in deconv2d
         stride = (stride[0], 1) if stride is not None else stride
         dilation = (dilation[0], 1) if dilation is not None else dilation
-        output_padding = (
-            (tuple(output_padding) + (0,))
-            if output_padding is not None
-            else output_padding
-        )
-
+        output_padding = tuple(output_padding) + (0,)
     # Set relevant attributes of deconvolution layer
     if padding is not None:
         deconv_layer.padding_nd = padding
