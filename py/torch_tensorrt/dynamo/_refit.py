@@ -274,9 +274,15 @@ def refit_module_weights(
     else:
         for name, submodule in compiled_module.named_children():
             if not isinstance(
-                submodule, (PythonTorchTensorRTModule, TorchTensorRTModule)
+                submodule,
+                (
+                    PythonTorchTensorRTModule,
+                    TorchTensorRTModule,
+                    torch.nn.modules.module.Module,
+                ),
             ):
                 continue
+
             settings = submodule.settings
 
     assert settings is not None
