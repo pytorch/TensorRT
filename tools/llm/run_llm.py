@@ -54,6 +54,7 @@ def get_model(args):
                 args.model,
                 use_cache=False,
                 attn_implementation="sdpa",
+                num_hidden_layers=1,
             )
             .eval()
             .cuda()
@@ -108,7 +109,7 @@ def compile_torchtrt(model, input_ids, args):
     else:
         enabled_precisions = {torch.float32}
 
-    with torch_tensorrt.logging.debug() if args.debug else nullcontext():
+    with torch_tensorrt.dynamo.Debugger() if args.debug else nullcontext():
         trt_model = torch_tensorrt.dynamo.compile(
             ep,
             inputs=[input_ids, position_ids],
