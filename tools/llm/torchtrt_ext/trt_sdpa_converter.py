@@ -14,6 +14,7 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     SourceIR,
     cast_trt_tensor,
     get_trt_tensor,
+    prepend_ones,
 )
 from torch_tensorrt.dynamo.types import TRTTensor
 
@@ -146,12 +147,30 @@ def scaled_dot_product_attention(
     kwargs: Dict[str, Any],
     name: str,
 ) -> TRTTensor:
+    source_ir = SourceIR.ATEN
 
     # always create our own attn_mask
-    query, key, value, _, dropout_p, is_causal = args
+    query, key, value, mask, dropout_p, is_causal = args
+    breakpoint()
+    # L, S = query.shape[-2], key.shape[-2]
+    query_len = impl.shape.shape(ctx, target, source_ir, name + "_query_len", query, -2)
+    key_len = impl.shape.shape(ctx, target, source_ir, name + "_key_len", query, -2)
+    mask_tensor = tril(
+        ctx,
+        target,
+        source_ir,
+        name + "_tril",
+        query_len,
+        key_len,
+    )
 
+    diff = len(query.shape) - len(mask_tensor.shape)
+
+    mask_tensor = prepend_ones(ctx, mask_tensor, name + "_prepend_ones", diff)
     attention_layer = ctx.net.add_attention(
         query, key, value, trt.AttentionNormalizationOp.SOFTMAX, False
     )
+    if is_causal:
+        attention_layer.mask = mask_tensor
 
     return attention_layer.get_output(0)
