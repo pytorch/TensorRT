@@ -26,8 +26,8 @@ def rule_based_autocast(
     gm: torch.fx.GraphModule, settings: CompilationSettings
 ) -> torch.fx.GraphModule:
     """Rule-based autocast"""
-    if settings.use_explicit_typing:
-        logger.debug("Strong typing is enabled, skipping rule-based autocast.")
+    if not settings.enable_autocast:
+        logger.debug("Autocast is not enabled, skipping rule-based autocast.")
         return gm
 
     # nodes = list(gm.graph.nodes)

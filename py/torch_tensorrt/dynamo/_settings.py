@@ -14,6 +14,7 @@ from torch_tensorrt.dynamo._defaults import (
     DLA_LOCAL_DRAM_SIZE,
     DLA_SRAM_SIZE,
     DRYRUN,
+    ENABLE_AUTOCAST,
     ENABLE_CROSS_COMPILE_FOR_WINDOWS,
     ENABLE_EXPERIMENTAL_DECOMPOSITIONS,
     ENABLE_WEIGHT_STREAMING,
@@ -103,6 +104,7 @@ class CompilationSettings:
         tiling_optimization_level (str): The optimization level of tiling strategies. A higher level allows TensorRT to spend more time searching for better tiling strategy. We currently support ["none", "fast", "moderate", "full"].
         l2_limit_for_tiling (int): The target L2 cache usage limit (in bytes) for tiling optimization (default is -1 which means no limit).
         use_distributed_mode_trace (bool):  Using aot_autograd to trace the graph. This is enabled when DTensors or distributed tensors are present in distributed model
+        enable_autocast (bool): Whether to enable autocast. If enabled, use_explicit_typing will be set to True.
         low_precision_type (Optional[Union[torch.dtype, dtype]]): The precision to reduce to. We currently support torch.float16 and torch.bfloat16. Default is None, which means no low precision is used.
         nodes_to_exclude (Collection[str]): The set of regex patterns to match node names that should remain in FP32. Default is [].
         targets_to_exclude (Collection[Target]): The set of targets (ATen ops) that should remain in FP32. Default is [].
@@ -152,6 +154,7 @@ class CompilationSettings:
     l2_limit_for_tiling: int = L2_LIMIT_FOR_TILING
     use_distributed_mode_trace: bool = USE_DISTRIBUTED_MODE_TRACE
     offload_module_to_cpu: bool = OFFLOAD_MODULE_TO_CPU
+    enable_autocast: bool = ENABLE_AUTOCAST
     low_precision_type: Optional[dtype] = LOW_PRECISION_TYPE
     nodes_to_exclude: Collection[str] = field(default_factory=lambda: NODES_TO_EXCLUDE)
     targets_to_exclude: Collection[Target] = field(
@@ -179,6 +182,7 @@ class CompilationSettings:
         self.__dict__.update(state)
 
 
+# If any of the following setting is changed, the engine should be rebuilt.
 _SETTINGS_TO_BE_ENGINE_INVARIANT = (
     "enabled_precisions",
     "max_aux_streams",

@@ -85,9 +85,14 @@ if __name__ == "__main__":
         trt_mod = torch_tensorrt.compile(
             ep.module(),
             arg_inputs=inputs,
-            use_explicit_typing=False,
             min_block_size=1,
             use_python_runtime=True,
+            ##### weak typing #####
+            # use_explicit_typing=False,
+            # enabled_precisions={torch.float16},
+            ##### strong typing + autocast #####
+            use_explicit_typing=True,
+            enable_autocast=True,
             low_precision_type=torch.float16,
             # nodes_to_exclude={"^conv2d$"},
             targets_to_exclude={},

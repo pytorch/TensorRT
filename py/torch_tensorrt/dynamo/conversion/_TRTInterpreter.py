@@ -292,9 +292,17 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             )
 
         if not self.compilation_settings.use_explicit_typing:
-            _LOGGER.info(
-                "Torch-TensorRT uses Autocast to determine the precision of the graph, because weak typing has been deprecated in TensorRT 10.12."
-            )
+            if dtype.float16 in self.compilation_settings.enabled_precisions:
+                builder_config.set_flag(trt.BuilderFlag.FP16)
+
+            if dtype.int8 in self.compilation_settings.enabled_precisions:
+                builder_config.set_flag(trt.BuilderFlag.INT8)
+
+            if dtype.fp8 in self.compilation_settings.enabled_precisions:
+                builder_config.set_flag(trt.BuilderFlag.FP8)
+
+            if dtype.bfloat16 in self.compilation_settings.enabled_precisions:
+                builder_config.set_flag(trt.BuilderFlag.BF16)
 
         if self.compilation_settings.sparse_weights:
             builder_config.set_flag(trt.BuilderFlag.SPARSE_WEIGHTS)

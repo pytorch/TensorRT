@@ -154,10 +154,6 @@ class CudaGraphsTorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
                         + contiguous_inputs[i + 1 :]
                     )
 
-                assert (
-                    contiguous_inputs[i].dtype == inputs[i].dtype
-                ), f"Dtype mismatch for {i}th input. Expect {inputs[i].dtype}, got {contiguous_inputs[i].dtype}."
-
                 if need_cudagraphs_record:
                     # If cudagraphs is enabled, this memory is reserved for future cudagraph runs
                     # Clone is required to avoid re-using user-provided GPU memory
