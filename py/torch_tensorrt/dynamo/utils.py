@@ -875,7 +875,7 @@ def get_cpu_memory_usage() -> Any:
     return psutil.Process().memory_info().rss / 1024 / 1024
 
 
-def release_memory() -> None:
+def release_host_and_device_memory() -> None:
     gc.collect()
     if torch.cuda.is_available():
         torch.cuda.synchronize()
@@ -883,7 +883,10 @@ def release_memory() -> None:
         torch.cuda.ipc_collect()
         torch.cuda.synchronize()
 
-    if platform.system() == "Linux" and os.environ.get("TRIM_CPU_MEMORY", "0") == "1":
+    if (
+        platform.system() == "Linux"
+        and os.environ.get("TORCHTRT_ENABLE_BUILDER_MALLOC_TRIM", "0") == "1"
+    ):
         try:
             libc = ctypes.CDLL("libc.so.6")
             if libc.malloc_trim(0) != 1:

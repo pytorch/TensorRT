@@ -15,7 +15,7 @@ from torch_tensorrt.dynamo.runtime import PythonTorchTensorRTModule, TorchTensor
 from torch_tensorrt.dynamo.utils import (
     get_cpu_memory_usage,
     get_output_dtypes,
-    release_memory,
+    release_host_and_device_memory,
 )
 
 logger = logging.getLogger(__name__)
@@ -62,6 +62,7 @@ def interpret_module_to_result(
     Returns:
         TRTInterpreterResult
     """
+
     output_dtypes = infer_module_output_dtypes(
         module, truncate_double=settings.truncate_double
     )
@@ -80,7 +81,7 @@ def interpret_module_to_result(
     for attr in dir(module):
         if attr.startswith("_frozen_param"):
             delattr(module, attr)
-    release_memory()
+    release_host_and_device_memory()
     logger.debug(
         f"CPU memory usage after clearing frozen parameters and building memory in conversion: {get_cpu_memory_usage()} MB"
     )
@@ -92,6 +93,27 @@ def interpret_module_to_result(
         logger.debug(
             f"CPU memory usage after serializing engine: {get_cpu_memory_usage()} MB"
         )
+
+    # Engine caching only for refittable engines
+    if (
+        not settings.immutable_weights
+        and settings.cache_built_engines
+        and engine_cache is not None
+    ):
+        hash_val = engine_cache.get_hash(module, inputs, settings)
+        engine_cache.insert(
+            hash_val,
+            (
+                serialized_engine,
+                interpreter_result.input_names,
+                interpreter_result.output_names,
+                inputs,
+                settings,
+                interpreter_result.weight_name_map,
+                interpreter_result.requires_output_allocator,
+            ),
+        )
+
     serialized_interpreter_result = SerializedInterpreterResult(
         serialized_engine=serialized_engine,
         input_names=interpreter_result.input_names,

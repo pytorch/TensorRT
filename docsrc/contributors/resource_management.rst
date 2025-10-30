@@ -18,7 +18,7 @@ Memory Usage Control
 CPU Memory
 ^^^^^^^^^^
 
-By default, Torch-TensorRT may consume up to **5×** the model size in CPU memory.  
+By default, Torch-TensorRT may consume up to **5x** the model size in CPU memory.  
 This can exceed system limits when compiling large models.
 
 **Common symptoms of high CPU memory usage:**
@@ -34,10 +34,10 @@ This can exceed system limits when compiling large models.
 
    .. code-block:: bash
 
-      export TRIM_CPU_MEMORY=1
+      export TORCHTRT_ENABLE_BUILDER_MALLOC_TRIM=1
 
-   This reduces approximately **2×** of redundant model copies, limiting 
-   total CPU memory usage to up to **3×** the model size.
+   This reduces approximately **2x** of redundant model copies, limiting 
+   total CPU memory usage to up to **3x** the model size.
 
 2. **Disable CPU offloading**
 
@@ -47,13 +47,13 @@ This can exceed system limits when compiling large models.
 
       offload_module_to_cpu = False
 
-   This removes another **1×** model copy, reducing peak CPU memory 
-   usage to about **2×** the model size.
+   This removes another **1x** model copy, reducing peak CPU memory 
+   usage to about **2x** the model size.
 
 GPU Memory
 ^^^^^^^^^^
 
-By default, Torch-TensorRT may consume up to **2×** the model size in GPU memory.
+By default, Torch-TensorRT may consume up to **2x** the model size in GPU memory.
 
 **Common symptoms of high GPU memory usage:**
 
@@ -71,7 +71,7 @@ By default, Torch-TensorRT may consume up to **2×** the model size in GPU memor
       offload_module_to_cpu = True
 
    This shifts one model copy from GPU to CPU memory.  
-   As a result, peak GPU memory usage decreases to about **1×** 
-   the model size, while CPU memory usage increases by roughly **1×**.
+   As a result, peak GPU memory usage decreases to about **1x** 
+   the model size, while one more copy of the model will occupy the CPU memory so CPU memory usage increases by roughly **1x**.
 
 
