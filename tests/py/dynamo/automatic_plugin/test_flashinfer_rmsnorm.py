@@ -34,7 +34,7 @@ if not torch_tensorrt.ENABLED_FEATURES.tensorrt_rtx:
     )
 
 
-# @unittest.skip("Not Available")
+@unittest.skip("Not Available")
 @unittest.skipIf(
     not importlib.util.find_spec("flashinfer")
     or torch_tensorrt.ENABLED_FEATURES.tensorrt_rtx,

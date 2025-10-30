@@ -1,4 +1,3 @@
-import os
 import unittest
 from typing import Tuple
 
@@ -12,9 +11,6 @@ from torch.testing._internal.common_utils import run_tests
 import torch_tensorrt
 
 from ..conversion.harness import DispatchTestCase
-
-os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
-
 
 @triton.jit
 def elementwise_scale_mul_kernel(X, Y, Z, a, b, BLOCK_SIZE: tl.constexpr):
