@@ -24,6 +24,7 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     get_positive_dim,
     is_only_operator_on_placeholder,
 )
+from torch_tensorrt.dynamo.utils import is_thor
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -3601,10 +3602,18 @@ def aten_ops_full(
     )
 
 
+def nonzero_validator(
+    node: Node, settings: Optional[CompilationSettings] = None
+) -> bool:
+    return not is_thor()
+
+
 # currently nonzero is not supported for tensorrt_rtx
 # TODO: lan to add the nonzero support once tensorrt_rtx team has added the support
+# TODO: apbose to remove the capability validator once thor bug resolve in NGC
 @dynamo_tensorrt_converter(
     torch.ops.aten.nonzero.default,
+    capability_validator=nonzero_validator,
     supports_dynamic_shapes=True,
     requires_output_allocator=True,
 )
