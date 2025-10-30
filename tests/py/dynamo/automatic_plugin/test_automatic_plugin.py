@@ -12,6 +12,7 @@ import torch_tensorrt
 
 from ..conversion.harness import DispatchTestCase
 
+
 @triton.jit
 def elementwise_mul_kernel(X, Y, Z, BLOCK_SIZE: tl.constexpr):
     # Program ID determines the block of data each thread will process

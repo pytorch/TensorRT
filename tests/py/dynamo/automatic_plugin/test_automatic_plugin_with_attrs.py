@@ -12,6 +12,7 @@ import torch_tensorrt
 
 from ..conversion.harness import DispatchTestCase
 
+
 @triton.jit
 def elementwise_scale_mul_kernel(X, Y, Z, a, b, BLOCK_SIZE: tl.constexpr):
     pid = tl.program_id(0)
