@@ -1,5 +1,4 @@
 import gc
-import io
 import logging
 import os
 import warnings
@@ -596,32 +595,6 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         torch.cuda.empty_cache()
 
     @needs_refit  # type: ignore[misc]
-    def _insert_engine_to_cache(self, hash_val: str, engine: trt.ICudaEngine) -> None:
-        serialized_engine = engine.serialize()
-        # TODO: @Evan is waiting for TRT's feature to cache the weight-stripped engine
-        # if not self.compilation_settings.strip_engine_weights:
-        #     # set EXCLUDE_WEIGHTS flag to strip weights
-        #     serialization_config = engine.create_serialization_config()
-        #     serialization_config.set_flag(trt.SerializationFlag.EXCLUDE_WEIGHTS)
-        #     serialized_engine = engine.serialize_with_config(
-        #         serialization_config
-        #     )
-
-        # Cache weighted engine for now
-        self.engine_cache.insert(  # type: ignore[union-attr]
-            hash_val,
-            (
-                serialized_engine,
-                self._input_names,
-                self._output_names,
-                self.input_specs,
-                self.compilation_settings,
-                self.weight_name_map,
-                self.ctx.requires_output_allocator,
-            ),
-        )
-
-    @needs_refit  # type: ignore[misc]
     def _pull_cached_engine(self, hash_val: str) -> Optional[TRTInterpreterResult]:
         # query the cached TRT engine
         cached_data = self.engine_cache.check(hash_val)  # type: ignore[union-attr]
@@ -673,7 +646,6 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                     settings=self.compilation_settings,
                     weight_name_map=self.weight_name_map,
                 )
-                serialized_engine = engine.serialize()
 
                 # TODO: @Evan is waiting for TRT's feature to load the weight-stripped engine
                 # # EXCLUDE_WEIGHTS flag must be cleared
@@ -686,12 +658,8 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                 # )
                 # # As of now, the engine becomes non-refittable because when EXCLUDE_WEIGHTS flag is cleared, the REFIT flag is also cleared by TRT to make the plan file smaller
 
-            with io.BytesIO() as engine_bytes:
-                engine_bytes.write(serialized_engine)
-                engine_str = engine_bytes.getvalue()
-
             return TRTInterpreterResult(
-                engine_str,
+                engine,
                 self._input_names,
                 self._output_names,
                 self.weight_name_map,
@@ -756,9 +724,21 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             builder_config, self.compilation_settings.timing_cache_path
         )
 
-        cuda_engine = self.builder.build_engine_with_config(
-            self.ctx.net, builder_config
-        )
+        if (
+            ENABLED_FEATURES.tensorrt_rtx
+            or self.compilation_settings.version_compatible
+        ):
+            # TODO: When TRT-RTX matures, change it to build_engine_with_config
+            serialized_engine = self.builder.build_serialized_network(
+                self.ctx.net, builder_config
+            )
+            runtime = trt.Runtime(TRT_LOGGER)
+            cuda_engine = runtime.deserialize_cuda_engine(serialized_engine)
+        else:
+
+            cuda_engine = self.builder.build_engine_with_config(
+                self.ctx.net, builder_config
+            )
         assert cuda_engine
 
         _LOGGER.debug(
@@ -773,14 +753,6 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         self._save_timing_cache(
             builder_config, self.compilation_settings.timing_cache_path
         )
-
-        # Engine caching only for refittable engines
-        if (
-            not self.compilation_settings.immutable_weights
-            and self.compilation_settings.cache_built_engines
-            and self.engine_cache is not None
-        ):
-            self._insert_engine_to_cache(hash_val, cuda_engine)
 
         return TRTInterpreterResult(
             cuda_engine,
