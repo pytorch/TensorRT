@@ -151,7 +151,7 @@ def compile_model(
         generator=torch.Generator("cuda").manual_seed(seed),
     ).images
     print(f"generated {len(image)} images")
-    image[0].save("/tmp/forest.png")
+    image[0].save("forest.png")
 
     torch.cuda.empty_cache()
 
@@ -197,8 +197,12 @@ def launch_gradio(pipeline, backbone, trt_gm):
         print("Refitting Finished!")
 
     # Create Gradio interface
-    with gr.Blocks(title="Flux Demo with Torch-TensorRT") as demo:
-        gr.Markdown("# Flux Image Generation Demo Accelerated by Torch-TensorRT")
+    if torch_tensorrt.ENABLED_FEATURES.tensorrt_rtx:
+        backend = "Torch-TensorRT-RTX"
+    else: 
+        backend = "Torch-TensorRT"
+    with gr.Blocks(title=f"Flux Demo with {backend}") as demo:
+        gr.Markdown(f"# Flux Image Generation Demo Accelerated by {backend}")
 
         with gr.Row():
             with gr.Column():
@@ -207,9 +211,14 @@ def launch_gradio(pipeline, backbone, trt_gm):
                     label="Prompt", placeholder="Enter your prompt here...", lines=3
                 )
                 model_dropdown = gr.Dropdown(
-                    choices=["Torch Model", "Torch-TensorRT Accelerated Model"],
-                    value="Torch-TensorRT Accelerated Model",
+                    choices=["Torch Model", f"{backend} Accelerated Model"],
+                    value=f"{backend} Accelerated Model",
                     label="Model Variant",
+                )
+                model_name_dropdown = gr.Dropdown(
+                    choices=["FLUX.1-dev", "FLUX.1-Kontext-dev", "stabilityai/stable-diffusion-xl-base-1.0", "stabilityai/stable-diffusion-3.5-large", "stabilityai/stable-diffusion-3.5-medium"],
+                    value="FLUX.1-dev",
+                    label="Model Name",
                 )
 
                 lora_upload_path = gr.Textbox(
