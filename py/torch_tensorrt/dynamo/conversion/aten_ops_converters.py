@@ -425,9 +425,23 @@ def index_dtype_validator(
     return True
 
 
+def index_nonbool_validator(
+    node: Node, settings: Optional[CompilationSettings] = None
+) -> bool:
+    # for thor, we don't support boolean indices
+    if is_thor():
+        index = node.args[1]
+        for ind in index:
+            if ind is not None:
+                val = ind.meta.get("val")
+                if val is not None and val.dtype == torch.bool:
+                    return False
+    return True
+
+
 @dynamo_tensorrt_converter(
     torch.ops.aten.index.Tensor,
-    capability_validator=index_dtype_validator,
+    capability_validator=index_dtype_validator and index_nonbool_validator,
     supports_dynamic_shapes=True,
     requires_output_allocator=True,
 )
