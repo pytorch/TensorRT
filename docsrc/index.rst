@@ -234,6 +234,7 @@ Contributor Documentation
    contributors/writing_dynamo_aten_lowering_passes
    contributors/ts_converters
    contributors/useful_links
+   contributors/resource_management
 
 Indices
 ----------------
