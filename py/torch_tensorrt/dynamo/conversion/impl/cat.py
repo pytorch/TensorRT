@@ -55,11 +55,6 @@ def unify_and_concat_trt_tensors(
             layer = ctx.net.add_constant(shape, const_arr)
             set_layer_name(layer, target, f"{name}_dim{i}_const")
             t = layer.get_output(0)
-
-        # optional cast
-        if cast_dtype and isinstance(t, TRTTensor):
-            t = cast_trt_tensor(ctx, t, cast_dtype, f"{name}_cast_{i}")
-
         trt_tensors.append(t)
 
     if not has_dynamic and not force_trt_output:
@@ -70,7 +65,7 @@ def unify_and_concat_trt_tensors(
         # Explicit cast requested
         if isinstance(cast_dtype, _enums.dtype):
             final_dtype = cast_dtype.to(trt.DataType)
-        elif isinstance(cast_dtype, np.dtype):
+        elif isinstance(cast_dtype, (np.dtype, torch.dtype)):
             final_dtype = _enums.dtype._from(cast_dtype).to(trt.DataType)
         else:
             final_dtype = cast_dtype  # already trt.DataType
