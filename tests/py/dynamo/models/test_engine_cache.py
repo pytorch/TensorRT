@@ -755,10 +755,9 @@ class TestEngineCache(TestCase):
                 strip_engine_weights=strip_engine_weights,
                 refit_identical_engine_weights=refit_identical_engine_weights,
             )
-            # currently, strip_engine_weights is not supported in torch_tensorrt, enable it when we support it
-            # commenting out for now, so that coverage report will not report this line as 10012 Logically dead code
-            # if strip_engine_weights:
-            #     trt_gm = refit_module_weights(trt_gm, exp_program)
+
+            if strip_engine_weights:
+                trt_gm = refit_module_weights(trt_gm, exp_program)
 
             end.record()
             torch.cuda.synchronize()
