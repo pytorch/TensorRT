@@ -551,8 +551,7 @@ def test_refit_one_engine_inline_runtime_with_weightmap():
         min_block_size=min_block_size,
         immutable_weights=False,
     )
-    torchtrt.save(trt_gm, trt_ep_path, arg_inputs=inputs)
-
+    torchtrt.save(trt_gm, trt_ep_path, arg_inputs=inputs, retrace=True)
     trt_gm = torch.export.load(trt_ep_path)
 
     new_trt_gm = refit_module_weights(
@@ -567,6 +566,7 @@ def test_refit_one_engine_inline_runtime_with_weightmap():
     expected_outputs, refitted_outputs = exp_program2.module()(*inputs), new_trt_gm(
         *inputs
     )
+
     for expected_output, refitted_output in zip(expected_outputs, refitted_outputs):
         assertions.assertTrue(
             torch.allclose(expected_output, refitted_output, 1e-2, 1e-2),

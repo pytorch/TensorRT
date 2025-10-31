@@ -27,6 +27,7 @@ from torch_tensorrt.dynamo.conversion.impl.normalization.ops import (
 )
 from torch_tensorrt.dynamo.conversion.truncate_double import repair_double_inputs
 from torch_tensorrt.dynamo.lowering import (
+    clean_up_graph_after_modifications,
     get_decompositions,
     post_lowering,
     pre_export_lowering,
@@ -272,6 +273,9 @@ def refit_module_weights(
             compiled_submodules_map[name] = submodule
 
     else:
+        # Handle torch modules
+        compiled_submodules_map = {}
+        guard_fn_modules = []
         for name, submodule in compiled_module.named_children():
             if not isinstance(
                 submodule,
@@ -283,7 +287,41 @@ def refit_module_weights(
             ):
                 continue
 
-            settings = submodule.settings
+            # When we re-export the graph module, torch.export._unlift.GuardsFn modules are being added as submodules.
+            if isinstance(submodule, torch.export._unlift.GuardsFn):
+                guard_fn_modules.append(name)
+                continue
+            # Obtain the settings
+
+            compiled_submodules = [
+                (name.replace("_engine", ""), engine)
+                for name, engine in submodule.__dict__.items()
+                if "engine" in name
+            ]
+
+            encoded_metadata = compiled_submodules[0][1].__getstate__()[0][
+                SERIALIZED_METADATA_IDX
+            ]
+            assert (
+                encoded_metadata != ""
+            ), "The engine provided is either not refittable or was built with a version of Torch-TensorRT that is too old, please recompile using the latest version"
+            settings = TorchTensorRTModule.decode_metadata(encoded_metadata)["settings"]
+
+            compiled_submodules_map[name] = submodule
+
+        # Delete the guard fn modules to avoid the guard fn modules being refitted
+        # First, remove nodes in the graph that reference the guard function modules
+        for node in list(compiled_module.graph.nodes):
+            if node.op == "call_module" and node.target in guard_fn_modules:
+                compiled_module.graph.erase_node(node)
+
+        # Now delete the submodules themselves
+        for guard_fn_module_name in guard_fn_modules:
+            # delattr(compiled_module, guard_fn_module_name)
+            compiled_module.delete_submodule(guard_fn_module_name)
+
+        # Clean up the graph
+        clean_up_graph_after_modifications(compiled_module)
 
     assert settings is not None
 
@@ -417,6 +455,7 @@ def refit_module_weights(
                             )
             else:
                 compiled_submodule = getattr(compiled_module, name)
+
                 weight_name_map = None
                 if use_weight_map_cache:
                     try:
@@ -433,20 +472,15 @@ def refit_module_weights(
                         logger.warning(
                             "This engine does not have a weight map cache. Rebuilding the weight map"
                         )
-                if isinstance(compiled_submodule, PythonTorchTensorRTModule):
+
+                # Rexporting the TRT compiled graph module and loading it back doesn't preserve the instance type and registers
+                # the compiled submodule as torch.nn.Module. So we use settings.use_python_runtime to determine the instance type.
+                if settings.use_python_runtime:
                     engine = compiled_submodule.engine
-                elif isinstance(compiled_submodule, TorchTensorRTModule):
+                else:
                     engine_info = compiled_submodule.engine.__getstate__()[0]
                     engine = get_engine_from_encoded_engine(
                         engine_info[ENGINE_IDX], runtime
-                    )
-                elif isinstance(compiled_submodule, torch.fx.graph_module.GraphModule):
-                    # This is graph break resulted by unsupported ops
-                    compiled_submodule.load_state_dict(new_submodule.state_dict())
-                    continue
-                else:
-                    raise AssertionError(
-                        "The type of graph module is not supported for refitting."
                     )
         except AttributeError:
             raise AssertionError(
