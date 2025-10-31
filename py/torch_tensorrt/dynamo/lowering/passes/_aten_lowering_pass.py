@@ -15,6 +15,13 @@ from .remove_input_alias_fixing_clones import remove_input_alias_fixing_clones
 from .remove_num_users_is_0_nodes import remove_num_users_is_0_nodes
 from .repair_input_as_output import repair_input_as_output
 from .replace_max_pool_with_indices import replace_max_pool_with_indices
+from .rule_based_autocast import rule_based_autocast
+
+pre_lowering_pass_list = [
+    remove_detach,
+    rule_based_autocast,
+    remove_assert_nodes,  # rule_based_autocast might insert assert nodes
+]
 
 post_lowering_pass_list = [
     remove_input_alias_fixing_clones,
@@ -25,10 +32,6 @@ post_lowering_pass_list = [
     remove_assert_nodes,
     remove_num_users_is_0_nodes,
     complex_graph_detection,
-]
-
-pre_lowering_pass_list = [
-    remove_detach,
 ]
 
 if not is_tegra_platform():

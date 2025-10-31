@@ -275,10 +275,6 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
             len(self.input_names) + len(self.output_names)
         )
 
-        self.input_dtypes = [
-            dtype._from(self.engine.get_tensor_dtype(input_name))
-            for input_name in self.input_names
-        ]
         self.input_shapes = [
             self.engine.get_tensor_shape(input_name) for input_name in self.input_names
         ]
@@ -370,10 +366,6 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                     + [contiguous_inputs[i].cuda()]
                     + contiguous_inputs[i + 1 :]
                 )
-
-            assert (
-                contiguous_inputs[i].dtype == self.input_dtypes[i]
-            ), f"Dtype mismatch for {i}th input({input_name}). Expect {self.input_dtypes[i]}, got {contiguous_inputs[i].dtype}."
 
             if need_cudagraphs_record:
                 # If cudagraphs is enabled, this memory is reserved for future cudagraph runs
