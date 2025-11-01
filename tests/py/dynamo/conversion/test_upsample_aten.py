@@ -296,6 +296,50 @@ class TestUpsampleConverter(DispatchTestCase):
         ]
         self.run_test_with_dynamic_shape(TestModule(), input_specs)
 
+    @parameterized.expand(
+        [
+            ([torch.tensor(3), 3], None),
+            (None, [torch.tensor(0.5), 1.5]),
+        ]
+    )
+    def test_nearest2d_mixed_dynamic_shape(self, output_size, scale_factors):
+        class TestModule(torch.nn.Module):
+            def forward(self, x):
+                out_size = output_size
+                scale = scale_factors
+
+                return torch.ops.aten.upsample_nearest2d.vec(x, out_size, scale)
+
+        input_specs = [
+            Input(
+                min_shape=(1, 1, 1, 1),
+                opt_shape=(5, 5, 5, 5),
+                max_shape=(9, 9, 9, 9),
+                dtype=torch.float32,
+            )
+        ]
+        self.run_test_with_dynamic_shape(TestModule(), input_specs)
+
+    @parameterized.expand(
+        [
+            # Mix of Tensor and int in output_size
+            ([torch.tensor(3), 3], None),
+            # Mix of Tensor and float in scale_factors
+            (None, [torch.tensor(0.5), 1.5]),
+        ]
+    )
+    def test_nearest2d_mixed_static_input(self, output_size, scale_factors):
+        class TestModule(torch.nn.Module):
+            def forward(self, x):
+                out_size = output_size
+                scale = scale_factors
+                return torch.ops.aten.upsample_nearest2d.vec(x, out_size, scale)
+
+        input_size = [7, 7]  # H, W
+        inputs = [torch.randn([1, 1] + input_size)]  # shape [1, 1, 7, 7]
+
+        self.run_test(TestModule(), inputs)
+
 
 if __name__ == "__main__":
     run_tests()
