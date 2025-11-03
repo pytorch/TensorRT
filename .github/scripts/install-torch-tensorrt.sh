@@ -12,6 +12,8 @@ if [[ $(uname -m) == "aarch64" ]]; then
     install_cuda_aarch64
 fi
 
+pip install cuda-toolkit
+
 # Install all the dependencies required for Torch-TensorRT
 pip install --pre -r ${PWD}/tests/py/requirements.txt
 # dependencies in the tests/py/requirements.txt might install a different version of torch or torchvision

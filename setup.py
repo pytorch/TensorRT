@@ -729,6 +729,8 @@ base_requirements = [
     "packaging>=23",
     "typing-extensions>=4.7.0",
     "dllist",
+    # dummy package as a WAR for the tensorrt dependency on nvidia-cuda-runtime-cu13
+    "nvidia-cuda-runtime-cu13==0.0.0a0",
 ]
 
 cuda_version = torch.version.cuda
@@ -761,6 +763,7 @@ def get_requirements():
                     f"{tensorrt_prefix}-bindings>=10.13.0,<10.14.0",
                     f"{tensorrt_prefix}-libs>=10.13.0,<10.14.0",
                 ]
+    print(f"{requirements=}")
     return requirements
 
 

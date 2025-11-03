@@ -5,6 +5,13 @@ set -x
 # Install dependencies
 python3 -m pip install pyyaml
 
+# CU_VERSION: cu130, cu129, etc.
+# CU_MAJOR_VERSION: 13, 12, etc.
+# CU_MINOR_VERSION: 0, 9, etc.
+CU_MAJOR_VERSION=${CU_VERSION:2:4}
+CU_MINOR_VERSION=${CU_VERSION:4:5}
+ctk_name="cuda-toolkit-${CU_MAJOR_VERSION}-${CU_MINOR_VERSION}"
+
 if [[ $(uname -m) == "aarch64" ]]; then
   IS_AARCH64=true
   BAZEL_PLATFORM=arm64
@@ -12,15 +19,15 @@ if [[ $(uname -m) == "aarch64" ]]; then
   if [[ ${os_name} == "ubuntu" ]]; then
       IS_JETPACK=true
       apt-get update
-      apt-get install -y ninja-build gettext curl libopenblas-dev zip unzip libfmt-dev
+      apt-get install -y ninja-build gettext curl libopenblas-dev zip unzip libfmt-dev ${ctk_name}
   else
       IS_SBSA=true
       yum install -y ninja-build gettext zip unzip
-      yum install -y fmt-devel
+      yum install -y fmt-devel ${ctk_name}
   fi
 else
   BAZEL_PLATFORM="amd64"
-  yum install -y fmt-devel
+  yum install -y fmt-devel ${ctk_name}
 fi
 
 
@@ -62,7 +69,7 @@ export TORCH_INSTALL_PATH=$(python -c "import torch, os; print(os.path.dirname(t
 # CU_UPPERBOUND eg:13.0 or 12.9
 # tensorrt tar for linux and windows are different across cuda version
 # for sbsa it is the same tar across cuda version
-if [[ ${CU_VERSION:2:2} == "13" ]]; then
+if [[ ${CU_MAJOR_VERSION} == "13" ]]; then
     export CU_UPPERBOUND="13.0"
 else
     export CU_UPPERBOUND="12.9"
