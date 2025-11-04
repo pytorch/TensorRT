@@ -2,11 +2,7 @@ set -x
 
 pip install -U numpy packaging pyyaml setuptools wheel fmt
 
-CU_MAJOR_VERSION=${CU_VERSION:2:4}
-CU_MINOR_VERSION=${CU_VERSION:4:5}
-ctk_name="cuda-toolkit-${CU_MAJOR_VERSION}-${CU_MINOR_VERSION}"
-
-choco install bazelisk ${ctk_name} -y
+choco install bazelisk -y
 
 echo TENSORRT_VERSION=${TENSORRT_VERSION}
 
@@ -42,7 +38,7 @@ ls -lart $TORCH_INSTALL_PATH/include/fmt/
 # CU_UPPERBOUND eg:13.0 or 12.9
 # tensorrt tar for linux and windows are different across cuda version
 # for sbsa it is the same tar across cuda version
-if [[ ${CU_MAJOR_VERSION} == "13" ]]; then
+if [[ ${CU_VERSION:2:2} == "13" ]]; then
     export CU_UPPERBOUND="13.0"
 else
     export CU_UPPERBOUND="12.9"

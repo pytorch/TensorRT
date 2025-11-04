@@ -8,8 +8,8 @@ python3 -m pip install pyyaml
 # CU_VERSION: cu130, cu129, etc.
 # CU_MAJOR_VERSION: 13, 12, etc.
 # CU_MINOR_VERSION: 0, 9, etc.
-CU_MAJOR_VERSION=${CU_VERSION:2:4}
-CU_MINOR_VERSION=${CU_VERSION:4:5}
+CU_MAJOR_VERSION=${CU_VERSION:2:2}
+CU_MINOR_VERSION=${CU_VERSION:4:1}
 ctk_name="cuda-toolkit-${CU_MAJOR_VERSION}-${CU_MINOR_VERSION}"
 
 if [[ $(uname -m) == "aarch64" ]]; then
