@@ -763,7 +763,6 @@ def get_requirements():
                     f"{tensorrt_prefix}-bindings>=10.13.0,<10.14.0",
                     f"{tensorrt_prefix}-libs>=10.13.0,<10.14.0",
                 ]
-    print(f"{requirements=}")
     return requirements
 
 
