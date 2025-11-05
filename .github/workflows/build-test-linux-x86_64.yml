@@ -426,9 +426,9 @@ jobs:
         set -euo pipefail
         pushd .
         cd tests/py/dynamo
-        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l2_dynamo_plugins_tests_results.xml automatic_plugin/test_automatic_plugin.py
-        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l2_dynamo_plugins_tests_results.xml automatic_plugin/test_automatic_plugin_with_attrs.py
-        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l2_dynamo_plugins_tests_results.xml automatic_plugin/test_flashinfer_rmsnorm.py.py
+        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/test_automatic_plugin.xml automatic_plugin/test_automatic_plugin.py
+        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/test_automatic_plugin_with_attrs.xml automatic_plugin/test_automatic_plugin_with_attrs.py
+        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/test_flashinfer_rmsnorm.xml automatic_plugin/test_flashinfer_rmsnorm.py.py
         popd
 
   L2-torchscript-tests:
