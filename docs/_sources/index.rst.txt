@@ -28,7 +28,6 @@ Getting Started
    getting_started/installation
    getting_started/jetpack
    getting_started/quick_start
-   getting_started/tensorrt_rtx
    getting_started/capture_and_replay
 
 User Guide
