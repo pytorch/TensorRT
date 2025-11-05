@@ -3,9 +3,6 @@ import operator
 from typing import Any
 
 import torch
-from torch._export.passes.replace_autocast_with_hop_pass import (
-    replace_autocast_with_hop_pass,
-)
 from torch_tensorrt._enums import dtype
 from torch_tensorrt.dynamo._settings import CompilationSettings
 
@@ -30,40 +27,27 @@ def rule_based_autocast(
         logger.debug("Autocast is not enabled, skipping rule-based autocast.")
         return gm
 
-    # nodes = list(gm.graph.nodes)
-    # # insert enter autocast node in the beginning of the graph
-    # with gm.graph.inserting_before(nodes[0]):
-    #     enter_autocast_node = gm.graph.call_function(torch.amp.autocast_mode._enter_autocast, args=("cuda", torch.float16, True, True))
-    #     enter_autocast_node.meta.update(getattr(nodes[0], "meta", {}))
-
-    # # insert exit autocast node before the return node, assuming the return node is the last node
-    # with gm.graph.inserting_before(nodes[-1]):
-    #     exit_autocast_node = gm.graph.call_function(torch.amp.autocast_mode._exit_autocast, args=(enter_autocast_node,))
-    #     exit_autocast_node.meta.update(getattr(nodes[-1], "meta", {}))
-
-    # gm = clean_up_graph_after_modifications(gm)
-    # gm, new_signature = replace_autocast_with_hop_pass(gm, None)
-    # logger.debug("Graph after replace_autocast_with_hop_pass:\n%s", gm.graph)
-
     # get config from settings
-    low_precision_type = settings.low_precision_type
-    if low_precision_type is None:
+    autocast_low_precision_type = settings.autocast_low_precision_type
+    if autocast_low_precision_type is None:
         return gm
-    if isinstance(low_precision_type, dtype):
-        low_precision_type = low_precision_type.to(torch.dtype)
+    if isinstance(autocast_low_precision_type, dtype):
+        autocast_low_precision_type = autocast_low_precision_type.to(torch.dtype)
     high_precision_type = torch.float32
-    nodes_to_exclude = settings.nodes_to_exclude
-    targets_to_exclude = settings.targets_to_exclude
-    data_max = settings.data_max
-    max_depth_of_reduction = settings.max_depth_of_reduction
-    reference_data: dict[str, torch.Tensor] = settings.intermediate_node_outputs
+    autocast_excluded_nodes = settings.autocast_excluded_nodes
+    autocast_excluded_ops = settings.autocast_excluded_ops
+    autocast_data_max = settings.autocast_data_max
+    autocast_max_depth_of_reduction = settings.autocast_max_depth_of_reduction
+    reference_data: dict[str, torch.Tensor] = (
+        settings.autocast_intermediate_node_outputs
+    )
 
     node_classifier = NodeClassifier(
         gm.graph.nodes,
-        nodes_to_exclude=nodes_to_exclude,
-        targets_to_exclude=targets_to_exclude,
-        data_max=data_max,
-        max_depth_of_reduction=max_depth_of_reduction,
+        excluded_nodes=autocast_excluded_nodes,
+        excluded_ops=autocast_excluded_ops,
+        data_max=autocast_data_max,
+        max_depth_of_reduction=autocast_max_depth_of_reduction,
     )
     low_precision_nodes, high_precision_nodes = node_classifier.run(reference_data)
 
@@ -110,10 +94,10 @@ def rule_based_autocast(
 
             if node.name in low_precision_nodes:
                 node.args = _cast_all_tensor_args_to_dtype(
-                    node.args, low_precision_type
+                    node.args, autocast_low_precision_type
                 )
                 node.kwargs = _cast_all_tensor_args_to_dtype(
-                    node.kwargs, low_precision_type
+                    node.kwargs, autocast_low_precision_type
                 )
             elif node.name in high_precision_nodes:
                 node.args = _cast_all_tensor_args_to_dtype(

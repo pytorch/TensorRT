@@ -435,13 +435,15 @@ def compile(
     offload_module_to_cpu: bool = _defaults.OFFLOAD_MODULE_TO_CPU,
     use_distributed_mode_trace: bool = _defaults.USE_DISTRIBUTED_MODE_TRACE,
     enable_autocast: bool = _defaults.ENABLE_AUTOCAST,
-    low_precision_type: Optional[
+    autocast_low_precision_type: Optional[
         Union[torch.dtype, dtype]
-    ] = _defaults.LOW_PRECISION_TYPE,
-    nodes_to_exclude: Collection[str] = _defaults.NODES_TO_EXCLUDE,
-    targets_to_exclude: Collection[Target] = _defaults.TARGETS_TO_EXCLUDE,
-    data_max: float = _defaults.DATA_MAX,
-    max_depth_of_reduction: Optional[int] = _defaults.MAX_DEPTH_OF_REDUCTION,
+    ] = _defaults.AUTOCAST_LOW_PRECISION_TYPE,
+    autocast_excluded_nodes: Collection[str] = _defaults.AUTOCAST_EXCLUDED_NODES,
+    autocast_excluded_ops: Collection[Target] = _defaults.AUTOCAST_EXCLUDED_OPS,
+    autocast_data_max: float = _defaults.AUTOCAST_DATA_MAX,
+    autocast_max_depth_of_reduction: Optional[
+        int
+    ] = _defaults.AUTOCAST_MAX_DEPTH_OF_REDUCTION,
     **kwargs: Any,
 ) -> torch.fx.GraphModule:
     """Compile an ExportedProgram module for NVIDIA GPUs using TensorRT
@@ -520,11 +522,11 @@ def compile(
         offload_module_to_cpu (bool): Offload the module to CPU. This is useful when we need to minimize GPU memory usage.
         use_distributed_mode_trace (bool):  Using aot_autograd to trace the graph. This is enabled when DTensors or distributed tensors are present in distributed model
         enable_autocast (bool): Whether to enable autocast. If enabled, use_explicit_typing will be set to True.
-        low_precision_type (Optional[Union[torch.dtype, dtype]]): The precision to reduce to. We currently support torch.float16 and torch.bfloat16. Default is None, which means no low precision is used.
-        nodes_to_exclude (Collection[str]): The set of regex patterns to match node names that should remain in FP32. Default is [].
-        targets_to_exclude (Collection[Target]): The set of targets (ATen ops) that should remain in FP32. Default is [].
-        data_max (float): Maximum absolute value for node outputs, nodes with outputs greater than this value will remain in FP32. Default is 512.
-        max_depth_of_reduction (Optional[int]): Maximum depth of reduction allowed in low precision. Nodes with higher reduction depths will remain in FP32. If not provided, infinity will be used. Default is None.
+        autocast_low_precision_type (Optional[Union[torch.dtype, dtype]]): The precision to reduce to. We currently support torch.float16 and torch.bfloat16. Default is None, which means no low precision is used.
+        autocast_excluded_nodes (Collection[str]): The set of regex patterns to match node names that should remain in FP32. Default is [].
+        autocast_excluded_ops (Collection[Target]): The set of targets (ATen ops) that should remain in FP32. Default is [].
+        autocast_data_max (float): Maximum absolute value for node outputs, nodes with outputs greater than this value will remain in FP32. Default is 512.
+        autocast_max_depth_of_reduction (Optional[int]): Maximum depth of reduction allowed in low precision. Nodes with higher reduction depths will remain in FP32. If not provided, infinity will be used. Default is None.
         **kwargs: Any,
     Returns:
         torch.fx.GraphModule: Compiled FX Module, when run it will execute via TensorRT
@@ -611,17 +613,17 @@ def compile(
                 f"use_explicit_typing was set to True, however found that enabled_precisions was also specified (saw: {enabled_precisions}, expected: dtype.f32, dtype.f4). enabled_precisions should not be used when use_explicit_typing=True"
             )
 
-    if low_precision_type is not None:
-        if not isinstance(low_precision_type, (torch.dtype, dtype)):
+    if autocast_low_precision_type is not None:
+        if not isinstance(autocast_low_precision_type, (torch.dtype, dtype)):
             raise ValueError(
-                f"low_precision_type must be a torch.dtype or torch_tensorrt._enums.dtype, got {type(low_precision_type)}"
+                f"autocast_low_precision_type must be a torch.dtype or torch_tensorrt._enums.dtype, got {type(autocast_low_precision_type)}"
             )
-        if low_precision_type not in {
+        if autocast_low_precision_type not in {
             torch.float16,
             torch.bfloat16,
-        } and low_precision_type not in {dtype.f16, dtype.bf16}:
+        } and autocast_low_precision_type not in {dtype.f16, dtype.bf16}:
             raise ValueError(
-                f"low_precision_type must be one of torch.float16, torch.bfloat16, dtype.f16, dtype.bf16, got {low_precision_type}"
+                f"autocast_low_precision_type must be one of torch.float16, torch.bfloat16, dtype.f16, dtype.bf16, got {autocast_low_precision_type}"
             )
 
     if use_fp32_acc:
@@ -654,7 +656,7 @@ def compile(
         arg_inputs = [arg_inputs]  # type: ignore
 
     # save intermediate outputs of each node for Autocast
-    intermediate_node_outputs = {}
+    autocast_intermediate_node_outputs = {}
     if not use_explicit_typing:
 
         class DumpInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
@@ -670,7 +672,7 @@ def compile(
                         raise ValueError(
                             f"Please file a bug with Torch-TensorRT because it expects a torch.Tensor but got {type(out)} for node {n.name}."
                         )
-                    intermediate_node_outputs[n.name] = out
+                    autocast_intermediate_node_outputs[n.name] = out
                     return out
                 return super().run_node(n)
 
@@ -744,12 +746,12 @@ def compile(
         "offload_module_to_cpu": offload_module_to_cpu,
         "use_distributed_mode_trace": use_distributed_mode_trace,
         "enable_autocast": enable_autocast,
-        "low_precision_type": low_precision_type,
-        "nodes_to_exclude": nodes_to_exclude,
-        "targets_to_exclude": targets_to_exclude,
-        "data_max": data_max,
-        "max_depth_of_reduction": max_depth_of_reduction,
-        "intermediate_node_outputs": intermediate_node_outputs,
+        "autocast_low_precision_type": autocast_low_precision_type,
+        "autocast_excluded_nodes": autocast_excluded_nodes,
+        "autocast_excluded_ops": autocast_excluded_ops,
+        "autocast_data_max": autocast_data_max,
+        "autocast_max_depth_of_reduction": autocast_max_depth_of_reduction,
+        "autocast_intermediate_node_outputs": autocast_intermediate_node_outputs,
     }
 
     settings = CompilationSettings(**compilation_options)

@@ -53,24 +53,28 @@ class DisabledNodeNameRegexRule(NodeRuleBase):
         self.disabled_node_name_regex = disabled_node_name_regex
 
     def _check_inner(self, node):
+        stack = node.meta.get("nn_module_stack")
+        node_name = next(reversed(stack), "").split("__")[
+            -1
+        ]  # get the user specified name of the node
         return any(
-            re.match(regex, node.name) for regex in self.disabled_node_name_regex
+            re.match(regex, node_name) for regex in self.disabled_node_name_regex
         )
 
 
-class DisabledTargets(NodeRuleBase):
+class DisabledOpTypes(NodeRuleBase):
     """Rule for keeping nodes with specific operation types in high precision."""
 
-    def __init__(self, targets_to_exclude):
+    def __init__(self, excluded_ops):
         """Initialize the rule.
 
         Args:
-            targets_to_exclude: List of operation types to keep in high precision.
+            excluded_ops: List of operation types to keep in high precision.
         """
-        self.targets_to_exclude = targets_to_exclude
+        self.excluded_ops = excluded_ops
 
     def _check_inner(self, node):
-        return node.target in self.targets_to_exclude
+        return node.target in self.excluded_ops
 
 
 class IORangeRule(NodeRuleBase):
@@ -219,8 +223,8 @@ class NodeClassifier:
     def __init__(
         self,
         nodes,
-        nodes_to_exclude: Collection[str] | None = None,
-        targets_to_exclude: Collection[torch.fx.node.Target] | None = None,
+        excluded_nodes: Collection[str] | None = None,
+        excluded_ops: Collection[torch.fx.node.Target] | None = None,
         custom_rule: NodeRuleBase | None = None,
         data_max: float | None = 1000.0,
         max_depth_of_reduction: int | None = None,
@@ -236,8 +240,8 @@ class NodeClassifier:
             max_depth_of_reduction: Maximum depth of reduction allowed in low precision.
         """
         self.nodes = nodes
-        self.nodes_to_exclude = nodes_to_exclude
-        self.targets_to_exclude = targets_to_exclude
+        self.excluded_nodes = excluded_nodes
+        self.excluded_ops = excluded_ops
         self.custom_rule = custom_rule
         self.data_max = data_max
         self.max_depth_of_reduction = max_depth_of_reduction
@@ -252,10 +256,10 @@ class NodeClassifier:
             list[NodeRuleBase]: List of rules to apply.
         """
         block_node_rules: list[NodeRuleBase] = []
-        if self.nodes_to_exclude:
-            block_node_rules.append(DisabledNodeNameRegexRule(self.nodes_to_exclude))
-        if self.targets_to_exclude:
-            block_node_rules.append(DisabledTargets(self.targets_to_exclude))
+        if self.excluded_nodes:
+            block_node_rules.append(DisabledNodeNameRegexRule(self.excluded_nodes))
+        if self.excluded_ops:
+            block_node_rules.append(DisabledOpTypes(self.excluded_ops))
         if reference_data:
             block_node_rules.append(IORangeRule(self.data_max, reference_data))
         if self.max_depth_of_reduction is not None:
