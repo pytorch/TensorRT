@@ -129,6 +129,7 @@ void setup_input_tensors(
           compiled_engine->exec_ctx->setTensorAddress(name.c_str(), inputShapeTensorValues.back().data()),
           "Error while setting the tensor address for shape inputs");
 
+      void* tensor_addr = nullptr;
       if (cudagraphs_enabled) {
         // @peri044 I dont know if this makes sense since they are supposed to be GPU buffers
         compiled_engine->input_buffers[i] = input_cpu;
@@ -152,15 +153,23 @@ void setup_input_tensors(
       if (cudagraphs_enabled) {
         // If using CUDAGraphs copy formatted input to the corresponding persistent input buffer
         compiled_engine->input_buffers[i].copy_(formatted_inputs.back(), true);
-        TORCHTRT_CHECK(
-            compiled_engine->exec_ctx->setTensorAddress(name.c_str(), compiled_engine->input_buffers[i].data_ptr()),
-            "Error while setting the input tensor address for inputs");
+        tensor_addr = compiled_engine->input_buffers[i].data_ptr();
       } else {
         // Otherwise use the formatted buffer directly
-        TORCHTRT_CHECK(
-            compiled_engine->exec_ctx->setTensorAddress(name.c_str(), formatted_inputs.back().data_ptr()),
-            "Error while setting the input tensor address for inputs");
+        tensor_addr = formatted_inputs.back().data_ptr();
       }
+      // handle empty tensors→ TensorRT requires non-null address even if numel() = 0
+      size_t nbytes = final_input.numel() * final_input.element_size();
+      if (nbytes == 0 || tensor_addr == nullptr) {
+        void* dummy = nullptr;
+        cudaMalloc(&dummy, 1); // allocate 1 byte GPU buffer to satisfy TRT and get a non-null address
+        tensor_addr = dummy;
+        compiled_engine->empty_input_ptrs.push_back(dummy); // track to free later
+      }
+
+      TORCHTRT_CHECK(
+          compiled_engine->exec_ctx->setTensorAddress(name.c_str(), tensor_addr),
+          "Failed to bind tensor address for " << name);
     }
   }
 }
