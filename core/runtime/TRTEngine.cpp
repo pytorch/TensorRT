@@ -264,6 +264,11 @@ TRTEngine::~TRTEngine() {
   trt_engine_profiler.reset();
   exec_ctx.reset();
   cuda_engine.reset();
+  for (void* ptr : empty_input_ptrs) {
+    if (ptr)
+      cudaFree(ptr);
+  }
+  empty_input_ptrs.clear();
   rt.reset();
 }
 

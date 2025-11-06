@@ -415,6 +415,18 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                 self.context.set_input_shape(
                     input_name, tuple(contiguous_inputs[i].shape)
                 )
+                tensor_to_bind = contiguous_inputs[i]
+                if tensor_to_bind.numel() == 0:
+                    # this is used to provide valid memory address to TRT
+                    dummy = torch.empty(
+                        1,
+                        dtype=tensor_to_bind.dtype,
+                        device=torch.cuda.current_device(),
+                    )
+                    tensor_to_bind = dummy
+                    if not hasattr(self, "_empty_input_buffers"):
+                        self._empty_input_buffers = []
+                    self._empty_input_buffers.append(dummy)
                 if cudagraphs_enabled:
                     self._input_buffers[i].copy_(contiguous_inputs[i])
                     self.context.set_tensor_address(
@@ -422,7 +434,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                     )
                 else:
                     self.context.set_tensor_address(
-                        input_name, contiguous_inputs[i].data_ptr()
+                        input_name, tensor_to_bind.data_ptr()
                     )
 
     def create_output_tensors(self) -> List[torch.Tensor]:

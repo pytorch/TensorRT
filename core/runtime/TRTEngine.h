@@ -187,6 +187,9 @@ struct TRTEngine : torch::CustomClassHolder {
   bool use_pre_allocated_outputs = false;
   std::vector<at::Tensor> pre_allocated_outputs;
 
+  // Empty Input Pointers
+  std::vector<void*> empty_input_ptrs = {};
+
   // Output Allocator-Related Functionality
   bool requires_output_allocator = false; // engine requires output allocator
   bool use_output_allocator_outputs = false; // users specify to use output allocator
