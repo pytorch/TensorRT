@@ -1,3 +1,4 @@
+import logging
 from typing import Optional, Sequence, Union
 
 import numpy as np
@@ -14,6 +15,8 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     get_trt_tensor,
     set_layer_name,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def cat(
