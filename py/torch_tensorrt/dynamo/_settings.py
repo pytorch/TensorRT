@@ -7,6 +7,7 @@ from torch_tensorrt._Device import Device
 from torch_tensorrt._enums import EngineCapability, dtype
 from torch_tensorrt.dynamo._defaults import (
     ASSUME_DYNAMIC_SHAPE_SUPPORT,
+    AUTOCAST_CALIBRATION_DATALOADER,
     AUTOCAST_DATA_MAX,
     AUTOCAST_EXCLUDED_NODES,
     AUTOCAST_EXCLUDED_OPS,
@@ -110,7 +111,7 @@ class CompilationSettings:
         autocast_excluded_ops (Collection[Target]): The set of targets (ATen ops) that should remain in FP32. Default is [].
         autocast_data_max (float): Maximum absolute value for node outputs, nodes with outputs greater than this value will remain in FP32. Default is 512.
         autocast_max_depth_of_reduction (Optional[int]): Maximum depth of reduction allowed in low precision. Nodes with higher reduction depths will remain in FP32. If not provided, infinity will be used. Default is None.
-        autocast_intermediate_node_outputs (dict[str, torch.Tensor]): The intermediate node outputs of the graph. Default is {}.
+        autocast_calibration_dataloader (Optional[torch.utils.data.DataLoader]): The dataloader to use for autocast calibration. Default is None.
     """
 
     enabled_precisions: Set[dtype] = field(default_factory=lambda: ENABLED_PRECISIONS)
@@ -164,8 +165,8 @@ class CompilationSettings:
     )
     autocast_data_max: float = AUTOCAST_DATA_MAX
     autocast_max_depth_of_reduction: Optional[int] = AUTOCAST_MAX_DEPTH_OF_REDUCTION
-    autocast_intermediate_node_outputs: dict[str, torch.Tensor] = field(
-        default_factory=lambda: {}
+    autocast_calibration_dataloader: Optional[torch.utils.data.DataLoader] = (
+        AUTOCAST_CALIBRATION_DATALOADER
     )
 
     def __getstate__(self) -> dict[str, Any]:

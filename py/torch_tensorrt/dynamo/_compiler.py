@@ -444,6 +444,9 @@ def compile(
     autocast_max_depth_of_reduction: Optional[
         int
     ] = _defaults.AUTOCAST_MAX_DEPTH_OF_REDUCTION,
+    autocast_calibration_dataloader: Optional[
+        torch.utils.data.DataLoader
+    ] = _defaults.AUTOCAST_CALIBRATION_DATALOADER,
     **kwargs: Any,
 ) -> torch.fx.GraphModule:
     """Compile an ExportedProgram module for NVIDIA GPUs using TensorRT
@@ -527,6 +530,7 @@ def compile(
         autocast_excluded_ops (Collection[Target]): The set of targets (ATen ops) that should remain in FP32. Default is [].
         autocast_data_max (float): Maximum absolute value for node outputs, nodes with outputs greater than this value will remain in FP32. Default is 512.
         autocast_max_depth_of_reduction (Optional[int]): Maximum depth of reduction allowed in low precision. Nodes with higher reduction depths will remain in FP32. If not provided, infinity will be used. Default is None.
+        autocast_calibration_dataloader (Optional[torch.utils.data.DataLoader]): The dataloader to use for autocast calibration. Default is None.
         **kwargs: Any,
     Returns:
         torch.fx.GraphModule: Compiled FX Module, when run it will execute via TensorRT
@@ -655,38 +659,6 @@ def compile(
     if not isinstance(arg_inputs, collections.abc.Sequence):
         arg_inputs = [arg_inputs]  # type: ignore
 
-    # save intermediate outputs of each node for Autocast
-    autocast_intermediate_node_outputs = {}
-    if not use_explicit_typing:
-
-        class DumpInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
-            """Dump intermediate outputs of each node"""
-
-            def run_node(self, n: torch.fx.Node) -> Any:
-                if (
-                    n.op == "call_function"
-                    and n.target != torch.ops.higher_order.wrap_with_autocast
-                ):
-                    out = super().run_node(n)
-                    if not isinstance(out, torch.Tensor):
-                        raise ValueError(
-                            f"Please file a bug with Torch-TensorRT because it expects a torch.Tensor but got {type(out)} for node {n.name}."
-                        )
-                    autocast_intermediate_node_outputs[n.name] = out
-                    return out
-                return super().run_node(n)
-
-        def _materialize(x: Input | torch.Tensor) -> torch.Tensor:
-            """Materialize an Input object to a tensor"""
-            if isinstance(x, Input):
-                return x.torch_tensor
-            return x
-
-        with torch.no_grad():
-            mat_args = tuple(_materialize(a) for a in arg_inputs)
-            mat_kwargs = {k: _materialize(v) for k, v in kwarg_inputs.items()}
-            DumpInterpreter(exported_program.module()).run(*mat_args, **mat_kwargs)
-
     # Prepare torch_trt inputs
     trt_arg_inputs: Sequence[Input] = prepare_inputs(arg_inputs)
     trt_kwarg_inputs: Optional[dict[Any, Any]] = prepare_inputs(kwarg_inputs)
@@ -751,7 +723,7 @@ def compile(
         "autocast_excluded_ops": autocast_excluded_ops,
         "autocast_data_max": autocast_data_max,
         "autocast_max_depth_of_reduction": autocast_max_depth_of_reduction,
-        "autocast_intermediate_node_outputs": autocast_intermediate_node_outputs,
+        "autocast_calibration_dataloader": autocast_calibration_dataloader,
     }
 
     settings = CompilationSettings(**compilation_options)

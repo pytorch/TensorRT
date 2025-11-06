@@ -63,6 +63,7 @@ AUTOCAST_EXCLUDED_NODES = set[str]()
 AUTOCAST_EXCLUDED_OPS = set[torch.fx.node.Target]()
 AUTOCAST_DATA_MAX = 512
 AUTOCAST_MAX_DEPTH_OF_REDUCTION = None
+AUTOCAST_CALIBRATION_DATALOADER = None
 
 if platform.system() == "Linux":
     import pwd

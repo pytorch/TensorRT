@@ -138,6 +138,36 @@ def pre_export_lowering(
     logging.debug(
         f"Invoking DynamoPassManager and applying lowering passes: {ATEN_PRE_LOWERING_PASSES}"
     )
+
+    # Only for rule-based autocast to collect the intermediate node outputs
+    if settings.enable_autocast:
+        autocast_intermediate_node_outputs: dict[str, torch.Tensor] = {}
+
+        class IntermediateNodeTracer(torch.fx.Interpreter):  # type: ignore[misc]
+            def run_node(self, n: torch.fx.Node) -> Any:
+                out = super().run_node(n)
+                if (
+                    n.op == "call_function"
+                    and n.target != torch.ops.higher_order.wrap_with_autocast
+                ):
+                    if not isinstance(out, torch.Tensor):
+                        raise ValueError(
+                            f"Please file a bug with Torch-TensorRT because it expects a torch.Tensor but got {type(out)} for node {n.name}."
+                        )
+                    if n.name in autocast_intermediate_node_outputs:
+                        autocast_intermediate_node_outputs[n.name] = torch.cat(
+                            [autocast_intermediate_node_outputs[n.name], out], dim=0
+                        )
+                    else:
+                        autocast_intermediate_node_outputs[n.name] = out
+                return out
+
+        if settings.autocast_calibration_dataloader is not None:
+            tracer = IntermediateNodeTracer(ep.module())
+            for batch in settings.autocast_calibration_dataloader:
+                tracer.run(tuple(batch))
+        settings.autocast_intermediate_node_outputs = autocast_intermediate_node_outputs
+
     gm = ep.graph_module
     gm = ATEN_PRE_LOWERING_PASSES(gm, settings)
     return ep
