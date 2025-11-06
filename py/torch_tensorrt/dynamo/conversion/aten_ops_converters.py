@@ -250,19 +250,9 @@ def parse_cat_args(
     return input_tensors, dim
 
 
-def cat_validator(node: Node, settings: Optional[CompilationSettings] = None) -> bool:
-    # empty tensor in cat input as ITensor leads to [RemoveDeadLayers] Input Tensor y is unused or used only at compile-time, but is not being removed.
-    inputs, _ = parse_cat_args(node.args, node.kwargs)
-    for each_input in inputs:
-        if isinstance(each_input, TRTTensor) and any(s == 0 for s in each_input.shape):
-            return False
-    return True
-
-
 @dynamo_tensorrt_converter(
     torch.ops.aten.cat.default,
     supports_dynamic_shapes=True,
-    capability_validator=cat_validator,
 )
 def aten_ops_cat(
     ctx: ConversionContext,
