@@ -117,6 +117,8 @@ void setup_input_tensors(
     auto shape = core::util::toVec(dims);
     LOG_DEBUG("Input Name: " << name << " Shape: " << dims);
 
+    void* tensor_addr = nullptr;
+
     if (compiled_engine->cuda_engine->isShapeInferenceIO(name.c_str())) {
       // Shape tensor inputs are casted to int64 explicitly.
       // Refer to
@@ -149,18 +151,29 @@ void setup_input_tensors(
       TORCHTRT_CHECK(
           compiled_engine->exec_ctx->setInputShape(name.c_str(), dims), "Error while setting the input shape");
 
+      at::Tensor final_input;
       if (cudagraphs_enabled) {
         // If using CUDAGraphs copy formatted input to the corresponding persistent input buffer
         compiled_engine->input_buffers[i].copy_(formatted_inputs.back(), true);
-        TORCHTRT_CHECK(
-            compiled_engine->exec_ctx->setTensorAddress(name.c_str(), compiled_engine->input_buffers[i].data_ptr()),
-            "Error while setting the input tensor address for inputs");
+        final_input = compiled_engine->input_buffers[i];
+        tensor_addr = final_input.data_ptr();
       } else {
         // Otherwise use the formatted buffer directly
-        TORCHTRT_CHECK(
-            compiled_engine->exec_ctx->setTensorAddress(name.c_str(), formatted_inputs.back().data_ptr()),
-            "Error while setting the input tensor address for inputs");
+        final_input = formatted_inputs.back();
+        tensor_addr = final_input.data_ptr();
       }
+      // handle empty tensors→ TensorRT requires non-null address even if numel() = 0
+      size_t nbytes = final_input.numel() * final_input.element_size();
+      if (nbytes == 0 || tensor_addr == nullptr) {
+        void* dummy = nullptr;
+        cudaMalloc(&dummy, 1); // allocate 1 byte GPU buffer to satisfy TRT and get a non-null address
+        tensor_addr = dummy;
+        compiled_engine->empty_input_ptrs.push_back(dummy); // track to free later
+      }
+
+      TORCHTRT_CHECK(
+          compiled_engine->exec_ctx->setTensorAddress(name.c_str(), tensor_addr),
+          "Failed to bind tensor address for " << name);
     }
   }
 }
