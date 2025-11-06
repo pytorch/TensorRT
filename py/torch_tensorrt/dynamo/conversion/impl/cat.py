@@ -30,13 +30,6 @@ def cat(
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     trt_inputs = []
     for i, each_input in enumerate(input):
-        if isinstance(each_input, torch.Tensor) and each_input.numel() == 0:
-            logger.warning(
-                f"Warning: empty tensor in cat input {i}, replacing with zeros"
-            )
-            # ITensor with same condition leads to [RemoveDeadLayers] Input Tensor y is unused or used only at compile-time, but is not being removed.
-            # hence the validator
-            continue
         if not isinstance(each_input, TRTTensor):
             each_input = get_trt_tensor(ctx, each_input, f"{name}_tensor_{i}")
         if cast_dtype:
