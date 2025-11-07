@@ -29,7 +29,7 @@ class NodeRuleBase:
         """Check if a node should be skipped based on the rule.
 
         Args:
-            node: The ONNX node to check.
+            node: The torch.fx.Node to check.
 
         Returns:
             bool: True if the node should be kept in high precision, False otherwise.
@@ -42,13 +42,13 @@ class NodeRuleBase:
 
 
 class DisabledNodeNameRegexRule(NodeRuleBase):
-    """Rule for keeping nodes with matching names in high precision."""
+    """Rule for keeping nodes with matching user-specified names in high precision."""
 
     def __init__(self, disabled_node_name_regex):
         """Initialize the rule.
 
         Args:
-            disabled_node_name_regex: List of regex patterns for node names to keep in high precision.
+            disabled_node_name_regex: List of regex patterns for user-specified node names to keep in high precision.
         """
         self.disabled_node_name_regex = disabled_node_name_regex
 
@@ -63,13 +63,13 @@ class DisabledNodeNameRegexRule(NodeRuleBase):
 
 
 class DisabledOpTypes(NodeRuleBase):
-    """Rule for keeping nodes with specific operation types in high precision."""
+    """Rule for keeping nodes with specific ATen ops in high precision."""
 
     def __init__(self, excluded_ops):
         """Initialize the rule.
 
         Args:
-            excluded_ops: List of operation types to keep in high precision.
+            excluded_ops: List of ATen ops that should remain in FP32.
         """
         self.excluded_ops = excluded_ops
 
@@ -80,14 +80,14 @@ class DisabledOpTypes(NodeRuleBase):
 class IORangeRule(NodeRuleBase):
     """Rule for keeping nodes with out-of-range inputs/outputs in high precision."""
 
-    def __init__(self, data_max, reference_data):
+    def __init__(self, max_output_threshold, reference_data):
         """Initialize the rule.
 
         Args:
-            data_max: Maximum absolute value allowed for node I/O.
+            max_output_threshold: Maximum absolute value allowed for node I/O.
             reference_data: Reference data for checking I/O ranges.
         """
-        self.data_max = data_max
+        self.max_output_threshold = max_output_threshold
         self.reference_data = reference_data
         self.output_data = None
 
@@ -108,7 +108,7 @@ class IORangeRule(NodeRuleBase):
             logger.debug(
                 f"Node {node.name}: reference data: min={ref_data.min()}, max={ref_data.max()}"
             )
-            if torch.any(torch.abs(ref_data) > self.data_max):
+            if torch.any(torch.abs(ref_data) > self.max_output_threshold):
                 self.output_data = ref_data
                 return True
 
@@ -126,14 +126,17 @@ class IORangeRule(NodeRuleBase):
         if self.output_data is not None:
             logger.info(
                 f"Skipping node {node.name}: reference IO out of range: min={torch.min(self.output_data)}, "
-                f"max={torch.max(self.output_data)}, range=[{-self.data_max}, {self.data_max}]"
+                f"max={torch.max(self.output_data)}, range=[{-self.max_output_threshold}, {self.max_output_threshold}]"
             )
         else:
             super()._log_skipped(node, **kwargs)
 
 
 class DepthOfReductionRule(NodeRuleBase):
-    """Rule for keeping nodes with high depth of reduction in high precision."""
+    """
+    Rule for keeping nodes with high depth of reduction in high precision. This helps prevent excessive accuracy loss in operations particularly sensitive to reduced precision, as higher-depth reductions may amplify computation errors in low precision formats.
+    Reduction ops are those that aggregate data across one or more axes, decreasing the dimensionality of the input tensor, such as convolution, gemm, etc.
+    """
 
     def __init__(self, max_depth_of_reduction, reference_data):
         """Initialize the rule.
@@ -226,7 +229,7 @@ class NodeClassifier:
         excluded_nodes: Collection[str] | None = None,
         excluded_ops: Collection[torch.fx.node.Target] | None = None,
         custom_rule: NodeRuleBase | None = None,
-        data_max: float | None = 1000.0,
+        max_output_threshold: float | None = 512,
         max_depth_of_reduction: int | None = None,
     ):
         """Initialize the node classifier.
@@ -236,14 +239,14 @@ class NodeClassifier:
             nodes_to_exclude: Collection of regex patterns for node names to keep in high precision.
             targets_to_exclude: Collection of targets to keep in high precision.
             custom_rule: Optional custom classification rule.
-            data_max: Maximum absolute value allowed for node I/O.
+            max_output_threshold: Maximum absolute value allowed for node I/O.
             max_depth_of_reduction: Maximum depth of reduction allowed in low precision.
         """
         self.nodes = nodes
         self.excluded_nodes = excluded_nodes
         self.excluded_ops = excluded_ops
         self.custom_rule = custom_rule
-        self.data_max = data_max
+        self.max_output_threshold = max_output_threshold
         self.max_depth_of_reduction = max_depth_of_reduction
 
     def _gen_block_node_rules(self, reference_data):
@@ -261,7 +264,9 @@ class NodeClassifier:
         if self.excluded_ops:
             block_node_rules.append(DisabledOpTypes(self.excluded_ops))
         if reference_data:
-            block_node_rules.append(IORangeRule(self.data_max, reference_data))
+            block_node_rules.append(
+                IORangeRule(self.max_output_threshold, reference_data)
+            )
         if self.max_depth_of_reduction is not None:
             block_node_rules.append(
                 DepthOfReductionRule(

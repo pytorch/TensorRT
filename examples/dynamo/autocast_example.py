@@ -31,12 +31,14 @@ class AutocastExample(nn.Module):
         )  # fp32 because of `torch.ops.aten.flatten.using_ints` in `autocast_excluded_ops`
         # Respect the precisions in the pytorch autocast context
         with torch.autocast(x.device.type, enabled=True, dtype=torch.float32):
-            x = self.fc1(x)
+            x = self.fc1(x)  # fp32
             with torch.autocast(x.device.type, enabled=False):
-                x = torch.sub(x.half(), y)
-                out2 = torch.add(x, x)
+                x = torch.sub(x.half(), y)  # fp16
+                out2 = torch.add(x, x)  # fp16
         with torch.autocast(x.device.type, enabled=True, dtype=torch.float16):
-            out2 = torch.log(out2)
+            out2 = torch.log(
+                out2
+            )  # fp32 because Pytorch Autocast requires `log` to be in fp32
         return x, out, out2
 
 
@@ -45,6 +47,9 @@ if __name__ == "__main__":
     inputs = (
         torch.randn((1, 3, 32, 32), dtype=torch.float32, device="cuda"),
         torch.randn((1,), dtype=torch.float16, device="cuda"),
+    )
+    calibration_dataloader = torch.utils.data.DataLoader(
+        torch.utils.data.TensorDataset(*inputs), batch_size=1, shuffle=False
     )
 
     ep = torch.export.export(model, inputs)
@@ -68,8 +73,9 @@ if __name__ == "__main__":
             autocast_low_precision_type=torch.float16,
             autocast_excluded_nodes={"^conv1$", "relu"},
             autocast_excluded_ops={torch.ops.aten.flatten.using_ints},
-            autocast_data_max=512,
+            autocast_max_output_threshold=512,
             autocast_max_depth_of_reduction=None,
+            autocast_calibration_dataloader=calibration_dataloader,
         )
 
         trt_out = trt_mod(*inputs)
