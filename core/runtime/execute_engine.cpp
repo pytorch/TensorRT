@@ -107,6 +107,12 @@ void setup_input_tensors(
     TORCHTRT_CHECK(
         inputs[i].is_cuda(), "Expected input tensors to have device cuda, found device " << inputs[i].device());
 
+    auto expected_type =
+        util::TRTDataTypeToScalarType(compiled_engine->exec_ctx->getEngine().getTensorDataType(name.c_str()));
+    TORCHTRT_CHECK(
+        inputs[i].dtype() == expected_type,
+        "Expected input tensors to have type " << expected_type << ", found type " << inputs[i].dtype());
+
     auto dims = core::util::toDims(inputs[i].sizes());
     auto shape = core::util::toVec(dims);
     LOG_DEBUG("Input Name: " << name << " Shape: " << dims);

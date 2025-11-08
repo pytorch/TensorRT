@@ -3,9 +3,9 @@ import torch.nn as nn
 import torch_tensorrt
 
 
-class AutocastExample(nn.Module):
+class MixedPytorchAutocastModel(nn.Module):
     def __init__(self):
-        super(AutocastExample, self).__init__()
+        super(MixedPytorchAutocastModel, self).__init__()
         self.conv1 = nn.Conv2d(
             in_channels=3, out_channels=8, kernel_size=3, stride=1, padding=1
         )
@@ -19,47 +19,36 @@ class AutocastExample(nn.Module):
         self.flatten = nn.Flatten()
         self.fc1 = nn.Linear(16 * 8 * 8, 10)
 
-    def forward(self, x, y):
-        x = self.conv1(x)  # fp32 because of "^conv1$" in `autocast_excluded_nodes`
-        x = self.relu1(x)  # fp32 because of "relu" in `autocast_excluded_nodes`
-        out = self.pool1(x)  # fp16
-        x = self.conv2(out)  # fp16
-        x = self.relu2(x)  # fp32 because of "relu" in `autocast_excluded_nodes`
-        x = self.pool2(x)  # fp16
-        x = self.flatten(
-            x
-        )  # fp32 because of `torch.ops.aten.flatten.using_ints` in `autocast_excluded_ops`
-        # Respect the precisions in the pytorch autocast context
-        with torch.autocast(x.device.type, enabled=True, dtype=torch.float32):
-            x = self.fc1(x)  # fp32
-            with torch.autocast(x.device.type, enabled=False):
-                x = torch.sub(x.half(), y)  # fp16
-                out2 = torch.add(x, x)  # fp16
+    def forward(self, x):
+        x = self.conv1(x)
+        x = self.relu1(x)
+        x = self.pool1(x)
+        x = self.conv2(x)
+        x = self.relu2(x)
+        x = self.pool2(x)
+        x = self.flatten(x)
         with torch.autocast(x.device.type, enabled=True, dtype=torch.float16):
-            out2 = torch.log(
-                out2
-            )  # fp32 because Pytorch Autocast requires `log` to be in fp32
-        return x, out, out2
+            x = self.fc1(x)
+            out = torch.log(
+                torch.abs(x) + 1
+            )  # log is fp32 due to Pytorch Autocast requirements
+        return out
 
 
 if __name__ == "__main__":
-    model = AutocastExample().cuda().eval()
-    inputs = (
-        torch.randn((1, 3, 32, 32), dtype=torch.float32, device="cuda"),
-        torch.randn((1,), dtype=torch.float16, device="cuda"),
-    )
-    calibration_dataloader = torch.utils.data.DataLoader(
-        torch.utils.data.TensorDataset(*inputs), batch_size=1, shuffle=False
-    )
-
+    model = MixedPytorchAutocastModel().cuda().eval()
+    inputs = (torch.randn((8, 3, 32, 32), dtype=torch.float32, device="cuda"),)
     ep = torch.export.export(model, inputs)
+    calibration_dataloader = torch.utils.data.DataLoader(
+        torch.utils.data.TensorDataset(*inputs), batch_size=2, shuffle=False
+    )
 
     with torch_tensorrt.dynamo.Debugger(
         "graphs",
         logging_dir=".",
         engine_builder_monitor=False,
     ):
-        trt_mod = torch_tensorrt.compile(
+        trt_autocast_mod = torch_tensorrt.compile(
             ep.module(),
             arg_inputs=inputs,
             min_block_size=1,
@@ -78,4 +67,4 @@ if __name__ == "__main__":
             autocast_calibration_dataloader=calibration_dataloader,
         )
 
-        trt_out = trt_mod(*inputs)
+        autocast_outs = trt_autocast_mod(*inputs)

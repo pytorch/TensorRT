@@ -93,9 +93,7 @@ def trace_intermediate_node_outputs(
             out = super().run_node(n)
             if n.op == "call_function" and n.target not in excluded_ops:
                 if not isinstance(out, torch.Tensor):
-                    raise ValueError(
-                        f"Please file a bug with Torch-TensorRT because it expects a torch.Tensor but got {type(out)} for node {n.name}."
-                    )
+                    return out
                 if n.name in intermediate_node_outputs:
                     intermediate_node_outputs[n.name] = torch.cat(
                         [intermediate_node_outputs[n.name], out], dim=0

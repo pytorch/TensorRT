@@ -54,9 +54,13 @@ class DisabledNodeNameRegexRule(NodeRuleBase):
 
     def _check_inner(self, node):
         stack = node.meta.get("nn_module_stack")
-        node_name = next(reversed(stack), "").split("__")[
-            -1
-        ]  # get the user specified name of the node
+        try:
+            # get the user specified name of the node
+            node_name = stack.get(next(reversed(stack)), [""])[0]
+        except Exception as e:
+            raise ValueError(
+                f"Failed to get the user specified name of the node {node.name} because {e}. Please file a bug with Torch-TensorRT."
+            )
         return any(
             re.match(regex, node_name) for regex in self.disabled_node_name_regex
         )

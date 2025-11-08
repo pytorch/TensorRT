@@ -66,15 +66,19 @@ def rule_based_autocast(
         """
         if isinstance(arg, torch.fx.Node) and is_tensor_node(arg):
             val = arg.meta.get("val", None)
-            with gm.graph.inserting_before(node):
-                cast = gm.graph.call_function(
-                    torch.ops.aten.to.dtype, args=(arg, dtype)
-                )
-
             if isinstance(val, torch.Tensor):
-                arg.meta["val"] = val.to(dtype)
-            cast.meta.update(arg.meta)
-            return cast
+                if val.dtype == dtype:
+                    return arg
+                else:
+                    with gm.graph.inserting_before(node):
+                        cast = gm.graph.call_function(
+                            torch.ops.aten.to.dtype, args=(arg, dtype)
+                        )
+                    # copy the meta of the original tensor to the casted tensor
+                    cast.meta.update(arg.meta)
+                    # update the dtype of the casted tensor
+                    cast.meta["val"] = cast.meta["val"].to(dtype)
+                    return cast
         elif isinstance(arg, (tuple, list)):
             return type(arg)(
                 _cast_all_tensor_args_to_dtype(node, a, dtype) for a in arg
@@ -102,6 +106,7 @@ def rule_based_autocast(
                 node.kwargs = _cast_all_tensor_args_to_dtype(
                     node, node.kwargs, autocast_low_precision_type
                 )
+                node.meta["val"] = node.meta["val"].to(autocast_low_precision_type)
             elif node.name in high_precision_nodes:
                 node.args = _cast_all_tensor_args_to_dtype(
                     node, node.args, autocast_high_precision_type
@@ -109,6 +114,7 @@ def rule_based_autocast(
                 node.kwargs = _cast_all_tensor_args_to_dtype(
                     node, node.kwargs, autocast_high_precision_type
                 )
+                node.meta["val"] = node.meta["val"].to(autocast_high_precision_type)
 
     gm = clean_up_graph_after_modifications(gm)
     logger.debug("Graph after Autocast based on the rules:\n%s", gm.graph)

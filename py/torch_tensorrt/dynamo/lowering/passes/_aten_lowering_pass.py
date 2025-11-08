@@ -23,8 +23,8 @@ from .rule_based_autocast import rule_based_autocast
 
 pre_lowering_pass_list = [
     remove_detach,
+    remove_assert_nodes,
     rule_based_autocast,
-    remove_assert_nodes,  # rule_based_autocast might insert assert nodes
 ]
 
 post_lowering_pass_list = [
