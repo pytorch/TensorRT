@@ -24,7 +24,6 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     get_positive_dim,
     is_only_operator_on_placeholder,
 )
-from torch_tensorrt._utils import is_thor
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
