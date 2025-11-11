@@ -68,11 +68,13 @@ def fake_tensorrt_execute_engine(
                     output_shape.append(min_val)
         else:
             output_shape.extend(outputs_mode_dict["opt"][out_idx].size())
-
         fake_outputs.append(
-            torch.empty(output_shape, dtype=outputs_mode_dict["opt"][out_idx].dtype)
+            torch.empty(
+                output_shape,
+                dtype=outputs_mode_dict["opt"][out_idx].dtype,
+                device=inputs[0].device,
+            )
         )
-
     return fake_outputs
 
 
