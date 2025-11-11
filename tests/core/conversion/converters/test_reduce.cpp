@@ -345,7 +345,14 @@ TEST(Converters, ATenAnyDimNegIndexConvertsCorrectly) {
       %3 : bool = prim::Constant[value=1]()
       %5 : Tensor = aten::any(%0, %1, %3)
       return (%5))IR";
-  auto in = at::randint(-2, 2, {2, 32}, at::kCUDA);
+  std::vector<int> data(64, 0);
+  for (int i = 0; i < 64; ++i) {
+    if (i % 7 == 0)
+      data[i] = 1; // some positives
+    if (i % 13 == 0)
+      data[i] = -1; // some negatives
+  }
+  auto in = at::tensor(data, at::TensorOptions().dtype(at::kInt).device(at::kCUDA)).reshape({2, 32}); // shape [2, 32]
   test_body(graph, in);
 }
 
