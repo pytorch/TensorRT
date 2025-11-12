@@ -36,7 +36,7 @@ new_local_repository(
 new_local_repository(
     name = "cuda",
     build_file = "@//third_party/cuda:BUILD",
-    path = "/usr/local/cuda-13.0/",
+    path = "/usr/local/cuda-12.8/",
 )
 
 # for Jetson
@@ -65,7 +65,7 @@ http_archive(
     name = "libtorch",
     build_file = "@//third_party/libtorch:BUILD",
     strip_prefix = "libtorch",
-    urls = ["https://download.pytorch.org/libtorch/nightly/cu130/libtorch-shared-with-deps-latest.zip"],
+    urls = ["https://download.pytorch.org/libtorch/nightly/cu128/libtorch-shared-with-deps-latest.zip"],
 )
 
 # in aarch64 platform you can get libtorch via either local or wheel file
@@ -103,7 +103,7 @@ http_archive(
     build_file = "@//third_party/tensorrt/archive:BUILD",
     strip_prefix = "TensorRT-10.13.3.9",
     urls = [
-        "https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.13.3/tars/TensorRT-10.13.3.9.Linux.x86_64-gnu.cuda-13.0.tar.gz",
+        "https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.13.3/tars/TensorRT-10.13.3.9.Linux.x86_64-gnu.cuda-12.9.tar.gz",
     ],
 )
 

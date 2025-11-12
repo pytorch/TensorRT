@@ -867,6 +867,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
     def call_module(
         self, target: str, args: Any, kwargs: Any
     ) -> Any:  # Probably should be Tuple[trt.ITensor]? Case for Any?
+        breakpoint()
         assert isinstance(target, str)
         submod = self.fetch_attr(target)
         submod_type = getattr(submod, "_base_class_origin", type(submod))

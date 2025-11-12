@@ -3,6 +3,7 @@ import getpass
 import logging
 import os
 import platform
+import subprocess
 import sys
 import tempfile
 import urllib.request
@@ -37,6 +38,25 @@ def check_cross_compile_trt_win_lib() -> bool:
         loaded_libs = dllist.dllist()
         target_lib = ".*libnvinfer_builder_resource_win.so.*"
         return any(re.match(target_lib, lib) for lib in loaded_libs)
+    return False
+
+
+def check_aoti_cross_compile_win_lib() -> bool:
+    if sys.platform.startswith("linux"):
+        try:
+            result = subprocess.run(
+                ["x86_64-w64-mingw32-gcc", "--version"],
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+            return result.returncode == 0
+        except (
+            subprocess.SubprocessError,
+            FileNotFoundError,
+            subprocess.TimeoutExpired,
+        ):
+            return False
     return False
 
 
