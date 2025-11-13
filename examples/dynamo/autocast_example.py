@@ -61,7 +61,7 @@ if __name__ == "__main__":
             enable_autocast=True,
             autocast_low_precision_type=torch.float16,
             autocast_excluded_nodes={"^conv1$", "relu"},
-            autocast_excluded_ops={torch.ops.aten.flatten.using_ints},
+            autocast_excluded_ops={"torch.ops.aten.flatten.using_ints"},
             autocast_max_output_threshold=512,
             autocast_max_depth_of_reduction=None,
             autocast_calibration_dataloader=calibration_dataloader,

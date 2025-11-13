@@ -6,6 +6,9 @@ import re
 from typing import Collection, Optional
 
 import torch
+from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
+    ConverterRegistry,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -78,7 +81,8 @@ class DisabledOpTypes(NodeRuleBase):
         self.excluded_ops = excluded_ops
 
     def _check_inner(self, node):
-        return node.target in self.excluded_ops
+        node_name = ConverterRegistry.qualified_name_or_str(node.target)
+        return node_name in self.excluded_ops
 
 
 class IORangeRule(NodeRuleBase):

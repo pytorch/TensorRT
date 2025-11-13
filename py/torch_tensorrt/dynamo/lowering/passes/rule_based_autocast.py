@@ -41,6 +41,7 @@ def rule_based_autocast(
     reference_data: dict[str, torch.Tensor] = (
         settings.autocast_intermediate_node_outputs
     )
+    del settings.autocast_intermediate_node_outputs
 
     node_classifier = NodeClassifier(
         gm.graph.nodes,
