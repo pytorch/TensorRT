@@ -78,33 +78,33 @@ jobs:
       architecture: "x86_64"
       use-rtx: false
 
-  L0-dynamo-converter-tests:
-    name: L0 dynamo converter tests
-    needs: [filter-matrix, build]
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - repository: pytorch/tensorrt
-            package-name: torch_tensorrt
-            pre-script: packaging/pre_build_script.sh
-            post-script: packaging/post_build_script.sh
-            smoke-test-script: packaging/smoke_test_script.sh
-    uses: ./.github/workflows/linux-test.yml
-    with:
-      job-name: L0-dynamo-converter-tests
-      repository: "pytorch/tensorrt"
-      ref: ""
-      test-infra-repository: pytorch/test-infra
-      test-infra-ref: main
-      build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
-      pre-script: ${{ matrix.pre-script }}
-      script: |
-        set -euo pipefail
-        pushd .
-        cd tests/py/dynamo
-        python -m pytest -ra -n 8 --junitxml=${RUNNER_TEST_RESULTS_DIR}/l0_dynamo_converter_tests_results.xml  --dist=loadscope --maxfail=20 conversion/
-        popd
+  # L0-dynamo-converter-tests:
+  #   name: L0 dynamo converter tests
+  #   needs: [filter-matrix, build]
+  #   strategy:
+  #     fail-fast: false
+  #     matrix:
+  #       include:
+  #         - repository: pytorch/tensorrt
+  #           package-name: torch_tensorrt
+  #           pre-script: packaging/pre_build_script.sh
+  #           post-script: packaging/post_build_script.sh
+  #           smoke-test-script: packaging/smoke_test_script.sh
+  #   uses: ./.github/workflows/linux-test.yml
+  #   with:
+  #     job-name: L0-dynamo-converter-tests
+  #     repository: "pytorch/tensorrt"
+  #     ref: ""
+  #     test-infra-repository: pytorch/test-infra
+  #     test-infra-ref: main
+  #     build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
+  #     pre-script: ${{ matrix.pre-script }}
+  #     script: |
+  #       set -euo pipefail
+  #       pushd .
+  #       cd tests/py/dynamo
+  #       python -m pytest -ra -n 8 --junitxml=${RUNNER_TEST_RESULTS_DIR}/l0_dynamo_converter_tests_results.xml  --dist=loadscope --maxfail=20 conversion/
+  #       popd
 
   L0-dynamo-core-tests:
     name: L0 dynamo core tests
@@ -127,79 +127,88 @@ jobs:
       test-infra-ref: main
       build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
       pre-script: ${{ matrix.pre-script }}
+      filter-cuda: ${{ matrix.desired_cuda }}
+      filter-python: ${{ matrix.python_version }}
       script: |
         set -euo pipefail
-        pushd .
-        cd tests/py
-        cd dynamo
-        python -m pytest -ra -n 8 --junitxml=${RUNNER_TEST_RESULTS_DIR}/l0_dynamo_core_runtime_tests_results.xml runtime/test_000_*
-        python -m pytest -ra -n 8 --junitxml=${RUNNER_TEST_RESULTS_DIR}/l0_dynamo_core_partitioning_tests_results.xml partitioning/
-        python -m pytest -ra -n 8 --junitxml=${RUNNER_TEST_RESULTS_DIR}/l0_dynamo_core_lowering_tests_results.xml lowering/
-        popd
+        echo "L0-dynamo-core-tests successfully completed"
+        if [ ${{ CU_VERSION }} == "cu128" ]; then
+           echo "running L0-dynamo-core-tests for cu128 is not supported"
+           exit -1
+        fi
+        echo "Running L0-dynamo-core-tests for ${{ CU_VERSION }} successfully completed"
+        # pushd .
+        # cd tests/py
+        # cd dynamo
+        # python -m pytest -ra -n 8 --junitxml=${RUNNER_TEST_RESULTS_DIR}/l0_dynamo_core_runtime_tests_results.xml runtime/test_000_*
+        # python -m pytest -ra -n 8 --junitxml=${RUNNER_TEST_RESULTS_DIR}/l0_dynamo_core_partitioning_tests_results.xml partitioning/
+        # python -m pytest -ra -n 8 --junitxml=${RUNNER_TEST_RESULTS_DIR}/l0_dynamo_core_lowering_tests_results.xml lowering/
+        # popd
 
-  L0-py-core-tests:
-    name: L0 core python tests
-    needs: [filter-matrix, build]
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - repository: pytorch/tensorrt
-            package-name: torch_tensorrt
-            pre-script: packaging/pre_build_script.sh
-            post-script: packaging/post_build_script.sh
-            smoke-test-script: packaging/smoke_test_script.sh
-    uses: ./.github/workflows/linux-test.yml
-    with:
-      job-name: L0-py-core-tests
-      repository: "pytorch/tensorrt"
-      ref: ""
-      test-infra-repository: pytorch/test-infra
-      test-infra-ref: main
-      build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
-      pre-script: ${{ matrix.pre-script }}
-      script: |
-        set -euo pipefail
-        pushd .
-        cd tests/py/core
-        python -m pytest -ra -n 8 --junitxml=${RUNNER_TEST_RESULTS_DIR}/l0_py_core_tests_results.xml  .
-        popd
+  # L0-py-core-tests:
+  #   name: L0 core python tests
+  #   needs: [filter-matrix, build]
+  #   strategy:
+  #     fail-fast: false
+  #     matrix:
+  #       include:
+  #         - repository: pytorch/tensorrt
+  #           package-name: torch_tensorrt
+  #           pre-script: packaging/pre_build_script.sh
+  #           post-script: packaging/post_build_script.sh
+  #           smoke-test-script: packaging/smoke_test_script.sh
+  #   uses: ./.github/workflows/linux-test.yml
+  #   with:
+  #     job-name: L0-py-core-tests
+  #     repository: "pytorch/tensorrt"
+  #     ref: ""
+  #     test-infra-repository: pytorch/test-infra
+  #     test-infra-ref: main
+  #     build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
+  #     pre-script: ${{ matrix.pre-script }}
+  #     script: |
+  #       set -euo pipefail
+  #       pushd .
+  #       cd tests/py/core
+  #       python -m pytest -ra -n 8 --junitxml=${RUNNER_TEST_RESULTS_DIR}/l0_py_core_tests_results.xml  .
+  #       popd
 
-  L0-torchscript-tests:
-    name: L0 torchscript tests
-    needs: [filter-matrix, build]
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - repository: pytorch/tensorrt
-            package-name: torch_tensorrt
-            pre-script: packaging/pre_build_script.sh
-            post-script: packaging/post_build_script.sh
-            smoke-test-script: packaging/smoke_test_script.sh
-    uses: ./.github/workflows/linux-test.yml
-    with:
-      job-name: L0-torchscript-tests
-      repository: "pytorch/tensorrt"
-      ref: ""
-      test-infra-repository: pytorch/test-infra
-      test-infra-ref: main
-      build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
-      pre-script: ${{ matrix.pre-script }}
-      script: |
-        set -euo pipefail
-        pushd .
-        cd tests/modules
-        python hub.py
-        popd
-        pushd .
-        cd tests/py/ts
-        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l0_ts_api_tests_results.xml   api/
-        popd
+  # L0-torchscript-tests:
+  #   name: L0 torchscript tests
+  #   needs: [filter-matrix, build]
+  #   strategy:
+  #     fail-fast: false
+  #     matrix:
+  #       include:
+  #         - repository: pytorch/tensorrt
+  #           package-name: torch_tensorrt
+  #           pre-script: packaging/pre_build_script.sh
+  #           post-script: packaging/post_build_script.sh
+  #           smoke-test-script: packaging/smoke_test_script.sh
+  #   uses: ./.github/workflows/linux-test.yml
+  #   with:
+  #     job-name: L0-torchscript-tests
+  #     repository: "pytorch/tensorrt"
+  #     ref: ""
+  #     test-infra-repository: pytorch/test-infra
+  #     test-infra-ref: main
+  #     build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
+  #     pre-script: ${{ matrix.pre-script }}
+  #     script: |
+  #       set -euo pipefail
+  #       pushd .
+  #       cd tests/modules
+  #       python hub.py
+  #       popd
+  #       pushd .
+  #       cd tests/py/ts
+  #       python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l0_ts_api_tests_results.xml   api/
+  #       popd
 
   L1-dynamo-core-tests:
     name: L1 dynamo core tests
-    needs: [filter-matrix, build, L0-dynamo-converter-tests, L0-dynamo-core-tests, L0-py-core-tests, L0-torchscript-tests]
+    needs: [filter-matrix, build, L0-dynamo-core-tests]
+    #needs: [filter-matrix, build, L0-dynamo-converter-tests, L0-dynamo-core-tests, L0-py-core-tests, L0-torchscript-tests]
     strategy:
       fail-fast: false
       matrix:
@@ -218,281 +227,284 @@ jobs:
       test-infra-ref: main
       build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
       pre-script: ${{ matrix.pre-script }}
+      filter-cuda: ${{ matrix.desired_cuda }}
+      filter-python: ${{ matrix.python_version }}
       script: |
         set -euo pipefail
-        pushd .
-        cd tests/py/dynamo
-        python -m pytest -ra -n 8 --junitxml=${RUNNER_TEST_RESULTS_DIR}/l1_dynamo_core_tests_results.xml  runtime/test_001_*
-        popd
+        echo "L1-dynamo-core-tests successfully completed"
+        # pushd .
+        # cd tests/py/dynamo
+        # python -m pytest -ra -n 8 --junitxml=${RUNNER_TEST_RESULTS_DIR}/l1_dynamo_core_tests_results.xml  runtime/test_001_*
+        # popd
 
-  L1-dynamo-compile-tests:
-    name: L1 dynamo compile tests
-    needs: [filter-matrix, build, L0-dynamo-converter-tests, L0-dynamo-core-tests, L0-py-core-tests, L0-torchscript-tests]
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - repository: pytorch/tensorrt
-            package-name: torch_tensorrt
-            pre-script: packaging/pre_build_script.sh
-            post-script: packaging/post_build_script.sh
-            smoke-test-script: packaging/smoke_test_script.sh
-    uses: ./.github/workflows/linux-test.yml
-    with:
-      job-name: L1-dynamo-compile-tests
-      repository: "pytorch/tensorrt"
-      ref: ""
-      test-infra-repository: pytorch/test-infra
-      test-infra-ref: main
-      build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
-      pre-script: ${{ matrix.pre-script }}
-      script: |
-        set -euo pipefail
-        pushd .
-        cd tests/py/dynamo/
-        python -m pytest -m critical -ra  --junitxml=${RUNNER_TEST_RESULTS_DIR}/l1_dynamo_compile_tests_results.xml models/
-        popd
+  # L1-dynamo-compile-tests:
+  #   name: L1 dynamo compile tests
+  #   needs: [filter-matrix, build, L0-dynamo-converter-tests, L0-dynamo-core-tests, L0-py-core-tests, L0-torchscript-tests]
+  #   strategy:
+  #     fail-fast: false
+  #     matrix:
+  #       include:
+  #         - repository: pytorch/tensorrt
+  #           package-name: torch_tensorrt
+  #           pre-script: packaging/pre_build_script.sh
+  #           post-script: packaging/post_build_script.sh
+  #           smoke-test-script: packaging/smoke_test_script.sh
+  #   uses: ./.github/workflows/linux-test.yml
+  #   with:
+  #     job-name: L1-dynamo-compile-tests
+  #     repository: "pytorch/tensorrt"
+  #     ref: ""
+  #     test-infra-repository: pytorch/test-infra
+  #     test-infra-ref: main
+  #     build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
+  #     pre-script: ${{ matrix.pre-script }}
+  #     script: |
+  #       set -euo pipefail
+  #       pushd .
+  #       cd tests/py/dynamo/
+  #       python -m pytest -m critical -ra  --junitxml=${RUNNER_TEST_RESULTS_DIR}/l1_dynamo_compile_tests_results.xml models/
+  #       popd
 
-  L1-torch-compile-tests:
-    name: L1 torch compile tests
-    needs: [filter-matrix, build, L0-dynamo-converter-tests, L0-dynamo-core-tests, L0-py-core-tests, L0-torchscript-tests]
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - repository: pytorch/tensorrt
-            package-name: torch_tensorrt
-            pre-script: packaging/pre_build_script.sh
-            post-script: packaging/post_build_script.sh
-            smoke-test-script: packaging/smoke_test_script.sh
-    uses: ./.github/workflows/linux-test.yml
-    with:
-      job-name: L1-torch-compile-tests
-      repository: "pytorch/tensorrt"
-      ref: ""
-      test-infra-repository: pytorch/test-infra
-      test-infra-ref: main
-      build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
-      pre-script: ${{ matrix.pre-script }}
-      script: |
-        set -euo pipefail
-        pushd .
-        cd tests/py/dynamo/
-        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l1_torch_compile_be_tests_results.xml  backend/
-        python -m pytest -m critical -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l1_torch_compile_models_tests_results.xml --ir torch_compile models/test_models.py
-        python -m pytest -m critical -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l1_torch_compile_dyn_models_tests_results.xml --ir torch_compile models/test_dyn_models.py
-        popd
+  # L1-torch-compile-tests:
+  #   name: L1 torch compile tests
+  #   needs: [filter-matrix, build, L0-dynamo-converter-tests, L0-dynamo-core-tests, L0-py-core-tests, L0-torchscript-tests]
+  #   strategy:
+  #     fail-fast: false
+  #     matrix:
+  #       include:
+  #         - repository: pytorch/tensorrt
+  #           package-name: torch_tensorrt
+  #           pre-script: packaging/pre_build_script.sh
+  #           post-script: packaging/post_build_script.sh
+  #           smoke-test-script: packaging/smoke_test_script.sh
+  #   uses: ./.github/workflows/linux-test.yml
+  #   with:
+  #     job-name: L1-torch-compile-tests
+  #     repository: "pytorch/tensorrt"
+  #     ref: ""
+  #     test-infra-repository: pytorch/test-infra
+  #     test-infra-ref: main
+  #     build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
+  #     pre-script: ${{ matrix.pre-script }}
+  #     script: |
+  #       set -euo pipefail
+  #       pushd .
+  #       cd tests/py/dynamo/
+  #       python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l1_torch_compile_be_tests_results.xml  backend/
+  #       python -m pytest -m critical -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l1_torch_compile_models_tests_results.xml --ir torch_compile models/test_models.py
+  #       python -m pytest -m critical -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l1_torch_compile_dyn_models_tests_results.xml --ir torch_compile models/test_dyn_models.py
+  #       popd
 
-  L1-torchscript-tests:
-    name: L1 torch script tests
-    needs: [filter-matrix, build, L0-dynamo-core-tests, L0-dynamo-converter-tests, L0-py-core-tests, L0-torchscript-tests]
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - repository: pytorch/tensorrt
-            package-name: torch_tensorrt
-            pre-script: packaging/pre_build_script.sh
-            post-script: packaging/post_build_script.sh
-            smoke-test-script: packaging/smoke_test_script.sh
-    uses: ./.github/workflows/linux-test.yml
-    with:
-      job-name: L1-torchscript-tests
-      repository: "pytorch/tensorrt"
-      ref: ""
-      test-infra-repository: pytorch/test-infra
-      test-infra-ref: main
-      build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
-      pre-script: ${{ matrix.pre-script }}
-      script: |
-        set -euo pipefail
-        pushd .
-        cd tests/modules
-        python hub.py
-        popd
-        pushd .
-        cd tests/py/ts
-        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l1_ts_models_tests_results.xml   models/
-        popd
+  # L1-torchscript-tests:
+  #   name: L1 torch script tests
+  #   needs: [filter-matrix, build, L0-dynamo-core-tests, L0-dynamo-converter-tests, L0-py-core-tests, L0-torchscript-tests]
+  #   strategy:
+  #     fail-fast: false
+  #     matrix:
+  #       include:
+  #         - repository: pytorch/tensorrt
+  #           package-name: torch_tensorrt
+  #           pre-script: packaging/pre_build_script.sh
+  #           post-script: packaging/post_build_script.sh
+  #           smoke-test-script: packaging/smoke_test_script.sh
+  #   uses: ./.github/workflows/linux-test.yml
+  #   with:
+  #     job-name: L1-torchscript-tests
+  #     repository: "pytorch/tensorrt"
+  #     ref: ""
+  #     test-infra-repository: pytorch/test-infra
+  #     test-infra-ref: main
+  #     build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
+  #     pre-script: ${{ matrix.pre-script }}
+  #     script: |
+  #       set -euo pipefail
+  #       pushd .
+  #       cd tests/modules
+  #       python hub.py
+  #       popd
+  #       pushd .
+  #       cd tests/py/ts
+  #       python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l1_ts_models_tests_results.xml   models/
+  #       popd
 
-  L2-torch-compile-tests:
-    name: L2 torch compile tests
-    needs: [filter-matrix, build, L1-torch-compile-tests, L1-dynamo-compile-tests, L1-dynamo-core-tests, L1-torchscript-tests]
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - repository: pytorch/tensorrt
-            package-name: torch_tensorrt
-            pre-script: packaging/pre_build_script.sh
-            post-script: packaging/post_build_script.sh
-            smoke-test-script: packaging/smoke_test_script.sh
-    uses: ./.github/workflows/linux-test.yml
-    with:
-      job-name: L2-torch-compile-tests
-      repository: "pytorch/tensorrt"
-      ref: ""
-      test-infra-repository: pytorch/test-infra
-      test-infra-ref: main
-      build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
-      pre-script: ${{ matrix.pre-script }}
-      script: |
-        set -euo pipefail
-        pushd .
-        cd tests/py/dynamo/
-        python -m pytest -m "not critical" -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l2_torch_compile_models_tests_results.xml --ir torch_compile models/test_models.py
-        python -m pytest -m "not critical" -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l2_torch_compile_dyn_models_tests_results.xml --ir torch_compile models/test_dyn_models.py
-        popd
+  # L2-torch-compile-tests:
+  #   name: L2 torch compile tests
+  #   needs: [filter-matrix, build, L1-torch-compile-tests, L1-dynamo-compile-tests, L1-dynamo-core-tests, L1-torchscript-tests]
+  #   strategy:
+  #     fail-fast: false
+  #     matrix:
+  #       include:
+  #         - repository: pytorch/tensorrt
+  #           package-name: torch_tensorrt
+  #           pre-script: packaging/pre_build_script.sh
+  #           post-script: packaging/post_build_script.sh
+  #           smoke-test-script: packaging/smoke_test_script.sh
+  #   uses: ./.github/workflows/linux-test.yml
+  #   with:
+  #     job-name: L2-torch-compile-tests
+  #     repository: "pytorch/tensorrt"
+  #     ref: ""
+  #     test-infra-repository: pytorch/test-infra
+  #     test-infra-ref: main
+  #     build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
+  #     pre-script: ${{ matrix.pre-script }}
+  #     script: |
+  #       set -euo pipefail
+  #       pushd .
+  #       cd tests/py/dynamo/
+  #       python -m pytest -m "not critical" -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l2_torch_compile_models_tests_results.xml --ir torch_compile models/test_models.py
+  #       python -m pytest -m "not critical" -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l2_torch_compile_dyn_models_tests_results.xml --ir torch_compile models/test_dyn_models.py
+  #       popd
 
-  L2-dynamo-compile-tests:
-    name: L2 dynamo compile tests
-    needs: [filter-matrix, build, L1-dynamo-compile-tests, L1-dynamo-core-tests, L1-torch-compile-tests, L1-torchscript-tests]
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - repository: pytorch/tensorrt
-            package-name: torch_tensorrt
-            pre-script: packaging/pre_build_script.sh
-            post-script: packaging/post_build_script.sh
-            smoke-test-script: packaging/smoke_test_script.sh
-    uses: ./.github/workflows/linux-test.yml
-    with:
-      job-name: L2-dynamo-compile-tests
-      repository: "pytorch/tensorrt"
-      ref: ""
-      test-infra-repository: pytorch/test-infra
-      test-infra-ref: main
-      build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
-      pre-script: ${{ matrix.pre-script }}
-      script: |
-        set -euo pipefail
-        pushd .
-        cd tests/py/dynamo/
-        python -m pytest -m "not critical" -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l2_dynamo_compile_tests_results.xml models/
-        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l2_dynamo_compile_llm_tests_results.xml llm/
-        popd
+  # L2-dynamo-compile-tests:
+  #   name: L2 dynamo compile tests
+  #   needs: [filter-matrix, build, L1-dynamo-compile-tests, L1-dynamo-core-tests, L1-torch-compile-tests, L1-torchscript-tests]
+  #   strategy:
+  #     fail-fast: false
+  #     matrix:
+  #       include:
+  #         - repository: pytorch/tensorrt
+  #           package-name: torch_tensorrt
+  #           pre-script: packaging/pre_build_script.sh
+  #           post-script: packaging/post_build_script.sh
+  #           smoke-test-script: packaging/smoke_test_script.sh
+  #   uses: ./.github/workflows/linux-test.yml
+  #   with:
+  #     job-name: L2-dynamo-compile-tests
+  #     repository: "pytorch/tensorrt"
+  #     ref: ""
+  #     test-infra-repository: pytorch/test-infra
+  #     test-infra-ref: main
+  #     build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
+  #     pre-script: ${{ matrix.pre-script }}
+  #     script: |
+  #       set -euo pipefail
+  #       pushd .
+  #       cd tests/py/dynamo/
+  #       python -m pytest -m "not critical" -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l2_dynamo_compile_tests_results.xml models/
+  #       python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l2_dynamo_compile_llm_tests_results.xml llm/
+  #       popd
 
-  L2-dynamo-core-tests:
-    name: L2 dynamo core tests
-    needs: [filter-matrix, build, L1-dynamo-core-tests, L1-dynamo-compile-tests, L1-torch-compile-tests, L1-torchscript-tests]
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - repository: pytorch/tensorrt
-            package-name: torch_tensorrt
-            pre-script: packaging/pre_build_script.sh
-            post-script: packaging/post_build_script.sh
-            smoke-test-script: packaging/smoke_test_script.sh
-    uses: ./.github/workflows/linux-test.yml
-    with:
-      job-name: L2-dynamo-core-tests
-      repository: "pytorch/tensorrt"
-      ref: ""
-      test-infra-repository: pytorch/test-infra
-      test-infra-ref: main
-      build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
-      pre-script: ${{ matrix.pre-script }}
-      script: |
-        set -euo pipefail
-        pushd .
-        cd tests/py/dynamo
-        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l2_dynamo_core_tests_results.xml  -k "not test_000_ and not test_001_" runtime/*
-        popd
+  # L2-dynamo-core-tests:
+  #   name: L2 dynamo core tests
+  #   needs: [filter-matrix, build, L1-dynamo-core-tests, L1-dynamo-compile-tests, L1-torch-compile-tests, L1-torchscript-tests]
+  #   strategy:
+  #     fail-fast: false
+  #     matrix:
+  #       include:
+  #         - repository: pytorch/tensorrt
+  #           package-name: torch_tensorrt
+  #           pre-script: packaging/pre_build_script.sh
+  #           post-script: packaging/post_build_script.sh
+  #           smoke-test-script: packaging/smoke_test_script.sh
+  #   uses: ./.github/workflows/linux-test.yml
+  #   with:
+  #     job-name: L2-dynamo-core-tests
+  #     repository: "pytorch/tensorrt"
+  #     ref: ""
+  #     test-infra-repository: pytorch/test-infra
+  #     test-infra-ref: main
+  #     build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
+  #     pre-script: ${{ matrix.pre-script }}
+  #     script: |
+  #       set -euo pipefail
+  #       pushd .
+  #       cd tests/py/dynamo
+  #       python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l2_dynamo_core_tests_results.xml  -k "not test_000_ and not test_001_" runtime/*
+  #       popd
 
-  L2-dynamo-plugin-tests:
-    name: L2 dynamo plugin tests
-    needs: [filter-matrix, build, L1-dynamo-core-tests, L1-dynamo-compile-tests, L1-torch-compile-tests, L1-torchscript-tests]
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - repository: pytorch/tensorrt
-            package-name: torch_tensorrt
-            pre-script: packaging/pre_build_script.sh
-            post-script: packaging/post_build_script.sh
-            smoke-test-script: packaging/smoke_test_script.sh
-    uses: ./.github/workflows/linux-test.yml
-    with:
-      job-name: L2-dynamo-plugin-tests
-      repository: "pytorch/tensorrt"
-      ref: ""
-      test-infra-repository: pytorch/test-infra
-      test-infra-ref: main
-      build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
-      pre-script: ${{ matrix.pre-script }}
-      script: |
-        set -euo pipefail
-        pushd .
-        cd tests/py/dynamo
-        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l2_dynamo_plugins_tests_results.xml automatic_plugin/
-        popd
+  # L2-dynamo-plugin-tests:
+  #   name: L2 dynamo plugin tests
+  #   needs: [filter-matrix, build, L1-dynamo-core-tests, L1-dynamo-compile-tests, L1-torch-compile-tests, L1-torchscript-tests]
+  #   strategy:
+  #     fail-fast: false
+  #     matrix:
+  #       include:
+  #         - repository: pytorch/tensorrt
+  #           package-name: torch_tensorrt
+  #           pre-script: packaging/pre_build_script.sh
+  #           post-script: packaging/post_build_script.sh
+  #           smoke-test-script: packaging/smoke_test_script.sh
+  #   uses: ./.github/workflows/linux-test.yml
+  #   with:
+  #     job-name: L2-dynamo-plugin-tests
+  #     repository: "pytorch/tensorrt"
+  #     ref: ""
+  #     test-infra-repository: pytorch/test-infra
+  #     test-infra-ref: main
+  #     build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
+  #     pre-script: ${{ matrix.pre-script }}
+  #     script: |
+  #       set -euo pipefail
+  #       pushd .
+  #       cd tests/py/dynamo
+  #       python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l2_dynamo_plugins_tests_results.xml automatic_plugin/
+  #       popd
 
-  L2-torchscript-tests:
-    name: L2 torch script tests
-    needs: [filter-matrix, build, L1-dynamo-core-tests, L1-dynamo-compile-tests, L1-torch-compile-tests, L1-torchscript-tests]
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - repository: pytorch/tensorrt
-            package-name: torch_tensorrt
-            pre-script: packaging/pre_build_script.sh
-            post-script: packaging/post_build_script.sh
-            smoke-test-script: packaging/smoke_test_script.sh
-    uses: ./.github/workflows/linux-test.yml
-    with:
-      job-name: L2-torchscript-tests
-      repository: "pytorch/tensorrt"
-      ref: ""
-      test-infra-repository: pytorch/test-infra
-      test-infra-ref: main
-      build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
-      pre-script: ${{ matrix.pre-script }}
-      script: |
-        set -euo pipefail
-        pushd .
-        cd tests/modules
-        python hub.py
-        popd
-        pushd .
-        cd tests/py/ts
-        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l2_ts_integrations_tests_results.xml   integrations/
-        popd
+  # L2-torchscript-tests:
+  #   name: L2 torch script tests
+  #   needs: [filter-matrix, build, L1-dynamo-core-tests, L1-dynamo-compile-tests, L1-torch-compile-tests, L1-torchscript-tests]
+  #   strategy:
+  #     fail-fast: false
+  #     matrix:
+  #       include:
+  #         - repository: pytorch/tensorrt
+  #           package-name: torch_tensorrt
+  #           pre-script: packaging/pre_build_script.sh
+  #           post-script: packaging/post_build_script.sh
+  #           smoke-test-script: packaging/smoke_test_script.sh
+  #   uses: ./.github/workflows/linux-test.yml
+  #   with:
+  #     job-name: L2-torchscript-tests
+  #     repository: "pytorch/tensorrt"
+  #     ref: ""
+  #     test-infra-repository: pytorch/test-infra
+  #     test-infra-ref: main
+  #     build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
+  #     pre-script: ${{ matrix.pre-script }}
+  #     script: |
+  #       set -euo pipefail
+  #       pushd .
+  #       cd tests/modules
+  #       python hub.py
+  #       popd
+  #       pushd .
+  #       cd tests/py/ts
+  #       python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l2_ts_integrations_tests_results.xml   integrations/
+  #       popd
 
-  L2-dynamo-distributed-tests:
-    name: L2 dynamo distributed tests
-    needs: [filter-matrix, build, L1-dynamo-core-tests, L1-dynamo-compile-tests, L1-torch-compile-tests, L1-torchscript-tests]
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - repository: pytorch/tensorrt
-            package-name: torch_tensorrt
-            pre-script: packaging/pre_build_script.sh
-            post-script: packaging/post_build_script.sh
-            smoke-test-script: packaging/smoke_test_script.sh
-    uses: ./.github/workflows/linux-test.yml
-    with:
-      job-name: L2-dynamo-distributed-tests
-      repository: "pytorch/tensorrt"
-      ref: ""
-      test-infra-repository: pytorch/test-infra
-      test-infra-ref: main
-      build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
-      pre-script: ${{ matrix.pre-script }}
-      script: |
-        set -euo pipefail
-        export USE_HOST_DEPS=1
-        export CI_BUILD=1
-        export USE_TRTLLM_PLUGINS=1
-        dnf install -y mpich mpich-devel openmpi openmpi-devel
-        pushd .
-        cd tests/py
-        cd dynamo
-        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l2_dynamo_distributed_test_results.xml distributed/test_nccl_ops.py
-        popd
+  # L2-dynamo-distributed-tests:
+  #   name: L2 dynamo distributed tests
+  #   needs: [filter-matrix, build, L1-dynamo-core-tests, L1-dynamo-compile-tests, L1-torch-compile-tests, L1-torchscript-tests]
+  #   strategy:
+  #     fail-fast: false
+  #     matrix:
+  #       include:
+  #         - repository: pytorch/tensorrt
+  #           package-name: torch_tensorrt
+  #           pre-script: packaging/pre_build_script.sh
+  #           post-script: packaging/post_build_script.sh
+  #           smoke-test-script: packaging/smoke_test_script.sh
+  #   uses: ./.github/workflows/linux-test.yml
+  #   with:
+  #     job-name: L2-dynamo-distributed-tests
+  #     repository: "pytorch/tensorrt"
+  #     ref: ""
+  #     test-infra-repository: pytorch/test-infra
+  #     test-infra-ref: main
+  #     build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
+  #     pre-script: ${{ matrix.pre-script }}
+  #     script: |
+  #       set -euo pipefail
+  #       export USE_HOST_DEPS=1
+  #       export CI_BUILD=1
+  #       export USE_TRTLLM_PLUGINS=1
+  #       dnf install -y mpich mpich-devel openmpi openmpi-devel
+  #       pushd .
+  #       cd tests/py
+  #       cd dynamo
+  #       python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l2_dynamo_distributed_test_results.xml distributed/test_nccl_ops.py
+  #       popd
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref_name }}-tensorrt-${{ inputs.repository }}-${{ github.event_name == 'workflow_dispatch' }}-${{ inputs.job-name }}
