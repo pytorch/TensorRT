@@ -1,6 +1,11 @@
 
 install_tensorrt_rtx() {
     if [[ ${USE_TRT_RTX} == true ]]; then
+        if [[ ${CU_VERSION:2:2} == "13" ]]; then
+            export CU_UPPERBOUND="13.0"
+        else
+            export CU_UPPERBOUND="12.9"
+        fi
         TRT_RTX_VERSION=1.2.0.54
         install_wheel_or_not=${1:-false}
         echo "It is the tensorrt-rtx build, install tensorrt-rtx with install_wheel_or_not:${install_wheel_or_not}"
