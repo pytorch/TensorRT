@@ -38,9 +38,8 @@ install_tensorrt_rtx() {
                 pip install TensorRT-RTX-${TRT_RTX_VERSION}/python/tensorrt_rtx-${TRT_RTX_VERSION}-${CPYTHON_TAG}-none-linux_x86_64.whl
             fi
         fi
-        # clean up the downloaded files
+        # clean up the downloaded rtx tarball
         rm tensorrt-rtx*.tar.gz
-        rm -rf TensorRT-RTX-${TRT_RTX_VERSION}
     else
         echo "It is the standard tensorrt build, skip install tensorrt-rtx"
     fi

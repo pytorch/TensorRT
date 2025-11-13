@@ -758,7 +758,8 @@ def get_requirements():
                 ]
             else:
                 requirements = requirements + [
-                    "tensorrt>=10.14.0,<10.15.0",
+                    # directly use tensorrt>=10.14.0,<10.15.0 in cu12* env, it will pull both tensorrt_cu12 and tensorrt_cu13
+                    # which will cause the conflict due to cuda-toolkit 13 is also pulled in, so we need to specify tensorrt_cu12 or tensorrt_cu13 here
                     f"{tensorrt_prefix}>=10.14.0,<10.15.0",
                     f"{tensorrt_prefix}-bindings>=10.14.0,<10.15.0",
                     f"{tensorrt_prefix}-libs>=10.14.0,<10.15.0",
