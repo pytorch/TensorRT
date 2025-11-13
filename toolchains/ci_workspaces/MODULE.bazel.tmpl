@@ -75,27 +75,27 @@ http_archive = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "ht
 http_archive(
     name = "tensorrt",
     build_file = "@//third_party/tensorrt/archive:BUILD",
-    strip_prefix = "TensorRT-10.13.3.9",
+    strip_prefix = "TensorRT-10.14.1.48",
     urls = [
-        "https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.13.3/tars/TensorRT-10.13.3.9.Linux.x86_64-gnu.cuda-${CU_UPPERBOUND}.tar.gz",
+        "https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.14.1/tars/TensorRT-10.14.1.48.Linux.x86_64-gnu.cuda-${CU_UPPERBOUND}.tar.gz",
     ],
 )
 
 http_archive(
     name = "tensorrt_rtx",
     build_file = "@//third_party/tensorrt_rtx/archive:BUILD",
-    strip_prefix = "TensorRT-RTX-1.0.0.21",
+    strip_prefix = "TensorRT-RTX-1.2.0.54",
     urls = [
-        "https://developer.nvidia.com/downloads/trt/rtx_sdk/secure/1.0/TensorRT-RTX-1.0.0.21.Linux.x86_64-gnu.cuda-12.9.tar.gz",
+        "https://developer.nvidia.com/downloads/trt/rtx_sdk/secure/1.2/tensorrt-rtx-1.2.0.54-linux-x86_64-cuda-${CU_UPPERBOUND}-release-external.tar.gz",
     ],
 )
 
 http_archive(
     name = "tensorrt_sbsa",
     build_file = "@//third_party/tensorrt/archive:BUILD",
-    strip_prefix = "TensorRT-10.13.3.9",
+    strip_prefix = "TensorRT-10.14.1.48",
     urls = [
-        "https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.13.3/tars/TensorRT-10.13.3.9.Linux.aarch64-gnu.cuda-13.0.tar.gz",
+        "https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.14.1/tars/TensorRT-10.14.1.48.Linux.aarch64-gnu.cuda-13.0.tar.gz",
     ],
 )
 
@@ -111,18 +111,18 @@ http_archive(
 http_archive(
     name = "tensorrt_win",
     build_file = "@//third_party/tensorrt/archive:BUILD",
-    strip_prefix = "TensorRT-10.13.3.9",
+    strip_prefix = "TensorRT-10.14.1.48",
     urls = [
-        "https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.13.3/zip/TensorRT-10.13.3.9.Windows.win10.cuda-${CU_UPPERBOUND}.zip",
+        "https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.14.1/zip/TensorRT-10.14.1.48.Windows.win10.cuda-${CU_UPPERBOUND}.zip",
     ],
 )
 
 http_archive(
     name = "tensorrt_rtx_win",
     build_file = "@//third_party/tensorrt_rtx/archive:BUILD",
-    strip_prefix = "TensorRT-RTX-1.0.0.21",
+    strip_prefix = "TensorRT-RTX-1.2.0.54",
     urls = [
-        "https://developer.nvidia.com/downloads/trt/rtx_sdk/secure/1.0/TensorRT-RTX-1.0.0.21.Windows.win10.cuda-12.9.zip",
+        "https://developer.nvidia.com/downloads/trt/rtx_sdk/secure/1.2/tensorrt-rtx-1.2.0.54-win10-amd64-cuda-${CU_UPPERBOUND}-release-external.zip",
     ],
 )
 

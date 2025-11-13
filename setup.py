@@ -754,14 +754,14 @@ def get_requirements():
             requirements = requirements + ["torch>=2.10.0.dev,<2.11.0"]
             if USE_TRT_RTX:
                 requirements = requirements + [
-                    "tensorrt_rtx>=1.0.0.21",
+                    "tensorrt_rtx>=1.2.0.54",
                 ]
             else:
                 requirements = requirements + [
-                    "tensorrt>=10.13.0,<10.14.0",
-                    f"{tensorrt_prefix}>=10.13.0,<10.14.0",
-                    f"{tensorrt_prefix}-bindings>=10.13.0,<10.14.0",
-                    f"{tensorrt_prefix}-libs>=10.13.0,<10.14.0",
+                    "tensorrt>=10.14.0,<10.15.0",
+                    f"{tensorrt_prefix}>=10.14.0,<10.15.0",
+                    f"{tensorrt_prefix}-bindings>=10.14.0,<10.15.0",
+                    f"{tensorrt_prefix}-libs>=10.14.0,<10.15.0",
                 ]
     return requirements
 
@@ -781,7 +781,7 @@ def get_sbsa_requirements():
     # also due to we use sbsa torch_tensorrt wheel for thor, so when we build sbsa wheel, we need to only include tensorrt dependency.
     return sbsa_requirements + [
         "torch>=2.10.0.dev,<2.11.0",
-        "tensorrt>=10.13.0,<10.14.0",
+        "tensorrt>=10.14.0,<10.15.0",
     ]
 
 
