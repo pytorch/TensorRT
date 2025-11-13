@@ -2,6 +2,7 @@ import os
 import platform
 import tempfile
 
+import psutil
 import torch
 from torch_tensorrt._Device import Device
 from torch_tensorrt._enums import EngineCapability, dtype
@@ -57,6 +58,7 @@ TILING_OPTIMIZATION_LEVEL = "none"
 L2_LIMIT_FOR_TILING = -1
 USE_DISTRIBUTED_MODE_TRACE = False
 OFFLOAD_MODULE_TO_CPU = False
+CPU_MEMORY_BUDGET = psutil.virtual_memory().available
 
 if platform.system() == "Linux":
     import pwd
