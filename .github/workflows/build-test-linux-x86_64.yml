@@ -132,11 +132,11 @@ jobs:
       script: |
         set -euo pipefail
         echo "L0-dynamo-core-tests successfully completed"
-        if [ ${{ CU_VERSION }} == "cu128" ]; then
+        if [ ${CU_VERSION} == "cu128" ]; then
            echo "running L0-dynamo-core-tests for cu128 is not supported"
            exit -1
         fi
-        echo "Running L0-dynamo-core-tests for ${{ CU_VERSION }} successfully completed"
+        echo "Running L0-dynamo-core-tests for ${CU_VERSION} successfully completed"
         # pushd .
         # cd tests/py
         # cd dynamo
