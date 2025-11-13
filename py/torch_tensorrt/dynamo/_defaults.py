@@ -2,6 +2,7 @@ import os
 import platform
 import tempfile
 
+import psutil
 import torch
 from torch_tensorrt._Device import Device
 from torch_tensorrt._enums import EngineCapability, dtype
@@ -64,6 +65,7 @@ AUTOCAST_EXCLUDED_OPS = set[torch.fx.node.Target]()
 AUTOCAST_MAX_OUTPUT_THRESHOLD = 512
 AUTOCAST_MAX_DEPTH_OF_REDUCTION = None
 AUTOCAST_CALIBRATION_DATALOADER = None
+CPU_MEMORY_BUDGET = psutil.virtual_memory().available
 
 if platform.system() == "Linux":
     import pwd

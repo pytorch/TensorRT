@@ -14,6 +14,7 @@ from torch_tensorrt.dynamo._defaults import (
     AUTOCAST_MAX_DEPTH_OF_REDUCTION,
     AUTOCAST_MAX_OUTPUT_THRESHOLD,
     CACHE_BUILT_ENGINES,
+    CPU_MEMORY_BUDGET,
     DISABLE_TF32,
     DLA_GLOBAL_DRAM_SIZE,
     DLA_LOCAL_DRAM_SIZE,
@@ -168,6 +169,7 @@ class CompilationSettings:
     autocast_calibration_dataloader: Optional[torch.utils.data.DataLoader] = (
         AUTOCAST_CALIBRATION_DATALOADER
     )
+    cpu_memory_budget: int = CPU_MEMORY_BUDGET
 
     def __getstate__(self) -> dict[str, Any]:
         from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
