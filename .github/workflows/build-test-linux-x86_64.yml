@@ -208,6 +208,7 @@ jobs:
   L1-dynamo-core-tests:
     name: L1 dynamo core tests
     needs: [filter-matrix, build, L0-dynamo-core-tests]
+    if: always()
     #needs: [filter-matrix, build, L0-dynamo-converter-tests, L0-dynamo-core-tests, L0-py-core-tests, L0-torchscript-tests]
     strategy:
       fail-fast: false

@@ -84,7 +84,6 @@ jobs:
       USE_TRT_RTX: ${{ inputs.use-rtx }}
       DOWNLOAD_ARTIFACT_NAME: pytorch_tensorrt_${{ matrix.tensorrt.version }}_${{ matrix.python_version }}_${{ matrix.desired_cuda }}_${{ inputs.architecture }}
     name: ${{ inputs.job-name }}-${{ matrix.tensorrt.version }}-${{ matrix.python_version }}-${{ matrix.desired_cuda }}
-    if: ${{ matrix.desired_cuda == inputs.filter-cuda && matrix.python_version == inputs.filter-python }}
     runs-on: ${{ matrix.validation_runner }}
     container:
       image: ${{ matrix.container_image }}
@@ -93,7 +92,19 @@ jobs:
     # to have a conversation
     timeout-minutes: 120
     steps:
+      - name: Check if should run this variant
+        id: check_variant
+        run: |
+          set -euxo pipefail
+          echo "lan added .... PYTHON_VERSION=${PYTHON_VERSION} and inputs.filter-python=${inputs.filter-python}"
+          echo "lan added .... CU_VERSION=${CU_VERSION} and inputs.filter-cuda=${inputs.filter-cuda}"
+          if [ "${PYTHON_VERSION}" = "${{ inputs.filter-python }}" ] && [ "${CU_VERSION}" = "${{ inputs.filter-cuda }}" ]; then
+            echo "should_run=true" >> $GITHUB_OUTPUT
+          else
+            echo "should_run=false" >> $GITHUB_OUTPUT
+          fi
       - name: Clean workspace
+        if: steps.check_variant.outputs.should_run == 'true'
         run: |
           set -euxo pipefail
           echo "::group::Cleanup debug output"
