@@ -6,13 +6,24 @@ on:
 
 
 jobs:
+  generate-matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.generate-matrix.outputs.matrix }}
+    steps:
+      - name: Generate matrix
+        id: generate-matrix
+        run: |
+          echo "matrix={\"cuda-version\":[\"12.8\", \"13.0\"]}" >> $GITHUB_OUTPUT
+
   build:
     runs-on: ubuntu-latest
+    needs: [generate-matrix]
     strategy:
-      matrix:
-        cuda-version: [12.8, 13.0]
+      matrix: ${{ fromJSON(needs.generate-matrix.outputs.matrix) }}
     steps:
       - name: Build with CUDA ${{ matrix.cuda-version }}
+        id: build-step
         run: |
           echo "Building with CUDA ${{ matrix.cuda-version }}"
           if [ "${{ matrix.cuda-version }}" == "12.8" ]; then
@@ -23,13 +34,13 @@ jobs:
 
   test:
     needs: [build]
-    if: always() && needs.build.result == 'success'
+    if: always() && needs.build.build-step.outputs.result == 'success'
     runs-on: ubuntu-latest
     strategy:
-      matrix:
-        cuda-version: [12.8, 13.0]
+      matrix: ${{ fromJSON(needs.generate-matrix.outputs.matrix) }}
     steps:
       - name: Test with CUDA ${{ matrix.cuda-version }}
         run: |
+          echo "needs.build.build-step.result=${{ needs.build.build-step.result }}"
           echo "Testing with CUDA ${{ matrix.cuda-version }}"
 
