@@ -28,6 +28,8 @@ install_tensorrt_rtx() {
             if [[ ${install_wheel_or_not} == true ]]; then
                 pip install TensorRT-RTX-${TRT_RTX_VERSION}/python/tensorrt_rtx-${TRT_RTX_VERSION}-${CPYTHON_TAG}-none-win_amd64.whl
             fi
+            # clean up the downloaded rtx zip
+            rm tensorrt-rtx*.zip
         else
             curl -L https://developer.nvidia.com/downloads/trt/rtx_sdk/secure/1.2/tensorrt-rtx-${TRT_RTX_VERSION}-linux-x86_64-cuda-${CU_UPPERBOUND}-release-external.tar.gz -o tensorrt-rtx-${TRT_RTX_VERSION}-linux-x86_64-cuda-${CU_UPPERBOUND}-release-external.tar.gz
             tar -xzf tensorrt-rtx-${TRT_RTX_VERSION}-linux-x86_64-cuda-${CU_UPPERBOUND}-release-external.tar.gz
@@ -37,9 +39,9 @@ install_tensorrt_rtx() {
             if [[ ${install_wheel_or_not} == true ]]; then
                 pip install TensorRT-RTX-${TRT_RTX_VERSION}/python/tensorrt_rtx-${TRT_RTX_VERSION}-${CPYTHON_TAG}-none-linux_x86_64.whl
             fi
+            # clean up the downloaded rtx tarball
+            rm tensorrt-rtx*.tar.gz
         fi
-        # clean up the downloaded rtx tarball
-        rm tensorrt-rtx*.tar.gz
     else
         echo "It is the standard tensorrt build, skip install tensorrt-rtx"
     fi
