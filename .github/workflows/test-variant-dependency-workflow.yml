@@ -47,11 +47,12 @@ jobs:
   L0-test-results:
      name: Prepare-L0-results
      runs-on: ubuntu-latest
-     needs: [L0-dynamo-test, L0-core-test]
+     needs: [generate-matrix, L0-dynamo-test, L0-core-test]
      strategy:
       fail-fast: false
+      matrix: ${{ needs.generate-matrix.outputs.matrix }}
      outputs:
-       result: ${{ steps.prepare-l0-results.outputs.l0-results-url }}
+       result: ${{ steps.prepare-l0-results.outputs.result }}
      if: always()
      steps:
       - name: Prepare L0 test results
@@ -64,6 +65,7 @@ jobs:
           else
             echo "L0 test results are not successful"
             echo "result=failure" >> $GITHUB_OUTPUT
+            exit 1
           fi
 
   L1-test:
