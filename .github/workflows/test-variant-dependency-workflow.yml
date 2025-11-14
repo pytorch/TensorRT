@@ -1,0 +1,35 @@
+name: Test variant dependency workflow
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        cuda-version: [12.8, 13.0]
+    steps:
+      - name: Build with CUDA ${{ matrix.cuda-version }}
+        run: |
+          echo "Building with CUDA ${{ matrix.cuda-version }}"
+          if [ "${{ matrix.cuda-version }}" == "12.8" ]; then
+            echo "result=success" >> $GITHUB_OUTPUT
+          else
+            echo "result=failure" >> $GITHUB_OUTPUT
+          fi
+
+  test:
+    needs: [build]
+    if: always() && needs.build.result == 'success'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        cuda-version: [12.8, 13.0]
+    steps:
+      - name: Test with CUDA ${{ matrix.cuda-version }}
+        run: |
+          echo "Testing with CUDA ${{ matrix.cuda-version }}"
+

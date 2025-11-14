@@ -96,12 +96,16 @@ jobs:
         id: check_variant
         run: |
           set -euxo pipefail
-          echo "lan added .... PYTHON_VERSION=${PYTHON_VERSION} and inputs.filter-python=${inputs.filter-python}"
-          echo "lan added .... CU_VERSION=${CU_VERSION} and inputs.filter-cuda=${inputs.filter-cuda}"
-          if [ "${PYTHON_VERSION}" = "${{ inputs.filter-python }}" ] && [ "${CU_VERSION}" = "${{ inputs.filter-cuda }}" ]; then
+          echo "lan added .... PYTHON_VERSION=${PYTHON_VERSION} and inputs.filter-python=${{inputs.filter-python}}"
+          echo "lan added .... CU_VERSION=${CU_VERSION} and inputs.filter-cuda=${{inputs.filter-cuda}}"
+          if [ "${{ inputs.filter-python }}" == "" ] || [ "${{ inputs.filter-cuda }}" == "" ]; then
             echo "should_run=true" >> $GITHUB_OUTPUT
           else
-            echo "should_run=false" >> $GITHUB_OUTPUT
+            if [ "${PYTHON_VERSION}" == "${{ inputs.filter-python }}" ] && [ "${CU_VERSION}" == "${{ inputs.filter-cuda }}" ]; then
+              echo "should_run=true" >> $GITHUB_OUTPUT
+            else
+              echo "should_run=false" >> $GITHUB_OUTPUT
+            fi
           fi
       - name: Clean workspace
         if: steps.check_variant.outputs.should_run == 'true'
@@ -183,7 +187,11 @@ jobs:
           summary: true
           display-options: fEs
           fail-on-empty: true
-
+      - name: Set result
+        id: set_result
+        run: |
+          set -euxo pipefail
+          echo "result=success" >> $GITHUB_OUTPUT
       - name: Prepare artifacts for upload
         working-directory: ${{ inputs.repository }}
         id: check-artifacts
