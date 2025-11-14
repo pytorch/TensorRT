@@ -8,7 +8,24 @@ from conversion.harness import DispatchTestCase
 from distributed_utils import set_environment_variables_pytest
 from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
-from torch_tensorrt._utils import is_platform_supported_for_trtllm
+
+
+def is_distributed_nccl_available():
+    """
+    Check if torch.distributed with NCCL backend is available.
+
+    Note: torch.distributed is available on Windows but NCCL backend is not.
+    NCCL (NVIDIA Collective Communications Library) is Linux/Unix only.
+    This function returns False on Windows, Jetson, and other platforms
+    where NCCL backend is not supported.
+    """
+    try:
+        import torch.distributed as dist
+
+        # Check if NCCL backend is available (False on Windows, since its gloo. For ORIN some torch distribution it is available
+        return dist.is_nccl_available()
+    except (ImportError, AttributeError):
+        return False
 
 
 class DistributedGatherModel(nn.Module):
@@ -42,9 +59,11 @@ class DistributedReduceScatterModel(nn.Module):
 
 
 class TestNcclOpsConverter(DispatchTestCase):
+    # 1. Skip if NCCL backend is not available (e.g., Windows, Jetson) - hard requirement
+    # 2. Don't skip if TRTLLM is unavailable (e.g., CUDA 13) - falls back to PyTorch
     @unittest.skipIf(
-        not is_platform_supported_for_trtllm(),
-        "Skipped on Windows, Jetson and CUDA13: NCCL backend is not supported.",
+        not is_distributed_nccl_available(),
+        "Skipped: NCCL backend is not available (Windows/Jetson not supported).",
     )
     @classmethod
     def setUpClass(cls):
