@@ -28,10 +28,12 @@ jobs:
   L0-test:
     name: L0-test
     needs: [generate-matrix, build]
-    if: always() && needs.build.result == 'success'
+    if: always()
+    #if: always() && needs.build.result == 'success'
     uses: ./.github/workflows/test-variant-dependency-test.yml
     with:
       build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
+      build-result: ${{ needs.build.outputs.result }}
 
   L1-test:
     name: L1-test

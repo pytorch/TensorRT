@@ -15,6 +15,10 @@ on:
         description: "Build matrix to utilize"
         default: ""
         type: string
+      build-result:
+        description: "Build result"
+        default: ""
+        type: string
 
 jobs:
   test:
@@ -23,6 +27,7 @@ jobs:
       fail-fast: false
       matrix: ${{ fromJSON(inputs.build-matrix) }}
     name: test-${{ matrix.cuda-version }}
+    if: ${{ inputs.build-result == 'success' }}
     outputs:
       result: ${{ steps.test-step.outputs.result }}
     steps:
