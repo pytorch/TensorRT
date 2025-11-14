@@ -30,8 +30,6 @@ jobs:
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(inputs.build-matrix) }}
-      build-result: ${{ inputs.build-result }}
-      test-result: ${{ inputs.test-result }}
     name: test-${{ matrix.cuda-version }}
     outputs:
       result: ${{ steps.test-step.outputs.result }}
@@ -41,7 +39,6 @@ jobs:
         run: |
           set -euo pipefail
           echo "Build result: ${{ inputs.build-result }}"
-          echo "Build matrix: ${{ build-result }}"
           if [ "${{ inputs.build-result }}" == "success" ]; then
             echo "Build result is success"
           else
