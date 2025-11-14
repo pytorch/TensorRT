@@ -885,16 +885,6 @@ def compile_module(
     # Iterate over all components that can be accelerated
     # Generate the corresponding TRT Module for those
 
-    # Here we delete the frozen parameters from the graph module. Note this does not affect the submodules. We are going to delete the frozen parameters from the submodules in the convert_module function.
-    # This is done to release CPU memory.
-    for attr in dir(gm):
-        if attr.startswith("_frozen_param"):
-            delattr(gm, attr)
-
-    from torch_tensorrt.dynamo.conversion._ConverterRegistry import DYNAMO_CONVERTERS
-
-    DYNAMO_CONVERTERS.disallowed_targets = set()
-
     for name, _ in partitioned_module.named_children():
         submodule = getattr(partitioned_module, name)
         # filter on the GraphModule
