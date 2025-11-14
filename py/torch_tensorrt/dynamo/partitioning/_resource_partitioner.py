@@ -52,7 +52,7 @@ import psutil
 import torch
 from torch.fx.passes.splitter_base import Subgraph, _SplitterBase
 from torch.fx.passes.tools_common import CALLABLE_NODE_OPS
-from torch_tensorrt.dynamo.partitioning.fusion_patterns import (
+from torch_tensorrt.dynamo.partitioning._atomic_subgraphs import (
     get_node_in_fusion_pattern,
 )
 
@@ -211,7 +211,7 @@ class ResourcePartitioner(_SplitterBase):  # type: ignore
             int: Budget in bytes for a single accelerated subgraph.
         """
 
-        used_rss: int = psutil.virtual_memory().used
+        used_rss: int = psutil.Process().memory_info().rss
         available_rss = self.cpu_memory_budget - used_rss
         return available_rss // engine_compilation_memory_usage_multiplier
 
