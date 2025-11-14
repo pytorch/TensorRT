@@ -74,7 +74,7 @@ T = TypeVar("T")
 
 def _enabled_features_str() -> str:
     enabled = lambda x: "ENABLED" if x else "DISABLED"
-    out_str: str = f"Enabled Features:\n - Dynamo Frontend: {enabled(_DYNAMO_FE_AVAIL)}\n - Torch-TensorRT Runtime: {enabled(_TORCHTRT_RT_AVAIL)}\n - FX Frontend: {enabled(_FX_FE_AVAIL)}\n - TorchScript Frontend: {enabled(_TS_FE_AVAIL)}\n - Refit: {enabled(_REFIT_AVAIL)}\n - QDP Plugin: {enabled(_QDP_PLUGIN_AVAIL)} \n - TensorRT-RTX: {enabled(_TENSORRT_RTX)}\n"  # type: ignore[no-untyped-call]
+    out_str: str = f"Enabled Features:\n - Dynamo Frontend: {enabled(_DYNAMO_FE_AVAIL)}\n - Torch-TensorRT Runtime: {enabled(_TORCHTRT_RT_AVAIL)}\n - FX Frontend: {enabled(_FX_FE_AVAIL)}\n - TorchScript Frontend: {enabled(_TS_FE_AVAIL)}\n - Refit: {enabled(_REFIT_AVAIL)}\n - QDP Plugin: {enabled(_QDP_PLUGIN_AVAIL)} \n - TensorRT-RTX: {enabled(_TENSORRT_RTX)}\n - TensorRT-LLM for NCCL: {enabled(_TRTLLM_AVAIL)}\n"  # type: ignore[no-untyped-call]
     return out_str
 
 
@@ -163,14 +163,26 @@ def needs_cross_compile(f: Callable[..., Any]) -> Callable[..., Any]:
 
 
 def needs_trtllm_for_nccl(f: Callable[..., Any]) -> Callable[..., Any]:
+    """
+    Runtime check decorator for TensorRT-LLM NCCL plugin availability.
+
+    WARNING: This decorator CANNOT prevent registration of converters at import time.
+    When used with @dynamo_tensorrt_converter, the converter is always registered
+    regardless of decorator order, because registration happens at import time before
+    the wrapper is called.
+
+    This decorator is kept for potential non-registration use cases where
+    runtime checks are appropriate.
+    @apbose: to discuss if this is required
+    """
+
     def wrapper(*args: List[Any], **kwargs: Dict[str, Any]) -> Any:
         if ENABLED_FEATURES.trtllm_for_nccl:
             return f(*args, **kwargs)
         else:
-
             def not_implemented(*args: List[Any], **kwargs: Dict[str, Any]) -> Any:
                 raise NotImplementedError(
-                    "Refit feature is currently not available in Python 3.13 or higher"
+                    "TensorRT-LLM plugin for NCCL is not available"
                 )
 
             return not_implemented(*args, **kwargs)
