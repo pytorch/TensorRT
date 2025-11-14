@@ -8,6 +8,7 @@ import numpy as np
 import torch
 from tensorrt import ITensor as TRTTensor
 from torch.fx.node import Argument, Node, Target
+from torch_tensorrt import ENABLED_FEATURES
 from torch_tensorrt._features import needs_not_tensorrt_rtx
 from torch_tensorrt._utils import is_tensorrt_version_supported, is_thor
 from torch_tensorrt.dynamo._settings import CompilationSettings
@@ -427,8 +428,8 @@ def index_dtype_validator(
 def index_nonbool_validator(
     node: Node, settings: Optional[CompilationSettings] = None
 ) -> bool:
-    # for thor, we don't support boolean indices
-    if is_thor():
+    # for thor and tensorrt_rtx, we don't support boolean indices, due to nonzero op not supported
+    if is_thor() or ENABLED_FEATURES.tensorrt_rtx:
         index = node.args[1]
         for ind in index:
             if ind is not None:
@@ -903,6 +904,8 @@ def aten_ops_select(
 
 @dynamo_tensorrt_converter(
     torch.ops.aten.index_put.default,
+    capability_validator=lambda node, settings: index_dtype_validator(node, settings)
+    and index_nonbool_validator(node, settings),
     supports_dynamic_shapes=True,
 )
 @enforce_tensor_types(
@@ -2786,6 +2789,7 @@ def aten_ops_max_pool(
 @dynamo_tensorrt_converter(
     torch.ops.aten._reshape_copy.default, supports_dynamic_shapes=True
 )
+@dynamo_tensorrt_converter(torch.ops.aten.view.default, supports_dynamic_shapes=True)
 @enforce_tensor_types(
     {
         0: (TRTTensor,),
