@@ -40,6 +40,9 @@ from torch_tensorrt.dynamo.lowering import (
     post_lowering,
     pre_export_lowering,
 )
+from torch_tensorrt.dynamo.partitioning._resource_partitioner import (
+    resource_partition,
+)
 from torch_tensorrt.dynamo.utils import (
     deallocate_module,
     get_cpu_memory_usage,
@@ -913,10 +916,6 @@ def compile_module(
             torch_executed_ops=settings.torch_executed_ops,
             require_full_compilation=settings.require_full_compilation,
         )
-
-    from torch_tensorrt.dynamo.partitioning._resource_partitioner import (
-        resource_partition,
-    )
 
     partitioned_module = resource_partition(
         gm,

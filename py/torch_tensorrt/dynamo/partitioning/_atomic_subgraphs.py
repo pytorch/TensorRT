@@ -165,7 +165,6 @@ class MulMul(torch.nn.Module):  # type: ignore[misc]
         return x
 
 
-@lru_cache(maxsize=None)
 def get_node_in_fusion_pattern(
     graph: torch.fx.Graph,
 ) -> Dict[torch.fx.Node, Set[torch.fx.Node]]:
@@ -175,10 +174,8 @@ def get_node_in_fusion_pattern(
     Value: the list of nodes that should be fused together
     """
     fusion_nodes = {}
-    for pattern, is_aten in ATOMIC_SUBGRAPHS:
-        pattern_graph = torch.fx.symbolic_trace(pattern())
-        # TODO: Add decomposition and lowering if is_aten is False
-        subgraph_matcher = SubgraphMatcher(pattern_graph.graph)
+    for compiled_pattern_graph in get_compiled_atomic_subgraphs():
+        subgraph_matcher = SubgraphMatcher(compiled_pattern_graph.graph)
         match_result = subgraph_matcher.match(graph)
         for match in match_result:
             fusion_group = {
@@ -193,3 +190,21 @@ def get_node_in_fusion_pattern(
                 fusion_nodes[node] = fusion_group
 
     return fusion_nodes
+
+
+@lru_cache(maxsize=None)
+def get_compiled_atomic_subgraphs() -> List[torch.fx.GraphModule]:
+    """
+    This function gets the compiled atomic subgraphs from the graph.
+    LRU cache the result to avoid recompiling the same pattern multiple times.
+    """
+    compiled_atomic_subgraphs = []
+    for pattern, is_aten in ATOMIC_SUBGRAPHS:
+        pattern_graph = torch.fx.symbolic_trace(pattern())
+        if not is_aten:
+            # TODO: Add decomposition and lowering if is_aten is False
+            raise NotImplementedError(
+                "Atomic subgraphs are not supported for non-aten subgraphs yet."
+            )
+        compiled_atomic_subgraphs.append(pattern_graph)
+    return compiled_atomic_subgraphs
