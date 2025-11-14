@@ -1,11 +1,25 @@
 from functools import lru_cache
-from typing import Dict, List, Set
+from typing import Callable, Dict, List, Set
 
 import torch
 from torch.fx.passes.utils.matcher_utils import SubgraphMatcher
 from torch.ops import aten
 
+ATOMIC_SUBGRAPHS = []
 
+
+def register_atomic_subgraph(
+    is_aten: bool = False,
+) -> Callable[[torch.nn.Module], torch.nn.Module]:
+
+    def decorator(subgraph: torch.nn.Module) -> torch.nn.Module:
+        ATOMIC_SUBGRAPHS.append((subgraph, is_aten))
+        return subgraph
+
+    return decorator
+
+
+@register_atomic_subgraph(is_aten=True)
 class ConvBNReLU(torch.nn.Module):  # type: ignore[misc]
     def __init__(self) -> None:
         super().__init__()
@@ -46,6 +60,7 @@ class ConvBNReLU(torch.nn.Module):  # type: ignore[misc]
         return x
 
 
+@register_atomic_subgraph(is_aten=True)
 class ConvReLU(torch.nn.Module):  # type: ignore[misc]
     def __init__(self) -> None:
         super().__init__()
@@ -77,6 +92,7 @@ class ConvReLU(torch.nn.Module):  # type: ignore[misc]
         return x
 
 
+@register_atomic_subgraph(is_aten=True)
 class ConvGelu(torch.nn.Module):  # type: ignore[misc]
     def __init__(self) -> None:
         super().__init__()
@@ -108,6 +124,7 @@ class ConvGelu(torch.nn.Module):  # type: ignore[misc]
         return x
 
 
+@register_atomic_subgraph(is_aten=True)
 class ConvSilu(torch.nn.Module):  # type: ignore[misc]
     def __init__(self) -> None:
         super().__init__()
@@ -122,6 +139,7 @@ class ConvSilu(torch.nn.Module):  # type: ignore[misc]
         return x
 
 
+@register_atomic_subgraph(is_aten=True)
 class MulAdd(torch.nn.Module):  # type: ignore[misc]
     def __init__(self) -> None:
         super().__init__()
@@ -134,6 +152,7 @@ class MulAdd(torch.nn.Module):  # type: ignore[misc]
         return x
 
 
+@register_atomic_subgraph(is_aten=True)
 class MulMul(torch.nn.Module):  # type: ignore[misc]
     def __init__(self) -> None:
         super().__init__()
@@ -146,16 +165,6 @@ class MulMul(torch.nn.Module):  # type: ignore[misc]
         return x
 
 
-All_FUSION_PATTERNS = [
-    ConvBNReLU,
-    ConvReLU,
-    ConvGelu,
-    ConvSilu,
-    MulAdd,
-    MulMul,
-]
-
-
 @lru_cache(maxsize=None)
 def get_node_in_fusion_pattern(
     graph: torch.fx.Graph,
@@ -166,8 +175,9 @@ def get_node_in_fusion_pattern(
     Value: the list of nodes that should be fused together
     """
     fusion_nodes = {}
-    for pattern in All_FUSION_PATTERNS:
+    for pattern, is_aten in ATOMIC_SUBGRAPHS:
         pattern_graph = torch.fx.symbolic_trace(pattern())
+        # TODO: Add decomposition and lowering if is_aten is False
         subgraph_matcher = SubgraphMatcher(pattern_graph.graph)
         match_result = subgraph_matcher.match(graph)
         for match in match_result:
