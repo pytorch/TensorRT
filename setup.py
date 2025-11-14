@@ -760,8 +760,11 @@ def get_requirements():
                         f"{tensorrt_prefix}-libs>=10.14.1,<10.15.0",
                     ]
                 elif cuda_version.startswith("13"):
+                    tensorrt_prefix = "tensorrt-cu13"
                     requirements = requirements + [
-                        "tensorrt>=10.14.1,<10.15.0",
+                        f"{tensorrt_prefix}==10.14.1.48.post1",
+                        f"{tensorrt_prefix}-bindings==10.14.1.48.post1",
+                        f"{tensorrt_prefix}-libs==10.14.1.48.post1",
                     ]
                 else:
                     raise ValueError(f"Unsupported CUDA version: {cuda_version}")
