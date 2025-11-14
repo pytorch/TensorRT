@@ -26,20 +26,20 @@ jobs:
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(inputs.build-matrix) }}
-    name: test-${{ matrix.cuda-version }}
-    if: ${{ inputs.build-result == 'success' }}
+    name: test-${{ inputs.build-matrix.cuda-version }}
     outputs:
       result: ${{ steps.test-step.outputs.result }}
     steps:
-      - name: Test with CUDA ${{ matrix.cuda-version }}
+      - name: Test with CUDA ${{ inputs.build-matrix.cuda-version }}
         id: test-step
+        if: ${{ inputs.build-result == 'success' }}
         run: |
           set -euo pipefail
-          echo "Testing with CUDA ${{ matrix.cuda-version }}"
-          if [ "${{ matrix.cuda-version }}" == "12.8" ]; then
+          echo "Testing with CUDA ${{ inputs.build-matrix.cuda-version }}"
+          if [ "${{ inputs.build-matrix.cuda-version }}" == "12.8" ]; then
             echo "Testing with CUDA 12.8 is not supported"
             echo "result=failure" >> $GITHUB_OUTPUT
             exit -1
           fi
-          echo "Testing with CUDA ${{ matrix.cuda-version }} successfully completed"
+          echo "Testing with CUDA ${{ inputs.build-matrix.cuda-version }} successfully completed"
           echo "result=success" >> $GITHUB_OUTPUT
