@@ -1,0 +1,39 @@
+name: Test on Linux
+
+on:
+  workflow_call:
+    inputs:
+      filter-cuda:
+        description: "Filter CUDA version"
+        default: ""
+        type: string
+      filter-python:
+        description: "Filter Python version"
+        default: ""
+        type: string
+      build-matrix:
+        description: "Build matrix to utilize"
+        default: ""
+        type: string
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(inputs.build-matrix) }}
+    name: test-${{ matrix.cuda-version }}
+    outputs:
+      result: ${{ steps.test-step.outputs.result }}
+    steps:
+      - name: Test with CUDA ${{ matrix.cuda-version }}
+        id: test-step
+        run: |
+          set -euo pipefail
+          echo "Testing with CUDA ${{ matrix.cuda-version }}"
+          if [ "${{ matrix.cuda-version }}" == "12.8" ]; then
+            echo "Testing with CUDA 12.8 is not supported"
+            echo "result=failure" >> $GITHUB_OUTPUT
+            exit -1
+          fi
+          echo "Testing with CUDA ${{ matrix.cuda-version }} successfully completed"
+          echo "result=success" >> $GITHUB_OUTPUT

@@ -1,0 +1,39 @@
+name: Build on Linux
+
+on:
+  workflow_call:
+    inputs:
+      filter-cuda:
+        description: "Filter CUDA version"
+        default: ""
+        type: string
+      filter-python:
+        description: "Filter Python version"
+        default: ""
+        type: string
+      build-matrix:
+        description: "Build matrix to utilize"
+        default: ""
+        type: string
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(inputs.build-matrix) }}
+    name: build-${{ matrix.cuda-version }}
+    outputs:
+      result: ${{ steps.build-step.outputs.result }}
+    steps:
+      - name: Build with CUDA ${{ matrix.cuda-version }}
+        id: build-step
+        run: |
+          set -euo pipefail
+          echo "Building with CUDA ${{ matrix.cuda-version }}"
+          if [ "${{ matrix.cuda-version }}" == "12.8" ]; then
+            echo "Building with CUDA 12.8 is not supported"
+            echo "result=failure" >> $GITHUB_OUTPUT
+            exit -1
+          fi
+          echo "Building with CUDA ${{ matrix.cuda-version }} successfully completed"
+          echo "result=success" >> $GITHUB_OUTPUT

@@ -21,31 +21,51 @@ jobs:
     name: Build
     runs-on: ubuntu-latest
     needs: [generate-matrix]
-    outputs:
-      result: ${{ steps.build-step.outputs.result }}
     strategy:
-      matrix: ${{ fromJSON(needs.generate-matrix.outputs.matrix) }}
-    steps:
-      - name: Build with CUDA ${{ matrix.cuda-version }}
-        id: build-step
-        run: |
-          echo "Building with CUDA ${{ matrix.cuda-version }}"
-          if [ "${{ matrix.cuda-version }}" == "12.8" ]; then
-            echo "result=success" >> $GITHUB_OUTPUT
-          else
-            echo "result=failure" >> $GITHUB_OUTPUT
-          fi
+      fail-fast: false
+    uses: ./.github/workflows/test-variant-dependency-build.yml
+    with:
+      build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
 
-  test:
-    name: Test
+
+  L0-test:
+    name: L0-test
     needs: [generate-matrix, build]
-    if: always() && needs.build.outputs.result == 'success'
+    if: always() && needs.build.result == 'success'
     runs-on: ubuntu-latest
     strategy:
-      matrix: ${{ fromJSON(needs.generate-matrix.outputs.matrix) }}
-    steps:
-      - name: Test with CUDA ${{ matrix.cuda-version }}
-        run: |
-          echo "needs.build.outputs.result=${{ needs.build.outputs.result }}"
-          echo "Testing with CUDA ${{ matrix.cuda-version }}"
+      fail-fast: false
+    uses: ./.github/workflows/test-variant-dependency-test.yml
+    with:
+      build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
+      script: |
+        set -euo pipefail
+        echo "needs.build.outputs.result=${{ needs.build.outputs.result }}"
+        echo "Running L0 test with CUDA ${{ matrix.cuda-version }}"
+        if [ "${{ matrix.cuda-version }}" == "12.8" ]; then
+          echo "Running L0 test for cu128 is not supported"
+          exit -1
+        fi
+        echo "Running L0 test for ${{ matrix.cuda-version }} successfully completed"
+
+  L1-test:
+    name: L1-test
+    needs: [generate-matrix, build, L0-test]
+    if: always() && needs.build.result == 'success' && needs.L0-test.result == 'success'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+    uses: ./.github/workflows/test-variant-dependency-test.yml
+    with:
+      build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
+      script: |
+        set -euo pipefail
+        echo "needs.build.outputs.result=${{ needs.build.outputs.result }}"
+        echo "Running L1 test with CUDA ${{ matrix.cuda-version }}"
+        if [ "${{ matrix.cuda-version }}" == "12.8" ]; then
+          echo "Running L1 test for cu128 is not supported"
+          exit -1
+        fi
+        echo "Running L1 test for ${{ matrix.cuda-version }} successfully completed"
+
 
