@@ -25,8 +25,8 @@ jobs:
       build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
 
 
-  L0-test:
-    name: L0-test
+  L0-dynamo-test:
+    name: L0-dynamo-test
     needs: [generate-matrix, build]
     if: always()
     #if: always() && needs.build.result == 'success'
@@ -35,12 +35,44 @@ jobs:
       build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
       build-result: ${{ needs.build.outputs.result }}
 
-  L1-test:
-    name: L1-test
-    needs: [generate-matrix, build, L0-test]
-    if: always() && needs.build.result == 'success' && needs.L0-test.result == 'success'
+  L0-core-test:
+    name: L0-core-test
+    needs: [generate-matrix, build]
+    if: always()
     uses: ./.github/workflows/test-variant-dependency-test.yml
     with:
       build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
+      build-result: ${{ needs.build.outputs.result }}
+
+  L0-test-results:
+     name: Prepare-L0-results
+     needs: [L0-dynamo-test, L0-core-test]
+     strategy:
+      fail-fast: false
+     outputs:
+       result: ${{ steps.prepare-l0-results.outputs.l0-results-url }}
+     if: always()
+     steps:
+      - name: Prepare L0 test results
+        id: prepare-l0-results
+        run: |
+          set -euo pipefail
+          if [ "${{ needs.L0-dynamo-test.outputs.result }}" == "success" ] && [ "${{ needs.L0-core-test.outputs.result }}" == "success" ]; then
+            echo "L0 test results are successful"
+            echo "result=success" >> $GITHUB_OUTPUT
+          else
+            echo "L0 test results are not successful"
+            echo "result=failure" >> $GITHUB_OUTPUT
+          fi
+
+  L1-test:
+    name: L1-test
+    needs: [generate-matrix, build, L0-test-results]
+    if: always()
+    uses: ./.github/workflows/test-variant-dependency-test.yml
+    with:
+      build-matrix: ${{ needs.generate-matrix.outputs.matrix }}
+      build-result: ${{ needs.build.outputs.result }}
+      test-result: ${{ needs.L0-test-results.outputs.result }}
 
 
