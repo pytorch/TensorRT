@@ -15,7 +15,7 @@ import torch
 logger = logging.getLogger(__name__)
 
 _WHL_CPYTHON_VERSION = "cp310"
-_TENSORRT_LLM_VERSION_ = "0.17.0.post1"
+_TENSORRT_LLM_VERSION_ = "1.2.0rc2"
 
 
 def sanitized_torch_version() -> Any:
@@ -104,27 +104,6 @@ def is_platform_supported_for_trtllm() -> bool:
         logger.info(
             "TensorRT-LLM plugins for NCCL backend are not supported on Jetson/Orin/Xavier (Tegra) or Thor devices."
         )
-        return False
-
-    try:
-        cuda_version = torch.version.cuda  # e.g., "12.4" or "13.0"
-        if cuda_version is None:
-            logger.error(
-                "This pytorch build does not support CUDA, please reinstall pytorch with CUDA support"
-            )
-            return False
-
-        major, minor = map(int, cuda_version.split("."))
-        if major != 12:
-            logger.error(
-                "CUDA 13 is not currently supported for TRT-LLM plugins. Please install pytorch with CUDA 12.x support"
-            )
-            return False
-
-        return True
-
-    except Exception as e:
-        logger.warning(f"Failed to detect CUDA version: {e}")
         return False
 
     return True
@@ -252,6 +231,13 @@ def load_and_initialize_trtllm_plugin(plugin_lib_path: str) -> bool:
         if "libmpi" in str(e_os_error):
             logger.warning(
                 f"Failed to load libnvinfer_plugin_tensorrt_llm.so from {plugin_lib_path}, got error {e_os_error} (hint: libmpi.so is a necessary dependency; ensure that OpenMPI or MPICH is installed on your system)",
+                exc_info=e_os_error,
+            )
+        elif "libpython" in str(e_os_error):
+            python_version = f"{sys.version_info.major}.{sys.version_info.minor}"
+            logger.error(
+                f"Failed to load TensorRT-LLM plugin: missing libpython{python_version}.so. "
+                f"Install it with: apt-get install libpython{python_version} (or equivalent for your OS)",
                 exc_info=e_os_error,
             )
         else:
