@@ -765,6 +765,7 @@ def get_requirements():
                         f"{tensorrt_prefix}>=10.14.1,<10.15.0,!=10.14.1.48",
                         f"{tensorrt_prefix}-bindings>=10.14.1,<10.15.0,!=10.14.1.48",
                         f"{tensorrt_prefix}-libs>=10.14.1,<10.15.0,!=10.14.1.48",
+                        "nvidia-cuda-runtime==13.0.96",
                     ]
                 else:
                     raise ValueError(f"Unsupported CUDA version: {cuda_version}")
