@@ -32,18 +32,15 @@ Consider the following PyTorch model which explicitly casts intermediate layer t
             return x
 
 
-If we compile the above model using Torch-TensorRT, layer profiling logs indicate that all the layers are 
-run in FP32. This is because TensorRT picks the kernels for layers which result in the best performance. 
+If we compile the above model using Torch-TensorRT with the following settings, layer profiling logs indicate that all the layers are 
+run in FP32. This is because TensorRT picks the kernels for layers which result in the best performance (i.e., weak typing in TensorRT). 
 
 .. code-block:: python
 
     inputs = [torch.randn((1, 10), dtype=torch.float32).cuda()]
     mod = MyModule().eval().cuda()
     ep = torch.export.export(mod, tuple(inputs))
-    with torch_tensorrt.logging.debug():
-        trt_gm = torch_tensorrt.dynamo.compile(ep, 
-                                            inputs=inputs, 
-                                            debug=True)
+    trt_gm = torch_tensorrt.dynamo.compile(ep, inputs=inputs)
 
     # Debug log info
     # Layers:
@@ -53,21 +50,14 @@ run in FP32. This is because TensorRT picks the kernels for layers which result 
 
 
 In order to respect the types specified by the user in the model (eg: in this case, ``linear2`` layer to run in FP16), users can enable 
-the compilation setting ``use_explicit_typing=True``. Compiling with this option results in the following TensorRT logs
-
-.. note:: If you enable ``use_explicit_typing=True``, only torch.float32 is supported in the enabled_precisions.
-
+the compilation setting ``use_explicit_typing=True``. Compiling with this option results in the following TensorRT logs:
 
 .. code-block:: python
 
     inputs = [torch.randn((1, 10), dtype=torch.float32).cuda()]
     mod = MyModule().eval().cuda()
     ep = torch.export.export(mod, tuple(inputs))
-    with torch_tensorrt.logging.debug():
-        trt_gm = torch_tensorrt.dynamo.compile(ep, 
-                                            inputs=inputs, 
-                                            use_explicit_typing=True,
-                                            debug=True)
+    trt_gm = torch_tensorrt.dynamo.compile(ep, inputs=inputs, use_explicit_typing=True)
 
     # Debug log info
     # Layers:
@@ -75,9 +65,35 @@ the compilation setting ``use_explicit_typing=True``. Compiling with this option
     # Name: __myl_ResMulSumAddCas_myl0_1, LayerType: kgen, Inputs: [ { Name: __mye127_dconst, Dimensions: [10,30], Format/Datatype: Half }, { Name: linear2/addmm_1_constant_0 _ linear2/addmm_1_add_broadcast_to_same_shape_lhs_broadcast_constantHalf, Dimensions: [1,30], Format/Datatype: Half }, { Name: __myln_k_arg__bb1_2, Dimensions: [1,10], Format/Datatype: Half }], Outputs: [ { Name: __myln_k_arg__bb1_3, Dimensions: [1,30], Format/Datatype: Float }], TacticName: __myl_ResMulSumAddCas_0x5a3b318b5a1c97b7d5110c0291481337, StreamId: 0, Metadata: 
     # Name: __myl_ResMulSumAdd_myl0_2, LayerType: kgen, Inputs: [ { Name: __mye142_dconst, Dimensions: [30,40], Format/Datatype: Float }, { Name: linear3/addmm_2_constant_0 _ linear3/addmm_2_add_broadcast_to_same_shape_lhs_broadcast_constantFloat, Dimensions: [1,40], Format/Datatype: Float }, { Name: __myln_k_arg__bb1_3, Dimensions: [1,30], Format/Datatype: Float }], Outputs: [ { Name: output0, Dimensions: [1,40], Format/Datatype: Float }], TacticName: __myl_ResMulSumAdd_0x3fad91127c640fd6db771aa9cde67db0, StreamId: 0, Metadata: 
 
-Now the ``linear2`` layer runs in FP16 as shown in the above logs. 
+Autocast
+---------------
+
+Weak typing behavior in TensorRT is deprecated. However it is a good way to maximize performance. Therefore, in Torch-TensorRT,
+we want to provide a way to enable weak typing behavior in Torch-TensorRT, which is called `Autocast`. 
+
+Torch-TensorRT Autocast intelligently selects nodes to keep in FP32 precision to maintain model accuracy while benefiting from 
+reduced precision on the rest of the nodes. Torch-TensorRT Autocast also supports users to specify which nodes to exclude from Autocast,
+considering some nodes might be more sensitive to affecting accuracy. In addition, Torch-TensorRT Autocast can cooperate with PyTorch 
+native Autocast, allowing users to use both PyTorch and Torch-TensorRT Autocast in the same model. Torch-TensorRT respects the precision
+of the nodes within PyTorch Autocast.
+
+To enable Torch-TensorRT Autocast, users need to set both ``enable_autocast=True`` and ``use_explicit_typing=True``. For example,
+
+.. code-block:: python
+
+    inputs = [torch.randn((1, 10), dtype=torch.float32).cuda()]
+    mod = MyModule().eval().cuda()
+    ep = torch.export.export(mod, tuple(inputs))
+    trt_gm = torch_tensorrt.dynamo.compile(ep, inputs=inputs, enable_autocast=True, use_explicit_typing=True)
 
 
+Users can also specify the precision of the nodes by ``autocast_low_precision_type``, or ``autocast_excluded_nodes`` / ``autocast_excluded_ops`` 
+to exclude certain nodes/ops from Autocast.
+
+In summary, there are three ways in Torch-TensorRT to enable mixed precision:
+1. TRT chooses precision (weak typing):                     ``use_explicit_typing=False + enable_autocast=False``
+2. User specifies precision (strong typing):                ``use_explicit_typing=True + enable_autocast=False``
+3. Autocast chooses precision (autocast + strong typing):   ``use_explicit_typing=True + enable_autocast=True``
 
 FP32 Accumulation
 -----------------
@@ -93,14 +109,12 @@ When ``use_fp32_acc=True`` is set, Torch-TensorRT will attempt to use FP32 accum
     inputs = [torch.randn((1, 10), dtype=torch.float16).cuda()]
     mod = MyModule().eval().cuda()
     ep = torch.export.export(mod, tuple(inputs))
-    with torch_tensorrt.logging.debug():
-        trt_gm = torch_tensorrt.dynamo.compile(
-            ep,
-            inputs=inputs,
-            use_fp32_acc=True,
-            use_explicit_typing=True,  # Explicit typing must be enabled
-            debug=True
-        )
+    trt_gm = torch_tensorrt.dynamo.compile(
+        ep,
+        inputs=inputs,
+        use_fp32_acc=True,
+        use_explicit_typing=True,  # Explicit typing must be enabled
+    )
 
     # Debug log info
     # Layers:

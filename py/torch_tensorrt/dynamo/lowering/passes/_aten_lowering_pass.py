@@ -1,9 +1,13 @@
 import logging
+import operator
 from typing import Any, Callable, Optional, Sequence, Union
 
 import torch
 from torch_tensorrt._utils import is_tegra_platform
 from torch_tensorrt.dynamo._settings import CompilationSettings
+from torch_tensorrt.dynamo.lowering.passes.pass_utils import (
+    trace_intermediate_node_outputs,
+)
 
 from .complex_graph_rewrite import complex_graph_detection
 from .constant_folding import constant_fold
@@ -15,6 +19,13 @@ from .remove_input_alias_fixing_clones import remove_input_alias_fixing_clones
 from .remove_num_users_is_0_nodes import remove_num_users_is_0_nodes
 from .repair_input_as_output import repair_input_as_output
 from .replace_max_pool_with_indices import replace_max_pool_with_indices
+from .rule_based_autocast import rule_based_autocast
+
+pre_lowering_pass_list = [
+    remove_detach,
+    remove_assert_nodes,
+    rule_based_autocast,
+]
 
 post_lowering_pass_list = [
     remove_input_alias_fixing_clones,
@@ -25,10 +36,6 @@ post_lowering_pass_list = [
     remove_assert_nodes,
     remove_num_users_is_0_nodes,
     complex_graph_detection,
-]
-
-pre_lowering_pass_list = [
-    remove_detach,
 ]
 
 if not is_tegra_platform():
@@ -135,6 +142,14 @@ def pre_export_lowering(
     logging.debug(
         f"Invoking DynamoPassManager and applying lowering passes: {ATEN_PRE_LOWERING_PASSES}"
     )
+
+    # Only for rule-based autocast to collect the intermediate node outputs
+    if settings.enable_autocast:
+        settings.autocast_intermediate_node_outputs = trace_intermediate_node_outputs(
+            ep.module(),
+            settings.autocast_calibration_dataloader,
+            [torch.ops.higher_order.wrap_with_autocast, operator.getitem],
+        )
     gm = ep.graph_module
     gm = ATEN_PRE_LOWERING_PASSES(gm, settings)
     return ep
