@@ -487,6 +487,21 @@ jobs:
         export USE_HOST_DEPS=1
         export CI_BUILD=1
         export USE_TRTLLM_PLUGINS=1
+        # export ENABLE_MIG=1  # Uncomment to enable MIG if supported
+
+        # GPU Hardware Diagnostics
+        echo "=== GPU Hardware Information ==="
+        nvidia-smi
+        echo ""
+        echo "GPU Details:"
+        nvidia-smi --query-gpu=index,name,compute_cap,driver_version,memory.total --format=csv
+        echo ""
+        echo "GPU List:"
+        nvidia-smi -L
+        echo ""
+        echo "MIG Status:"
+        nvidia-smi --query-gpu=index,name,mig.mode.current,mig.mode.pending --format=csv
+        echo "=== End GPU Hardware Information ==="
         dnf install -y mpich mpich-devel openmpi openmpi-devel
         pushd .
         cd tests/py
