@@ -23,7 +23,8 @@ install_tensorrt_rtx() {
             curl -L https://developer.nvidia.com/downloads/trt/rtx_sdk/secure/1.2/tensorrt-rtx-${TRT_RTX_VERSION}-win10-amd64-cuda-${CU_UPPERBOUND}-release-external.zip -o tensorrt-rtx-${TRT_RTX_VERSION}.win10-amd64-cuda-${CU_UPPERBOUND}.zip
             unzip tensorrt-rtx-${TRT_RTX_VERSION}.win10-amd64-cuda-${CU_UPPERBOUND}.zip
             rtx_lib_dir=${PWD}/TensorRT-RTX-${TRT_RTX_VERSION}/lib
-            export PATH=${rtx_lib_dir}:$PATH
+            rtx_bin_dir=${PWD}/TensorRT-RTX-${TRT_RTX_VERSION}/bin
+            export PATH=${rtx_lib_dir}:${rtx_bin_dir}:$PATH
             echo "PATH: $PATH"
             if [[ ${install_wheel_or_not} == true ]]; then
                 pip install TensorRT-RTX-${TRT_RTX_VERSION}/python/tensorrt_rtx-${TRT_RTX_VERSION}-${CPYTHON_TAG}-none-win_amd64.whl
@@ -34,7 +35,8 @@ install_tensorrt_rtx() {
             curl -L https://developer.nvidia.com/downloads/trt/rtx_sdk/secure/1.2/tensorrt-rtx-${TRT_RTX_VERSION}-linux-x86_64-cuda-${CU_UPPERBOUND}-release-external.tar.gz -o tensorrt-rtx-${TRT_RTX_VERSION}-linux-x86_64-cuda-${CU_UPPERBOUND}-release-external.tar.gz
             tar -xzf tensorrt-rtx-${TRT_RTX_VERSION}-linux-x86_64-cuda-${CU_UPPERBOUND}-release-external.tar.gz
             rtx_lib_dir=${PWD}/TensorRT-RTX-${TRT_RTX_VERSION}/lib
-            export LD_LIBRARY_PATH=${rtx_lib_dir}:$LD_LIBRARY_PATH
+            rtx_bin_dir=${PWD}/TensorRT-RTX-${TRT_RTX_VERSION}/bin
+            export LD_LIBRARY_PATH=${rtx_lib_dir}:${rtx_bin_dir}:$LD_LIBRARY_PATH
             echo "LD_LIBRARY_PATH: $LD_LIBRARY_PATH"
             if [[ ${install_wheel_or_not} == true ]]; then
                 pip install TensorRT-RTX-${TRT_RTX_VERSION}/python/tensorrt_rtx-${TRT_RTX_VERSION}-${CPYTHON_TAG}-none-linux_x86_64.whl

@@ -64,13 +64,15 @@ class TestDynamicShapePdistConverter(DispatchTestCase):
                 (5, 4),
                 float("inf"),
             ),
-            (
-                "dim0_dynamic_dim1_dynamic_p_other",
-                (2, 1),
-                (3, 2),
-                (4, 7),
-                1.7,
-            ),
+            # disable this testcase due to https://github.com/pytorch/TensorRT/issues/3898
+            # TODO: enable back once the issue is fixed in both rtx 1.2 and tensorrt 10.14
+            # (
+            #     "dim0_dynamic_dim1_dynamic_p_other",
+            #     (2, 1),
+            #     (3, 2),
+            #     (4, 7),
+            #     1.7,
+            # ),
         ]
     )
     def test_pdist_float(self, _, min_shape, opt_shape, max_shape, p):
