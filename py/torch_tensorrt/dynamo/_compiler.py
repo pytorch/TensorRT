@@ -40,6 +40,9 @@ from torch_tensorrt.dynamo.lowering import (
     post_lowering,
     pre_export_lowering,
 )
+from torch_tensorrt.dynamo.partitioning._resource_partitioner import (
+    resource_partition,
+)
 from torch_tensorrt.dynamo.utils import (
     deallocate_module,
     get_flat_args_with_check,
@@ -104,6 +107,7 @@ def cross_compile_for_windows(
     l2_limit_for_tiling: int = _defaults.L2_LIMIT_FOR_TILING,
     offload_module_to_cpu: bool = _defaults.OFFLOAD_MODULE_TO_CPU,
     use_distributed_mode_trace: bool = _defaults.USE_DISTRIBUTED_MODE_TRACE,
+    cpu_memory_budget: int = _defaults.CPU_MEMORY_BUDGET,
     **kwargs: Any,
 ) -> torch.fx.GraphModule:
     """Compile an ExportedProgram module using TensorRT in Linux for Inference in Windows
@@ -178,6 +182,7 @@ def cross_compile_for_windows(
         tiling_optimization_level (str): The optimization level of tiling strategies. A higher level allows TensorRT to spend more time searching for better tiling strategy. We currently support ["none", "fast", "moderate", "full"].
         l2_limit_for_tiling (int): The target L2 cache usage limit (in bytes) for tiling optimization (default is -1 which means no limit).
         use_distributed_mode_trace (bool):  Using aot_autograd to trace the graph. This is enabled when DTensors or distributed tensors are present in distributed model
+        cpu_memory_budget (int): The maximum amount of CPU memory to use for the compilation. If the compilation requires more memory than this budget, the compilation will fail. If set to -1, the compilation will use all available CPU memory.
         **kwargs: Any,
     Returns:
         torch.fx.GraphModule: Compiled FX Module, when run it will execute via TensorRT
@@ -333,6 +338,7 @@ def cross_compile_for_windows(
         "tiling_optimization_level": tiling_optimization_level,
         "l2_limit_for_tiling": l2_limit_for_tiling,
         "use_distributed_mode_trace": use_distributed_mode_trace,
+        "cpu_memory_budget": cpu_memory_budget,
     }
 
     # disable the following settings is not supported for cross compilation for windows feature
@@ -434,6 +440,7 @@ def compile(
     l2_limit_for_tiling: int = _defaults.L2_LIMIT_FOR_TILING,
     offload_module_to_cpu: bool = _defaults.OFFLOAD_MODULE_TO_CPU,
     use_distributed_mode_trace: bool = _defaults.USE_DISTRIBUTED_MODE_TRACE,
+    cpu_memory_budget: int = _defaults.CPU_MEMORY_BUDGET,
     **kwargs: Any,
 ) -> torch.fx.GraphModule:
     """Compile an ExportedProgram module for NVIDIA GPUs using TensorRT
@@ -614,6 +621,10 @@ def compile(
             "'arg_inputs' and 'inputs' should not be used at the same time."
         )
 
+    assert (
+        cpu_memory_budget >= 2 * 1024 * 1024 * 1024
+    ), "CPU memory budget must be greater than 10GB"
+
     arg_inputs = inputs or arg_inputs
 
     if kwarg_inputs is None:
@@ -680,8 +691,8 @@ def compile(
         "l2_limit_for_tiling": l2_limit_for_tiling,
         "offload_module_to_cpu": offload_module_to_cpu,
         "use_distributed_mode_trace": use_distributed_mode_trace,
+        "cpu_memory_budget": cpu_memory_budget,
     }
-
     settings = CompilationSettings(**compilation_options)
     logger.info("Compilation Settings: %s\n", settings)
     exported_program = pre_export_lowering(exported_program, settings)
@@ -849,6 +860,12 @@ def compile_module(
             torch_executed_ops=settings.torch_executed_ops,
             require_full_compilation=settings.require_full_compilation,
         )
+
+    partitioned_module = resource_partition(
+        gm,
+        partitioned_module,
+        cpu_memory_budget=settings.cpu_memory_budget,
+    )
 
     dryrun_tracker.unsupported_ops = supported_ops.unsupported_operators
 
@@ -1243,7 +1260,7 @@ def convert_exported_program_to_serialized_trt_engine(
 
     # Prepare torch_trt inputs
     trt_arg_inputs: Sequence[Input] = prepare_inputs(arg_inputs)
-    trt_kwarg_inputs: Optional[dict[Any, Any]] = prepare_inputs(kwarg_inputs)
+    trt_kwarg_inputs: Optional[dict[str, Any]] = prepare_inputs(kwarg_inputs)
     device = to_torch_tensorrt_device(device)
     enabled_precisions = {dtype._from(p) for p in enabled_precisions}
 
