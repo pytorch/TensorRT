@@ -4,9 +4,10 @@ import unittest
 import pytest
 import torch
 import torch.nn as nn
-import torch_tensorrt
 from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
+
+import torch_tensorrt
 from torch_tensorrt._enums import dtype
 
 from ..conversion.harness import DispatchTestCase
