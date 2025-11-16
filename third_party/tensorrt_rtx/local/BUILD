@@ -50,7 +50,7 @@ cc_library(
 cc_import(
     name = "nvinfer_static_lib",
     static_library = select({
-        ":rtx_win": "lib/tensorrt_rtx_1_0.lib",
+        ":rtx_win": "lib/tensorrt_rtx_1_2.lib",
     }),
     visibility = ["//visibility:private"],
 )
@@ -58,7 +58,7 @@ cc_import(
 cc_import(
     name = "nvinfer_lib",
     shared_library = select({
-        ":rtx_win": "lib/tensorrt_rtx_1_0.dll",
+        ":rtx_win": "bin/tensorrt_rtx_1_2.dll",
         ":rtx_x86_64": "lib/libtensorrt_rtx.so",
     }),
     visibility = ["//visibility:private"],

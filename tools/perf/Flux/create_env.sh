@@ -15,7 +15,7 @@ bazel
 cd /home/TensorRT
 
 python -m pip install --pre -e . --extra-index-url https://download.pytorch.org/whl/nightly/cu130
-pip install tensorrt==10.13.2.6 --force-reinstall
+pip install tensorrt==10.14.1.48 --force-reinstall
 
 pip3 install --pre  torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cu130
 

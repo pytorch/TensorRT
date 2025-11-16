@@ -7,7 +7,7 @@ Torch-TensorRT
 [![Documentation](https://img.shields.io/badge/docs-master-brightgreen)](https://nvidia.github.io/Torch-TensorRT/)
 [![pytorch](https://img.shields.io/badge/PyTorch-2.10-green)](https://download.pytorch.org/whl/nightly/cu130)
 [![cuda](https://img.shields.io/badge/CUDA-13.0-green)](https://developer.nvidia.com/cuda-downloads)
-[![trt](https://img.shields.io/badge/TensorRT-10.13.0-green)](https://github.com/nvidia/tensorrt)
+[![trt](https://img.shields.io/badge/TensorRT-10.14.0-green)](https://github.com/nvidia/tensorrt)
 [![license](https://img.shields.io/badge/license-BSD--3--Clause-blue)](./LICENSE)
 [![Linux x86-64 Nightly Wheels](https://github.com/pytorch/TensorRT/actions/workflows/build-test-linux-x86_64.yml/badge.svg?branch=nightly)](https://github.com/pytorch/TensorRT/actions/workflows/build-test-linux-x86_64.yml)
 [![Linux SBSA Nightly Wheels](https://github.com/pytorch/TensorRT/actions/workflows/build-test-linux-aarch64.yml/badge.svg?branch=nightly)](https://github.com/pytorch/TensorRT/actions/workflows/build-test-linux-aarch64.yml)
@@ -123,7 +123,7 @@ These are the following dependencies used to verify the testcases. Torch-TensorR
 - Bazel 8.1.1
 - Libtorch 2.10.0.dev (latest nightly)
 - CUDA 13.0 (CUDA 12.6 on Jetson)
-- TensorRT 10.13.2.6 (TensorRT 10.3 on Jetson)
+- TensorRT 10.14.1.48 (TensorRT 10.3 on Jetson)
 
 ## Deprecation Policy
 

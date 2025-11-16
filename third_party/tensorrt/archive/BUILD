@@ -38,7 +38,7 @@ cc_library(
 cc_import(
     name = "nvinfer_lib",
     shared_library = select({
-        ":windows": "lib/nvinfer_10.dll",
+        ":windows": "bin/nvinfer_10.dll",
         "//conditions:default": "lib/libnvinfer.so",
     }),
     visibility = ["//visibility:private"],

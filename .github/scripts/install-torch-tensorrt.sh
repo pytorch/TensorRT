@@ -32,7 +32,7 @@ fi
 if [[ ${PLATFORM} == win32 ]]; then
     pip install ${RUNNER_ARTIFACT_DIR}/torch_tensorrt*.whl
 else
-    pip install /opt/torch-tensorrt-builds/torch_tensorrt*.whl
+    pip install /opt/torch-tensorrt-builds/torch_tensorrt*.whl --use-deprecated=legacy-resolver
 fi
 
 echo -e "Running test script";
