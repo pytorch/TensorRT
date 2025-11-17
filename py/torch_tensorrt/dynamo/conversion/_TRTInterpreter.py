@@ -1,5 +1,4 @@
 import gc
-import io
 import logging
 import os
 import warnings
@@ -50,7 +49,12 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
 from torch_tensorrt.dynamo.debug._DebuggerConfig import DebuggerConfig
 from torch_tensorrt.dynamo.debug._supports_debugger import cls_supports_debugger
 from torch_tensorrt.dynamo.observer import Observer
-from torch_tensorrt.dynamo.utils import DYNAMIC_DIM, deallocate_module, to_torch_device
+from torch_tensorrt.dynamo.utils import (
+    DYNAMIC_DIM,
+    deallocate_module,
+    get_cpu_memory_usage,
+    to_torch_device,
+)
 from torch_tensorrt.logging import TRT_LOGGER
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
@@ -65,7 +69,7 @@ class UnsupportedOperatorException(RuntimeError):
 
 
 class TRTInterpreterResult(NamedTuple):
-    serialized_engine: bytes
+    engine: trt.ICudaEngine
     input_names: Sequence[str]
     output_names: Sequence[str]
     weight_name_map: Optional[dict[Any, Any]]
@@ -512,8 +516,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         _LOGGER.info("Building weight name mapping...")
         # Stage 1: Name mapping
         torch_device = to_torch_device(self.compilation_settings.device)
-        self.module.to(torch_device)
-        sd = self.module.state_dict()
+        sd = {k: v.to(torch_device) for k, v in self.module.state_dict().items()}
         weight_name_map: dict[str, Any] = {}
         weight_refit_map = self.ctx.weight_refit_map
         constant_mapping = {k: v for k, v in weight_refit_map.items() if v.size == 1}
@@ -592,34 +595,6 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         torch.cuda.empty_cache()
 
     @needs_refit  # type: ignore[misc]
-    def _insert_engine_to_cache(self, hash_val: str, serialized_engine: bytes) -> None:
-        # TODO: @Evan is waiting for TRT's feature to cache the weight-stripped engine
-        # if not self.compilation_settings.strip_engine_weights:
-        #     # set EXCLUDE_WEIGHTS flag to strip weights
-        #     runtime = trt.Runtime(TRT_LOGGER)
-        #     engine = runtime.deserialize_cuda_engine(serialized_engine)
-
-        #     serialization_config = engine.create_serialization_config()
-        #     serialization_config.set_flag(trt.SerializationFlag.EXCLUDE_WEIGHTS)
-        #     serialized_engine = engine.serialize_with_config(
-        #         serialization_config
-        #     )
-
-        # Cache weighted engine for now
-        self.engine_cache.insert(  # type: ignore[union-attr]
-            hash_val,
-            (
-                serialized_engine,
-                self._input_names,
-                self._output_names,
-                self.input_specs,
-                self.compilation_settings,
-                self.weight_name_map,
-                self.ctx.requires_output_allocator,
-            ),
-        )
-
-    @needs_refit  # type: ignore[misc]
     def _pull_cached_engine(self, hash_val: str) -> Optional[TRTInterpreterResult]:
         # query the cached TRT engine
         cached_data = self.engine_cache.check(hash_val)  # type: ignore[union-attr]
@@ -671,7 +646,6 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                     settings=self.compilation_settings,
                     weight_name_map=self.weight_name_map,
                 )
-                serialized_engine = engine.serialize()
 
                 # TODO: @Evan is waiting for TRT's feature to load the weight-stripped engine
                 # # EXCLUDE_WEIGHTS flag must be cleared
@@ -684,12 +658,8 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                 # )
                 # # As of now, the engine becomes non-refittable because when EXCLUDE_WEIGHTS flag is cleared, the REFIT flag is also cleared by TRT to make the plan file smaller
 
-            with io.BytesIO() as engine_bytes:
-                engine_bytes.write(serialized_engine)
-                engine_str = engine_bytes.getvalue()
-
             return TRTInterpreterResult(
-                engine_str,
+                engine,
                 self._input_names,
                 self._output_names,
                 self.weight_name_map,
@@ -733,6 +703,9 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
                         return interpreter_result  # type: ignore[no-any-return]
 
         self._construct_trt_network_def()
+        _LOGGER.debug(
+            f"CPU memory usage after network construction: {get_cpu_memory_usage()} MB"
+        )
 
         if not self.compilation_settings.immutable_weights:
             self._save_weight_mapping()
@@ -750,36 +723,39 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         self._create_timing_cache(
             builder_config, self.compilation_settings.timing_cache_path
         )
-        serialized_engine = self.builder.build_serialized_network(
-            self.ctx.net, builder_config
+
+        if (
+            ENABLED_FEATURES.tensorrt_rtx
+            or self.compilation_settings.version_compatible
+        ):
+            # TODO: When TRT-RTX matures, change it to build_engine_with_config
+            serialized_engine = self.builder.build_serialized_network(
+                self.ctx.net, builder_config
+            )
+            runtime = trt.Runtime(TRT_LOGGER)
+            cuda_engine = runtime.deserialize_cuda_engine(serialized_engine)
+        else:
+
+            cuda_engine = self.builder.build_engine_with_config(
+                self.ctx.net, builder_config
+            )
+        assert cuda_engine
+
+        _LOGGER.debug(
+            f"CPU memory usage after engine building: {get_cpu_memory_usage()} MB"
         )
-        assert serialized_engine
 
         _LOGGER.info(
             f"Build TRT engine elapsed time: {datetime.now() - build_engine_start_time}"
         )
-        _LOGGER.info(f"TRT Engine uses: {serialized_engine.nbytes} bytes of Memory")
-
         self.ctx.clear_cpu_weights_reference_holder()
 
         self._save_timing_cache(
             builder_config, self.compilation_settings.timing_cache_path
         )
 
-        # Engine caching only for refittable engines
-        if (
-            not self.compilation_settings.immutable_weights
-            and self.compilation_settings.cache_built_engines
-            and self.engine_cache is not None
-        ):
-            self._insert_engine_to_cache(hash_val, serialized_engine)
-
-        with io.BytesIO() as engine_bytes:
-            engine_bytes.write(serialized_engine)
-            engine_str = engine_bytes.getvalue()
-
         return TRTInterpreterResult(
-            engine_str,
+            cuda_engine,
             self._input_names,
             self._output_names,
             self.weight_name_map,
