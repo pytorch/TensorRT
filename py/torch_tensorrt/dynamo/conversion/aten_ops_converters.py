@@ -2762,14 +2762,14 @@ def topk_sort_validator(k: int) -> bool:
 
     # topk layer supports dynamic k value but we cannot determine supported dynamic topk value at
     # compile time.
-    if k == DYNAMIC_DIM:
-        _LOGGER.debug(
-            "[top_k validator] Converter does not support k being a dynamic value. Therefore, aten::topk will run in PyTorch"
+    if k == DYNAMIC_DIM or not isinstance(k, int):
+        _LOGGER.warning(
+            "[top_k validator] It's not expected for k to be a dynamic or data-dependent value. aten::topk will run in PyTorch"
         )
         return False
 
     if k > 3840:
-        _LOGGER.debug(
+        _LOGGER.warning(
             f"[top_k validator] Currently only topk values up to 3840 are supported, got k={k}. Therefore, aten::topk will run in PyTorch"
         )
         return False
