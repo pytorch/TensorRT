@@ -859,18 +859,6 @@ def get_output_dtypes(output: Any, truncate_double: bool = False) -> List[dtype]
     return output_dtypes
 
 
-def is_tegra_platform() -> bool:
-    if torch.cuda.get_device_capability() in [(8, 7), (7, 2)]:
-        return True
-    return False
-
-
-def is_thor() -> bool:
-    if torch.cuda.get_device_capability() in [(11, 0)]:
-        return True
-    return False
-
-
 def get_cpu_memory_usage() -> Any:
     return psutil.Process().memory_info().rss / 1024 / 1024
 
