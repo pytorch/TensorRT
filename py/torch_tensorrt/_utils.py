@@ -164,6 +164,40 @@ def extract_wheel_file(
         logger.debug(
             f"[Rank {rank}] Starting extraction of {wheel_path} to {extract_dir}"
         )
+
+        # Check for stale/corrupt extraction and clean up if needed
+        if lock_file.exists():
+            try:
+                lock_age = time.time() - lock_file.stat().st_mtime
+                if lock_age > 300:  # 5 minutes
+                    logger.warning(
+                        f"[Rank {rank}] Detected stale lock file (age: {lock_age:.1f}s). "
+                        f"Previous extraction likely crashed. Cleaning up and retrying..."
+                    )
+                    # Clean up stale extraction
+                    import shutil
+
+                    if extract_dir.exists():
+                        shutil.rmtree(extract_dir, ignore_errors=True)
+                    logger.info(
+                        f"[Rank {rank}] Cleaned up stale extraction directory: {extract_dir}"
+                    )
+                elif not plugin_lib_path.exists():
+                    logger.warning(
+                        f"[Rank {rank}] Lock file exists but plugin missing. "
+                        f"Previous extraction incomplete. Cleaning up and retrying..."
+                    )
+                    # Clean up incomplete extraction
+                    import shutil
+
+                    if extract_dir.exists():
+                        shutil.rmtree(extract_dir, ignore_errors=True)
+                    logger.info(
+                        f"[Rank {rank}] Cleaned up incomplete extraction directory: {extract_dir}"
+                    )
+            except Exception as e:
+                logger.warning(f"[Rank {rank}] Error checking stale lock: {e}")
+
         # If another job already finished earlier, skip immediately
         if plugin_lib_path.exists():
             logger.debug(
@@ -189,14 +223,14 @@ def extract_wheel_file(
         # Only one process should be able to create the lock file with O_EXCL
         logger.debug(f"[Rank {rank}] Attempting to acquire lock: {lock_file}")
         acquire_start_time = time.time()
+        # Re-check in case extractor finished while we waited
+        if plugin_lib_path.exists():
+            logger.debug(
+                f"[Rank {rank}] Plugin appeared at {plugin_lib_path} during acquire, skipping extraction"
+            )
+            return
         while True:
             try:
-                # Re-check in case extractor finished while we waited
-                if plugin_lib_path.exists():
-                    logger.debug(
-                        f"[Rank {rank}] Plugin appeared at {plugin_lib_path} during acquire, skipping extraction"
-                    )
-                    return
                 lock_fd = os.open(str(lock_file), os.O_CREAT | os.O_EXCL | os.O_RDWR)
                 logger.debug(f"[Rank {rank}] Successfully acquired lock")
                 # write lock owner metadata for race condition time logging
@@ -223,6 +257,16 @@ def extract_wheel_file(
             logger.debug(
                 f"[Rank {rank}] Plugin already present at {plugin_lib_path} after acquire, skipping extraction"
             )
+            # Clean up lock and return, since lock already acquired
+            try:
+                if lock_fd is not None:
+                    os.close(lock_fd)
+            except Exception as e:
+                logger.debug(f"[Rank {rank}] Failed to close lock fd: {e}")
+            try:
+                lock_file.unlink(missing_ok=True)
+            except Exception as e:
+                logger.debug(f"[Rank {rank}] Failed to unlink lock file: {e}")
             return
         # With lock held, perform extraction
         logger.debug(
@@ -426,9 +470,33 @@ def load_tensorrt_llm_for_nccl() -> bool:
     Attempts to load the TensorRT-LLM plugin and initialize it.
     Either the env variable TRTLLM_PLUGINS_PATH can specify the path
     Or the user can specify USE_TRTLLM_PLUGINS as either of (1, true, yes, on) to download the TRT-LLM distribution and load it
+
+    Environment Variables:
+    TRTLLM_PLUGINS_PATH: Path to pre-installed TensorRT-LLM plugin library
+    USE_TRTLLM_PLUGINS: Set to 1/true/yes/on to auto-download plugin
+    TRTLLM_FORCE_CLEANUP: Set to 1 to force cleanup of cached files on startup (useful after mpirunbus errors)
+
     Returns:
         bool: True if the plugin was successfully loaded and initialized, False otherwise.
     """
+    if os.environ.get("TRTLLM_FORCE_CLEANUP", "0").lower() in (
+        "1",
+        "true",
+        "yes",
+        "on",
+    ):
+        import shutil
+
+        cache_root = _cache_root()
+        if cache_root.exists():
+            logger.warning(
+                f"TRTLLM_FORCE_CLEANUP=1 detected. Cleaning up cache: {cache_root}"
+            )
+            shutil.rmtree(cache_root, ignore_errors=True)
+            logger.info(
+                "Cache cleaned up. Proceeding with fresh download/extraction..."
+            )
+
     if not is_platform_supported_for_trtllm():
         return False
     plugin_lib_path = os.environ.get("TRTLLM_PLUGINS_PATH")
