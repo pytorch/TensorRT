@@ -40,9 +40,10 @@ cc_test(
         "//tests/util",
         "@googletest//:gtest_main",
     ] + select({
+        ":jetpack": ["@torch_l4t//:libtorch"],
+        ":use_torch_whl": ["@torch_whl//:libtorch"],
         ":windows": ["@libtorch_win//:libtorch"],
-	":jetpack": ["@torch_l4t//:libtorch"],
-	"//conditions:default": ["@libtorch"],
+        "//conditions:default": ["@libtorch"],
     }),
 )
 
