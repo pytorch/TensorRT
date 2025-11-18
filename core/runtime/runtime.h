@@ -3,13 +3,17 @@
 #include <memory>
 #include <mutex>
 #include <utility>
-#include "ATen/core/function_schema.h"
 #include "NvInfer.h"
 #include "core/runtime/Platform.h"
 #include "core/runtime/RTDevice.h"
 #include "core/runtime/TRTEngine.h"
 #include "core/util/prelude.h"
-#include "torch/custom_class.h"
+#include "torch/csrc/stable/library.h"
+#include "torch/csrc/stable/tensor_struct.h"
+#include "torch/csrc/stable/ops.h"
+#include "torch/csrc/stable/stableivalue_conversions.h"
+#include "torch/headeronly/core/ScalarType.h"
+#include "torch/headeronly/macros/Macros.h"
 
 namespace torch_tensorrt {
 namespace core {
@@ -52,6 +56,7 @@ c10::optional<RTDevice> get_most_compatible_device(
 std::vector<RTDevice> find_compatible_devices(const RTDevice& target_device, bool hardware_compatible);
 
 std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intrusive_ptr<TRTEngine> compiled_engine);
+void execute_engine_boxed(StableIValue* stack, uint64_t num_args, uint64_t num_outputs);
 
 void multi_gpu_device_check();
 

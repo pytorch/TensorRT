@@ -1,5 +1,11 @@
 #include <codecvt>
 
+#include "torch/csrc/stable/library.h"
+#include "torch/csrc/stable/tensor_struct.h"
+#include "torch/csrc/stable/ops.h"
+#include "torch/csrc/stable/stableivalue_conversions.h"
+#include "torch/headeronly/core/ScalarType.h"
+#include "torch/headeronly/macros/Macros.h"
 #include "core/runtime/Platform.h"
 #include "core/runtime/runtime.h"
 #include "core/util/macros.h"
@@ -7,6 +13,8 @@
 namespace torch_tensorrt {
 namespace core {
 namespace runtime {
+
+namespace {
 
 std::string serialize_bindings(const std::vector<std::string>& bindings) {
   std::stringstream ss;
@@ -65,48 +73,7 @@ std::string base64_decode(const std::string& in) {
   return out;
 }
 
-namespace {
-// TODO: Implement a call method
-// c10::List<at::Tensor> TRTEngine::Run(c10::List<at::Tensor> inputs) {
-//     auto input_vec = inputs.vec();
-//    auto output_vec = RunCudaEngine(exec_ctx, num_io, input_vec);
-//
-//     return c10::List<at::Tensor>(output_vec);
-// }
-static auto TORCHTRT_UNUSED TRTEngineTSRegistrtion =
-    torch::class_<TRTEngine>("tensorrt", "Engine")
-        .def(torch::init<std::vector<std::string>>())
-        // TODO: .def("__call__", &TRTEngine::Run)
-        // TODO: .def("run", &TRTEngine::Run)
-        .def("__str__", &TRTEngine::to_str)
-        .def("__repr__", &TRTEngine::to_str)
-        .def("__obj_flatten__", &TRTEngine::__obj_flatten__)
-        .def("enable_profiling", &TRTEngine::enable_profiling)
-        .def("set_profile_format", &TRTEngine::set_profile_format)
-        .def("disable_profiling", &TRTEngine::disable_profiling)
-        .def_readwrite("profile_path_prefix", &TRTEngine::profile_path_prefix)
-        .def("dump_engine_layer_info_to_file", &TRTEngine::dump_engine_layer_info_to_file)
-        .def("dump_engine_layer_info", &TRTEngine::dump_engine_layer_info)
-        .def("get_engine_layer_info", &TRTEngine::get_engine_layer_info)
-        .def("infer_outputs", &TRTEngine::infer_outputs)
-        .def("reset_captured_graph", &TRTEngine::reset_captured_graph)
-        .def_readwrite("use_pre_allocated_outputs", &TRTEngine::use_pre_allocated_outputs)
-        .def_readwrite("use_output_allocator_outputs", &TRTEngine::use_output_allocator_outputs)
-        .def_property(
-            "device_memory_budget",
-            &TRTEngine::get_device_memory_budget,
-            &TRTEngine::set_device_memory_budget)
-        .def_property("streamable_device_memory_budget", &TRTEngine::get_streamable_device_memory_budget)
-        .def_property("automatic_device_memory_budget", &TRTEngine::get_automatic_device_memory_budget)
-        .def_pickle(
-            [](const c10::intrusive_ptr<TRTEngine>& self) -> std::vector<std::string> { return self->serialize(); },
-            [](std::vector<std::string> serialized_info) -> c10::intrusive_ptr<TRTEngine> {
-              serialized_info[ENGINE_IDX] = base64_decode(serialized_info[ENGINE_IDX]);
-              TRTEngine::verify_serialization_fmt(serialized_info);
-              return c10::make_intrusive<TRTEngine>(serialized_info);
-            });
-
-TORCH_LIBRARY(tensorrt, m) {
+STABLE_TORCH_LIBRARY(tensorrt, m) {
   m.def("execute_engine(Tensor[] input_tensors, __torch__.torch.classes.tensorrt.Engine engine) -> Tensor[]");
   m.def("SERIALIZED_ENGINE_BINDING_DELIM", []() -> std::string { return std::string(1, TRTEngine::BINDING_DELIM); });
   m.def("SERIALIZED_RT_DEVICE_DELIM", []() -> std::string { return DEVICE_INFO_DELIM; });
@@ -157,22 +124,20 @@ TORCH_LIBRARY(tensorrt, m) {
   });
 }
 
-TORCH_LIBRARY_IMPL(tensorrt, CompositeExplicitAutograd, m) {
-  m.impl("execute_engine", execute_engine);
+void execute_engine_boxed(StableIValue* stack, uint64_t num_args, uint64_t num_outputs) {
+  auto input_tensors = to<std::vector<at::Tensor>>(stack[0]);
+  auto engine = to<c10::intrusive_ptr<TRTEngine>>(stack[1]);
+  stack[0] = from(execute_engine(input_tensors, engine));
+  return;
 }
 
-TORCH_LIBRARY_IMPL(tensorrt, CUDA, m) {
-  m.impl("execute_engine", &execute_engine);
+STABLE_TORCH_LIBRARY_IMPL(tensorrt, CompositeExplicitAutograd, m) {
+  m.impl("execute_engine", &execute_engine_boxed);
 }
 
-TORCH_LIBRARY_IMPL(tensorrt, CompositeExplicitAutograd, m) {
-  m.impl("execute_engine", execute_engine);
+STABLE_TORCH_LIBRARY_IMPL(tensorrt, CUDA, m) {
+  m.impl("execute_engine", &execute_engine_boxed);
 }
-
-TORCH_LIBRARY_IMPL(tensorrt, CUDA, m) {
-  m.impl("execute_engine", &execute_engine);
-}
-
 
 } // namespace
 } // namespace runtime
