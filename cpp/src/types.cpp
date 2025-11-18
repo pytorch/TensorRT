@@ -126,27 +126,20 @@ DataType::DataType(c10::ScalarType t) {
       "Data type is unsupported (" << t << ")");
   switch (t) {
     case at::kHalf:
-      value = DataType::kHalf;
-      break;
+      return DataType::kHalf;
     case at::kChar:
-      value = DataType::kChar;
-      break;
+      return DataType::kChar;
     case at::kInt:
-      value = DataType::kInt;
-      break;
+      return DataType::kInt;
     case at::kLong:
-      value = DataType::kLong;
-      break;
+      return DataType::kLong;
     case at::kDouble:
-      value = DataType::kDouble;
-      break;
+      return DataType::kDouble;
     case at::kBool:
-      value = DataType::kBool;
-      break;
+      return DataType::kBool;
     case at::kFloat:
     default:
-      value = DataType::kFloat;
-      break;
+      return DataType::kFloat;
   }
 }
 
@@ -157,11 +150,10 @@ TensorFormat::TensorFormat(at::MemoryFormat t) {
 
   switch (t) {
     case at::MemoryFormat::ChannelsLast:
-      value = TensorFormat::kChannelsLast;
+      return TensorFormat::kChannelsLast;
     case at::MemoryFormat::Contiguous:
     default:
-      value = TensorFormat::kContiguous;
-      break;
+      return TensorFormat::kContiguous;
   }
 }
 
