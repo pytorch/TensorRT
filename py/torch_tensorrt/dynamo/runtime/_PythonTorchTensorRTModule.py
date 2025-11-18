@@ -172,8 +172,9 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         self._input_buffers: List[torch.Tensor] = []
         self._output_buffers: List[torch.Tensor] = []
         self.cudagraph: Optional[torch.cuda.CUDAGraph] = None
-        self._caller_stream: Optional[torch.cuda.Stream] = None
-        self._engine_stream: Optional[torch.cuda.Stream] = None
+        self._engine_stream: torch.cuda.Stream = torch.cuda.current_stream()
+        self.output_tensors: Optional[List[torch.Tensor]] = None
+        self.sync_stream = True
 
         # TODO: Make the below a Dictionary {shape: cudagraph}
         self.shape_key: Optional[str] = None
@@ -224,6 +225,24 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         self.output_tensors_are_unowned = False
         if self.serialized_engine is not None and not self.settings.lazy_engine_init:
             self.setup_engine()
+        self.is_shape_inference_io = {
+            input_name: self.engine.is_shape_inference_io(input_name)
+            for input_name in self.input_names
+        }
+
+    def set_unowned_output_tensor(self, enabled: bool) -> None:
+        """
+        Set the flag to indicate if the output tensor is unowned by the engine.
+        If self.unowned_output_tensor=True, the engine will create a new output tensor in each forward pass.
+        This would be slower but is required when users need to manipulate the output tensor after each forward pass.
+        Therefore, this should be set to True only for the last module in a graph and leave to False for intermediate modules,
+        which users don't have access to.
+        Args:
+            enabled: bool
+                Whether to set the flag to True.
+
+        """
+        self.unowned_output_tensor = enabled
 
     def set_output_tensors_as_unowned(self, enabled: bool) -> None:
         """
@@ -280,6 +299,9 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         assert (
             self.target_platform == Platform.current_platform()
         ), f"TensorRT engine was not built to target current platform (target: {self.target_platform}, current: {Platform.current_platform()})"
+        # Stream handling: if the caller stream is the pytorch default stream, create a new engine stream
+        # otherwise, use the caller stream and disable stream synchronization
+        self._engine_stream = torch.cuda.current_stream()
 
         self.initialized = True
         runtime = trt.Runtime(TRT_LOGGER)
@@ -305,9 +327,13 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
             for output_name in self.output_names
         ]
         self.output_shapes = [
-            self.engine.get_tensor_shape(output_name)
+            tuple(self.context.get_tensor_shape(output_name))
             for output_name in self.output_names
         ]
+
+        self.shape_key = "".join(
+            str(tuple(t)).replace(" ", "") for t in self.input_shapes
+        )
 
         if self.requires_output_allocator:
             self.create_output_allocator()
@@ -379,6 +405,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         contiguous_inputs: List[torch.Tensor],
         cudagraphs_enabled: bool,
         need_cudagraphs_record: bool,
+        shape_changed: bool = True,
     ) -> None:
         for i, input_name in enumerate(self.input_names):
             if not contiguous_inputs[i].is_cuda:
@@ -412,9 +439,10 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                 inputs_cpu = contiguous_inputs[i].cpu().to(torch.int64).numpy().copy()
                 self.context.set_tensor_address(input_name, inputs_cpu.ctypes.data)
             else:
-                self.context.set_input_shape(
-                    input_name, tuple(contiguous_inputs[i].shape)
-                )
+                if shape_changed:
+                    self.context.set_input_shape(
+                        input_name, tuple(contiguous_inputs[i].shape)
+                    )
                 if cudagraphs_enabled:
                     self._input_buffers[i].copy_(contiguous_inputs[i])
                     self.context.set_tensor_address(
@@ -482,7 +510,11 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                 ), f"Wrong number of inputs, expect {len(self.input_names)} get {len(contiguous_inputs)}."
 
                 self.setup_input_tensors(
-                    contiguous_inputs, self.cudagraphs_enabled, need_cudagraphs_record
+                    contiguous_inputs,
+                    self.cudagraphs_enabled,
+                    need_cudagraphs_record,
+                    shape_changed
+                    or self.output_tensors is None,  # First time execution
                 )
 
                 if shape_changed:
@@ -504,15 +536,22 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                 if can_use_pre_allocated_outputs:
                     outputs = self.pre_allocated_outputs
                 else:
-                    self.output_shapes = [
-                        tuple(self.context.get_tensor_shape(output_name))
-                        for output_name in self.output_names
-                    ]
+                    if shape_changed:
+                        self.output_shapes = [
+                            tuple(self.context.get_tensor_shape(output_name))
+                            for output_name in self.output_names
+                        ]
                     if DYNAMIC_DIM in self.output_shapes:
                         raise ValueError(
                             "Encountered dynamic output shapes during runtime. This could mean the network has data-dependent output shapes which is not currently supported."
                         )
-                    outputs = self.create_output_tensors()
+                    if (
+                        self.output_tensors is None
+                        or self.unowned_output_tensor
+                        or shape_changed
+                    ):
+                        self.output_tensors = self.create_output_tensors()
+                    outputs = self.output_tensors
 
                 for o, output_name in enumerate(self.output_names):
                     if need_cudagraphs_record:
@@ -534,41 +573,46 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                 if self.profiling_enabled
                 else nullcontext()
             ):
-                self._caller_stream = torch.cuda.current_stream()
-                if (
-                    self._engine_stream == torch.cuda.default_stream()
-                    or self._engine_stream is None
-                ):
-                    self._engine_stream = torch.cuda.Stream()
 
-                self._engine_stream.wait_stream(self._caller_stream)
+                if self.cudagraphs_enabled:
+                    if need_cudagraphs_record:
+                        self.cudagraph = torch.cuda.CUDAGraph()
 
-                with torch.cuda.stream(self._engine_stream):
-                    if self.cudagraphs_enabled:
-                        if need_cudagraphs_record:
-                            self.cudagraph = torch.cuda.CUDAGraph()
+                        if self.profiling_enabled:
+                            self.cudagraph.enable_debug_mode()
 
-                            if self.profiling_enabled:
-                                self.cudagraph.enable_debug_mode()
+                        with torch.cuda.graph(
+                            self.cudagraph, stream=self._engine_stream
+                        ):
+                            self.context.execute_async_v3(
+                                self._engine_stream.cuda_stream
+                            )
 
-                            with torch.cuda.graph(
-                                self.cudagraph, stream=self._engine_stream
-                            ):
-                                self.context.execute_async_v3(
-                                    self._engine_stream.cuda_stream
+                        if self.profiling_enabled:
+                            import tempfile
+
+                            with tempfile.TemporaryDirectory() as tmpdir:
+                                self.cudagraph.debug_dump(
+                                    f"{tmpdir}/{self.name}_cudagraph.dot"
                                 )
 
                             if self.profiling_enabled:
                                 self.cudagraph.debug_dump(
                                     f"{DEBUG_LOGGING_DIR}/{self.name}_cudagraph.dot"
                                 )
+                    self.cudagraph.replay()  # type: ignore
 
-                        self.cudagraph.replay()  # type: ignore
+                else:
+                    import warnings
 
-                    else:
-                        self.context.execute_async_v3(self._engine_stream.cuda_stream)
-
-                self._caller_stream.wait_stream(self._engine_stream)
+                    with warnings.catch_warnings():
+                        try:
+                            self.context.execute_async_v3(
+                                self._engine_stream.cuda_stream
+                            )
+                        except Warning as e:
+                            breakpoint()
+                            print("warning ignored")
 
             # When the pre-allocated output mode is turned on, for intermediate modules, we only create the output in the first execution or when shape is changed.
             if self.use_pre_allocated_outputs and (
@@ -628,21 +672,11 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                 if self.profiling_enabled
                 else nullcontext()
             ):
-                self._caller_stream = torch.cuda.current_stream()
-                if (
-                    self._engine_stream == torch.cuda.default_stream()
-                    or self._engine_stream is None
-                ):
-                    self._engine_stream = torch.cuda.Stream()
-
-                self._engine_stream.wait_stream(self._caller_stream)
 
                 with torch.cuda.stream(self._engine_stream):
                     self.context.execute_async_v3(
                         self._engine_stream.cuda_stream
                     )  # The OutputAllocator is called by execute_async_v3()
-
-                self._caller_stream.wait_stream(self._engine_stream)
 
             with (
                 torch.autograd.profiler.record_function(
@@ -671,8 +705,6 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                 return outputs[0]
 
             return outputs
-
-        self.cudagraphs_enabled = torch_tensorrt.runtime.get_cudagraphs_mode()
 
         # Run forward function
         contiguous_inputs: List[torch.Tensor] = [
