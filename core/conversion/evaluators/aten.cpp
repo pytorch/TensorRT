@@ -948,7 +948,7 @@ auto aten_registrations TORCHTRT_UNUSED =
                  stack.push_back(*args.at(v).IValue());
                }
                stack.push_back(input_num);
-               auto& ops = torch::jit::getAllOperatorsFor(c10::Symbol::fromQualString("aten::format"));
+               auto ops = torch::jit::getAllOperatorsFor(c10::Symbol::fromQualString("aten::format"));
                auto& aten_format = ops.front();
                aten_format->getOperation()(stack);
                std::string output;
