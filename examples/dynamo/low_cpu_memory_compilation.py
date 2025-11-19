@@ -82,3 +82,29 @@ with torchtrt.dynamo.Debugger(
 
     # Expect two back-to-back TensorRT engines due to partitioning under the memory budget.
     print(trt_gm)
+
+
+"""
+You should be able to see two back-to-back TensorRT engines in the graph
+Graph Structure:
+
+   Inputs: List[Tensor: (1, 1024, 224, 224)@float32]
+    ...
+    TRT Engine #1 - Submodule name: _run_on_acc_0
+     Engine Inputs: List[Tensor: (1, 1024, 224, 224)@float32]
+     Number of Operators in Engine: 9
+     Engine Outputs: List[Tensor: (1, 1024, 112, 112)@float32]
+    ...
+    TRT Engine #2 - Submodule name: _run_on_acc_1
+     Engine Inputs: List[Tensor: (1, 1024, 112, 112)@float32]
+     Number of Operators in Engine: 3
+     Engine Outputs: List[Tensor: (1, 10)@float32]
+    ...
+   Outputs: List[Tensor: (1, 10)@float32]
+
+
+GraphModule(
+  (_run_on_acc_0): TorchTensorRTModule()
+  (_run_on_acc_1): TorchTensorRTModule()
+)
+"""
