@@ -68,7 +68,11 @@ jobs:
       ref: ""
       test-infra-repository: pytorch/test-infra
       test-infra-ref: main
-      build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
+      # Extract the include array from filter-matrix output
+      build-matrix: |
+        {
+          "include": ${{ toJSON(fromJSON(needs.filter-matrix.outputs.matrix).include) }}
+        }
       pre-script: ${{ matrix.pre-script }}
       env-var-script: ${{ matrix.env-var-script }}
       post-script: ${{ matrix.post-script }}
@@ -498,18 +502,50 @@ jobs:
       ref: ""
       test-infra-repository: pytorch/test-infra
       test-infra-ref: main
-      build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
+      # Extract the distributed_include array from filter-matrix output
+      build-matrix: |
+        {
+          "include": ${{ toJSON(fromJSON(needs.filter-matrix.outputs.matrix).distributed_include) }}
+        }
       pre-script: ${{ matrix.pre-script }}
       script: |
         set -euo pipefail
+
+        # Debug: Show what config we're using
+        echo "=========================================="
+        echo "DISTRIBUTED TEST CONFIGURATION"
+        echo "=========================================="
+        echo "Python version: ${PYTHON_VERSION}"
+        echo "CUDA version: ${CU_VERSION}"
+        echo "Runner: ${{ matrix.validation_runner }}"
+        echo "Num GPUs: ${{ matrix.num_gpus }}"
+        echo "Config: ${{ matrix.config }}"
+        echo "=========================================="
+
+        # Verify GPUs are available
+        echo "Checking GPU availability:"
+        nvidia-smi
+        echo "GPU count: $(nvidia-smi --query-gpu=name --format=csv,noheader | wc -l)"
+        echo "=========================================="
+
         export USE_HOST_DEPS=1
         export CI_BUILD=1
         export USE_TRTLLM_PLUGINS=1
+
+        # Install MPI (required for TensorRT-LLM plugins)
+        echo "Installing MPI..."
         dnf install -y mpich mpich-devel openmpi openmpi-devel
+
+        # Run distributed tests
         pushd .
-        cd tests/py
-        cd dynamo
-        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l2_dynamo_distributed_test_results.xml distributed/test_nccl_ops.py
+        cd tests/py/dynamo
+
+        echo "Running distributed tests with mpirun..."
+        mpirun --allow-run-as-root -n ${{ matrix.num_gpus }} \
+          python -m pytest -ra \
+          --junitxml=${RUNNER_TEST_RESULTS_DIR}/l2_dynamo_distributed_test_results.xml \
+          distributed/test_nccl_ops.py
+
         popd
 
 concurrency:
