@@ -536,7 +536,7 @@ jobs:
 
   L2-dynamo-distributed-tests:
     name: L2 dynamo distributed tests
-    needs: [filter-matrix, build, L1-dynamo-core-tests, L1-dynamo-compile-tests, L1-torch-compile-tests, L1-torchscript-tests]
+    needs: [filter-matrix, build]
     if: ${{ (github.ref_name == 'main' || github.ref_name == 'nightly' || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success() }}
     strategy:
       fail-fast: false
@@ -560,6 +560,8 @@ jobs:
           "include": ${{ toJSON(fromJSON(needs.filter-matrix.outputs.matrix).distributed_include) }}
         }
       pre-script: ${{ matrix.pre-script }}
+      post-script: ${{ matrix.post-script }}
+      smoke-test-script: ${{ matrix.smoke-test-script }}
       script: |
         set -euo pipefail
 
@@ -569,9 +571,7 @@ jobs:
         echo "=========================================="
         echo "Python version: ${PYTHON_VERSION}"
         echo "CUDA version: ${CU_VERSION}"
-        echo "Runner: ${{ matrix.validation_runner }}"
-        echo "Num GPUs: ${{ matrix.num_gpus }}"
-        echo "Config: ${{ matrix.config }}"
+        echo "Num GPUs: ${NUM_GPUS}"
         echo "=========================================="
 
         # Verify GPUs are available
@@ -586,17 +586,36 @@ jobs:
 
         # Install MPI (required for TensorRT-LLM plugins)
         echo "Installing MPI..."
-        dnf install -y mpich mpich-devel openmpi openmpi-devel
+        dnf install -y openmpi openmpi-devel
+
+        # Add OpenMPI to PATH (RHEL/AlmaLinux specific location)
+        export PATH="/usr/lib64/openmpi/bin:$PATH"
+        export LD_LIBRARY_PATH="/usr/lib64/openmpi/lib:$LD_LIBRARY_PATH"
+
+        # Verify mpirun is accessible
+        which mpirun
+        mpirun --version
 
         # Run distributed tests
         pushd .
         cd tests/py/dynamo
 
         echo "Running distributed tests with mpirun..."
-        mpirun --allow-run-as-root -n ${{ matrix.num_gpus }} \
-          python -m pytest -ra \
-          --junitxml=${RUNNER_TEST_RESULTS_DIR}/l2_dynamo_distributed_test_results.xml \
-          distributed/test_nccl_ops.py
+        echo "[CONFIG] Number of GPUs to use: ${NUM_GPUS}"
+        echo "[AVAILABLE] GPUs detected by nvidia-smi: $(nvidia-smi --query-gpu=name --format=csv,noheader | wc -l)"
+
+        # Use a wrapper script to ensure only rank 0 writes the JUnit XML
+        # Each rank runs pytest, but only rank 0 saves results to avoid file conflicts
+        RANK_0_XML="${RUNNER_TEST_RESULTS_DIR}/l2_dynamo_distributed_test_results.xml"
+        mpirun --allow-run-as-root -n ${NUM_GPUS} \
+          bash -c '
+            echo "[MPI DEBUG] Rank: ${OMPI_COMM_WORLD_RANK:-0}, World Size: ${OMPI_COMM_WORLD_SIZE:-1}"
+            if [ "${OMPI_COMM_WORLD_RANK:-0}" -eq 0 ]; then
+              python -m pytest -ra --junitxml='"${RANK_0_XML}"' distributed/test_nccl_ops.py
+            else
+              python -m pytest -ra distributed/test_nccl_ops.py
+            fi
+          '
 
         popd
 
