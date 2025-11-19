@@ -150,6 +150,8 @@ def main(args: list[str]) -> None:
             options.limit_pr_builds == "true",
         ):
             print(f"[DEBUG] passed filter - adding to build matrix", file=sys.stderr)
+            # Add tensorrt version to all items (required by linux-test.yml)
+            item["tensorrt"] = {"version": "10.13.3"}
             filtered_includes.append(item)
 
             # NEW: Create distributed variant for specific configs
