@@ -174,6 +174,7 @@ _SETTINGS_TO_BE_ENGINE_INVARIANT = (
     "enable_weight_streaming",
     "tiling_optimization_level",
     "l2_limit_for_tiling",
+    "cpu_memory_budget",
 )
 
 
