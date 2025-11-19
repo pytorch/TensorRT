@@ -160,6 +160,17 @@ jobs:
       options: ${{ matrix.gpu_arch_type == 'cuda' && '--gpus all' || ' ' }}
     timeout-minutes: ${{ inputs.timeout }}
     steps:
+      - name: Debug matrix configuration
+        shell: bash
+        run: |
+          echo "=========================================="
+          echo "BUILD MATRIX DEBUG"
+          echo "=========================================="
+          echo "Python version: ${{ matrix.python_version }}"
+          echo "CUDA version: ${{ matrix.desired_cuda }}"
+          echo "GPU arch type: ${{ matrix.gpu_arch_type }}"
+          echo "Runner: ${{ matrix.validation_runner }}"
+          echo "=========================================="
       - name: Clean workspace
         shell: bash -l {0}
         run: |

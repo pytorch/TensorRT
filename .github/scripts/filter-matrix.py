@@ -60,6 +60,41 @@ def filter_matrix_item(
         return True
 
 
+def create_distributed_config(item: Dict[str, Any]) -> Dict[str, Any]:
+    """Create distributed test configuration from a regular config.
+
+    Takes a standard test config and modifies it for distributed testing:
+    - Changes runner to multi-GPU instance
+    - Adds num_gpus field
+    - Adds config marker
+    """
+    import sys
+
+    # Create a copy to avoid modifying the original
+    dist_item = item.copy()
+
+    # Debug: Show original config
+    print(f"[DEBUG] Creating distributed config from:", file=sys.stderr)
+    print(f"[DEBUG]   Python: {item.get('python_version')}", file=sys.stderr)
+    print(f"[DEBUG]   CUDA: {item.get('desired_cuda')}", file=sys.stderr)
+    print(
+        f"[DEBUG]   Original runner: {item.get('validation_runner')}", file=sys.stderr
+    )
+
+    # Override runner to use multi-GPU instance
+    dist_item["validation_runner"] = "linux.g4dn.12xlarge.nvidia.gpu"
+
+    # Add distributed-specific fields
+    dist_item["num_gpus"] = 2
+    dist_item["config"] = "distributed"
+
+    # Debug: Show modified config
+    print(f"[DEBUG]   New runner: {dist_item['validation_runner']}", file=sys.stderr)
+    print(f"[DEBUG]   GPUs: {dist_item['num_gpus']}", file=sys.stderr)
+
+    return dist_item
+
+
 def main(args: list[str]) -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -99,16 +134,69 @@ def main(args: list[str]) -> None:
 
     includes = matrix_dict["include"]
     filtered_includes = []
+    distributed_includes = []  # NEW: separate list for distributed configs
+
+    print(f"[DEBUG] Processing {len(includes)} input configs", file=sys.stderr)
 
     for item in includes:
+        py_ver = item.get("python_version", "unknown")
+        cuda_ver = item.get("desired_cuda", "unknown")
+
+        print(f"[DEBUG] Checking config: py={py_ver}, cuda={cuda_ver}", file=sys.stderr)
+
         if filter_matrix_item(
             item,
             options.jetpack == "true",
             options.limit_pr_builds == "true",
         ):
+            print(f"[DEBUG] passed filter - adding to build matrix", file=sys.stderr)
             filtered_includes.append(item)
 
-    filtered_matrix_dict = {"include": filtered_includes}
+            # NEW: Create distributed variant for specific configs
+            # Only Python 3.10 + CUDA 13.0 for now
+            if item["python_version"] == "3.10" and item["desired_cuda"] == "cu130":
+                print(
+                    f"[DEBUG]  Creating distributed config for py3.10+cu130",
+                    file=sys.stderr,
+                )
+                distributed_includes.append(create_distributed_config(item))
+        else:
+            print(f"[DEBUG] FILTERED OUT", file=sys.stderr)
+
+    # Debug: Show summary
+    print(f"[DEBUG] Final counts:", file=sys.stderr)
+    print(f"[DEBUG]   Regular configs: {len(filtered_includes)}", file=sys.stderr)
+    print(
+        f"[DEBUG]   Distributed configs: {len(distributed_includes)}", file=sys.stderr
+    )
+
+    # Debug: Show which configs will be built
+    print(
+        f"[DEBUG] Configs that will be BUILT (in filtered_includes):", file=sys.stderr
+    )
+    for item in filtered_includes:
+        print(
+            f"[DEBUG]   - py={item.get('python_version')}, cuda={item.get('desired_cuda')}",
+            file=sys.stderr,
+        )
+
+    print(
+        f"[DEBUG] Configs for DISTRIBUTED TESTS (in distributed_includes):",
+        file=sys.stderr,
+    )
+    for item in distributed_includes:
+        print(
+            f"[DEBUG]   - py={item.get('python_version')}, cuda={item.get('desired_cuda')}, gpus={item.get('num_gpus')}",
+            file=sys.stderr,
+        )
+
+    # NEW: Output both regular and distributed configs
+    filtered_matrix_dict = {
+        "include": filtered_includes,
+        "distributed_include": distributed_includes,  # NEW field
+    }
+
+    # Output to stdout (consumed by GitHub Actions)
     print(json.dumps(filtered_matrix_dict))
 
 
