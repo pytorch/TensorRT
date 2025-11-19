@@ -30,6 +30,8 @@ class MyEngineCache(BaseEngineCache):
             os.makedirs(self.engine_cache_dir, exist_ok=True)
 
         self.hashes = {}
+    def exist(self, hash: str) -> bool:
+        return hash in self.hashes
 
     def save(
         self,
