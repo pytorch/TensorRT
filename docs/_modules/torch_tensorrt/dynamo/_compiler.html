@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt.dynamo._compiler &mdash; Torch-TensorRT v2.10.0.dev0+4ad6ee8 documentation</title>
+  <title>torch_tensorrt.dynamo._compiler &mdash; Torch-TensorRT v2.10.0.dev0+2e6843e documentation</title>
   
 
   
@@ -290,7 +290,7 @@
               
               
                 <div class="version">
-                  v2.10.0.dev0+4ad6ee8
+                  v2.10.0.dev0+2e6843e
                 </div>
               
             
@@ -407,6 +407,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../../../contributors/writing_dynamo_aten_lowering_passes.html">Writing Dynamo ATen Lowering Passes</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../contributors/ts_converters.html">Writing TorchScript Converters</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../contributors/useful_links.html">Useful Links for Torch-TensorRT Development</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../contributors/resource_management.html">Resource Management</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Indices</span></p>
 <ul>
@@ -530,6 +531,7 @@
 <span class="p">)</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.utils</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
     <span class="n">deallocate_module</span><span class="p">,</span>
+    <span class="n">get_cpu_memory_usage</span><span class="p">,</span>
     <span class="n">get_flat_args_with_check</span><span class="p">,</span>
     <span class="n">get_output_metadata</span><span class="p">,</span>
     <span class="n">parse_graph_io</span><span class="p">,</span>
@@ -1169,7 +1171,7 @@
         <span class="s2">&quot;offload_module_to_cpu&quot;</span><span class="p">:</span> <span class="n">offload_module_to_cpu</span><span class="p">,</span>
         <span class="s2">&quot;use_distributed_mode_trace&quot;</span><span class="p">:</span> <span class="n">use_distributed_mode_trace</span><span class="p">,</span>
     <span class="p">}</span>
-
+    <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;CPU memory usage before lowering: </span><span class="si">{</span><span class="n">get_cpu_memory_usage</span><span class="p">()</span><span class="si">}</span><span class="s2"> MB&quot;</span><span class="p">)</span>
     <span class="n">settings</span> <span class="o">=</span> <span class="n">CompilationSettings</span><span class="p">(</span><span class="o">**</span><span class="n">compilation_options</span><span class="p">)</span>
     <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Compilation Settings: </span><span class="si">%s</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">settings</span><span class="p">)</span>
     <span class="n">exported_program</span> <span class="o">=</span> <span class="n">pre_export_lowering</span><span class="p">(</span><span class="n">exported_program</span><span class="p">,</span> <span class="n">settings</span><span class="p">)</span>
@@ -1183,14 +1185,17 @@
 
     <span class="c1"># Apply lowering on the graph module</span>
     <span class="n">gm</span> <span class="o">=</span> <span class="n">post_lowering</span><span class="p">(</span><span class="n">gm</span><span class="p">,</span> <span class="n">settings</span><span class="p">)</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;CPU memory usage after post_lowering: </span><span class="si">{</span><span class="n">get_cpu_memory_usage</span><span class="p">()</span><span class="si">}</span><span class="s2"> MB&quot;</span><span class="p">)</span>
     <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Lowered Input graph: &quot;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="p">))</span>
 
     <span class="c1"># Move the weights in the state_dict to CPU</span>
     <span class="k">if</span> <span class="n">offload_module_to_cpu</span><span class="p">:</span>
+        <span class="n">deallocate_module</span><span class="p">(</span><span class="n">gm</span><span class="p">,</span> <span class="n">delete_module</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
         <span class="n">deallocate_module</span><span class="p">(</span><span class="n">exported_program</span><span class="o">.</span><span class="n">module</span><span class="p">(),</span> <span class="n">delete_module</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
         <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
             <span class="s2">&quot;The PyTorch model was moved to the CPU to allocate all GPU memory to TensorRT. To retain the model on the GPU, set offload_module_to_cpu=False&quot;</span>
         <span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;CPU memory usage after CPU offload: </span><span class="si">{</span><span class="n">get_cpu_memory_usage</span><span class="p">()</span><span class="si">}</span><span class="s2"> MB&quot;</span><span class="p">)</span>
     <span class="k">else</span><span class="p">:</span>
         <span class="n">remaining_memory</span><span class="p">,</span> <span class="n">total_memory</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">mem_get_info</span><span class="p">()</span>
         <span class="k">if</span> <span class="n">remaining_memory</span> <span class="o">&lt;</span> <span class="n">total_memory</span> <span class="o">//</span> <span class="mi">2</span><span class="p">:</span>
@@ -1356,6 +1361,11 @@
     <span class="c1"># Iterate over all components that can be accelerated</span>
     <span class="c1"># Generate the corresponding TRT Module for those</span>
 
+    <span class="c1"># Here we delete the frozen parameters from the graph module. Note this does not affect the submodules. We are going to delete the frozen parameters from the submodules in the convert_module function.</span>
+    <span class="c1"># This is done to release CPU memory.</span>
+    <span class="k">for</span> <span class="n">attr</span> <span class="ow">in</span> <span class="nb">dir</span><span class="p">(</span><span class="n">gm</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">attr</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;_frozen_param&quot;</span><span class="p">):</span>
+            <span class="nb">delattr</span><span class="p">(</span><span class="n">gm</span><span class="p">,</span> <span class="n">attr</span><span class="p">)</span>
     <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">_</span> <span class="ow">in</span> <span class="n">partitioned_module</span><span class="o">.</span><span class="n">named_children</span><span class="p">():</span>
         <span class="n">submodule</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">partitioned_module</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span>
         <span class="c1"># filter on the GraphModule</span>
@@ -1731,7 +1741,7 @@
 
     <span class="c1"># Prepare torch_trt inputs</span>
     <span class="n">trt_arg_inputs</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="n">Input</span><span class="p">]</span> <span class="o">=</span> <span class="n">prepare_inputs</span><span class="p">(</span><span class="n">arg_inputs</span><span class="p">)</span>
-    <span class="n">trt_kwarg_inputs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="n">prepare_inputs</span><span class="p">(</span><span class="n">kwarg_inputs</span><span class="p">)</span>
+    <span class="n">trt_kwarg_inputs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="n">prepare_inputs</span><span class="p">(</span><span class="n">kwarg_inputs</span><span class="p">)</span>
     <span class="n">device</span> <span class="o">=</span> <span class="n">to_torch_tensorrt_device</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
     <span class="n">enabled_precisions</span> <span class="o">=</span> <span class="p">{</span><span class="n">dtype</span><span class="o">.</span><span class="n">_from</span><span class="p">(</span><span class="n">p</span><span class="p">)</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">enabled_precisions</span><span class="p">}</span>
 
@@ -1818,7 +1828,7 @@
             <span class="p">)</span>
 
     <span class="n">flattened_input_list</span> <span class="o">=</span> <span class="n">get_flat_args_with_check</span><span class="p">(</span>
-        <span class="n">exported_program</span><span class="p">,</span> <span class="nb">list</span><span class="p">(</span><span class="n">trt_arg_inputs</span><span class="p">),</span> <span class="n">trt_kwarg_inputs</span>
+        <span class="n">exported_program</span><span class="p">,</span> <span class="nb">list</span><span class="p">(</span><span class="n">trt_arg_inputs</span><span class="p">),</span> <span class="n">trt_kwarg_inputs</span>  <span class="c1"># type: ignore</span>
     <span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
 
     <span class="k">try</span><span class="p">:</span>

@@ -14,6 +14,16 @@ config_setting(
     ],
 )
 
+config_setting(
+    name = "jetpack",
+    constraint_values = [
+        "@platforms//cpu:aarch64",
+    ],
+    flag_values = {
+        "//toolchains/dep_collection:compute_libs": "jetpack",
+    },
+)
+
 converter_test(
     name = "test_activation",
 )
