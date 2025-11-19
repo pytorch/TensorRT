@@ -19,8 +19,10 @@ def evaluator_test(name, visibility = None):
             "//tests/util",
             "@googletest//:gtest_main",
         ] + select({
+            ":jetpack": ["@torch_l4t//:libtorch"],
+            ":use_torch_whl": ["@torch_whl//:libtorch"],
             ":windows": ["@libtorch_win//:libtorch"],
-            "//conditions:default": ["@libtorch//:libtorch"],
+            "//conditions:default": ["@libtorch"],
         }),
         timeout = "long",
     )
