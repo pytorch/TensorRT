@@ -242,7 +242,8 @@ class ResourcePartitioner(_SplitterBase):  # type: ignore
         sizes = self.size_of_subgraphs(subgraphs)
         if sum(sizes) > subgraph_size_budget * 40:
             raise ValueError(
-                f"CPU memory budget or available memory is too small to compile the model. CPU memory budget: {self.cpu_memory_budget // (1024 * 1024) if self.cpu_memory_budget != -1 else "All available memory"} MB, Model size: {sum(sizes) // (1024 * 1024)} MB. "
+                "CPU memory budget or available memory is too small to compile the model. "
+                + f"CPU memory budget: {self.cpu_memory_budget // (1024 * 1024)} MB, Model size: {sum(sizes) // (1024 * 1024)} MB. "
                 + "Consider setting cpu_memory_budget to a larger value or disable offload_module_to_cpu to save more CPU memory."
             )
         for subgraph, size in zip(subgraphs, sizes):
