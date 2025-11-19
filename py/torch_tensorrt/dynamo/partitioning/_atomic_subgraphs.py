@@ -9,17 +9,17 @@ ATOMIC_SUBGRAPHS = []
 
 
 def register_atomic_subgraph(
-    is_aten: bool = False,
+    is_core_aten: bool = False,
 ) -> Callable[[torch.nn.Module], torch.nn.Module]:
 
     def decorator(subgraph: torch.nn.Module) -> torch.nn.Module:
-        ATOMIC_SUBGRAPHS.append((subgraph, is_aten))
+        ATOMIC_SUBGRAPHS.append((subgraph, is_core_aten))
         return subgraph
 
     return decorator
 
 
-@register_atomic_subgraph(is_aten=True)
+@register_atomic_subgraph(is_core_aten=True)
 class ConvBNReLU(torch.nn.Module):  # type: ignore[misc]
     def __init__(self) -> None:
         super().__init__()
@@ -60,7 +60,7 @@ class ConvBNReLU(torch.nn.Module):  # type: ignore[misc]
         return x
 
 
-@register_atomic_subgraph(is_aten=True)
+@register_atomic_subgraph(is_core_aten=True)
 class ConvReLU(torch.nn.Module):  # type: ignore[misc]
     def __init__(self) -> None:
         super().__init__()
@@ -92,7 +92,7 @@ class ConvReLU(torch.nn.Module):  # type: ignore[misc]
         return x
 
 
-@register_atomic_subgraph(is_aten=True)
+@register_atomic_subgraph(is_core_aten=True)
 class ConvGelu(torch.nn.Module):  # type: ignore[misc]
     def __init__(self) -> None:
         super().__init__()
@@ -124,7 +124,7 @@ class ConvGelu(torch.nn.Module):  # type: ignore[misc]
         return x
 
 
-@register_atomic_subgraph(is_aten=True)
+@register_atomic_subgraph(is_core_aten=True)
 class ConvSilu(torch.nn.Module):  # type: ignore[misc]
     def __init__(self) -> None:
         super().__init__()
@@ -139,7 +139,7 @@ class ConvSilu(torch.nn.Module):  # type: ignore[misc]
         return x
 
 
-@register_atomic_subgraph(is_aten=True)
+@register_atomic_subgraph(is_core_aten=True)
 class MulAdd(torch.nn.Module):  # type: ignore[misc]
     def __init__(self) -> None:
         super().__init__()
@@ -152,7 +152,7 @@ class MulAdd(torch.nn.Module):  # type: ignore[misc]
         return x
 
 
-@register_atomic_subgraph(is_aten=True)
+@register_atomic_subgraph(is_core_aten=True)
 class MulMul(torch.nn.Module):  # type: ignore[misc]
     def __init__(self) -> None:
         super().__init__()
@@ -192,19 +192,30 @@ def get_node_in_fusion_pattern(
     return fusion_nodes
 
 
-@lru_cache(maxsize=None)
 def get_compiled_atomic_subgraphs() -> List[torch.fx.GraphModule]:
     """
     This function gets the compiled atomic subgraphs from the graph.
     LRU cache the result to avoid recompiling the same pattern multiple times.
     """
     compiled_atomic_subgraphs = []
-    for pattern, is_aten in ATOMIC_SUBGRAPHS:
-        pattern_graph = torch.fx.symbolic_trace(pattern())
-        if not is_aten:
-            # TODO: Add decomposition and lowering if is_aten is False
+    for pattern, is_core_aten in ATOMIC_SUBGRAPHS:
+        pattern_graph = trace_atomic_graph(pattern, is_core_aten)
+        if not is_core_aten:
+            # TODO: Add decomposition and lowering if is_core_aten is False
             raise NotImplementedError(
                 "Atomic subgraphs are not supported for non-aten subgraphs yet."
             )
         compiled_atomic_subgraphs.append(pattern_graph)
     return compiled_atomic_subgraphs
+
+
+@lru_cache(maxsize=None)
+def trace_atomic_graph(
+    graph: torch.nn.Module, is_core_aten: bool = True
+) -> torch.fx.GraphModule:
+    if is_core_aten:
+        return torch.fx.symbolic_trace(graph())
+    else:
+        raise NotImplementedError(
+            "Resource partitioner currently does not support unlowered atomic subgraphs"
+        )
