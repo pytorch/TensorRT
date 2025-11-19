@@ -103,7 +103,11 @@ jobs:
       ref: ""
       test-infra-repository: pytorch/test-infra
       test-infra-ref: main
-      build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
+      # Extract the include array from filter-matrix output
+      build-matrix: |
+        {
+          "include": ${{ toJSON(fromJSON(needs.filter-matrix.outputs.matrix).include) }}
+        }
       pre-script: ${{ matrix.pre-script }}
       script: |
         set -euo pipefail
@@ -132,7 +136,11 @@ jobs:
       ref: ""
       test-infra-repository: pytorch/test-infra
       test-infra-ref: main
-      build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
+      # Extract the include array from filter-matrix output
+      build-matrix: |
+        {
+          "include": ${{ toJSON(fromJSON(needs.filter-matrix.outputs.matrix).include) }}
+        }
       pre-script: ${{ matrix.pre-script }}
       script: |
         set -euo pipefail
@@ -164,7 +172,11 @@ jobs:
       ref: ""
       test-infra-repository: pytorch/test-infra
       test-infra-ref: main
-      build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
+      # Extract the include array from filter-matrix output
+      build-matrix: |
+        {
+          "include": ${{ toJSON(fromJSON(needs.filter-matrix.outputs.matrix).include) }}
+        }
       pre-script: ${{ matrix.pre-script }}
       script: |
         set -euo pipefail
@@ -193,7 +205,11 @@ jobs:
       ref: ""
       test-infra-repository: pytorch/test-infra
       test-infra-ref: main
-      build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
+      # Extract the include array from filter-matrix output
+      build-matrix: |
+        {
+          "include": ${{ toJSON(fromJSON(needs.filter-matrix.outputs.matrix).include) }}
+        }
       pre-script: ${{ matrix.pre-script }}
       script: |
         set -euo pipefail
@@ -226,7 +242,11 @@ jobs:
       ref: ""
       test-infra-repository: pytorch/test-infra
       test-infra-ref: main
-      build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
+      # Extract the include array from filter-matrix output
+      build-matrix: |
+        {
+          "include": ${{ toJSON(fromJSON(needs.filter-matrix.outputs.matrix).include) }}
+        }
       pre-script: ${{ matrix.pre-script }}
       script: |
         set -euo pipefail
@@ -255,7 +275,11 @@ jobs:
       ref: ""
       test-infra-repository: pytorch/test-infra
       test-infra-ref: main
-      build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
+      # Extract the include array from filter-matrix output
+      build-matrix: |
+        {
+          "include": ${{ toJSON(fromJSON(needs.filter-matrix.outputs.matrix).include) }}
+        }
       pre-script: ${{ matrix.pre-script }}
       script: |
         set -euo pipefail
@@ -284,7 +308,11 @@ jobs:
       ref: ""
       test-infra-repository: pytorch/test-infra
       test-infra-ref: main
-      build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
+      # Extract the include array from filter-matrix output
+      build-matrix: |
+        {
+          "include": ${{ toJSON(fromJSON(needs.filter-matrix.outputs.matrix).include) }}
+        }
       pre-script: ${{ matrix.pre-script }}
       script: |
         set -euo pipefail
@@ -315,7 +343,11 @@ jobs:
       ref: ""
       test-infra-repository: pytorch/test-infra
       test-infra-ref: main
-      build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
+      # Extract the include array from filter-matrix output
+      build-matrix: |
+        {
+          "include": ${{ toJSON(fromJSON(needs.filter-matrix.outputs.matrix).include) }}
+        }
       pre-script: ${{ matrix.pre-script }}
       script: |
         set -euo pipefail
@@ -348,7 +380,11 @@ jobs:
       ref: ""
       test-infra-repository: pytorch/test-infra
       test-infra-ref: main
-      build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
+      # Extract the include array from filter-matrix output
+      build-matrix: |
+        {
+          "include": ${{ toJSON(fromJSON(needs.filter-matrix.outputs.matrix).include) }}
+        }
       pre-script: ${{ matrix.pre-script }}
       script: |
         set -euo pipefail
@@ -378,7 +414,11 @@ jobs:
       ref: ""
       test-infra-repository: pytorch/test-infra
       test-infra-ref: main
-      build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
+      # Extract the include array from filter-matrix output
+      build-matrix: |
+        {
+          "include": ${{ toJSON(fromJSON(needs.filter-matrix.outputs.matrix).include) }}
+        }
       pre-script: ${{ matrix.pre-script }}
       script: |
         set -euo pipefail
@@ -408,7 +448,11 @@ jobs:
       ref: ""
       test-infra-repository: pytorch/test-infra
       test-infra-ref: main
-      build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
+      # Extract the include array from filter-matrix output
+      build-matrix: |
+        {
+          "include": ${{ toJSON(fromJSON(needs.filter-matrix.outputs.matrix).include) }}
+        }
       pre-script: ${{ matrix.pre-script }}
       script: |
         set -euo pipefail
@@ -437,7 +481,11 @@ jobs:
       ref: ""
       test-infra-repository: pytorch/test-infra
       test-infra-ref: main
-      build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
+      # Extract the include array from filter-matrix output
+      build-matrix: |
+        {
+          "include": ${{ toJSON(fromJSON(needs.filter-matrix.outputs.matrix).include) }}
+        }
       pre-script: ${{ matrix.pre-script }}
       script: |
         set -euo pipefail
@@ -469,7 +517,11 @@ jobs:
       ref: ""
       test-infra-repository: pytorch/test-infra
       test-infra-ref: main
-      build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
+      # Extract the include array from filter-matrix output
+      build-matrix: |
+        {
+          "include": ${{ toJSON(fromJSON(needs.filter-matrix.outputs.matrix).include) }}
+        }
       pre-script: ${{ matrix.pre-script }}
       script: |
         set -euo pipefail
