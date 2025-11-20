@@ -20,7 +20,6 @@ RegisterOperators trt_placeholder_ops_reg({
         [](Stack& stack) {
           auto attn_mask = pop(stack).to<at::Tensor>();
           if (attn_mask.scalar_type() == at::kBool) {
-            attn_mask = attn_mask;
             attn_mask.masked_fill_(attn_mask.logical_not(), -std::numeric_limits<float>::infinity());
           }
           return attn_mask;
