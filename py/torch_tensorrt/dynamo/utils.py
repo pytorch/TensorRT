@@ -455,6 +455,9 @@ def unwrap_tensor_shape(
             tensor_shape.append(min_max_opt[mode])
         else:
             tensor_shape.append((min_max_opt["min"], min_max_opt["max"]))
+    elif isinstance(tensor, torch.SymFloat):
+        # SymFloats can be an input to graph sometimes. We register their shape as [1] to avoid errors.
+        tensor_shape.append(1)
     elif isinstance(tensor, (torch.Tensor, FakeTensor)):
         for dimension in tensor.shape:
             tensor_shape.extend(unwrap_tensor_shape(dimension, mode=mode))
@@ -472,6 +475,8 @@ def unwrap_tensor_dtype(tensor: Union[torch.Tensor, FakeTensor, torch.SymInt]) -
         return torch.tensor(tensor).dtype
     elif isinstance(tensor, torch.SymInt):
         return torch.int64
+    elif isinstance(tensor, torch.SymFloat):
+        return torch.float32
     elif tensor is None:
         # Case where we explicitly pass one of the inputs to be None (eg: FLUX.1-dev)
         return None
