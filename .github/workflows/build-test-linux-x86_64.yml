@@ -560,8 +560,6 @@ jobs:
           "include": ${{ toJSON(fromJSON(needs.filter-matrix.outputs.matrix).distributed_include) }}
         }
       pre-script: ${{ matrix.pre-script }}
-      post-script: ${{ matrix.post-script }}
-      smoke-test-script: ${{ matrix.smoke-test-script }}
       script: |
         set -euo pipefail
 
