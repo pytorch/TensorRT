@@ -543,6 +543,13 @@ def compile(
             stacklevel=2,
         )
 
+    if kwargs.get("use_explicit_typing", False) == False:
+        warnings.warn(
+            "`use_explicit_typing` is deprecated. This setting will be removed and you should enable autocast instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+
     if "truncate_long_and_double" in kwargs.keys():
         if truncate_double is not _defaults.TRUNCATE_DOUBLE:
             raise ValueError(
