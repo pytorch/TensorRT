@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Define TORCH_TENSORRT_MINOR_VERSION &mdash; Torch-TensorRT v2.10.0.dev0+2e6843e documentation</title>
+  <title>Resource Management &mdash; Torch-TensorRT v2.10.0.dev0+2e6843e documentation</title>
   
 
   
@@ -39,8 +39,8 @@
   <link rel="stylesheet" href="../_static/css/custom.css" type="text/css" />
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="Define TORCH_TENSORRT_PATCH_VERSION" href="define_macros_8h_1a282fd3c0b1c3a215148ae372070e1268.html" />
-    <link rel="prev" title="Define TORCH_TENSORRT_MAJOR_VERSION" href="define_macros_8h_1a31398a6d4d27e28817afb0f0139e909e.html" />
+    <link rel="next" title="Operators Supported" href="../indices/supported_ops.html" />
+    <link rel="prev" title="Useful Links for Torch-TensorRT Development" href="useful_links.html" />
   <!-- Google Tag Manager -->
     <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
     new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
@@ -393,24 +393,24 @@
 <li class="toctree-l1"><a class="reference internal" href="../py_api/ptq.html">torch_tensorrt.ts.ptq</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">C++ API Documentation</span></p>
-<ul class="current">
-<li class="toctree-l1 current"><a class="reference internal" href="torch_tensort_cpp.html">Torch-TensorRT C++ API</a></li>
-<li class="toctree-l1"><a class="reference internal" href="namespace_torch_tensorrt.html">Namespace torch_tensorrt</a></li>
-<li class="toctree-l1"><a class="reference internal" href="namespace_torch_tensorrt__logging.html">Namespace torch_tensorrt::logging</a></li>
-<li class="toctree-l1"><a class="reference internal" href="namespace_torch_tensorrt__torchscript.html">Namespace torch_tensorrt::torchscript</a></li>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../_cpp_api/torch_tensort_cpp.html">Torch-TensorRT C++ API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../_cpp_api/namespace_torch_tensorrt.html">Namespace torch_tensorrt</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../_cpp_api/namespace_torch_tensorrt__logging.html">Namespace torch_tensorrt::logging</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../_cpp_api/namespace_torch_tensorrt__torchscript.html">Namespace torch_tensorrt::torchscript</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">CLI Documentation</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../cli/torchtrtc.html">torchtrtc</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Contributor Documentation</span></p>
-<ul>
-<li class="toctree-l1"><a class="reference internal" href="../contributors/system_overview.html">System Overview</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../contributors/dynamo_converters.html">Writing Dynamo Converters</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../contributors/writing_dynamo_aten_lowering_passes.html">Writing Dynamo ATen Lowering Passes</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../contributors/ts_converters.html">Writing TorchScript Converters</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../contributors/useful_links.html">Useful Links for Torch-TensorRT Development</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../contributors/resource_management.html">Resource Management</a></li>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="system_overview.html">System Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="dynamo_converters.html">Writing Dynamo Converters</a></li>
+<li class="toctree-l1"><a class="reference internal" href="writing_dynamo_aten_lowering_passes.html">Writing Dynamo ATen Lowering Passes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="ts_converters.html">Writing TorchScript Converters</a></li>
+<li class="toctree-l1"><a class="reference internal" href="useful_links.html">Useful Links for Torch-TensorRT Development</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Resource Management</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Indices</span></p>
 <ul>
@@ -455,15 +455,13 @@
       </li>
 
         
-          <li><a href="torch_tensort_cpp.html">Torch-TensorRT C++ API</a> &gt;</li>
-        
-      <li>Define TORCH_TENSORRT_MINOR_VERSION</li>
+      <li>Resource Management</li>
     
     
       <li class="pytorch-breadcrumbs-aside">
         
             
-            <a href="../_sources/_cpp_api/define_macros_8h_1a35703561b26b1a9d2738ad7d58b27827.rst.txt" rel="nofollow"><img src="../_static/images/view-page-source-icon.svg"></a>
+            <a href="../_sources/contributors/resource_management.rst.txt" rel="nofollow"><img src="../_static/images/view-page-source-icon.svg"></a>
           
         
       </li>
@@ -493,18 +491,68 @@
             <div role="main" class="main-content" itemscope="itemscope" itemtype="http://schema.org/Article">
              <article itemprop="articleBody" id="pytorch-article" class="pytorch-article">
               
-  <section id="define-torch-tensorrt-minor-version">
-<span id="exhale-define-macros-8h-1a35703561b26b1a9d2738ad7d58b27827"></span><h1>Define TORCH_TENSORRT_MINOR_VERSION<a class="headerlink" href="#define-torch-tensorrt-minor-version" title="Permalink to this heading">¶</a></h1>
+  <section id="resource-management">
+<span id="id1"></span><h1>Resource Management<a class="headerlink" href="#resource-management" title="Permalink to this heading">¶</a></h1>
+<section id="overview">
+<h2>Overview<a class="headerlink" href="#overview" title="Permalink to this heading">¶</a></h2>
+<p>Efficient control of CPU and GPU memory is essential for successful model compilation,
+especially when working with large models such as LLMs or diffusion models.
+Uncontrolled memory growth can cause compilation failures or process termination.
+This guide describes the symptoms of excessive memory usage and provides methods
+to reduce both CPU and GPU memory consumption.</p>
+</section>
+<section id="memory-usage-control">
+<h2>Memory Usage Control<a class="headerlink" href="#memory-usage-control" title="Permalink to this heading">¶</a></h2>
+<section id="cpu-memory">
+<h3>CPU Memory<a class="headerlink" href="#cpu-memory" title="Permalink to this heading">¶</a></h3>
+<p>By default, Torch-TensorRT may consume up to <strong>5x</strong> the model size in CPU memory.
+This can exceed system limits when compiling large models.</p>
+<p><strong>Common symptoms of high CPU memory usage:</strong></p>
 <ul class="simple">
-<li><p>Defined in <a class="reference internal" href="file_cpp_include_torch_tensorrt_macros.h.html#file-cpp-include-torch-tensorrt-macros-h"><span class="std std-ref">File macros.h</span></a></p></li>
+<li><p>Program freeze</p></li>
+<li><p>Process terminated by the operating system</p></li>
 </ul>
-<section id="define-documentation">
-<h2>Define Documentation<a class="headerlink" href="#define-documentation" title="Permalink to this heading">¶</a></h2>
-<dl class="cpp macro">
-<dt class="sig sig-object cpp" id="c.TORCH_TENSORRT_MINOR_VERSION">
-<span class="target" id="macros_8h_1a35703561b26b1a9d2738ad7d58b27827"></span><span class="sig-name descname"><span class="n"><span class="pre">TORCH_TENSORRT_MINOR_VERSION</span></span></span><a class="headerlink" href="#c.TORCH_TENSORRT_MINOR_VERSION" title="Permalink to this definition">¶</a><br /></dt>
-<dd></dd></dl>
-
+<p><strong>Ways to lower CPU memory usage:</strong></p>
+<ol class="arabic">
+<li><p><strong>Enable memory trimming</strong></p>
+<p>Set the following environment variable:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">export</span><span class="w"> </span><span class="nv">TORCHTRT_ENABLE_BUILDER_MALLOC_TRIM</span><span class="o">=</span><span class="m">1</span>
+</pre></div>
+</div>
+<p>This reduces approximately <strong>2x</strong> of redundant model copies, limiting
+total CPU memory usage to up to <strong>3x</strong> the model size.</p>
+</li>
+<li><p><strong>Disable CPU offloading</strong></p>
+<p>In compilation settings, set:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">offload_module_to_cpu</span> <span class="o">=</span> <span class="kc">False</span>
+</pre></div>
+</div>
+<p>This removes another <strong>1x</strong> model copy, reducing peak CPU memory
+usage to about <strong>2x</strong> the model size.</p>
+</li>
+</ol>
+</section>
+<section id="gpu-memory">
+<h3>GPU Memory<a class="headerlink" href="#gpu-memory" title="Permalink to this heading">¶</a></h3>
+<p>By default, Torch-TensorRT may consume up to <strong>2x</strong> the model size in GPU memory.</p>
+<p><strong>Common symptoms of high GPU memory usage:</strong></p>
+<ul class="simple">
+<li><p>CUDA out-of-memory errors</p></li>
+<li><p>TensorRT compilation errors</p></li>
+</ul>
+<p><strong>Ways to lower GPU memory usage:</strong></p>
+<ol class="arabic">
+<li><p><strong>Enable offloading to CPU</strong></p>
+<p>In compilation settings, set:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">offload_module_to_cpu</span> <span class="o">=</span> <span class="kc">True</span>
+</pre></div>
+</div>
+<p>This shifts one model copy from GPU to CPU memory.
+As a result, peak GPU memory usage decreases to about <strong>1x</strong>
+the model size, while one more copy of the model will occupy the CPU memory so CPU memory usage increases by roughly <strong>1x</strong>.</p>
+</li>
+</ol>
+</section>
 </section>
 </section>
 
@@ -516,10 +564,10 @@
   
     <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
       
-        <a href="define_macros_8h_1a282fd3c0b1c3a215148ae372070e1268.html" class="btn btn-neutral float-right" title="Define TORCH_TENSORRT_PATCH_VERSION" accesskey="n" rel="next">Next <img src="../_static/images/chevron-right-orange.svg" class="next-page"></a>
+        <a href="../indices/supported_ops.html" class="btn btn-neutral float-right" title="Operators Supported" accesskey="n" rel="next">Next <img src="../_static/images/chevron-right-orange.svg" class="next-page"></a>
       
       
-        <a href="define_macros_8h_1a31398a6d4d27e28817afb0f0139e909e.html" class="btn btn-neutral" title="Define TORCH_TENSORRT_MAJOR_VERSION" accesskey="p" rel="prev"><img src="../_static/images/chevron-right-orange.svg" class="previous-page"> Previous</a>
+        <a href="useful_links.html" class="btn btn-neutral" title="Useful Links for Torch-TensorRT Development" accesskey="p" rel="prev"><img src="../_static/images/chevron-right-orange.svg" class="previous-page"> Previous</a>
       
     </div>
   
@@ -551,8 +599,13 @@
           <div class="pytorch-right-menu" id="pytorch-right-menu">
             <div class="pytorch-side-scroll" id="pytorch-side-scroll-right">
               <ul>
-<li><a class="reference internal" href="#">Define TORCH_TENSORRT_MINOR_VERSION</a><ul>
-<li><a class="reference internal" href="#define-documentation">Define Documentation</a></li>
+<li><a class="reference internal" href="#">Resource Management</a><ul>
+<li><a class="reference internal" href="#overview">Overview</a></li>
+<li><a class="reference internal" href="#memory-usage-control">Memory Usage Control</a><ul>
+<li><a class="reference internal" href="#cpu-memory">CPU Memory</a></li>
+<li><a class="reference internal" href="#gpu-memory">GPU Memory</a></li>
+</ul>
+</li>
 </ul>
 </li>
 </ul>

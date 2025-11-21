@@ -28,7 +28,6 @@ Getting Started
    getting_started/installation
    getting_started/jetpack
    getting_started/quick_start
-   getting_started/tensorrt_rtx
    getting_started/capture_and_replay
 
 User Guide
@@ -234,6 +233,7 @@ Contributor Documentation
    contributors/writing_dynamo_aten_lowering_passes
    contributors/ts_converters
    contributors/useful_links
+   contributors/resource_management
 
 Indices
 ----------------

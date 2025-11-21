@@ -12,7 +12,7 @@ if [[ $(uname -m) == "aarch64" ]]; then
   if [[ ${os_name} == "ubuntu" ]]; then
       IS_JETPACK=true
       apt-get update
-      apt-get install -y ninja-build gettext curl libopenblas-dev zip unzip libfmt-dev
+      apt-get install -y ninja-build gettext curl libopenblas-dev zip unzip libfmt-dev libopenblas-dev
   else
       IS_SBSA=true
       yum install -y ninja-build gettext zip unzip

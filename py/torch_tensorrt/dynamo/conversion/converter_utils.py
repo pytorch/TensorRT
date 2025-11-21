@@ -446,53 +446,47 @@ def create_constant(
         else:
             shape = list(torch_value.shape)
 
-        if torch_value is not None:
-
-            if torch_value.dtype == torch.uint8:
-                if is_tensorrt_version_supported("10.8.0"):
-                    if (
-                        target_quantized_type is None
-                        or target_quantized_type != trt.DataType.FP4
-                    ):
-                        # Iconstant layer does not support Uint8, it only support that FP4 data packed in uint8
-                        raise ValueError(
-                            "Currently supported target_quantized_type for uint8 is FP4, got {target_quantized_type=}"
-                        )
-                    shape[-1] = shape[-1] * 2
-                    weights = to_trt_weights(
-                        ctx,
-                        torch_value,
-                        name,
-                        "CONSTANT",
-                        "CONSTANT",
-                        dtype=trt.DataType.FP4,
-                        count=torch_value.numel() * 2,
-                    )
-                    constant = ctx.net.add_constant(
-                        shape,
-                        weights,
-                    )
-                    constant.name = name
-                    return constant.get_output(0)
-                else:
+        if torch_value.dtype == torch.uint8:
+            if is_tensorrt_version_supported("10.8.0"):
+                if (
+                    target_quantized_type is None
+                    or target_quantized_type != trt.DataType.FP4
+                ):
+                    # Iconstant layer does not support Uint8, it only support that FP4 data packed in uint8
                     raise ValueError(
-                        "Currently FP4 is only supported in TensorRT 10.8.0 and above"
+                        "Currently supported target_quantized_type for uint8 is FP4, got {target_quantized_type=}"
                     )
-            # Record the weight in ctx for refit and cpu memory reference
+                shape[-1] = shape[-1] * 2
+                weights = to_trt_weights(
+                    ctx,
+                    torch_value,
+                    name,
+                    "CONSTANT",
+                    "CONSTANT",
+                    dtype=trt.DataType.FP4,
+                    count=torch_value.numel() * 2,
+                )
+                constant = ctx.net.add_constant(
+                    shape,
+                    weights,
+                )
+                constant.name = name
+                return constant.get_output(0)
+            else:
+                raise ValueError(
+                    "Currently FP4 is only supported in TensorRT 10.8.0 and above"
+                )
+        # Record the weight in ctx for refit and cpu memory reference
 
-            # Convert the torch.Tensor to a trt.Weights object
-            trt_weights = to_trt_weights(ctx, torch_value, name, "CONSTANT", "CONSTANT")
-            constant = ctx.net.add_constant(
-                shape,
-                trt_weights,
-            )
-            constant.name = name
+        # Convert the torch.Tensor to a trt.Weights object
+        trt_weights = to_trt_weights(ctx, torch_value, name, "CONSTANT", "CONSTANT")
+        constant = ctx.net.add_constant(
+            shape,
+            trt_weights,
+        )
+        constant.name = name
 
-            return constant.get_output(0)
-        else:
-            raise ValueError(
-                f"Cannot convert tensor '{name}' to a TensorRT constant because its value is None."
-            )
+        return constant.get_output(0)
 
 
 def get_trt_tensor(

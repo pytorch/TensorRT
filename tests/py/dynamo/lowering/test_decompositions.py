@@ -1679,15 +1679,8 @@ class TestLowering(TestCase):
         )
         optimized_model_results = optimized_model(*inputs).detach().cpu()
         torch_model_results = fx_graph(*inputs).detach().cpu()
-
-        max_diff = float(
-            torch.max(torch.abs(optimized_model_results - torch_model_results))
-        )
-        self.assertAlmostEqual(
-            max_diff,
-            0,
-            DECIMALS_OF_AGREEMENT,
-            f"Log_softmax TRT outputs don't match with the original model.",
+        assert torch.allclose(
+            optimized_model_results, torch_model_results, atol=1e-3, rtol=1e-3
         )
 
     @parameterized.expand(

@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import ctypes
 import gc
 import logging
+import os
+import platform
 import warnings
 from dataclasses import fields, replace
 from enum import Enum
@@ -17,6 +20,7 @@ from typing import (
 )
 
 import numpy as np
+import psutil
 import sympy
 import tensorrt as trt
 import torch
@@ -826,13 +830,13 @@ def get_output_metadata(
     return [node.meta for node in nodes]
 
 
-def get_output_dtypes(output: Any, truncate_doulbe: bool = False) -> List[dtype]:
+def get_output_dtypes(output: Any, truncate_double: bool = False) -> List[dtype]:
     output_dtypes = []
     if isinstance(output, torch.fx.node.Node):
         if "val" in output.meta:
             output_meta = output.meta["val"]
             if isinstance(output_meta, (FakeTensor, torch.Tensor)):
-                if truncate_doulbe and output_meta.dtype == torch.float64:
+                if truncate_double and output_meta.dtype == torch.float64:
                     output_dtypes.append(dtype.float32)
                 else:
                     output_dtypes.append(dtype._from(output_meta.dtype))
@@ -853,3 +857,27 @@ def get_output_dtypes(output: Any, truncate_doulbe: bool = False) -> List[dtype]
             f"got unexpected type {type(output)}, expected type is a torch.fx.node.Node or a tuple/list of torch.fx.node.Node"
         )
     return output_dtypes
+
+
+def get_cpu_memory_usage() -> Any:
+    return psutil.Process().memory_info().rss / 1024 / 1024
+
+
+def release_host_and_device_memory() -> None:
+    gc.collect()
+    if torch.cuda.is_available():
+        torch.cuda.synchronize()
+        torch.cuda.empty_cache()
+        torch.cuda.ipc_collect()
+        torch.cuda.synchronize()
+
+    if (
+        platform.system() == "Linux"
+        and os.environ.get("TORCHTRT_ENABLE_BUILDER_MALLOC_TRIM", "0") == "1"
+    ):
+        try:
+            libc = ctypes.CDLL("libc.so.6")
+            if libc.malloc_trim(0) != 1:
+                logger.warning("Failed to release CPU memory.")
+        except Exception:
+            logger.warning("Failed to release CPU memory.")

@@ -331,7 +331,7 @@ class ReduceOperation(Enum):
             scatter_tensor = initial_tensor
         else:
             # This case would not be encountered from torch itself
-            print("Invalid Operation for Reduce op!!")
+            raise ValueError(f"Invalid Operation for Reduce op: {self}")
 
         operation_rhs = torch.scatter(scatter_tensor, dim, index_tensor, src_tensor)
         device = to_torch_device(scatter_tensor.device)

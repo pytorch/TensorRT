@@ -9,7 +9,12 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     has_dynamic_shape,
     set_layer_name,
 )
-from torch_tensorrt.dynamo.conversion.impl.shape import get_shape_with_dynamic_shape
+from torch_tensorrt.dynamo.conversion.impl.cat import (
+    unify_and_concat_trt_tensors as unify_trt_shape_tensors,
+)
+from torch_tensorrt.dynamo.conversion.impl.shape import (
+    get_shape_with_dynamic_shape,
+)
 
 
 def upsample(
@@ -28,14 +33,22 @@ def upsample(
     if scale_factor is not None:
         layer.scales = [1.0, 1.0] + list(scale_factor)
     else:
-        shape = list(input.shape)[:2] + list(size)
+        shape = list(input.shape)[:2]
+        if size is not None:
+            shape += list(size)
         if has_dynamic_shape(shape):
             shape = get_shape_with_dynamic_shape(
                 ctx, target, source_ir, name, shape, input
             )
             layer.set_input(1, shape)
         else:
-            layer.shape = shape
+            trt_shape = unify_trt_shape_tensors(
+                ctx, target, name, shape, concat_axis=0, force_trt_output=False
+            )
+            if isinstance(trt_shape, list):
+                layer.shape = trt_shape
+            else:
+                layer.set_input(1, trt_shape)
 
     if mode == "nearest":
         layer.resize_mode = trt.InterpolationMode.NEAREST

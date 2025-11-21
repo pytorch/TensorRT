@@ -95,7 +95,7 @@ cc_import(
     shared_library = select({
         ":aarch64_linux": "lib/aarch64-linux-gnu/libnvinfer.so",
         ":ci_rhel_x86_64_linux": "lib64/libnvinfer.so",
-        ":windows": "lib/nvinfer_10.dll",
+        ":windows": "bin/nvinfer_10.dll",
         "//conditions:default": "lib/x86_64-linux-gnu/libnvinfer.so",
     }),
     visibility = ["//visibility:private"],

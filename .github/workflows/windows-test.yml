@@ -143,10 +143,12 @@ jobs:
           is_windows: 'enabled'
       - name: Surface failing tests
         if: always()
-        uses: pmeier/pytest-results-action@v0.3.0
+        uses: pmeier/pytest-results-action@v0.5.0
         with:
-          path: ${{ env.RUNNER_TEST_RESULTS_DIR }}
-          fail-on-empty: false
+          path: ${{ env.RUNNER_TEST_RESULTS_DIR }}/*.xml
+          summary: true
+          display-options: fEs
+          fail-on-empty: true
       - name: Teardown Windows
         if: ${{ always() }}
         uses: ./test-infra/.github/actions/teardown-windows

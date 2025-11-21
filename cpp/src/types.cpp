@@ -158,6 +158,7 @@ TensorFormat::TensorFormat(at::MemoryFormat t) {
   switch (t) {
     case at::MemoryFormat::ChannelsLast:
       value = TensorFormat::kChannelsLast;
+      break;
     case at::MemoryFormat::Contiguous:
     default:
       value = TensorFormat::kContiguous;

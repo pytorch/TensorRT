@@ -173,7 +173,10 @@ def to_numpy(
     """
     output = None
 
-    if value is None or isinstance(value, np.ndarray):
+    if value is None:
+        return None
+
+    elif isinstance(value, np.ndarray):
         output = value
 
     elif isinstance(value, torch.Tensor):

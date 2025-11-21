@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Torch-TensorRT-RTX &mdash; Torch-TensorRT v2.10.0.dev0+e73a442 documentation</title>
+  <title>Torch-TensorRT-RTX &mdash; Torch-TensorRT v2.10.0.dev0+2e6843e documentation</title>
   
 
   
@@ -39,8 +39,6 @@
   <link rel="stylesheet" href="../_static/css/custom.css" type="text/css" />
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="Introduction" href="capture_and_replay.html" />
-    <link rel="prev" title="Quick Start" href="quick_start.html" />
   <!-- Google Tag Manager -->
     <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
     new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
@@ -293,7 +291,7 @@
               
               
                 <div class="version">
-                  v2.10.0.dev0+e73a442
+                  v2.10.0.dev0+2e6843e
                 </div>
               
             
@@ -322,11 +320,10 @@
             
             
               <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
-<ul class="current">
+<ul>
 <li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="jetpack.html">Torch-TensorRT in JetPack</a></li>
 <li class="toctree-l1"><a class="reference internal" href="quick_start.html">Quick Start</a></li>
-<li class="toctree-l1 current"><a class="current reference internal" href="#">Torch-TensorRT-RTX</a></li>
 <li class="toctree-l1"><a class="reference internal" href="capture_and_replay.html">Introduction</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">User Guide</span></p>
@@ -411,6 +408,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../contributors/writing_dynamo_aten_lowering_passes.html">Writing Dynamo ATen Lowering Passes</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../contributors/ts_converters.html">Writing TorchScript Converters</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../contributors/useful_links.html">Useful Links for Torch-TensorRT Development</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributors/resource_management.html">Resource Management</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Indices</span></p>
 <ul>
@@ -532,19 +530,19 @@ Torch-TensorRT by default uses standard TensorRT during the build and run.</p>
 <section id="install-tensorrt-rtx-tarball">
 <h3>Install TensorRT-RTX Tarball<a class="headerlink" href="#install-tensorrt-rtx-tarball" title="Permalink to this heading">¶</a></h3>
 <p>TensorRT-RTX tarball can be downloaded from <a class="reference external" href="https://developer.nvidia.com/tensorrt-rtx">https://developer.nvidia.com/tensorrt-rtx</a>.
-Currently, Torch-TensorRT uses TensorRT-RTX version <strong>1.0.0.21</strong>.</p>
+Currently, Torch-TensorRT uses TensorRT-RTX version <strong>1.2.0.54</strong>.</p>
 <p>Once downloaded:</p>
 <p><strong>In Linux:</strong></p>
 <p>Make sure you add the lib path to the <code class="docutils literal notranslate"><span class="pre">LD_LIBRARY_PATH</span></code> environment variable.</p>
-<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span><span class="c1"># If TensorRT-RTX is downloaded in /your_local_download_path/TensorRT-RTX-1.0.0.21</span>
-<span class="nb">export</span><span class="w"> </span><span class="nv">LD_LIBRARY_PATH</span><span class="o">=</span>/your_local_download_path/TensorRT-RTX-1.0.0.21/lib:<span class="nv">$LD_LIBRARY_PATH</span>
+<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span><span class="c1"># If TensorRT-RTX is downloaded in /your_local_download_path/TensorRT-RTX-1.2.0.54</span>
+<span class="nb">export</span><span class="w"> </span><span class="nv">LD_LIBRARY_PATH</span><span class="o">=</span>/your_local_download_path/TensorRT-RTX-1.2.0.54/lib:<span class="nv">$LD_LIBRARY_PATH</span>
 <span class="nb">echo</span><span class="w"> </span><span class="nv">$LD_LIBRARY_PATH</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>TensorRT-RTX
 </pre></div>
 </div>
 <p><strong>In Windows:</strong></p>
 <p>Make sure you add the lib path to the Windows system variable <code class="docutils literal notranslate"><span class="pre">PATH</span></code>.</p>
-<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span><span class="c1"># If TensorRT-RTX is downloaded in C:\your_local_download_path\TensorRT-RTX-1.0.0.21</span>
-<span class="nb">set</span><span class="w"> </span><span class="nv">PATH</span><span class="o">=</span><span class="s2">&quot;%PATH%;C:\your_local_download_path\TensorRT-RTX-1.0.0.21\lib&quot;</span>
+<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span><span class="c1"># If TensorRT-RTX is downloaded in C:\your_local_download_path\TensorRT-RTX-1.2.0.54</span>
+<span class="nb">set</span><span class="w"> </span><span class="nv">PATH</span><span class="o">=</span><span class="s2">&quot;%PATH%;C:\your_local_download_path\TensorRT-RTX-1.2.0.54\lib&quot;</span>
 <span class="nb">echo</span><span class="w"> </span>%PATH%<span class="w"> </span><span class="p">|</span><span class="w"> </span>findstr<span class="w"> </span>TensorRT-RTX
 </pre></div>
 </div>
@@ -553,8 +551,8 @@ Currently, Torch-TensorRT uses TensorRT-RTX version <strong>1.0.0.21</strong>.</
 <h3>Install TensorRT-RTX Wheel<a class="headerlink" href="#install-tensorrt-rtx-wheel" title="Permalink to this heading">¶</a></h3>
 <p>Currently, the <cite>tensorrt_rtx</cite> wheel is not published on PyPI.
 You must install it manually from the downloaded tarball.</p>
-<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span><span class="c1"># If the tarball is downloaded in /your_local_download_path/TensorRT-RTX-1.0.0.21</span>
-python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>/your_local_download_path/TensorRT-RTX-1.0.0.21/python/tensorrt_rtx-1.0.0.21-cp39-none-linux_x86_64.whl
+<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span><span class="c1"># If the tarball is downloaded in /your_local_download_path/TensorRT-RTX-1.2.0.54</span>
+python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>/your_local_download_path/TensorRT-RTX-1.2.0.54/python/tensorrt_rtx-1.2.0.54-cp39-none-linux_x86_64.whl
 </pre></div>
 </div>
 </section>
@@ -615,15 +613,6 @@ dumpbin<span class="w"> </span>/DEPENDENTS<span class="w"> </span>torchtrt.dll
              
             </div>
             <footer>
-  
-    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
-      
-        <a href="capture_and_replay.html" class="btn btn-neutral float-right" title="Introduction" accesskey="n" rel="next">Next <img src="../_static/images/chevron-right-orange.svg" class="next-page"></a>
-      
-      
-        <a href="quick_start.html" class="btn btn-neutral" title="Quick Start" accesskey="p" rel="prev"><img src="../_static/images/chevron-right-orange.svg" class="previous-page"> Previous</a>
-      
-    </div>
   
 
   
