@@ -90,7 +90,6 @@ class ResourcePartitioner(_SplitterBase):  # type: ignore
         self.submodule_name = submodule_name
         self.deps = self.find_deps()
 
-        self.non_acc_submodule_name = "_run_on_gpu_"
         self._node_submodule_map: Dict[str, str] = {}
         self._return_tuple = False
         self.fusion_patterns: Dict[torch.fx.Node, List[torch.fx.Node]] = {}

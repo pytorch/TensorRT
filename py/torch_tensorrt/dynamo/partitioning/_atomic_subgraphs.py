@@ -1,5 +1,5 @@
 from functools import lru_cache
-from typing import Callable, Dict, List, Set
+from typing import Any, Callable, Dict, List, Set, Tuple
 
 import torch
 from torch.fx.passes.utils.matcher_utils import SubgraphMatcher
@@ -9,20 +9,25 @@ ATOMIC_SUBGRAPHS = []
 
 
 def register_atomic_subgraph(
+    init_args: Tuple[Any, ...] = tuple(),
     is_core_aten: bool = False,
 ) -> Callable[[torch.nn.Module], torch.nn.Module]:
 
     def decorator(subgraph: torch.nn.Module) -> torch.nn.Module:
-        ATOMIC_SUBGRAPHS.append((subgraph, is_core_aten))
+        ATOMIC_SUBGRAPHS.append((subgraph, init_args, is_core_aten))
         return subgraph
 
     return decorator
 
 
-@register_atomic_subgraph(is_core_aten=True)
-class ConvBNReLU(torch.nn.Module):  # type: ignore[misc]
-    def __init__(self) -> None:
+@register_atomic_subgraph(init_args=(aten.silu.default,), is_core_aten=True)
+@register_atomic_subgraph(init_args=(aten.gelu.default,), is_core_aten=True)
+@register_atomic_subgraph(init_args=(aten.relu.default,), is_core_aten=True)
+@register_atomic_subgraph(init_args=(aten.sigmoid.default,), is_core_aten=True)
+class ConvBNActivation(torch.nn.Module):  # type: ignore[misc]
+    def __init__(self, activation: torch._ops.OpOverload) -> None:
         super().__init__()
+        self.activation = activation
 
     def forward(
         self,
@@ -56,14 +61,18 @@ class ConvBNReLU(torch.nn.Module):  # type: ignore[misc]
         x = aten._native_batch_norm_legit_no_training.default(
             x, bn_weight, bn_bias, running_mean, running_var, momentum, eps
         )[0]
-        x = aten.relu.default(x)
+        x = self.activation(x)
         return x
 
 
-@register_atomic_subgraph(is_core_aten=True)
-class ConvReLU(torch.nn.Module):  # type: ignore[misc]
-    def __init__(self) -> None:
+@register_atomic_subgraph(init_args=(aten.silu.default,), is_core_aten=True)
+@register_atomic_subgraph(init_args=(aten.gelu.default,), is_core_aten=True)
+@register_atomic_subgraph(init_args=(aten.relu.default,), is_core_aten=True)
+@register_atomic_subgraph(init_args=(aten.sigmoid.default,), is_core_aten=True)
+class ConvActivation(torch.nn.Module):  # type: ignore[misc]
+    def __init__(self, activation: torch._ops.OpOverload) -> None:
         super().__init__()
+        self.activation = activation
 
     def forward(
         self,
@@ -88,58 +97,11 @@ class ConvReLU(torch.nn.Module):  # type: ignore[misc]
             output_padding,
             groups,
         )
-        x = aten.relu.default(x)
+        x = self.activation(x)
         return x
 
 
-@register_atomic_subgraph(is_core_aten=True)
-class ConvGelu(torch.nn.Module):  # type: ignore[misc]
-    def __init__(self) -> None:
-        super().__init__()
-
-    def forward(
-        self,
-        x: torch.Tensor,
-        weight: torch.Tensor,
-        bias: torch.Tensor,
-        stride: List[int],
-        padding: List[int],
-        dilation: List[int],
-        transposed: bool,
-        output_padding: List[int],
-        groups: int,
-    ) -> torch.Tensor:
-        x = aten.convolution.default(
-            x,
-            weight,
-            bias,
-            stride,
-            padding,
-            dilation,
-            transposed,
-            output_padding,
-            groups,
-        )
-        x = aten.gelu.default(x)
-        return x
-
-
-@register_atomic_subgraph(is_core_aten=True)
-class ConvSilu(torch.nn.Module):  # type: ignore[misc]
-    def __init__(self) -> None:
-        super().__init__()
-
-    def forward(
-        self, x: torch.Tensor, weight: torch.Tensor, bias: torch.Tensor
-    ) -> torch.Tensor:
-        x = aten.convolution.default(
-            x, weight, bias, [1, 1], [1, 1], [1, 1], False, [0, 0], 1
-        )
-        x = aten.silu.default(x)
-        return x
-
-
-@register_atomic_subgraph(is_core_aten=True)
+@register_atomic_subgraph(init_args=(), is_core_aten=True)
 class MulAdd(torch.nn.Module):  # type: ignore[misc]
     def __init__(self) -> None:
         super().__init__()
@@ -152,7 +114,7 @@ class MulAdd(torch.nn.Module):  # type: ignore[misc]
         return x
 
 
-@register_atomic_subgraph(is_core_aten=True)
+@register_atomic_subgraph(init_args=(), is_core_aten=True)
 class MulMul(torch.nn.Module):  # type: ignore[misc]
     def __init__(self) -> None:
         super().__init__()
@@ -198,8 +160,8 @@ def get_compiled_atomic_subgraphs() -> List[torch.fx.GraphModule]:
     LRU cache the result to avoid recompiling the same pattern multiple times.
     """
     compiled_atomic_subgraphs = []
-    for pattern, is_core_aten in ATOMIC_SUBGRAPHS:
-        pattern_graph = trace_atomic_graph(pattern, is_core_aten)
+    for pattern, init_args, is_core_aten in ATOMIC_SUBGRAPHS:
+        pattern_graph = trace_atomic_graph(pattern, init_args, is_core_aten)
         if not is_core_aten:
             # TODO: Add decomposition and lowering if is_core_aten is False
             raise NotImplementedError(
@@ -211,10 +173,10 @@ def get_compiled_atomic_subgraphs() -> List[torch.fx.GraphModule]:
 
 @lru_cache(maxsize=None)
 def trace_atomic_graph(
-    graph: torch.nn.Module, is_core_aten: bool = True
+    graph: torch.nn.Module, init_args: Any, is_core_aten: bool = True
 ) -> torch.fx.GraphModule:
     if is_core_aten:
-        return torch.fx.symbolic_trace(graph())
+        return torch.fx.symbolic_trace(graph(*init_args))
     else:
         raise NotImplementedError(
             "Resource partitioner currently does not support unlowered atomic subgraphs"
