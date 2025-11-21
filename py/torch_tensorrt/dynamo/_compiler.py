@@ -918,7 +918,6 @@ def compile_module(
         )
 
     partitioned_module = resource_partition(
-        gm,
         partitioned_module,
         cpu_memory_budget=settings.cpu_memory_budget,
     )
@@ -946,6 +945,7 @@ def compile_module(
     for attr in dir(gm):
         if attr.startswith("_frozen_param"):
             delattr(gm, attr)
+
     for name, _ in partitioned_module.named_children():
         submodule = getattr(partitioned_module, name)
         # filter on the GraphModule
@@ -1408,7 +1408,7 @@ def convert_exported_program_to_serialized_trt_engine(
             )
 
     flattened_input_list = get_flat_args_with_check(
-        exported_program, list(trt_arg_inputs), trt_kwarg_inputs  # type: ignore
+        exported_program, list(trt_arg_inputs), trt_kwarg_inputs
     )[0]
 
     try:
