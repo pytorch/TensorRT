@@ -63,8 +63,32 @@ The ``fn_name`` argument allows users to target specific submodules of the GR00T
     --fn_name all \
     --benchmark cuda_event
 
-Preliminary results indicate that Torch-TensorRT achieves performance levels comparable to ONNX-TensorRT on the GR00T N1.5 model. However, certain submodules, particularly the LLM component  still present optimization opportunities to fully match ONNX-TensorRT performance
-Support for Torch-TensorRT is currently available in this `PR <https://github.com/NVIDIA/Isaac-GR00T/pull/419>`_ and will be merged.
+Results indicate that Torch-TensorRT achieves performance levels comparable to ONNX-TensorRT on the GR00T N1.5 model. However, certain submodules, particularly the LLM component  still present optimization opportunities to fully match ONNX-TensorRT performance
+Support for Torch-TensorRT is currently available in this `PR <https://github.com/NVIDIA/Isaac-GR00T/pull/419>`_ and will be merged. Results indicate that Torch-TensorRT achieves performance levels comparable to ONNX-TensorRT on the GR00T N1.5 model. However, certain submodules, particularly the LLM component  still present optimization opportunities to fully match ONNX-TensorRT performance
+
+RoboCasa Simulation 
+--------------------
+
+RoboCasa is a large-scale simulation framework for training generally capable robots to perform everyday tasks. In this section, we will evaluate the GR00T N1.5 model 
+in RoboCasa simulation environment to better understand its behavior in closed-loop settings. This is especially useful for assessing quantitative performance on long-horizon or multi-step tasks.
+
+Please follow these `instructions <https://github.com/robocasa/robocasa-gr1-tabletop-tasks?tab=readme-ov-file#getting-started>`_ to set up the RoboCasa simulation environment.
+Once you setup the environment, you can run the following command to start the simulation from ``Isaac-GR00T`` directory:
+.. code-block:: bash
+  cd Isaac-GR00T
+  python3 scripts/inference_service.py --server --model_path nvidia/GR00T-N1.5-3B  --data_config fourier_gr1_arms_waist --use_torch_tensorrt --vit_dtype fp16 --llm_dtype fp16 --dit_dtype fp16 --precision fp16
+
+This would compile the GR00T N1.5 model using Torch-TensorRT and start the inference service at port 5555.
+
+You can then use the following command to start the simulation:
+.. code-block:: bash
+  cd robocasa-gr1-tabletop-tasks
+  python3 scripts/simulation_service.py --client  --env_name gr1_unified/PnPCupToDrawerClose_GR1ArmsAndWaistFourierHands_Env  --video_dir ./videos  --max_episode_steps 720  --n_envs 1 --n_episodes 10 --use_torch_tensorrt
+
+This would start the simulation, display the success rate and record the videos in ``videos`` directory.
+
+.. note::
+   If you are running Isaac GR00T in a Docker environment, you can create two separate tmux sessions and launch both Docker containers on the same network to enable inter-container communication. This allows the inference service and simulation service to communicate seamlessly across containers.
 
 
 Requirements
