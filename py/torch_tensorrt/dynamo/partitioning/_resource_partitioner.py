@@ -50,6 +50,7 @@ from typing import Dict, List, Tuple
 
 import psutil
 import torch
+from torch.fx.experimental.const_fold import _inline_module
 from torch.fx.passes.splitter_base import Subgraph, _SplitterBase
 from torch.fx.passes.tools_common import CALLABLE_NODE_OPS
 from torch_tensorrt.dynamo.partitioning._atomic_subgraphs import (
@@ -77,17 +78,16 @@ class ResourcePartitioner(_SplitterBase):  # type: ignore
     def __init__(
         self,
         module: torch.fx.GraphModule,
-        partitioned_module: torch.fx.GraphModule,
         cpu_memory_budget: int,
+        submodule_name: str,
     ):
 
         assert isinstance(module, torch.fx.GraphModule)
-        assert isinstance(partitioned_module, torch.fx.GraphModule)
 
         self.module = module
-        self.partitioned_module = partitioned_module
         self.cpu_memory_budget = cpu_memory_budget
-
+        self.resource_split_count = 0
+        self.submodule_name = submodule_name
         self.deps = self.find_deps()
 
         self.non_acc_submodule_name = "_run_on_gpu_"
@@ -119,64 +119,39 @@ class ResourcePartitioner(_SplitterBase):  # type: ignore
         # Tag the accelerated nodes and split the graph accordingly
         self.tag(subgraphs)
 
-        gm = self.split()
+        gm = self.split(remove_tag=True)
 
         return gm
 
+    def tag(self, subgraphs: list[Subgraph]) -> None:
+        self.tags = []
+        for subgraph in subgraphs:
+            tag = f"{self.submodule_name}_resource_split_{self.resource_split_count}"
+            self.resource_split_count += 1
+            self.tags.append(tag)
+            for node in subgraph.nodes:
+                node.tag = tag
+                self._node_submodule_map[node.name] = tag
+
     def put_nodes_into_subgraphs(self) -> list[Subgraph]:
-        """Map original graph nodes into capability-based subgraphs.
-
-        - Iterates `partitioned_module` submodules to establish which node names
-          belong to which subgraph (accelerated or not).
-        - Builds a fusion pattern map for each subgraph so that known fusion groups remain intact.
-          Note that since fusion map is built for each subgraph, the capability partitioning can still break the fusion groups.
-        - Put the nodes into the subgraphs based on the capability partitioning.
-        - Verifies the resulting list of subgraphs is topologically ordered.
-
-        Returns:
-            list[Subgraph]: Ordered subgraphs consisting of nodes in `module` based on capability partitioning.
         """
-        subgraphs_map = {}
-        subgraphs = []
-        name_to_node_map = (
-            {}
-        )  # We use this map to help map the nodes in partitioned module to the nodes in original module.
-        for name, _ in self.partitioned_module.named_children():
-            # We first iterate over the partitioned module to find the subgraphs based on capability partitioning.
-            submodule = getattr(self.partitioned_module, name)
-            if not isinstance(submodule, torch.fx.graph_module.GraphModule):
-                continue
-            subgraph = Subgraph(is_acc="acc" in name, nodes=[])
-            subgraphs.append(subgraph)
-            self.fusion_patterns.update(get_node_in_fusion_pattern(submodule.graph))
+        Put the nodes into the subgraphs and erase the tag from previous partitioner if it exists.
+        Returns:
+            list[Subgraph]: Ordered subgraphs consisting of nodes in `module`.
+        """
 
-            for node in submodule.graph.nodes:
-                # Erase the tag from previous partitioner if it exists
-                if hasattr(node, "tag"):
-                    delattr(node, "tag")
-
-                if node.op in CALLABLE_NODE_OPS:
-                    # Store which subgraph the node should be put in
-                    subgraphs_map[node.name] = subgraph
-
-        # We then iterate over the original module to put the nodes into the subgraphs.
+        nodes = []
         for node in self.module.graph.nodes:
             if hasattr(node, "tag"):
-                # Erase the tag from previous partitioner
-                delattr(node, "tag")
+                del node.tag
             if node.op in CALLABLE_NODE_OPS:
-                name_to_node_map[node.name] = node
-                subgraphs_map[node.name].nodes.append(node)
+                nodes.append(node)
+        subgraphs = [Subgraph(is_acc=True, nodes=nodes)]
+        self.fusion_patterns = get_node_in_fusion_pattern(self.module.graph)
 
         assert self.check_topological_order(
             subgraphs
         ), "The subgraphs are not topologically ordered"
-        self.fusion_patterns = {
-            name_to_node_map[node.name]: [
-                name_to_node_map[n.name] for n in fusion_nodes
-            ]
-            for node, fusion_nodes in self.fusion_patterns.items()
-        }
 
         return subgraphs
 
@@ -240,6 +215,7 @@ class ResourcePartitioner(_SplitterBase):  # type: ignore
         # We throw an error if the remaining memory is almost empty compared to the model size.
         # i.e. if the remaining memory is 4G (budget is 1G) the model size is greater than 40G, we stop the compilation.
         sizes = self.size_of_subgraphs(subgraphs)
+        # subgraph_size_budget = 500*1024*1024
         if sum(sizes) > subgraph_size_budget * 40:
             raise ValueError(
                 "CPU memory budget or available memory is too small to compile the model. "
@@ -255,7 +231,9 @@ class ResourcePartitioner(_SplitterBase):  # type: ignore
                 size = size_1
                 new_subgraphs.append(broken_subgraphs[0])
                 subgraph = broken_subgraphs[1]
-            new_subgraphs.append(subgraph)
+
+            if len(subgraph.nodes) != 0:
+                new_subgraphs.append(subgraph)
 
         self._varify_all_fusion_nodes_in_same_subgraph(new_subgraphs)
 
@@ -325,8 +303,6 @@ class ResourcePartitioner(_SplitterBase):  # type: ignore
             if size_0 > size_to_break:
                 break
 
-        if len(new_subgraphs[1].nodes) == 0:
-            new_subgraphs.pop(1)
         return new_subgraphs, size_0, size_1
 
     def step_and_validate(
@@ -530,7 +506,6 @@ class ResourcePartitioner(_SplitterBase):  # type: ignore
 
 def resource_partition(
     gm: torch.fx.GraphModule,
-    partitioned_module: torch.fx.GraphModule,
     cpu_memory_budget: int,
 ) -> torch.fx.GraphModule:
     """Resource-aware partitioning entry point.
@@ -552,12 +527,29 @@ def resource_partition(
     """
 
     # Construct
-    partitioner = ResourcePartitioner(
-        gm,
-        partitioned_module,
-        cpu_memory_budget=cpu_memory_budget,
-    )
+    for name, _ in gm.named_children():
+        submodule = getattr(gm, name)
+        if (
+            not isinstance(submodule, torch.fx.graph_module.GraphModule)
+            or "_run_on_acc" not in name
+        ):
+            continue
+        partitioner = ResourcePartitioner(
+            submodule,
+            submodule_name=name,
+            cpu_memory_budget=cpu_memory_budget,
+        )
 
-    partitioned_graph = partitioner.partition_graph()
+        partitioned_graph = partitioner.partition_graph()
+        setattr(gm, name, partitioned_graph)
 
-    return partitioned_graph
+    for name, module in list(gm.named_children()):
+        if "_run_on_acc" in name:
+            for subname, submodule in module.named_children():
+                if "resource_split" in subname:
+                    setattr(gm, subname, submodule)
+            _inline_module(gm, name)
+            delattr(gm, name)
+
+    gm.recompile()
+    return gm
