@@ -602,6 +602,10 @@ jobs:
         echo "[CONFIG] Number of GPUs to use: ${NUM_GPUS}"
         echo "[AVAILABLE] GPUs detected by nvidia-smi: $(nvidia-smi --query-gpu=name --format=csv,noheader | wc -l)"
 
+        # Set master port for distributed communication (must be same across all ranks)
+        export MASTER_ADDR=127.0.0.1
+        export MASTER_PORT=29500
+
         # Use a wrapper script to ensure only rank 0 writes the JUnit XML
         # Each rank runs pytest, but only rank 0 saves results to avoid file conflicts
         RANK_0_XML="${RUNNER_TEST_RESULTS_DIR}/l2_dynamo_distributed_test_results.xml"
