@@ -27,6 +27,7 @@ from torch_tensorrt.dynamo.conversion.impl.normalization.ops import (
 )
 from torch_tensorrt.dynamo.conversion.truncate_double import repair_double_inputs
 from torch_tensorrt.dynamo.lowering import (
+    clean_up_graph_after_modifications,
     get_decompositions,
     post_lowering,
     pre_export_lowering,
@@ -94,6 +95,8 @@ def construct_refit_mapping_from_weight_name_map(
     engine_weight_map = {}
     for engine_weight_name, (sd_weight_name, np_weight_type) in weight_name_map.items():
         # Add more constant folding converters here
+        trt_dtype = dtype._from(np_weight_type).to(trt.DataType)
+        torch_dtype = dtype._from(np_weight_type).to(torch.dtype)
         if engine_weight_name.split(" ")[-1] in ["SCALE", "SHIFT"]:
             # Batch Norm Layer
             params = {}
@@ -106,12 +109,12 @@ def construct_refit_mapping_from_weight_name_map(
             engine_weight_map[engine_weight_name] = eval(
                 engine_weight_name.split(" ")[-1].lower()
             )
+
         elif sd_weight_name not in state_dict:
             # If weights is not in sd, we can leave it unchanged
             continue
         else:
-            trt_dtype = dtype._from(np_weight_type).to(trt.DataType)
-            torch_dtype = dtype._from(np_weight_type).to(torch.dtype)
+
             engine_weight_map[engine_weight_name] = state_dict[sd_weight_name].to(
                 to_torch_device(settings.device)
             )
@@ -272,12 +275,66 @@ def refit_module_weights(
             compiled_submodules_map[name] = submodule
 
     else:
+        # Handle torch modules
+        compiled_submodules_map = {}
+        guard_fn_modules = []
         for name, submodule in compiled_module.named_children():
-            if not isinstance(
-                submodule, (PythonTorchTensorRTModule, TorchTensorRTModule)
+            if (
+                not isinstance(
+                    submodule,
+                    (
+                        PythonTorchTensorRTModule,
+                        TorchTensorRTModule,
+                        torch.nn.modules.module.Module,
+                    ),
+                )
+                or "_run_on_gpu" in name
             ):
                 continue
-            settings = submodule.settings
+
+            # When we re-export the graph module, torch.export._unlift.GuardsFn modules are being added as submodules.
+            if isinstance(submodule, torch.export._unlift.GuardsFn):
+                guard_fn_modules.append(name)
+                continue
+            # Obtain the settings
+
+            compiled_submodules = [
+                (name.replace("_engine", ""), engine)
+                for name, engine in submodule.__dict__.items()
+                if "engine" in name
+            ]
+
+            settings = None
+            try:
+                # If the gm is not inlined or transformed by retracing, the settings is stored in the submodule
+                settings = submodule.settings
+            except AttributeError:
+
+                encoded_metadata = [
+                    engine for name, engine in compiled_submodules if name == "engine"
+                ][0].__getstate__()[0][SERIALIZED_METADATA_IDX]
+                assert (
+                    encoded_metadata != ""
+                ), "The engine provided is either not refittable or was built with a version of Torch-TensorRT that is too old, please recompile using the latest version"
+                settings = TorchTensorRTModule.decode_metadata(encoded_metadata)[
+                    "settings"
+                ]
+
+            compiled_submodules_map[name] = submodule
+
+        # Delete the guard fn modules to avoid the guard fn modules being refitted
+        # First, remove nodes in the graph that reference the guard function modules
+        for node in list(compiled_module.graph.nodes):
+            if node.op == "call_module" and node.target in guard_fn_modules:
+                compiled_module.graph.erase_node(node)
+
+        # Now delete the submodules themselves
+        for guard_fn_module_name in guard_fn_modules:
+            # delattr(compiled_module, guard_fn_module_name)
+            compiled_module.delete_submodule(guard_fn_module_name)
+
+        # Clean up the graph
+        clean_up_graph_after_modifications(compiled_module)
 
     assert settings is not None
 
@@ -411,11 +468,29 @@ def refit_module_weights(
                             )
             else:
                 compiled_submodule = getattr(compiled_module, name)
+                if "_run_on_acc" not in name:
+                    compiled_submodule.load_state_dict(new_submodule.state_dict())
+                    continue
+
                 weight_name_map = None
                 if use_weight_map_cache:
                     try:
                         weight_name_map = compiled_submodule.weight_name_map
                     except AttributeError:
+                        if isinstance(compiled_submodule, torch.nn.Module):
+                            # Torch retrace module
+                            assert (
+                                not settings.use_python_runtime
+                            ), "Refitting a torch retraced module is only supported with use_python_runtime=False"
+                            encoded_metadata = [
+                                engine
+                                for name, engine in compiled_submodules
+                                if name == "engine"
+                            ][0].__getstate__()[0][SERIALIZED_METADATA_IDX]
+                            weight_name_map = TorchTensorRTModule.decode_metadata(
+                                encoded_metadata
+                            )["weight_name_map"]
+
                         if not isinstance(
                             compiled_submodule, torch.fx.graph_module.GraphModule
                         ):
@@ -427,20 +502,15 @@ def refit_module_weights(
                         logger.warning(
                             "This engine does not have a weight map cache. Rebuilding the weight map"
                         )
-                if isinstance(compiled_submodule, PythonTorchTensorRTModule):
+
+                # Rexporting the TRT compiled graph module and loading it back doesn't preserve the instance type and registers
+                # the compiled submodule as torch.nn.Module. So we use settings.use_python_runtime to determine the instance type.
+                if settings.use_python_runtime:
                     engine = compiled_submodule.engine
-                elif isinstance(compiled_submodule, TorchTensorRTModule):
+                else:
                     engine_info = compiled_submodule.engine.__getstate__()[0]
                     engine = get_engine_from_encoded_engine(
                         engine_info[ENGINE_IDX], runtime
-                    )
-                elif isinstance(compiled_submodule, torch.fx.graph_module.GraphModule):
-                    # This is graph break resulted by unsupported ops
-                    compiled_submodule.load_state_dict(new_submodule.state_dict())
-                    continue
-                else:
-                    raise AssertionError(
-                        "The type of graph module is not supported for refitting."
                     )
         except AttributeError:
             raise AssertionError(
@@ -500,7 +570,12 @@ def refit_module_weights(
             new_engine_info[ENGINE_IDX] = bytes(serialized_engine)
             refitted_engine = torch.classes.tensorrt.Engine(tuple(new_engine_info))
             setattr(compiled_module, f"{name}_engine", refitted_engine)
-
+        elif isinstance(compiled_submodule, torch.nn.Module):
+            # Torch retrace module
+            new_engine_info = list(engine_info)
+            new_engine_info[ENGINE_IDX] = bytes(serialized_engine)
+            refitted_engine = torch.classes.tensorrt.Engine(tuple(new_engine_info))
+            compiled_submodule.engine = refitted_engine
         del engine
         gc.collect()
         torch.cuda.empty_cache()
