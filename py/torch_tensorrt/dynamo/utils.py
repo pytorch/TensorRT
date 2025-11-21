@@ -456,7 +456,7 @@ def unwrap_tensor_shape(
         else:
             tensor_shape.append((min_max_opt["min"], min_max_opt["max"]))
     elif isinstance(tensor, torch.SymFloat):
-        # SymFloats can be an input to graph sometimes. We register their shape as [1] to avoid errors.
+        # SymFloats can be an input to graph sometimes. Although SymFloat is scalar value, we treat it as a 1D tensor throughout Torch-TRT codebase.
         tensor_shape.append(1)
     elif isinstance(tensor, (torch.Tensor, FakeTensor)):
         for dimension in tensor.shape:
