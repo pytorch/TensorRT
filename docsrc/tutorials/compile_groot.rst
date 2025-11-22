@@ -112,6 +112,10 @@ You can then use the following command to start the simulation:
   python3 scripts/simulation_service.py --client  --env_name gr1_unified/PnPCupToDrawerClose_GR1ArmsAndWaistFourierHands_Env  --video_dir ./videos  --max_episode_steps 720  --n_envs 1 --n_episodes 10 --use_torch_tensorrt
 
 This would start the simulation, display the success rate and record the videos in ``videos`` directory. Here is a sample video of the GR00T N1.5 model in the simulation:
+.. image:: https://github.com/pytorch/TensorRT/blob/groot_docs/docsrc/tutorials/output.gif
+   :alt: GR00T N1.5 model in RoboCasa simulation
+   :align: center
+   :width: 80%
 
 .. note::
    If you are running Isaac GR00T in a Docker environment, you can create two separate tmux sessions and launch both Docker containers on the same network to enable inter-container communication. This allows the inference service and simulation service to communicate seamlessly across containers.
