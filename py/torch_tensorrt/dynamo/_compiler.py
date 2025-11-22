@@ -142,7 +142,7 @@ def cross_compile_for_windows(
         disable_tf32 (bool): Force FP32 layers to use traditional as FP32 format vs the default behavior of rounding the inputs to 10-bit mantissas before multiplying, but accumulates the sum using 23-bit mantissas
         assume_dynamic_shape_support (bool): Setting this to true enables the converters work for both dynamic and static shapes. Default: False
         sparse_weights (bool): Enable sparsity for convolution and fully connected layers.
-        enabled_precision (Set(Union(torch.dtype, torch_tensorrt.dtype))): The set of datatypes that TensorRT can use when selecting kernels
+        enabled_precisions (Set(Union(torch.dtype, torch_tensorrt.dtype))): The set of datatypes that TensorRT can use when selecting kernels
         capability (torch_tensorrt.EngineCapability): Restrict kernel selection to safe gpu kernels or safe dla kernels
         num_avg_timing_iters (int): Number of averaging timing iterations used to select kernels
         workspace_size (int): Maximum size of workspace given to TensorRT
@@ -435,6 +435,19 @@ def compile(
     l2_limit_for_tiling: int = _defaults.L2_LIMIT_FOR_TILING,
     offload_module_to_cpu: bool = _defaults.OFFLOAD_MODULE_TO_CPU,
     use_distributed_mode_trace: bool = _defaults.USE_DISTRIBUTED_MODE_TRACE,
+    enable_autocast: bool = _defaults.ENABLE_AUTOCAST,
+    autocast_low_precision_type: Optional[
+        Union[torch.dtype, dtype]
+    ] = _defaults.AUTOCAST_LOW_PRECISION_TYPE,
+    autocast_excluded_nodes: Collection[str] = _defaults.AUTOCAST_EXCLUDED_NODES,
+    autocast_excluded_ops: Collection[Target] = _defaults.AUTOCAST_EXCLUDED_OPS,
+    autocast_max_output_threshold: float = _defaults.AUTOCAST_MAX_OUTPUT_THRESHOLD,
+    autocast_max_depth_of_reduction: Optional[
+        int
+    ] = _defaults.AUTOCAST_MAX_DEPTH_OF_REDUCTION,
+    autocast_calibration_dataloader: Optional[
+        torch.utils.data.DataLoader
+    ] = _defaults.AUTOCAST_CALIBRATION_DATALOADER,
     **kwargs: Any,
 ) -> torch.fx.GraphModule:
     """Compile an ExportedProgram module for NVIDIA GPUs using TensorRT
@@ -512,6 +525,13 @@ def compile(
         l2_limit_for_tiling (int): The target L2 cache usage limit (in bytes) for tiling optimization (default is -1 which means no limit).
         offload_module_to_cpu (bool): Offload the module to CPU. This is useful when we need to minimize GPU memory usage.
         use_distributed_mode_trace (bool):  Using aot_autograd to trace the graph. This is enabled when DTensors or distributed tensors are present in distributed model
+        enable_autocast (bool): Whether to enable autocast. If enabled, use_explicit_typing will be set to True.
+        autocast_low_precision_type (Optional[Union[torch.dtype, dtype]]): The precision to reduce to. We currently support torch.float16 and torch.bfloat16. Default is None, which means no low precision is used.
+        autocast_excluded_nodes (Collection[str]): The set of regex patterns to match user-specified node names that should remain in FP32. Default is [].
+        autocast_excluded_ops (Collection[Target]): The set of targets (ATen ops) that should remain in FP32. Default is [].
+        autocast_max_output_threshold (float): Maximum absolute value for node outputs, nodes with outputs greater than this value will remain in FP32. Default is 512.
+        autocast_max_depth_of_reduction (Optional[int]): Maximum depth of reduction allowed in low precision. Nodes with higher reduction depths will remain in FP32. This helps prevent excessive accuracy loss in operations particularly sensitive to reduced precision, as higher-depth reductions may amplify computation errors in low precision formats. If not provided, infinity will be used. Default is None.
+        autocast_calibration_dataloader (Optional[torch.utils.data.DataLoader]): The dataloader to use for autocast calibration. Default is None.
         **kwargs: Any,
     Returns:
         torch.fx.GraphModule: Compiled FX Module, when run it will execute via TensorRT
@@ -520,6 +540,13 @@ def compile(
     if kwargs.get("debug", False):
         warnings.warn(
             "`debug` is deprecated. Please use `with torch_tensorrt.dynamo.Debugger(...)` to wrap your compilation call to enable debugging functionality.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+
+    if kwargs.get("use_explicit_typing", False) == False:
+        warnings.warn(
+            "`use_explicit_typing` is deprecated. This setting will be removed and you should enable autocast instead.",
             DeprecationWarning,
             stacklevel=2,
         )
@@ -585,6 +612,10 @@ def compile(
             "\nThis feature is unimplemented in Torch-TRT Dynamo currently."
         )
 
+    if enable_autocast:
+        use_explicit_typing = True
+        logger.debug("Autocast is enabled, setting use_explicit_typing to True.")
+
     if use_explicit_typing:
         if len(enabled_precisions) != 1 or not any(
             x in enabled_precisions
@@ -592,6 +623,19 @@ def compile(
         ):
             raise AssertionError(
                 f"use_explicit_typing was set to True, however found that enabled_precisions was also specified (saw: {enabled_precisions}, expected: dtype.f32, dtype.f4). enabled_precisions should not be used when use_explicit_typing=True"
+            )
+
+    if autocast_low_precision_type is not None:
+        if not isinstance(autocast_low_precision_type, (torch.dtype, dtype)):
+            raise ValueError(
+                f"autocast_low_precision_type must be a torch.dtype or torch_tensorrt._enums.dtype, got {type(autocast_low_precision_type)}"
+            )
+        if autocast_low_precision_type not in {
+            torch.float16,
+            torch.bfloat16,
+        } and autocast_low_precision_type not in {dtype.f16, dtype.bf16}:
+            raise ValueError(
+                f"autocast_low_precision_type must be one of torch.float16, torch.bfloat16, dtype.f16, dtype.bf16, got {autocast_low_precision_type}"
             )
 
     if use_fp32_acc:
@@ -681,6 +725,13 @@ def compile(
         "l2_limit_for_tiling": l2_limit_for_tiling,
         "offload_module_to_cpu": offload_module_to_cpu,
         "use_distributed_mode_trace": use_distributed_mode_trace,
+        "enable_autocast": enable_autocast,
+        "autocast_low_precision_type": autocast_low_precision_type,
+        "autocast_excluded_nodes": autocast_excluded_nodes,
+        "autocast_excluded_ops": autocast_excluded_ops,
+        "autocast_max_output_threshold": autocast_max_output_threshold,
+        "autocast_max_depth_of_reduction": autocast_max_depth_of_reduction,
+        "autocast_calibration_dataloader": autocast_calibration_dataloader,
     }
     logger.debug(f"CPU memory usage before lowering: {get_cpu_memory_usage()} MB")
     settings = CompilationSettings(**compilation_options)
