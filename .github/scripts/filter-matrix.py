@@ -152,8 +152,6 @@ def main(args: list[str]) -> None:
             print(f"[DEBUG] passed filter - adding to build matrix", file=sys.stderr)
             filtered_includes.append(item)
 
-            # NEW: Create distributed variant for specific configs
-            # Only Python 3.10 + CUDA 13.0 for now
             if item["python_version"] == "3.10" and item["desired_cuda"] == "cu130":
                 print(
                     f"[DEBUG]  Creating distributed config for py3.10+cu130",
