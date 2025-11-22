@@ -31,6 +31,9 @@ class MyEngineCache(BaseEngineCache):
 
         self.hashes = {}
 
+    def exist(self, hash: str) -> bool:
+        return hash in self.hashes
+
     def save(
         self,
         hash: str,

@@ -101,18 +101,20 @@ def interpret_module_to_result(
         and engine_cache is not None
     ):
         hash_val = engine_cache.get_hash(module, inputs, settings)
-        engine_cache.insert(
-            hash_val,
-            (
-                serialized_engine,
-                interpreter_result.input_names,
-                interpreter_result.output_names,
-                inputs,
-                settings,
-                interpreter_result.weight_name_map,
-                interpreter_result.requires_output_allocator,
-            ),
-        )
+        # only insert if the cache entry does not exist
+        if not engine_cache.exist(hash_val):
+            engine_cache.insert(
+                hash_val,
+                (
+                    serialized_engine,
+                    interpreter_result.input_names,
+                    interpreter_result.output_names,
+                    inputs,
+                    settings,
+                    interpreter_result.weight_name_map,
+                    interpreter_result.requires_output_allocator,
+                ),
+            )
 
     serialized_interpreter_result = SerializedInterpreterResult(
         serialized_engine=serialized_engine,

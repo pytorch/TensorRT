@@ -187,12 +187,20 @@ class BaseEngineCache(ABC):
         Returns:
             Optional[Tuple[bytes, List[str], List[str], CompilationSettings, Optional[Dict[Any, Any]]]]: The unpacked cache entry if found, None otherwise.
         """
-        packed_cache_info = self.load(hash, *args, **kwargs)
+        if self.exist(hash):
+            packed_cache_info = self.load(hash, *args, **kwargs)
+            if packed_cache_info:
+                return BaseEngineCache.unpack(packed_cache_info)
+        return None
 
-        if packed_cache_info:
-            return BaseEngineCache.unpack(packed_cache_info)
-        else:
-            return None
+    @abstractmethod
+    def exist(self, hash: str) -> bool:
+        """Check if a cache entry exists for the given hash.
+
+        Args:
+            hash (str): hash value of the GraphModule
+        """
+        pass
 
     @abstractmethod
     def save(self, hash: str, blob: bytes, *args: Any, **kwargs: Any) -> None:
@@ -305,6 +313,14 @@ class DiskEngineCache(BaseEngineCache):
             )
         else:
             LRU()
+
+    def exist(self, hash: str) -> bool:
+        directory = os.path.join(self.engine_cache_dir, hash)
+        if os.path.exists(directory):
+            blob_path = os.path.join(directory, "blob.bin")
+            if os.path.exists(blob_path):
+                return True
+        return False
 
     def save(self, hash: str, blob: bytes, *args: Any, **kwargs: Any) -> None:
         blob_size = len(blob)
