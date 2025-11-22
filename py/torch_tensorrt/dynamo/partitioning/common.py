@@ -102,6 +102,15 @@ def construct_submodule_inputs(module: torch.fx.GraphModule) -> Sequence[Input]:
                                 is_shape_tensor=True,
                             )
                         )
+                    elif isinstance(input_meta, torch.SymFloat):
+                        torchtrt_inputs.append(
+                            get_input(
+                                [1],
+                                torch.float32,
+                                name=input.name,
+                                is_shape_tensor=False,  # Only SymInt inputs are treated as shape tensors
+                            )
+                        )
                     else:
                         raise ValueError(
                             f"The meta val for input node {input.target} is of type : {type(input_meta)}. Supported types: torch.Tensor|FakeTensor|torch.SymInt"
