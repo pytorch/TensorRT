@@ -230,7 +230,7 @@ class TRTPartitioner(_SplitterBase):  # type: ignore
 
         # Tag the accelerated nodes and split the graph accordingly
         self.tag(subgraphs)
-        return self.split()
+        return self.split(remove_tag=True)
 
     def starter_nodes(self) -> Tuple[NodeSet, NodeSet]:
         """Generates starter nodes for partitioning + segmentation"""

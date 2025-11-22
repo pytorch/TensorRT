@@ -7,6 +7,7 @@ from torch_tensorrt._enums import EngineCapability, dtype
 from torch_tensorrt.dynamo._defaults import (
     ASSUME_DYNAMIC_SHAPE_SUPPORT,
     CACHE_BUILT_ENGINES,
+    CPU_MEMORY_BUDGET,
     DISABLE_TF32,
     DLA_GLOBAL_DRAM_SIZE,
     DLA_LOCAL_DRAM_SIZE,
@@ -140,6 +141,7 @@ class CompilationSettings:
     l2_limit_for_tiling: int = L2_LIMIT_FOR_TILING
     use_distributed_mode_trace: bool = USE_DISTRIBUTED_MODE_TRACE
     offload_module_to_cpu: bool = OFFLOAD_MODULE_TO_CPU
+    cpu_memory_budget: int = CPU_MEMORY_BUDGET
 
     def __getstate__(self) -> dict[str, Any]:
         from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
@@ -172,6 +174,7 @@ _SETTINGS_TO_BE_ENGINE_INVARIANT = (
     "enable_weight_streaming",
     "tiling_optimization_level",
     "l2_limit_for_tiling",
+    "cpu_memory_budget",
 )
 
 
