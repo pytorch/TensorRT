@@ -2026,6 +2026,7 @@ def aten_ops_sub(
     )
 
 
+@dynamo_tensorrt_converter(operator.truediv, supports_dynamic_shapes=True)
 @dynamo_tensorrt_converter(torch.ops.aten.div.Tensor, supports_dynamic_shapes=True)
 @dynamo_tensorrt_converter(torch.ops.aten.div.Tensor_mode, supports_dynamic_shapes=True)
 @dynamo_tensorrt_converter(torch.ops.aten.div.Scalar, supports_dynamic_shapes=True)
