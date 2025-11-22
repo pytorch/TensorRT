@@ -150,16 +150,8 @@ def main(args: list[str]) -> None:
             options.limit_pr_builds == "true",
         ):
             print(f"[DEBUG] passed filter - adding to build matrix", file=sys.stderr)
-            filtered_includes.append(item)
-
-            # NEW: Create distributed variant for specific configs
-            # Only Python 3.10 + CUDA 13.0 for now
-            if item["python_version"] == "3.10" and item["desired_cuda"] == "cu130":
-                print(
-                    f"[DEBUG]  Creating distributed config for py3.10+cu130",
-                    file=sys.stderr,
-                )
-                distributed_includes.append(create_distributed_config(item))
+            filtered_includes.append(item) 
+            distributed_includes.append(create_distributed_config(item))
         else:
             print(f"[DEBUG] FILTERED OUT", file=sys.stderr)
 
