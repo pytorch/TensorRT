@@ -56,6 +56,7 @@ The primary entry point for model compilation and benchmarking is ``run_groot_to
 The ``fn_name`` argument allows users to target specific submodules of the GR00T N1.5 model for optimization, which is particularly useful for profiling and debugging individual components. For example, to benchmark the Vision Transformer module in FP16 precision mode, run:
 
 .. code-block:: bash
+  
   python run_groot_torchtrt.py \
     --precision FP16 \
     --use_fp32_acc \
@@ -71,24 +72,27 @@ VLA Optimizations
 
 The following optimizations have been applied to the components of the GR00T N1.5 model to improve performance using Torch-TensorRT:
 
-1) Vision Transformer (ViT)
-   - The ViT component is optimized by using the Torch-TensorRT MutableTorchTensorRTModule (MTTM). TensorRT optimizations include layer fusion, kernel auto-tuning, dynamic shape handling.
-   - FP8 quantization support is available to reduce model size and improve performance.
-   - For the SiglipVisionModel, the ``SiglipMultiheadAttentionPoolingHead`` of the ViT component is disabled to eliminate unnecessary latency overhead, as this layer is not utilized by the downstream model. See the implementation `here <https://github.com/peri044/Isaac-GR00T/blob/6b34a65e02b07b19d689498ec75066792b4bb738/deployment_scripts/run_groot_torchtrt.py#L258-L261>`_.
+* Vision Transformer (ViT)
+   * The ViT component is optimized by using the Torch-TensorRT MutableTorchTensorRTModule (MTTM). TensorRT optimizations include layer fusion, kernel auto-tuning, dynamic shape handling.
+   * FP8 quantization support is available to reduce model size and improve performance.
+   * For the SiglipVisionModel, the ``SiglipMultiheadAttentionPoolingHead`` of the ViT component is disabled to eliminate unnecessary latency overhead, as this layer is not utilized by the downstream model. See the `ViT implementation <https://github.com/peri044/Isaac-GR00T/blob/6b34a65e02b07b19d689498ec75066792b4bb738/deployment_scripts/run_groot_torchtrt.py#L258-L261>`_.
   
-2) Text Transformer (LLM)
-   - MTTM support for the LLM component and similar TensorRT optimizations apply.
-   - FP8 quantization support is available to reduce model size and improve performance.
+* Text Transformer (LLM)
+   * MTTM support for the LLM component and similar TensorRT optimizations apply.
+   * FP8 quantization support is available to reduce model size and improve performance.
   
-3) Flow Matching Action Head
-   - The Flow Matching Action Head component consists of 5 different components: VLM backbone processor, State encoder, Action encoder and Action decoder and DiT.
-   - VLM backbone processor uses a LayerNorm layer and Self-Attention Transformer network to process the outputs of VLM (ViT + LLM). We merge these two components into a single ``torch.nn.Module`` to minimize graph fragmentation and improve performance. See the implementation `here <https://github.com/peri044/Isaac-GR00T/blob/6b34a65e02b07b19d689498ec75066792b4bb738/deployment_scripts/run_groot_torchtrt.py#L485-L506>`_.
-   - State encoder, Action encoder and Action Decoder use a Multi-Layer Perceptron (MLP) like networks to encode the state and action vectors. These are wrapped with MTTM and standard TensorRT optimizations apply.
-   - DiT is a Diffusion-Transformer model that is used to generate the action vector. It is wrapped with MTTM and standard TensorRT optimizations apply. FP8 quantization support is available to this component.
+* Flow Matching Action Head
+   * The Flow Matching Action Head component consists of 5 different components: VLM backbone processor, State encoder, Action encoder and Action decoder and DiT.
+   * VLM backbone processor uses a LayerNorm layer and Self-Attention Transformer network to process the outputs of VLM (ViT + LLM). We merge these two components into a single ``torch.nn.Module`` to minimize graph fragmentation and improve performance. See the `VLM backbone implementation <https://github.com/peri044/Isaac-GR00T/blob/6b34a65e02b07b19d689498ec75066792b4bb738/deployment_scripts/run_groot_torchtrt.py#L485-L506>`_.
+   * State encoder, Action encoder and Action Decoder use a Multi-Layer Perceptron (MLP) like networks to encode the state and action vectors. These are wrapped with MTTM and standard TensorRT optimizations apply.
+   * DiT is a Diffusion-Transformer model that is used to generate the action vector. It is wrapped with MTTM and standard TensorRT optimizations apply. FP8 quantization support is available to this component.
 
-4) Dynamic Shape Management
-   - A general optimization that provides performance improvements is using dynamic shapes only when necessary. In the GR00T N1.5 model, dynamic shapes are applied selectively to the LLM and DiT components where input dimensions may vary.
-   - For components with predictable input sizes, fixed batch dimensions are preferred. Specifying a batch size as dynamic can reduce performance compared to a fixed batch size when the dimensions are known in advance, as TensorRT can apply more aggressive optimizations with static shapes.
+* Module Merging
+   * In some cases, similar to the VLM backbone processor, the eagle backbone (ViT + LLM) can be compiled jointly into a single ``torch.nn.Module`` to minimize graph fragmentation and improve performance. While this approach may yield better runtime performance, compiling these modules independently can be more CPU memory efficient during TensorRT compilation while still achieving comparable inference performance to the merged module.
+
+* Dynamic Shape Management
+   * A general optimization that provides performance improvements is using dynamic shapes only when necessary. In the GR00T N1.5 model, dynamic shapes are applied selectively to the LLM and DiT components where input dimensions may vary.
+   * For components with predictable input sizes, fixed batch dimensions are preferred. Specifying a batch size as dynamic can reduce performance compared to a fixed batch size when the dimensions are known in advance, as TensorRT can apply more aggressive optimizations with static shapes.
 
 While these optimizations have been specifically applied to the GR00T N1.5 model, many of them are generalizable to other Vision-Language-Action (VLA) models. Techniques such as selective dynamic shape management, component-level MTTM wrapping, and FP8 quantization can be adapted to similar architectures to achieve comparable performance improvements.
 
@@ -99,15 +103,19 @@ RoboCasa is a large-scale simulation framework for training generally capable ro
 in RoboCasa simulation environment to better understand its behavior in closed-loop settings. This is especially useful for assessing quantitative performance on long-horizon or multi-step tasks.
 
 Please follow these `instructions <https://github.com/robocasa/robocasa-gr1-tabletop-tasks?tab=readme-ov-file#getting-started>`_ to set up the RoboCasa simulation environment.
-Once you setup the environment, you can run the following command to start the simulation from ``Isaac-GR00T`` directory:
+Once you setup the environment, you can run the following command to start the simulation from ``Isaac-GR00T`` directory
+
 .. code-block:: bash
+
   cd Isaac-GR00T
   python3 scripts/inference_service.py --server --model_path nvidia/GR00T-N1.5-3B  --data_config fourier_gr1_arms_waist --use_torch_tensorrt --vit_dtype fp16 --llm_dtype fp16 --dit_dtype fp16 --precision fp16
 
 This would compile the GR00T N1.5 model using Torch-TensorRT and start the inference service at port 5555.
 
-You can then use the following command to start the simulation:
+You can then use the following command to start the simulation
+
 .. code-block:: bash
+
   cd robocasa-gr1-tabletop-tasks
   python3 scripts/simulation_service.py --client  --env_name gr1_unified/PnPCupToDrawerClose_GR1ArmsAndWaistFourierHands_Env  --video_dir ./videos  --max_episode_steps 720  --n_envs 1 --n_episodes 10 --use_torch_tensorrt
 
