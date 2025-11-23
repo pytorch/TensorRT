@@ -429,7 +429,7 @@ def index_nonbool_validator(
     node: Node, settings: Optional[CompilationSettings] = None
 ) -> bool:
     # for thor and tensorrt_rtx, we don't support boolean indices, due to nonzero op not supported
-    if is_thor() or ENABLED_FEATURES.tensorrt_rtx:
+    if ENABLED_FEATURES.tensorrt_rtx:
         index = node.args[1]
         for ind in index:
             if ind is not None:
