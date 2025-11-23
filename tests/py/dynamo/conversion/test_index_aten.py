@@ -6,7 +6,7 @@ import torch_tensorrt
 from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
 from torch_tensorrt import ENABLED_FEATURES, Input
-from torch_tensorrt._utils import is_tegra_platform, is_thor
+from torch_tensorrt._utils import is_tegra_platform
 
 from .harness import DispatchTestCase
 
@@ -114,8 +114,8 @@ class TestIndexConstantConverter(DispatchTestCase):
         ]
     )
     @unittest.skipIf(
-        is_thor() or ENABLED_FEATURES.tensorrt_rtx,
-        "Skipped on Thor or tensorrt_rtx due to nonzero not supported",
+        ENABLED_FEATURES.tensorrt_rtx,
+        "Skipped on tensorrt_rtx due to nonzero not supported",
     )
     def test_index_constant_bool_mask(self, _, index, input):
         class TestModule(torch.nn.Module):
@@ -149,8 +149,8 @@ class TestIndexConverter(DispatchTestCase):
         )
 
     @unittest.skipIf(
-        is_thor() or ENABLED_FEATURES.tensorrt_rtx,
-        "Skipped on Thor or tensorrt_rtx due to nonzero not supported",
+        iENABLED_FEATURES.tensorrt_rtx,
+        "Skipped on tensorrt_rtx due to nonzero not supported",
     )
     def test_index_zero_two_dim_ITensor_mask(self):
         class TestModule(nn.Module):
@@ -163,10 +163,6 @@ class TestIndexConverter(DispatchTestCase):
         index0 = torch.tensor([True, False])
         self.run_test(TestModule(), [input, index0], enable_passes=True)
 
-    @unittest.skipIf(
-        is_thor(),
-        "Skipped on Thor due to nonzero not supported",
-    )
     def test_index_zero_index_three_dim_ITensor(self):
         class TestModule(nn.Module):
             def forward(self, x, index0):
@@ -180,8 +176,8 @@ class TestIndexConverter(DispatchTestCase):
         self.run_test(TestModule(), [input, index0])
 
     @unittest.skipIf(
-        is_thor() or ENABLED_FEATURES.tensorrt_rtx,
-        "Skipped on Thor or tensorrt_rtx due to nonzero not supported",
+        ENABLED_FEATURES.tensorrt_rtx,
+        "Skipped on tensorrt_rtx due to nonzero not supported",
     )
     def test_index_zero_index_three_dim_mask_ITensor(self):
         class TestModule(nn.Module):
@@ -252,8 +248,8 @@ class TestIndexDynamicConstantConverter(DispatchTestCase):
 
 
 @unittest.skipIf(
-    torch_tensorrt.ENABLED_FEATURES.tensorrt_rtx or is_thor() or is_tegra_platform(),
-    "nonzero is not supported for tensorrt_rtx",
+    torch_tensorrt.ENABLED_FEATURES.tensorrt_rtx or is_tegra_platform(),
+    "nonzero is not supported for tensorrt_rtx or Tegra platforms",
 )
 class TestIndexDynamicInputNonDynamicIndexConverter(DispatchTestCase):
     def test_index_input_non_dynamic_index_dynamic(self):
