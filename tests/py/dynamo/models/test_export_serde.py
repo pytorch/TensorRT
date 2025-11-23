@@ -141,6 +141,8 @@ def test_no_compile(ir):
     This tests export serde functionality on a model
     which won't convert to TRT because of min_block_size=5 constraint
     """
+    tmp_dir = tempfile.mkdtemp(prefix="test_no_compile")
+    trt_ep_path = os.path.join(tmp_dir, "trt.ep")
 
     class MyModule(torch.nn.Module):
         def __init__(self):
