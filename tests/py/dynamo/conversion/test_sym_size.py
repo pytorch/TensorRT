@@ -4,15 +4,10 @@ import torch
 import torch.nn as nn
 from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
-from torch_tensorrt._utils import is_thor
 
 from .harness import DispatchTestCase
 
 
-@unittest.skipIf(
-    is_thor(),
-    "Skipped on Thor",
-)
 class TestSymSizeConverter(DispatchTestCase):
     @parameterized.expand(
         [
