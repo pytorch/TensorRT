@@ -301,7 +301,9 @@ def test_custom_model_with_dynamo_trace_kwarg_dynamic():
         msg=f"CustomKwargs Module TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
     )
     # Save the module
-    tmp_dir = tempfile.mkdtemp(prefix="test_custom_model_with_dynamo_trace_kwarg_dynamic")
+    tmp_dir = tempfile.mkdtemp(
+        prefix="test_custom_model_with_dynamo_trace_kwarg_dynamic"
+    )
     trt_ep_path = os.path.join(tmp_dir, "compiled.ep")
     torchtrt.save(trt_gm, trt_ep_path)
     # Clean up model env
@@ -392,7 +394,9 @@ def test_custom_model_with_dynamo_trace_kwarg_dynamic():
         msg=f"CustomKwargs Module TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
     )
     # Save the module
-    tmp_dir = tempfile.mkdtemp(prefix="test_custom_model_with_dynamo_trace_kwarg_dynamic")
+    tmp_dir = tempfile.mkdtemp(
+        prefix="test_custom_model_with_dynamo_trace_kwarg_dynamic"
+    )
     trt_ep_path = os.path.join(tmp_dir, "compiled.ep")
     torchtrt.save(trt_gm, trt_ep_path)
     # Clean up model env

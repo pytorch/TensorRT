@@ -160,6 +160,7 @@ def test_no_compile(ir):
             conv = conv * 0.5
             relu = self.relu(conv)
             return conv, relu
+
     tmp_dir = tempfile.mkdtemp(prefix="test_no_compile")
     trt_ep_path = os.path.join(tmp_dir, "trt.ep")
     model = MyModule().eval().cuda()
