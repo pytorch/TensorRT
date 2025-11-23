@@ -149,7 +149,7 @@ class TestIndexConverter(DispatchTestCase):
         )
 
     @unittest.skipIf(
-        iENABLED_FEATURES.tensorrt_rtx,
+        ENABLED_FEATURES.tensorrt_rtx,
         "Skipped on tensorrt_rtx due to nonzero not supported",
     )
     def test_index_zero_two_dim_ITensor_mask(self):
