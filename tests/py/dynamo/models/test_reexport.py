@@ -14,8 +14,6 @@ assertions = unittest.TestCase()
 if importlib.util.find_spec("torchvision"):
     import torchvision.models as models
 
-trt_ep_path = os.path.join(tempfile.gettempdir(), "trt.ep")
-
 
 @pytest.mark.unit
 @pytest.mark.critical
@@ -56,6 +54,9 @@ def test_base_full_compile(ir):
 
     # Reexport
     trt_exp_program = torch.export.export(trt_module, (input,), strict=False)
+    tmp_dir = tempfile.mkdtemp(prefix="test_base_full_compile")
+    trt_ep_path = os.path.join(tmp_dir, "trt.ep")
+
     torch.export.save(trt_exp_program, trt_ep_path)
 
     deser_trt_module = torchtrt.load(trt_ep_path).module()
@@ -81,6 +82,9 @@ def test_base_full_compile_multiple_outputs(ir):
     This tests export serde functionality on a base model
     with multiple outputs which is fully TRT convertible
     """
+
+    tmp_dir = tempfile.mkdtemp(prefix="test_base_full_compile_multiple_outputs")
+    trt_ep_path = os.path.join(tmp_dir, "trt.ep")
 
     class MyModule(torch.nn.Module):
         def __init__(self):
@@ -156,7 +160,8 @@ def test_no_compile(ir):
             conv = conv * 0.5
             relu = self.relu(conv)
             return conv, relu
-
+    tmp_dir = tempfile.mkdtemp(prefix="test_no_compile")
+    trt_ep_path = os.path.join(tmp_dir, "trt.ep")
     model = MyModule().eval().cuda()
     input = torch.randn((1, 3, 224, 224)).to("cuda")
 
@@ -206,6 +211,9 @@ def test_hybrid_relu_fallback(ir):
     model with Pytorch and TRT segments. Relu (unweighted) layer is forced to
     fallback
     """
+
+    tmp_dir = tempfile.mkdtemp(prefix="test_hybrid_relu_fallback")
+    trt_ep_path = os.path.join(tmp_dir, "trt.ep")
 
     class MyModule(torch.nn.Module):
         def __init__(self):
@@ -270,6 +278,9 @@ def test_resnet18(ir):
     """
     This tests export save and load functionality on Resnet18 model
     """
+    tmp_dir = tempfile.mkdtemp(prefix="test_resnet18")
+    trt_ep_path = os.path.join(tmp_dir, "trt.ep")
+
     model = models.resnet18().eval().cuda()
     input = torch.randn((1, 3, 224, 224)).to("cuda")
 
@@ -315,6 +326,8 @@ def test_hybrid_conv_fallback(ir):
     This tests export save and load functionality on a hybrid
     model where a conv (a weighted layer)  has been forced to fallback to Pytorch.
     """
+    tmp_dir = tempfile.mkdtemp(prefix="test_hybrid_conv_fallback")
+    trt_ep_path = os.path.join(tmp_dir, "trt.ep")
 
     class MyModule(torch.nn.Module):
         def __init__(self):
@@ -378,6 +391,8 @@ def test_arange_export(ir):
     Here the arange output is a static constant (which is registered as input to the graph)
     in the exporter.
     """
+    tmp_dir = tempfile.mkdtemp(prefix="test_arange_export")
+    trt_ep_path = os.path.join(tmp_dir, "trt.ep")
 
     class MyModule(torch.nn.Module):
         def __init__(self):
@@ -440,6 +455,8 @@ def test_resnet18_dynamic(ir):
     """
     This tests export save and load functionality on Resnet18 model with dynamic shapes
     """
+    tmp_dir = tempfile.mkdtemp(prefix="test_resnet18_dynamic")
+    trt_ep_path = os.path.join(tmp_dir, "trt.ep")
     model = models.resnet18().eval().cuda()
     input_bs2 = torch.randn((2, 3, 224, 224)).to("cuda")
 
@@ -514,6 +531,8 @@ def test_resnet18_dynamic_fallback(ir):
     """
     This tests export save and load functionality on Resnet18 model with dynamic shapes and fallback
     """
+    tmp_dir = tempfile.mkdtemp(prefix="test_resnet18_dynamic_fallback")
+    trt_ep_path = os.path.join(tmp_dir, "trt.ep")
     model = models.resnet18().eval().cuda()
     input_bs2 = torch.randn((2, 3, 224, 224)).to("cuda")
 
@@ -588,6 +607,8 @@ def test_bitwise_and_dynamic_fallback(ir):
     """
     This tests export save and load functionality on a bitwise_and model with dynamic shapes and fallback
     """
+    tmp_dir = tempfile.mkdtemp(prefix="test_bitwise_and_dynamic_fallback")
+    trt_ep_path = os.path.join(tmp_dir, "trt.ep")
 
     class bitwise_and(torch.nn.Module):
         def forward(self, lhs_val, rhs_val):
@@ -668,6 +689,8 @@ def test_random_dynamic_fallback(ir):
     """
     This tests export save and load functionality on a random model with dynamic shapes and fallback
     """
+    tmp_dir = tempfile.mkdtemp(prefix="test_random_dynamic_fallback")
+    trt_ep_path = os.path.join(tmp_dir, "trt.ep")
 
     class NeuralNetwork(nn.Module):
         def __init__(self):
