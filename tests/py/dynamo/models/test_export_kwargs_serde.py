@@ -75,7 +75,8 @@ def test_custom_model():
     )
 
     # Save the module
-    trt_ep_path = os.path.join(tempfile.gettempdir(), "compiled.ep")
+    tmp_dir = tempfile.mkdtemp(prefix="test_custom_model")
+    trt_ep_path = os.path.join(tmp_dir, "compiled.ep")
     torchtrt.save(trt_gm, trt_ep_path, retrace=False)
     # Clean up model env
     torch._dynamo.reset()
@@ -137,7 +138,8 @@ def test_custom_model_with_dynamo_trace():
     )
 
     # Save the module
-    trt_ep_path = os.path.join(tempfile.gettempdir(), "compiled.ep")
+    tmp_dir = tempfile.mkdtemp(prefix="test_custom_model_with_dynamo_trace")
+    trt_ep_path = os.path.join(tmp_dir, "compiled.ep")
     torchtrt.save(trt_gm, trt_ep_path, retrace=False)
     # Clean up model env
     torch._dynamo.reset()
@@ -208,7 +210,8 @@ def test_custom_model_with_dynamo_trace_dynamic():
     )
 
     # Save the module
-    trt_ep_path = os.path.join(tempfile.gettempdir(), "compiled.ep")
+    tmp_dir = tempfile.mkdtemp(prefix="test_custom_model_with_dynamo_trace_dynamic")
+    trt_ep_path = os.path.join(tmp_dir, "compiled.ep")
     torchtrt.save(trt_gm, trt_ep_path, retrace=False)
     # Clean up model env
     torch._dynamo.reset()
@@ -298,7 +301,8 @@ def test_custom_model_with_dynamo_trace_kwarg_dynamic():
         msg=f"CustomKwargs Module TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
     )
     # Save the module
-    trt_ep_path = os.path.join(tempfile.gettempdir(), "compiled.ep")
+    tmp_dir = tempfile.mkdtemp(prefix="test_custom_model_with_dynamo_trace_kwarg_dynamic")
+    trt_ep_path = os.path.join(tmp_dir, "compiled.ep")
     torchtrt.save(trt_gm, trt_ep_path, retrace=False)
     # Clean up model env
     torch._dynamo.reset()
@@ -388,7 +392,8 @@ def test_custom_model_with_dynamo_trace_kwarg_dynamic():
         msg=f"CustomKwargs Module TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
     )
     # Save the module
-    trt_ep_path = os.path.join(tempfile.gettempdir(), "compiled.ep")
+    tmp_dir = tempfile.mkdtemp(prefix="test_custom_model_with_dynamo_trace_kwarg_dynamic")
+    trt_ep_path = os.path.join(tmp_dir, "compiled.ep")
     torchtrt.save(trt_gm, trt_ep_path, retrace=False)
     # Clean up model env
     torch._dynamo.reset()

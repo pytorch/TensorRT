@@ -17,9 +17,6 @@ assertions = unittest.TestCase()
 if importlib.util.find_spec("torchvision"):
     import torchvision.models as models
 
-trt_ep_path = os.path.join(tempfile.gettempdir(), "trt.ep")
-
-
 @pytest.mark.unit
 @pytest.mark.critical
 def test_base_full_compile(ir):
@@ -27,6 +24,8 @@ def test_base_full_compile(ir):
     This tests export serde functionality on a base model
     which is fully TRT convertible
     """
+    tmp_dir = tempfile.mkdtemp(prefix="test_base_full_compile")
+    trt_ep_path = os.path.join(tmp_dir, "trt.ep")
 
     class MyModule(torch.nn.Module):
         def __init__(self):
@@ -81,6 +80,9 @@ def test_base_full_compile_multiple_outputs(ir):
     This tests export serde functionality on a base model
     with multiple outputs which is fully TRT convertible
     """
+
+    tmp_dir = tempfile.mkdtemp(prefix="test_base_full_compile_multiple_outputs")
+    trt_ep_path = os.path.join(tmp_dir, "trt.ep")
 
     class MyModule(torch.nn.Module):
         def __init__(self):
@@ -204,6 +206,9 @@ def test_hybrid_relu_fallback(ir):
     fallback
     """
 
+    tmp_dir = tempfile.mkdtemp(prefix="test_hybrid_relu_fallback")
+    trt_ep_path = os.path.join(tmp_dir, "trt.ep")
+
     class MyModule(torch.nn.Module):
         def __init__(self):
             super().__init__()
@@ -264,6 +269,9 @@ def test_resnet18(ir):
     """
     This tests export save and load functionality on Resnet18 model
     """
+    tmp_dir = tempfile.mkdtemp(prefix="test_resnet18")
+    trt_ep_path = os.path.join(tmp_dir, "trt.ep")
+
     model = models.resnet18().eval().cuda()
     input = torch.randn((1, 3, 224, 224)).to("cuda")
 
@@ -309,6 +317,9 @@ def test_resnet18_cpu_offload(ir):
     """
     This tests export save and load functionality on Resnet18 model
     """
+    tmp_dir = tempfile.mkdtemp(prefix="test_resnet18_cpu_offload")
+    trt_ep_path = os.path.join(tmp_dir, "trt.ep")
+
     model = models.resnet18().eval().cuda()
     input = torch.randn((1, 3, 224, 224)).to("cuda")
 
@@ -361,6 +372,9 @@ def test_resnet18_dynamic(ir):
     """
     This tests export save and load functionality on Resnet18 model
     """
+    tmp_dir = tempfile.mkdtemp(prefix="test_resnet18_dynamic")
+    trt_ep_path = os.path.join(tmp_dir, "trt.ep")
+
     model = models.resnet18().eval().cuda()
     input = torch.randn((1, 3, 224, 224)).to("cuda")
 
@@ -401,6 +415,9 @@ def test_resnet18_torch_exec_ops_serde(ir):
     """
     This tests export save and load functionality on Resnet18 model
     """
+    tmp_dir = tempfile.mkdtemp(prefix="test_resnet18_torch_exec_ops_serde")
+    trt_ep_path = os.path.join(tmp_dir, "trt.ep")
+
     model = models.resnet18().eval().cuda()
     input = torch.randn((1, 3, 224, 224)).to("cuda")
 
@@ -433,6 +450,9 @@ def test_hybrid_conv_fallback(ir):
     This tests export save and load functionality on a hybrid
     model where a conv (a weighted layer)  has been forced to fallback to Pytorch.
     """
+
+    tmp_dir = tempfile.mkdtemp(prefix="test_hybrid_conv_fallback")
+    trt_ep_path = os.path.join(tmp_dir, "trt.ep")
 
     class MyModule(torch.nn.Module):
         def __init__(self):
@@ -494,6 +514,9 @@ def test_hybrid_conv_fallback_cpu_offload(ir):
     This tests export save and load functionality on a hybrid
     model where a conv (a weighted layer)  has been forced to fallback to Pytorch.
     """
+
+    tmp_dir = tempfile.mkdtemp(prefix="test_hybrid_conv_fallback_cpu_offload")
+    trt_ep_path = os.path.join(tmp_dir, "trt.ep")
 
     class MyModule(torch.nn.Module):
         def __init__(self):
@@ -557,6 +580,8 @@ def test_arange_export(ir):
     Here the arange output is a static constant (which is registered as input to the graph)
     in the exporter.
     """
+    tmp_dir = tempfile.mkdtemp(prefix="test_arange_export")
+    trt_ep_path = os.path.join(tmp_dir, "trt.ep")
 
     class MyModule(torch.nn.Module):
         def __init__(self):
