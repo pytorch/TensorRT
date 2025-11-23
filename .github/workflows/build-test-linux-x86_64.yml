@@ -110,6 +110,7 @@ jobs:
   L0-dynamo-core-tests:
     name: L0 dynamo core tests
     needs: [filter-matrix, build]
+    if: ${{ (github.ref_name == 'main' || github.ref_name == 'nightly' || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success() }}
     strategy:
       fail-fast: false
       matrix:
@@ -141,6 +142,7 @@ jobs:
   L0-py-core-tests:
     name: L0 core python tests
     needs: [filter-matrix, build]
+    if: ${{ (github.ref_name == 'main' || github.ref_name == 'nightly' || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success() }}
     strategy:
       fail-fast: false
       matrix:
@@ -169,6 +171,7 @@ jobs:
   L0-torchscript-tests:
     name: L0 torchscript tests
     needs: [filter-matrix, build]
+    if: ${{ (github.ref_name == 'main' || github.ref_name == 'nightly' || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success() }}
     strategy:
       fail-fast: false
       matrix:
