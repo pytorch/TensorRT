@@ -17,6 +17,7 @@ assertions = unittest.TestCase()
 if importlib.util.find_spec("torchvision"):
     import torchvision.models as models
 
+
 @pytest.mark.unit
 @pytest.mark.critical
 def test_base_full_compile(ir):

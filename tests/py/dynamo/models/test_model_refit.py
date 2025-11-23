@@ -532,7 +532,9 @@ def test_refit_one_engine_bert_with_weightmap():
 )
 @pytest.mark.unit
 def test_refit_one_engine_inline_runtime_with_weightmap():
-    tmp_dir = tempfile.mkdtemp(prefix="test_refit_one_engine_inline_runtime_with_weightmap")
+    tmp_dir = tempfile.mkdtemp(
+        prefix="test_refit_one_engine_inline_runtime_with_weightmap"
+    )
     trt_ep_path = os.path.join(tmp_dir, "compiled.ep")
     model = models.resnet18(pretrained=False).eval().to("cuda")
     model2 = models.resnet18(pretrained=True).eval().to("cuda")
@@ -890,7 +892,9 @@ def test_refit_one_engine_bert_without_weightmap():
 )
 @pytest.mark.unit
 def test_refit_one_engine_inline_runtime_without_weightmap():
-    tmp_dir = tempfile.mkdtemp(prefix="test_refit_one_engine_inline_runtime_without_weightmap")
+    tmp_dir = tempfile.mkdtemp(
+        prefix="test_refit_one_engine_inline_runtime_without_weightmap"
+    )
     trt_ep_path = os.path.join(tmp_dir, "compiled.ep")
     model = models.resnet18(pretrained=True).eval().to("cuda")
     model2 = models.resnet18(pretrained=False).eval().to("cuda")
