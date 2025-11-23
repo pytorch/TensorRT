@@ -5,7 +5,7 @@ import torch
 import torch_tensorrt
 from parameterized import parameterized
 from torch.testing._internal.common_utils import TestCase, run_tests
-from torch_tensorrt._utils import is_tegra_platform, is_thor
+from torch_tensorrt._utils import is_tegra_platform
 
 from ..testing_utilities import DECIMALS_OF_AGREEMENT
 
@@ -45,7 +45,7 @@ class DDSModel2(torch.nn.Module):
 
 
 @unittest.skipIf(
-    torch_tensorrt.ENABLED_FEATURES.tensorrt_rtx or is_thor() or is_tegra_platform(),
+    torch_tensorrt.ENABLED_FEATURES.tensorrt_rtx or is_tegra_platform(),
     "TensorRT RTX does not support nonzero which are required for this test",
 )
 class TestOutputAllocatorStaticModel(TestCase):
@@ -158,7 +158,7 @@ class TestOutputAllocatorStaticModel(TestCase):
 
 
 @unittest.skipIf(
-    torch_tensorrt.ENABLED_FEATURES.tensorrt_rtx or is_thor() or is_tegra_platform(),
+    torch_tensorrt.ENABLED_FEATURES.tensorrt_rtx or s_tegra_platform(),
     "TensorRT RTX does not support nonzero which are required for this test",
 )
 class TestOutputAllocatorDDSModel(TestCase):
@@ -268,7 +268,7 @@ class TestOutputAllocatorDDSModel(TestCase):
 
 
 @unittest.skipIf(
-    torch_tensorrt.ENABLED_FEATURES.tensorrt_rtx or is_thor() or is_tegra_platform(),
+    torch_tensorrt.ENABLED_FEATURES.tensorrt_rtx or is_tegra_platform(),
     "TensorRT RTX does not support nonzero which are required for this test",
 )
 class TestOutputAllocatorDDSOpWithReductionOpModel(TestCase):
@@ -382,7 +382,7 @@ class TestOutputAllocatorDDSOpWithReductionOpModel(TestCase):
 
 
 @unittest.skipIf(
-    torch_tensorrt.ENABLED_FEATURES.tensorrt_rtx or is_thor() or is_tegra_platform(),
+    torch_tensorrt.ENABLED_FEATURES.tensorrt_rtx or is_tegra_platform(),
     "TensorRT RTX does not support nonzero which are required for this test",
 )
 class TestOutputAllocatorDDSModelWithGraphBreak(TestCase):
