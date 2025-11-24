@@ -458,7 +458,7 @@ class TestWeightStrippedEngine(TestCase):
         class MyModel(torch.nn.Module):
             def __init__(self):
                 super().__init__()
-                self.conv = torch.nn.Conv2d(512, 64, 32, stride=1, bias=True)
+                self.conv = torch.nn.Conv2d(3, 4, 3, stride=1, bias=True)
                 self.relu = torch.nn.ReLU()
 
             def forward(self, x):
@@ -472,7 +472,7 @@ class TestWeightStrippedEngine(TestCase):
         if os.path.exists(engine_cache_dir):
             shutil.rmtree(engine_cache_dir)
 
-        inputs = [torch.rand((64, 512, 32, 32)).to("cuda")]
+        inputs = [torch.rand((4, 3, 32, 32)).to("cuda")]
 
         for i in range(2):
             if i == 0:
