@@ -3,11 +3,12 @@ from typing import Tuple
 
 import torch
 import torch.nn as nn
-import torch_tensorrt
 import triton
 import triton.language as tl
 from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
+
+import torch_tensorrt
 
 from ..conversion.harness import DispatchTestCase
 
@@ -40,7 +41,7 @@ def elementwise_scale_mul(
     Z = torch.empty_like(X)
 
     # Define block size
-    BLOCK_SIZE = 1024
+    BLOCK_SIZE = 64
 
     # Grid of programs
     grid = lambda meta: (X.numel() // meta["BLOCK_SIZE"],)
