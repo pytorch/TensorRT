@@ -158,7 +158,7 @@ class TestOutputAllocatorStaticModel(TestCase):
 
 
 @unittest.skipIf(
-    torch_tensorrt.ENABLED_FEATURES.tensorrt_rtx or s_tegra_platform(),
+    torch_tensorrt.ENABLED_FEATURES.tensorrt_rtx or is_tegra_platform(),
     "TensorRT RTX does not support nonzero which are required for this test",
 )
 class TestOutputAllocatorDDSModel(TestCase):
