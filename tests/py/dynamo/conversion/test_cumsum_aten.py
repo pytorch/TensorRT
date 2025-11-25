@@ -5,15 +5,10 @@ import torch.nn as nn
 import torch_tensorrt
 from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
-from torch_tensorrt._utils import is_tegra_platform
 
 from .harness import DispatchTestCase
 
 
-@unittest.skipIf(
-    is_tegra_platform(),
-    "Skipped on Tegra platforms",
-)
 class TestCumsumConverter(DispatchTestCase):
     @parameterized.expand(
         [

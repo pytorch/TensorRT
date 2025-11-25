@@ -6,7 +6,6 @@ import torch_tensorrt
 from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
 from torch_tensorrt import ENABLED_FEATURES, Input
-from torch_tensorrt._utils import is_tegra_platform
 
 from .harness import DispatchTestCase
 
@@ -248,8 +247,8 @@ class TestIndexDynamicConstantConverter(DispatchTestCase):
 
 
 @unittest.skipIf(
-    torch_tensorrt.ENABLED_FEATURES.tensorrt_rtx or is_tegra_platform(),
-    "nonzero is not supported for tensorrt_rtx or Tegra platforms",
+    torch_tensorrt.ENABLED_FEATURES.tensorrt_rtx,
+    "nonzero is not supported for tensorrt_rtx",
 )
 class TestIndexDynamicInputNonDynamicIndexConverter(DispatchTestCase):
     def test_index_input_non_dynamic_index_dynamic(self):
