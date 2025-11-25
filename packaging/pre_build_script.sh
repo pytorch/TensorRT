@@ -53,7 +53,7 @@ else
     INDEX_URL=https://download.pytorch.org/whl/${CHANNEL}/${CU_VERSION}
 
     # Install all the dependencies required for Torch-TensorRT
-    pip install --force-reinstall --pre ${TORCH} --index-url ${INDEX_URL}
+    pip install --force-reinstall --pre ${TORCH} --index-url ${INDEX_URL} --extra-index-url https://pypi.org/simple
 fi
 
 export TORCH_BUILD_NUMBER=$(python -c "import torch, urllib.parse as ul; print(ul.quote_plus(torch.__version__))")
