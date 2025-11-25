@@ -107,6 +107,7 @@ def compile_torchtrt(model, input_ids, args):
         use_fp32_acc = False
     else:
         enabled_precisions = {torch.float32}
+        use_explicit_typing = True
 
     with torch_tensorrt.dynamo.Debugger() if args.debug else nullcontext():
         trt_model = torch_tensorrt.dynamo.compile(

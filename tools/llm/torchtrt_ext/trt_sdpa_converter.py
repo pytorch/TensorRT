@@ -181,6 +181,7 @@ def scaled_dot_product_attention(
     attention_layer = ctx.net.add_attention(
         query, key, value, trt.AttentionNormalizationOp.SOFTMAX, False
     )
+    attention_layer.decomposable = True
 
     assert attention_layer is not None, "attention layer is None"
 
