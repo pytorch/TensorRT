@@ -18,8 +18,8 @@ pip install --pre -r ${PWD}/tests/py/requirements.txt
 # eg. timm will install the latest torchvision, however we want to use the torchvision from nightly
 # reinstall torch torchvisionto make sure we have the correct version
 pip uninstall -y torch torchvision
-pip install --force-reinstall --pre ${TORCHVISION} --index-url ${INDEX_URL}
-pip install --force-reinstall --pre ${TORCH} --index-url ${INDEX_URL}
+pip install --force-reinstall --pre ${TORCHVISION} --index-url ${INDEX_URL} --extra-index-url https://pypi.org/simple
+pip install --force-reinstall --pre ${TORCH} --index-url ${INDEX_URL} --extra-index-url https://pypi.org/simple
 
 if [[ ${USE_TRT_RTX} == true ]]; then
     source .github/scripts/install-tensorrt-rtx.sh
