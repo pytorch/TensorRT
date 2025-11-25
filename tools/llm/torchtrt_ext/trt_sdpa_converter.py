@@ -152,18 +152,20 @@ def scaled_dot_product_attention(
     # always create our own attn_mask
     query, key, value, mask, dropout_p, is_causal = args
 
-    num_attention_heads = -1  # key.shape[1]
-    num_attention_heads_tensor = (
-        -1
-    )  # get_trt_tensor(ctx, num_attention_heads, name + "_num_attention_heads")
-
-    # Reshape key and value tensors to have -1 in the attn_heads dimension due to TRT MHA API restriction.
-    # key = impl.shuffle.reshape(ctx, target, source_ir, name + "_key_reshape", input=key, shape=[key.shape[0], num_attention_heads_tensor, key.shape[2], key.shape[3]])
-    # value = impl.shuffle.reshape(ctx, target, source_ir, name + "_value_reshape", input=value, shape=[value.shape[0], num_attention_heads_tensor, value.shape[2], value.shape[3]])
-    # breakpoint()
+    # The exported graph of LLM models have -1 in the attention heads dimension for the query tensor. This value is static for key and value tensors though.
+    # TODO: We assume that the attention heads dimension is the same for key and value and query tensors. We can implement a lowering pass
+    # that reads number of attention heads from model config similar to gemma3. For now, we directly use the key.shape[1] as the attention heads dimension.
+    query = impl.shuffle.reshape(
+        ctx,
+        target,
+        source_ir,
+        name + "_query_reshape",
+        input=query,
+        shape=[query.shape[0], key.shape[1], query.shape[2], query.shape[3]],
+    )
     # L, S = query.shape[-2], key.shape[-2]
     query_len = impl.shape.shape(ctx, target, source_ir, name + "_query_len", query, -2)
-    key_len = impl.shape.shape(ctx, target, source_ir, name + "_key_len", query, -2)
+    key_len = impl.shape.shape(ctx, target, source_ir, name + "_key_len", key, -2)
     mask_tensor = tril(
         ctx,
         target,
@@ -179,6 +181,8 @@ def scaled_dot_product_attention(
     attention_layer = ctx.net.add_attention(
         query, key, value, trt.AttentionNormalizationOp.SOFTMAX, False
     )
+
+    assert attention_layer is not None, "attention layer is None"
 
     if is_causal:
         attention_layer.mask = mask_tensor
