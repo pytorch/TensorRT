@@ -10,7 +10,7 @@ from tensorrt import ITensor as TRTTensor
 from torch.fx.node import Argument, Node, Target
 from torch_tensorrt import ENABLED_FEATURES
 from torch_tensorrt._features import needs_not_tensorrt_rtx
-from torch_tensorrt._utils import is_tensorrt_version_supported, is_thor
+from torch_tensorrt._utils import is_tensorrt_version_supported
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion import impl
@@ -429,7 +429,7 @@ def index_nonbool_validator(
     node: Node, settings: Optional[CompilationSettings] = None
 ) -> bool:
     # for thor and tensorrt_rtx, we don't support boolean indices, due to nonzero op not supported
-    if is_thor() or ENABLED_FEATURES.tensorrt_rtx:
+    if ENABLED_FEATURES.tensorrt_rtx:
         index = node.args[1]
         for ind in index:
             if ind is not None:
@@ -3621,18 +3621,10 @@ def aten_ops_full(
     )
 
 
-def nonzero_validator(
-    node: Node, settings: Optional[CompilationSettings] = None
-) -> bool:
-    return not is_thor()
-
-
 # currently nonzero is not supported for tensorrt_rtx
 # TODO: lan to add the nonzero support once tensorrt_rtx team has added the support
-# TODO: apbose to remove the capability validator once thor bug resolve in NGC
 @dynamo_tensorrt_converter(
     torch.ops.aten.nonzero.default,
-    capability_validator=nonzero_validator,
     supports_dynamic_shapes=True,
     requires_output_allocator=True,
 )

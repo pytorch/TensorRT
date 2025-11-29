@@ -1,6 +1,5 @@
 import importlib
 import os
-import tempfile
 import unittest
 
 import pytest
@@ -14,12 +13,10 @@ assertions = unittest.TestCase()
 if importlib.util.find_spec("torchvision"):
     import torchvision.models as models
 
-trt_ep_path = os.path.join(tempfile.gettempdir(), "trt.ep")
-
 
 @pytest.mark.unit
 @pytest.mark.critical
-def test_base_full_compile(ir):
+def test_base_full_compile(ir, tmpdir):
     """
     This tests export serde functionality on a base model
     which is fully TRT convertible
@@ -56,6 +53,8 @@ def test_base_full_compile(ir):
 
     # Reexport
     trt_exp_program = torch.export.export(trt_module, (input,), strict=False)
+    trt_ep_path = os.path.join(tmpdir, "trt.ep")
+
     torch.export.save(trt_exp_program, trt_ep_path)
 
     deser_trt_module = torchtrt.load(trt_ep_path).module()
@@ -76,11 +75,13 @@ def test_base_full_compile(ir):
 
 @pytest.mark.unit
 @pytest.mark.critical
-def test_base_full_compile_multiple_outputs(ir):
+def test_base_full_compile_multiple_outputs(ir, tmpdir):
     """
     This tests export serde functionality on a base model
     with multiple outputs which is fully TRT convertible
     """
+
+    trt_ep_path = os.path.join(tmpdir, "trt.ep")
 
     class MyModule(torch.nn.Module):
         def __init__(self):
@@ -139,7 +140,7 @@ def test_base_full_compile_multiple_outputs(ir):
 
 @pytest.mark.unit
 @pytest.mark.critical
-def test_no_compile(ir):
+def test_no_compile(ir, tmpdir):
     """
     This tests export serde functionality on a model
     which won't convert to TRT because of min_block_size=5 constraint
@@ -157,6 +158,7 @@ def test_no_compile(ir):
             relu = self.relu(conv)
             return conv, relu
 
+    trt_ep_path = os.path.join(tmpdir, "trt.ep")
     model = MyModule().eval().cuda()
     input = torch.randn((1, 3, 224, 224)).to("cuda")
 
@@ -200,12 +202,14 @@ def test_no_compile(ir):
 
 
 @pytest.mark.unit
-def test_hybrid_relu_fallback(ir):
+def test_hybrid_relu_fallback(ir, tmpdir):
     """
     This tests export save and load functionality on a hybrid
     model with Pytorch and TRT segments. Relu (unweighted) layer is forced to
     fallback
     """
+
+    trt_ep_path = os.path.join(tmpdir, "trt.ep")
 
     class MyModule(torch.nn.Module):
         def __init__(self):
@@ -266,10 +270,13 @@ def test_hybrid_relu_fallback(ir):
     not importlib.util.find_spec("torchvision"),
     "torchvision is not installed",
 )
-def test_resnet18(ir):
+def test_resnet18(ir, tmpdir):
     """
     This tests export save and load functionality on Resnet18 model
     """
+
+    trt_ep_path = os.path.join(tmpdir, "trt.ep")
+
     model = models.resnet18().eval().cuda()
     input = torch.randn((1, 3, 224, 224)).to("cuda")
 
@@ -310,11 +317,13 @@ def test_resnet18(ir):
 
 
 @pytest.mark.unit
-def test_hybrid_conv_fallback(ir):
+def test_hybrid_conv_fallback(ir, tmpdir):
     """
     This tests export save and load functionality on a hybrid
     model where a conv (a weighted layer)  has been forced to fallback to Pytorch.
     """
+
+    trt_ep_path = os.path.join(tmpdir, "trt.ep")
 
     class MyModule(torch.nn.Module):
         def __init__(self):
@@ -372,12 +381,14 @@ def test_hybrid_conv_fallback(ir):
 
 
 @pytest.mark.unit
-def test_arange_export(ir):
+def test_arange_export(ir, tmpdir):
     """
     This tests export save and load functionality on a arange static graph
     Here the arange output is a static constant (which is registered as input to the graph)
     in the exporter.
     """
+
+    trt_ep_path = os.path.join(tmpdir, "trt.ep")
 
     class MyModule(torch.nn.Module):
         def __init__(self):
@@ -436,10 +447,12 @@ def test_arange_export(ir):
     not importlib.util.find_spec("torchvision"),
     "torchvision is not installed",
 )
-def test_resnet18_dynamic(ir):
+def test_resnet18_dynamic(ir, tmpdir):
     """
     This tests export save and load functionality on Resnet18 model with dynamic shapes
     """
+
+    trt_ep_path = os.path.join(tmpdir, "trt.ep")
     model = models.resnet18().eval().cuda()
     input_bs2 = torch.randn((2, 3, 224, 224)).to("cuda")
 
@@ -510,10 +523,12 @@ def test_resnet18_dynamic(ir):
     not importlib.util.find_spec("torchvision"),
     "torchvision is not installed",
 )
-def test_resnet18_dynamic_fallback(ir):
+def test_resnet18_dynamic_fallback(ir, tmpdir):
     """
     This tests export save and load functionality on Resnet18 model with dynamic shapes and fallback
     """
+
+    trt_ep_path = os.path.join(tmpdir, "trt.ep")
     model = models.resnet18().eval().cuda()
     input_bs2 = torch.randn((2, 3, 224, 224)).to("cuda")
 
@@ -584,10 +599,12 @@ def test_resnet18_dynamic_fallback(ir):
 
 
 @pytest.mark.unit
-def test_bitwise_and_dynamic_fallback(ir):
+def test_bitwise_and_dynamic_fallback(ir, tmpdir):
     """
     This tests export save and load functionality on a bitwise_and model with dynamic shapes and fallback
     """
+
+    trt_ep_path = os.path.join(tmpdir, "trt.ep")
 
     class bitwise_and(torch.nn.Module):
         def forward(self, lhs_val, rhs_val):
@@ -664,10 +681,12 @@ def test_bitwise_and_dynamic_fallback(ir):
 
 
 @pytest.mark.unit
-def test_random_dynamic_fallback(ir):
+def test_random_dynamic_fallback(ir, tmpdir):
     """
     This tests export save and load functionality on a random model with dynamic shapes and fallback
     """
+
+    trt_ep_path = os.path.join(tmpdir, "trt.ep")
 
     class NeuralNetwork(nn.Module):
         def __init__(self):
