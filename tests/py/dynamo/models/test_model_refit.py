@@ -1,6 +1,5 @@
 import importlib
 import os
-import tempfile
 import unittest
 
 import pytest
@@ -531,8 +530,9 @@ def test_refit_one_engine_bert_with_weightmap():
     "Refit feature is not supported in Python 3.13 or higher",
 )
 @pytest.mark.unit
-def test_refit_one_engine_inline_runtime_with_weightmap():
-    trt_ep_path = os.path.join(tempfile.gettempdir(), "compiled.ep")
+def test_refit_one_engine_inline_runtime_with_weightmap(tmpdir):
+
+    trt_ep_path = os.path.join(tmpdir, "compiled.ep")
     model = models.resnet18(pretrained=False).eval().to("cuda")
     model2 = models.resnet18(pretrained=True).eval().to("cuda")
     inputs = [torch.randn((1, 3, 224, 224)).to("cuda")]
@@ -888,8 +888,8 @@ def test_refit_one_engine_bert_without_weightmap():
     "Refit feature is not supported in Python 3.13 or higher",
 )
 @pytest.mark.unit
-def test_refit_one_engine_inline_runtime_without_weightmap():
-    trt_ep_path = os.path.join(tempfile.gettempdir(), "compiled.ep")
+def test_refit_one_engine_inline_runtime_without_weightmap(tmpdir):
+    trt_ep_path = os.path.join(tmpdir, "compiled.ep")
     model = models.resnet18(pretrained=True).eval().to("cuda")
     model2 = models.resnet18(pretrained=False).eval().to("cuda")
     inputs = [torch.randn((1, 3, 224, 224)).to("cuda")]
