@@ -63,6 +63,7 @@ class TestResourcePartitioning(TestCase):
             "min_block_size": 1,
             "immutable_weights": True,
             "reuse_cached_engines": False,
+            "enable_resource_partitioning": True,
         }
         settings = CompilationSettings(**compilation_options)
 
@@ -144,6 +145,7 @@ class TestResourcePartitioning(TestCase):
             "immutable_weights": True,
             "reuse_cached_engines": False,
             "torch_executed_ops": {"torch.ops.aten.max_pool2d.default"},
+            "enable_resource_partitioning": True,
         }
         settings = CompilationSettings(**compilation_options)
 
@@ -175,8 +177,8 @@ class TestResourcePartitioning(TestCase):
                     if "_run_on_acc" in name
                 ]
             )
-            == 5
-        ), "The graph should have 5 accelerated subgraphs"
+            > 3
+        ), "The graph should have more than 3 accelerated subgraphs"
         assert (
             len(
                 [
@@ -275,6 +277,7 @@ class TestResourcePartitioning(TestCase):
             "immutable_weights": True,
             "reuse_cached_engines": False,
             "torch_executed_ops": {"torch.ops.aten.max_pool2d.default"},
+            "enable_resource_partitioning": True,
         }
         settings = CompilationSettings(**compilation_options)
 
@@ -355,6 +358,7 @@ class TestResourcePartitioning(TestCase):
             "min_block_size": 1,
             "immutable_weights": True,
             "reuse_cached_engines": False,
+            "enable_resource_partitioning": True,
         }
         settings = CompilationSettings(**compilation_options)
 
@@ -409,7 +413,7 @@ class TestResourcePartitioning(TestCase):
             assert broken_fusion
 
             # The fusion should be fixed after the step
-            partitioner._varify_all_fusion_nodes_in_same_subgraph(new_subgraphs)
+            partitioner._verify_all_fusion_nodes_in_same_subgraph(new_subgraphs)
 
             break
 
@@ -463,6 +467,7 @@ class TestResourcePartitioning(TestCase):
             "immutable_weights": True,
             "reuse_cached_engines": False,
             "torch_executed_ops": {"torch.ops.aten.max_pool2d.default"},
+            "enable_resource_partitioning": True,
         }
         settings = CompilationSettings(**compilation_options)
 

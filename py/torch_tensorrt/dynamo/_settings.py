@@ -23,6 +23,7 @@ from torch_tensorrt.dynamo._defaults import (
     ENABLE_AUTOCAST,
     ENABLE_CROSS_COMPILE_FOR_WINDOWS,
     ENABLE_EXPERIMENTAL_DECOMPOSITIONS,
+    ENABLE_RESOURCE_PARTITIONING,
     ENABLE_WEIGHT_STREAMING,
     ENABLED_PRECISIONS,
     ENGINE_CAPABILITY,
@@ -169,6 +170,7 @@ class CompilationSettings:
     autocast_calibration_dataloader: Optional[torch.utils.data.DataLoader] = (
         AUTOCAST_CALIBRATION_DATALOADER
     )
+    enable_resource_partitioning: bool = ENABLE_RESOURCE_PARTITIONING
     cpu_memory_budget: int = CPU_MEMORY_BUDGET
 
     def __getstate__(self) -> dict[str, Any]:

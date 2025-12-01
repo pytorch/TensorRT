@@ -108,7 +108,8 @@ def cross_compile_for_windows(
     l2_limit_for_tiling: int = _defaults.L2_LIMIT_FOR_TILING,
     offload_module_to_cpu: bool = _defaults.OFFLOAD_MODULE_TO_CPU,
     use_distributed_mode_trace: bool = _defaults.USE_DISTRIBUTED_MODE_TRACE,
-    cpu_memory_budget: int = _defaults.CPU_MEMORY_BUDGET,
+    enable_resource_partitioning: bool = _defaults.ENABLE_RESOURCE_PARTITIONING,
+    cpu_memory_budget: Optional[int] = _defaults.CPU_MEMORY_BUDGET,
     **kwargs: Any,
 ) -> torch.fx.GraphModule:
     """Compile an ExportedProgram module using TensorRT in Linux for Inference in Windows
@@ -183,7 +184,8 @@ def cross_compile_for_windows(
         tiling_optimization_level (str): The optimization level of tiling strategies. A higher level allows TensorRT to spend more time searching for better tiling strategy. We currently support ["none", "fast", "moderate", "full"].
         l2_limit_for_tiling (int): The target L2 cache usage limit (in bytes) for tiling optimization (default is -1 which means no limit).
         use_distributed_mode_trace (bool):  Using aot_autograd to trace the graph. This is enabled when DTensors or distributed tensors are present in distributed model
-        cpu_memory_budget (int): The maximum amount of CPU memory to use for the compilation. If the compilation requires more memory than this budget, the compilation will fail. If set to -1, the compilation will use all available CPU memory.
+        enable_resource_partitioning (bool): Enable resource-aware partitioning. This is useful when the model is large and the CPU memory is limited.
+        cpu_memory_budget (Optional[int]): The maximum amount of CPU memory to use for the compilation. If the compilation requires more memory than this budget, the compilation will fail.
         **kwargs: Any,
     Returns:
         torch.fx.GraphModule: Compiled FX Module, when run it will execute via TensorRT
@@ -339,6 +341,7 @@ def cross_compile_for_windows(
         "tiling_optimization_level": tiling_optimization_level,
         "l2_limit_for_tiling": l2_limit_for_tiling,
         "use_distributed_mode_trace": use_distributed_mode_trace,
+        "enable_resource_partitioning": enable_resource_partitioning,
         "cpu_memory_budget": cpu_memory_budget,
     }
 
@@ -454,7 +457,8 @@ def compile(
     autocast_calibration_dataloader: Optional[
         torch.utils.data.DataLoader
     ] = _defaults.AUTOCAST_CALIBRATION_DATALOADER,
-    cpu_memory_budget: int = _defaults.CPU_MEMORY_BUDGET,
+    cpu_memory_budget: Optional[int] = _defaults.CPU_MEMORY_BUDGET,
+    enable_resource_partitioning: bool = _defaults.ENABLE_RESOURCE_PARTITIONING,
     **kwargs: Any,
 ) -> torch.fx.GraphModule:
     """Compile an ExportedProgram module for NVIDIA GPUs using TensorRT
@@ -539,6 +543,8 @@ def compile(
         autocast_max_output_threshold (float): Maximum absolute value for node outputs, nodes with outputs greater than this value will remain in FP32. Default is 512.
         autocast_max_depth_of_reduction (Optional[int]): Maximum depth of reduction allowed in low precision. Nodes with higher reduction depths will remain in FP32. This helps prevent excessive accuracy loss in operations particularly sensitive to reduced precision, as higher-depth reductions may amplify computation errors in low precision formats. If not provided, infinity will be used. Default is None.
         autocast_calibration_dataloader (Optional[torch.utils.data.DataLoader]): The dataloader to use for autocast calibration. Default is None.
+        enable_resource_partitioning (bool): Enable resource-aware partitioning. This is useful when the model is large and the CPU memory is limited.
+        cpu_memory_budget (Optional[int]): The maximum amount of CPU memory to use for the compilation. If the compilation requires more memory than this budget, the compilation will fail.
         **kwargs: Any,
     Returns:
         torch.fx.GraphModule: Compiled FX Module, when run it will execute via TensorRT
@@ -739,6 +745,7 @@ def compile(
         "autocast_max_output_threshold": autocast_max_output_threshold,
         "autocast_max_depth_of_reduction": autocast_max_depth_of_reduction,
         "autocast_calibration_dataloader": autocast_calibration_dataloader,
+        "enable_resource_partitioning": enable_resource_partitioning,
         "cpu_memory_budget": cpu_memory_budget,
     }
     logger.debug(f"CPU memory usage before lowering: {get_cpu_memory_usage()} MB")
@@ -913,10 +920,11 @@ def compile_module(
             require_full_compilation=settings.require_full_compilation,
         )
 
-    partitioned_module = resource_partition(
-        partitioned_module,
-        cpu_memory_budget=settings.cpu_memory_budget,
-    )
+    if settings.enable_resource_partitioning:
+        partitioned_module = resource_partition(
+            partitioned_module,
+            cpu_memory_budget=settings.cpu_memory_budget,
+        )
 
     dryrun_tracker.unsupported_ops = supported_ops.unsupported_operators
 

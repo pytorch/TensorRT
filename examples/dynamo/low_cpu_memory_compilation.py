@@ -63,6 +63,7 @@ compilation_options = {
     "min_block_size": 1,
     "immutable_weights": True,
     "reuse_cached_engines": False,
+    "enable_resource_partitioning": True,
     "cpu_memory_budget": 2 * 1024 * 1024 * 1024,  # 2 GiB in bytes
 }
 

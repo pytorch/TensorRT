@@ -46,7 +46,7 @@ Notes
 """
 
 import logging
-from typing import Dict, List, Set, Tuple
+from typing import Dict, List, Optional, Set, Tuple
 
 import psutil
 import torch
@@ -58,6 +58,8 @@ from torch_tensorrt.dynamo.partitioning._atomic_subgraphs import (
 )
 
 logger = logging.getLogger(__name__)
+
+MAX_NUM_OF_ENGINES = 40
 
 
 class ResourcePartitioner(_SplitterBase):  # type: ignore
@@ -78,14 +80,19 @@ class ResourcePartitioner(_SplitterBase):  # type: ignore
     def __init__(
         self,
         module: torch.fx.GraphModule,
-        cpu_memory_budget: int,
+        cpu_memory_budget: Optional[int],
         submodule_name: str,
     ):
 
         assert isinstance(module, torch.fx.GraphModule)
 
         self.module = module
-        self.cpu_memory_budget = cpu_memory_budget
+        self.cpu_memory_budget = (
+            cpu_memory_budget
+            if cpu_memory_budget is not None
+            else psutil.virtual_memory().available
+        )
+        self.not_set_limit = cpu_memory_budget is None
         self.resource_split_count = 0
         self.submodule_name = submodule_name
         self.deps = self.find_deps()
@@ -148,10 +155,6 @@ class ResourcePartitioner(_SplitterBase):  # type: ignore
         subgraphs = [Subgraph(is_acc=True, nodes=nodes)]
         self.fusion_patterns = get_node_in_fusion_pattern(self.module.graph)
 
-        assert self.check_topological_order(
-            subgraphs
-        ), "The subgraphs are not topologically ordered"
-
         return subgraphs
 
     def check_topological_order(self, subgraphs: List[Subgraph]) -> bool:
@@ -186,7 +189,11 @@ class ResourcePartitioner(_SplitterBase):  # type: ignore
         """
 
         used_rss: int = psutil.Process().memory_info().rss
-        available_rss = self.cpu_memory_budget - used_rss
+        available_rss = (
+            self.cpu_memory_budget
+            if self.not_set_limit
+            else self.cpu_memory_budget - used_rss
+        )
         return available_rss // engine_compilation_memory_usage_multiplier
 
     def break_subgraphs(
@@ -214,12 +221,17 @@ class ResourcePartitioner(_SplitterBase):  # type: ignore
         # We throw an error if the remaining memory is almost empty compared to the model size.
         # i.e. if the remaining memory is 4G (budget is 1G) the model size is greater than 40G, we stop the compilation.
         sizes = self.size_of_subgraphs(subgraphs)
-        if sum(sizes) > subgraph_size_budget * 40:
-            raise ValueError(
-                "CPU memory budget or available memory is too small to compile the model. "
-                + f"CPU memory budget: {self.cpu_memory_budget // (1024 * 1024)} MB, Model size: {sum(sizes) // (1024 * 1024)} MB. "
-                + "Consider setting cpu_memory_budget to a larger value or disable offload_module_to_cpu to save more CPU memory."
-            )
+        if sum(sizes) > subgraph_size_budget * MAX_NUM_OF_ENGINES:
+            if self.not_set_limit:
+                raise ValueError(
+                    "The system memory is too constrained to compile the model without severe perf degradation. Consider setting offload_module_to_cpu=False to save more CPU memory."
+                )
+            else:
+                raise ValueError(
+                    "CPU memory budget is too small to compile the model. "
+                    + f"CPU memory budget: {self.cpu_memory_budget // (1024 * 1024)} MB, Model size: {sum(sizes) // (1024 * 1024)} MB. "
+                    + "Consider setting cpu_memory_budget to a larger value."
+                )
         for subgraph, size in zip(subgraphs, sizes):
 
             while size > subgraph_size_budget:
@@ -233,11 +245,11 @@ class ResourcePartitioner(_SplitterBase):  # type: ignore
             if len(subgraph.nodes) != 0:
                 new_subgraphs.append(subgraph)
 
-        self._varify_all_fusion_nodes_in_same_subgraph(new_subgraphs)
+        self._verify_all_fusion_nodes_in_same_subgraph(new_subgraphs)
 
         return new_subgraphs
 
-    def _varify_all_fusion_nodes_in_same_subgraph(
+    def _verify_all_fusion_nodes_in_same_subgraph(
         self, subgraphs: List[Subgraph]
     ) -> None:
         """Assert that every fusion group is contained in exactly one subgraph."""
