@@ -36,10 +36,11 @@ def test_no_pytorch_autocast():
             return x, out1, out2, out3, out4, out5, out6, out7, out8, out9
 
     model = NoPytorchAutocastModel().cuda().eval()
-    inputs = (torch.randn((8, 3, 32, 32), dtype=torch.float32, device="cuda"),)
+    BS = 8
+    inputs = (torch.randn((BS, 3, 32, 32), dtype=torch.float32, device="cuda"),)
     ep = torch.export.export(model, inputs)
     calibration_dataloader = torch.utils.data.DataLoader(
-        torch.utils.data.TensorDataset(*inputs), batch_size=2, shuffle=False
+        torch.utils.data.TensorDataset(*inputs), batch_size=BS, shuffle=False
     )
 
     with torch_tensorrt.dynamo.Debugger(
@@ -126,10 +127,11 @@ def test_whole_pytorch_autocast():
                 return x, out1, out2, out3, out4, out5, out6, out7, out8, out9
 
     model = WholePytorchAutocastModel().cuda().eval()
-    inputs = (torch.randn((8, 3, 32, 32), dtype=torch.float32, device="cuda"),)
+    BS = 4
+    inputs = (torch.randn((BS, 3, 32, 32), dtype=torch.float32, device="cuda"),)
     ep = torch.export.export(model, inputs)
     calibration_dataloader = torch.utils.data.DataLoader(
-        torch.utils.data.TensorDataset(*inputs), batch_size=2, shuffle=False
+        torch.utils.data.TensorDataset(*inputs), batch_size=BS, shuffle=False
     )
 
     with torch_tensorrt.dynamo.Debugger(
@@ -205,10 +207,11 @@ def test_mixed_pytorch_autocast():
             return x, out1, out2, out3, out4, out5, out6, out7, out8, out9
 
     model = MixedPytorchAutocastModel().cuda().eval()
-    inputs = (torch.randn((8, 3, 32, 32), dtype=torch.float32, device="cuda"),)
+    BS = 2
+    inputs = (torch.randn((BS, 3, 32, 32), dtype=torch.float32, device="cuda"),)
     ep = torch.export.export(model, inputs)
     calibration_dataloader = torch.utils.data.DataLoader(
-        torch.utils.data.TensorDataset(*inputs), batch_size=2, shuffle=False
+        torch.utils.data.TensorDataset(*inputs), batch_size=BS, shuffle=False
     )
 
     with torch_tensorrt.dynamo.Debugger(
