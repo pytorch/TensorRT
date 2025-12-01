@@ -7,7 +7,7 @@ from typing import Any, List, NamedTuple, Optional, Sequence
 import tensorrt as trt
 import torch
 from torch_tensorrt._enums import dtype
-from torch_tensorrt._features import ENABLED_FEATURES, needs_refit
+from torch_tensorrt._features import ENABLED_FEATURES
 from torch_tensorrt._Input import Input
 from torch_tensorrt.dynamo._engine_cache import BaseEngineCache
 from torch_tensorrt.dynamo._settings import CompilationSettings, settings_are_compatible
@@ -70,11 +70,16 @@ def interpret_module_to_result(
 
     def _insert_engine_to_cache(
         hash_val: str, interpreter_result: TRTInterpreterResult
-    ) -> None:  # type: ignore[unused-ignore]
+    ) -> bool:
+        if not ENABLED_FEATURES.refit:
+            logger.info("Refit feature is not available, so the engine is not cached")
+            return False
+
         # Cache the weight-stripped engine regardless of the `strip_engine_weights` setting
         if engine_cache.check(hash_val) is not None:  # type: ignore[union-attr]
-            logger.info(f"Engine already exists in cache for hash: {hash_val}")
-            return
+            logger.info(f"The engine already exists in cache for hash: {hash_val}")
+            return False
+
         if not settings.strip_engine_weights:
             # set EXCLUDE_WEIGHTS flag to strip weights
             serialization_config = (
@@ -101,9 +106,15 @@ def interpret_module_to_result(
             ),
         )
         logger.info(f"Engine was successfully inserted into cache for hash: {hash_val}")
+        return True
 
-    @needs_refit  # type: ignore[misc]
     def _pull_cached_engine(hash_val: str) -> Optional[SerializedInterpreterResult]:
+        if not ENABLED_FEATURES.refit:
+            logger.info(
+                "Refit feature is not available, so the engine is not loaded from cache"
+            )
+            return None
+
         # query the cached TRT engine
         cached_data = engine_cache.check(hash_val)  # type: ignore[union-attr]
         if cached_data is not None:  # hit the cache
@@ -181,14 +192,18 @@ def interpret_module_to_result(
     # engine_cache could be None if:
     # 1) engine_cache is not passed in when calling this function like convert_exported_program_to_serialized_trt_engine etc., or
     # 2) both cache_built_engines and reuse_cached_engines are False
-    if engine_cache is not None and not settings.immutable_weights:
+    if (
+        ENABLED_FEATURES.refit
+        and engine_cache is not None
+        and not settings.immutable_weights
+    ):
         if settings.cache_built_engines or settings.reuse_cached_engines:
             hash_val = engine_cache.get_hash(module, inputs, settings)
 
             if settings.reuse_cached_engines:
                 serialized_interpreter_result = _pull_cached_engine(hash_val)
                 if serialized_interpreter_result is not None:  # hit the cache
-                    return serialized_interpreter_result  # type: ignore[no-any-return]
+                    return serialized_interpreter_result
 
     output_dtypes = infer_module_output_dtypes(
         module, truncate_double=settings.truncate_double
@@ -215,11 +230,12 @@ def interpret_module_to_result(
 
     # Engine caching only for refittable engines
     if (
-        not settings.immutable_weights
+        ENABLED_FEATURES.refit
+        and not settings.immutable_weights
         and settings.cache_built_engines
         and engine_cache is not None
     ):
-        _insert_engine_to_cache(hash_val, interpreter_result)
+        _ = _insert_engine_to_cache(hash_val, interpreter_result)
 
     serialized_engine = interpreter_result.engine.serialize()
     with io.BytesIO() as engine_bytes:
@@ -237,7 +253,7 @@ def interpret_module_to_result(
         requires_output_allocator=interpreter_result.requires_output_allocator,
     )
 
-    return serialized_interpreter_result  # type: ignore[no-any-return]
+    return serialized_interpreter_result
 
 
 def convert_module(
