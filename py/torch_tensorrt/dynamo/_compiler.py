@@ -666,10 +666,6 @@ def compile(
             "'arg_inputs' and 'inputs' should not be used at the same time."
         )
 
-    assert (
-        cpu_memory_budget >= 2 * 1024 * 1024 * 1024
-    ), "CPU memory budget must be greater than 10GB"
-
     arg_inputs = inputs or arg_inputs
 
     if kwarg_inputs is None:

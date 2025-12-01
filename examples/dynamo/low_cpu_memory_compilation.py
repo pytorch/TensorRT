@@ -86,25 +86,44 @@ with torchtrt.dynamo.Debugger(
 
 """
 You should be able to see two back-to-back TensorRT engines in the graph
+
 Graph Structure:
 
    Inputs: List[Tensor: (1, 1024, 224, 224)@float32]
     ...
-    TRT Engine #1 - Submodule name: _run_on_acc_0
+    TRT Engine #1 - Submodule name: _run_on_acc_0_resource_split_0
      Engine Inputs: List[Tensor: (1, 1024, 224, 224)@float32]
      Number of Operators in Engine: 9
      Engine Outputs: List[Tensor: (1, 1024, 112, 112)@float32]
     ...
-    TRT Engine #2 - Submodule name: _run_on_acc_1
+    TRT Engine #2 - Submodule name: _run_on_acc_0_resource_split_1
      Engine Inputs: List[Tensor: (1, 1024, 112, 112)@float32]
      Number of Operators in Engine: 3
      Engine Outputs: List[Tensor: (1, 10)@float32]
     ...
    Outputs: List[Tensor: (1, 10)@float32]
 
+  ------------------------- Aggregate Stats -------------------------
 
+   Average Number of Operators per TRT Engine: 6.0
+   Most Operators in a TRT Engine: 9
+
+  ********** Recommendations **********
+
+   - For minimal graph segmentation, select min_block_size=9 which would generate 1 TRT engine(s)
+   - For moderate graph segmentation, select min_block_size=6 which would generate 1 TRT engine(s)
+   - The current level of graph segmentation is equivalent to selecting min_block_size=3 which generates 2 TRT engine(s)
 GraphModule(
-  (_run_on_acc_0): TorchTensorRTModule()
-  (_run_on_acc_1): TorchTensorRTModule()
+  (_run_on_acc_0_resource_split_0): TorchTensorRTModule()
+  (_run_on_acc_0_resource_split_1): TorchTensorRTModule()
+)
+
+
+
+def forward(self, x):
+    x, = fx_pytree.tree_flatten_spec(([x], {}), self._in_spec)
+    _run_on_acc_0_resource_split_0 = self._run_on_acc_0_resource_split_0(x);  x = None
+    _run_on_acc_0_resource_split_1 = self._run_on_acc_0_resource_split_1(_run_on_acc_0_resource_split_0);  _run_on_acc_0_resource_split_0 = None
+    return pytree.tree_unflatten((_run_on_acc_0_resource_split_1,), self._out_spec)
 )
 """

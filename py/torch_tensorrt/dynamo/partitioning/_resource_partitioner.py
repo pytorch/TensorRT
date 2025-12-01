@@ -46,7 +46,7 @@ Notes
 """
 
 import logging
-from typing import Dict, List, Tuple
+from typing import Dict, List, Set, Tuple
 
 import psutil
 import torch
@@ -92,7 +92,7 @@ class ResourcePartitioner(_SplitterBase):  # type: ignore
 
         self._node_submodule_map: Dict[str, str] = {}
         self._return_tuple = False
-        self.fusion_patterns: Dict[torch.fx.Node, List[torch.fx.Node]] = {}
+        self.fusion_patterns: Dict[torch.fx.Node, Set[torch.fx.Node]] = {}
 
     def partition_graph(self) -> torch.fx.GraphModule:
         """Build the final partitioned `GraphModule` honoring memory constraints.
@@ -214,7 +214,6 @@ class ResourcePartitioner(_SplitterBase):  # type: ignore
         # We throw an error if the remaining memory is almost empty compared to the model size.
         # i.e. if the remaining memory is 4G (budget is 1G) the model size is greater than 40G, we stop the compilation.
         sizes = self.size_of_subgraphs(subgraphs)
-        # subgraph_size_budget = 500*1024*1024
         if sum(sizes) > subgraph_size_budget * 40:
             raise ValueError(
                 "CPU memory budget or available memory is too small to compile the model. "
@@ -468,12 +467,6 @@ class ResourcePartitioner(_SplitterBase):  # type: ignore
                     visited_nodes[node] = i
                 # breakpoint node's users should belong to the next subgraph
                 visited_nodes[subgraph.nodes[-1]] = i + 1
-                continue
-
-            elif not subgraph.is_acc:
-                # non-accelerated subgraphs should be put in the next subgraph
-                for node in subgraph.nodes:
-                    visited_nodes[subgraph.nodes[-1]] = i + 1
                 continue
 
             else:

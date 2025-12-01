@@ -1,3 +1,4 @@
+from collections import defaultdict
 from functools import lru_cache
 from typing import Any, Callable, Dict, List, Set, Tuple
 
@@ -135,7 +136,7 @@ def get_node_in_fusion_pattern(
     Key: node that appears in the fusion pattern
     Value: the list of nodes that should be fused together
     """
-    fusion_nodes = {}
+    fusion_nodes = defaultdict(set)
     for compiled_pattern_graph in get_compiled_atomic_subgraphs():
         subgraph_matcher = SubgraphMatcher(compiled_pattern_graph.graph)
         match_result = subgraph_matcher.match(graph)
@@ -149,7 +150,7 @@ def get_node_in_fusion_pattern(
                 and node not in match.placeholder_nodes
             }
             for node in fusion_group:
-                fusion_nodes[node] = fusion_group
+                fusion_nodes[node].update(fusion_group)
 
     return fusion_nodes
 
