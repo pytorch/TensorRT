@@ -55,9 +55,14 @@ def is_tensorrt_version_supported(min_version: str) -> bool:
     try:
         if trt._package_name == "tensorrt_rtx":
             return True
-        from importlib import metadata
 
         from packaging.version import Version
+
+        module = sys.modules["tensorrt"]
+        if module is not None and hasattr(module, "__version__"):
+            return bool(Version(module.__version__) >= Version(min_version))
+        # if cannot get from the modules, fall back to metadata
+        from importlib import metadata
 
         return bool(Version(metadata.version("tensorrt")) >= Version(min_version))
     except (ImportError, ValueError):

@@ -1,7 +1,6 @@
 import importlib
 import os
 import platform
-import tempfile
 import unittest
 
 import pytest
@@ -17,16 +16,15 @@ assertions = unittest.TestCase()
 if importlib.util.find_spec("torchvision"):
     import torchvision.models as models
 
-trt_ep_path = os.path.join(tempfile.gettempdir(), "trt.ep")
-
 
 @pytest.mark.unit
 @pytest.mark.critical
-def test_base_full_compile(ir):
+def test_base_full_compile(ir, tmpdir):
     """
     This tests export serde functionality on a base model
     which is fully TRT convertible
     """
+    trt_ep_path = os.path.join(tmpdir, "trt.ep")
 
     class MyModule(torch.nn.Module):
         def __init__(self):
@@ -56,7 +54,7 @@ def test_base_full_compile(ir):
 
     exp_program = torchtrt.dynamo.trace(model, **compile_spec)
     trt_module = torchtrt.dynamo.compile(exp_program, **compile_spec)
-    torchtrt.save(trt_module, trt_ep_path)
+    torchtrt.save(trt_module, trt_ep_path, retrace=False)
 
     deser_trt_module = torchtrt.load(trt_ep_path).module()
     # Check Pyt and TRT exported program outputs
@@ -76,11 +74,12 @@ def test_base_full_compile(ir):
 
 @pytest.mark.unit
 @pytest.mark.critical
-def test_base_full_compile_multiple_outputs(ir):
+def test_base_full_compile_multiple_outputs(ir, tmpdir):
     """
     This tests export serde functionality on a base model
     with multiple outputs which is fully TRT convertible
     """
+    trt_ep_path = os.path.join(tmpdir, "trt.ep")
 
     class MyModule(torch.nn.Module):
         def __init__(self):
@@ -111,7 +110,7 @@ def test_base_full_compile_multiple_outputs(ir):
 
     exp_program = torchtrt.dynamo.trace(model, **compile_spec)
     trt_module = torchtrt.dynamo.compile(exp_program, **compile_spec)
-    torchtrt.save(trt_module, trt_ep_path)
+    torchtrt.save(trt_module, trt_ep_path, retrace=False)
 
     deser_trt_module = torchtrt.load(trt_ep_path).module()
     # Check Pyt and TRT exported program outputs
@@ -136,11 +135,12 @@ def test_base_full_compile_multiple_outputs(ir):
 
 @pytest.mark.unit
 @pytest.mark.critical
-def test_no_compile(ir):
+def test_no_compile(ir, tmpdir):
     """
     This tests export serde functionality on a model
     which won't convert to TRT because of min_block_size=5 constraint
     """
+    trt_ep_path = os.path.join(tmpdir, "trt.ep")
 
     class MyModule(torch.nn.Module):
         def __init__(self):
@@ -170,7 +170,7 @@ def test_no_compile(ir):
 
     exp_program = torchtrt.dynamo.trace(model, **compile_spec)
     trt_module = torchtrt.dynamo.compile(exp_program, **compile_spec)
-    torchtrt.save(trt_module, trt_ep_path)
+    torchtrt.save(trt_module, trt_ep_path, retrace=False)
 
     deser_trt_module = torchtrt.load(trt_ep_path).module()
     # Check Pyt and TRT exported program outputs
@@ -195,12 +195,14 @@ def test_no_compile(ir):
 
 @pytest.mark.unit
 @pytest.mark.critical
-def test_hybrid_relu_fallback(ir):
+def test_hybrid_relu_fallback(ir, tmpdir):
     """
     This tests export save and load functionality on a hybrid
     model with Pytorch and TRT segments. Relu (unweighted) layer is forced to
     fallback
     """
+
+    trt_ep_path = os.path.join(tmpdir, "trt.ep")
 
     class MyModule(torch.nn.Module):
         def __init__(self):
@@ -232,7 +234,7 @@ def test_hybrid_relu_fallback(ir):
 
     exp_program = torchtrt.dynamo.trace(model, **compile_spec)
     trt_module = torchtrt.dynamo.compile(exp_program, **compile_spec)
-    torchtrt.save(trt_module, trt_ep_path)
+    torchtrt.save(trt_module, trt_ep_path, retrace=False)
 
     deser_trt_module = torchtrt.load(trt_ep_path).module()
     outputs_pyt = model(input)
@@ -258,10 +260,13 @@ def test_hybrid_relu_fallback(ir):
     not importlib.util.find_spec("torchvision"),
     "torchvision is not installed",
 )
-def test_resnet18(ir):
+def test_resnet18(ir, tmpdir):
     """
     This tests export save and load functionality on Resnet18 model
     """
+
+    trt_ep_path = os.path.join(tmpdir, "trt.ep")
+
     model = models.resnet18().eval().cuda()
     input = torch.randn((1, 3, 224, 224)).to("cuda")
 
@@ -279,7 +284,7 @@ def test_resnet18(ir):
 
     exp_program = torchtrt.dynamo.trace(model, **compile_spec)
     trt_module = torchtrt.dynamo.compile(exp_program, **compile_spec)
-    torchtrt.save(trt_module, trt_ep_path)
+    torchtrt.save(trt_module, trt_ep_path, retrace=False)
 
     deser_trt_module = torchtrt.load(trt_ep_path).module()
     outputs_pyt = model(input)
@@ -303,10 +308,12 @@ def test_resnet18(ir):
     not importlib.util.find_spec("torchvision"),
     "torchvision is not installed",
 )
-def test_resnet18_cpu_offload(ir):
+def test_resnet18_cpu_offload(ir, tmpdir):
     """
     This tests export save and load functionality on Resnet18 model
     """
+    trt_ep_path = os.path.join(tmpdir, "trt.ep")
+
     model = models.resnet18().eval().cuda()
     input = torch.randn((1, 3, 224, 224)).to("cuda")
 
@@ -331,7 +338,7 @@ def test_resnet18_cpu_offload(ir):
             msg="Model should be offloaded to CPU",
         )
         model.cuda()
-    torchtrt.save(trt_module, trt_ep_path)
+    torchtrt.save(trt_module, trt_ep_path, retrace=False)
 
     deser_trt_module = torchtrt.load(trt_ep_path).module()
     outputs_pyt = model(input)
@@ -355,10 +362,13 @@ def test_resnet18_cpu_offload(ir):
     not importlib.util.find_spec("torchvision"),
     "torchvision is not installed",
 )
-def test_resnet18_dynamic(ir):
+def test_resnet18_dynamic(ir, tmpdir):
     """
     This tests export save and load functionality on Resnet18 model
     """
+
+    trt_ep_path = os.path.join(tmpdir, "trt.ep")
+
     model = models.resnet18().eval().cuda()
     input = torch.randn((1, 3, 224, 224)).to("cuda")
 
@@ -380,7 +390,7 @@ def test_resnet18_dynamic(ir):
 
     exp_program = torchtrt.dynamo.trace(model, **compile_spec)
     trt_module = torchtrt.dynamo.compile(exp_program, **compile_spec)
-    torchtrt.save(trt_module, trt_ep_path)
+    torchtrt.save(trt_module, trt_ep_path, retrace=False)
     # TODO: Enable this serialization issues are fixed
     # deser_trt_module = torchtrt.load(trt_ep_path).module()
     outputs_pyt = model(input)
@@ -395,10 +405,13 @@ def test_resnet18_dynamic(ir):
 @unittest.skipIf(
     not importlib.util.find_spec("torchvision"), "torchvision not installed"
 )
-def test_resnet18_torch_exec_ops_serde(ir):
+def test_resnet18_torch_exec_ops_serde(ir, tmpdir):
     """
     This tests export save and load functionality on Resnet18 model
     """
+
+    trt_ep_path = os.path.join(tmpdir, "trt.ep")
+
     model = models.resnet18().eval().cuda()
     input = torch.randn((1, 3, 224, 224)).to("cuda")
 
@@ -413,7 +426,7 @@ def test_resnet18_torch_exec_ops_serde(ir):
 
     exp_program = torchtrt.dynamo.trace(model, **compile_spec)
     trt_module = torchtrt.dynamo.compile(exp_program, **compile_spec)
-    torchtrt.save(trt_module, trt_ep_path)
+    torchtrt.save(trt_module, trt_ep_path, retrace=False)
     deser_trt_module = torchtrt.load(trt_ep_path).module()
     outputs_pyt = deser_trt_module(input)
     outputs_trt = trt_module(input)
@@ -426,11 +439,13 @@ def test_resnet18_torch_exec_ops_serde(ir):
 
 @pytest.mark.unit
 @pytest.mark.critical
-def test_hybrid_conv_fallback(ir):
+def test_hybrid_conv_fallback(ir, tmpdir):
     """
     This tests export save and load functionality on a hybrid
     model where a conv (a weighted layer)  has been forced to fallback to Pytorch.
     """
+
+    trt_ep_path = os.path.join(tmpdir, "trt.ep")
 
     class MyModule(torch.nn.Module):
         def __init__(self):
@@ -463,7 +478,7 @@ def test_hybrid_conv_fallback(ir):
     exp_program = torchtrt.dynamo.trace(model, **compile_spec)
     trt_module = torchtrt.dynamo.compile(exp_program, **compile_spec)
 
-    torchtrt.save(trt_module, trt_ep_path)
+    torchtrt.save(trt_module, trt_ep_path, retrace=False)
 
     deser_trt_module = torchtrt.load(trt_ep_path).module()
     outputs_pyt = model(input)
@@ -487,11 +502,13 @@ def test_hybrid_conv_fallback(ir):
 
 @pytest.mark.unit
 @pytest.mark.critical
-def test_hybrid_conv_fallback_cpu_offload(ir):
+def test_hybrid_conv_fallback_cpu_offload(ir, tmpdir):
     """
     This tests export save and load functionality on a hybrid
     model where a conv (a weighted layer)  has been forced to fallback to Pytorch.
     """
+
+    trt_ep_path = os.path.join(tmpdir, "trt.ep")
 
     class MyModule(torch.nn.Module):
         def __init__(self):
@@ -525,7 +542,7 @@ def test_hybrid_conv_fallback_cpu_offload(ir):
     exp_program = torchtrt.dynamo.trace(model, **compile_spec)
     trt_module = torchtrt.dynamo.compile(exp_program, **compile_spec)
     model.cuda()
-    torchtrt.save(trt_module, trt_ep_path)
+    torchtrt.save(trt_module, trt_ep_path, retrace=False)
 
     deser_trt_module = torchtrt.load(trt_ep_path).module()
     outputs_pyt = model(input)
@@ -549,12 +566,14 @@ def test_hybrid_conv_fallback_cpu_offload(ir):
 
 @pytest.mark.unit
 @pytest.mark.critical
-def test_arange_export(ir):
+def test_arange_export(ir, tmpdir):
     """
     This tests export save and load functionality on a arange static graph
     Here the arange output is a static constant (which is registered as input to the graph)
     in the exporter.
     """
+
+    trt_ep_path = os.path.join(tmpdir, "trt.ep")
 
     class MyModule(torch.nn.Module):
         def __init__(self):
@@ -584,7 +603,7 @@ def test_arange_export(ir):
     exp_program = torchtrt.dynamo.trace(model, **compile_spec)
     trt_module = torchtrt.dynamo.compile(exp_program, **compile_spec)
 
-    torchtrt.save(trt_module, trt_ep_path)
+    torchtrt.save(trt_module, trt_ep_path, retrace=False)
 
     deser_trt_module = torchtrt.load(trt_ep_path).module()
     outputs_pyt = model(input)
@@ -607,7 +626,7 @@ def test_arange_export(ir):
 
 
 @pytest.mark.unit
-def test_save_load_ts(ir):
+def test_save_load_ts(ir, tmpdir):
     """
     This tests save/load API on Torchscript format (model still compiled using dynamo workflow)
     """
@@ -624,6 +643,7 @@ def test_save_load_ts(ir):
             mul = relu * 0.5
             return mul
 
+    ts_path = os.path.join(tmpdir, "trt.ts")
     model = MyModule().eval().cuda()
     input = torch.randn((1, 3, 224, 224)).to("cuda")
 
@@ -641,9 +661,9 @@ def test_save_load_ts(ir):
     )
     outputs_trt = trt_gm(input)
     # Save it as torchscript representation
-    torchtrt.save(trt_gm, "./trt.ts", output_format="torchscript", inputs=[input])
+    torchtrt.save(trt_gm, ts_path, output_format="torchscript", inputs=[input])
 
-    trt_ts_module = torchtrt.load("./trt.ts")
+    trt_ts_module = torchtrt.load(ts_path)
     outputs_trt_deser = trt_ts_module(input)
 
     cos_sim = cosine_similarity(outputs_trt, outputs_trt_deser)

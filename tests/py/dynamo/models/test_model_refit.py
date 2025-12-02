@@ -1,6 +1,5 @@
 import importlib
 import os
-import tempfile
 import unittest
 
 import pytest
@@ -531,8 +530,9 @@ def test_refit_one_engine_bert_with_weightmap():
     "Refit feature is not supported in Python 3.13 or higher",
 )
 @pytest.mark.unit
-def test_refit_one_engine_inline_runtime_with_weightmap():
-    trt_ep_path = os.path.join(tempfile.gettempdir(), "compiled.ep")
+def test_refit_one_engine_inline_runtime_with_weightmap(tmpdir):
+
+    trt_ep_path = os.path.join(tmpdir, "compiled.ep")
     model = models.resnet18(pretrained=False).eval().to("cuda")
     model2 = models.resnet18(pretrained=True).eval().to("cuda")
     inputs = [torch.randn((1, 3, 224, 224)).to("cuda")]
@@ -540,8 +540,8 @@ def test_refit_one_engine_inline_runtime_with_weightmap():
     min_block_size = 1
     use_python_runtime = False
 
-    exp_program = torch.export.export(model, tuple(inputs))
-    exp_program2 = torch.export.export(model2, tuple(inputs))
+    exp_program = torch.export.export(model, tuple(inputs), strict=False)
+    exp_program2 = torch.export.export(model2, tuple(inputs), strict=False)
 
     trt_gm = torchtrt.dynamo.compile(
         exp_program,
@@ -551,8 +551,9 @@ def test_refit_one_engine_inline_runtime_with_weightmap():
         min_block_size=min_block_size,
         immutable_weights=False,
     )
-    torchtrt.save(trt_gm, trt_ep_path)
+    torchtrt.save(trt_gm, trt_ep_path, arg_inputs=inputs, retrace=True)
     trt_gm = torch.export.load(trt_ep_path)
+
     new_trt_gm = refit_module_weights(
         compiled_module=trt_gm,
         new_weight_module=exp_program2,
@@ -565,6 +566,7 @@ def test_refit_one_engine_inline_runtime_with_weightmap():
     expected_outputs, refitted_outputs = exp_program2.module()(*inputs), new_trt_gm(
         *inputs
     )
+
     for expected_output, refitted_output in zip(expected_outputs, refitted_outputs):
         assertions.assertTrue(
             torch.allclose(expected_output, refitted_output, 1e-2, 1e-2),
@@ -886,8 +888,8 @@ def test_refit_one_engine_bert_without_weightmap():
     "Refit feature is not supported in Python 3.13 or higher",
 )
 @pytest.mark.unit
-def test_refit_one_engine_inline_runtime_without_weightmap():
-    trt_ep_path = os.path.join(tempfile.gettempdir(), "compiled.ep")
+def test_refit_one_engine_inline_runtime_without_weightmap(tmpdir):
+    trt_ep_path = os.path.join(tmpdir, "compiled.ep")
     model = models.resnet18(pretrained=True).eval().to("cuda")
     model2 = models.resnet18(pretrained=False).eval().to("cuda")
     inputs = [torch.randn((1, 3, 224, 224)).to("cuda")]
@@ -906,7 +908,7 @@ def test_refit_one_engine_inline_runtime_without_weightmap():
         min_block_size=min_block_size,
         immutable_weights=False,
     )
-    torchtrt.save(trt_gm, trt_ep_path)
+    torchtrt.save(trt_gm, trt_ep_path, arg_inputs=inputs)
     trt_gm = torch.export.load(trt_ep_path)
     new_trt_gm = refit_module_weights(
         compiled_module=trt_gm,

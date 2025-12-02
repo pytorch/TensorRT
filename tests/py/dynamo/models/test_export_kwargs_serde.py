@@ -1,6 +1,5 @@
 # type: ignore
 import os
-import tempfile
 import unittest
 
 import pytest
@@ -22,7 +21,7 @@ assertions = unittest.TestCase()
 
 @pytest.mark.unit
 @pytest.mark.critical
-def test_custom_model():
+def test_custom_model(tmpdir):
     class net(nn.Module):
         def __init__(self):
             super().__init__()
@@ -75,15 +74,15 @@ def test_custom_model():
     )
 
     # Save the module
-    trt_ep_path = os.path.join(tempfile.gettempdir(), "compiled.ep")
-    torchtrt.save(trt_gm, trt_ep_path)
+    trt_ep_path = os.path.join(tmpdir, "compiled.ep")
+    torchtrt.save(trt_gm, trt_ep_path, retrace=False)
     # Clean up model env
     torch._dynamo.reset()
 
 
 @pytest.mark.unit
 @pytest.mark.critical
-def test_custom_model_with_dynamo_trace():
+def test_custom_model_with_dynamo_trace(tmpdir):
     class net(nn.Module):
         def __init__(self):
             super().__init__()
@@ -137,15 +136,15 @@ def test_custom_model_with_dynamo_trace():
     )
 
     # Save the module
-    trt_ep_path = os.path.join(tempfile.gettempdir(), "compiled.ep")
-    torchtrt.save(trt_gm, trt_ep_path)
+    trt_ep_path = os.path.join(tmpdir, "compiled.ep")
+    torchtrt.save(trt_gm, trt_ep_path, retrace=False)
     # Clean up model env
     torch._dynamo.reset()
 
 
 @pytest.mark.unit
 @pytest.mark.critical
-def test_custom_model_with_dynamo_trace_dynamic():
+def test_custom_model_with_dynamo_trace_dynamic(tmpdir):
     class net(nn.Module):
         def __init__(self):
             super().__init__()
@@ -208,15 +207,15 @@ def test_custom_model_with_dynamo_trace_dynamic():
     )
 
     # Save the module
-    trt_ep_path = os.path.join(tempfile.gettempdir(), "compiled.ep")
-    torchtrt.save(trt_gm, trt_ep_path)
+    trt_ep_path = os.path.join(tmpdir, "compiled.ep")
+    torchtrt.save(trt_gm, trt_ep_path, retrace=False)
     # Clean up model env
     torch._dynamo.reset()
 
 
 @pytest.mark.unit
 @pytest.mark.critical
-def test_custom_model_with_dynamo_trace_kwarg_dynamic():
+def test_custom_model_with_dynamo_trace_kwarg_dynamic(tmpdir):
     ir = "dynamo"
 
     class net(nn.Module):
@@ -298,15 +297,15 @@ def test_custom_model_with_dynamo_trace_kwarg_dynamic():
         msg=f"CustomKwargs Module TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
     )
     # Save the module
-    trt_ep_path = os.path.join(tempfile.gettempdir(), "compiled.ep")
-    torchtrt.save(trt_gm, trt_ep_path)
+    trt_ep_path = os.path.join(tmpdir, "compiled.ep")
+    torchtrt.save(trt_gm, trt_ep_path, retrace=False)
     # Clean up model env
     torch._dynamo.reset()
 
 
 @pytest.mark.unit
 @pytest.mark.critical
-def test_custom_model_with_dynamo_trace_kwarg_dynamic():
+def test_custom_model_with_dynamo_trace_kwarg_dynamic(tmpdir):
     ir = "dynamo"
 
     class net(nn.Module):
@@ -388,8 +387,8 @@ def test_custom_model_with_dynamo_trace_kwarg_dynamic():
         msg=f"CustomKwargs Module TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
     )
     # Save the module
-    trt_ep_path = os.path.join(tempfile.gettempdir(), "compiled.ep")
-    torchtrt.save(trt_gm, trt_ep_path)
+    trt_ep_path = os.path.join(tmpdir, "compiled.ep")
+    torchtrt.save(trt_gm, trt_ep_path, retrace=False)
     # Clean up model env
     torch._dynamo.reset()
 

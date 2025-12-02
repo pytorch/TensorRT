@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import ctypes
 import gc
 import logging
+import os
+import platform
 import warnings
 from dataclasses import fields, replace
 from enum import Enum
@@ -17,6 +20,7 @@ from typing import (
 )
 
 import numpy as np
+import psutil
 import sympy
 import tensorrt as trt
 import torch
@@ -451,6 +455,9 @@ def unwrap_tensor_shape(
             tensor_shape.append(min_max_opt[mode])
         else:
             tensor_shape.append((min_max_opt["min"], min_max_opt["max"]))
+    elif isinstance(tensor, torch.SymFloat):
+        # SymFloats can be an input to graph sometimes. Although SymFloat is scalar value, we treat it as a 1D tensor throughout Torch-TRT codebase.
+        tensor_shape.append(1)
     elif isinstance(tensor, (torch.Tensor, FakeTensor)):
         for dimension in tensor.shape:
             tensor_shape.extend(unwrap_tensor_shape(dimension, mode=mode))
@@ -468,6 +475,8 @@ def unwrap_tensor_dtype(tensor: Union[torch.Tensor, FakeTensor, torch.SymInt]) -
         return torch.tensor(tensor).dtype
     elif isinstance(tensor, torch.SymInt):
         return torch.int64
+    elif isinstance(tensor, torch.SymFloat):
+        return torch.float32
     elif tensor is None:
         # Case where we explicitly pass one of the inputs to be None (eg: FLUX.1-dev)
         return None
@@ -853,3 +862,27 @@ def get_output_dtypes(output: Any, truncate_double: bool = False) -> List[dtype]
             f"got unexpected type {type(output)}, expected type is a torch.fx.node.Node or a tuple/list of torch.fx.node.Node"
         )
     return output_dtypes
+
+
+def get_cpu_memory_usage() -> Any:
+    return psutil.Process().memory_info().rss / 1024 / 1024
+
+
+def release_host_and_device_memory() -> None:
+    gc.collect()
+    if torch.cuda.is_available():
+        torch.cuda.synchronize()
+        torch.cuda.empty_cache()
+        torch.cuda.ipc_collect()
+        torch.cuda.synchronize()
+
+    if (
+        platform.system() == "Linux"
+        and os.environ.get("TORCHTRT_ENABLE_BUILDER_MALLOC_TRIM", "0") == "1"
+    ):
+        try:
+            libc = ctypes.CDLL("libc.so.6")
+            if libc.malloc_trim(0) != 1:
+                logger.warning("Failed to release CPU memory.")
+        except Exception:
+            logger.warning("Failed to release CPU memory.")
