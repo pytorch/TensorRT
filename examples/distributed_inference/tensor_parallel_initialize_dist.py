@@ -48,7 +48,9 @@ def initialize_logger(
 
     # console handler
     ch = logging.StreamHandler()
-    ch.setLevel(console_level)  # Console handler controls what's printed in console output
+    ch.setLevel(
+        console_level
+    )  # Console handler controls what's printed in console output
     ch.setFormatter(logging.Formatter(f"[Rank {rank}] %(levelname)s: %(message)s"))
     logger.addHandler(ch)
 
@@ -123,21 +125,12 @@ def initialize_distributed_env(
     torch.cuda.set_device(device_id)
 
     # Set C++ TensorRT runtime log level based on most verbose handler
-    # this is similar to set_log_level()
+    # Use the most verbose level to ensure all important logs are captured
     cpp_level = min(file_level_int, console_level_int)
     try:
-        import tensorrt as trt
-        from torch_tensorrt._features import ENABLED_FEATURES
+        import torch_tensorrt.logging as torchtrt_logging
 
-        if ENABLED_FEATURES.torch_tensorrt_runtime:
-            if cpp_level == logging.DEBUG:
-                torch.ops.tensorrt.set_logging_level(int(trt.ILogger.Severity.VERBOSE))
-            elif cpp_level == logging.INFO:
-                torch.ops.tensorrt.set_logging_level(int(trt.ILogger.Severity.INFO))
-            elif cpp_level == logging.WARNING:
-                torch.ops.tensorrt.set_logging_level(int(trt.ILogger.Severity.WARNING))
-            else:
-                torch.ops.tensorrt.set_logging_level(int(trt.ILogger.Severity.ERROR))
+        torchtrt_logging.set_level(cpp_level)
     except Exception as e:
         logger.warning(f"Could not set C++ TensorRT log level: {e}")
 

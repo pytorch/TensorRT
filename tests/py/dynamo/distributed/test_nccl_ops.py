@@ -45,6 +45,7 @@ def is_distributed_nccl_available():
     except (ImportError, AttributeError):
         return False
 
+
 if "OMPI_COMM_WORLD_SIZE" in os.environ:
     set_environment_variables_pytest_multi_process()
 else:
@@ -92,7 +93,7 @@ class TestNcclOpsConverter(DispatchTestCase):
     # 2. Don't skip if TRTLLM is unavailable (e.g., CUDA 13) - falls back to PyTorch
     @unittest.skipIf(
         not is_distributed_nccl_available(),
-        "Skipped: NCCL backend is not available (Windows/Jetson not supported).",
+        "Skipped: NCCL backend is not available (Windows/Jetson Orin not supported).",
     )
     @classmethod
     def setUpClass(cls):

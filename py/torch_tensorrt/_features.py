@@ -78,6 +78,25 @@ def _enabled_features_str() -> str:
     return out_str
 
 
+# Inline helper functions for checking feature availability
+def has_torch_tensorrt_runtime() -> bool:
+    """Check if Torch-TensorRT C++ runtime is available.
+
+    Returns:
+        bool: True if libtorchtrt_runtime.so or libtorchtrt.so is available
+    """
+    return bool(ENABLED_FEATURES.torch_tensorrt_runtime)
+
+
+def has_torchscript_frontend() -> bool:
+    """Check if TorchScript frontend is available.
+
+    Returns:
+        bool: True if libtorchtrt.so is available
+    """
+    return bool(ENABLED_FEATURES.torchscript_frontend)
+
+
 def needs_tensorrt_rtx(f: Callable[..., Any]) -> Callable[..., Any]:
     def wrapper(*args: List[Any], **kwargs: Dict[str, Any]) -> Any:
         if ENABLED_FEATURES.tensorrt_rtx:
@@ -180,6 +199,7 @@ def needs_trtllm_for_nccl(f: Callable[..., Any]) -> Callable[..., Any]:
         if ENABLED_FEATURES.trtllm_for_nccl:
             return f(*args, **kwargs)
         else:
+
             def not_implemented(*args: List[Any], **kwargs: Dict[str, Any]) -> Any:
                 raise NotImplementedError(
                     "TensorRT-LLM plugin for NCCL is not available"
