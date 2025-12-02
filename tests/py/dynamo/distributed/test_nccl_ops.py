@@ -26,6 +26,7 @@ from distributed_utils import (
 )
 from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
+from torch_tensorrt._features import ENABLED_FEATURES
 
 
 def is_distributed_nccl_available():
@@ -90,10 +91,14 @@ class DistributedReduceScatterModel(nn.Module):
 
 class TestNcclOpsConverter(DispatchTestCase):
     # 1. Skip if NCCL backend is not available (e.g., Windows, Jetson) - hard requirement
-    # 2. Don't skip if TRTLLM is unavailable (e.g., CUDA 13) - falls back to PyTorch
+    # 2. Skip if TRTLLM is unavailable (e.g., CUDA 13) - no converters registered
     @unittest.skipIf(
         not is_distributed_nccl_available(),
         "Skipped: NCCL backend is not available (Windows/Jetson Orin not supported).",
+    )
+    @unittest.skipIf(
+        not ENABLED_FEATURES.trtllm_for_nccl,
+        "Skipped: TensorRT-LLM plugin for NCCL is not available (e.g., CUDA 13).",
     )
     @classmethod
     def setUpClass(cls):
