@@ -2,7 +2,7 @@
 
 import logging
 import operator
-from typing import Callable, Dict, Optional, Sequence, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 import numpy as np
 import torch
@@ -10,7 +10,7 @@ from tensorrt import ITensor as TRTTensor
 from torch.fx.node import Argument, Node, Target
 from torch_tensorrt import ENABLED_FEATURES
 from torch_tensorrt._features import needs_not_tensorrt_rtx
-from torch_tensorrt._utils import is_tensorrt_version_supported, is_thor
+from torch_tensorrt._utils import is_tensorrt_version_supported
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion import impl
@@ -218,7 +218,42 @@ def aten_ops_native_group_norm(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.cat.default, supports_dynamic_shapes=True)
+def parse_cat_args(
+    args: Tuple[Argument, ...], kwargs: Dict[str, Any]
+) -> Tuple[List[Any], int]:
+    """
+    Process inputs for torch.ops.aten.cat.default.
+
+    Handles these valid patterns:
+      1. args = ((t1, t2, ...), dim)
+      2. args = ((t1, t2, ...),), kwargs = {dim: X} with optional dim in kwargs
+
+    Returns:
+        (input_tensors, dim)
+        input_tensors: tuple of tensor arguments
+        dim: integer concatenation dimension (default 0)
+    """
+
+    if len(args) > 1 and isinstance(args[0], (list, tuple)):
+        input_tensors = list(args[0])
+        dim = args_bounds_check(args, 1, 0)
+
+    else:
+        # If single arg is itself a tuple/list, unwrap it
+        if len(args) == 1 and isinstance(args[0], (list, tuple)):
+            input_tensors = list(args[0])
+        else:
+            input_tensors = list(args)
+
+        dim = kwargs.get("dim", 0)
+
+    return input_tensors, dim
+
+
+@dynamo_tensorrt_converter(
+    torch.ops.aten.cat.default,
+    supports_dynamic_shapes=True,
+)
 def aten_ops_cat(
     ctx: ConversionContext,
     target: Target,
@@ -226,13 +261,14 @@ def aten_ops_cat(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    inputs, dim = parse_cat_args(args, kwargs)
     return impl.cat.cat(
         ctx,
         target,
         SourceIR.ATEN,
         name,
-        input=args[0],
-        dim=args_bounds_check(args, 1, 0),
+        input=inputs,
+        dim=dim,
     )
 
 
@@ -429,7 +465,7 @@ def index_nonbool_validator(
     node: Node, settings: Optional[CompilationSettings] = None
 ) -> bool:
     # for thor and tensorrt_rtx, we don't support boolean indices, due to nonzero op not supported
-    if is_thor() or ENABLED_FEATURES.tensorrt_rtx:
+    if ENABLED_FEATURES.tensorrt_rtx:
         index = node.args[1]
         for ind in index:
             if ind is not None:
@@ -3621,18 +3657,10 @@ def aten_ops_full(
     )
 
 
-def nonzero_validator(
-    node: Node, settings: Optional[CompilationSettings] = None
-) -> bool:
-    return not is_thor()
-
-
 # currently nonzero is not supported for tensorrt_rtx
 # TODO: lan to add the nonzero support once tensorrt_rtx team has added the support
-# TODO: apbose to remove the capability validator once thor bug resolve in NGC
 @dynamo_tensorrt_converter(
     torch.ops.aten.nonzero.default,
-    capability_validator=nonzero_validator,
     supports_dynamic_shapes=True,
     requires_output_allocator=True,
 )
