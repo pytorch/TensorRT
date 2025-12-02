@@ -53,7 +53,5 @@ torch_tensorrt.runtime.set_multi_device_safe_mode(True)
 
 # Assume there are 2 processes (2 devices)
 with distributed_state.split_between_processes(["a dog", "a cat"]) as prompt:
-    print("before \n")
     result = pipe(prompt).images[0]
-    print("after ")
     result.save(f"result_{distributed_state.process_index}.png")
