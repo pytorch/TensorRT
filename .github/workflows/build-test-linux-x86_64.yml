@@ -536,7 +536,7 @@ jobs:
 
   L2-dynamo-distributed-tests:
     name: L2 dynamo distributed tests
-    needs: [filter-matrix, build]
+    needs: [filter-matrix, build, L1-dynamo-core-tests, L1-dynamo-compile-tests, L1-torch-compile-tests, L1-torchscript-tests]
     if: ${{ (github.ref_name == 'main' || github.ref_name == 'nightly' || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success() }}
     strategy:
       fail-fast: false

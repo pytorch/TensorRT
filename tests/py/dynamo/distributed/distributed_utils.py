@@ -12,6 +12,7 @@ from torch.distributed._tensor.device_mesh import init_device_mesh
 # the below two functions are used to set the environment variables for the pytest single and multi process
 # this is for the github CI where we use pytest
 def set_environment_variables_pytest_single_process():
+    # Random port avoids conflicts when multiple single-process pytest sessions run in parallel. Useful for local cases
     port = 29500 + random.randint(1, 1000)
     os.environ["WORLD_SIZE"] = str(1)
     os.environ["RANK"] = str(0)
@@ -22,10 +23,18 @@ def set_environment_variables_pytest_single_process():
 def set_environment_variables_pytest_multi_process(
     rank: int = 0, world_size: int = 1
 ) -> None:
-    # Use existing MASTER_PORT if set, otherwise generate random one
+    # Multi-process tests require MASTER_PORT to be set before mpirun
+    # so all ranks connect to the same rendezvous point
+    # CI uses a fixed port
     if "MASTER_PORT" not in os.environ:
-        port = 29500 + random.randint(1, 1000)
-        os.environ["MASTER_PORT"] = str(port)
+        raise RuntimeError(
+            "MASTER_PORT must be set before mpirun to ensure all ranks use the same port.\n"
+            "\n"
+            "For local testing (random port avoids 'Address already in use' errors):\n"
+            "  export MASTER_PORT=$((29500 + RANDOM % 1000))\n"
+            "  mpirun -n 2 python -m pytest distributed/test_nccl_ops.py\n"
+            "\n"
+        )
 
     # these variables are set by mpirun -n 2
     local_rank = int(
