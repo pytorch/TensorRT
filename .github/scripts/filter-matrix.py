@@ -68,18 +68,8 @@ def create_distributed_config(item: Dict[str, Any]) -> Dict[str, Any]:
     - Adds num_gpus field
     - Adds config marker
     """
-    import sys
-
     # Create a copy to avoid modifying the original
     dist_item = item.copy()
-
-    # Debug: Show original config
-    print(f"[DEBUG] Creating distributed config from:", file=sys.stderr)
-    print(f"[DEBUG]   Python: {item.get('python_version')}", file=sys.stderr)
-    print(f"[DEBUG]   CUDA: {item.get('desired_cuda')}", file=sys.stderr)
-    print(
-        f"[DEBUG]   Original runner: {item.get('validation_runner')}", file=sys.stderr
-    )
 
     # Override runner to use multi-GPU instance
     dist_item["validation_runner"] = "linux.g4dn.12xlarge.nvidia.gpu"
@@ -87,10 +77,6 @@ def create_distributed_config(item: Dict[str, Any]) -> Dict[str, Any]:
     # Add distributed-specific fields
     dist_item["num_gpus"] = 2
     dist_item["config"] = "distributed"
-
-    # Debug: Show modified config
-    print(f"[DEBUG]   New runner: {dist_item['validation_runner']}", file=sys.stderr)
-    print(f"[DEBUG]   GPUs: {dist_item['num_gpus']}", file=sys.stderr)
 
     return dist_item
 
@@ -134,58 +120,21 @@ def main(args: list[str]) -> None:
 
     includes = matrix_dict["include"]
     filtered_includes = []
-    distributed_includes = []  # NEW: separate list for distributed configs
-
-    print(f"[DEBUG] Processing {len(includes)} input configs", file=sys.stderr)
+    distributed_includes = []  # Separate list for distributed configs
 
     for item in includes:
-        py_ver = item.get("python_version", "unknown")
-        cuda_ver = item.get("desired_cuda", "unknown")
-
-        print(f"[DEBUG] Checking config: py={py_ver}, cuda={cuda_ver}", file=sys.stderr)
-
         if filter_matrix_item(
             item,
             options.jetpack == "true",
             options.limit_pr_builds == "true",
         ):
-            print(f"[DEBUG] passed filter - adding to build matrix", file=sys.stderr)
-            filtered_includes.append(item) 
+            filtered_includes.append(item)
             distributed_includes.append(create_distributed_config(item))
-        else:
-            print(f"[DEBUG] FILTERED OUT", file=sys.stderr)
 
-    # Debug: Show summary
-    print(f"[DEBUG] Final counts:", file=sys.stderr)
-    print(f"[DEBUG]   Regular configs: {len(filtered_includes)}", file=sys.stderr)
-    print(
-        f"[DEBUG]   Distributed configs: {len(distributed_includes)}", file=sys.stderr
-    )
-
-    # Debug: Show which configs will be built
-    print(
-        f"[DEBUG] Configs that will be BUILT (in filtered_includes):", file=sys.stderr
-    )
-    for item in filtered_includes:
-        print(
-            f"[DEBUG]   - py={item.get('python_version')}, cuda={item.get('desired_cuda')}",
-            file=sys.stderr,
-        )
-
-    print(
-        f"[DEBUG] Configs for DISTRIBUTED TESTS (in distributed_includes):",
-        file=sys.stderr,
-    )
-    for item in distributed_includes:
-        print(
-            f"[DEBUG]   - py={item.get('python_version')}, cuda={item.get('desired_cuda')}, gpus={item.get('num_gpus')}",
-            file=sys.stderr,
-        )
-
-    # NEW: Output both regular and distributed configs
+    # Output both regular and distributed configs
     filtered_matrix_dict = {
         "include": filtered_includes,
-        "distributed_include": distributed_includes,  # NEW field
+        "distributed_include": distributed_includes,
     }
 
     # Output to stdout (consumed by GitHub Actions)

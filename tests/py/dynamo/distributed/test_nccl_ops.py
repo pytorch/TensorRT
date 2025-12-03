@@ -1,11 +1,25 @@
+import glob
 import os
+import shutil
 import unittest
+
+# Check /dev/shm space BEFORE importing torch/NCCL
+# If insufficient, disable shared memory transport (use sockets instead)
+try:
+    _, _, free = shutil.disk_usage("/dev/shm")
+    free_mb = free / (1024 * 1024)
+    if free_mb < 40:  # NCCL needs ~33 MB per process from the CI error message
+        os.environ["NCCL_SHM_DISABLE"] = "1"
+        print(
+            f"[NCCL] /dev/shm has only {free_mb:.1f} MB free. Disabling shared memory transport."
+        )
+except Exception:
+    pass  # If check fails, let NCCL use default behavior
 
 import torch
 import torch.distributed as dist
 import torch.nn as nn
 from conversion.harness import DispatchTestCase
-
 from distributed_utils import (
     set_environment_variables_pytest_multi_process,
     set_environment_variables_pytest_single_process,
@@ -72,6 +86,12 @@ class TestNcclOpsConverter(DispatchTestCase):
     def tearDownClass(cls):
         if dist.is_initialized():
             dist.destroy_process_group()
+        # Clean up NCCL shared memory after tests complete
+        for f in glob.glob("/dev/shm/nccl-*"):
+            try:
+                os.remove(f)
+            except OSError:
+                pass
 
     @parameterized.expand([8])
     def test_nccl_ops_gather(self, linear_layer_dim):

@@ -563,21 +563,6 @@ jobs:
       script: |
         set -euo pipefail
 
-        # Debug: Show what config we're using
-        echo "=========================================="
-        echo "DISTRIBUTED TEST CONFIGURATION"
-        echo "=========================================="
-        echo "Python version: ${PYTHON_VERSION}"
-        echo "CUDA version: ${CU_VERSION}"
-        echo "Num GPUs: ${NUM_GPUS}"
-        echo "=========================================="
-
-        # Verify GPUs are available
-        echo "Checking GPU availability:"
-        nvidia-smi
-        echo "GPU count: $(nvidia-smi --query-gpu=name --format=csv,noheader | wc -l)"
-        echo "=========================================="
-
         export USE_HOST_DEPS=1
         export CI_BUILD=1
         export USE_TRTLLM_PLUGINS=1
@@ -590,17 +575,9 @@ jobs:
         export PATH="/usr/lib64/openmpi/bin:$PATH"
         export LD_LIBRARY_PATH="/usr/lib64/openmpi/lib:$LD_LIBRARY_PATH"
 
-        # Verify mpirun is accessible
-        which mpirun
-        mpirun --version
-
         # Run distributed tests
         pushd .
         cd tests/py/dynamo
-
-        echo "Running distributed tests with mpirun..."
-        echo "[CONFIG] Number of GPUs to use: ${NUM_GPUS}"
-        echo "[AVAILABLE] GPUs detected by nvidia-smi: $(nvidia-smi --query-gpu=name --format=csv,noheader | wc -l)"
 
         # Set master port for distributed communication (must be same across all ranks)
         export MASTER_ADDR=127.0.0.1
@@ -611,7 +588,6 @@ jobs:
         RANK_0_XML="${RUNNER_TEST_RESULTS_DIR}/l2_dynamo_distributed_test_results.xml"
         mpirun --allow-run-as-root -n ${NUM_GPUS} \
           bash -c '
-            echo "[MPI DEBUG] Rank: ${OMPI_COMM_WORLD_RANK:-0}, World Size: ${OMPI_COMM_WORLD_SIZE:-1}"
             if [ "${OMPI_COMM_WORLD_RANK:-0}" -eq 0 ]; then
               python -m pytest -ra --junitxml='"${RANK_0_XML}"' distributed/test_nccl_ops.py
             else
