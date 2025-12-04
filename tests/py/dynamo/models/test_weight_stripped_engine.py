@@ -29,7 +29,7 @@ class TestWeightStrippedEngine(TestCase):
     )
     def test_three_ways_to_compile(self):
         pyt_model = models.resnet18(pretrained=True).eval().to("cuda")
-        example_inputs = (torch.randn((100, 3, 224, 224)).to("cuda"),)
+        example_inputs = (torch.randn((2, 3, 224, 224)).to("cuda"),)
         exp_program = torch.export.export(pyt_model, example_inputs)
 
         settings = {
@@ -48,6 +48,7 @@ class TestWeightStrippedEngine(TestCase):
             **settings,
         )
         gm1_output = gm1(*example_inputs)
+        torch.cuda.empty_cache()
 
         # 2. Compile with torch.compile using tensorrt backend
         gm2 = torch.compile(
@@ -56,8 +57,10 @@ class TestWeightStrippedEngine(TestCase):
             options=settings,
         )
         gm2_output = gm2(*example_inputs)
+        torch.cuda.empty_cache()
 
         pyt_model_output = pyt_model(*example_inputs)
+        torch.cuda.empty_cache()
 
         assert torch.allclose(
             pyt_model_output, gm1_output, 1e-2, 1e-2
