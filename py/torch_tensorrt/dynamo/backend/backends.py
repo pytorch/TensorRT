@@ -22,7 +22,6 @@ from torch_tensorrt.dynamo.lowering import (
 )
 from torch_tensorrt.dynamo.utils import (
     parse_dynamo_kwargs,
-    prepare_inputs,
     set_log_level,
 )
 
@@ -150,9 +149,6 @@ def _pretraced_backend(
 
             logger.debug("Lowered Input graph:\n " + str(gm.graph))
 
-            torchtrt_inputs = prepare_inputs(
-                torch_inputs, disable_memory_format_check=True
-            )
             if settings.require_full_compilation:
                 logger.warning(
                     "require_full_compilation arg is not applicable for torch.compile with backend='torch_tensorrt"
@@ -163,7 +159,6 @@ def _pretraced_backend(
                 )
             trt_compiled = compile_module(
                 gm,
-                torchtrt_inputs,
                 settings=settings,
                 engine_cache=engine_cache,
             )

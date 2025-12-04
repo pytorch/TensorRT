@@ -13,7 +13,6 @@ from torch.fx.node import Target
 from torch_tensorrt._Device import Device
 from torch_tensorrt._enums import EngineCapability, dtype
 from torch_tensorrt._features import needs_cross_compile
-from torch_tensorrt._Input import Input
 from torch_tensorrt.dynamo import _defaults, partitioning
 from torch_tensorrt.dynamo._DryRunTracker import (
     DryRunTracker,
@@ -288,7 +287,6 @@ def cross_compile_for_windows(
         arg_inputs = [arg_inputs]  # type: ignore
 
     # Prepare torch_trt inputs
-    trt_arg_inputs: Sequence[Input] = prepare_inputs(arg_inputs)
     trt_kwarg_inputs: Optional[dict[Any, Any]] = prepare_inputs(kwarg_inputs)
     device = to_torch_tensorrt_device(device)
     enabled_precisions = {dtype._from(p) for p in enabled_precisions}
@@ -378,7 +376,6 @@ def cross_compile_for_windows(
             )
     trt_gm = compile_module(
         gm,
-        trt_arg_inputs,
         trt_kwarg_inputs,
         settings,
     )
@@ -624,7 +621,6 @@ def compile(
         arg_inputs = [arg_inputs]  # type: ignore
 
     # Prepare torch_trt inputs
-    trt_arg_inputs: Sequence[Input] = prepare_inputs(arg_inputs)
     trt_kwarg_inputs: Optional[dict[Any, Any]] = prepare_inputs(kwarg_inputs)
     device = to_torch_tensorrt_device(device)
     enabled_precisions = {dtype._from(p) for p in enabled_precisions}
@@ -713,16 +709,13 @@ def compile(
             logger.warning(
                 "Remaining GPU memory may not be enough to compile the TensorRT engine for this model resulting in an OOM error, Consider setting offload_module_to_cpu=True"
             )
-    trt_gm = compile_module(
-        gm, trt_arg_inputs, trt_kwarg_inputs, settings, engine_cache
-    )
+    trt_gm = compile_module(gm, trt_kwarg_inputs, settings, engine_cache)
     return trt_gm
 
 
 @fn_supports_debugger  # type: ignore[misc]
 def compile_module(
     gm: torch.fx.GraphModule,
-    sample_arg_inputs: Sequence[Input],
     sample_kwarg_inputs: Optional[dict[Any, Any]] = None,
     settings: CompilationSettings = CompilationSettings(),
     engine_cache: Optional[BaseEngineCache] = None,
