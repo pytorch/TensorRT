@@ -179,17 +179,12 @@ def interpret_module_to_result(
     module: torch.fx.GraphModule,
     inputs: Sequence[Input],
     settings: CompilationSettings = CompilationSettings(),
-    arg_inputs: Optional[Sequence[Input]] = None,
-    kwarg_inputs: Optional[dict[str, Any]] = None,
     engine_cache: Optional[BaseEngineCache] = None,
 ) -> SerializedInterpreterResult:
     """Interpret an FX module to a TRTInterpreterResult
     Args:
         module: FX GraphModule to interpret
-        inputs: Sequence of FLATTENED Tensors representing inputs to the module. It should include both
-                arg_inputs and kwarg_inputs, if applicable.
-        arg_inputs: Sequence of Tensors representing inputs to the module.
-        kwarg_inputs: A dictionary of Tensors representing inputs to the module.
+        inputs: It requires a sequence of FLATTENED Inputs representing inputs to the module. It should include both arg_inputs and kwarg_inputs, if applicable.
         settings: Compilation settings
         engine_cache: Engine cache instance
     Returns:
