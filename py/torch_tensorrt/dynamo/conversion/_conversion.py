@@ -47,6 +47,134 @@ def infer_module_output_dtypes(
     return get_output_dtypes(outputs, truncate_double)  # type: ignore[no-any-return]
 
 
+def insert_engine_to_cache(
+    hash_val: str,
+    interpreter_result: TRTInterpreterResult,
+    engine_cache: BaseEngineCache,
+    settings: CompilationSettings,
+    inputs: Sequence[Input],
+) -> bool:
+    if not ENABLED_FEATURES.refit:
+        logger.info("Refit feature is not available, so the engine is not cached")
+        return False
+
+    # Cache the weight-stripped engine regardless of the `strip_engine_weights` setting
+    if engine_cache.check(hash_val) is not None:
+        logger.info(f"The engine already exists in cache for hash: {hash_val}")
+        return False
+
+    if not settings.strip_engine_weights:
+        # set EXCLUDE_WEIGHTS flag to strip weights
+        serialization_config = interpreter_result.engine.create_serialization_config()
+        serialization_config.set_flag(trt.SerializationFlag.EXCLUDE_WEIGHTS)
+        weight_stripped_serialized_engine = (
+            interpreter_result.engine.serialize_with_config(serialization_config)
+        )
+    else:
+        weight_stripped_serialized_engine = interpreter_result.engine.serialize()
+
+    # Insert weight-stripped engine to cache
+    engine_cache.insert(
+        hash_val,
+        (
+            weight_stripped_serialized_engine,
+            interpreter_result.input_names,
+            interpreter_result.output_names,
+            inputs,
+            settings,
+            interpreter_result.weight_name_map,
+            interpreter_result.requires_output_allocator,
+        ),
+    )
+    logger.info(f"Engine was successfully inserted into cache for hash: {hash_val}")
+    return True
+
+
+def pull_cached_engine(
+    hash_val: str,
+    module: torch.fx.GraphModule,
+    engine_cache: BaseEngineCache,
+    settings: CompilationSettings,
+    inputs: Sequence[Input],
+) -> Optional[SerializedInterpreterResult]:
+    if not ENABLED_FEATURES.refit:
+        logger.info(
+            "Refit feature is not available, so the engine is not loaded from cache"
+        )
+        return None
+
+    # query the cached TRT engine
+    cached_data = engine_cache.check(hash_val)
+    if cached_data is not None:  # hit the cache
+        (
+            serialized_engine,  # weight-stripped engine
+            input_names,
+            output_names,
+            cached_engine_inputs,
+            cached_engine_compilation_settings,
+            weight_name_map,
+            requires_output_allocator,
+        ) = cached_data
+
+        setting_compatiblity, incompattible_settings = settings_are_compatible(
+            settings, cached_engine_compilation_settings
+        )
+        assert (
+            setting_compatiblity
+        ), f"Attempted to refit a cached engine with incompatible settings: {incompattible_settings}, (old_settings: {cached_engine_compilation_settings}, new_settings: {settings})"
+
+        for i, e in enumerate(
+            [Input.equivalent_spec(c, i) for c, i in zip(cached_engine_inputs, inputs)]
+        ):
+            assert (
+                e
+            ), f"Attempted to refit a cached engine built for a different input size (input: {i}, cached size: {cached_engine_inputs[i]}, new size: {inputs[i]}"
+
+        logger.info(
+            "Found the cached engine that corresponds to this graph. It is directly loaded."
+        )
+
+        # refit the cached engine with the new graph module
+        if not settings.strip_engine_weights:
+            runtime = trt.Runtime(TRT_LOGGER)
+            engine = runtime.deserialize_cuda_engine(
+                serialized_engine
+            )  # weight-stripped engine
+
+            from torch_tensorrt.dynamo._refit import (
+                _refit_single_trt_engine_with_gm,
+            )
+
+            # weight-stripped engine --in place--> weight-included engine
+            _refit_single_trt_engine_with_gm(
+                new_gm=module,
+                old_engine=engine,
+                input_list=inputs,
+                settings=settings,
+                weight_name_map=weight_name_map,
+            )
+
+            # EXCLUDE_WEIGHTS flag must be cleared and INCLUDE_REFIT flag must be set
+            serialization_config = engine.create_serialization_config()
+            serialization_config.clear_flag(trt.SerializationFlag.EXCLUDE_WEIGHTS)
+            serialization_config.set_flag(trt.SerializationFlag.INCLUDE_REFIT)
+            serialized_engine = engine.serialize_with_config(serialization_config)
+            # Start from here, the engine is weight-included and refittable
+
+            with io.BytesIO() as engine_bytes:
+                engine_bytes.write(serialized_engine)
+                serialized_engine = engine_bytes.getvalue()
+
+        return SerializedInterpreterResult(
+            serialized_engine=serialized_engine,
+            input_names=input_names,
+            output_names=output_names,
+            weight_name_map=weight_name_map,
+            requires_output_allocator=requires_output_allocator,
+        )
+    return None
+
+
 def interpret_module_to_result(
     module: torch.fx.GraphModule,
     inputs: Sequence[Input],
@@ -68,127 +196,6 @@ def interpret_module_to_result(
         SerializedInterpreterResult
     """
 
-    def _insert_engine_to_cache(
-        hash_val: str, interpreter_result: TRTInterpreterResult
-    ) -> bool:
-        if not ENABLED_FEATURES.refit:
-            logger.info("Refit feature is not available, so the engine is not cached")
-            return False
-
-        # Cache the weight-stripped engine regardless of the `strip_engine_weights` setting
-        if engine_cache.check(hash_val) is not None:  # type: ignore[union-attr]
-            logger.info(f"The engine already exists in cache for hash: {hash_val}")
-            return False
-
-        if not settings.strip_engine_weights:
-            # set EXCLUDE_WEIGHTS flag to strip weights
-            serialization_config = (
-                interpreter_result.engine.create_serialization_config()
-            )
-            serialization_config.set_flag(trt.SerializationFlag.EXCLUDE_WEIGHTS)
-            weight_stripped_serialized_engine = (
-                interpreter_result.engine.serialize_with_config(serialization_config)
-            )
-        else:
-            weight_stripped_serialized_engine = interpreter_result.engine.serialize()
-
-        # Insert weight-stripped engine to cache
-        engine_cache.insert(  # type: ignore[union-attr]
-            hash_val,
-            (
-                weight_stripped_serialized_engine,
-                interpreter_result.input_names,
-                interpreter_result.output_names,
-                inputs,
-                settings,
-                interpreter_result.weight_name_map,
-                interpreter_result.requires_output_allocator,
-            ),
-        )
-        logger.info(f"Engine was successfully inserted into cache for hash: {hash_val}")
-        return True
-
-    def _pull_cached_engine(hash_val: str) -> Optional[SerializedInterpreterResult]:
-        if not ENABLED_FEATURES.refit:
-            logger.info(
-                "Refit feature is not available, so the engine is not loaded from cache"
-            )
-            return None
-
-        # query the cached TRT engine
-        cached_data = engine_cache.check(hash_val)  # type: ignore[union-attr]
-        if cached_data is not None:  # hit the cache
-            (
-                serialized_engine,  # weight-stripped engine
-                input_names,
-                output_names,
-                cached_engine_inputs,
-                cached_engine_compilation_settings,
-                weight_name_map,
-                requires_output_allocator,
-            ) = cached_data
-
-            setting_compatiblity, incompattible_settings = settings_are_compatible(
-                settings, cached_engine_compilation_settings
-            )
-            assert (
-                setting_compatiblity
-            ), f"Attempted to refit a cached engine with incompatible settings: {incompattible_settings}, (old_settings: {cached_engine_compilation_settings}, new_settings: {settings})"
-
-            for i, e in enumerate(
-                [
-                    Input.equivalent_spec(c, i)
-                    for c, i in zip(cached_engine_inputs, inputs)
-                ]
-            ):
-                assert (
-                    e
-                ), f"Attempted to refit a cached engine built for a different input size (input: {i}, cached size: {cached_engine_inputs[i]}, new size: {inputs[i]}"
-
-            logger.info(
-                "Found the cached engine that corresponds to this graph. It is directly loaded."
-            )
-
-            # refit the cached engine with the new graph module
-            if not settings.strip_engine_weights:
-                runtime = trt.Runtime(TRT_LOGGER)
-                engine = runtime.deserialize_cuda_engine(
-                    serialized_engine
-                )  # weight-stripped engine
-
-                from torch_tensorrt.dynamo._refit import (
-                    _refit_single_trt_engine_with_gm,
-                )
-
-                # weight-stripped engine --in place--> weight-included engine
-                _refit_single_trt_engine_with_gm(
-                    new_gm=module,
-                    old_engine=engine,
-                    input_list=inputs,
-                    settings=settings,
-                    weight_name_map=weight_name_map,
-                )
-
-                # EXCLUDE_WEIGHTS flag must be cleared and INCLUDE_REFIT flag must be set
-                serialization_config = engine.create_serialization_config()
-                serialization_config.clear_flag(trt.SerializationFlag.EXCLUDE_WEIGHTS)
-                serialization_config.set_flag(trt.SerializationFlag.INCLUDE_REFIT)
-                serialized_engine = engine.serialize_with_config(serialization_config)
-                # Start from here, the engine is weight-included and refittable
-
-                with io.BytesIO() as engine_bytes:
-                    engine_bytes.write(serialized_engine)
-                    serialized_engine = engine_bytes.getvalue()
-
-            return SerializedInterpreterResult(
-                serialized_engine=serialized_engine,
-                input_names=input_names,
-                output_names=output_names,
-                weight_name_map=weight_name_map,
-                requires_output_allocator=requires_output_allocator,
-            )
-        return None
-
     # engine_cache could be None if:
     # 1) engine_cache is not passed in when calling this function like convert_exported_program_to_serialized_trt_engine etc., or
     # 2) both cache_built_engines and reuse_cached_engines are False
@@ -201,7 +208,9 @@ def interpret_module_to_result(
             hash_val = engine_cache.get_hash(module, inputs, settings)
 
             if settings.reuse_cached_engines:
-                serialized_interpreter_result = _pull_cached_engine(hash_val)
+                serialized_interpreter_result = pull_cached_engine(
+                    hash_val, module, engine_cache, settings, inputs
+                )
                 if serialized_interpreter_result is not None:  # hit the cache
                     return serialized_interpreter_result
 
@@ -235,7 +244,9 @@ def interpret_module_to_result(
         and settings.cache_built_engines
         and engine_cache is not None
     ):
-        _ = _insert_engine_to_cache(hash_val, interpreter_result)
+        _ = insert_engine_to_cache(
+            hash_val, interpreter_result, engine_cache, settings, inputs
+        )
 
     serialized_engine = interpreter_result.engine.serialize()
     with io.BytesIO() as engine_bytes:
