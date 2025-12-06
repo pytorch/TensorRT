@@ -78,7 +78,7 @@ class TestWeightStrippedEngine(TestCase):
         not importlib.util.find_spec("torchvision"),
         "torchvision is not installed",
     )
-    def test_three_ways_to_compile_weight_stripped_engine(self):
+    def test_compile_weight_stripped_engine(self):
         pyt_model = models.resnet18(pretrained=True).eval().to("cuda")
         example_inputs = (torch.randn((100, 3, 224, 224)).to("cuda"),)
 
@@ -91,19 +91,11 @@ class TestWeightStrippedEngine(TestCase):
             "refit_identical_engine_weights": False,
         }
 
-        # 1. Compile with torch_trt.compile using dynamo backend
+        # Compile with torch_trt.compile using dynamo backend
         gm1 = torch_trt.compile(
             pyt_model, ir="dynamo", inputs=example_inputs, **settings
         )
         gm1_output = gm1(*example_inputs)
-
-        # 2. Compile with torch.compile using tensorrt backend, which is not supported to set strip_engine_weights=True
-        # gm2 = torch.compile(
-        #     pyt_model,
-        #     backend="tensorrt",
-        #     options=settings,
-        # )
-        # gm2_output = gm2(*example_inputs)
 
         assertions.assertEqual(
             gm1_output.sum(), 0, msg="gm1_output should be all zeros"
