@@ -49,6 +49,9 @@
     - "narendasan"
     - "bowang007"
 
+"component: mgmn":
+    - "apbose"
+
 "component: quantization":
     - "zewenli98"
     - "lanluo-nvidia"
