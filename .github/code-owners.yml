@@ -112,6 +112,12 @@
 "component: tooling":
     - "narendasan"
 
+"backend: tensorrt"
+    - "zewenli98"
+
+"backend: tensorrt-rtx"
+    - "lanluo-nvidia"
+
 "performance":
     - "cehongwang"
     - "bowang007"
