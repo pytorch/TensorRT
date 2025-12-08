@@ -100,6 +100,7 @@ with torch.inference_mode():
                 reuse_cached_engines=True,  # Reuse cached engines if available
                 engine_cache_dir=engine_cache_dir,  # Directory to store cached engines
                 engine_cache_size=1073741824,  # Max cache size: 1GB
+                immutable_weights=False,
             )
 
             compile_time = time.time() - compile_start
