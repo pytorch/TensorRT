@@ -60,6 +60,7 @@ from torch_tensorrt.dynamo.partitioning._atomic_subgraphs import (
 logger = logging.getLogger(__name__)
 
 MAX_NUM_OF_ENGINES = 40
+ENGINE_COMPILATION_MEMORY_USAGE_MULTIPLIER = 4
 
 
 class ResourcePartitioner(_SplitterBase):  # type: ignore
@@ -87,8 +88,9 @@ class ResourcePartitioner(_SplitterBase):  # type: ignore
         assert isinstance(module, torch.fx.GraphModule)
 
         self.module = module
-        self.cpu_memory_budget = (
-            cpu_memory_budget
+        used_rss: int = psutil.Process().memory_info().rss
+        self.remaining_memory_budget = (
+            cpu_memory_budget - used_rss
             if cpu_memory_budget is not None
             else psutil.virtual_memory().available
         )
@@ -114,6 +116,12 @@ class ResourcePartitioner(_SplitterBase):  # type: ignore
         """
         # Delegate nodes based on operator coverage
         subgraphs = self.put_nodes_into_subgraphs()
+        sizes = self.size_of_subgraphs(subgraphs)
+        if (
+            sum(sizes) * ENGINE_COMPILATION_MEMORY_USAGE_MULTIPLIER
+            < self.remaining_memory_budget
+        ):
+            return self.module
 
         subgraphs = self.break_subgraphs(
             subgraphs, subgraph_size_budget=self.calculate_size_budget()
@@ -172,7 +180,8 @@ class ResourcePartitioner(_SplitterBase):  # type: ignore
         return True
 
     def calculate_size_budget(
-        self, engine_compilation_memory_usage_multiplier: int = 4
+        self,
+        engine_compilation_memory_usage_multiplier: int = ENGINE_COMPILATION_MEMORY_USAGE_MULTIPLIER,
     ) -> int:
         """Compute the per-engine size budget in bytes.
 
@@ -188,13 +197,9 @@ class ResourcePartitioner(_SplitterBase):  # type: ignore
             int: Budget in bytes for a single accelerated subgraph.
         """
 
-        used_rss: int = psutil.Process().memory_info().rss
-        available_rss = (
-            self.cpu_memory_budget
-            if self.not_set_limit
-            else self.cpu_memory_budget - used_rss
+        return (
+            self.remaining_memory_budget // engine_compilation_memory_usage_multiplier
         )
-        return available_rss // engine_compilation_memory_usage_multiplier
 
     def break_subgraphs(
         self, subgraphs: List[Subgraph], subgraph_size_budget: int
@@ -229,7 +234,7 @@ class ResourcePartitioner(_SplitterBase):  # type: ignore
             else:
                 raise ValueError(
                     "CPU memory budget is too small to compile the model. "
-                    + f"CPU memory budget: {self.cpu_memory_budget // (1024 * 1024)} MB, Model size: {sum(sizes) // (1024 * 1024)} MB. "
+                    + f"CPU memory budget: {self.remaining_memory_budget // (1024 * 1024)} MB, Model size: {sum(sizes) // (1024 * 1024)} MB. "
                     + "Consider setting cpu_memory_budget to a larger value."
                 )
         for subgraph, size in zip(subgraphs, sizes):
@@ -548,12 +553,15 @@ def resource_partition(
         setattr(gm, name, partitioned_graph)
 
     for name, module in list(gm.named_children()):
+        split = False
         if "_run_on_acc" in name:
             for subname, submodule in module.named_children():
                 if "resource_split" in subname:
+                    split = True
                     setattr(gm, subname, submodule)
-            _inline_module(gm, name)
-            delattr(gm, name)
+            if split:
+                _inline_module(gm, name)
+                delattr(gm, name)
 
     gm.recompile()
     return gm
