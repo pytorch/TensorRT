@@ -1,0 +1,105 @@
+name: Sync uv.lock
+
+on:
+  schedule:
+    # Every Monday at 03:00 UTC; adjust as needed
+    - cron: "0 3 * * 1"
+  push:
+    tags: [uv-update-v1]
+    branches: [main]
+    paths:
+      - 'pyproject.toml'
+      - 'setup.py'
+
+permissions:
+  contents: write
+
+jobs:
+  sync-uv-lock:
+    runs-on: linux.g5.4xlarge.nvidia.gpu
+    if: ${{ ! contains(github.actor, 'pytorchbot') }}
+    #environment: pytorchbot-env
+    container:
+      image: pytorch/manylinux2_28-builder:cuda13.0
+      options: --gpus all
+      env:
+        CUDA_VERSION: 13.0
+        CUDA_HOME: /usr/local/cuda
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # to remove: test only
+          ref: lluo/add_uv_sync_job
+          #token: ${{ secrets.GH_PYTORCHBOT_TOKEN }}
+          fetch-depth: 0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "latest"
+
+      - name: Install bazel
+        run: |
+         set -euo pipefail
+         set -x
+          curl -L https://github.com/bazelbuild/bazelisk/releases/download/v1.26.0/bazelisk-linux-amd64 \
+          -o bazelisk-linux-amd64 \
+          && mv bazelisk-linux-amd64 /usr/local/bin/bazel \
+          && chmod +x /usr/local/bin/bazel
+          bazel --version
+
+      - name: UV lock and check for changes
+        id: check-changes
+        working-directory: ${{ github.workspace }}
+        run: |
+          set -euo pipefail
+          set -x
+          git config --global safe.directory "$GITHUB_WORKSPACE"
+
+          if ! uv lock; then
+            echo "Error: Failed to update uv.lock"
+            exit 1
+          fi
+          echo "successfully ran uv lock"
+          if git diff --quiet uv.lock; then
+            echo "No changes to uv.lock"
+            exit 0
+          fi
+          echo "has_changes=true" >> "$GITHUB_OUTPUT"
+          echo "there is changes to the uv.lock file"
+
+      - name: Validate the changes
+        id: validate-changes
+        if: steps.check-changes.outputs.has_changes == 'true'
+        run: |
+          set -euo pipefail
+          set -x
+          if ! uv sync --frozen; then
+            echo "Error: Failed to run uv sync --frozen"
+            exit 1
+          fi
+          if uv run -m pip check; then
+            echo "Error: Failed to run uv run -m pip check"
+            exit 1
+          fi
+          echo "valid_changes=true" >> "$GITHUB_OUTPUT"
+          echo "successfully validated the changes to uv.lock"
+
+      - name: Auto-commit changes
+        uses: stefanzweifel/git-auto-commit-action@v7
+        if: steps.check-changes.outputs.valid_changes == 'true'
+        with:
+          commit_message: "chore: update uv.lock"
+          # to remove: test only
+          branch: lluo/add_uv_sync_job
+          commit_options: "--no-verify --signoff"
+          file_pattern: uv.lock
+          commit_user_name: Torch-TensorRT Github Bot
+          commit_user_email: torch-tensorrt.github.bot@nvidia.com
+          commit_author: Torch-TensorRT Github Bot <torch-tensorrt.github.bot@nvidia.com>
+
+concurrency:
+  group: ${{ github.workflow }}-uv-update-${{ github.event.pull_request.number || github.ref_name }}-${{ github.event_name == 'workflow_dispatch' }}
+  cancel-in-progress: true

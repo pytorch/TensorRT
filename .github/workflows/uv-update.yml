@@ -1,7 +1,7 @@
 name: Sync uv.lock
 
 on:
-  pull_request:
+  #pull_request:
   schedule:
     # Every Monday at 03:00 UTC; adjust as needed
     - cron: "0 3 * * 1"
@@ -35,7 +35,6 @@ jobs:
       - name: Auto-commit changes
         uses: stefanzweifel/git-auto-commit-action@v7
         with:
-          token: ${{ secrets.UV_LOCK_PR_TOKEN }}
           branch: update/uv-lockfiles-20059032135
           commit_message: "chore: update uv.lock"
           commit_options: "--no-verify --signoff"
