@@ -15,13 +15,12 @@ on:
 jobs:
   sync-uv-lock:
     runs-on: ubuntu-latest
-    environment: pytorchbot-env
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          token: ${{ secrets.GH_PYTORCHBOT_TOKEN }}
+          token: ${{ secrets.UV_LOCK_PR_TOKEN }}
 
       - name: Fake the changes to the uv.lock file
         run: |
@@ -33,6 +32,7 @@ jobs:
       - name: Auto-commit changes
         uses: stefanzweifel/git-auto-commit-action@v7
         with:
+          token: ${{ secrets.UV_LOCK_PR_TOKEN }}
           branch: update/uv-lockfiles-20059032135
           commit_message: "chore: update uv.lock"
           commit_options: "--no-verify --signoff"
