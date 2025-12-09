@@ -15,7 +15,7 @@ on:
 jobs:
   sync-uv-lock:
     runs-on: ubuntu-latest
-
+    environment: pytorchbot-env
     steps:
       - name: Checkout
         uses: actions/checkout@v4
