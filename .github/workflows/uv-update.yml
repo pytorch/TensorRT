@@ -21,7 +21,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          #token: ${{ secrets.UV_LOCK_PR_TOKEN }}
+          token: ${{ secrets.GH_PYTORCHBOT_TOKEN }}
 
       - name: Fake the changes to the uv.lock file
         run: |
