@@ -33,6 +33,7 @@ jobs:
       - name: Auto-commit changes
         uses: stefanzweifel/git-auto-commit-action@v7
         with:
+          branch: update/uv-lockfiles-20059032135
           commit_message: "chore: update uv.lock"
           commit_options: "--no-verify --signoff"
           file_pattern: uv.lock
