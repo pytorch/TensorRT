@@ -32,7 +32,7 @@ classifiers = [
     "Topic :: Software Development :: Libraries",
 ]
 readme = { file = "README.md", content-type = "text/markdown" }
-requires-python = ">=3.12"
+requires-python = ">=3.11"
 keywords = [
     "pytorch",
     "torch",
