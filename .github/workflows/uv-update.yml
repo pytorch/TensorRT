@@ -25,14 +25,15 @@ jobs:
 
       - name: Fake the changes to the uv.lock file
         run: |
+          git config --safe.directory "$GITHUB_WORKSPACE"
+          git fetch origin update/uv-lockfiles-20059032135
+          git checkout update/uv-lockfiles-20059032135
           echo "fake changes to uv.lock" > uv.lock
 
       - name: Auto-commit changes
         uses: stefanzweifel/git-auto-commit-action@v7
         with:
           commit_message: "chore: update uv.lock"
-          # testing only 
-          branch: update/uv-lockfiles-20059032135
           commit_options: "--no-verify --signoff"
           file_pattern: uv.lock
           commit_user_name: Torch-TensorRT Github Bot
