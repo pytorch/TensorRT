@@ -168,6 +168,7 @@ def test_resnet18_torch_exec_ops(ir):
             )
         ],
         "ir": ir,
+        "use_explicit_typing": False,
         "enabled_precisions": {torch.float32, torch.float16},
         "min_block_size": 1,
         "output_format": "exported_program",
@@ -403,6 +404,7 @@ def test_resnet18_half(ir):
             )
         ],
         "device": torchtrt.Device("cuda:0"),
+        "use_explicit_typing": False,
         "enabled_precisions": {torch.half},
         "ir": ir,
         "pass_through_build_failures": True,

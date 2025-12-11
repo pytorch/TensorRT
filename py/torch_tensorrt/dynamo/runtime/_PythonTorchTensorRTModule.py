@@ -279,6 +279,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
             dtype._from(self.engine.get_tensor_dtype(input_name))
             for input_name in self.input_names
         ]
+
         self.input_shapes = [
             self.engine.get_tensor_shape(input_name) for input_name in self.input_names
         ]
