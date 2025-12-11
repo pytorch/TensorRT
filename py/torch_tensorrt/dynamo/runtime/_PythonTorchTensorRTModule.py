@@ -230,19 +230,19 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
             for input_name in self.input_names
         }
 
-    def set_unowned_output_tensor(self, enabled: bool) -> None:
+    def set_output_tensors_as_unowned(self, enabled: bool) -> None:
         """
-        Set the flag to indicate if the output tensor is unowned by the engine.
-        If self.unowned_output_tensor=True, the engine will create a new output tensor in each forward pass.
-        This would be slower but is required when users need to manipulate the output tensor after each forward pass.
-        Therefore, this should be set to True only for the last module in a graph and leave to False for intermediate modules,
-        which users don't have access to.
+        Flag to set if the output tensors of this engine are solely owned by the Torch-TensorRT Runtime or if they might be shared with a user.
+        If the tensors are not owned by the runtime, then they must be recreated on every forward call which may have implications for performance.
+        Typically only the final engine in a graph requires output tensors to be unowned and there are performance gains to be had for intermediate engines to manage their own standing memory.
+        Therefore this should only be set to True for the final module in a graph and leave false for intermediate modules.
+
         Args:
             enabled: bool
                 Whether to set the flag to True.
 
         """
-        self.unowned_output_tensor = enabled
+        self.output_tensors_are_unowned = enabled
 
     def set_output_tensors_as_unowned(self, enabled: bool) -> None:
         """
@@ -547,7 +547,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                         )
                     if (
                         self.output_tensors is None
-                        or self.unowned_output_tensor
+                        or self.output_tensors_are_unowned
                         or shape_changed
                     ):
                         self.output_tensors = self.create_output_tensors()
