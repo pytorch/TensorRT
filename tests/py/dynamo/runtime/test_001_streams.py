@@ -27,6 +27,7 @@ class TestStreams(TestCase):
                 model,
                 ir="dynamo",
                 inputs=inputs,
+                use_explicit_typing=False,
                 enabled_precisions={dtype},
                 min_block_size=1,
                 device=device,
