@@ -166,7 +166,7 @@ class TestResourcePartitioning(TestCase):
         )
 
         partitioned_module = resource_partition(
-            partitioned_module, cpu_memory_budget=1.7 * 1024 * 1024 * 1024  # 1.7GB,
+            partitioned_module, cpu_memory_budget=1.4 * 1024 * 1024 * 1024  # 1.4GB,
         )
 
         assert (
@@ -177,8 +177,8 @@ class TestResourcePartitioning(TestCase):
                     if "_run_on_acc" in name
                 ]
             )
-            > 3
-        ), "The graph should have more than 3 accelerated subgraphs"
+            == 5
+        ), "The graph should have 5 accelerated subgraphs"
         assert (
             len(
                 [
@@ -298,7 +298,7 @@ class TestResourcePartitioning(TestCase):
         )
 
         partitioned_module = resource_partition(
-            partitioned_module, cpu_memory_budget=1.7 * 1024 * 1024 * 1024  # 1.7GB,
+            partitioned_module, cpu_memory_budget=1.4 * 1024 * 1024 * 1024  # 1.4GB,
         )
 
         assert (
@@ -396,7 +396,7 @@ class TestResourcePartitioning(TestCase):
         )
 
         partitioned_module = resource_partition(
-            partitioned_module, cpu_memory_budget=1.7 * 1024 * 1024 * 1024  # 1.7GB,
+            partitioned_module, cpu_memory_budget=1.4 * 1024 * 1024 * 1024  # 1.4GB,
         )
 
         assert (

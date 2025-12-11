@@ -59,7 +59,7 @@ from torch_tensorrt.dynamo.partitioning._atomic_subgraphs import (
 
 logger = logging.getLogger(__name__)
 
-MAX_NUM_OF_ENGINES = 40
+MAX_NUM_OF_ENGINES = 50
 ENGINE_COMPILATION_MEMORY_USAGE_MULTIPLIER = 4
 
 
@@ -126,6 +126,9 @@ class ResourcePartitioner(_SplitterBase):  # type: ignore
         subgraphs = self.break_subgraphs(
             subgraphs, subgraph_size_budget=self.calculate_size_budget()
         )
+
+        if len(subgraphs) == 1:
+            return self.module
 
         # Set the number of TRT engines to be generated
         self.num_trt_accelerated_subgraphs = len([s for s in subgraphs if s.is_acc])
@@ -315,7 +318,7 @@ class ResourcePartitioner(_SplitterBase):  # type: ignore
             )
             new_subgraphs = self.step_and_validate(new_subgraphs, step_size)
             size_0, size_1 = self.size_of_subgraphs(new_subgraphs)
-            if size_0 > size_to_break:
+            if size_0 > size_to_break or size_0 > size_1:
                 break
 
         return new_subgraphs, size_0, size_1
