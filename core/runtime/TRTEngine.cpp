@@ -289,12 +289,12 @@ void TRTEngine::enable_profiling() {
   exec_ctx->setProfiler(trt_engine_profiler.get());
 }
 
-void TRTEngine::set_unowned_output_tensor(bool enable) {
-  this->unowned_output_tensor = enable;
+void TRTEngine::set_output_tensors_as_unowned(bool enable) {
+  this->output_tensors_are_unowned = enable;
 }
 
-bool TRTEngine::is_unowned_output_tensor() {
-  return this->unowned_output_tensor;
+bool TRTEngine::are_output_tensors_unowned() {
+  return this->output_tensors_are_unowned;
 }
 
 void TRTEngine::set_profile_format(std::string format) {

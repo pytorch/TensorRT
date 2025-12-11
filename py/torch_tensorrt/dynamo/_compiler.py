@@ -557,7 +557,7 @@ def compile(
             stacklevel=2,
         )
 
-    if kwargs.get("use_explicit_typing", False) == False:
+    if not kwargs.get("use_explicit_typing", False):
         warnings.warn(
             "`use_explicit_typing` is deprecated. This setting will be removed and you should enable autocast instead.",
             DeprecationWarning,
@@ -949,7 +949,6 @@ def compile_module(
     for attr in dir(gm):
         if attr.startswith("_frozen_param"):
             delattr(gm, attr)
-            
     trt_module = None
     for name, _ in partitioned_module.named_children():
         submodule = getattr(partitioned_module, name)
@@ -1073,7 +1072,7 @@ def compile_module(
 
     # Only set the requires_unique_output flag for the last TRT Module when user has access to the output tensor
     if trt_module:
-        trt_module.set_unowned_output_tensor(True)
+        trt_module.set_output_tensors_as_unowned(True)
 
     # Parse the graph I/O and store it in dryrun tracker
     parse_graph_io(gm, dryrun_tracker)

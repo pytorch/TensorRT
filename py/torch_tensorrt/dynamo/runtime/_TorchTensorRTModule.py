@@ -289,8 +289,8 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
             metadata = TorchTensorRTModule.decode_metadata(serialized_metadata)
             self.settings = metadata["settings"]
             self.weight_name_map = metadata["weight_name_map"]
-            self.unowned_output_tensor = metadata["unowned_output_tensor"]
-            self.engine.set_unowned_output_tensor(self.unowned_output_tensor)
+            self.output_tensors_are_unowned = metadata["output_tensors_are_unowned"]
+            self.engine.set_output_tensors_as_unowned(self.output_tensors_are_unowned)
 
         else:
             self.engine = None
@@ -362,11 +362,11 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         self.engine.enable_profiling()
         self.engine.set_profile_format(profile_format)
 
-    def set_unowned_output_tensor(self, enabled: bool) -> None:
-        self.engine.set_unowned_output_tensor(enabled)
+    def set_output_tensors_as_unowned(self, enabled: bool) -> None:
+        self.engine.set_output_tensors_as_unowned(enabled)
 
-    def is_unowned_output_tensor(self) -> bool:
-        return self.engine.is_unowned_output_tensor()  # type: ignore[no-any-return]
+    def are_output_tensors_unowned(self) -> bool:
+        return self.engine.are_output_tensors_unowned()  # type: ignore[no-any-return]
 
     def disable_profiling(self) -> None:
         """Disable the profiler"""
