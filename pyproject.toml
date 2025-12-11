@@ -93,7 +93,11 @@ include-package-data = false
 
 [tool.uv]
 package = true
-environments = ["sys_platform == 'linux'", "sys_platform == 'windows'"]
+environments = ["sys_platform == 'linux'", "sys_platform == 'win32'"]
+required-environments = [
+    "sys_platform == 'linux' and python_version >= '3.10' and platform_machine == 'x86_64'",
+    "sys_platform == 'win32' and python_version >= '3.10' and platform_machine == 'AMD64'"
+]
 prerelease = "if-necessary-or-explicit"
 index-strategy = "unsafe-best-match"
 
