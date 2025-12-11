@@ -75,7 +75,6 @@ jobs:
           echo "has_changes=true" >> "$GITHUB_OUTPUT"
           echo "there is changes to the uv.lock file"
           # to remove: test only
-          git diff uv.lock
           cat uv.lock
 
       - name: Validate the changes
@@ -88,10 +87,10 @@ jobs:
             echo "Error: Failed to run uv sync --frozen"
             exit 1
           fi
-          # if uv run -m pip check; then
-          #   echo "Error: Failed to run uv run -m pip check"
-          #   exit 1
-          # fi
+          if uv run -m pip check; then
+            echo "Error: Failed to run uv run -m pip check"
+            exit 1
+          fi
           echo "valid_changes=true" >> "$GITHUB_OUTPUT"
           echo "successfully validated the changes to uv.lock"
 
