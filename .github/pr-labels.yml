@@ -1,55 +1,57 @@
 "component: torchtrtc":
-  - cpp/torchtrtc/**/*
+    - cpp/torchtrtc/**/*
 
 "component: api [C++]":
-  - cpp/**/*
+    - cpp/**/*
 
 "component: api [Python]":
-  - py/**/*
+    - py/**/*
 
 "component: core":
-  - core/**/*
+    - core/**/*
+    - py/torch_tensorrt/dynamo/**/*
 
 "component: conversion":
-  - core/conversion/**/*
-  - py/torch_tensorrt/dynamo/conversion/**/*
-  
+    - core/conversion/**/*
+    - py/torch_tensorrt/dynamo/conversion/**/*
+
 "component: converters":
-  - core/conversion/converters/**/*
-  - py/torch_tensorrt/dynamo/conversion/impl/**/*
+    - core/conversion/converters/**/*
+    - py/torch_tensorrt/dynamo/conversion/impl/**/*
 
 "component: evaluators":
-  - core/conversion/evaluators/**/*
+    - core/conversion/evaluators/**/*
 
 "component: fx":
-  - py/torch_tensorrt/fx/**/*
+    - py/torch_tensorrt/fx/**/*
 
 "component: dynamo":
-  - py/torch_tensorrt/dynamo/**/*
+    - py/torch_tensorrt/dynamo/**/*
 
 "component: torch_compile":
-  - py/torch_tensorrt/dynamo/backend/*
+    - py/torch_tensorrt/dynamo/backend/*
 
 "component: partitioning":
-  - core/partitioning/**/*
+    - core/partitioning/**/*
 
 "component: runtime":
-  - core/runtime/**/*
-  - py/torch_tensorrt/dynamo/runtime/**/*
+    - core/runtime/**/*
+    - py/torch_tensorrt/dynamo/runtime/**/*
 
 "component: lowering":
-  - core/lowering/**/*
-  - py/torch_tensorrt/dynamo/lowering/**/*
+    - core/lowering/**/*
+    - py/torch_tensorrt/dynamo/lowering/**/*
 
 "component: tests":
-  - tests/**/*
+    - tests/**/*
 
 "component: build system":
-  - WORKSPACE
-  - BUILD
-  - pyproject.toml
-  - setup.py
+    - MODULE.bazel
+    - BUILD
+    - pyproject.toml
+    - setup.py
+    - toolchain/**/*
 
 "documentation":
-  - docs/**/*
-  - docsrc/**/*
+    - docs/**/*
+    - docsrc/**/*
