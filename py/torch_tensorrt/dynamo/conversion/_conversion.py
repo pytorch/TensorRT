@@ -48,30 +48,34 @@ def infer_module_output_dtypes(
 
 
 def insert_engine_to_cache(
-    hash_val: str,
+    hash_val: Optional[str],
     interpreter_result: TRTInterpreterResult,
     engine_cache: BaseEngineCache,
     settings: CompilationSettings,
     inputs: Sequence[Input],
 ) -> bool:
+    if hash_val is None:
+        logger.warning("Hash value is not provided, so the engine will not be cached")
+        return False
+
     if not ENABLED_FEATURES.refit:
-        logger.info("Refit feature is not available, so the engine is not cached")
+        logger.warning(
+            "Refit feature is not available, so the engine cache will not be used"
+        )
         return False
 
     # Cache the weight-stripped engine regardless of the `strip_engine_weights` setting
     if engine_cache.check(hash_val) is not None:
-        logger.info(f"The engine already exists in cache for hash: {hash_val}")
-        return False
-
-    if not settings.strip_engine_weights:
-        # set EXCLUDE_WEIGHTS flag to strip weights
-        serialization_config = interpreter_result.engine.create_serialization_config()
-        serialization_config.set_flag(trt.SerializationFlag.EXCLUDE_WEIGHTS)
-        weight_stripped_serialized_engine = (
-            interpreter_result.engine.serialize_with_config(serialization_config)
+        logger.info(
+            f"Detected that the engine with hash: {hash_val} exists in cache. It will be refreshed"
         )
-    else:
-        weight_stripped_serialized_engine = interpreter_result.engine.serialize()
+
+    # set EXCLUDE_WEIGHTS flag to strip weights
+    serialization_config = interpreter_result.engine.create_serialization_config()
+    serialization_config.set_flag(trt.SerializationFlag.EXCLUDE_WEIGHTS)
+    weight_stripped_serialized_engine = interpreter_result.engine.serialize_with_config(
+        serialization_config
+    )
 
     # Insert weight-stripped engine to cache
     engine_cache.insert(
@@ -86,20 +90,26 @@ def insert_engine_to_cache(
             interpreter_result.requires_output_allocator,
         ),
     )
-    logger.info(f"Engine was successfully inserted into cache for hash: {hash_val}")
+    logger.info(f"Engine with hash: {hash_val} was successfully inserted into cache")
     return True
 
 
 def pull_cached_engine(
-    hash_val: str,
+    hash_val: Optional[str],
     module: torch.fx.GraphModule,
     engine_cache: BaseEngineCache,
     settings: CompilationSettings,
     inputs: Sequence[Input],
 ) -> Optional[SerializedInterpreterResult]:
+    if hash_val is None:
+        logger.warning(
+            "Hash value is not provided, so the engine cache will not be used"
+        )
+        return None
+
     if not ENABLED_FEATURES.refit:
-        logger.info(
-            "Refit feature is not available, so the engine is not loaded from cache"
+        logger.warning(
+            "Refit feature is not available, so the engine cache will not be used"
         )
         return None
 
@@ -131,7 +141,7 @@ def pull_cached_engine(
             ), f"Attempted to refit a cached engine built for a different input size (input: {i}, cached size: {cached_engine_inputs[i]}, new size: {inputs[i]}"
 
         logger.info(
-            "Found the cached engine that corresponds to this graph. It is directly loaded."
+            f"Found the cached engine with hash {hash_val} that corresponds to this graph. It is directly loaded."
         )
 
         # refit the cached engine with the new graph module
@@ -194,20 +204,39 @@ def interpret_module_to_result(
     # engine_cache could be None if:
     # 1) engine_cache is not passed in when calling this function like convert_exported_program_to_serialized_trt_engine etc., or
     # 2) both cache_built_engines and reuse_cached_engines are False
-    if (
-        ENABLED_FEATURES.refit
-        and engine_cache is not None
-        and not settings.immutable_weights
-    ):
-        if settings.cache_built_engines or settings.reuse_cached_engines:
-            hash_val = engine_cache.get_hash(module, inputs, settings)
 
-            if settings.reuse_cached_engines:
-                serialized_interpreter_result = pull_cached_engine(
-                    hash_val, module, engine_cache, settings, inputs
-                )
-                if serialized_interpreter_result is not None:  # hit the cache
-                    return serialized_interpreter_result
+    is_engine_caching_supported = (
+        engine_cache is not None
+        and ENABLED_FEATURES.refit
+        and not settings.immutable_weights
+    )
+    # calculate the hash only once. It will be used in pulling and inserting the engine.
+    hash_val = (
+        engine_cache.get_hash(module, inputs, settings)  # type: ignore
+        if is_engine_caching_supported
+        and (settings.cache_built_engines or settings.reuse_cached_engines)
+        else None
+    )
+
+    if settings.reuse_cached_engines:
+        if engine_cache is None:
+            logger.warning(
+                "Engine cache is not provided, so the engine will not be reused from cache"
+            )
+        elif not ENABLED_FEATURES.refit:
+            logger.warning(
+                "Refit feature is not available, so the engine will not be reused from cache"
+            )
+        elif settings.immutable_weights:
+            logger.warning(
+                "The engine weights are immutable, so the engine will not be reused from cache"
+            )
+        else:
+            serialized_interpreter_result = pull_cached_engine(
+                hash_val, module, engine_cache, settings, inputs
+            )
+            if serialized_interpreter_result is not None:  # hit the cache
+                return serialized_interpreter_result
 
     output_dtypes = infer_module_output_dtypes(
         module, truncate_double=settings.truncate_double
@@ -232,16 +261,23 @@ def interpret_module_to_result(
         f"CPU memory usage after clearing frozen parameters and building memory in conversion: {get_cpu_memory_usage()} MB"
     )
 
-    # Engine caching only for refittable engines
-    if (
-        ENABLED_FEATURES.refit
-        and not settings.immutable_weights
-        and settings.cache_built_engines
-        and engine_cache is not None
-    ):
-        _ = insert_engine_to_cache(
-            hash_val, interpreter_result, engine_cache, settings, inputs
-        )
+    if settings.cache_built_engines:
+        if engine_cache is None:
+            logger.warning(
+                "Engine cache is not provided, so the engine will not be cached"
+            )
+        elif not ENABLED_FEATURES.refit:
+            logger.warning(
+                "Refit feature is not available, so the engine will not be cached"
+            )
+        elif settings.immutable_weights:
+            logger.warning(
+                "The engine weights are immutable, so the engine will not be cached"
+            )
+        else:
+            _ = insert_engine_to_cache(
+                hash_val, interpreter_result, engine_cache, settings, inputs
+            )
 
     serialized_engine = interpreter_result.engine.serialize()
     with io.BytesIO() as engine_bytes:
