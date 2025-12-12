@@ -25,10 +25,14 @@ def swizzle_2d(M, N, tm, tn, GROUP_SIZE_M):
 
 
 @ct.kernel(num_ctas=ct.ByTarget(sm_100=2))
-def matmul_kernel(A, B, C,
-                  tm: ConstInt,         # Tile size along M dimension (rows of C)
-                  tn: ConstInt,         # Tile size along N dimension (columns of C)
-                  tk: ConstInt):        # Tile size along K dimension (inner product dimension)
+def matmul_kernel(
+    A,
+    B,
+    C,
+    tm: ConstInt,  # Tile size along M dimension (rows of C)
+    tn: ConstInt,  # Tile size along N dimension (columns of C)
+    tk: ConstInt,
+):  # Tile size along K dimension (inner product dimension)
     """
     cuTile kernel for performing matrix multiplication C = A @ B.
 
@@ -74,12 +78,16 @@ def matmul_kernel(A, B, C,
         # Load tile from matrix A.
         # The `index=(bidx, k_tile_idx)` specifies which (M-tile, K-tile) to load
         # from global memory A. `shape=(tm, tk)` defines the size of this tile.
-        a = ct.load(A, index=(bidx, k), shape=(tm, tk), padding_mode=zero_pad).astype(dtype)
+        a = ct.load(A, index=(bidx, k), shape=(tm, tk), padding_mode=zero_pad).astype(
+            dtype
+        )
 
         # Load tile from matrix B.
         # The `index=(k_tile_idx, bidy)` specifies which (K-tile, N-tile) to load
         # from global memory B. `shape=(tk, tn)` defines the size of this tile.
-        b = ct.load(B, index=(k, bidy), shape=(tk, tn), padding_mode=zero_pad).astype(dtype)
+        b = ct.load(B, index=(k, bidy), shape=(tk, tn), padding_mode=zero_pad).astype(
+            dtype
+        )
 
         # Perform Matrix Multiplication for the current tiles.
         # `ct.mma` computes the product of the two loaded tiles and accumulates the result.
@@ -95,9 +103,9 @@ def matmul_kernel(A, B, C,
 
 
 @ct.kernel
-def matmul_split_k_kernel(A, B, C, LOCKS, COUNTS,
-                          tm: ConstInt, tn: ConstInt, tk: ConstInt,
-                          SPLIT_K: ConstInt):
+def matmul_split_k_kernel(
+    A, B, C, LOCKS, COUNTS, tm: ConstInt, tn: ConstInt, tk: ConstInt, SPLIT_K: ConstInt
+):
     GROUP_SIZE_M = 8
     M = A.shape[0]
     N = B.shape[1]
@@ -112,16 +120,21 @@ def matmul_split_k_kernel(A, B, C, LOCKS, COUNTS,
     dtype = ct.tfloat32 if A.dtype == ct.float32 else A.dtype
 
     for k in range(bidz, num_tiles, SPLIT_K):
-        a = ct.load(A, index=(bidx, k), shape=(tm, tk),
-                    padding_mode=zero_pad).astype(dtype)
-        b = ct.load(B, index=(k, bidy), shape=(tk, tn),
-                    padding_mode=zero_pad).astype(dtype)
+        a = ct.load(A, index=(bidx, k), shape=(tm, tk), padding_mode=zero_pad).astype(
+            dtype
+        )
+        b = ct.load(B, index=(k, bidy), shape=(tk, tn), padding_mode=zero_pad).astype(
+            dtype
+        )
         sum = ct.mma(a, b, sum)
 
     sum = ct.astype(sum, C.dtype)
     lock_offset = ct.bid(0)
     count_offset = lock_offset
-    while ct.atomic_cas(LOCKS, lock_offset, 0, 1, memory_order=ct.MemoryOrder.ACQUIRE) == 1:
+    while (
+        ct.atomic_cas(LOCKS, lock_offset, 0, 1, memory_order=ct.MemoryOrder.ACQUIRE)
+        == 1
+    ):
         pass
     count = ct.gather(COUNTS, count_offset)
     if count == 0:
@@ -156,11 +169,15 @@ def batch_matmul_kernel(A, B, C, tm: ConstInt, tn: ConstInt, tk: ConstInt):
     for k in range(num_k_tiles):
         # Load tiles with 3D index and 3D shape
         # A is (Batch, M, K), load (1, tm, tk) tile
-        a = ct.load(A, index=(pid_batch, pidx, k), shape=(1, tm, tk), padding_mode=zero_pad)
+        a = ct.load(
+            A, index=(pid_batch, pidx, k), shape=(1, tm, tk), padding_mode=zero_pad
+        )
         a = ct.reshape(a, (tm, tk))  # Reshape to 2D for ct.mma
 
         # B is (Batch, K, N), load (1, tk, tn) tile
-        b = ct.load(B, index=(pid_batch, k, pidy), shape=(1, tk, tn), padding_mode=zero_pad)
+        b = ct.load(
+            B, index=(pid_batch, k, pidy), shape=(1, tk, tn), padding_mode=zero_pad
+        )
         b = ct.reshape(b, (tk, tn))  # Reshape to 2D for ct.mma
 
         accumulator = ct.mma(a, b, acc=accumulator)

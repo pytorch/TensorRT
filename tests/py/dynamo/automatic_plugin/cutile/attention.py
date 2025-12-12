@@ -2,10 +2,10 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-import cuda.tile as ct
-import numpy as np
 import math
 
+import cuda.tile as ct
+import numpy as np
 from cuda.tile import RoundingMode as RMd
 
 INV_LOG_2 = 1.0 / math.log(2)
@@ -18,16 +18,21 @@ ConstBool = ct.Constant[bool]
 
 # --- FMHA Kernel Implementation ---
 @ct.kernel(occupancy=2)
-def fmha_kernel(Q, K, V, Out,
-                qk_scale: float,
-                input_pos: int,
-                TILE_D: ConstInt,  # TILE_D = hidden_size
-                H: ConstInt,
-                TILE_M: ConstInt,
-                TILE_N: ConstInt,
-                QUERY_GROUP_SIZE: ConstInt,
-                CAUSAL: ConstBool,
-                EVEN_K: ConstBool):
+def fmha_kernel(
+    Q,
+    K,
+    V,
+    Out,
+    qk_scale: float,
+    input_pos: int,
+    TILE_D: ConstInt,  # TILE_D = hidden_size
+    H: ConstInt,
+    TILE_M: ConstInt,
+    TILE_N: ConstInt,
+    QUERY_GROUP_SIZE: ConstInt,
+    CAUSAL: ConstBool,
+    EVEN_K: ConstBool,
+):
     """
     cuTile kernel for Fused Multi-Head Attention (FMHA).
     Computes attention output for a specific batch item and head, using tiling and online softmax.
@@ -59,7 +64,9 @@ def fmha_kernel(Q, K, V, Out,
     # Load query tile for this batch, head, and M-chunk
     q = ct.load(
         Q, index=(batch_idx, head_idx, bid_x, 0), shape=(1, 1, TILE_M, TILE_D)
-    ).reshape((TILE_M, TILE_D))  # [TILE_M, TILE_D]
+    ).reshape(
+        (TILE_M, TILE_D)
+    )  # [TILE_M, TILE_D]
 
     # loop over k, v and update accumulator
     m_end = input_pos + (bid_x + 1) * TILE_M
@@ -78,12 +85,14 @@ def fmha_kernel(Q, K, V, Out,
     for j in range(0, Tc):
         # --- Compute QK product ---
         k = ct.load(
-            K, index=(batch_idx, off_kv_h, 0, j), shape=(1, 1, TILE_D, TILE_N),
+            K,
+            index=(batch_idx, off_kv_h, 0, j),
+            shape=(1, 1, TILE_D, TILE_N),
             order=(0, 1, 3, 2),
             latency=2,
         )
         k = k.reshape((TILE_D, TILE_N))  # [TILE_D, TILE_N]
-        qk = ct.full((TILE_M, TILE_N), 0., dtype=np.float32)
+        qk = ct.full((TILE_M, TILE_N), 0.0, dtype=np.float32)
         qk = ct.mma(q, k, qk)  # [TILE_M, TILE_N]
 
         # --- Apply Causal Masking ---
@@ -115,9 +124,13 @@ def fmha_kernel(Q, K, V, Out,
 
         # --- Compute PV product ---
         v = ct.load(
-            V, index=(batch_idx, off_kv_h, j, 0), shape=(1, 1, TILE_N, TILE_D),
+            V,
+            index=(batch_idx, off_kv_h, j, 0),
+            shape=(1, 1, TILE_N, TILE_D),
             latency=4,
-        ).reshape((TILE_N, TILE_D))  # [TILE_N, TILE_D]
+        ).reshape(
+            (TILE_N, TILE_D)
+        )  # [TILE_N, TILE_D]
         p = p.astype(Q.dtype)
         acc = ct.mma(p, v, acc)  # [TILE_M, TILE_N]
         m_i = m_ij  # [TILE_M, 1]
