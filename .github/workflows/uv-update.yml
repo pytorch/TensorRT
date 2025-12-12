@@ -63,7 +63,7 @@ jobs:
           set -x
           git config --global safe.directory "$GITHUB_WORKSPACE"
 
-          if ! uv lock; then
+          if ! uv lock --refresh --prerelease=allow --verbose; then
             echo "Error: Failed to update uv.lock"
             exit 1
           fi
@@ -85,10 +85,6 @@ jobs:
           set -x
           if ! uv sync --frozen; then
             echo "Error: Failed to run uv sync --frozen"
-            exit 1
-          fi
-          if uv run -m pip check; then
-            echo "Error: Failed to run uv run -m pip check"
             exit 1
           fi
           echo "valid_changes=true" >> "$GITHUB_OUTPUT"
