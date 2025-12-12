@@ -68,7 +68,11 @@ jobs:
       ref: ""
       test-infra-repository: pytorch/test-infra
       test-infra-ref: main
-      build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
+      # Extract the include array from filter-matrix output
+      build-matrix: |
+        {
+          "include": ${{ toJSON(fromJSON(needs.filter-matrix.outputs.matrix).include) }}
+        }
       pre-script: ${{ matrix.pre-script }}
       env-var-script: ${{ matrix.env-var-script }}
       post-script: ${{ matrix.post-script }}
@@ -99,7 +103,11 @@ jobs:
       ref: ""
       test-infra-repository: pytorch/test-infra
       test-infra-ref: main
-      build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
+      # Extract the include array from filter-matrix output
+      build-matrix: |
+        {
+          "include": ${{ toJSON(fromJSON(needs.filter-matrix.outputs.matrix).include) }}
+        }
       pre-script: ${{ matrix.pre-script }}
       script: |
         set -euo pipefail
@@ -128,7 +136,11 @@ jobs:
       ref: ""
       test-infra-repository: pytorch/test-infra
       test-infra-ref: main
-      build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
+      # Extract the include array from filter-matrix output
+      build-matrix: |
+        {
+          "include": ${{ toJSON(fromJSON(needs.filter-matrix.outputs.matrix).include) }}
+        }
       pre-script: ${{ matrix.pre-script }}
       script: |
         set -euo pipefail
@@ -160,7 +172,11 @@ jobs:
       ref: ""
       test-infra-repository: pytorch/test-infra
       test-infra-ref: main
-      build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
+      # Extract the include array from filter-matrix output
+      build-matrix: |
+        {
+          "include": ${{ toJSON(fromJSON(needs.filter-matrix.outputs.matrix).include) }}
+        }
       pre-script: ${{ matrix.pre-script }}
       script: |
         set -euo pipefail
@@ -189,7 +205,11 @@ jobs:
       ref: ""
       test-infra-repository: pytorch/test-infra
       test-infra-ref: main
-      build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
+      # Extract the include array from filter-matrix output
+      build-matrix: |
+        {
+          "include": ${{ toJSON(fromJSON(needs.filter-matrix.outputs.matrix).include) }}
+        }
       pre-script: ${{ matrix.pre-script }}
       script: |
         set -euo pipefail
@@ -222,7 +242,11 @@ jobs:
       ref: ""
       test-infra-repository: pytorch/test-infra
       test-infra-ref: main
-      build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
+      # Extract the include array from filter-matrix output
+      build-matrix: |
+        {
+          "include": ${{ toJSON(fromJSON(needs.filter-matrix.outputs.matrix).include) }}
+        }
       pre-script: ${{ matrix.pre-script }}
       script: |
         set -euo pipefail
@@ -253,7 +277,11 @@ jobs:
       ref: ""
       test-infra-repository: pytorch/test-infra
       test-infra-ref: main
-      build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
+      # Extract the include array from filter-matrix output
+      build-matrix: |
+        {
+          "include": ${{ toJSON(fromJSON(needs.filter-matrix.outputs.matrix).include) }}
+        }
       pre-script: ${{ matrix.pre-script }}
       script: |
         set -euo pipefail
@@ -282,7 +310,11 @@ jobs:
       ref: ""
       test-infra-repository: pytorch/test-infra
       test-infra-ref: main
-      build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
+      # Extract the include array from filter-matrix output
+      build-matrix: |
+        {
+          "include": ${{ toJSON(fromJSON(needs.filter-matrix.outputs.matrix).include) }}
+        }
       pre-script: ${{ matrix.pre-script }}
       script: |
         set -euo pipefail
@@ -313,7 +345,11 @@ jobs:
       ref: ""
       test-infra-repository: pytorch/test-infra
       test-infra-ref: main
-      build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
+      # Extract the include array from filter-matrix output
+      build-matrix: |
+        {
+          "include": ${{ toJSON(fromJSON(needs.filter-matrix.outputs.matrix).include) }}
+        }
       pre-script: ${{ matrix.pre-script }}
       script: |
         set -euo pipefail
@@ -346,7 +382,11 @@ jobs:
       ref: ""
       test-infra-repository: pytorch/test-infra
       test-infra-ref: main
-      build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
+      # Extract the include array from filter-matrix output
+      build-matrix: |
+        {
+          "include": ${{ toJSON(fromJSON(needs.filter-matrix.outputs.matrix).include) }}
+        }
       pre-script: ${{ matrix.pre-script }}
       script: |
         set -euo pipefail
@@ -376,7 +416,11 @@ jobs:
       ref: ""
       test-infra-repository: pytorch/test-infra
       test-infra-ref: main
-      build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
+      # Extract the include array from filter-matrix output
+      build-matrix: |
+        {
+          "include": ${{ toJSON(fromJSON(needs.filter-matrix.outputs.matrix).include) }}
+        }
       pre-script: ${{ matrix.pre-script }}
       script: |
         set -euo pipefail
@@ -406,7 +450,11 @@ jobs:
       ref: ""
       test-infra-repository: pytorch/test-infra
       test-infra-ref: main
-      build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
+      # Extract the include array from filter-matrix output
+      build-matrix: |
+        {
+          "include": ${{ toJSON(fromJSON(needs.filter-matrix.outputs.matrix).include) }}
+        }
       pre-script: ${{ matrix.pre-script }}
       script: |
         set -euo pipefail
@@ -435,7 +483,11 @@ jobs:
       ref: ""
       test-infra-repository: pytorch/test-infra
       test-infra-ref: main
-      build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
+      # Extract the include array from filter-matrix output
+      build-matrix: |
+        {
+          "include": ${{ toJSON(fromJSON(needs.filter-matrix.outputs.matrix).include) }}
+        }
       pre-script: ${{ matrix.pre-script }}
       script: |
         set -euo pipefail
@@ -467,7 +519,11 @@ jobs:
       ref: ""
       test-infra-repository: pytorch/test-infra
       test-infra-ref: main
-      build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
+      # Extract the include array from filter-matrix output
+      build-matrix: |
+        {
+          "include": ${{ toJSON(fromJSON(needs.filter-matrix.outputs.matrix).include) }}
+        }
       pre-script: ${{ matrix.pre-script }}
       script: |
         set -euo pipefail
@@ -500,18 +556,47 @@ jobs:
       ref: ""
       test-infra-repository: pytorch/test-infra
       test-infra-ref: main
-      build-matrix: ${{ needs.filter-matrix.outputs.matrix }}
+      # Extract the distributed_include array from filter-matrix output
+      build-matrix: |
+        {
+          "include": ${{ toJSON(fromJSON(needs.filter-matrix.outputs.matrix).distributed_include) }}
+        }
       pre-script: ${{ matrix.pre-script }}
       script: |
         set -euo pipefail
+
         export USE_HOST_DEPS=1
         export CI_BUILD=1
         export USE_TRTLLM_PLUGINS=1
-        dnf install -y mpich mpich-devel openmpi openmpi-devel
+
+        # Install MPI (required for TensorRT-LLM plugins)
+        echo "Installing MPI..."
+        dnf install -y openmpi openmpi-devel
+
+        # Add OpenMPI to PATH (RHEL/AlmaLinux specific location)
+        export PATH="/usr/lib64/openmpi/bin:$PATH"
+        export LD_LIBRARY_PATH="/usr/lib64/openmpi/lib:$LD_LIBRARY_PATH"
+
+        # Run distributed tests
         pushd .
-        cd tests/py
-        cd dynamo
-        python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l2_dynamo_distributed_test_results.xml distributed/test_nccl_ops.py
+        cd tests/py/dynamo
+
+        # Set master port for distributed communication (must be same across all ranks)
+        export MASTER_ADDR=127.0.0.1
+        export MASTER_PORT=29500
+
+        # Use a wrapper script to ensure only rank 0 writes the JUnit XML
+        # Each rank runs pytest, but only rank 0 saves results to avoid file conflicts
+        RANK_0_XML="${RUNNER_TEST_RESULTS_DIR}/l2_dynamo_distributed_test_results.xml"
+        mpirun --allow-run-as-root -n ${NUM_GPUS} \
+          bash -c '
+            if [ "${OMPI_COMM_WORLD_RANK:-0}" -eq 0 ]; then
+              python -m pytest -ra --junitxml='"${RANK_0_XML}"' distributed/test_nccl_ops.py
+            else
+              python -m pytest -ra distributed/test_nccl_ops.py
+            fi
+          '
+
         popd
 
 concurrency:
