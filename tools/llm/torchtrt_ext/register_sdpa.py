@@ -434,6 +434,5 @@ def enable_sdpa_converter(args: argparse.Namespace, model_config: Any) -> None:
 # Global registry for SDPA passes
 _SDPA_MAPPING: Dict[str, Callable] = {
     "google/gemma-3-1b-it": register_gemma3_sdpa_pass,
-    # "Qwen/Qwen2.5-0.5B-Instruct": register_cutile_sdpa_pass,
     "default": register_default_sdpa_pass,
 }
