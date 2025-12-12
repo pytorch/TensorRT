@@ -1071,8 +1071,6 @@ def compile_module(
                         f.write(trt_module.get_layer_info())
 
     # Only set the requires_unique_output flag for the last TRT Module when user has access to the output tensor
-    if trt_module:
-        trt_module.set_output_tensors_as_unowned(True)
 
     # Parse the graph I/O and store it in dryrun tracker
     parse_graph_io(gm, dryrun_tracker)
@@ -1081,7 +1079,11 @@ def compile_module(
     for name, trt_module in trt_modules.items():
         setattr(partitioned_module, name, trt_module)
         if settings.lazy_engine_init and not settings.enable_cross_compile_for_windows:
-            getattr(partitioned_module, name).setup_engine()
+            trt_module = getattr(partitioned_module, name)
+            trt_module.setup_engine()
+
+    if trt_module:
+        trt_module.set_output_tensors_as_unowned(True)
 
     # Reset settings object to user specification after fallback to global partitioning mode
     if fast_partitioner_failed:

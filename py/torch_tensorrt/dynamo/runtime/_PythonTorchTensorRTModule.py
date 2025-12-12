@@ -225,10 +225,6 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         self.output_tensors_are_unowned = False
         if self.serialized_engine is not None and not self.settings.lazy_engine_init:
             self.setup_engine()
-        self.is_shape_inference_io = {
-            input_name: self.engine.is_shape_inference_io(input_name)
-            for input_name in self.input_names
-        }
 
     def set_output_tensors_as_unowned(self, enabled: bool) -> None:
         """
@@ -326,6 +322,11 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
 
         if torch_tensorrt.runtime.get_cudagraphs_mode():
             self.cudagraph = torch.cuda.CUDAGraph()
+
+        self.is_shape_inference_io = {
+            input_name: self.engine.is_shape_inference_io(input_name)
+            for input_name in self.input_names
+        }
 
     def _check_initialized(self) -> None:
         if not self.initialized:
@@ -517,7 +518,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                 if can_use_pre_allocated_outputs:
                     outputs = self.pre_allocated_outputs
                 else:
-                    if shape_changed:
+                    if shape_changed or self.output_tensors is None:
                         self.output_shapes = [
                             tuple(self.context.get_tensor_shape(output_name))
                             for output_name in self.output_names
