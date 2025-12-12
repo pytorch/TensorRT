@@ -1,123 +1,133 @@
 "component: api [C++]":
-  - "narendasan"
+    - "narendasan"
 
 "component: api [Python]":
-  - "gs-olive"
-  - "peri044"
+    - "narendasan"
+    - "zewenli98"
 
 "component: api":
-  - "narendasan"
+    - "narendasan"
 
 "component: build system":
-  - "narendasan"
+    - "narendasan"
+    - "lanluo-nvidia"
 
 "component: conversion":
-  - "apbose"
-  - "peri044"
+    - "apbose"
+    - "zewenli98"
 
 "component: converters":
-  - "apbose"
-  - "zewenli98"
+    - "apbose"
+    - "zewenli98"
 
 "component: core":
-  - "narendasan"
-  - "peri044"
-  - "bowang007"
+    - "narendasan"
+    - "zewenli98"
+    - "cehongwang"
 
 "component: dynamo":
-  - "narendasan"
-  - "gs-olive"
-  - "peri044"
+    - "narendasan"
+    - "zewenli98"
+    - "cehongwang"
 
 "component: evaluators":
-  - "narendasan"
-  - "peri044"
+    - "zewenli98"
+    - "apbose"
 
 "component: execution":
-  - "narendasan"
+    - "narendasan"
 
 "component: lowering":
-  - "peri044"
-  - "gs-olive"
+    - "zewenli98"
+    - "cehongwang"
 
 "component: partitioning":
-  - "bowang007"
-  - "peri044"
+    - "bowang007"
+    - "cehongwang"
 
 "component: plugins":
-  - "peri044"
+    - "narendasan"
+    - "bowang007"
+
+"component: mgmn":
+    - "apbose"
 
 "component: quantization":
-  - "peri044"
-  - "bowang007"
+    - "zewenli98"
+    - "lanluo-nvidia"
 
 "component: runtime":
-  - "narendasan"
+    - "narendasan"
+    - "cehongwang"
 
 "component: tests":
-  - "narendasan"
+    - "lanluo-nvidia"
 
 "component: torch_compile":
-  - "gs-olive"
-  - "narendasan"
+    - "zewenli98"
+    - "narendasan"
 
 "component: torchtrtc":
-  - "narendasan"
+    - "narendasan"
 
 "component: dependencies":
-  # Work RE: upgrading dependencies in the compiler / testing new versions
-  - "peri044"
-  - "bowang007"
-  - "narendasan"
+    # Work RE: upgrading dependencies in the compiler / testing new versions
+    - "lanluo-nvidia"
+    - "narendasan"
 
 "documentation":
-  - "narendasan"
+    - "narendasan"
 
 "examples":
-  # Sample applications and notebooks on how to use TorchTRT features
-  - "peri044"
-  - "tanayvarshney"
+    # Sample applications and notebooks on how to use TorchTRT features
+    - "narendasan"
 
 "infrastructre":
-  - "narendasan"
+    - "narendasan"
+    - "lanluo-nvidia"
 
 "component: packaging":
-  - "narendasan"
-  - "peri044"
+    - "narendasan"
+    - "lanluo-nvidia"
 
 "channel: NGC":
-  - "peri044"
+    - "apbose"
+    - "lanluo-nvidia"
 
 "channel: linux-x86":
-  - "narendasan"
-  - "peri044"
+    - "narendasan"
+    - "lanluo-nvidia"
 
 "channel: linux-sbsa":
-  - "bowang007"
+    - "narendasan"
+    - "lanluo-nvidia"
 
 "channel: windows":
-  - "narendasan"
+    - "lanluo-nvidia"
 
 "channel: linux-jetpack":
-  - "narendasan"
-  - "bowang007"
+    - "narendasan"
+    - "lanluo-nvidia"
 
 "component: tooling":
-  - "narendasan"
+    - "narendasan"
+
+"backend: tensorrt"
+    - "zewenli98"
+
+"backend: tensorrt-rtx"
+    - "lanluo-nvidia"
 
 "performance":
-  - "peri044"
-  - "bowang007"
+    - "cehongwang"
+    - "bowang007"
 
 "channel: docker":
-  - "narendasan"
+    - "narendasan"
 
 "ux":
-  # Issues related to the user experience including debugging and installation
-  - "narendasan"
-  - "peri044"
+    # Issues related to the user experience including debugging and installation
+    - "narendasan"
 
 "component: fx":
-  - "frank-wei"
-  - "yinghai"
-  - "wushirong"
+    - "narendasan"
