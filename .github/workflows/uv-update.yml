@@ -92,7 +92,7 @@ jobs:
 
       - name: Auto-commit changes
         uses: stefanzweifel/git-auto-commit-action@v7
-        if: steps.check-changes.outputs.valid_changes == 'true'
+        if: steps.validate-changes.outputs.valid_changes == 'true'
         with:
           commit_message: "chore: update uv.lock"
           # to remove: test only
