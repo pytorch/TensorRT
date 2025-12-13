@@ -23,7 +23,7 @@ jobs:
             CHANNEL: nightly
             CI_BUILD: 1
         steps:
-            - uses: actions/checkout@v4
+            - uses: actions/checkout@v6
               with:
                   ref: ${{github.head_ref}}
                   token: ${{ secrets.GH_PYTORCHBOT_TOKEN }}
