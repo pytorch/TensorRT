@@ -91,7 +91,7 @@ jobs:
           rm -rfv "${GITHUB_WORKSPACE}"
           mkdir -p "${GITHUB_WORKSPACE}"
           echo "::endgroup::"
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           # Support the use case where we need to checkout someone's fork
           repository: ${{ inputs.test-infra-repository }}
@@ -120,13 +120,13 @@ jobs:
           script: ${{ inputs.pre-script }}
       - name: Download artifacts
         if: ${{ matrix.tensorrt == '' }}
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: ${{ env.ARTIFACT_NAME }}
           path: /opt/torch-tensorrt-builds/
       - name: Download artifacts
         if: ${{ matrix.tensorrt != '' }}
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: ${{ env.DOWNLOAD_ARTIFACT_NAME }}
           path: /opt/torch-tensorrt-builds/
@@ -191,7 +191,7 @@ jobs:
           echo "upload-docs=${upload_docs}" >> "${GITHUB_OUTPUT}"
 
       - name: Upload artifacts to GitHub (if any)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         if: ${{ inputs.upload-artifact != '' }}
         with:
           name: ${{ inputs.upload-artifact }}

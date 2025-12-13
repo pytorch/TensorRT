@@ -173,7 +173,7 @@ jobs:
           fi
           echo "::endgroup::"
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           # Support the use case where we need to checkout someone's fork
           repository: ${{ inputs.test-infra-repository }}
@@ -381,14 +381,14 @@ jobs:
       - name: Upload wheel to GitHub
         if: ${{ inputs.is-release-tarball == false }}
         continue-on-error: true
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: ${{ env.ARTIFACT_NAME }}
           path: ${{ inputs.repository }}/dist/
       - name: Upload cxx11 tarball to GitHub
         if: ${{ inputs.is-release-tarball == true }}
         continue-on-error: true
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: cxx11-tarball-${{ env.PYTHON_VERSION }}-${{ env.CU_VERSION }}
           path: ${{ inputs.repository }}/release/tarball/
