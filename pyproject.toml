@@ -32,7 +32,7 @@ classifiers = [
     "Topic :: Software Development :: Libraries",
 ]
 readme = { file = "README.md", content-type = "text/markdown" }
-requires-python = ">=3.10"
+requires-python = ">=3.10, <=3.13"
 keywords = [
     "pytorch",
     "torch",
@@ -93,7 +93,11 @@ include-package-data = false
 
 [tool.uv]
 package = true
-environments = ["sys_platform == 'linux'", "sys_platform == 'windows'"]
+environments = ["sys_platform == 'linux'", "sys_platform == 'win32'"]
+required-environments = [
+    "sys_platform == 'linux' and python_version >= '3.10' and python_version <= '3.13' and platform_machine == 'x86_64'",
+    "sys_platform == 'win32' and python_version >= '3.10' and python_version <= '3.13' and platform_machine == 'AMD64'"
+]
 prerelease = "if-necessary-or-explicit"
 index-strategy = "unsafe-best-match"
 
