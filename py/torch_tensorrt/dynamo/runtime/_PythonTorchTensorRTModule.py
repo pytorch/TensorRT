@@ -417,7 +417,9 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                 inputs_cpu = contiguous_inputs[i].cpu().to(torch.int64).numpy().copy()
                 self.context.set_tensor_address(input_name, inputs_cpu.ctypes.data)
             else:
-                if need_cudagraphs_record:
+                if (
+                    need_cudagraphs_record or self.output_tensors is None
+                ):  # First time execution:
                     self.context.set_input_shape(
                         input_name, tuple(contiguous_inputs[i].shape)
                     )

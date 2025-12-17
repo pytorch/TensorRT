@@ -145,7 +145,7 @@ void setup_input_tensors(
         // Create a new persistent input buffer
         compiled_engine->input_buffers[i] = std::move(formatted_inputs.back().clone());
       }
-      if (need_cudagraphs_record) {
+      if (need_cudagraphs_record or compiled_engine->allocated_outputs.size() == 0) {
         TORCHTRT_CHECK(
             compiled_engine->exec_ctx->setInputShape(name.c_str(), dims), "Error while setting the input shape");
       }
