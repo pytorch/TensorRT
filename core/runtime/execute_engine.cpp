@@ -289,9 +289,7 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
     auto current_device_id = -1;
     if (inputs.size() > 0) {
       current_device_id = inputs[0].device().index(); // Done this way to avoid a call to cudart
-      if (current_device_id != compiled_engine->current_device_id) {
-        compiled_engine->stream = c10::cuda::getCurrentCUDAStream(current_device_id);
-      }
+      compiled_engine->stream = c10::cuda::getCurrentCUDAStream(current_device_id);
     }
 
     { // Engine Execution (execute on engine stream)
@@ -379,9 +377,7 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
     auto current_device_id = -1;
     if (inputs.size() > 0) {
       current_device_id = inputs[0].device().index(); // Done this way to avoid a call to cudart
-      if (current_device_id != compiled_engine->current_device_id) {
-        compiled_engine->stream = c10::cuda::getCurrentCUDAStream(current_device_id);
-      }
+      compiled_engine->stream = c10::cuda::getCurrentCUDAStream(current_device_id);
     }
 
     { // Engine Execution (execute on engine stream)

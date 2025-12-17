@@ -43,6 +43,7 @@ from torch_tensorrt.dynamo.lowering import (
 from torch_tensorrt.dynamo.partitioning._resource_partitioner import (
     resource_partition,
 )
+from torch_tensorrt.dynamo.runtime._stream_handler import handle_cuda_stream
 from torch_tensorrt.dynamo.utils import (
     deallocate_module,
     get_cpu_memory_usage,
@@ -956,6 +957,7 @@ def compile_module(
         if attr.startswith("_frozen_param"):
             delattr(gm, attr)
     trt_module = None
+
     for name, _ in partitioned_module.named_children():
         submodule = getattr(partitioned_module, name)
         # filter on the GraphModule
@@ -1103,6 +1105,8 @@ def compile_module(
         settings.use_fast_partitioner = True
 
     dryrun_stats_display(dryrun_tracker, settings.dryrun)
+    if not settings.dryrun:
+        handle_cuda_stream(partitioned_module)
 
     return partitioned_module
 
