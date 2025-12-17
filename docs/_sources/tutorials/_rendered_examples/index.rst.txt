@@ -218,6 +218,23 @@ Model Zoo
 
 .. raw:: html
 
+    <div class="sphx-glr-thumbcontainer" tooltip="This example demonstrates how to use Torch-TensorRT Autocast with PyTorch Autocast to compile a...">
+
+.. only:: html
+
+  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_autocast_example_thumb.png
+    :alt:
+
+  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_autocast_example.py`
+
+.. raw:: html
+
+      <div class="sphx-glr-thumbnail-title">An example of using Torch-TensorRT Autocast</div>
+    </div>
+
+
+.. raw:: html
+
     <div class="sphx-glr-thumbcontainer" tooltip="This example illustrates the state of the art model FLUX.1-dev optimized using Torch-TensorRT.">
 
 .. only:: html
@@ -264,6 +281,23 @@ Model Zoo
 .. raw:: html
 
       <div class="sphx-glr-thumbnail-title">Automatically Generate a Plugin for a Custom Kernel</div>
+    </div>
+
+
+.. raw:: html
+
+    <div class="sphx-glr-thumbcontainer" tooltip="This example demonstrates compiling a model with a bounded CPU (host) memory budget using Torch...">
+
+.. only:: html
+
+  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_low_cpu_memory_compilation_thumb.png
+    :alt:
+
+  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_low_cpu_memory_compilation.py`
+
+.. raw:: html
+
+      <div class="sphx-glr-thumbnail-title">Low CPU Memory Compilation Example</div>
     </div>
 
 
