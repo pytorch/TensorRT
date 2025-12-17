@@ -237,6 +237,12 @@ TRTEngine::TRTEngine(
       out_binding_names[pyt_idx] = binding_name;
     }
     num_io = std::make_pair(inputs_size, outputs);
+
+    this->io_size = this->cuda_engine->getNbIOTensors();
+    for (int64_t i = 0; i < this->in_binding_names.size(); i++) {
+      this->isShapeInferenceIO[this->in_binding_names[i]] =
+          this->cuda_engine->isShapeInferenceIO(this->in_binding_names[i].c_str());
+    }
   }
 
 #ifndef NDEBUG
@@ -279,6 +285,14 @@ void TRTEngine::enable_profiling() {
   profile_execution = true;
   trt_engine_profiler = std::make_unique<TRTEngineProfiler>(name);
   exec_ctx->setProfiler(trt_engine_profiler.get());
+}
+
+void TRTEngine::set_output_tensors_as_unowned(bool enable) {
+  this->output_tensors_are_unowned = enable;
+}
+
+bool TRTEngine::are_output_tensors_unowned() {
+  return this->output_tensors_are_unowned;
 }
 
 void TRTEngine::set_profile_format(std::string format) {

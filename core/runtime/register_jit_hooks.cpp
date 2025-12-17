@@ -90,6 +90,8 @@ static auto TORCHTRT_UNUSED TRTEngineTSRegistrtion =
         .def("get_engine_layer_info", &TRTEngine::get_engine_layer_info)
         .def("infer_outputs", &TRTEngine::infer_outputs)
         .def("reset_captured_graph", &TRTEngine::reset_captured_graph)
+        .def("set_output_tensors_as_unowned", &TRTEngine::set_output_tensors_as_unowned)
+        .def("are_output_tensors_unowned", &TRTEngine::are_output_tensors_unowned)
         .def_readwrite("use_pre_allocated_outputs", &TRTEngine::use_pre_allocated_outputs)
         .def_readwrite("use_output_allocator_outputs", &TRTEngine::use_output_allocator_outputs)
         .def_property(

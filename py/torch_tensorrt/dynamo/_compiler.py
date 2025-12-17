@@ -557,7 +557,7 @@ def compile(
             stacklevel=2,
         )
 
-    if kwargs.get("use_explicit_typing", False) == False:
+    if not kwargs.get("use_explicit_typing", False):
         warnings.warn(
             "`use_explicit_typing` is deprecated. This setting will be removed and you should enable autocast instead.",
             DeprecationWarning,
@@ -949,7 +949,7 @@ def compile_module(
     for attr in dir(gm):
         if attr.startswith("_frozen_param"):
             delattr(gm, attr)
-
+    trt_module = None
     for name, _ in partitioned_module.named_children():
         submodule = getattr(partitioned_module, name)
         # filter on the GraphModule
@@ -1070,6 +1070,8 @@ def compile_module(
                     ) as f:
                         f.write(trt_module.get_layer_info())
 
+    # Only set the requires_unique_output flag for the last TRT Module when user has access to the output tensor
+
     # Parse the graph I/O and store it in dryrun tracker
     parse_graph_io(gm, dryrun_tracker)
 
@@ -1077,7 +1079,11 @@ def compile_module(
     for name, trt_module in trt_modules.items():
         setattr(partitioned_module, name, trt_module)
         if settings.lazy_engine_init and not settings.enable_cross_compile_for_windows:
-            getattr(partitioned_module, name).setup_engine()
+            trt_module = getattr(partitioned_module, name)
+            trt_module.setup_engine()
+
+    if trt_module:
+        trt_module.set_output_tensors_as_unowned(True)
 
     # Reset settings object to user specification after fallback to global partitioning mode
     if fast_partitioner_failed:
