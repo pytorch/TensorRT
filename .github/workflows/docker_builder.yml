@@ -39,7 +39,7 @@ jobs:
         echo "container_name=$container_name" >> $GITHUB_OUTPUT
 
     - name: Log in to the Container registry
-      uses: docker/login-action@v2
+      uses: docker/login-action@v3
       with:
         registry: ${{ env.DOCKER_REGISTRY }}
         username: ${{ github.actor }}
