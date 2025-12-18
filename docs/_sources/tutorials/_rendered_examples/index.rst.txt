@@ -303,23 +303,6 @@ Model Zoo
 
 .. raw:: html
 
-    <div class="sphx-glr-thumbcontainer" tooltip="If for some reason you want to change the conversion behavior of a specific PyTorch operation t...">
-
-.. only:: html
-
-  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_converter_overloading_thumb.png
-    :alt:
-
-  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_converter_overloading.py`
-
-.. raw:: html
-
-      <div class="sphx-glr-thumbnail-title">Overloading Torch-TensorRT Converters with Custom Converters</div>
-    </div>
-
-
-.. raw:: html
-
     <div class="sphx-glr-thumbcontainer" tooltip="In some cases there isn&#x27;t a great way to do either of these, perhaps because the operator is a ...">
 
 .. only:: html
@@ -332,6 +315,23 @@ Model Zoo
 .. raw:: html
 
       <div class="sphx-glr-thumbnail-title">Torch-TensorRT supports falling back to PyTorch implementations of operations in the case that Torch-TensorRT</div>
+    </div>
+
+
+.. raw:: html
+
+    <div class="sphx-glr-thumbcontainer" tooltip="If for some reason you want to change the conversion behavior of a specific PyTorch operation t...">
+
+.. only:: html
+
+  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_converter_overloading_thumb.png
+    :alt:
+
+  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_converter_overloading.py`
+
+.. raw:: html
+
+      <div class="sphx-glr-thumbnail-title">Overloading Torch-TensorRT Converters with Custom Converters</div>
     </div>
 
 
@@ -434,6 +434,23 @@ Model Zoo
 .. raw:: html
 
       <div class="sphx-glr-thumbnail-title">Engine Caching</div>
+    </div>
+
+
+.. raw:: html
+
+    <div class="sphx-glr-thumbcontainer" tooltip="This example demonstrates how to use the NVIDIA Runtime Compilation (NVRTC) library to compile ...">
+
+.. only:: html
+
+  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_nvrtc_aot_plugin_thumb.png
+    :alt:
+
+  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_nvrtc_aot_plugin.py`
+
+.. raw:: html
+
+      <div class="sphx-glr-thumbnail-title">Using Custom Kernels with NVRTC in TensorRT AOT Plugins</div>
     </div>
 
 
