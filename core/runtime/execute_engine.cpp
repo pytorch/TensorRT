@@ -96,7 +96,7 @@ void setup_input_tensors(
     std::vector<at::Tensor> inputs,
     c10::intrusive_ptr<TRTEngine> compiled_engine,
     bool cudagraphs_enabled,
-    bool need_cudagraphs_record) {
+    bool shape_changed) {
   // this is a buffer to store shape tensor input addresses throughout the runtime scope
   std::list<std::vector<int64_t>> inputShapeTensorValues;
   std::list<at::Tensor> formatted_inputs(compiled_engine->num_io.first);
@@ -140,12 +140,14 @@ void setup_input_tensors(
     } else {
       at::Tensor contig_input = inputs[i].view(shape).contiguous();
       formatted_inputs.emplace_back(std::move(contig_input));
-
+      bool need_cudagraphs_record = cudagraphs_enabled &&
+          (!compiled_engine->runtime_states.old_cudagraphs || shape_changed ||
+           compiled_engine->runtime_states.context_changed);
       if (need_cudagraphs_record) {
         // Create a new persistent input buffer
         compiled_engine->input_buffers[i] = std::move(formatted_inputs.back().clone());
       }
-      if (need_cudagraphs_record or compiled_engine->allocated_outputs.size() == 0) {
+      if (shape_changed || compiled_engine->allocated_outputs.size() == 0) {
         TORCHTRT_CHECK(
             compiled_engine->exec_ctx->setInputShape(name.c_str(), dims), "Error while setting the input shape");
       }
@@ -226,7 +228,7 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
         input_profiler_guard =
             std::make_unique<torch::autograd::profiler::RecordProfile>(compiled_engine->input_profile_path);
       }
-      setup_input_tensors(inputs, compiled_engine, cudagraphs_enabled, need_cudagraphs_record);
+      setup_input_tensors(inputs, compiled_engine, cudagraphs_enabled, shape_changed);
       // Check if input shapes can be inferred.
       int32_t const io_size{compiled_engine->io_size};
       std::vector<char const*> names(io_size);

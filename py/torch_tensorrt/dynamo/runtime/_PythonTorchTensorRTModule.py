@@ -383,8 +383,13 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         self,
         contiguous_inputs: List[torch.Tensor],
         cudagraphs_enabled: bool,
-        need_cudagraphs_record: bool,
+        shape_changed: bool = True,
     ) -> None:
+        need_cudagraphs_record = cudagraphs_enabled and (
+            not self.runtime_states.old_cudagraphs
+            or shape_changed
+            or self.runtime_states.context_changed
+        )
         for i, input_name in enumerate(self.input_names):
             if not contiguous_inputs[i].is_cuda:
                 logger.warning(
@@ -417,9 +422,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                 inputs_cpu = contiguous_inputs[i].cpu().to(torch.int64).numpy().copy()
                 self.context.set_tensor_address(input_name, inputs_cpu.ctypes.data)
             else:
-                if (
-                    need_cudagraphs_record or self.output_tensors is None
-                ):  # First time execution:
+                if shape_changed or self.output_tensors is None:
                     self.context.set_input_shape(
                         input_name, tuple(contiguous_inputs[i].shape)
                     )
@@ -490,9 +493,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                 ), f"Wrong number of inputs, expect {len(self.input_names)} get {len(contiguous_inputs)}."
 
                 self.setup_input_tensors(
-                    contiguous_inputs,
-                    self.cudagraphs_enabled,
-                    need_cudagraphs_record,
+                    contiguous_inputs, self.cudagraphs_enabled, shape_changed
                 )
 
                 if shape_changed:
@@ -807,3 +808,6 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
             return True
 
         return False
+
+    def are_output_tensors_unowned(self) -> bool:
+        return self.output_tensors_are_unowned

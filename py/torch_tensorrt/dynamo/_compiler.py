@@ -949,7 +949,7 @@ def compile_module(
     for attr in dir(gm):
         if attr.startswith("_frozen_param"):
             delattr(gm, attr)
-    trt_module = None
+
     for name, _ in partitioned_module.named_children():
         submodule = getattr(partitioned_module, name)
         # filter on the GraphModule
@@ -1082,8 +1082,12 @@ def compile_module(
             trt_module = getattr(partitioned_module, name)
             trt_module.setup_engine()
 
-    if trt_module:
-        trt_module.set_output_tensors_as_unowned(True)
+    output_node = list(partitioned_module.graph.nodes)[-1]
+    for arg in output_node.args:
+        target = arg[0].target
+        if "_run_on_acc" not in str(target):
+            continue
+        getattr(partitioned_module, target).set_output_tensors_as_unowned(True)
 
     # Reset settings object to user specification after fallback to global partitioning mode
     if fast_partitioner_failed:
