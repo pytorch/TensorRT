@@ -98,9 +98,8 @@ def add_plugin_aot_impl(
             "x_ptr": f"*{type_str}",
             "n_elements": "i32",
             "y_ptr": f"*{type_str}",
-            "BLOCK_SIZE": "constexpr",
         },
-        constants={
+        constexprs={
             "BLOCK_SIZE": block_size,
         },
     )
