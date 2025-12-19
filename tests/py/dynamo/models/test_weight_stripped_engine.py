@@ -98,7 +98,9 @@ class TestWeightStrippedEngine(TestCase):
         gm1_output = gm1(*example_inputs)
 
         assertions.assertEqual(
-            gm1_output.sum(), 0, msg="gm1_output should be all zeros"
+            gm1_output.sum(),
+            0,
+            msg=f"gm1_output should be all zeros, but got {gm1_output}",
         )
 
     @unittest.skipIf(

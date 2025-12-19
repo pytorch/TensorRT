@@ -159,8 +159,10 @@ def _pretraced_backend(
                 )
             if settings.strip_engine_weights:
                 logger.warning(
-                    "strip_engine_weights arg is not supported for torch.compile()"
+                    "strip_engine_weights=True is not supported for torch.compile(). It will be set to False automatically."
                 )
+                settings.strip_engine_weights = False
+
             trt_compiled = compile_module(
                 gm,
                 torchtrt_inputs,
