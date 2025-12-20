@@ -167,7 +167,6 @@ _SETTINGS_TO_BE_ENGINE_INVARIANT = (
     "engine_capability",
     "hardware_compatible",
     "refit_identical_engine_weights",
-    "strip_engine_weights",  # TODO: @Evan to remove this after implementing caching weight-stripped engines as default?
     "immutable_weights",
     "enable_weight_streaming",
     "tiling_optimization_level",

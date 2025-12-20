@@ -1346,8 +1346,6 @@ def convert_exported_program_to_serialized_trt_engine(
         interpreter_result = interpret_module_to_result(
             gm,
             inputs=flattened_input_list,
-            arg_inputs=list(trt_arg_inputs),
-            kwarg_inputs=trt_kwarg_inputs,
             settings=settings,
             engine_cache=engine_cache,
         )
