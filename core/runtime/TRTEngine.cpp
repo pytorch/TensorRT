@@ -130,7 +130,6 @@ TRTEngine::TRTEngine(
   runtime_states.old_cudagraphs = CUDAGRAPHS_MODE;
   runtime_states.old_pre_allocated_outputs = false;
   runtime_states.context_changed = false;
-  runtime_states.need_cudagraphs_record = false;
 
   if (_in_binding_names.size() == 0 && _out_binding_names.size() == 0) {
     uint64_t inputs = 0;

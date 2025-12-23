@@ -96,7 +96,7 @@ void setup_input_tensors(
     std::vector<at::Tensor> inputs,
     c10::intrusive_ptr<TRTEngine> compiled_engine,
     bool cudagraphs_enabled,
-    bool shape_changed) {
+    bool need_cudagraphs_record) {
   // this is a buffer to store shape tensor input addresses throughout the runtime scope
   std::list<std::vector<int64_t>> inputShapeTensorValues;
   std::list<at::Tensor> formatted_inputs(compiled_engine->num_io.first);
@@ -140,15 +140,15 @@ void setup_input_tensors(
     } else {
       at::Tensor contig_input = inputs[i].view(shape).contiguous();
       formatted_inputs.emplace_back(std::move(contig_input));
-      bool need_cudagraphs_record = compiled_engine->runtime_states.need_cudagraphs_record;
+
       if (need_cudagraphs_record) {
         // Create a new persistent input buffer
         compiled_engine->input_buffers[i] = std::move(formatted_inputs.back().clone());
       }
-      if (shape_changed || compiled_engine->allocated_outputs.size() == 0) {
-        TORCHTRT_CHECK(
-            compiled_engine->exec_ctx->setInputShape(name.c_str(), dims), "Error while setting the input shape");
-      }
+
+      TORCHTRT_CHECK(
+          compiled_engine->exec_ctx->setInputShape(name.c_str(), dims), "Error while setting the input shape");
+
       if (cudagraphs_enabled) {
         // If using CUDAGraphs copy formatted input to the corresponding persistent input buffer
         compiled_engine->input_buffers[i].copy_(formatted_inputs.back(), true);

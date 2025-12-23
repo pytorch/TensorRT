@@ -38,7 +38,6 @@ struct TorchTRTRuntimeStates {
   bool old_pre_allocated_outputs;
   // Indicates whether context has changed
   bool context_changed;
-  bool need_cudagraphs_record;
 
   // Evaluates whether certain conditions are met to enable CUDA Graph recording/reset or to reuse pre-allocated outputs
   // based on the current and previous states, as well as input shape has changed
@@ -46,7 +45,7 @@ struct TorchTRTRuntimeStates {
       bool new_cudagraphs,
       bool new_pre_allocated_output,
       bool shape_changed) {
-    need_cudagraphs_record = false;
+    bool need_cudagraphs_record = false;
     bool can_use_pre_allocated_outputs = false;
     bool need_cudagraphs_reset = false;
 
