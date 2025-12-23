@@ -167,7 +167,9 @@ def pull_cached_engine(
             # EXCLUDE_WEIGHTS flag must be cleared and INCLUDE_REFIT flag must be set
             serialization_config = engine.create_serialization_config()
             serialization_config.clear_flag(trt.SerializationFlag.EXCLUDE_WEIGHTS)
-            serialization_config.set_flag(trt.SerializationFlag.INCLUDE_REFIT)
+            # INCLUDE_REFIT flag is only available in TensorRT
+            if hasattr(trt.SerializationFlag, "INCLUDE_REFIT"):
+                serialization_config.set_flag(trt.SerializationFlag.INCLUDE_REFIT)
             serialized_engine = engine.serialize_with_config(serialization_config)
             # Start from here, the engine is weight-included and refittable
 

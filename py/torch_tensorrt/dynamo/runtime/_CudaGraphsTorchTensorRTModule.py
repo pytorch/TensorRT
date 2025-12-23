@@ -105,11 +105,22 @@ class CudaGraphsTorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
 
     def _reset_captured_graph(self) -> None:
         if self.cudagraph:
-            self.cudagraph.reset()
-            self.cudagraph = None
+            try:
+                self.cudagraph.reset()
+            except Exception as e:
+                # Catch any exceptions during graph reset, especially during shutdown
+                # when CUDA context may already be destroyed
+                logger.debug(f"Failed to reset CUDA graph during cleanup: {e}")
+            finally:
+                self.cudagraph = None
 
     def __del__(self) -> None:
-        self._reset_captured_graph()
+        try:
+            self._reset_captured_graph()
+        except Exception:
+            # Silently ignore exceptions in destructor to prevent segfaults
+            # during interpreter shutdown when CUDA context is already gone
+            pass
 
     def set_use_output_allocator(self, enable: bool) -> None:
         self.use_output_allocator_outputs = enable

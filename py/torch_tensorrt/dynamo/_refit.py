@@ -557,7 +557,9 @@ def refit_module_weights(
         # clear EXCLUDE_WEIGHTS flag and set INCLUDE_REFIT flag to make the engine refittable
         serialization_config = engine.create_serialization_config()
         serialization_config.clear_flag(trt.SerializationFlag.EXCLUDE_WEIGHTS)
-        serialization_config.set_flag(trt.SerializationFlag.INCLUDE_REFIT)
+        # INCLUDE_REFIT flag is only available in TensorRT
+        if hasattr(trt.SerializationFlag, "INCLUDE_REFIT"):
+            serialization_config.set_flag(trt.SerializationFlag.INCLUDE_REFIT)
         serialized_engine = engine.serialize_with_config(serialization_config)
 
         if isinstance(compiled_submodule, PythonTorchTensorRTModule):
