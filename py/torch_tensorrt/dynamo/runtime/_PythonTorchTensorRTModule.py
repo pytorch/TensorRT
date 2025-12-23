@@ -68,6 +68,7 @@ class TorchTRTRuntimeStates:
         self.old_pre_allocated_outputs = False
         # Indicates whether context has changed
         self.context_changed = False
+        self.need_cudagraphs_record = False
 
     def set_runtime_states(
         self,
@@ -106,6 +107,7 @@ class TorchTRTRuntimeStates:
         # reset flag
         self.context_changed = False
 
+        self.need_cudagraphs_record = need_cudagraphs_record
         return (
             need_cudagraphs_record,
             can_use_pre_allocated_outputs,
@@ -385,11 +387,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         cudagraphs_enabled: bool,
         shape_changed: bool = True,
     ) -> None:
-        need_cudagraphs_record = cudagraphs_enabled and (
-            not self.runtime_states.old_cudagraphs
-            or shape_changed
-            or self.runtime_states.context_changed
-        )
+        need_cudagraphs_record = self.runtime_states.need_cudagraphs_record
         for i, input_name in enumerate(self.input_names):
             if not contiguous_inputs[i].is_cuda:
                 logger.warning(

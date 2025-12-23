@@ -140,9 +140,7 @@ void setup_input_tensors(
     } else {
       at::Tensor contig_input = inputs[i].view(shape).contiguous();
       formatted_inputs.emplace_back(std::move(contig_input));
-      bool need_cudagraphs_record = cudagraphs_enabled &&
-          (!compiled_engine->runtime_states.old_cudagraphs || shape_changed ||
-           compiled_engine->runtime_states.context_changed);
+      bool need_cudagraphs_record = compiled_engine->runtime_states.need_cudagraphs_record;
       if (need_cudagraphs_record) {
         // Create a new persistent input buffer
         compiled_engine->input_buffers[i] = std::move(formatted_inputs.back().clone());
@@ -241,7 +239,6 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
     }
 
     { // Output Setup
-      bool new_outputs = false;
       std::unique_ptr<torch::autograd::profiler::RecordProfile> output_profiler_guard;
       if (compiled_engine->profile_execution) {
         output_profiler_guard =
@@ -253,30 +250,27 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
         if (compiled_engine->allocated_outputs.size() == 0 or compiled_engine->output_tensors_are_unowned or
             shape_changed) {
           compiled_engine->allocated_outputs = create_output_tensors(compiled_engine);
-          new_outputs = true;
         }
         outputs = compiled_engine->allocated_outputs;
       }
 
-      if (new_outputs) {
-        for (auto output_indices : compiled_engine->out_binding_map) {
-          auto pyt_idx = output_indices.second;
-          std::string name = compiled_engine->out_binding_names[pyt_idx];
-          if (need_cudagraphs_record) {
-            // If we are recording the cuda graph then we need to update the persistent output buffer
-            compiled_engine->output_buffers[pyt_idx] = std::move(outputs[pyt_idx].clone());
-          }
+      for (auto output_indices : compiled_engine->out_binding_map) {
+        auto pyt_idx = output_indices.second;
+        std::string name = compiled_engine->out_binding_names[pyt_idx];
+        if (need_cudagraphs_record) {
+          // If we are recording the cuda graph then we need to update the persistent output buffer
+          compiled_engine->output_buffers[pyt_idx] = std::move(outputs[pyt_idx].clone());
+        }
 
-          if (cudagraphs_enabled) {
-            TORCHTRT_CHECK(
-                compiled_engine->exec_ctx->setTensorAddress(
-                    name.c_str(), compiled_engine->output_buffers[pyt_idx].data_ptr()),
-                "Error while setting the output tensor address");
-          } else {
-            TORCHTRT_CHECK(
-                compiled_engine->exec_ctx->setTensorAddress(name.c_str(), outputs[pyt_idx].data_ptr()),
-                "Error while setting the output tensor address");
-          }
+        if (cudagraphs_enabled) {
+          TORCHTRT_CHECK(
+              compiled_engine->exec_ctx->setTensorAddress(
+                  name.c_str(), compiled_engine->output_buffers[pyt_idx].data_ptr()),
+              "Error while setting the output tensor address");
+        } else {
+          TORCHTRT_CHECK(
+              compiled_engine->exec_ctx->setTensorAddress(name.c_str(), outputs[pyt_idx].data_ptr()),
+              "Error while setting the output tensor address");
         }
       }
     }
