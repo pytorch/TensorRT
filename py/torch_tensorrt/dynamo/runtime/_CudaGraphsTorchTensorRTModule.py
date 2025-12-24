@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import sys
 from typing import Any, List, Optional, Sequence, Tuple
 
 import torch
@@ -68,6 +69,16 @@ class CudaGraphsTorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         self.shape_key: Optional[str] = None
         self._caller_stream: Optional[torch.cuda.Stream] = None
         self._engine_stream: Optional[torch.cuda.Stream] = None
+
+        # Check if running on Orin platform (SM 8.7) to avoid reset segfault
+        self._is_orin_platform = False
+        if torch.cuda.is_available():
+            capability = torch.cuda.get_device_capability()
+            # Orin has compute capability 8.7
+            self._is_orin_platform = (capability[0] == 8 and capability[1] == 7)
+            if self._is_orin_platform:
+                logger.info("Detected Orin platform (SM 8.7), disabling CUDA graph reset")
+
         self.warm_up()
 
     def warm_up(self) -> None:
@@ -105,6 +116,12 @@ class CudaGraphsTorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
 
     def _reset_captured_graph(self) -> None:
         if self.cudagraph:
+            # Skip reset on Orin platform to avoid segmentation fault
+            if self._is_orin_platform:
+                logger.debug("Skipping CUDA graph reset on Orin platform")
+                self.cudagraph = None
+                return
+
             try:
                 self.cudagraph.reset()
             except Exception as e:
@@ -115,12 +132,18 @@ class CudaGraphsTorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
                 self.cudagraph = None
 
     def __del__(self) -> None:
+        # Check if we're in interpreter shutdown - if so, skip cleanup to avoid segfaults
+        # During shutdown, CUDA context may already be destroyed (especially on Jetson/ARM)
+        # sys.is_finalizing() returns True during interpreter shutdown
+        if sys.is_finalizing():
+            # Python is shutting down - CUDA driver will clean up automatically
+            return
+        # Normal execution - safe to clean up CUDA graphs
         try:
             self._reset_captured_graph()
-        except Exception:
-            # Silently ignore exceptions in destructor to prevent segfaults
-            # during interpreter shutdown when CUDA context is already gone
-            pass
+        except Exception as e:
+            # Catch any unexpected exceptions during cleanup
+            logger.debug(f"Failed to reset CUDA graph in destructor: {e}")
 
     def set_use_output_allocator(self, enable: bool) -> None:
         self.use_output_allocator_outputs = enable
