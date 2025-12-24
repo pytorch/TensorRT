@@ -27,6 +27,26 @@ if importlib.util.find_spec("torchvision"):
     import torchvision.models as models
 
 
+# Check TensorRT version
+def _get_trt_version():
+    """Get TensorRT version as tuple (major, minor, patch)"""
+    version_str = trt.__version__
+    try:
+        # Parse version string like "10.11.0.33" or "10.14.0"
+        parts = version_str.split(".")
+        return (int(parts[0]), int(parts[1]), int(parts[2]))
+    except (ValueError, IndexError):
+        return (0, 0, 0)
+
+
+_TRT_VERSION = _get_trt_version()
+_REQUIRES_TRT_10_14_OR_HIGHER = _TRT_VERSION < (10, 14, 0)
+
+
+@unittest.skipIf(
+    _REQUIRES_TRT_10_14_OR_HIGHER,
+    f"Test requires TensorRT 10.14.0 or higher, current version: {trt.__version__}",
+)
 @unittest.skipIf(
     not torch_trt.ENABLED_FEATURES.torch_tensorrt_runtime,
     "TorchScript Frontend is not available",
@@ -88,6 +108,10 @@ def test_mapping():
     torch._dynamo.reset()
 
 
+@unittest.skipIf(
+    _REQUIRES_TRT_10_14_OR_HIGHER,
+    f"Test requires TensorRT 10.14.0 or higher, current version: {trt.__version__}",
+)
 @unittest.skipIf(
     not torch_trt.ENABLED_FEATURES.torch_tensorrt_runtime,
     "TorchScript Frontend is not available",
@@ -154,6 +178,10 @@ def test_conv_refit_with_weightmap():
 
 
 @unittest.skipIf(
+    _REQUIRES_TRT_10_14_OR_HIGHER,
+    f"Test requires TensorRT 10.14.0 or higher, current version: {trt.__version__}",
+)
+@unittest.skipIf(
     not torch_trt.ENABLED_FEATURES.torch_tensorrt_runtime,
     "TorchScript Frontend is not available",
 )
@@ -218,6 +246,10 @@ def test_batch_norm_refit_one_engine_with_weightmap():
     torch._dynamo.reset()
 
 
+@unittest.skipIf(
+    _REQUIRES_TRT_10_14_OR_HIGHER,
+    f"Test requires TensorRT 10.14.0 or higher, current version: {trt.__version__}",
+)
 @unittest.skipIf(
     not torch_trt.ENABLED_FEATURES.torch_tensorrt_runtime,
     "TorchScript Frontend is not available",
@@ -284,6 +316,10 @@ def test_batch_norm_refit_one_engine_without_weightmap():
 
 
 @unittest.skipIf(
+    _REQUIRES_TRT_10_14_OR_HIGHER,
+    f"Test requires TensorRT 10.14.0 or higher, current version: {trt.__version__}",
+)
+@unittest.skipIf(
     not torch_trt.ENABLED_FEATURES.torch_tensorrt_runtime,
     "TorchScript Frontend is not available",
 )
@@ -339,6 +375,10 @@ def test_refit_one_engine_with_weightmap():
     torch._dynamo.reset()
 
 
+@unittest.skipIf(
+    _REQUIRES_TRT_10_14_OR_HIGHER,
+    f"Test requires TensorRT 10.14.0 or higher, current version: {trt.__version__}",
+)
 @unittest.skipIf(
     not torch_trt.ENABLED_FEATURES.torch_tensorrt_runtime,
     "TorchScript Frontend is not available",
@@ -396,6 +436,10 @@ def test_refit_one_engine_no_map_with_weightmap():
     torch._dynamo.reset()
 
 
+@unittest.skipIf(
+    _REQUIRES_TRT_10_14_OR_HIGHER,
+    f"Test requires TensorRT 10.14.0 or higher, current version: {trt.__version__}",
+)
 @unittest.skipIf(
     not torch_trt.ENABLED_FEATURES.torch_tensorrt_runtime,
     "TorchScript Frontend is not available",
@@ -457,6 +501,10 @@ def test_refit_one_engine_with_wrong_weightmap():
     torch._dynamo.reset()
 
 
+@unittest.skipIf(
+    _REQUIRES_TRT_10_14_OR_HIGHER,
+    f"Test requires TensorRT 10.14.0 or higher, current version: {trt.__version__}",
+)
 @unittest.skipIf(
     not torch_trt.ENABLED_FEATURES.torch_tensorrt_runtime,
     "TorchScript Frontend is not available",
@@ -522,6 +570,10 @@ def test_refit_one_engine_bert_with_weightmap():
 
 
 @unittest.skipIf(
+    _REQUIRES_TRT_10_14_OR_HIGHER,
+    f"Test requires TensorRT 10.14.0 or higher, current version: {trt.__version__}",
+)
+@unittest.skipIf(
     not torch_trt.ENABLED_FEATURES.torch_tensorrt_runtime,
     "TorchScript Frontend is not available",
 )
@@ -578,6 +630,10 @@ def test_refit_one_engine_inline_runtime_with_weightmap(tmpdir):
 
 
 @unittest.skipIf(
+    _REQUIRES_TRT_10_14_OR_HIGHER,
+    f"Test requires TensorRT 10.14.0 or higher, current version: {trt.__version__}",
+)
+@unittest.skipIf(
     not torch_trt.ENABLED_FEATURES.refit,
     "Refit feature is not supported in Python 3.13 or higher",
 )
@@ -624,6 +680,10 @@ def test_refit_one_engine_python_runtime_with_weightmap():
     torch._dynamo.reset()
 
 
+@unittest.skipIf(
+    _REQUIRES_TRT_10_14_OR_HIGHER,
+    f"Test requires TensorRT 10.14.0 or higher, current version: {trt.__version__}",
+)
 @unittest.skipIf(
     not torch_trt.ENABLED_FEATURES.torch_tensorrt_runtime,
     "TorchScript Frontend is not available",
@@ -698,6 +758,10 @@ def test_refit_multiple_engine_with_weightmap():
     torch._dynamo.reset()
 
 
+@unittest.skipIf(
+    _REQUIRES_TRT_10_14_OR_HIGHER,
+    f"Test requires TensorRT 10.14.0 or higher, current version: {trt.__version__}",
+)
 @pytest.mark.unit
 def test_refit_multiple_engine_with_weightmap_cpu_offload():
     class net(nn.Module):
@@ -765,6 +829,10 @@ def test_refit_multiple_engine_with_weightmap_cpu_offload():
 
 
 @unittest.skipIf(
+    _REQUIRES_TRT_10_14_OR_HIGHER,
+    f"Test requires TensorRT 10.14.0 or higher, current version: {trt.__version__}",
+)
+@unittest.skipIf(
     not torch_trt.ENABLED_FEATURES.torch_tensorrt_runtime,
     "TorchScript Frontend is not available",
 )
@@ -815,6 +883,10 @@ def test_refit_one_engine_without_weightmap():
     torch._dynamo.reset()
 
 
+@unittest.skipIf(
+    _REQUIRES_TRT_10_14_OR_HIGHER,
+    f"Test requires TensorRT 10.14.0 or higher, current version: {trt.__version__}",
+)
 @unittest.skipIf(
     not torch_trt.ENABLED_FEATURES.torch_tensorrt_runtime,
     "TorchScript Frontend is not available",
@@ -880,6 +952,10 @@ def test_refit_one_engine_bert_without_weightmap():
 
 
 @unittest.skipIf(
+    _REQUIRES_TRT_10_14_OR_HIGHER,
+    f"Test requires TensorRT 10.14.0 or higher, current version: {trt.__version__}",
+)
+@unittest.skipIf(
     not torch_trt.ENABLED_FEATURES.torch_tensorrt_runtime,
     "TorchScript Frontend is not available",
 )
@@ -933,6 +1009,10 @@ def test_refit_one_engine_inline_runtime_without_weightmap(tmpdir):
 
 
 @unittest.skipIf(
+    _REQUIRES_TRT_10_14_OR_HIGHER,
+    f"Test requires TensorRT 10.14.0 or higher, current version: {trt.__version__}",
+)
+@unittest.skipIf(
     not torch_trt.ENABLED_FEATURES.refit,
     "Refit feature is not supported in Python 3.13 or higher",
 )
@@ -979,6 +1059,10 @@ def test_refit_one_engine_python_runtime_without_weightmap():
     torch._dynamo.reset()
 
 
+@unittest.skipIf(
+    _REQUIRES_TRT_10_14_OR_HIGHER,
+    f"Test requires TensorRT 10.14.0 or higher, current version: {trt.__version__}",
+)
 @unittest.skipIf(
     not torch_trt.ENABLED_FEATURES.torch_tensorrt_runtime,
     "TorchScript Frontend is not available",
@@ -1053,6 +1137,10 @@ def test_refit_multiple_engine_without_weightmap():
     torch._dynamo.reset()
 
 
+@unittest.skipIf(
+    _REQUIRES_TRT_10_14_OR_HIGHER,
+    f"Test requires TensorRT 10.14.0 or higher, current version: {trt.__version__}",
+)
 @unittest.skipIf(
     not torch_trt.ENABLED_FEATURES.refit,
     "Refit feature is not supported in Python 3.13 or higher",
