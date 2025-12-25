@@ -103,6 +103,9 @@ struct TRTEngine : torch::CustomClassHolder {
   std::shared_ptr<nvinfer1::ICudaEngine> cuda_engine;
   std::shared_ptr<nvinfer1::IExecutionContext> exec_ctx;
   std::pair<uint64_t, uint64_t> num_io;
+  uint64_t io_size;
+  std::map<std::string, bool> isShapeInferenceIO;
+  bool output_tensors_are_unowned = false;
   std::string name;
   RTDevice device_info;
 
@@ -159,6 +162,8 @@ struct TRTEngine : torch::CustomClassHolder {
   int64_t get_automatic_device_memory_budget();
   std::vector<at::Tensor> infer_outputs(std::vector<std::vector<int64_t>> input_shapes);
   void set_pre_allocated_outputs(bool enable);
+  void set_output_tensors_as_unowned(bool enable);
+  bool are_output_tensors_unowned();
   TorchTRTRuntimeStates runtime_states;
   friend std::ostream& operator<<(std::ostream& os, const TRTEngine& engine);
   static const char BINDING_DELIM = '%';
@@ -176,6 +181,7 @@ struct TRTEngine : torch::CustomClassHolder {
   std::string shape_key = "None";
   bool use_pre_allocated_outputs = false;
   std::vector<at::Tensor> pre_allocated_outputs;
+  std::vector<at::Tensor> allocated_outputs;
 
   // Output Allocator-Related Functionality
   bool requires_output_allocator = false; // engine requires output allocator

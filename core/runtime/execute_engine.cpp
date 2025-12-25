@@ -117,7 +117,7 @@ void setup_input_tensors(
     auto shape = core::util::toVec(dims);
     LOG_DEBUG("Input Name: " << name << " Shape: " << dims);
 
-    if (compiled_engine->cuda_engine->isShapeInferenceIO(name.c_str())) {
+    if (compiled_engine->isShapeInferenceIO[name]) {
       // Shape tensor inputs are casted to int64 explicitly.
       // Refer to
       // https://github.com/NVIDIA/TensorRT/blob/d2f4ef789a9a6ffdf37b55c3f81b486225f6b380/samples/common/sampleInference.cpp#L435
@@ -217,7 +217,7 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
       compiled_engine->cudagraph.reset();
     }
 
-    std::vector<at::Tensor> outputs(compiled_engine->num_io.second);
+    std::vector<at::Tensor> outputs;
 
     // Intialize inputs and outputs to be available throughout the succeeding scopes
     { // Input Setup
@@ -226,10 +226,9 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
         input_profiler_guard =
             std::make_unique<torch::autograd::profiler::RecordProfile>(compiled_engine->input_profile_path);
       }
-
-      setup_input_tensors(inputs, compiled_engine, cudagraphs_enabled, need_cudagraphs_record);
+      setup_input_tensors(inputs, compiled_engine, cudagraphs_enabled, shape_changed);
       // Check if input shapes can be inferred.
-      int32_t const io_size{compiled_engine->cuda_engine->getNbIOTensors()};
+      int32_t const io_size{compiled_engine->io_size};
       std::vector<char const*> names(io_size);
       int32_t const nbNames = compiled_engine->exec_ctx->inferShapes(names.size(), names.data());
       TORCHTRT_CHECK(
@@ -248,7 +247,11 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
       if (can_use_pre_allocated_outputs) {
         outputs = compiled_engine->pre_allocated_outputs;
       } else {
-        outputs = create_output_tensors(compiled_engine);
+        if (compiled_engine->allocated_outputs.size() == 0 or compiled_engine->output_tensors_are_unowned or
+            shape_changed) {
+          compiled_engine->allocated_outputs = create_output_tensors(compiled_engine);
+        }
+        outputs = compiled_engine->allocated_outputs;
       }
 
       for (auto output_indices : compiled_engine->out_binding_map) {
