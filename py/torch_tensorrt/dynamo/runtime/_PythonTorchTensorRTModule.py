@@ -310,10 +310,6 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
             for output_name in self.output_names
         ]
 
-        self.shape_key = "".join(
-            str(tuple(t)).replace(" ", "") for t in self.input_shapes
-        )
-
         if self.requires_output_allocator:
             self.create_output_allocator()
 
