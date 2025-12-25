@@ -70,18 +70,22 @@ def insert_engine_to_cache(
             f"Detected that the engine with hash: {hash_val} exists in cache. It will be refreshed"
         )
 
-    # set EXCLUDE_WEIGHTS flag to strip weights
-    serialization_config = interpreter_result.engine.create_serialization_config()
-    serialization_config.set_flag(trt.SerializationFlag.EXCLUDE_WEIGHTS)
-    weight_stripped_serialized_engine = interpreter_result.engine.serialize_with_config(
-        serialization_config
-    )
+    # for TensorRT >= 10.14, we save weight-stripped engine in cache
+    if hasattr(trt.SerializationFlag, "INCLUDE_REFIT"):
+        # set EXCLUDE_WEIGHTS flag to strip weights
+        serialization_config = interpreter_result.engine.create_serialization_config()
+        serialization_config.set_flag(trt.SerializationFlag.EXCLUDE_WEIGHTS)
+        serialized_engine_in_cache = interpreter_result.engine.serialize_with_config(
+            serialization_config
+        )
+    else:  # for TensorRT < 10.14, we save original engine in cache
+        serialized_engine_in_cache = interpreter_result.engine.serialize()
 
     # Insert weight-stripped engine to cache
     engine_cache.insert(
         hash_val,
         (
-            weight_stripped_serialized_engine,
+            serialized_engine_in_cache,
             interpreter_result.input_names,
             interpreter_result.output_names,
             inputs,
@@ -164,13 +168,17 @@ def pull_cached_engine(
                 weight_name_map=weight_name_map,
             )
 
-            # EXCLUDE_WEIGHTS flag must be cleared and INCLUDE_REFIT flag must be set
-            serialization_config = engine.create_serialization_config()
-            serialization_config.clear_flag(trt.SerializationFlag.EXCLUDE_WEIGHTS)
-            serialization_config.set_flag(trt.SerializationFlag.INCLUDE_REFIT)
-            serialized_engine = engine.serialize_with_config(serialization_config)
-            # Start from here, the engine is weight-included and refittable
+            # for TensorRT >= 10.14, we need to clear EXCLUDE_WEIGHTS flag and set INCLUDE_REFIT flag to make the engine refittable
+            if hasattr(trt.SerializationFlag, "INCLUDE_REFIT"):
+                serialization_config = engine.create_serialization_config()
+                serialization_config.clear_flag(trt.SerializationFlag.EXCLUDE_WEIGHTS)
+                serialization_config.set_flag(trt.SerializationFlag.INCLUDE_REFIT)
+                serialized_engine = engine.serialize_with_config(serialization_config)
+                # Start from here, the engine is weight-included and refittable
+            else:
+                serialized_engine = engine.serialize()
 
+            del engine
             with io.BytesIO() as engine_bytes:
                 engine_bytes.write(serialized_engine)
                 serialized_engine = engine_bytes.getvalue()
