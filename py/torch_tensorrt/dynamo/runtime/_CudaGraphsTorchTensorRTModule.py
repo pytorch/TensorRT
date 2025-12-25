@@ -75,9 +75,11 @@ class CudaGraphsTorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         if torch.cuda.is_available():
             capability = torch.cuda.get_device_capability()
             # Orin has compute capability 8.7
-            self._is_orin_platform = (capability[0] == 8 and capability[1] == 7)
+            self._is_orin_platform = capability[0] == 8 and capability[1] == 7
             if self._is_orin_platform:
-                logger.info("Detected Orin platform (SM 8.7), disabling CUDA graph reset")
+                logger.info(
+                    "Detected Orin platform (SM 8.7), disabling CUDA graph reset"
+                )
 
         self.warm_up()
 
@@ -119,6 +121,7 @@ class CudaGraphsTorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
             # Skip reset on Orin platform to avoid segmentation fault
             if self._is_orin_platform:
                 logger.debug("Skipping CUDA graph reset on Orin platform")
+                print("Skipping CUDA graph reset on Orin platform")
                 self.cudagraph = None
                 return
 

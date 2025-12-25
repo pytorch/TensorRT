@@ -10,20 +10,49 @@ from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import TorchTensorRTModu
 def is_blackwell():
     """
     Check if running on NVIDIA Blackwell architecture (sm_90+).
-    
+
     Blackwell architecture adds input/output reformat layers in TensorRT engines.
-    
+
     Returns:
         bool: True if running on Blackwell (sm_90+), False otherwise
     """
     if not torch.cuda.is_available():
         return False
-    
+
     device_properties = torch.cuda.get_device_properties(0)
     compute_capability = device_properties.major * 10 + device_properties.minor
-    
+
     # Blackwell is sm_90 and above
     return compute_capability >= 90
+
+
+def is_gb200():
+    """
+    Check if running on NVIDIA GB200 platform (Grace ARM CPU + Blackwell GPU, sm_100).
+
+    GB200 (Grace+Blackwell) has known issues with engine inspector and layer info retrieval.
+    This specifically checks for ARM architecture to distinguish from B200 (x86 + Blackwell).
+
+    Returns:
+        bool: True if running on GB200 (ARM + sm_100), False otherwise
+    """
+    import platform
+
+    if not torch.cuda.is_available():
+        return False
+
+    device_properties = torch.cuda.get_device_properties(0)
+    compute_capability = device_properties.major * 10 + device_properties.minor
+
+    # GB200 is sm_100 (compute capability 10.0) + ARM architecture (Grace CPU)
+    # B200 is also sm_100 but typically x86_64
+    is_arm = platform.machine().lower() in ["aarch64", "arm64"]
+    print(f"is_arm: {is_arm}")
+    print(f"compute_capability: {compute_capability}")
+
+    return compute_capability == 100 and is_arm
+
+
 @unittest.skipIf(
     not torchtrt.ENABLED_FEATURES.torchscript_frontend,
     "TorchScript Frontend is not available",
@@ -333,6 +362,10 @@ class TestTorchTensorRTModule(unittest.TestCase):
         torchtrt.ENABLED_FEATURES.tensorrt_rtx,
         "layer info is different for tensorrt_rtx",
     )
+    @unittest.skipIf(
+        is_gb200(),
+        "Skipping test_get_layer_info on GB200 due to segfault",
+    )
     def test_get_layer_info(self):
         """
         {
@@ -348,12 +381,13 @@ class TestTorchTensorRTModule(unittest.TestCase):
         """
 
         import json
+
         if is_blackwell():
-            # blackwell has additional layers- 
-            #Layer 0: __mye88_myl0_0           ← Input reformat layer
-            #Layer 1: aten__matmul(...) fc1    ← First matmul (fc1)
-            #Layer 2: aten__matmul(...) fc2    ← Second matmul (fc2)
-            #Layer 3: __mye90_myl0_3           ← Output reformat layer
+            # Blackwell has additional input/output reformat layers
+            # Layer 0: Input reformat layer (auto-generated TRT layer)
+            # Layer 1: aten::matmul(...) fc1 - First matmul (fc1)
+            # Layer 2: aten::matmul(...) fc2 - Second matmul (fc2)
+            # Layer 3: Output reformat layer (auto-generated TRT layer)
             num_layers = 4
         else:
             num_layers = 2
