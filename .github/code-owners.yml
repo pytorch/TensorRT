@@ -103,7 +103,13 @@
   - "bowang007"
 
 "component: tooling":
-  - "narendasan"
+    - "narendasan"
+
+"backend: tensorrt":
+    - "zewenli98"
+
+"backend: tensorrt-rtx":
+    - "lanluo-nvidia"
 
 "performance":
   - "peri044"
