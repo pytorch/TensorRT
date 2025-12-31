@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt.dynamo._settings &mdash; Torch-TensorRT v2.10.0.dev0+1169e10 documentation</title>
+  <title>torch_tensorrt.dynamo._settings &mdash; Torch-TensorRT v2.10.0.dev0+41ef526 documentation</title>
   
 
   
@@ -290,7 +290,7 @@
               
               
                 <div class="version">
-                  v2.10.0.dev0+1169e10
+                  v2.10.0.dev0+41ef526
                 </div>
               
             
@@ -490,6 +490,7 @@
 <span></span><span class="kn">from</span><span class="w"> </span><span class="nn">dataclasses</span><span class="w"> </span><span class="kn">import</span> <span class="n">dataclass</span><span class="p">,</span> <span class="n">field</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Collection</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Set</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">,</span> <span class="n">Union</span>
 
+<span class="kn">import</span><span class="w"> </span><span class="nn">tensorrt</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">trt</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch.fx.node</span><span class="w"> </span><span class="kn">import</span> <span class="n">Target</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt._Device</span><span class="w"> </span><span class="kn">import</span> <span class="n">Device</span>
@@ -701,6 +702,10 @@
     <span class="s2">&quot;autocast_max_depth_of_reduction&quot;</span><span class="p">,</span>
     <span class="s2">&quot;autocast_calibration_dataloader&quot;</span><span class="p">,</span>
 <span class="p">)</span>
+
+
+<span class="k">if</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">trt</span><span class="o">.</span><span class="n">SerializationFlag</span><span class="p">,</span> <span class="s2">&quot;INCLUDE_REFIT&quot;</span><span class="p">):</span>  <span class="c1"># for TensorRT &lt; 10.14</span>
+    <span class="n">_SETTINGS_TO_BE_ENGINE_INVARIANT</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s2">&quot;strip_engine_weights&quot;</span><span class="p">)</span>
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">settings_are_compatible</span><span class="p">(</span>
