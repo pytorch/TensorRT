@@ -88,7 +88,8 @@ class BaseEngineCache(ABC):
         input_specs_hash = sha256_hash(input_specs_data)
 
         invariant_engine_specs = [
-            str(getattr(settings, field)) for field in _SETTINGS_TO_BE_ENGINE_INVARIANT
+            str(getattr(settings, field))
+            for field in sorted(_SETTINGS_TO_BE_ENGINE_INVARIANT)
         ]
         with io.BytesIO() as stream:
             engine_specs_data = pickle.dumps(invariant_engine_specs)
