@@ -159,7 +159,8 @@ class CompilationSettings:
         self.__dict__.update(state)
 
 
-_SETTINGS_TO_BE_ENGINE_INVARIANT = (
+# If any of the following setting is changed, the engine should be rebuilt.
+_SETTINGS_TO_BE_ENGINE_INVARIANT = {
     "enabled_precisions",
     "max_aux_streams",
     "version_compatible",
@@ -173,7 +174,7 @@ _SETTINGS_TO_BE_ENGINE_INVARIANT = (
     "enable_weight_streaming",
     "tiling_optimization_level",
     "l2_limit_for_tiling",
-)
+}
 
 
 if not hasattr(trt.SerializationFlag, "INCLUDE_REFIT"):  # for TensorRT < 10.14
