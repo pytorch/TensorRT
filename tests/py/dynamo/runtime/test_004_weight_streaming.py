@@ -11,6 +11,23 @@ from torch_tensorrt.dynamo.utils import prepare_inputs
 INPUT_SIZE = (64, 100)
 
 
+def is_orin():
+    """
+    Check if running on NVIDIA Orin platform (SM 8.7).
+    
+    Orin has known issues with CUDA graph cleanup causing segmentation faults.
+    
+    Returns:
+        bool: True if running on Orin (SM 8.7), False otherwise
+    """
+    if not torch.cuda.is_available():
+        return False
+    
+    capability = torch.cuda.get_device_capability()
+    # Orin has compute capability 8.7
+    return capability[0] == 8 and capability[1] == 7
+
+
 class SampleModel(torch.nn.Module):
     def __init__(self):
         super().__init__()
@@ -290,6 +307,10 @@ class TestWeightStreamingPython(TestCase):
             ("python_runtime", True),
             ("cpp_runtime", False),
         ]
+    )
+    @unittest.skipIf(
+        is_orin(),
+        "Skipping test_runtime_state_change on Orin due to CUDA graph cleanup segfault",
     )
     @unittest.skipIf(
         torchtrt.ENABLED_FEATURES.tensorrt_rtx, "TensorRT-RTX has bug on cudagraphs"
