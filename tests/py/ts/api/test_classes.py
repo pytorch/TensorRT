@@ -10,20 +10,22 @@ from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import TorchTensorRTModu
 def is_blackwell():
     """
     Check if running on NVIDIA Blackwell architecture (sm_90+).
-    
+
     Blackwell architecture adds input/output reformat layers in TensorRT engines.
-    
+
     Returns:
         bool: True if running on Blackwell (sm_90+), False otherwise
     """
     if not torch.cuda.is_available():
         return False
-    
+
     device_properties = torch.cuda.get_device_properties(0)
     compute_capability = device_properties.major * 10 + device_properties.minor
-    
+
     # Blackwell is sm_90 and above
     return compute_capability >= 90
+
+
 @unittest.skipIf(
     not torchtrt.ENABLED_FEATURES.torchscript_frontend,
     "TorchScript Frontend is not available",
@@ -348,12 +350,13 @@ class TestTorchTensorRTModule(unittest.TestCase):
         """
 
         import json
+
         if is_blackwell():
-            # blackwell has additional layers- 
-            #Layer 0: __mye88_myl0_0           ← Input reformat layer
-            #Layer 1: aten__matmul(...) fc1    ← First matmul (fc1)
-            #Layer 2: aten__matmul(...) fc2    ← Second matmul (fc2)
-            #Layer 3: __mye90_myl0_3           ← Output reformat layer
+            # blackwell has additional layers-
+            # Layer 0: __mye88_myl0_0           ← Input reformat layer
+            # Layer 1: aten__matmul(...) fc1    ← First matmul (fc1)
+            # Layer 2: aten__matmul(...) fc2    ← Second matmul (fc2)
+            # Layer 3: __mye90_myl0_3           ← Output reformat layer
             num_layers = 4
         else:
             num_layers = 2
