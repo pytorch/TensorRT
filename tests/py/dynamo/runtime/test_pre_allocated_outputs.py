@@ -125,6 +125,44 @@ class TestPreAllocatedOutputs(TestCase):
             )
         torch._dynamo.reset()
 
+    def test_pre_allocated_outputs_unowned_outputs(self):
+        class SampleModel(torch.nn.Module):
+            def forward(self, x):
+                return torch.softmax(x * 7 + 2, dim=0)
+
+        model = SampleModel().eval().cuda()
+        inputs = [torch.randn(*INPUT_SIZE).cuda() for _ in range(TRIALS)]
+        fx_graph = torch.fx.symbolic_trace(model)
+
+        # Validate that the results between Torch and Torch-TRT are similar
+        optimized_model = torchtrt.compile(
+            fx_graph,
+            "dynamo",
+            inputs[0],
+            min_block_size=1,
+            pass_through_build_failures=True,
+            use_python_runtime=True,
+            torch_executed_ops={torch.ops.aten.add.Tensor},
+        )
+
+        with torchtrt.runtime.enable_pre_allocated_outputs(optimized_model):
+            optimized_model(inputs[0])
+            output_tensors = [
+                trt_mod.pre_allocated_outputs
+                for name, trt_mod in optimized_model.named_children()
+                if "_run_on_acc" in name
+            ]
+            optimized_model(inputs[0])
+            new_output_tensors = [
+                trt_mod.pre_allocated_outputs
+                for name, trt_mod in optimized_model.named_children()
+                if "_run_on_acc" in name
+            ]
+            self.assertTrue(output_tensors[0] is new_output_tensors[0])
+            self.assertTrue(output_tensors[1] is not new_output_tensors[1])
+
+        torch._dynamo.reset()
+
 
 if __name__ == "__main__":
     run_tests()
