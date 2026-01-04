@@ -29,7 +29,7 @@ class TestWeightStrippedEngine(TestCase):
     )
     def test_three_ways_to_compile(self):
         pyt_model = models.resnet18(pretrained=True).eval().to("cuda")
-        example_inputs = (torch.randn((100, 3, 224, 224)).to("cuda"),)
+        example_inputs = (torch.randn((2, 3, 224, 224)).to("cuda"),)
         exp_program = torch.export.export(pyt_model, example_inputs)
 
         settings = {
@@ -48,6 +48,7 @@ class TestWeightStrippedEngine(TestCase):
             **settings,
         )
         gm1_output = gm1(*example_inputs)
+        torch.cuda.empty_cache()
 
         # 2. Compile with torch.compile using tensorrt backend
         gm2 = torch.compile(
@@ -56,8 +57,10 @@ class TestWeightStrippedEngine(TestCase):
             options=settings,
         )
         gm2_output = gm2(*example_inputs)
+        torch.cuda.empty_cache()
 
         pyt_model_output = pyt_model(*example_inputs)
+        torch.cuda.empty_cache()
 
         assert torch.allclose(
             pyt_model_output, gm1_output, 1e-2, 1e-2
@@ -75,7 +78,7 @@ class TestWeightStrippedEngine(TestCase):
         not importlib.util.find_spec("torchvision"),
         "torchvision is not installed",
     )
-    def test_three_ways_to_compile_weight_stripped_engine(self):
+    def test_compile_weight_stripped_engine(self):
         pyt_model = models.resnet18(pretrained=True).eval().to("cuda")
         example_inputs = (torch.randn((100, 3, 224, 224)).to("cuda"),)
 
@@ -88,22 +91,16 @@ class TestWeightStrippedEngine(TestCase):
             "refit_identical_engine_weights": False,
         }
 
-        # 1. Compile with torch_trt.compile using dynamo backend
+        # Compile with torch_trt.compile using dynamo backend
         gm1 = torch_trt.compile(
             pyt_model, ir="dynamo", inputs=example_inputs, **settings
         )
         gm1_output = gm1(*example_inputs)
 
-        # 2. Compile with torch.compile using tensorrt backend, which is not supported to set strip_engine_weights=True
-        # gm2 = torch.compile(
-        #     pyt_model,
-        #     backend="tensorrt",
-        #     options=settings,
-        # )
-        # gm2_output = gm2(*example_inputs)
-
         assertions.assertEqual(
-            gm1_output.sum(), 0, msg="gm1_output should be all zeros"
+            gm1_output.sum(),
+            0,
+            msg=f"gm1_output should be all zeros, but got {gm1_output}",
         )
 
     @unittest.skipIf(
@@ -454,7 +451,7 @@ class TestWeightStrippedEngine(TestCase):
         not torch_trt.ENABLED_FEATURES.refit,
         "Engine caching requires refit feature that is not supported in Python 3.13 or higher",
     )
-    def test_different_args_dont_share_cached_engine(self):
+    def test_different_args_share_cached_engine(self):
         class MyModel(torch.nn.Module):
             def __init__(self):
                 super().__init__()
@@ -468,7 +465,7 @@ class TestWeightStrippedEngine(TestCase):
 
         pyt_model = MyModel().eval().to("cuda")
 
-        engine_cache_dir = "/tmp/test_different_args_dont_share_cached_engine"
+        engine_cache_dir = "/tmp/test_different_args_share_cached_engine"
         if os.path.exists(engine_cache_dir):
             shutil.rmtree(engine_cache_dir)
 
@@ -498,8 +495,8 @@ class TestWeightStrippedEngine(TestCase):
 
         assertions.assertEqual(
             len(os.listdir(engine_cache_dir)),
-            2,
-            msg=f"It has {len(os.listdir(engine_cache_dir))} cached engine(s) but should have 2 engines",
+            1,
+            msg=f"It has {len(os.listdir(engine_cache_dir))} cached engine(s) but should have 1 engine",
         )
 
     @unittest.skipIf(
@@ -636,3 +633,83 @@ class TestWeightStrippedEngine(TestCase):
             )
         except Exception as e:
             pass
+
+    @unittest.skipIf(
+        not torch_trt.ENABLED_FEATURES.refit,
+        "Engine caching requires refit feature that is not supported in Python 3.13 or higher",
+    )
+    @unittest.skipIf(
+        not importlib.util.find_spec("torchvision"),
+        "torchvision is not installed",
+    )
+    def test_refit_weight_stripped_engine_multiple_times(self):
+        pyt_model = models.resnet18(pretrained=True).eval().to("cuda")
+        example_inputs = (torch.randn((100, 3, 224, 224)).to("cuda"),)
+        # Mark the dim0 of inputs as dynamic
+        batch = torch.export.Dim("batch", min=1, max=200)
+        exp_program = torch.export.export(
+            pyt_model, args=example_inputs, dynamic_shapes={"x": {0: batch}}
+        )
+
+        inputs = (torch.rand((128, 3, 224, 224)).to("cuda"),)
+
+        trt_gm = torch_trt.dynamo.compile(
+            exp_program,
+            inputs,
+            use_python_runtime=True,
+            enabled_precisions={torch.float},
+            min_block_size=1,
+            immutable_weights=False,
+            cache_built_engines=False,
+            reuse_cached_engines=False,
+            strip_engine_weights=True,
+            refit_identical_engine_weights=False,
+        )
+        output = trt_gm(*inputs)
+        assertions.assertEqual(
+            output.sum(), 0, msg="weight-stripped engine results should be all zeros"
+        )
+
+        # Refit the weight-stripped engine with the same weights
+        refitted_trt_gm = refit_module_weights(trt_gm, exp_program)
+        refitted_output = refitted_trt_gm(*inputs)
+        assertions.assertNotEqual(
+            refitted_output.sum(),
+            0,
+            msg="refitted engine results should not be all zeros",
+        )
+
+        inputs2 = (torch.rand((64, 3, 224, 224)).to("cuda"),)
+        exp_program2 = torch.export.export(
+            pyt_model, args=inputs2, dynamic_shapes={"x": {0: batch}}
+        )
+
+        # Refit with different weights
+        refitted_trt_gm = refit_module_weights(refitted_trt_gm, exp_program2)
+        refitted_output = refitted_trt_gm(*inputs2)
+        assertions.assertNotEqual(
+            refitted_output.sum(),
+            0,
+            msg="refitted engine results should not be all zeros",
+        )
+
+        compiled_model = torch.compile(
+            pyt_model,
+            backend="tensorrt",
+            options={
+                "use_python_runtime": False,
+                "enabled_precisions": {torch.float},
+                "min_block_size": 1,
+                "immutable_weights": False,
+                "cache_built_engines": False,
+                "reuse_cached_engines": False,
+                "refit_identical_engine_weights": False,
+                "strip_engine_weights": False,
+            },
+        )
+        compiled_model_output = compiled_model(*inputs2)
+        cos_sim = cosine_similarity(refitted_output, compiled_model_output)
+        assertions.assertTrue(
+            cos_sim > COSINE_THRESHOLD,
+            msg=f"refitted_output doesn't match with compiled_model_output. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
+        )

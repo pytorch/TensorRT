@@ -5,8 +5,8 @@ name: Generate Docs
 # Controls when the action will run. Triggers the workflow on push or pull request
 # events but only for the master branch
 on:
-    push:
-        branches: [main]
+  push:
+    branches: [main]
 
 jobs:
     build-docs:
@@ -67,5 +67,5 @@ jobs:
                   commit_author: Torch-TensorRT Github Bot <torch-tensorrt.github.bot@nvidia.com>
 
 concurrency:
-    group: ${{ github.workflow }}-${{ github.ref_name }}
-    cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.ref_name }}
+  cancel-in-progress: true
