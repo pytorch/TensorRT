@@ -320,7 +320,8 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
       }
     } // End engine exeuction (resets to caller stream)
 
-    // Create output buffer for next execution of graph or trt context.
+    // When the pre-allocated output mode is turned on, for intermediate modules, we only create the output in the first
+    // execution or when shape is changed.
     if (compiled_engine->use_pre_allocated_outputs &&
         (compiled_engine->pre_allocated_outputs.size() == 0 || compiled_engine->output_tensors_are_unowned ||
          shape_changed)) {

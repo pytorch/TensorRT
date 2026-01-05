@@ -570,6 +570,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
 
                 self._caller_stream.wait_stream(self._engine_stream)
 
+            # When the pre-allocated output mode is turned on, for intermediate modules, we only create the output in the first execution or when shape is changed.
             if self.use_pre_allocated_outputs and (
                 self.output_tensors_are_unowned
                 or not self.pre_allocated_outputs
