@@ -30,10 +30,10 @@ jobs:
       matrix: ${{ steps.generate.outputs.matrix }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.11'
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           repository: pytorch/tensorrt
       - name: Generate matrix
@@ -41,7 +41,7 @@ jobs:
         run: |
           set -eou pipefail
           MATRIX_BLOB=${{ toJSON(needs.generate-matrix.outputs.matrix) }}
-          MATRIX_BLOB="$(python3 .github/scripts/filter-matrix.py --matrix "${MATRIX_BLOB}")"
+          MATRIX_BLOB="$(python3 .github/scripts/filter-matrix.py --use-rtx true --matrix "${MATRIX_BLOB}")"
           echo "${MATRIX_BLOB}"
           echo "matrix=${MATRIX_BLOB}" >> "${GITHUB_OUTPUT}"
 
