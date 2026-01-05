@@ -61,8 +61,8 @@ jobs:
             post-script: packaging/post_build_script.sh
             smoke-test-script: packaging/smoke_test_script.sh
             package-name: torch_tensorrt
-            display-name: x86_64
-    name: Build Linux ${{ matrix.display-name }} torch-tensorrt whl package
+            display-name: Build Linux x86_64 torch-tensorrt whl package
+    name: ${{ matrix.display-name }}
     uses: ./.github/workflows/build_linux.yml
     with:
       repository: ${{ matrix.repository }}
@@ -81,7 +81,7 @@ jobs:
       pip-install-torch-extra-args: "--extra-index-url https://pypi.org/simple"
 
   L0-dynamo-converter-tests:
-    name: L0 dynamo converter tests ${{ matrix.display-name }}
+    name: ${{ matrix.display-name }}
     needs: [filter-matrix, build]
     if: ${{ (github.ref_name == 'main' || github.ref_name == 'nightly' || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success() }}
     strategy:
@@ -93,7 +93,7 @@ jobs:
             pre-script: packaging/pre_build_script.sh
             post-script: packaging/post_build_script.sh
             smoke-test-script: packaging/smoke_test_script.sh
-            display-name: x86_64
+            display-name: L0 dynamo converter tests
     uses: ./.github/workflows/linux-test.yml
     with:
       job-name: L0-dynamo-converter-tests
@@ -111,7 +111,7 @@ jobs:
         popd
 
   L0-dynamo-core-tests:
-    name: L0 dynamo core tests
+    name: ${{ matrix.display-name }}
     needs: [filter-matrix, build]
     if: ${{ (github.ref_name == 'main' || github.ref_name == 'nightly' || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success() }}
     strategy:
@@ -123,6 +123,7 @@ jobs:
             pre-script: packaging/pre_build_script.sh
             post-script: packaging/post_build_script.sh
             smoke-test-script: packaging/smoke_test_script.sh
+            display-name: L0 dynamo core tests
     uses: ./.github/workflows/linux-test.yml
     with:
       job-name: L0-dynamo-core-tests
@@ -143,7 +144,7 @@ jobs:
         popd
 
   L0-py-core-tests:
-    name: L0 core python tests
+    name: ${{ matrix.display-name }}
     needs: [filter-matrix, build]
     if: ${{ (github.ref_name == 'main' || github.ref_name == 'nightly' || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success() }}
     strategy:
@@ -155,6 +156,7 @@ jobs:
             pre-script: packaging/pre_build_script.sh
             post-script: packaging/post_build_script.sh
             smoke-test-script: packaging/smoke_test_script.sh
+            display-name: L0 core python tests
     uses: ./.github/workflows/linux-test.yml
     with:
       job-name: L0-py-core-tests
@@ -172,7 +174,7 @@ jobs:
         popd
 
   L0-torchscript-tests:
-    name: L0 torchscript tests
+    name: ${{ matrix.display-name }}
     needs: [filter-matrix, build]
     if: ${{ (github.ref_name == 'main' || github.ref_name == 'nightly' || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success() }}
     strategy:
@@ -184,6 +186,7 @@ jobs:
             pre-script: packaging/pre_build_script.sh
             post-script: packaging/post_build_script.sh
             smoke-test-script: packaging/smoke_test_script.sh
+            display-name: L0 torchscript tests
     uses: ./.github/workflows/linux-test.yml
     with:
       job-name: L0-torchscript-tests
@@ -205,7 +208,7 @@ jobs:
         popd
 
   L1-dynamo-core-tests:
-    name: L1 dynamo core tests
+    name: ${{ matrix.display-name }}
     needs: [filter-matrix, build, L0-dynamo-converter-tests, L0-dynamo-core-tests, L0-py-core-tests, L0-torchscript-tests]
     if: ${{ (github.ref_name == 'main' || github.ref_name == 'nightly' || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success() }}
     strategy:
@@ -217,6 +220,7 @@ jobs:
             pre-script: packaging/pre_build_script.sh
             post-script: packaging/post_build_script.sh
             smoke-test-script: packaging/smoke_test_script.sh
+            display-name: L1 dynamo core tests
     uses: ./.github/workflows/linux-test.yml
     with:
       job-name: L1-dynamo-core-tests
@@ -236,7 +240,7 @@ jobs:
         popd
 
   L1-dynamo-compile-tests:
-    name: L1 dynamo compile tests
+    name: ${{ matrix.display-name }}
     needs: [filter-matrix, build, L0-dynamo-converter-tests, L0-dynamo-core-tests, L0-py-core-tests, L0-torchscript-tests]
     if: ${{ (github.ref_name == 'main' || github.ref_name == 'nightly' || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success() }}
     strategy:
@@ -248,6 +252,7 @@ jobs:
             pre-script: packaging/pre_build_script.sh
             post-script: packaging/post_build_script.sh
             smoke-test-script: packaging/smoke_test_script.sh
+            display-name: L1 dynamo compile tests
     uses: ./.github/workflows/linux-test.yml
     with:
       job-name: L1-dynamo-compile-tests
@@ -265,7 +270,7 @@ jobs:
         popd
 
   L1-torch-compile-tests:
-    name: L1 torch compile tests
+    name: ${{ matrix.display-name }}
     needs: [filter-matrix, build, L0-dynamo-converter-tests, L0-dynamo-core-tests, L0-py-core-tests, L0-torchscript-tests]
     if: ${{ (github.ref_name == 'main' || github.ref_name == 'nightly' || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success() }}
     strategy:
@@ -277,6 +282,7 @@ jobs:
             pre-script: packaging/pre_build_script.sh
             post-script: packaging/post_build_script.sh
             smoke-test-script: packaging/smoke_test_script.sh
+            display-name: L1 torch compile tests
     uses: ./.github/workflows/linux-test.yml
     with:
       job-name: L1-torch-compile-tests
@@ -296,7 +302,7 @@ jobs:
         popd
 
   L1-torchscript-tests:
-    name: L1 torch script tests
+    name: ${{ matrix.display-name }}
     needs: [filter-matrix, build, L0-dynamo-core-tests, L0-dynamo-converter-tests, L0-py-core-tests, L0-torchscript-tests]
     if: ${{ (github.ref_name == 'main' || github.ref_name == 'nightly' || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success() }}
     strategy:
@@ -308,6 +314,7 @@ jobs:
             pre-script: packaging/pre_build_script.sh
             post-script: packaging/post_build_script.sh
             smoke-test-script: packaging/smoke_test_script.sh
+            display-name: L1 torch script tests
     uses: ./.github/workflows/linux-test.yml
     with:
       job-name: L1-torchscript-tests
@@ -329,7 +336,7 @@ jobs:
         popd
 
   L2-torch-compile-tests:
-    name: L2 torch compile tests
+    name: ${{ matrix.display-name }}
     needs: [filter-matrix, build, L1-torch-compile-tests, L1-dynamo-compile-tests, L1-dynamo-core-tests, L1-torchscript-tests]
     if: ${{ (github.ref_name == 'main' || github.ref_name == 'nightly' || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success() }}
     strategy:
@@ -341,6 +348,7 @@ jobs:
             pre-script: packaging/pre_build_script.sh
             post-script: packaging/post_build_script.sh
             smoke-test-script: packaging/smoke_test_script.sh
+            display-name: L2 torch compile tests
     uses: ./.github/workflows/linux-test.yml
     with:
       job-name: L2-torch-compile-tests
@@ -359,7 +367,7 @@ jobs:
         popd
 
   L2-dynamo-compile-tests:
-    name: L2 dynamo compile tests
+    name: ${{ matrix.display-name }}
     needs: [filter-matrix, build, L1-dynamo-compile-tests, L1-dynamo-core-tests, L1-torch-compile-tests, L1-torchscript-tests]
     if: ${{ (github.ref_name == 'main' || github.ref_name == 'nightly' || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success() }}
     strategy:
@@ -371,6 +379,7 @@ jobs:
             pre-script: packaging/pre_build_script.sh
             post-script: packaging/post_build_script.sh
             smoke-test-script: packaging/smoke_test_script.sh
+            display-name: L2 dynamo compile tests
     uses: ./.github/workflows/linux-test.yml
     with:
       job-name: L2-dynamo-compile-tests
@@ -389,7 +398,7 @@ jobs:
         popd
 
   L2-dynamo-core-tests:
-    name: L2 dynamo core tests
+    name: ${{ matrix.display-name }}
     needs: [filter-matrix, build, L1-dynamo-core-tests, L1-dynamo-compile-tests, L1-torch-compile-tests, L1-torchscript-tests]
     if: ${{ (github.ref_name == 'main' || github.ref_name == 'nightly' || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success() }}
     strategy:
@@ -401,6 +410,7 @@ jobs:
             pre-script: packaging/pre_build_script.sh
             post-script: packaging/post_build_script.sh
             smoke-test-script: packaging/smoke_test_script.sh
+            display-name: L2 dynamo core tests
     uses: ./.github/workflows/linux-test.yml
     with:
       job-name: L2-dynamo-core-tests
@@ -418,7 +428,7 @@ jobs:
         popd
 
   L2-dynamo-plugin-tests:
-    name: L2 dynamo plugin tests
+    name: ${{ matrix.display-name }}
     needs: [filter-matrix, build, L1-dynamo-core-tests, L1-dynamo-compile-tests, L1-torch-compile-tests, L1-torchscript-tests]
     if: ${{ (github.ref_name == 'main' || github.ref_name == 'nightly' || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success() }}
     strategy:
@@ -430,6 +440,7 @@ jobs:
             pre-script: packaging/pre_build_script.sh
             post-script: packaging/post_build_script.sh
             smoke-test-script: packaging/smoke_test_script.sh
+            display-name: L2 dynamo plugin tests
     uses: ./.github/workflows/linux-test.yml
     with:
       job-name: L2-dynamo-plugin-tests
@@ -450,7 +461,7 @@ jobs:
         popd
 
   L2-torchscript-tests:
-    name: L2 torch script tests
+    name: ${{ matrix.display-name }}
     needs: [filter-matrix, build, L1-dynamo-core-tests, L1-dynamo-compile-tests, L1-torch-compile-tests, L1-torchscript-tests]
     if: ${{ (github.ref_name == 'main' || github.ref_name == 'nightly' || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success() }}
     strategy:
@@ -462,6 +473,7 @@ jobs:
             pre-script: packaging/pre_build_script.sh
             post-script: packaging/post_build_script.sh
             smoke-test-script: packaging/smoke_test_script.sh
+            display-name: L2 torch script tests
     uses: ./.github/workflows/linux-test.yml
     with:
       job-name: L2-torchscript-tests
@@ -483,7 +495,7 @@ jobs:
         popd
 
   L2-dynamo-distributed-tests:
-    name: L2 dynamo distributed tests
+    name: ${{ matrix.display-name }}
     needs: [filter-matrix, build, L1-dynamo-core-tests, L1-dynamo-compile-tests, L1-torch-compile-tests, L1-torchscript-tests]
     if: ${{ (github.ref_name == 'main' || github.ref_name == 'nightly' || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success() }}
     strategy:
@@ -495,6 +507,7 @@ jobs:
             pre-script: packaging/pre_build_script.sh
             post-script: packaging/post_build_script.sh
             smoke-test-script: packaging/smoke_test_script.sh
+            display-name: L2 dynamo distributed tests
     uses: ./.github/workflows/linux-test.yml
     with:
       job-name: L2-dynamo-distributed-tests
