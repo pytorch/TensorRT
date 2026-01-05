@@ -5,9 +5,8 @@ on:
     # Every Monday at 03:00 UTC; adjust as needed
     - cron: "0 3 * * 1"
   push:
-    # to remove: test only
+    # to remvoe: test only
     tags: [uv-update-v1]
-
     branches: [main]
     paths:
       - 'pyproject.toml'
@@ -21,8 +20,7 @@ jobs:
   sync-uv-lock:
     runs-on: linux.g5.4xlarge.nvidia.gpu
     if: ${{ ! contains(github.actor, 'pytorchbot') }}
-    # uncomment for run in main branch
-    #environment: pytorchbot-env
+    environment: pytorchbot-env
     container:
       image: pytorch/manylinux2_28-builder:cuda13.0
       options: --gpus all
@@ -34,10 +32,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          # to remove: test only
-          ref: lluo/add_uv_sync_job
-          # uncomment for actual run in main branch
-          #token: ${{ secrets.GH_PYTORCHBOT_TOKEN }}
+          token: ${{ secrets.GH_PYTORCHBOT_TOKEN }}
           fetch-depth: 0
 
       - name: Install uv
@@ -74,8 +69,6 @@ jobs:
           fi
           echo "has_changes=true" >> "$GITHUB_OUTPUT"
           echo "there is changes to the uv.lock file"
-          # to remove: test only
-          cat uv.lock
 
       - name: Validate the changes
         id: validate-changes
@@ -95,8 +88,7 @@ jobs:
         if: steps.validate-changes.outputs.valid_changes == 'true'
         with:
           commit_message: "chore: update uv.lock"
-          # to remove: test only
-          branch: lluo/add_uv_sync_job
+          branch: main
           commit_options: "--no-verify --signoff"
           file_pattern: uv.lock
           commit_user_name: Torch-TensorRT Github Bot
