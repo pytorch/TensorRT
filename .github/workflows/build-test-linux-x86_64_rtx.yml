@@ -41,7 +41,7 @@ jobs:
         run: |
           set -eou pipefail
           MATRIX_BLOB=${{ toJSON(needs.generate-matrix.outputs.matrix) }}
-          MATRIX_BLOB="$(python3 .github/scripts/filter-matrix.py --matrix "${MATRIX_BLOB}")"
+          MATRIX_BLOB="$(python3 .github/scripts/filter-matrix.py --use-rtx true --matrix "${MATRIX_BLOB}")"
           echo "${MATRIX_BLOB}"
           echo "matrix=${MATRIX_BLOB}" >> "${GITHUB_OUTPUT}"
 

@@ -5,8 +5,6 @@ on:
     # Every Monday at 03:00 UTC; adjust as needed
     - cron: "0 3 * * 1"
   push:
-    # to remvoe: test only
-    tags: [uv-update-v1]
     branches: [main]
     paths:
       - 'pyproject.toml'

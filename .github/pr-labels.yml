@@ -1,57 +1,89 @@
 "component: torchtrtc":
-    - cpp/torchtrtc/**/*
+  - changed-files:
+      - any-glob-to-any-file:
+          - cpp/torchtrtc/**/*
 
 "component: api [C++]":
-    - cpp/**/*
+  - changed-files:
+      - any-glob-to-any-file:
+          - cpp/**/*
 
 "component: api [Python]":
-    - py/**/*
+  - changed-files:
+      - any-glob-to-any-file:
+          - py/**/*
 
 "component: core":
-    - core/**/*
-    - py/torch_tensorrt/dynamo/**/*
+  - changed-files:
+      - any-glob-to-any-file:
+          - core/**/*
+          - py/torch_tensorrt/dynamo/**/*
 
 "component: conversion":
-    - core/conversion/**/*
-    - py/torch_tensorrt/dynamo/conversion/**/*
+  - changed-files:
+      - any-glob-to-any-file:
+          - core/conversion/**/*
+          - py/torch_tensorrt/dynamo/conversion/**/*
 
 "component: converters":
-    - core/conversion/converters/**/*
-    - py/torch_tensorrt/dynamo/conversion/impl/**/*
+  - changed-files:
+      - any-glob-to-any-file:
+          - core/conversion/converters/**/*
+          - py/torch_tensorrt/dynamo/conversion/impl/**/*
 
 "component: evaluators":
-    - core/conversion/evaluators/**/*
+  - changed-files:
+      - any-glob-to-any-file:
+          - core/conversion/evaluators/**/*
 
 "component: fx":
-    - py/torch_tensorrt/fx/**/*
+  - changed-files:
+      - any-glob-to-any-file:
+          - py/torch_tensorrt/fx/**/*
 
 "component: dynamo":
-    - py/torch_tensorrt/dynamo/**/*
+  - changed-files:
+      - any-glob-to-any-file:
+          - py/torch_tensorrt/dynamo/**/*
 
 "component: torch_compile":
-    - py/torch_tensorrt/dynamo/backend/*
+  - changed-files:
+      - any-glob-to-any-file:
+          - py/torch_tensorrt/dynamo/backend/*
 
 "component: partitioning":
-    - core/partitioning/**/*
+  - changed-files:
+      - any-glob-to-any-file:
+          - core/partitioning/**/*
 
 "component: runtime":
-    - core/runtime/**/*
-    - py/torch_tensorrt/dynamo/runtime/**/*
+  - changed-files:
+      - any-glob-to-any-file:
+          - core/runtime/**/*
+          - py/torch_tensorrt/dynamo/runtime/**/*
 
 "component: lowering":
-    - core/lowering/**/*
-    - py/torch_tensorrt/dynamo/lowering/**/*
+  - changed-files:
+      - any-glob-to-any-file:
+          - core/lowering/**/*
+          - py/torch_tensorrt/dynamo/lowering/**/*
 
 "component: tests":
-    - tests/**/*
+  - changed-files:
+      - any-glob-to-any-file:
+          - tests/**/*
 
 "component: build system":
-    - MODULE.bazel
-    - BUILD
-    - pyproject.toml
-    - setup.py
-    - toolchain/**/*
+  - changed-files:
+      - any-glob-to-any-file:
+          - MODULE.bazel
+          - BUILD
+          - pyproject.toml
+          - setup.py
+          - toolchain/**/*
 
 "documentation":
-    - docs/**/*
-    - docsrc/**/*
+  - changed-files:
+      - any-glob-to-any-file:
+          - docs/**/*
+          - docsrc/**/*
