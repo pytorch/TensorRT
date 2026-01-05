@@ -15,6 +15,8 @@ jetpack_python_versions: List[str] = ["3.10"]
 jetpack_cuda_versions: List[str] = ["cu126"]
 # rtx 1.2 currently only supports cu129 and cu130
 rtx_cuda_versions: List[str] = ["cu129", "cu130"]
+# trt 10.14.1 currently only supports cu129 and cu130
+trt_cuda_versions: List[str] = ["cu129", "cu130"]
 
 jetpack_container_image: str = "nvcr.io/nvidia/l4t-jetpack:r36.4.0"
 sbsa_container_image: str = "quay.io/pypa/manylinux_2_39_aarch64"
@@ -55,9 +57,11 @@ def filter_matrix_item(
         return False
     else:
         if use_rtx:
-            if item["desired_cuda"] in rtx_cuda_versions:
-                return True
-            return False
+            if item["desired_cuda"] not in rtx_cuda_versions:
+                return False
+        else:
+            if item["desired_cuda"] not in trt_cuda_versions:
+                return False
         if item["gpu_arch_type"] == "cuda-aarch64":
             # pytorch image:pytorch/manylinuxaarch64-builder:cuda12.8 comes with glibc2.28
             # however, TensorRT requires glibc2.31 on aarch64 platform
