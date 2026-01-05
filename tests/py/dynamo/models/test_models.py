@@ -425,6 +425,10 @@ def test_resnet18_half(ir):
 
 
 @pytest.mark.unit
+@unittest.skipIf(
+    torch_trt.ENABLED_FEATURES.tensorrt_rtx,
+    "tensorrt_rtx does not support bfloat16",
+)
 def test_cosmos_true_div(ir):
     class CosmosLearnablePositionalEmbed(torch.nn.Module):
         def __init__(
