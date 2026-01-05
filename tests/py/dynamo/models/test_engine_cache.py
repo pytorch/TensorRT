@@ -310,6 +310,7 @@ class TestEngineCache(TestCase):
                 exp_program,
                 tuple(inputs),
                 use_python_runtime=True,
+                use_explicit_typing=False,
                 enabled_precisions={torch.float},
                 min_block_size=1,
                 immutable_weights=False,
@@ -429,13 +430,13 @@ class TestEngineCache(TestCase):
                 backend="tensorrt",
                 options={
                     "use_python_runtime": False,
+                    "use_explicit_typing": False,
                     "enabled_precisions": {torch.float},
                     "min_block_size": 1,
                     "immutable_weights": False,
                     "cache_built_engines": cache_built_engines,
                     "reuse_cached_engines": reuse_cached_engines,
                     "engine_cache_dir": engine_cache_dir,
-                    "engine_cache_size": 1 << 30,  # 1GB
                 },
             )
             results.append(compiled_model(*inputs))  # trigger the compilation
@@ -495,6 +496,7 @@ class TestEngineCache(TestCase):
                 backend="tensorrt",
                 options={
                     "use_python_runtime": False,
+                    "use_explicit_typing": False,
                     "enabled_precisions": {torch.float},
                     "min_block_size": 1,
                     "immutable_weights": False,
@@ -551,6 +553,7 @@ class TestEngineCache(TestCase):
                 inputs=inputs,
                 **{
                     "use_python_runtime": True,
+                    "use_explicit_typing": False,
                     "enabled_precisions": {torch.float},
                     "min_block_size": 1,
                     "immutable_weights": False,
@@ -593,6 +596,7 @@ class TestEngineCache(TestCase):
                 backend="tensorrt",
                 options={
                     "use_python_runtime": True,
+                    "use_explicit_typing": False,
                     "enabled_precisions": {torch.float},
                     "min_block_size": 1,
                     "immutable_weights": False,

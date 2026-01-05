@@ -768,7 +768,7 @@ def recursively_remove_trigger(obj: Any) -> Any:
         for i, v in enumerate(obj):
             obj[i] = recursively_remove_trigger(v)
     else:
-        if not hasattr(obj, "__dict__") or isinstance(obj, (type,)):
+        if not hasattr(obj, "__dict__") or isinstance(obj, (type, torch.Tensor)):
             return obj
         for k, v in obj.__dict__.items():
             if k[:2] != "__" or k[-2:] != "__":

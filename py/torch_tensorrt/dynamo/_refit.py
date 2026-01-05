@@ -53,7 +53,7 @@ from torch_tensorrt.logging import TRT_LOGGER
 logger = logging.getLogger(__name__)
 
 
-@needs_refit
+@needs_refit  # type: ignore[misc]
 def construct_refit_mapping(
     module: torch.fx.GraphModule,
     inputs: Sequence[Input],
@@ -86,7 +86,7 @@ def construct_refit_mapping(
     return weight_refit_map
 
 
-@needs_refit
+@needs_refit  # type: ignore[misc]
 def construct_refit_mapping_from_weight_name_map(
     weight_name_map: dict[Any, Any],
     state_dict: dict[Any, Any],
@@ -131,7 +131,7 @@ def construct_refit_mapping_from_weight_name_map(
     return engine_weight_map
 
 
-@needs_refit
+@needs_refit  # type: ignore[misc]
 def _refit_single_trt_engine_with_gm(
     new_gm: torch.fx.GraphModule,
     old_engine: trt.ICudaEngine,
@@ -214,7 +214,7 @@ def _refit_single_trt_engine_with_gm(
             raise AssertionError("Refitting failed.")
 
 
-@needs_refit
+@needs_refit  # type: ignore[misc]
 def refit_module_weights(
     compiled_module: torch.fx.GraphModule | ExportedProgram,
     new_weight_module: ExportedProgram,
@@ -554,9 +554,12 @@ def refit_module_weights(
                     weight_name_map=None,
                 )
 
-        # clear EXCLUDE_WEIGHTS flag
+        # clear EXCLUDE_WEIGHTS flag and set INCLUDE_REFIT flag to make the engine refittable
         serialization_config = engine.create_serialization_config()
         serialization_config.clear_flag(trt.SerializationFlag.EXCLUDE_WEIGHTS)
+        # INCLUDE_REFIT flag is only available as of TensorRT 10.14
+        if hasattr(trt.SerializationFlag, "INCLUDE_REFIT"):
+            serialization_config.set_flag(trt.SerializationFlag.INCLUDE_REFIT)
         serialized_engine = engine.serialize_with_config(serialization_config)
 
         if isinstance(compiled_submodule, PythonTorchTensorRTModule):

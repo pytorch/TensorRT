@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt.dynamo._settings &mdash; Torch-TensorRT v2.10.0.dev0+2e6843e documentation</title>
+  <title>torch_tensorrt.dynamo._settings &mdash; Torch-TensorRT v2.10.0.dev0+9764296 documentation</title>
   
 
   
@@ -290,7 +290,7 @@
               
               
                 <div class="version">
-                  v2.10.0.dev0+2e6843e
+                  v2.10.0.dev0+9764296
                 </div>
               
             
@@ -490,19 +490,30 @@
 <span></span><span class="kn">from</span><span class="w"> </span><span class="nn">dataclasses</span><span class="w"> </span><span class="kn">import</span> <span class="n">dataclass</span><span class="p">,</span> <span class="n">field</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Collection</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Set</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">,</span> <span class="n">Union</span>
 
+<span class="kn">import</span><span class="w"> </span><span class="nn">tensorrt</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">trt</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch.fx.node</span><span class="w"> </span><span class="kn">import</span> <span class="n">Target</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt._Device</span><span class="w"> </span><span class="kn">import</span> <span class="n">Device</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt._enums</span><span class="w"> </span><span class="kn">import</span> <span class="n">EngineCapability</span><span class="p">,</span> <span class="n">dtype</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo._defaults</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
     <span class="n">ASSUME_DYNAMIC_SHAPE_SUPPORT</span><span class="p">,</span>
+    <span class="n">AUTOCAST_CALIBRATION_DATALOADER</span><span class="p">,</span>
+    <span class="n">AUTOCAST_EXCLUDED_NODES</span><span class="p">,</span>
+    <span class="n">AUTOCAST_EXCLUDED_OPS</span><span class="p">,</span>
+    <span class="n">AUTOCAST_LOW_PRECISION_TYPE</span><span class="p">,</span>
+    <span class="n">AUTOCAST_MAX_DEPTH_OF_REDUCTION</span><span class="p">,</span>
+    <span class="n">AUTOCAST_MAX_OUTPUT_THRESHOLD</span><span class="p">,</span>
     <span class="n">CACHE_BUILT_ENGINES</span><span class="p">,</span>
+    <span class="n">CPU_MEMORY_BUDGET</span><span class="p">,</span>
     <span class="n">DISABLE_TF32</span><span class="p">,</span>
     <span class="n">DLA_GLOBAL_DRAM_SIZE</span><span class="p">,</span>
     <span class="n">DLA_LOCAL_DRAM_SIZE</span><span class="p">,</span>
     <span class="n">DLA_SRAM_SIZE</span><span class="p">,</span>
     <span class="n">DRYRUN</span><span class="p">,</span>
+    <span class="n">ENABLE_AUTOCAST</span><span class="p">,</span>
     <span class="n">ENABLE_CROSS_COMPILE_FOR_WINDOWS</span><span class="p">,</span>
     <span class="n">ENABLE_EXPERIMENTAL_DECOMPOSITIONS</span><span class="p">,</span>
+    <span class="n">ENABLE_RESOURCE_PARTITIONING</span><span class="p">,</span>
     <span class="n">ENABLE_WEIGHT_STREAMING</span><span class="p">,</span>
     <span class="n">ENABLED_PRECISIONS</span><span class="p">,</span>
     <span class="n">ENGINE_CAPABILITY</span><span class="p">,</span>
@@ -586,6 +597,13 @@
 <span class="sd">        tiling_optimization_level (str): The optimization level of tiling strategies. A higher level allows TensorRT to spend more time searching for better tiling strategy. We currently support [&quot;none&quot;, &quot;fast&quot;, &quot;moderate&quot;, &quot;full&quot;].</span>
 <span class="sd">        l2_limit_for_tiling (int): The target L2 cache usage limit (in bytes) for tiling optimization (default is -1 which means no limit).</span>
 <span class="sd">        use_distributed_mode_trace (bool):  Using aot_autograd to trace the graph. This is enabled when DTensors or distributed tensors are present in distributed model</span>
+<span class="sd">        enable_autocast (bool): Whether to enable autocast. If enabled, use_explicit_typing will be set to True.</span>
+<span class="sd">        autocast_low_precision_type (Optional[Union[torch.dtype, dtype]]): The precision to reduce to. We currently support torch.float16 and torch.bfloat16. Default is None, which means no low precision is used.</span>
+<span class="sd">        autocast_excluded_nodes (Collection[str]): The set of regex patterns to match user-specified node names that should remain in FP32. Default is [].</span>
+<span class="sd">        autocast_excluded_ops (Collection[Target]): The set of targets (ATen ops) that should remain in FP32. Default is [].</span>
+<span class="sd">        autocast_max_output_threshold (float): Maximum absolute value for node outputs, nodes with outputs greater than this value will remain in FP32. Default is 512.</span>
+<span class="sd">        autocast_max_depth_of_reduction (Optional[int]): Maximum depth of reduction allowed in low precision. Nodes with higher reduction depths will remain in FP32. This helps prevent excessive accuracy loss in operations particularly sensitive to reduced precision, as higher-depth reductions may amplify computation errors in low precision formats. If not provided, infinity will be used. Default is None.</span>
+<span class="sd">        autocast_calibration_dataloader (Optional[torch.utils.data.DataLoader]): The dataloader to use for autocast calibration. Default is None.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">enabled_precisions</span><span class="p">:</span> <span class="n">Set</span><span class="p">[</span><span class="n">dtype</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="k">lambda</span><span class="p">:</span> <span class="n">ENABLED_PRECISIONS</span><span class="p">)</span>
@@ -629,6 +647,21 @@
     <span class="n">l2_limit_for_tiling</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">L2_LIMIT_FOR_TILING</span>
     <span class="n">use_distributed_mode_trace</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">USE_DISTRIBUTED_MODE_TRACE</span>
     <span class="n">offload_module_to_cpu</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">OFFLOAD_MODULE_TO_CPU</span>
+    <span class="n">enable_autocast</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">ENABLE_AUTOCAST</span>
+    <span class="n">autocast_low_precision_type</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">dtype</span><span class="p">]</span> <span class="o">=</span> <span class="n">AUTOCAST_LOW_PRECISION_TYPE</span>
+    <span class="n">autocast_excluded_nodes</span><span class="p">:</span> <span class="n">Collection</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span>
+        <span class="n">default_factory</span><span class="o">=</span><span class="k">lambda</span><span class="p">:</span> <span class="n">AUTOCAST_EXCLUDED_NODES</span>
+    <span class="p">)</span>
+    <span class="n">autocast_excluded_ops</span><span class="p">:</span> <span class="n">Collection</span><span class="p">[</span><span class="n">Target</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span>
+        <span class="n">default_factory</span><span class="o">=</span><span class="k">lambda</span><span class="p">:</span> <span class="n">AUTOCAST_EXCLUDED_OPS</span>
+    <span class="p">)</span>
+    <span class="n">autocast_max_output_threshold</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="n">AUTOCAST_MAX_OUTPUT_THRESHOLD</span>
+    <span class="n">autocast_max_depth_of_reduction</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="n">AUTOCAST_MAX_DEPTH_OF_REDUCTION</span>
+    <span class="n">autocast_calibration_dataloader</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">utils</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">DataLoader</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">AUTOCAST_CALIBRATION_DATALOADER</span>
+    <span class="p">)</span>
+    <span class="n">enable_resource_partitioning</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">ENABLE_RESOURCE_PARTITIONING</span>
+    <span class="n">cpu_memory_budget</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">CPU_MEMORY_BUDGET</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">__getstate__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
         <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.conversion._ConverterRegistry</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
@@ -646,6 +679,7 @@
         <span class="bp">self</span><span class="o">.</span><span class="vm">__dict__</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">state</span><span class="p">)</span></div>
 
 
+<span class="c1"># If any of the following setting is changed, the engine should be rebuilt.</span>
 <span class="n">_SETTINGS_TO_BE_ENGINE_INVARIANT</span> <span class="o">=</span> <span class="p">(</span>
     <span class="s2">&quot;enabled_precisions&quot;</span><span class="p">,</span>
     <span class="s2">&quot;max_aux_streams&quot;</span><span class="p">,</span>
@@ -656,12 +690,22 @@
     <span class="s2">&quot;engine_capability&quot;</span><span class="p">,</span>
     <span class="s2">&quot;hardware_compatible&quot;</span><span class="p">,</span>
     <span class="s2">&quot;refit_identical_engine_weights&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;strip_engine_weights&quot;</span><span class="p">,</span>  <span class="c1"># TODO: @Evan to remove this after implementing caching weight-stripped engines as default?</span>
     <span class="s2">&quot;immutable_weights&quot;</span><span class="p">,</span>
     <span class="s2">&quot;enable_weight_streaming&quot;</span><span class="p">,</span>
     <span class="s2">&quot;tiling_optimization_level&quot;</span><span class="p">,</span>
     <span class="s2">&quot;l2_limit_for_tiling&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;enable_autocast&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;autocast_low_precision_type&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;autocast_excluded_nodes&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;autocast_excluded_ops&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;autocast_max_output_threshold&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;autocast_max_depth_of_reduction&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;autocast_calibration_dataloader&quot;</span><span class="p">,</span>
 <span class="p">)</span>
+
+
+<span class="k">if</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">trt</span><span class="o">.</span><span class="n">SerializationFlag</span><span class="p">,</span> <span class="s2">&quot;INCLUDE_REFIT&quot;</span><span class="p">):</span>  <span class="c1"># for TensorRT &lt; 10.14</span>
+    <span class="n">_SETTINGS_TO_BE_ENGINE_INVARIANT</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s2">&quot;strip_engine_weights&quot;</span><span class="p">)</span>
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">settings_are_compatible</span><span class="p">(</span>

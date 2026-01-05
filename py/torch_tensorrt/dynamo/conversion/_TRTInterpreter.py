@@ -31,7 +31,7 @@ from torch_tensorrt._Input import Input
 from torch_tensorrt._utils import is_tensorrt_version_supported
 from torch_tensorrt.dynamo import _defaults
 from torch_tensorrt.dynamo._engine_cache import BaseEngineCache
-from torch_tensorrt.dynamo._settings import CompilationSettings, settings_are_compatible
+from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
 from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
     DYNAMO_CONVERTERS as CONVERTERS,
@@ -594,79 +594,6 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         gc.collect()
         torch.cuda.empty_cache()
 
-    @needs_refit  # type: ignore[misc]
-    def _pull_cached_engine(self, hash_val: str) -> Optional[TRTInterpreterResult]:
-        # query the cached TRT engine
-        cached_data = self.engine_cache.check(hash_val)  # type: ignore[union-attr]
-        if cached_data is not None:  # hit the cache
-            (
-                serialized_engine,
-                self._input_names,
-                self._output_names,
-                cached_engine_input_specs,
-                engine_compilation_settings,
-                self.weight_name_map,
-                self.ctx.requires_output_allocator,
-            ) = cached_data
-
-            setting_compatiblity, incompattible_settings = settings_are_compatible(
-                self.compilation_settings, engine_compilation_settings
-            )
-            assert (
-                setting_compatiblity
-            ), f"Attempted to refit a cached engine with incompatible settings: {incompattible_settings}, (old_settings: {engine_compilation_settings}, new_settings: {self.compilation_settings})"
-
-            for i, e in enumerate(
-                [
-                    Input.equivalent_spec(c, i)
-                    for c, i in zip(cached_engine_input_specs, self.input_specs)
-                ]
-            ):
-                assert (
-                    e
-                ), f"Attempted to refit a cached engine built for a different input size (input: {i}, cached size: {cached_engine_input_specs[i]}, new size: {self.input_specs[i]}"
-
-            _LOGGER.info(
-                "Found the cached engine that corresponds to this graph. It is directly loaded."
-            )
-
-            # refit the cached engine with the new graph module
-            if not self.compilation_settings.strip_engine_weights:
-                runtime = trt.Runtime(TRT_LOGGER)
-                engine = runtime.deserialize_cuda_engine(serialized_engine)
-
-                from torch_tensorrt.dynamo._refit import (
-                    _refit_single_trt_engine_with_gm,
-                )
-
-                _refit_single_trt_engine_with_gm(
-                    new_gm=self.module,
-                    old_engine=engine,
-                    input_list=self.input_specs,
-                    settings=self.compilation_settings,
-                    weight_name_map=self.weight_name_map,
-                )
-
-                # TODO: @Evan is waiting for TRT's feature to load the weight-stripped engine
-                # # EXCLUDE_WEIGHTS flag must be cleared
-                # serialization_config = engine.create_serialization_config()
-                # serialization_config.clear_flag(
-                #     trt.SerializationFlag.EXCLUDE_WEIGHTS
-                # )
-                # serialized_engine = engine.serialize_with_config(
-                #     serialization_config
-                # )
-                # # As of now, the engine becomes non-refittable because when EXCLUDE_WEIGHTS flag is cleared, the REFIT flag is also cleared by TRT to make the plan file smaller
-
-            return TRTInterpreterResult(
-                engine,
-                self._input_names,
-                self._output_names,
-                self.weight_name_map,
-                self.ctx.requires_output_allocator,
-            )
-        return None
-
     def run(
         self,
         strict_type_constraints: bool = False,
@@ -682,26 +609,6 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         Return:
             TRTInterpreterResult
         """
-        # self.engine_cache could be None if:
-        # 1) engine_cache is not passed in when calling this function like convert_exported_program_to_serialized_trt_engine etc., or
-        # 2) both cache_built_engines and reuse_cached_engines are False
-        if (
-            self.engine_cache is not None
-            and not self.compilation_settings.immutable_weights
-        ):
-            if (
-                self.compilation_settings.cache_built_engines
-                or self.compilation_settings.reuse_cached_engines
-            ):
-                hash_val = self.engine_cache.get_hash(
-                    self.module, self.input_specs, self.compilation_settings
-                )
-
-                if self.compilation_settings.reuse_cached_engines:
-                    interpreter_result = self._pull_cached_engine(hash_val)
-                    if interpreter_result is not None:  # hit the cache
-                        return interpreter_result  # type: ignore[no-any-return]
-
         self._construct_trt_network_def()
         _LOGGER.debug(
             f"CPU memory usage after network construction: {get_cpu_memory_usage()} MB"
