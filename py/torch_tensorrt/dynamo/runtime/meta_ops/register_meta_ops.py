@@ -23,13 +23,15 @@ def fake_aten_cudnn_grid_sampler(
     if grid.dim() == 4:
         n, h_out, w_out, _ = grid.shape
         c = input.shape[1]
-        out_shape = (n, c, h_out, w_out)
+        out_shape = [n, c, h_out, w_out]
     elif grid.dim() == 5:
         n, d_out, h_out, w_out, _ = grid.shape
         c = input.shape[1]
-        out_shape = (n, c, d_out, h_out, w_out)
+        out_shape = [n, c, d_out, h_out, w_out]
     else:
-        raise RuntimeError(f"aten::cudnn_grid_sampler: unexpected grid rank {grid.dim()}")
+        raise RuntimeError(
+            f"aten::cudnn_grid_sampler: unexpected grid rank {grid.dim()}"
+        )
     return torch.empty(out_shape, dtype=input.dtype, device=input.device)
 
 
