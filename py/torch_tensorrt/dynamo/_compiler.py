@@ -1084,10 +1084,11 @@ def compile_module(
 
     output_node = list(partitioned_module.graph.nodes)[-1]
     for arg in output_node.args:
-        target = arg[0].target
-        if "_run_on_acc" not in str(target):
-            continue
-        getattr(partitioned_module, target).set_output_tensors_as_unowned(True)
+        for output in arg:
+            target = output.target
+            if "_run_on_acc" not in str(target):
+                continue
+            getattr(partitioned_module, target).set_output_tensors_as_unowned(True)
 
     # Reset settings object to user specification after fallback to global partitioning mode
     if fast_partitioner_failed:
