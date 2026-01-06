@@ -70,7 +70,8 @@ jobs:
             env-script: packaging/vc_env_helper.bat
             smoke-test-script: packaging/smoke_test_windows.py
             package-name: torch_tensorrt
-    name: RTX - Build Windows torch-tensorrt whl package
+            display-name: RTX - Build Windows torch-tensorrt whl package
+    name: ${{ matrix.display-name }}
     uses: ./.github/workflows/build_windows.yml
     with:
       repository: ${{ matrix.repository }}
@@ -88,7 +89,7 @@ jobs:
       timeout: 120
 
   L0-dynamo-converter-tests:
-    name: L0 dynamo converter tests
+    name: ${{ matrix.display-name }}
     needs: [substitute-runner, build]
     if: ${{ (github.ref_name == 'main' || github.ref_name == 'nightly' || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success() }}
     strategy:
@@ -97,6 +98,7 @@ jobs:
         include:
           - repository: pytorch/tensorrt
             package-name: torch_tensorrt
+            display-name: L0 dynamo converter tests
     uses: ./.github/workflows/windows-test.yml
     with:
       job-name: L0-dynamo-converter-tests
@@ -115,7 +117,7 @@ jobs:
         popd
 
   L0-dynamo-core-tests:
-    name: L0 dynamo core tests
+    name: ${{ matrix.display-name }}
     needs: [substitute-runner, build]
     if: ${{ (github.ref_name == 'main' || github.ref_name == 'nightly' || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success() }}
     strategy:
@@ -124,6 +126,7 @@ jobs:
         include:
           - repository: pytorch/tensorrt
             package-name: torch_tensorrt
+            display-name: L0 dynamo core tests
     uses: ./.github/workflows/windows-test.yml
     with:
       job-name: L0-dynamo-core-tests
@@ -144,7 +147,7 @@ jobs:
         popd
 
   L0-py-core-tests:
-    name: L0 core python tests
+    name: ${{ matrix.display-name }}
     needs: [substitute-runner, build]
     if: ${{ (github.ref_name == 'main' || github.ref_name == 'nightly' || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success() }}
     strategy:
@@ -153,6 +156,7 @@ jobs:
         include:
           - repository: pytorch/tensorrt
             package-name: torch_tensorrt
+            display-name: L0 core python tests
     uses: ./.github/workflows/windows-test.yml
     with:
       job-name: L0-core-python-tests
@@ -171,7 +175,7 @@ jobs:
         popd
 
   L1-dynamo-core-tests:
-    name: L1 dynamo core tests
+    name: ${{ matrix.display-name }}
     needs: [substitute-runner, build, L0-dynamo-converter-tests, L0-dynamo-core-tests, L0-py-core-tests]
     if: ${{ (github.ref_name == 'main' || github.ref_name == 'nightly' || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success() }}
     strategy:
@@ -180,6 +184,7 @@ jobs:
         include:
           - repository: pytorch/tensorrt
             package-name: torch_tensorrt
+            display-name: L1 dynamo core tests
     uses: ./.github/workflows/windows-test.yml
     with:
       job-name: L1-dynamo-core-tests
@@ -198,7 +203,7 @@ jobs:
         popd
 
   L1-dynamo-compile-tests:
-    name: L1 dynamo compile tests
+    name: ${{ matrix.display-name }}
     needs: [substitute-runner, build, L0-dynamo-converter-tests, L0-dynamo-core-tests, L0-py-core-tests]
     if: ${{ (github.ref_name == 'main' || github.ref_name == 'nightly' || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success() }}
     strategy:
@@ -207,6 +212,7 @@ jobs:
         include:
           - repository: pytorch/tensorrt
             package-name: torch_tensorrt
+            display-name: L1 dynamo compile tests
     uses: ./.github/workflows/windows-test.yml
     with:
       job-name: L1-dynamo-compile-tests
@@ -225,7 +231,7 @@ jobs:
         popd
 
   L1-torch-compile-tests:
-    name: L1 torch compile tests
+    name: ${{ matrix.display-name }}
     needs: [substitute-runner, build, L0-dynamo-converter-tests, L0-dynamo-core-tests, L0-py-core-tests]
     if: ${{ (github.ref_name == 'main' || github.ref_name == 'nightly' || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success() }}
     strategy:
@@ -234,6 +240,7 @@ jobs:
         include:
           - repository: pytorch/tensorrt
             package-name: torch_tensorrt
+            display-name: L1 torch compile tests
     uses: ./.github/workflows/windows-test.yml
     with:
       job-name: L1-torch-compile-tests
@@ -254,7 +261,7 @@ jobs:
         popd
 
   L2-torch-compile-tests:
-    name: L2 torch compile tests
+    name: ${{ matrix.display-name }}
     needs: [substitute-runner, build, L1-torch-compile-tests, L1-dynamo-compile-tests, L1-dynamo-core-tests]
     if: ${{ (github.ref_name == 'main' || github.ref_name == 'nightly' || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success() }}
     strategy:
@@ -263,6 +270,7 @@ jobs:
         include:
           - repository: pytorch/tensorrt
             package-name: torch_tensorrt
+            display-name: L2 torch compile tests
     uses: ./.github/workflows/windows-test.yml
     with:
       job-name: L2-torch-compile-tests
@@ -282,7 +290,7 @@ jobs:
         popd
 
   L2-dynamo-compile-tests:
-    name: L2 dynamo compile tests
+    name: ${{ matrix.display-name }}
     needs: [substitute-runner, build, L1-torch-compile-tests, L1-dynamo-compile-tests, L1-dynamo-core-tests]
     if: ${{ (github.ref_name == 'main' || github.ref_name == 'nightly' || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success() }}
     strategy:
@@ -291,6 +299,7 @@ jobs:
         include:
           - repository: pytorch/tensorrt
             package-name: torch_tensorrt
+            display-name: L2 dynamo compile tests
     uses: ./.github/workflows/windows-test.yml
     with:
       job-name: L2-dynamo-compile-tests
@@ -310,7 +319,7 @@ jobs:
         popd
 
   L2-dynamo-core-tests:
-    name: L2 dynamo core tests
+    name: ${{ matrix.display-name }}
     needs: [substitute-runner, build, L1-torch-compile-tests, L1-dynamo-compile-tests, L1-dynamo-core-tests]
     if: ${{ (github.ref_name == 'main' || github.ref_name == 'nightly' || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success() }}
     strategy:
@@ -319,6 +328,7 @@ jobs:
         include:
           - repository: pytorch/tensorrt
             package-name: torch_tensorrt
+            display-name: L2 dynamo core tests
     uses: ./.github/workflows/windows-test.yml
     with:
       job-name: L2-dynamo-core-tests
@@ -337,7 +347,7 @@ jobs:
         popd
 
   L2-dynamo-plugin-tests:
-    name: L2 dynamo plugin tests
+    name: ${{ matrix.display-name }}
     needs: [substitute-runner, build, L1-torch-compile-tests, L1-dynamo-compile-tests, L1-dynamo-core-tests]
     if: ${{ (github.ref_name == 'main' || github.ref_name == 'nightly' || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success() }}
     strategy:
@@ -346,6 +356,7 @@ jobs:
         include:
           - repository: pytorch/tensorrt
             package-name: torch_tensorrt
+            display-name: L2 dynamo plugin tests
     uses: ./.github/workflows/windows-test.yml
     with:
       job-name: L2-dynamo-plugin-tests
