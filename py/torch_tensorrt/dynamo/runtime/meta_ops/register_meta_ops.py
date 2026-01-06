@@ -6,6 +6,33 @@ import torch
 from torch_tensorrt.dynamo.utils import input_is_dynamic, unwrap_tensor_shape
 
 
+@torch.library.register_fake("aten::cudnn_grid_sampler")  # type: ignore
+def fake_aten_cudnn_grid_sampler(
+    input: torch.Tensor,
+    grid: torch.Tensor,
+    interpolation_mode: int = 0,
+    padding_mode: int = 0,
+    align_corners: bool = True,
+) -> torch.Tensor:
+    """
+    Meta kernel for aten::cudnn_grid_sampler to enable FakeTensor/compile flows.
+    Shapes follow grid_sampler semantics:
+      - 2D: input [N, C, H_in, W_in], grid [N, H_out, W_out, 2] -> output [N, C, H_out, W_out]
+      - 3D: input [N, C, D_in, H_in, W_in], grid [N, D_out, H_out, W_out, 3] -> output [N, C, D_out, H_out, W_out]
+    """
+    if grid.dim() == 4:
+        n, h_out, w_out, _ = grid.shape
+        c = input.shape[1]
+        out_shape = (n, c, h_out, w_out)
+    elif grid.dim() == 5:
+        n, d_out, h_out, w_out, _ = grid.shape
+        c = input.shape[1]
+        out_shape = (n, c, d_out, h_out, w_out)
+    else:
+        raise RuntimeError(f"aten::cudnn_grid_sampler: unexpected grid rank {grid.dim()}")
+    return torch.empty(out_shape, dtype=input.dtype, device=input.device)
+
+
 @torch.library.register_fake("tensorrt::execute_engine")  # type: ignore
 def fake_tensorrt_execute_engine(
     inputs: List[torch.Tensor], fake_trt_engine: Any
