@@ -191,7 +191,7 @@ class CompilationSettings:
 
 
 # If any of the following setting is changed, the engine should be rebuilt.
-_SETTINGS_TO_BE_ENGINE_INVARIANT = (
+_SETTINGS_TO_BE_ENGINE_INVARIANT = {
     "enabled_precisions",
     "max_aux_streams",
     "version_compatible",
@@ -212,7 +212,7 @@ _SETTINGS_TO_BE_ENGINE_INVARIANT = (
     "autocast_max_output_threshold",
     "autocast_max_depth_of_reduction",
     "autocast_calibration_dataloader",
-)
+}
 
 
 if not hasattr(trt.SerializationFlag, "INCLUDE_REFIT"):  # for TensorRT < 10.14
