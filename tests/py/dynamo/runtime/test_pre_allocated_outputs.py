@@ -165,12 +165,14 @@ class TestPreAllocatedOutputs(TestCase):
             self.assertTrue(output_tensors[1] is not new_output_tensors[1])
 
     @parameterized.expand(
-       [
-           ("python_runtime", True),
-           ("cpp_runtime", False),
-       ]
+        [
+            ("python_runtime", True),
+            ("cpp_runtime", False),
+        ]
     )
-    def test_pre_allocated_outputs_unowned_outputs_api_check(self, _, use_python_runtime):
+    def test_pre_allocated_outputs_unowned_outputs_api_check(
+        self, _, use_python_runtime
+    ):
         class SampleModel(torch.nn.Module):
             def forward(self, x):
                 return torch.softmax(x * 7 + 2, dim=0)
@@ -192,17 +194,18 @@ class TestPreAllocatedOutputs(TestCase):
 
         with torchtrt.runtime.enable_pre_allocated_outputs(optimized_model):
             _ = optimized_model(inputs[0])
-            if use_python_runtime:
-                self.assertTrue(all(seen == expected for seen, expected in zip([
-                    optimized_model._run_on_acc_0.are_output_tensors_unowned(),
-                    optimized_model._run_on_acc_2.are_output_tensors_unowned()
-                ], [False, True])))
-
-            else:
-                self.assertTrue(all(seen == expected for seen, expected in zip([
-                    optimized_model._run_on_acc_0.engine.are_output_tensors_unowned(),
-                    optimized_model._run_on_acc_2.engine.are_output_tensors_unowned()
-                ], [False, True])))
+            self.assertTrue(
+                all(
+                    seen == expected
+                    for seen, expected in zip(
+                        [
+                            optimized_model._run_on_acc_0.are_output_tensors_unowned(),
+                            optimized_model._run_on_acc_2.are_output_tensors_unowned(),
+                        ],
+                        [False, True],
+                    )
+                )
+            )
 
     @parameterized.expand(
         [
@@ -258,8 +261,9 @@ class TestPreAllocatedOutputs(TestCase):
 
         torch._dynamo.reset()
 
-
-    def test_pre_allocated_outputs_unowned_outputs_multiple_outputs_py_api_check_no_realloc(self):
+    def test_pre_allocated_outputs_unowned_outputs_multiple_outputs_py_api_check_no_realloc(
+        self,
+    ):
         class SampleModel(torch.nn.Module):
             def forward(self, x):
                 y = torch.ops.aten.mul(x, 7)
@@ -308,7 +312,9 @@ class TestPreAllocatedOutputs(TestCase):
             ("cpp_runtime", False),
         ]
     )
-    def test_pre_allocated_outputs_unowned_outputs_multiple_outputs_api_check(self, _, use_python_runtime):
+    def test_pre_allocated_outputs_unowned_outputs_multiple_outputs_api_check(
+        self, _, use_python_runtime
+    ):
         class SampleModel(torch.nn.Module):
             def forward(self, x):
                 y = torch.ops.aten.mul(x, 7)
@@ -333,17 +339,18 @@ class TestPreAllocatedOutputs(TestCase):
 
         with torchtrt.runtime.enable_pre_allocated_outputs(optimized_model):
             _ = optimized_model(inputs[0])
-            if use_python_runtime:
-                self.assertTrue(all(seen == expected for seen, expected in zip([
-                    optimized_model._run_on_acc_0.are_output_tensors_unowned(),
-                    optimized_model._run_on_acc_2.are_output_tensors_unowned()
-                ], [True, True])))
-
-            else:
-                self.assertTrue(all(seen == expected for seen, expected in zip([
-                    optimized_model._run_on_acc_0.engine.are_output_tensors_unowned(),
-                    optimized_model._run_on_acc_2.engine.are_output_tensors_unowned()
-                ], [True, True])))
+            self.assertTrue(
+                all(
+                    seen == expected
+                    for seen, expected in zip(
+                        [
+                            optimized_model._run_on_acc_0.are_output_tensors_unowned(),
+                            optimized_model._run_on_acc_2.are_output_tensors_unowned(),
+                        ],
+                        [True, True],
+                    )
+                )
+            )
 
     @parameterized.expand(
         [
@@ -351,7 +358,9 @@ class TestPreAllocatedOutputs(TestCase):
             ("cpp_runtime", False),
         ]
     )
-    def test_pre_allocated_outputs_unowned_outputs_multi_outputs(self, _, use_python_runtime):
+    def test_pre_allocated_outputs_unowned_outputs_multi_outputs(
+        self, _, use_python_runtime
+    ):
         class SampleModel(torch.nn.Module):
             def forward(self, x):
                 y = torch.ops.aten.mul(x, 7)
