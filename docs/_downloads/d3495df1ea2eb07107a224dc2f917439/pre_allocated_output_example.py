@@ -79,7 +79,6 @@ inputs = [
 optimized_model = torch_tensorrt.compile(
     model,
     ir="dynamo",
-    enabled_precisions={torch.half},
     inputs=inputs,
 )
 

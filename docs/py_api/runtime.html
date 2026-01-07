@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt.runtime &mdash; Torch-TensorRT v2.10.0.dev0+635a01d documentation</title>
+  <title>torch_tensorrt.runtime &mdash; Torch-TensorRT v2.10.0.dev0+093e8dc documentation</title>
   
 
   
@@ -293,7 +293,7 @@
               
               
                 <div class="version">
-                  v2.10.0.dev0+635a01d
+                  v2.10.0.dev0+093e8dc
                 </div>
               
             
@@ -705,6 +705,21 @@ registered hooks while the latter silently ignores them.</p>
 <dt class="sig sig-object py" id="torch_tensorrt.runtime.PythonTorchTensorRTModule.get_layer_info">
 <span class="sig-name descname"><span class="pre">get_layer_info</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span></span></span><a class="reference internal" href="../_modules/torch_tensorrt/dynamo/runtime/_PythonTorchTensorRTModule.html#PythonTorchTensorRTModule.get_layer_info"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.runtime.PythonTorchTensorRTModule.get_layer_info" title="Permalink to this definition">¶</a></dt>
 <dd><p>Get layer info of the engine. Only support for TRT &gt; 8.2.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="torch_tensorrt.runtime.PythonTorchTensorRTModule.set_output_tensors_as_unowned">
+<span class="sig-name descname"><span class="pre">set_output_tensors_as_unowned</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">enabled</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="../_modules/torch_tensorrt/dynamo/runtime/_PythonTorchTensorRTModule.html#PythonTorchTensorRTModule.set_output_tensors_as_unowned"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.runtime.PythonTorchTensorRTModule.set_output_tensors_as_unowned" title="Permalink to this definition">¶</a></dt>
+<dd><p>Flag to set if the output tensors of this engine are solely owned by the Torch-TensorRT Runtime or if they might be shared with a user.
+If the tensors are not owned by the runtime, then they must be recreated on every forward call which may have implications for performance.
+Typically only the final engine in a graph requires output tensors to be unowned and there are performance gains to be had for intermediate engines to manage their own standing memory.
+Therefore this should only be set to True for the final module in a graph and leave false for intermediate modules.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>enabled</strong> – bool
+Whether to set the flag to True.</p>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="py method">
