@@ -28,13 +28,13 @@ class ExpandReshapeModel(nn.Module):
 model = ExpandReshapeModel(embed_dim=768).cuda().eval()
 x = torch.randn(4, 196, 768).cuda()
 
-# 1. JIT
+# 1. JIT: torch.compile
 x1 = x.clone()
 torch._dynamo.mark_dynamic(x1, index=0, min=2, max=32)
 trt_module = torch.compile(model, backend="tensorrt")
 out1 = trt_module(x1)
 
-# 2. torch_tensorrt.compile API
+# 2. AOT: torch_tensorrt.compile
 x2 = x.clone()
 example_input = torch_tensorrt.Input(
     min_shape=[1, 196, 768],
@@ -45,7 +45,7 @@ example_input = torch_tensorrt.Input(
 trt_module = torch_tensorrt.compile(model, ir="dynamo", inputs=example_input)
 out2 = trt_module(x2)
 
-# 3. torch.export + Dynamo compile API
+# 3. AOT: torch.export + Dynamo compile
 x3 = x.clone()
 bs = torch.export.Dim("bs", min=1, max=32)
 dynamic_shapes = {"x": {0: bs}}
