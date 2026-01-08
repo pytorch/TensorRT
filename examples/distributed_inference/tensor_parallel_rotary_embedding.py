@@ -9,26 +9,31 @@ operations in attention models with rotary embeddings across multiple GPUs.
 
 """
 
-import logging
-import os
 import time
 
 import torch
-import torch_tensorrt
-from rotary_embedding import RotaryAttention, parallel_rotary_block
+import torch.distributed as dist
 from tensor_parallel_initialize_dist import (
     cleanup_distributed_env,
+    get_tensor_parallel_device_mesh,
     initialize_distributed_env,
+    initialize_distributed_logger,
 )
 
-device_mesh, _world_size, _rank, logger = initialize_distributed_env(
-    "./tensor_parallel_rotary_embedding"
-)
+if not dist.is_initialized():
+    initialize_distributed_env()
 
+import torch_tensorrt
+
+device_mesh, _world_size, _rank = get_tensor_parallel_device_mesh()
+logger = initialize_distributed_logger(_rank, "tensor_parallel_rotary_embedding")
+
+from rotary_embedding import RotaryAttention, parallel_rotary_block
 
 """
 This example covers the rotary embedding in Llama3 model and is derived from https://lightning.ai/lightning-ai/studios/tensor-parallelism-supercharging-large-model-training-with-pytorch-lightning
-Command to run with single GPU: mpirun -n 1 --allow-run-as-root python tensor_parallel_rotary_embedding.py
+Command to run with single GPU: USE_TRTLLM_PLUGINS=1 mpirun -n 1 --allow-run-as-root python tensor_parallel_rotary_embedding.py
+Command to run with 2 GPUs: USE_TRTLLM_PLUGINS=1 mpirun -n 2 --allow-run-as-root python tensor_parallel_rotary_embedding.py
 """
 
 BATCH = 2
