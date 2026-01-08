@@ -78,7 +78,7 @@ DEVICE = torch.device("cuda:0")
 _ = torch.zeros(1, device=DEVICE)  # Initialize CUDA
 print(f"CUDA initialized on {DEVICE}\n")
 
-PLUGIN_PATH = "/develop/TensorRT/tensorrt-edgellm/build/libNvInfer_edgellm_plugin.so"
+PLUGIN_PATH = "/develop/TensorRT/TensorRT-Edge-LLM-release/build/libNvInfer_edgellm_plugin.so"
 ctypes.CDLL(PLUGIN_PATH)
 print(f"Loaded plugin: {PLUGIN_PATH}\n")
 
@@ -242,7 +242,16 @@ class SDPAModel(nn.Module):
 
 
 def register_plugin_op():
-    """Register custom attention operation"""
+    """
+    Register custom attention operation.
+    
+    Note: The release version of TensorRT-Edge-LLM requires 5 inputs:
+    - qkv: [B, S, (Hq+Hk+Hv)*D] fused QKV tensor
+    - kv: [B, 2, Hkv, Capacity, D] KV cache tensor
+    - ctx_len: [B] context length per batch
+    - rope: [S, D] rotary position encoding
+    - kv_cache_start_idx: [B] starting index in KV cache (required for release version)
+    """
     
     @torch.library.custom_op("xqa::attn", mutates_args=())
     def attn(
@@ -250,6 +259,7 @@ def register_plugin_op():
         kv: torch.Tensor,
         ctx_len: torch.Tensor,
         rope: torch.Tensor,
+        kv_cache_start_idx: torch.Tensor,  # Required 5th input for release plugin
         nq: int,
         nkv: int,
         d: int
@@ -261,7 +271,7 @@ def register_plugin_op():
         return attn_out, updated_kv
     
     @torch.library.register_fake("xqa::attn")
-    def _(qkv, kv, ctx_len, rope, nq, nkv, d):
+    def _(qkv, kv, ctx_len, rope, kv_cache_start_idx, nq, nkv, d):
         batch_size = qkv.shape[0]
         seq_len = qkv.shape[1]
         attn_out = torch.empty(batch_size, seq_len, nq, d, dtype=qkv.dtype, device=qkv.device)
@@ -274,26 +284,32 @@ register_plugin_op()
 
 @dynamo_tensorrt_converter(torch.ops.xqa.attn.default, supports_dynamic_shapes=True)
 def convert_attn(ctx: ConversionContext, target, args, kwargs, name):
-    """Convert PyTorch custom op to TensorRT plugin"""
-    qkv, kv, ctx_len, rope, nq, nkv, d = args[:7]
+    """
+    Convert PyTorch custom op to TensorRT plugin.
+    
+    Release version of TensorRT-Edge-LLM requires 5 inputs:
+    - qkv, kv, ctx_len, rope, kv_cache_start_idx
+    
+    Plugin fields for release version:
+    - num_q_heads, num_kv_heads, head_size, enable_tree_attention, enable_delta_kv_output
+    """
+    # args: qkv, kv, ctx_len, rope, kv_cache_start_idx, nq, nkv, d
+    qkv, kv, ctx_len, rope, kv_cache_start_idx, nq, nkv, d = args[:8]
     
     # Get plugin creator
     creator = trt.get_plugin_registry().get_plugin_creator("AttentionPlugin", "1", "")
     if creator is None:
         raise RuntimeError("AttentionPlugin not found! Make sure plugin is loaded.")
     
-    # Create plugin fields
+    # Plugin fields for release version of TensorRT-Edge-LLM
     field_list = [
         trt.PluginField(field_name, np.array([field_val], dtype=np.int32), trt.PluginFieldType.INT32)
         for field_name, field_val in [
             ("num_q_heads", nq),
             ("num_kv_heads", nkv),
             ("head_size", d),
-            ("max_batch_size", BATCH_SIZE),
-            ("kv_cache_capacity", KV_CACHE_CAPACITY),
             ("enable_tree_attention", 0),
-            ("enable_reuse_kv_cache", 0),
-            ("enable_kv_cache_copy", 1),  # Enable for python runtime+torch_tensorrt
+            ("enable_delta_kv_output", 1),  # Enable for python runtime+torch_tensorrt
         ]
     ]
     
@@ -303,9 +319,15 @@ def convert_attn(ctx: ConversionContext, target, args, kwargs, name):
     if plugin is None:
         raise RuntimeError("Failed to create plugin")
     
-    # Convert inputs to TRT tensors
+    # 5 inputs for release version: qkv, kv, ctx_len, rope, kv_cache_start_idx
     inputs = [get_trt_tensor(ctx, i, f"{name}_i{idx}") if not isinstance(i, trt.ITensor) else i 
-              for idx, i in enumerate([qkv, kv, ctx_len, rope])]
+              for idx, i in enumerate([qkv, kv, ctx_len, rope, kv_cache_start_idx])]
+    
+    # Handle kv_cache_start_idx shape if needed (squeeze if [B, 1] -> [B])
+    if len(inputs[4].shape) == 2 and inputs[4].shape[1] == 1:
+        shuffle_layer = ctx.net.add_shuffle(inputs[4])
+        shuffle_layer.reshape_dims = (inputs[4].shape[0],)
+        inputs[4] = shuffle_layer.get_output(0)
     
     layer = ctx.net.add_plugin_v2(inputs, plugin)
     
@@ -324,9 +346,14 @@ class PluginModel(nn.Module):
         bsz, seq_len, _ = x.shape
         qkv = self.qkv(x)
         
-        # Custom plugin call
+        # kv_cache_start_idx: starting position in KV cache for each batch
+        # For normal inference, this is 0 (start from beginning)
+        kv_cache_start_idx = torch.zeros(bsz, dtype=torch.int32, device=x.device)
+        
+        # Custom plugin call (5 inputs for release version)
         attn_out, updated_kv = torch.ops.xqa.attn.default(
-            qkv, kv_cache, ctx_len_tensor, rope, NUM_Q_HEADS, NUM_KV_HEADS, HEAD_DIM
+            qkv, kv_cache, ctx_len_tensor, rope, kv_cache_start_idx,
+            NUM_Q_HEADS, NUM_KV_HEADS, HEAD_DIM
         )
         
         # Reshape from [B, S, num_heads, head_dim] to [B, S, hidden_dim]
@@ -351,6 +378,12 @@ def test_case(name: str, seq_len: int, has_past_context: bool, sdpa_model, trt_m
         sdpa_model: PyTorch SDPA reference model
         trt_model: Compiled TensorRT model
         rope: Precomputed RoPE cache
+        
+    Note:
+        With enable_delta_kv_output=1, TRT plugin outputs only the delta KV:
+        - Context Phase: [B, 2, H, seq_len, D] (newly processed tokens)
+        - Generation Phase: [B, 2, H, 1, D] (single new token)
+        Python runtime must merge this delta into the main KV cache.
     """
     print(f"\n{name}")
     
@@ -377,7 +410,12 @@ def test_case(name: str, seq_len: int, has_past_context: bool, sdpa_model, trt_m
     # Run both models
     with torch.no_grad():
         sdpa_out, sdpa_kv_new = sdpa_model(x, sdpa_kv, ctx_len, rope)
-        trt_out, trt_kv_new = trt_model(x, trt_kv, ctx_len, rope)
+        trt_out, trt_kv_delta = trt_model(x, trt_kv, ctx_len, rope)
+    
+    # TRT plugin with enable_delta_kv_output=1 returns only delta KV
+    # Merge delta into main KV cache at the correct position
+    delta_seq_len = trt_kv_delta.shape[3]  # Should be seq_len
+    trt_kv[:, :, :, past_len:past_len+delta_seq_len, :] = trt_kv_delta
     
     # Compute similarities
     attn_sim = F.cosine_similarity(
@@ -386,10 +424,10 @@ def test_case(name: str, seq_len: int, has_past_context: bool, sdpa_model, trt_m
         dim=0
     ).item()
     
-    # Compare ONLY the newly updated portion of KV cache
+    # Compare the newly updated portion of KV cache (after merge)
     new_kv_sim = F.cosine_similarity(
         sdpa_kv_new[:, :, :, past_len:past_len+seq_len, :].flatten().float(),
-        trt_kv_new[:, :, :, past_len:past_len+seq_len, :].flatten().float(),
+        trt_kv[:, :, :, past_len:past_len+seq_len, :].flatten().float(),
         dim=0
     ).item()
     
@@ -401,11 +439,11 @@ def test_case(name: str, seq_len: int, has_past_context: bool, sdpa_model, trt_m
     print(f"  Attention Output: cosine_similarity = {attn_sim:.6f}")
     print(f"  Updated KV Cache: cosine_similarity = {new_kv_sim:.6f}")
     
-    # If there's past context, verify it's preserved
+    # If there's past context, verify it's preserved in our main buffer
     if has_past_context:
         past_sim = F.cosine_similarity(
             sdpa_kv_new[:, :, :, :past_len, :].flatten().float(),
-            trt_kv_new[:, :, :, :past_len, :].flatten().float(),
+            trt_kv[:, :, :, :past_len, :].flatten().float(),
             dim=0
         ).item()
         print(f"  Past KV Preserved: cosine_similarity = {past_sim:.6f}")
@@ -513,6 +551,7 @@ if __name__ == "__main__":
     # Multi-Step Generation Test
     # ---------------------------
     # Realistic test: Process initial context (FMHA), then generate tokens one by one (XQA)
+    # Note: With enable_delta_kv_output=1, we must merge delta KV into main buffer
     
     print("\nTest 4: Multi-Step Generation (FMHA -> XQA x 3)")
     print("Simulating real LLM generation:")
@@ -529,7 +568,11 @@ if __name__ == "__main__":
     
     with torch.no_grad():
         sdpa_out_init, sdpa_kv_multi = sdpa_model(x_init, sdpa_kv_multi, ctx_len_init, rope)
-        trt_out_init, trt_kv_multi = trt_model(x_init, trt_kv_multi, ctx_len_init, rope)
+        trt_out_init, trt_kv_delta = trt_model(x_init, trt_kv_multi, ctx_len_init, rope)
+    
+    # Merge delta KV into main buffer (context phase: delta has shape [B, 2, H, seq_len, D])
+    delta_len = trt_kv_delta.shape[3]
+    trt_kv_multi[:, :, :, :delta_len, :] = trt_kv_delta
     
     init_sim = F.cosine_similarity(
         sdpa_out_init.flatten().float(),
@@ -543,6 +586,7 @@ if __name__ == "__main__":
     # Step 2: Generate tokens one by one (XQA)
     num_gen_tokens = 3
     all_passed_multi = init_sim > 0.99
+    current_pos = initial_seq_len  # Track current position in KV cache
     
     for gen_step in range(num_gen_tokens):
         current_ctx_len = initial_seq_len + gen_step + 1
@@ -551,7 +595,11 @@ if __name__ == "__main__":
         
         with torch.no_grad():
             sdpa_out_gen, sdpa_kv_multi = sdpa_model(x_gen, sdpa_kv_multi, ctx_len_gen, rope)
-            trt_out_gen, trt_kv_multi = trt_model(x_gen, trt_kv_multi, ctx_len_gen, rope)
+            trt_out_gen, trt_kv_delta = trt_model(x_gen, trt_kv_multi, ctx_len_gen, rope)
+        
+        # Merge delta KV into main buffer (generation phase: delta has shape [B, 2, H, 1, D])
+        trt_kv_multi[:, :, :, current_pos:current_pos+1, :] = trt_kv_delta
+        current_pos += 1
         
         gen_sim = F.cosine_similarity(
             sdpa_out_gen.flatten().float(),
