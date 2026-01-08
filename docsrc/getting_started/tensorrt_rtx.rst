@@ -86,14 +86,13 @@ Before building, install the required Python packages:
    # Install setuptools (provides distutils)
    pip install setuptools
 
+   # Install PyTorch
+   # Note: If you are building Torch-TensorRT at tip-of-tree, you need to install the latest PyTorch nightly build rather than the stable release. See below for details.
+   pip install torch torchvision
+
    # Install PyTorch nightly build (check CUDA version in MODULE.bazel)
    # Replace cuXXX with your CUDA version (e.g., cu130 for CUDA 13.0)
-   pip install --pre torch torchvision --index-url https://download.pytorch.org/whl/nightly/cuXXX
-
-   # If you encounter version conflicts during the build, you may need to specify
-   # the exact PyTorch version constraint. Check pyproject.toml for requirements.
-   # For example, if pyproject.toml specifies torch>=2.10.0.dev,<2.11.0:
-   # pip install --pre "torch>=2.10.0.dev,<2.11.0" torchvision --index-url https://download.pytorch.org/whl/nightly/cu130
+   # pip install --pre torch torchvision --index-url https://download.pytorch.org/whl/nightly/cuXXX
 
    # Install additional build dependencies
    pip install pyyaml numpy
