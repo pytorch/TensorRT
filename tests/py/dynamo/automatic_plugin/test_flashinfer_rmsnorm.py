@@ -4,10 +4,9 @@ import unittest
 import pytest
 import torch
 import torch.nn as nn
+import torch_tensorrt
 from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
-
-import torch_tensorrt
 from torch_tensorrt._enums import dtype
 
 from ..conversion.harness import DispatchTestCase
@@ -28,7 +27,7 @@ def _(input: torch.Tensor, weight: torch.Tensor, b: float = 1e-6) -> torch.Tenso
     return input
 
 
-if not torch_tensorrt.ENABLED_FEATURES.tensorrt_rtx:
+if torch_tensorrt.ENABLED_FEATURES.qdp_plugin:
     torch_tensorrt.dynamo.conversion.plugins.custom_op(
         "flashinfer::rmsnorm", supports_dynamic_shapes=True
     )
@@ -37,7 +36,7 @@ if not torch_tensorrt.ENABLED_FEATURES.tensorrt_rtx:
 @unittest.skip("Not Available")
 @unittest.skipIf(
     not importlib.util.find_spec("flashinfer")
-    or torch_tensorrt.ENABLED_FEATURES.tensorrt_rtx,
+    or not torch_tensorrt.ENABLED_FEATURES.qdp_plugin,
     "flashinfer not installed or TensorRT RTX is present",
 )
 class TestAutomaticPlugin(DispatchTestCase):
