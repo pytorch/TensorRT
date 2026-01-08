@@ -15,6 +15,8 @@ def remove_sym_nodes(
     """Remove sym_int placeholders which get inserted due to torch.compile's
     dynamic=True behavior
     """
+    gm = replace_symint_with_sym_size(gm)
+
     # Extract SymInt placeholder Tensors
     placeholder_idx_sym_ints = [
         (idx, node)
@@ -34,5 +36,44 @@ def remove_sym_nodes(
     gm.graph.lint()
     gm.recompile()
     logger.debug(f"Removed SymInt placeholders:\n{gm.graph}")
+
+    return gm
+
+
+def replace_symint_with_sym_size(
+    gm: torch.fx.GraphModule,
+) -> torch.fx.GraphModule:
+    """Replace SymInt placeholders with sym_size nodes"""
+    # Find all SymInt placeholders and their args
+    symint_node_arg_dict = {}
+    for node in gm.graph.nodes:
+        if (
+            node.op == "placeholder"
+            and isinstance(node.type, type)
+            and issubclass(node.type, torch.SymInt)
+        ):
+            ga = node.meta["grapharg"]
+            src = ga.source  # TensorPropertySource
+            symint_node_arg_dict[node] = (src.base.local_name, src.idx)
+
+    # Replace SymInt placeholders with sym_size nodes
+    for node in gm.graph.nodes:
+        if (
+            node.op == "placeholder"
+            and isinstance(node.type, type)
+            and issubclass(node.type, torch.Tensor)
+        ):
+            for symint_node, (arg_name, idx) in symint_node_arg_dict.items():
+                if node.target == "L_" + arg_name + "_":
+                    with gm.graph.inserting_after(node):
+                        size_node = gm.graph.call_function(
+                            torch.ops.aten.sym_size, args=(node, idx)
+                        )
+                    symint_node.replace_all_uses_with(size_node)
+                    # the symint_node is not used anymore, it will be removed in the outside of the function
+
+    gm.graph.lint()
+    gm.recompile()
+    logger.debug(f"Added sym_size nodes for SymInt placeholders:\n{gm.graph}")
 
     return gm
