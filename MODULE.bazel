@@ -36,7 +36,7 @@ new_local_repository(
 new_local_repository(
     name = "cuda",
     build_file = "@//third_party/cuda:BUILD",
-    path = "/usr/local/cuda-13.0/",
+    path = "/usr/local/cuda-12.9/",
 )
 
 # for Jetson
@@ -61,11 +61,11 @@ http_archive = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "ht
 #############################################################################################################
 
 # this is used for linux x86_64
-http_archive(
+# Use locally installed torch instead of downloading
+new_local_repository(
     name = "libtorch",
     build_file = "@//third_party/libtorch:BUILD",
-    strip_prefix = "libtorch",
-    urls = ["https://download.pytorch.org/libtorch/nightly/cu130/libtorch-shared-with-deps-latest.zip"],
+    path = "/root/.pyenv/versions/3.11.13/lib/python3.11/site-packages/torch",
 )
 
 # in aarch64 platform you can get libtorch via either local or wheel file

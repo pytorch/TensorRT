@@ -744,7 +744,7 @@ def get_requirements():
         # standard linux and windows requirements
         requirements = base_requirements + ["numpy"]
         if not IS_DLFW_CI:
-            requirements = requirements + ["torch>=2.10.0.dev,<2.11.0"]
+            requirements = requirements + ["torch>=2.9.0.dev,<2.11.0"]
             if USE_TRT_RTX:
                 requirements = requirements + [
                     "tensorrt_rtx>=1.2.0.54",
@@ -786,7 +786,7 @@ def get_sbsa_requirements():
     # TensorRT does not currently build wheels for Tegra, so we need to use the local tensorrt install from the tarball for thor
     # also due to we use sbsa torch_tensorrt wheel for thor, so when we build sbsa wheel, we need to only include tensorrt dependency.
     return sbsa_requirements + [
-        "torch>=2.10.0.dev,<2.11.0",
+        "torch>=2.9.0.dev,<2.11.0",
         "tensorrt>=10.14.1,<10.15.0",
     ]
 
