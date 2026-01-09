@@ -71,6 +71,7 @@ Tutorials
 * :ref:`mutable_torchtrt_module_example`
 * :ref:`weight_streaming_example`
 * :ref:`pre_allocated_output_example`
+* :ref:`debugger_example`
 
 .. toctree::
    :caption: Tutorials
