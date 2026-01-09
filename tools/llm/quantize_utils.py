@@ -28,6 +28,8 @@ from safetensors import safe_open
 MAX_BOUND_FP8 = 448.0
 # Additional scaling factor for NVFP4
 MAX_BOUND_NVFP4 = 6.0
+# for now we only support modelopt pre-quantized models
+SUPPORTED_QUANT_PRODUCER = ["modelopt"]
 
 
 def quantize_model(model, args, tokenizer):
@@ -107,7 +109,40 @@ class TensorRTQuantizedLinear(torch.nn.Module):
         return torch.nn.functional.linear(input, weight, self.original_linear.bias)
 
 
-def load_quantization_config(model_name):
+def validate_config(config):
+    if not "torch_dtype" in config:
+        raise RuntimeError(f"torch_dtype not found in {config["model_path"]}")
+
+
+def load_config(model_name):
+    """
+    Load configuration from a Hugging Face model.
+    Args:
+        model_name (str): Local directory path or model identifier
+    Returns:
+        dict or None: Configuration. None if no config found.
+    """
+    # Determine if model_name is a local directory or needs to be downloaded
+    if os.path.isdir(model_name):
+        model_path = model_name
+    else:
+        model_path = snapshot_download(
+            model_name,
+            local_files_only=huggingface_hub.constants.HF_HUB_OFFLINE,
+            ignore_patterns=["original/**/*"],
+            revision=None,
+        )
+    config_path = f"{model_path}/config.json"
+    if not os.path.exists(config_path):
+        raise RuntimeError(f"Config file {config_path} not found")
+    with open(config_path, "r") as f:
+        config = json.load(f)
+    config["model_path"] = model_path
+    validate_config(config)
+    return config
+
+
+def load_quantization_config(config):
     """
     Load quantization configuration from a Hugging Face model.
     Args:
@@ -115,30 +150,24 @@ def load_quantization_config(model_name):
     Returns:
         dict or None: Quantization configuration. None if no config found.
     """
-    # Determine if model_name is a local directory or needs to be downloaded
-    if os.path.isdir(model_name):
-        model_path = model_name
-    else:
-        # Download model from Hugging Face Hub
-        model_path = snapshot_download(
-            model_name,
-            local_files_only=huggingface_hub.constants.HF_HUB_OFFLINE,
-            ignore_patterns=["original/**/*"],
-            revision=None,
-        )
-    hf_quant_config = None
-    # Load and parse quantization configuration
-    hf_quant_config_path = f"{model_path}/hf_quant_config.json"
-    if os.path.exists(hf_quant_config_path):
-        with open(hf_quant_config_path, "r") as f:
-            hf_quant_config = json.load(f)
-            hf_quant_config = hf_quant_config["quantization"]
-            hf_quant_config["model_path"] = model_path
 
+    hf_quant_config = None
+    if "quantization_config" in config:
+        hf_quant_config = config["quantization_config"]
+        if not "quant_method" in hf_quant_config:
+            raise RuntimeError(
+                f"quant_method not found in {config["model_path"]} in quantization_config section"
+            )
+        quant_method = hf_quant_config["quant_method"]
+        if quant_method not in SUPPORTED_QUANT_PRODUCER:
+            raise RuntimeError(
+                f"Unsupported quant_method {quant_method} in {config["model_path"]} in quantization_config section"
+            )
+        hf_quant_config["model_path"] = config["model_path"]
     return hf_quant_config
 
 
-def convert_linear_to_tensorrt_quantized(model, model_precision, hf_quant_config):
+def convert_linear_to_tensorrt_quantized(model, original_model_dtype, hf_quant_config):
     """
     Convert linear layers in a model to TensorRT quantized versions from pre-quantized weights.
 
@@ -179,14 +208,9 @@ def convert_linear_to_tensorrt_quantized(model, model_precision, hf_quant_config
 
     hf_quant_algo = hf_quant_config.get("quant_algo", None)
     if hf_quant_algo != "FP8" and hf_quant_algo != "NVFP4":
-        raise RuntimeError("Only FP8 or NVFP4 quantization is supported")
-
-    if model_precision == "FP16":
-        weight_dtype = torch.float16
-    elif model_precision == "BF16":
-        weight_dtype = torch.bfloat16
-    else:
-        weight_dtype = torch.float32
+        raise RuntimeError(
+            "Only FP8 or NVFP4 quantization is supported, got {hf_quant_algo}"
+        )
 
     # Iterate through all modules in the model
     for name, module in model.named_modules():
@@ -212,7 +236,9 @@ def convert_linear_to_tensorrt_quantized(model, model_precision, hf_quant_config
                 input_amax = tensors.pop(input_scale_name) * MAX_BOUND_FP8
 
                 # Dequantize the weight using the scale factor
-                dequantized_weight_data = module.weight.to(weight_dtype) * weight_scale
+                dequantized_weight_data = (
+                    module.weight.to(original_model_dtype) * weight_scale
+                )
 
                 # Configure quantizer for FP8 format (4 exponent bits, 3 mantissa bits)
                 quantizer_attribute_config = QuantizerAttributeConfig(
@@ -236,7 +262,7 @@ def convert_linear_to_tensorrt_quantized(model, model_precision, hf_quant_config
                 original_shape = list(weight_data.shape)
                 original_shape[-1] *= 2  # NVFP4 packs 2 values per element
                 nvfp4_tensor = NVFP4QTensor(
-                    torch.Size(original_shape), weight_dtype, weight_data
+                    torch.Size(original_shape), original_model_dtype, weight_data
                 )
 
                 # Dequantize using both scales and block size configuration

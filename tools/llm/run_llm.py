@@ -22,6 +22,7 @@ import torch_tensorrt
 from modelopt.torch.quantization.utils import export_torch_mode
 from quantize_utils import (
     convert_linear_to_tensorrt_quantized,
+    load_config,
     load_quantization_config,
     quantize_model,
 )
@@ -68,11 +69,23 @@ def get_model(args):
         )
         # register SDPA variant for the model
         register_sdpa.enable_sdpa_converter(args.model, model.config)
+    model_config = load_config(args.model)
+    dtype_str = model_config["torch_dtype"]
+    if dtype_str == "float16":
+        original_model_dtype = torch.float16
+    elif dtype_str == "bfloat16":
+        original_model_dtype = torch.bfloat16
+    elif dtype_str == "float32":
+        original_model_dtype = torch.float32
+    else:
+        raise RuntimeError(
+            f"Unsupported torch_dtype {dtype_str} in {model_config["model_path"]}"
+        )
 
-    hf_quant_config = load_quantization_config(args.model)
+    hf_quant_config = load_quantization_config(model_config)
     if hf_quant_config:
         model = convert_linear_to_tensorrt_quantized(
-            model, args.model_precision, hf_quant_config
+            model, original_model_dtype, hf_quant_config
         ).cuda()
         print(
             f"Model is {hf_quant_config['quant_algo']} pre-quantized hf model. Quantized linear layers are applied"
@@ -81,7 +94,15 @@ def get_model(args):
             raise RuntimeError(
                 f"Quantization cannot be applied for pre-quantized hf model"
             )
+        if args.model_precision:
+            raise RuntimeError(
+                f"Model precision cannot be specified for pre-quantized hf model"
+            )
+    if args.model_precision is None:
+        # use the original model dtype
+        return model
 
+    # user might want to change the model precision other than the original model dtype
     if args.model_precision == "FP16":
         model = model.to(torch.float16)
     elif args.model_precision == "BF16":
@@ -120,11 +141,11 @@ def compile_torchtrt(model, input_ids, args):
     # Set precision specific flags
     use_fp32_acc = False
     use_explicit_typing = False
-    if args.model_precision == "FP16":
+    if model.dtype == torch.float16:
         enabled_precisions = {torch.float32}
         use_fp32_acc = True
         use_explicit_typing = True
-    elif args.model_precision == "BF16":
+    elif model.dtype == torch.bfloat16:
         enabled_precisions = {torch.bfloat16}
         use_fp32_acc = False
     else:
@@ -142,7 +163,8 @@ def compile_torchtrt(model, input_ids, args):
             disable_tf32=True,
             use_python_runtime=True,
             debug=args.debug,
-            offload_module_to_cpu=True,
+            # TODO: investigate why offload_module_to_cpu=True is not working
+            offload_module_to_cpu=False,
             min_block_size=args.min_block_size,
         )
 
@@ -214,8 +236,8 @@ if __name__ == "__main__":
     arg_parser.add_argument(
         "--model_precision",
         type=str,
-        default="FP16",
-        help="Precision to use in the model. Options: FP16, BF16, FP32",
+        default=None,
+        help="Optional: Precision to use in the model. Options: FP16, BF16, FP32, it is only valid for the unquantized model",
     )
     arg_parser.add_argument(
         "--iterations", type=int, default=5, help="no. of iterations to run"
@@ -260,11 +282,13 @@ if __name__ == "__main__":
     )
     arg_parser.add_argument(
         "--quant_format",
-        help=("Apply quantization format. Options: fp8, nvfp4 (default: None)"),
+        help=(
+            "Apply quantization format. Options: fp8, nvfp4 (default: None), it is only valid for the unquantized model, which you want use to quantize to the quant format specified here"
+        ),
         default=None,
     )
     args = arg_parser.parse_args()
-
+    breakpoint()
     with torch.inference_mode():
         model = get_model(args)
 
@@ -307,7 +331,7 @@ if __name__ == "__main__":
                 pyt_stats = record_stats(
                     "PyTorch",
                     pyt_timings,
-                    args.model_precision,
+                    str(model.dtype),
                     batch_size=args.batch_size,
                     compile_time_s=None,
                 )
@@ -365,7 +389,7 @@ if __name__ == "__main__":
             trt_stats = record_stats(
                 "TensorRT",
                 trt_timings,
-                args.model_precision,
+                str(model.dtype),
                 batch_size=args.batch_size,
                 compile_time_s=None,
             )
