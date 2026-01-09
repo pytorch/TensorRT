@@ -86,7 +86,7 @@ class TestResourcePartitioning(TestCase):
             current_subgraph = []
             # Split the subgraph into two subgraphs by the ReLU node, which breaks the fusion group.
             for node in subgraphs[0].nodes:
-                if node.op == "call_function" and node.target == aten.relu.default:
+                if node.op == "call_function" and "relu" in str(node.target):
                     new_subgraphs.append(Subgraph(is_acc=True, nodes=current_subgraph))
                     current_subgraph = []
                 current_subgraph.append(node)
