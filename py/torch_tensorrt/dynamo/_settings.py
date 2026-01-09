@@ -20,6 +20,7 @@ from torch_tensorrt.dynamo._defaults import (
     DLA_GLOBAL_DRAM_SIZE,
     DLA_LOCAL_DRAM_SIZE,
     DLA_SRAM_SIZE,
+    DYNAMICALLY_ALLOCATE_RESOURCES,
     DRYRUN,
     ENABLE_AUTOCAST,
     ENABLE_CROSS_COMPILE_FOR_WINDOWS,
@@ -115,6 +116,8 @@ class CompilationSettings:
         autocast_max_output_threshold (float): Maximum absolute value for node outputs, nodes with outputs greater than this value will remain in FP32. Default is 512.
         autocast_max_depth_of_reduction (Optional[int]): Maximum depth of reduction allowed in low precision. Nodes with higher reduction depths will remain in FP32. This helps prevent excessive accuracy loss in operations particularly sensitive to reduced precision, as higher-depth reductions may amplify computation errors in low precision formats. If not provided, infinity will be used. Default is None.
         autocast_calibration_dataloader (Optional[torch.utils.data.DataLoader]): The dataloader to use for autocast calibration. Default is None.
+        offload_module_to_cpu (bool): Offload the model to CPU to reduce memory footprint during compilation
+        dynamically_allocate_resources (bool): Dynamically allocate resources for TensorRT engines
     """
 
     enabled_precisions: Set[dtype] = field(default_factory=lambda: ENABLED_PRECISIONS)
@@ -173,6 +176,7 @@ class CompilationSettings:
     )
     enable_resource_partitioning: bool = ENABLE_RESOURCE_PARTITIONING
     cpu_memory_budget: int = CPU_MEMORY_BUDGET
+    dynamically_allocate_resources: bool = DYNAMICALLY_ALLOCATE_RESOURCES
 
     def __getstate__(self) -> dict[str, Any]:
         from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
