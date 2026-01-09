@@ -82,17 +82,18 @@ class TestResourcePartitioning(TestCase):
                 cpu_memory_budget=2 * 1024 * 1024 * 1024,
             )
             subgraphs = partitioner.put_nodes_into_subgraphs()
+            print(subgraphs)
             new_subgraphs = []
             current_subgraph = []
             # Split the subgraph into two subgraphs by the ReLU node, which breaks the fusion group.
             for node in subgraphs[0].nodes:
-                if node.op == "call_function" and node.target == aten.relu.default:
+                if node.op == "call_function" and "relu" in str(node.target):
                     new_subgraphs.append(Subgraph(is_acc=True, nodes=current_subgraph))
                     current_subgraph = []
                 current_subgraph.append(node)
             if current_subgraph:
                 new_subgraphs.append(Subgraph(is_acc=True, nodes=current_subgraph))
-
+            print(new_subgraphs)
             leaf_node = partitioner.get_leaf_node(new_subgraphs[0].nodes)
             broken_fusion = partitioner.step_if_break_fusion(
                 new_subgraphs,
