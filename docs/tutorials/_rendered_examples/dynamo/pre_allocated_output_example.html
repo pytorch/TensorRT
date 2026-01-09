@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Pre-allocated output buffer &mdash; Torch-TensorRT v2.10.0.dev0+2e6843e documentation</title>
+  <title>Pre-allocated output buffer &mdash; Torch-TensorRT v2.10.0.dev0+093e8dc documentation</title>
   
 
   
@@ -293,7 +293,7 @@
               
               
                 <div class="version">
-                  v2.10.0.dev0+2e6843e
+                  v2.10.0.dev0+093e8dc
                 </div>
               
             
@@ -581,7 +581,6 @@ If output buffer allocation is moved after the execution of the TensorRT context
 <span class="n">optimized_model</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span>
     <span class="n">model</span><span class="p">,</span>
     <span class="n">ir</span><span class="o">=</span><span class="s2">&quot;dynamo&quot;</span><span class="p">,</span>
-    <span class="n">enabled_precisions</span><span class="o">=</span><span class="p">{</span><span class="n">torch</span><span class="o">.</span><span class="n">half</span><span class="p">},</span>
     <span class="n">inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">,</span>
 <span class="p">)</span>
 </pre></div>

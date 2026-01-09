@@ -156,6 +156,11 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         metadata = {
             "settings": self.settings,
             "weight_name_map": self.weight_name_map,
+            "output_tensors_are_unowned": (
+                False
+                if self.engine is None
+                else self.engine.are_output_tensors_unowned()
+            ),
         }
         target_platform = (
             Platform.current_platform()
@@ -284,6 +289,8 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
             metadata = TorchTensorRTModule.decode_metadata(serialized_metadata)
             self.settings = metadata["settings"]
             self.weight_name_map = metadata["weight_name_map"]
+            self.output_tensors_are_unowned = metadata["output_tensors_are_unowned"]
+            self.engine.set_output_tensors_as_unowned(self.output_tensors_are_unowned)
 
         else:
             self.engine = None
@@ -354,6 +361,12 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         assert profile_format in ["trex", "perfetto"]
         self.engine.enable_profiling()
         self.engine.set_profile_format(profile_format)
+
+    def set_output_tensors_as_unowned(self, enabled: bool) -> None:
+        self.engine.set_output_tensors_as_unowned(enabled)
+
+    def are_output_tensors_unowned(self) -> bool:
+        return self.engine.are_output_tensors_unowned()  # type: ignore[no-any-return]
 
     def disable_profiling(self) -> None:
         """Disable the profiler"""

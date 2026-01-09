@@ -725,70 +725,84 @@ elif NO_TS:
 with open(os.path.join(get_root_dir(), "README.md"), "r", encoding="utf-8") as fh:
     long_description = fh.read()
 
-base_requirements = [
-    "packaging>=23",
-    "typing-extensions>=4.7.0",
-    "dllist",
-    "psutil",
-    # dummy package as a WAR for the tensorrt dependency on nvidia-cuda-runtime-cu13
-    "nvidia-cuda-runtime-cu13==0.0.0a0",
-]
+
+def get_jetpack_requirements(base_requirements):
+    requirements = base_requirements + ["numpy<2.0.0"]
+    if IS_DLFW_CI:
+        return requirements
+    else:
+        return requirements + ["torch>=2.8.0,<2.9.0", "tensorrt>=10.3.0,<10.4.0"]
+
+
+def get_sbsa_requirements(base_requirements):
+    requirements = base_requirements + ["numpy"]
+    if IS_DLFW_CI:
+        return requirements
+    else:
+        # TensorRT does not currently build wheels for Tegra, so we need to use the local tensorrt install from the tarball for thor
+        # also due to we use sbsa torch_tensorrt wheel for thor, so when we build sbsa wheel, we need to only include tensorrt dependency.
+        return requirements + [
+            "torch>=2.11.0.dev,<2.12.0",
+            "tensorrt>=10.14.1,<10.15.0",
+        ]
+
+
+def get_x86_64_requirements(base_requirements):
+    requirements = base_requirements + ["numpy"]
+
+    if IS_DLFW_CI:
+        return requirements
+    else:
+        requirements = requirements + ["torch>=2.11.0.dev,<2.12.0"]
+        if USE_TRT_RTX:
+            return requirements + [
+                "tensorrt_rtx>=1.2.0.54",
+            ]
+        else:
+            requirements = requirements + [
+                "tensorrt>=10.14.1,<10.15.0",
+            ]
+            cuda_version = torch.version.cuda
+            if cuda_version.startswith("12"):
+                # directly use tensorrt>=10.14.1,<10.15.0 in cu12* env, it will pull both tensorrt_cu12 and tensorrt_cu13
+                # which will cause the conflict due to cuda-toolkit 13 is also pulled in, so we need to specify tensorrt_cu12 here
+                tensorrt_prefix = "tensorrt-cu12"
+                requirements = requirements + [
+                    f"{tensorrt_prefix}>=10.14.1,<10.15.0",
+                    f"{tensorrt_prefix}-bindings>=10.14.1,<10.15.0",
+                    f"{tensorrt_prefix}-libs>=10.14.1,<10.15.0",
+                ]
+            elif cuda_version.startswith("13"):
+                tensorrt_prefix = "tensorrt-cu13"
+                requirements = requirements + [
+                    f"{tensorrt_prefix}>=10.14.1,<10.15.0,!=10.14.1.48",
+                    f"{tensorrt_prefix}-bindings>=10.14.1,<10.15.0,!=10.14.1.48",
+                    f"{tensorrt_prefix}-libs>=10.14.1,<10.15.0,!=10.14.1.48",
+                ]
+            else:
+                raise ValueError(f"Unsupported CUDA version: {cuda_version}")
+
+            return requirements
 
 
 def get_requirements():
+    base_requirements = [
+        "packaging>=23",
+        "typing-extensions>=4.7.0",
+        "dllist",
+        "psutil",
+        # dummy package as a WAR for the tensorrt dependency on nvidia-cuda-runtime-cu13
+        "nvidia-cuda-runtime-cu13==0.0.0a0",
+    ]
+
     if IS_JETPACK:
-        requirements = get_jetpack_requirements()
+        requirements = get_jetpack_requirements(base_requirements)
     elif IS_SBSA:
-        requirements = get_sbsa_requirements()
+        requirements = get_sbsa_requirements(base_requirements)
     else:
         # standard linux and windows requirements
-        requirements = base_requirements + ["numpy"]
-        if not IS_DLFW_CI:
-            requirements = requirements + ["torch>=2.10.0.dev,<2.11.0"]
-            if USE_TRT_RTX:
-                requirements = requirements + [
-                    "tensorrt_rtx>=1.2.0.54",
-                ]
-            else:
-                cuda_version = torch.version.cuda
-                if cuda_version.startswith("12"):
-                    # directly use tensorrt>=10.14.1,<10.15.0 in cu12* env, it will pull both tensorrt_cu12 and tensorrt_cu13
-                    # which will cause the conflict due to cuda-toolkit 13 is also pulled in, so we need to specify tensorrt_cu12 here
-                    tensorrt_prefix = "tensorrt-cu12"
-                    requirements = requirements + [
-                        f"{tensorrt_prefix}>=10.14.1,<10.15.0",
-                        f"{tensorrt_prefix}-bindings>=10.14.1,<10.15.0",
-                        f"{tensorrt_prefix}-libs>=10.14.1,<10.15.0",
-                    ]
-                elif cuda_version.startswith("13"):
-                    tensorrt_prefix = "tensorrt-cu13"
-                    requirements = requirements + [
-                        f"{tensorrt_prefix}>=10.14.1,<10.15.0,!=10.14.1.48",
-                        f"{tensorrt_prefix}-bindings>=10.14.1,<10.15.0,!=10.14.1.48",
-                        f"{tensorrt_prefix}-libs>=10.14.1,<10.15.0,!=10.14.1.48",
-                    ]
-                else:
-                    raise ValueError(f"Unsupported CUDA version: {cuda_version}")
+        requirements = get_x86_64_requirements(base_requirements)
     return requirements
-
-
-def get_jetpack_requirements():
-    jetpack_requirements = base_requirements + ["numpy<2.0.0"]
-    if IS_DLFW_CI:
-        return jetpack_requirements
-    return jetpack_requirements + ["torch>=2.8.0,<2.9.0", "tensorrt>=10.3.0,<10.4.0"]
-
-
-def get_sbsa_requirements():
-    sbsa_requirements = base_requirements + ["numpy"]
-    if IS_DLFW_CI:
-        return sbsa_requirements
-    # TensorRT does not currently build wheels for Tegra, so we need to use the local tensorrt install from the tarball for thor
-    # also due to we use sbsa torch_tensorrt wheel for thor, so when we build sbsa wheel, we need to only include tensorrt dependency.
-    return sbsa_requirements + [
-        "torch>=2.10.0.dev,<2.11.0",
-        "tensorrt>=10.14.1,<10.15.0",
-    ]
 
 
 setup(

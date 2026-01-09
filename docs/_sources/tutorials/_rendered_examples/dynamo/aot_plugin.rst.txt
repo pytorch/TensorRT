@@ -47,7 +47,7 @@ However, the above methods generates a JIT plugin that might not satisfy user's 
 To support that, Torch-TensorRT provides auto generation of TensorRT AOT Plugin which raps a function to define an Ahead-of-Time (AOT) implementation for a plugin already registered.
 This provides a performance boost comparing to JIT plugin.
 
-.. GENERATED FROM PYTHON SOURCE LINES 31-176
+.. GENERATED FROM PYTHON SOURCE LINES 31-175
 
 .. code-block:: python
 
@@ -121,9 +121,8 @@ This provides a performance boost comparing to JIT plugin.
                 "x_ptr": f"*{type_str}",
                 "n_elements": "i32",
                 "y_ptr": f"*{type_str}",
-                "BLOCK_SIZE": "constexpr",
             },
-            constants={
+            constexprs={
                 "BLOCK_SIZE": block_size,
             },
         )

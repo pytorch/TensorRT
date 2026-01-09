@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Compile Mixed Precision models with Torch-TensorRT &mdash; Torch-TensorRT v2.10.0.dev0+2e6843e documentation</title>
+  <title>Compile Mixed Precision models with Torch-TensorRT &mdash; Torch-TensorRT v2.10.0.dev0+093e8dc documentation</title>
   
 
   
@@ -293,7 +293,7 @@
               
               
                 <div class="version">
-                  v2.10.0.dev0+2e6843e
+                  v2.10.0.dev0+093e8dc
                 </div>
               
             
@@ -512,15 +512,13 @@
         <span class="k">return</span> <span class="n">x</span>
 </pre></div>
 </div>
-<p>If we compile the above model using Torch-TensorRT, layer profiling logs indicate that all the layers are
-run in FP32. This is because TensorRT picks the kernels for layers which result in the best performance.</p>
+<p>Before TensorRT 10.12, if we compile the above model using Torch-TensorRT with the following settings,
+layer profiling logs indicate that all the layers are run in FP32. This is because old TensorRT picks
+the kernels for layers which result in the best performance (i.e., weak typing in old TensorRT).</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">inputs</span> <span class="o">=</span> <span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">((</span><span class="mi">1</span><span class="p">,</span> <span class="mi">10</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span><span class="o">.</span><span class="n">cuda</span><span class="p">()]</span>
 <span class="n">mod</span> <span class="o">=</span> <span class="n">MyModule</span><span class="p">()</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
 <span class="n">ep</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">export</span><span class="p">(</span><span class="n">mod</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">inputs</span><span class="p">))</span>
-<span class="k">with</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">logging</span><span class="o">.</span><span class="n">debug</span><span class="p">():</span>
-    <span class="n">trt_gm</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">dynamo</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">ep</span><span class="p">,</span>
-                                        <span class="n">inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">,</span>
-                                        <span class="n">debug</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">trt_gm</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">dynamo</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">ep</span><span class="p">,</span> <span class="n">inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">)</span>
 
 <span class="c1"># Debug log info</span>
 <span class="c1"># Layers:</span>
@@ -529,20 +527,14 @@ run in FP32. This is because TensorRT picks the kernels for layers which result 
 <span class="c1"># Name: __myl_AddResMulSumAdd_myl0_2, LayerType: kgen, Inputs: [ { Name: __mye146_dconst, Dimensions: [30,40], Format/Datatype: Float }, { Name: linear3/addmm_2_constant_0 _ linear3/addmm_2_add_broadcast_to_same_shape_lhs_broadcast_constantFloat, Dimensions: [1,40], Format/Datatype: Float }, { Name: __myln_k_arg__bb1_3, Dimensions: [1,30], Format/Datatype: Float }, { Name: linear2/addmm_1_constant_0 _ linear2/addmm_1_add_broadcast_to_same_shape_lhs_broadcast_constantFloat, Dimensions: [1,30], Format/Datatype: Float }], Outputs: [ { Name: output0, Dimensions: [1,40], Format/Datatype: Float }], TacticName: __myl_AddResMulSumAdd_0xcdd0085ad25f5f45ac5fafb72acbffd6, StreamId: 0, Metadata:</span>
 </pre></div>
 </div>
-<p>In order to respect the types specified by the user in the model (eg: in this case, <code class="docutils literal notranslate"><span class="pre">linear2</span></code> layer to run in FP16), users can enable
-the compilation setting <code class="docutils literal notranslate"><span class="pre">use_explicit_typing=True</span></code>. Compiling with this option results in the following TensorRT logs</p>
-<div class="admonition note">
-<p class="admonition-title">Note</p>
-<p>If you enable <code class="docutils literal notranslate"><span class="pre">use_explicit_typing=True</span></code>, only torch.float32 is supported in the enabled_precisions.</p>
-</div>
+<p>However, since TensorRT 10.12, TensorRT has deprecated weak typing, we must set <code class="docutils literal notranslate"><span class="pre">use_explicit_typing=True</span></code>
+to enable strong typing, which means users must specify the precision of the nodes in the model. For example,
+in the case above, we set <code class="docutils literal notranslate"><span class="pre">linear2</span></code> layer to run in FP16, so if we compile the model with the following settings,
+the <code class="docutils literal notranslate"><span class="pre">linear2</span></code> layer will run in FP16 and other layers will run in FP32 as shown in the following TensorRT logs:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">inputs</span> <span class="o">=</span> <span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">((</span><span class="mi">1</span><span class="p">,</span> <span class="mi">10</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span><span class="o">.</span><span class="n">cuda</span><span class="p">()]</span>
 <span class="n">mod</span> <span class="o">=</span> <span class="n">MyModule</span><span class="p">()</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
 <span class="n">ep</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">export</span><span class="p">(</span><span class="n">mod</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">inputs</span><span class="p">))</span>
-<span class="k">with</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">logging</span><span class="o">.</span><span class="n">debug</span><span class="p">():</span>
-    <span class="n">trt_gm</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">dynamo</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">ep</span><span class="p">,</span>
-                                        <span class="n">inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">,</span>
-                                        <span class="n">use_explicit_typing</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-                                        <span class="n">debug</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">trt_gm</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">dynamo</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">ep</span><span class="p">,</span> <span class="n">inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">,</span> <span class="n">use_explicit_typing</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 
 <span class="c1"># Debug log info</span>
 <span class="c1"># Layers:</span>
@@ -551,7 +543,62 @@ the compilation setting <code class="docutils literal notranslate"><span class="
 <span class="c1"># Name: __myl_ResMulSumAdd_myl0_2, LayerType: kgen, Inputs: [ { Name: __mye142_dconst, Dimensions: [30,40], Format/Datatype: Float }, { Name: linear3/addmm_2_constant_0 _ linear3/addmm_2_add_broadcast_to_same_shape_lhs_broadcast_constantFloat, Dimensions: [1,40], Format/Datatype: Float }, { Name: __myln_k_arg__bb1_3, Dimensions: [1,30], Format/Datatype: Float }], Outputs: [ { Name: output0, Dimensions: [1,40], Format/Datatype: Float }], TacticName: __myl_ResMulSumAdd_0x3fad91127c640fd6db771aa9cde67db0, StreamId: 0, Metadata:</span>
 </pre></div>
 </div>
-<p>Now the <code class="docutils literal notranslate"><span class="pre">linear2</span></code> layer runs in FP16 as shown in the above logs.</p>
+</section>
+<section id="autocast">
+<h2>Autocast<a class="headerlink" href="#autocast" title="Permalink to this heading">¶</a></h2>
+<p>Weak typing behavior in TensorRT is deprecated. However mixed precision is a good way to maximize performance.
+Therefore, in Torch-TensorRT, we want to provide a way to enable mixed precision behavior like weak typing in
+old TensorRT, which is called <cite>Autocast</cite>.</p>
+<p>Before we dive into Torch-TensorRT Autocast, let’s first take a look at PyTorch Autocast. PyTorch Autocast is a
+context-based autocast, which means it will affect the precision of the nodes inside the context. For example,
+in PyTorch, we can do the following:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">x</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">linear1</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+<span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">autocast</span><span class="p">(</span><span class="n">device_type</span><span class="o">=</span><span class="s2">&quot;cuda&quot;</span><span class="p">,</span> <span class="n">enabled</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float16</span><span class="p">):</span>
+    <span class="n">x</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">linear2</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+<span class="n">x</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">linear3</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>This will run <code class="docutils literal notranslate"><span class="pre">linear2</span></code> in FP16 and other layers remain in FP32. Please refer to <a class="reference external" href="https://docs.pytorch.org/docs/stable/amp.html#torch.autocast">PyTorch Autocast documentation</a> for more details.</p>
+<p>Unlike PyTorch Autocast, Torch-TensorRT Autocast is a rule-based autocast, which intelligently selects nodes to
+keep in FP32 precision to maintain model accuracy while benefiting from reduced precision on the rest of the nodes.
+Torch-TensorRT Autocast also supports users to specify which nodes to exclude from Autocast, considering some nodes
+might be more sensitive to affecting accuracy. In addition, Torch-TensorRT Autocast can cooperate with PyTorch Autocast,
+allowing users to use both PyTorch Autocast and Torch-TensorRT Autocast in the same model. Torch-TensorRT Autocast
+respects the precision of the nodes within PyTorch Autocast context.</p>
+<p>To enable Torch-TensorRT Autocast, we need to set both <code class="docutils literal notranslate"><span class="pre">enable_autocast=True</span></code> and <code class="docutils literal notranslate"><span class="pre">use_explicit_typing=True</span></code>.
+On top of them, we can also specify the precision of the nodes to reduce to by <code class="docutils literal notranslate"><span class="pre">autocast_low_precision_type</span></code>,
+and exclude certain nodes/ops from Torch-TensorRT Autocast by <code class="docutils literal notranslate"><span class="pre">autocast_excluded_nodes</span></code> or <code class="docutils literal notranslate"><span class="pre">autocast_excluded_ops</span></code>.
+For example,</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">MyModule</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">linear1</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span><span class="mi">10</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">linear2</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span><span class="mi">30</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">linear3</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="mi">30</span><span class="p">,</span><span class="mi">40</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">linear1</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">linear2</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">linear3</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">x</span>
+
+<span class="n">inputs</span> <span class="o">=</span> <span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">((</span><span class="mi">1</span><span class="p">,</span> <span class="mi">10</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span><span class="o">.</span><span class="n">cuda</span><span class="p">()]</span>
+<span class="n">mod</span> <span class="o">=</span> <span class="n">MyModule</span><span class="p">()</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
+<span class="n">ep</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">export</span><span class="p">(</span><span class="n">mod</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">inputs</span><span class="p">))</span>
+<span class="n">trt_gm</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">dynamo</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span>
+    <span class="n">ep</span><span class="p">,</span>
+    <span class="n">inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">,</span>
+    <span class="n">enable_autocast</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">use_explicit_typing</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">autocast_low_precision_type</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float16</span><span class="p">,</span>
+    <span class="n">autocast_excluded_nodes</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;^linear2$&quot;</span><span class="p">},</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p>This model excludes <code class="docutils literal notranslate"><span class="pre">linear2</span></code> from Autocast, so it will run <code class="docutils literal notranslate"><span class="pre">linear2</span></code> in FP32 and other layers in FP16.</p>
+<p>In summary, now there are two ways in Torch-TensorRT to choose the precision of the nodes:
+1. User specifies precision (strong typing):                <code class="docutils literal notranslate"><span class="pre">use_explicit_typing=True</span> <span class="pre">+</span> <span class="pre">enable_autocast=False</span></code>
+2. Autocast chooses precision (autocast + strong typing):   <code class="docutils literal notranslate"><span class="pre">use_explicit_typing=True</span> <span class="pre">+</span> <span class="pre">enable_autocast=True</span></code></p>
 </section>
 <section id="fp32-accumulation">
 <h2>FP32 Accumulation<a class="headerlink" href="#fp32-accumulation" title="Permalink to this heading">¶</a></h2>
@@ -563,14 +610,12 @@ the compilation setting <code class="docutils literal notranslate"><span class="
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">inputs</span> <span class="o">=</span> <span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">((</span><span class="mi">1</span><span class="p">,</span> <span class="mi">10</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float16</span><span class="p">)</span><span class="o">.</span><span class="n">cuda</span><span class="p">()]</span>
 <span class="n">mod</span> <span class="o">=</span> <span class="n">MyModule</span><span class="p">()</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
 <span class="n">ep</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">export</span><span class="p">(</span><span class="n">mod</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">inputs</span><span class="p">))</span>
-<span class="k">with</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">logging</span><span class="o">.</span><span class="n">debug</span><span class="p">():</span>
-    <span class="n">trt_gm</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">dynamo</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span>
-        <span class="n">ep</span><span class="p">,</span>
-        <span class="n">inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">,</span>
-        <span class="n">use_fp32_acc</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-        <span class="n">use_explicit_typing</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>  <span class="c1"># Explicit typing must be enabled</span>
-        <span class="n">debug</span><span class="o">=</span><span class="kc">True</span>
-    <span class="p">)</span>
+<span class="n">trt_gm</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">dynamo</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span>
+    <span class="n">ep</span><span class="p">,</span>
+    <span class="n">inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">,</span>
+    <span class="n">use_fp32_acc</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">use_explicit_typing</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>  <span class="c1"># Explicit typing must be enabled</span>
+<span class="p">)</span>
 
 <span class="c1"># Debug log info</span>
 <span class="c1"># Layers:</span>
@@ -627,6 +672,7 @@ the compilation setting <code class="docutils literal notranslate"><span class="
               <ul>
 <li><a class="reference internal" href="#">Compile Mixed Precision models with Torch-TensorRT</a><ul>
 <li><a class="reference internal" href="#explicit-typing">Explicit Typing</a></li>
+<li><a class="reference internal" href="#autocast">Autocast</a></li>
 <li><a class="reference internal" href="#fp32-accumulation">FP32 Accumulation</a></li>
 </ul>
 </li>

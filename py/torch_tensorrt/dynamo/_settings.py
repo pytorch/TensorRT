@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 from typing import Any, Collection, Optional, Set, Tuple, Union
 
+import tensorrt as trt
 import torch
 from torch.fx.node import Target
 from torch_tensorrt._Device import Device
@@ -190,7 +191,7 @@ class CompilationSettings:
 
 
 # If any of the following setting is changed, the engine should be rebuilt.
-_SETTINGS_TO_BE_ENGINE_INVARIANT = (
+_SETTINGS_TO_BE_ENGINE_INVARIANT = {
     "enabled_precisions",
     "max_aux_streams",
     "version_compatible",
@@ -200,7 +201,6 @@ _SETTINGS_TO_BE_ENGINE_INVARIANT = (
     "engine_capability",
     "hardware_compatible",
     "refit_identical_engine_weights",
-    "strip_engine_weights",  # TODO: @Evan to remove this after implementing caching weight-stripped engines as default?
     "immutable_weights",
     "enable_weight_streaming",
     "tiling_optimization_level",
@@ -212,7 +212,11 @@ _SETTINGS_TO_BE_ENGINE_INVARIANT = (
     "autocast_max_output_threshold",
     "autocast_max_depth_of_reduction",
     "autocast_calibration_dataloader",
-)
+}
+
+
+if not hasattr(trt.SerializationFlag, "INCLUDE_REFIT"):  # for TensorRT < 10.14
+    _SETTINGS_TO_BE_ENGINE_INVARIANT.add("strip_engine_weights")
 
 
 def settings_are_compatible(

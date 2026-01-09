@@ -52,7 +52,9 @@ _REFIT_AVAIL = True
 _WINDOWS_CROSS_COMPILE = check_cross_compile_trt_win_lib()
 _TRTLLM_AVAIL = load_tensorrt_llm_for_nccl()
 
-if importlib.util.find_spec("tensorrt.plugin"):
+if importlib.util.find_spec("tensorrt.plugin") and importlib.util.find_spec(
+    "tensorrt.plugin._lib"
+):
     _QDP_PLUGIN_AVAIL = True
 else:
     _QDP_PLUGIN_AVAIL = False

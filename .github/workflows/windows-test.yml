@@ -78,7 +78,7 @@ jobs:
           mkdir -p "${GITHUB_WORKSPACE}"
           echo "::endgroup::"
       - name: Checkout repository (${{ inputs.test-infra-repository }}@${{ inputs.test-infra-ref }})
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           # Support the use case where we need to checkout someone's fork
           repository: ${{ inputs.test-infra-repository }}
@@ -113,13 +113,13 @@ jobs:
           is_windows: 'enabled'
       - name: Download artifacts
         if: ${{ matrix.tensorrt == '' }}
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: ${{ env.ARTIFACT_NAME }}${{ inputs.architecture }}
           path: ${{ runner.temp }}/artifacts/
       - name: Download artifacts
         if: ${{ matrix.tensorrt != '' }}
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: ${{ env.DOWNLOAD_ARTIFACT_NAME }}
           path: ${{ runner.temp }}/artifacts/

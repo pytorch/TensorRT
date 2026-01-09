@@ -3,12 +3,11 @@ from typing import Tuple
 
 import torch
 import torch.nn as nn
+import torch_tensorrt
 import triton
 import triton.language as tl
 from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
-
-import torch_tensorrt
 
 from ..conversion.harness import DispatchTestCase
 
@@ -56,15 +55,15 @@ def elementwise_mul(x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
     return x
 
 
-if not torch_tensorrt.ENABLED_FEATURES.tensorrt_rtx:
+if torch_tensorrt.ENABLED_FEATURES.qdp_plugin:
     torch_tensorrt.dynamo.conversion.plugins.custom_op(
         "torchtrt_ex::elementwise_mul", supports_dynamic_shapes=True
     )
 
 
 @unittest.skipIf(
-    torch_tensorrt.ENABLED_FEATURES.tensorrt_rtx,
-    "TensorRT RTX does not support plugins",
+    not torch_tensorrt.ENABLED_FEATURES.qdp_plugin,
+    "QDP Plugin is not available",
 )
 class TestAutomaticPlugin(DispatchTestCase):
 
