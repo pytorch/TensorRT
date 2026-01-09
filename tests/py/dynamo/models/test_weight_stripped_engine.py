@@ -4,6 +4,7 @@ import pickle
 import shutil
 import unittest
 
+import tensorrt as trt
 import torch
 import torch_tensorrt as torch_trt
 from torch.testing._internal.common_utils import TestCase
@@ -641,6 +642,10 @@ class TestWeightStrippedEngine(TestCase):
     @unittest.skipIf(
         not importlib.util.find_spec("torchvision"),
         "torchvision is not installed",
+    )
+    @unittest.skipIf(
+        not hasattr(trt.SerializationFlag, "INCLUDE_REFIT"),
+        "Multiple refit requires TensorRT >= 10.14 with INCLUDE_REFIT serialization flag",
     )
     def test_refit_weight_stripped_engine_multiple_times(self):
         pyt_model = models.resnet18(pretrained=True).eval().to("cuda")
