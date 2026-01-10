@@ -1,6 +1,7 @@
 from typing import Callable, Optional
 
 from torch.fx.node import Node
+from torch_tensorrt._features import needs_qdp_plugin
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.conversion._ConverterRegistry import ConverterPriority
 from torch_tensorrt.dynamo.conversion.plugins._generate_plugin import generate_plugin
@@ -9,6 +10,7 @@ from torch_tensorrt.dynamo.conversion.plugins._generate_plugin_converter import 
 )
 
 
+@needs_qdp_plugin
 def custom_op(
     op_name: str,
     capability_validator: Optional[Callable[[Node, CompilationSettings], bool]] = None,

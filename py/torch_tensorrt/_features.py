@@ -52,10 +52,18 @@ _REFIT_AVAIL = True
 _WINDOWS_CROSS_COMPILE = check_cross_compile_trt_win_lib()
 _TRTLLM_AVAIL = load_tensorrt_llm_for_nccl()
 
-if importlib.util.find_spec("tensorrt.plugin"):
-    _QDP_PLUGIN_AVAIL = True
+if importlib.util.find_spec("tensorrt.plugin") and importlib.util.find_spec(
+    "tensorrt.plugin._lib"
+):
+    # there is a bug in tensorrt 10.14.* that causes the plugin to not work, disable it for now
+    if tensorrt.__version__.startswith("10.14."):
+        _QDP_PLUGIN_AVAIL = False
+    else:
+        _QDP_PLUGIN_AVAIL = True
 else:
     _QDP_PLUGIN_AVAIL = False
+
+_QDP_PLUGIN_AVAIL = False
 
 ENABLED_FEATURES = FeatureSet(
     _TS_FE_AVAIL,
