@@ -516,7 +516,8 @@ def get_trt_tensor(
     # If the input is 64-bit, cast it to 32-bit for TRT freezing
     if isinstance(input_val, torch.Tensor) and ctx.compilation_settings.truncate_double:
         if input_val.dtype == torch.float64:
-            input_val = input_val.to(torch.float32)
+            with unset_fake_temporarily():
+                input_val = input_val.to(torch.float32)
     elif isinstance(input_val, np.ndarray) and ctx.compilation_settings.truncate_double:
         if input_val.dtype == np.float64:
             input_val = input_val.astype(np.float32)
