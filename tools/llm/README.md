@@ -38,7 +38,7 @@ We have officially verified support for the following models:
 #### Text-only LLMs: `run_llm.py`
 
 ```bash
-python run_llm.py --model meta-llama/Llama-3.2-1B-Instruct --prompt "What is parallel programming?" --precision FP16 --num_tokens 128 --cache static_v2 --benchmark
+python run_llm.py --model Qwen/Qwen2.5-0.5B-Instruct --prompt "What is parallel programming?" --precision FP16 --num_tokens 128 --cache static_v2 --benchmark
 ```
 
 #### Vision Language Models: `run_vlm.py`
