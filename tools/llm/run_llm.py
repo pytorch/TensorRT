@@ -59,7 +59,7 @@ def get_model(args):
             .cuda()
         )
         # register SDPA variant for the model
-        register_sdpa.enable_sdpa_converter(args.model, model.config)
+        register_sdpa.enable_sdpa_converter(args, model.config)
 
     if args.precision == "FP16":
         model = model.to(torch.float16)
@@ -235,6 +235,11 @@ if __name__ == "__main__":
     )
     arg_parser.add_argument(
         "--benchmark", action="store_true", help="Enable benchmark (default: False)"
+    )
+    arg_parser.add_argument(
+        "--enable_cutile_attention",
+        action="store_true",
+        help="Enable cutile attention (default: False)",
     )
 
     args = arg_parser.parse_args()
