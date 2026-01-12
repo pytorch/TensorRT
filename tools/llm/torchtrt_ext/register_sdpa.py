@@ -15,7 +15,7 @@ from torch_tensorrt.dynamo.lowering.passes.pass_utils import (
 )
 from transformers import AutoConfig, Gemma3TextConfig
 
-from .sdpa_converter import *
+from .trt_sdpa_converter import *
 
 logger = logging.getLogger(__name__)
 
@@ -143,7 +143,6 @@ def _process_sdpa_node(
         dropout_p,
         is_causal,
     )
-
     # Create a new node with torch.nn.functional.scaled_dot_product_attention
     with gm.graph.inserting_after(node):
         new_node = gm.graph.call_function(
