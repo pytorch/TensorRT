@@ -7,6 +7,7 @@ import platform
 import warnings
 from typing import Any, Collection, List, Optional, Sequence, Set, Tuple, Union
 
+import psutil
 import torch
 from torch.export import ExportedProgram
 from torch.fx.node import Target
@@ -693,6 +694,13 @@ def compile(
             if custom_engine_cache is not None
             else DiskEngineCache(engine_cache_dir, engine_cache_size)
         )
+
+    if cpu_memory_budget and cpu_memory_budget > psutil.virtual_memory().available:
+        logger.warning(
+            f"CPU memory budget is greater than the available memory: {cpu_memory_budget} > {psutil.virtual_memory().available}"
+            "\nUsing the available memory instead."
+        )
+        cpu_memory_budget = psutil.virtual_memory().available
 
     compilation_options = {
         "enabled_precisions": (
