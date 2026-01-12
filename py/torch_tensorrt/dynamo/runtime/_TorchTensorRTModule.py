@@ -50,7 +50,10 @@ if ENABLED_FEATURES.torch_tensorrt_runtime:
     REQUIRES_OUTPUT_ALLOCATOR_IDX = (
         torch.ops.tensorrt.REQUIRES_OUTPUT_ALLOCATOR_IDX()
     )  # 9
-    SERIALIZATION_LEN = torch.ops.tensorrt.SERIALIZATION_LEN()  # 10
+    RESOURCE_ALLOCATION_STRATEGY_IDX = (
+        torch.ops.tensorrt.RESOURCE_ALLOCATION_STRATEGY_IDX()
+    )  # 10
+    SERIALIZATION_LEN = torch.ops.tensorrt.SERIALIZATION_LEN()  # 11
 
 
 @for_all_methods(needs_torch_tensorrt_runtime)
@@ -139,6 +142,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         self.serialized_engine = serialized_engine
         self.engine = None
         self.requires_output_allocator = requires_output_allocator
+        self.dynamically_allocate_resources = settings.dynamically_allocate_resources
 
         if (
             serialized_engine
@@ -189,6 +193,12 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         engine_info[REQUIRES_OUTPUT_ALLOCATOR_IDX] = str(
             int(self.requires_output_allocator)
         )
+        logger.info(
+            f"PROVIDED RESOURCE ALLOCATION STRATEGY: {self.dynamically_allocate_resources}"
+        )
+        engine_info[RESOURCE_ALLOCATION_STRATEGY_IDX] = str(
+            int(self.dynamically_allocate_resources)
+        )
 
         return engine_info
 
@@ -216,6 +226,14 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
 
     def _reset_captured_graph(self) -> None:
         self.engine.reset_captured_graph()
+
+    def use_dynamically_allocated_resources(
+        self, dynamically_allocate_resources: bool = False
+    ) -> None:
+        self.dynamically_allocate_resources = dynamically_allocate_resources
+        self.engine.use_dynamically_allocated_resources(
+            self.dynamically_allocate_resources
+        )
 
     def setup_engine(self) -> None:
         """
