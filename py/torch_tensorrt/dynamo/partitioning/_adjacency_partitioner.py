@@ -66,7 +66,7 @@ class OpSupportTester(ops.OperatorSupportBase):  # type: ignore
 
     def print_support_overview(self, num_trt_blocks: Optional[int] = None) -> None:
         if num_trt_blocks is not None:
-            logger.debug(
+            print(
                 f"\nNumber of TensorRT-Accelerated Engines Generated: {num_trt_blocks}"
             )
 
@@ -75,16 +75,16 @@ class OpSupportTester(ops.OperatorSupportBase):  # type: ignore
         for node_name, count in self.supported_operators.items():
             supported_nodes_str += f"- {node_name} + Operator Count: {count}\n"
 
-        logger.debug(supported_nodes_str)
+        print(supported_nodes_str)
 
         if self.unsupported_operators:
             unsupported_nodes_str = "\nUnsupported or Excluded Nodes:\n"
             for node_name, count in self.unsupported_operators.items():
                 unsupported_nodes_str += f"- {node_name} + Operator Count: {count}\n"
 
-            logger.debug(unsupported_nodes_str)
+            print(unsupported_nodes_str)
         else:
-            logger.debug("\nAll Nodes Supported\n")
+            print("\nAll Nodes Supported\n")
 
 
 class TRTPartitioner(_SplitterBase):  # type: ignore
@@ -177,7 +177,7 @@ class TRTPartitioner(_SplitterBase):  # type: ignore
                 ):
                     result.append(subgraph)
                 else:
-                    logger.debug(
+                    print(
                         "Eliminating acc subgraph because it's smaller than the threshold: "
                         f"{len(subgraph.nodes)} < {self.settings.min_acc_module_size}"
                     )

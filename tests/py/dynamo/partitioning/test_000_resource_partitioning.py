@@ -17,6 +17,7 @@ from torch_tensorrt.dynamo.partitioning._resource_partitioner import (
 
 
 class TestResourcePartitioning(TestCase):
+
     def test_atomic_subgraph_correction(self):
         class net(nn.Module):
             def __init__(self):
@@ -40,6 +41,11 @@ class TestResourcePartitioning(TestCase):
 
         enabled_precisions = {torch.float}
         use_python_runtime = False
+        from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
+            DYNAMO_ATEN_CONVERTERS,
+        )
+
+        print(DYNAMO_ATEN_CONVERTERS.keys())
 
         exp_program = torch.export.export(model, tuple(inputs))
 
@@ -60,6 +66,9 @@ class TestResourcePartitioning(TestCase):
 
         gm = exported_program.module()
         gm = post_lowering(gm, settings)
+        print(settings.torch_executed_ops)
+        print(gm.graph)
+        gm.graph.print_tabular()
 
         partitioned_module, supported_ops = partitioning.fast_partition(
             gm,
@@ -68,6 +77,14 @@ class TestResourcePartitioning(TestCase):
             require_full_compilation=settings.require_full_compilation,
             skip_fusion=True,
         )
+        print(partitioned_module.graph)
+        partitioned_module.graph.print_tabular()
+
+        for name, _ in partitioned_module.named_children():
+            submodule = getattr(partitioned_module, name)
+            print(name + ": ")
+            if isinstance(submodule, torch.fx.graph_module.GraphModule):
+                submodule.graph.print_tabular()
 
         for name, _ in partitioned_module.named_children():
             submodule = getattr(partitioned_module, name)
@@ -83,6 +100,7 @@ class TestResourcePartitioning(TestCase):
             )
             subgraphs = partitioner.put_nodes_into_subgraphs()
             print(subgraphs)
+            print(len(subgraphs[0].nodes))
             new_subgraphs = []
             current_subgraph = []
             # Split the subgraph into two subgraphs by the ReLU node, which breaks the fusion group.
@@ -94,6 +112,7 @@ class TestResourcePartitioning(TestCase):
             if current_subgraph:
                 new_subgraphs.append(Subgraph(is_acc=True, nodes=current_subgraph))
             print(new_subgraphs)
+            print(len(new_subgraphs[0].nodes))
             leaf_node = partitioner.get_leaf_node(new_subgraphs[0].nodes)
             broken_fusion = partitioner.step_if_break_fusion(
                 new_subgraphs,
