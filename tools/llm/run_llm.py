@@ -5,31 +5,22 @@ Running LLM inference with Torch-TensorRT
 ==========================================================
 
 This script illustrates Torch-TensorRT workflow with dynamo backend on popular LLM models.
-
-Backend Options:
-    - sdpa: Uses SDPA lowering for attention operations (default)
-    - plugin: Uses TensorRT attention plugin with KV cache support
-
-Static Cache:
-    - Only applicable with 'sdpa' backend
-    - Options: static_v1, static_v2
 """
 
 import argparse
-import gc
+import copy
 import os
 import sys
 import timeit
 from contextlib import nullcontext
 
-# Add examples/dynamo to path for imports
-sys.path.append(os.path.join(os.path.dirname(__file__), "../../examples/dynamo"))
-
+# %%
+# Imports and Model Definition
+# ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 import torch
 import torch_tensorrt
-from transformers import AutoModelForCausalLM, AutoTokenizer
-
 from torchtrt_ext import register_sdpa
+from transformers import AutoModelForCausalLM, AutoTokenizer
 from utils import (
     export_llm,
     generate,
@@ -38,7 +29,7 @@ from utils import (
     time_generate,
 )
 
-# Import plugin utilities
+# Import plugin utilities (optional)
 try:
     from plugin_utils import (
         load_plugin,
@@ -54,7 +45,6 @@ try:
     PLUGIN_AVAILABLE = True
 except ImportError as e:
     PLUGIN_AVAILABLE = False
-    print(f"Warning: Plugin utilities not available: {e}")
 
 DEVICE = torch.device("cuda:0")
 
@@ -63,14 +53,18 @@ def get_model(args):
     """
     Load and configure the language model for inference.
 
+    This function loads a pre-trained causal language model using the specified
+    model name and configures it with the appropriate precision and settings
+    for inference.
+
     Args:
         args: Parsed command line arguments containing:
             - model (str): Name or path of the model to load
             - precision (str): Precision to use ("FP16", "BF16", or "FP32")
-            - backend (str): Backend to use ("sdpa" or "plugin")
 
     Returns:
-        torch.nn.Module: The loaded and configured model ready for inference
+        torch.nn.Module: The loaded and configured model ready for inference,
+            moved to CUDA device with the specified precision
     """
     with torch.no_grad():
         # For plugin backend, we don't set attn_implementation
@@ -87,6 +81,9 @@ def get_model(args):
             .eval()
             .cuda()
         )
+        # register SDPA variant for the model (only for sdpa backend)
+        if args.backend == "sdpa":
+            register_sdpa.enable_sdpa_converter(args.model, model.config)
 
     if args.precision == "FP16":
         model = model.to(torch.float16)
@@ -98,35 +95,30 @@ def get_model(args):
     return model
 
 
-def get_dtype_from_precision(precision: str) -> torch.dtype:
-    """Convert precision string to torch dtype."""
-    if precision == "FP16":
-        return torch.float16
-    elif precision == "BF16":
-        return torch.bfloat16
-    else:
-        return torch.float32
-
-
-def compile_sdpa_model(model, input_ids, args):
+def compile_torchtrt(model, input_ids, args):
     """
-    Compile a PyTorch model to TensorRT using SDPA lowering.
+    Compile a PyTorch model to TensorRT using torch_tensorrt.dynamo.compile.
+
+    This function exports the given model to a TorchScript representation and then
+    compiles it to TensorRT for optimized inference. The compilation process includes
+    precision-specific optimizations and various performance tuning parameters.
 
     Args:
         model (torch.nn.Module): The PyTorch model to compile
         input_ids (torch.Tensor): Input token IDs tensor used for model export
-        args: Parsed command line arguments
+        args: Parsed command line arguments containing:
+            - num_tokens (int): Number of tokens to generate (used for max sequence length)
+            - precision (str): Precision to use ("FP16", "BF16", or "FP32")
+            - debug (bool): Whether to enable debug logging
+            - min_block_size (int): Minimum block size for TensorRT compilation
 
     Returns:
-        torch_tensorrt.dynamo.TorchTensorRTModule: The compiled TensorRT model
+        torch_tensorrt.dynamo.TorchTensorRTModule: The compiled TensorRT model ready
+            for optimized inference
     """
-    # Register SDPA converter for the model
-    register_sdpa.enable_sdpa_converter(args.model, model.config)
-    
     max_seq_len = input_ids.shape[1] + args.num_tokens
     ep = export_llm(model, input_ids, max_seq_len=max_seq_len)
     position_ids = torch.arange(input_ids.shape[1]).unsqueeze(0).to(DEVICE)
-    
     # Set precision specific flags
     use_fp32_acc = False
     use_explicit_typing = False
@@ -145,6 +137,7 @@ def compile_sdpa_model(model, input_ids, args):
             ep,
             inputs=[input_ids, position_ids],
             enabled_precisions=enabled_precisions,
+            # truncate_double=True,
             use_explicit_typing=use_explicit_typing,
             use_fp32_acc=use_fp32_acc,
             device=DEVICE,
@@ -158,46 +151,12 @@ def compile_sdpa_model(model, input_ids, args):
     return trt_model
 
 
-def compile_plugin_model_wrapper(model, args, max_seq_len):
-    """
-    Compile a model with plugin attention for TensorRT inference.
-    
-    Args:
-        model: The PyTorch model (will be modified)
-        args: Parsed command line arguments
-        max_seq_len: Maximum sequence length
-        
-    Returns:
-        Tuple of (compiled model function, model config)
-    """
-    if not PLUGIN_AVAILABLE:
-        raise RuntimeError("Plugin utilities not available. Cannot compile plugin model.")
-    
-    dtype = get_dtype_from_precision(args.precision)
-    config = model.config
-    
-    # Load plugin and register op
-    load_plugin()
-    register_plugin_op()
-    
-    # Set plugin config
-    set_plugin_config_from_model(config, max_seq_len)
-    
-    # Replace attention with plugin
-    model = replace_attention_with_plugin(model, config, max_seq_len, DEVICE, dtype)
-    
-    # Wrap model
-    wrapper = LLMPluginWrapper(model)
-    
-    # Compile
-    print("Compiling TensorRT Plugin model...")
-    trt_model = compile_plugin_model(wrapper, config, max_seq_len, DEVICE, dtype, args.debug)
-    
-    return trt_model, config
 
 
 def print_outputs(backend_name, gen_tokens, tokenizer):
-    """Print the generated tokens from the model."""
+    """
+    Print the generated tokens from the model.
+    """
     print(f"========= {backend_name} =========")
     print(
         f"{backend_name} model generated text: ",
@@ -206,465 +165,285 @@ def print_outputs(backend_name, gen_tokens, tokenizer):
     print("===================================")
 
 
-def run_sdpa_generation(model, input_ids, args, tokenizer, use_cache=False):
+def measure_perf(trt_model, input_signature, backend_name):
     """
-    Run generation using SDPA backend.
-    
-    Args:
-        model: Compiled TensorRT model
-        input_ids: Input token IDs
-        args: Parsed arguments
-        tokenizer: Tokenizer
-        use_cache: Whether to use static cache
-        
-    Returns:
-        Tuple of (generated tokens, timings if benchmark else None)
+    Measure the performance of a TensorRT model by running it multiple times and
+    calculating the average time per iteration.
     """
-    MAX_OUTPUT_SEQ_LENGTH = input_ids.shape[1] + args.num_tokens
-    
-    if use_cache:
-        gen_tokens = generate_with_static_cache(
-            model,
-            input_ids.clone(),
-            MAX_OUTPUT_SEQ_LENGTH,
-            tokenizer.eos_token_id,
-        )
-        
-        if args.benchmark:
-            timings = time_generate(
-                generate_with_static_cache,
-                model,
-                input_ids.clone(),
-                MAX_OUTPUT_SEQ_LENGTH,
-                tokenizer.eos_token_id,
-                iterations=args.iterations,
-            )
-        else:
-            timings = None
-    else:
-        gen_tokens = generate(
-            model,
-            input_ids.clone(),
-            MAX_OUTPUT_SEQ_LENGTH,
-            tokenizer.eos_token_id,
-        )
-        
-        if args.benchmark:
-            timings = time_generate(
-                generate,
-                model,
-                input_ids.clone(),
-                MAX_OUTPUT_SEQ_LENGTH,
-                tokenizer.eos_token_id,
-                iterations=args.iterations,
-            )
-        else:
-            timings = None
-    
-    return gen_tokens, timings
+    total_time = 0
+    iterations = 10
 
+    print("Running warmup iteration...")
+    # Warmup run
+    _ = trt_model(*input_signature)
+    torch.cuda.synchronize()
 
-def run_plugin_generation(model_func, config, input_ids, args, tokenizer, max_seq_len):
-    """
-    Run generation using plugin backend.
-    
-    Args:
-        model_func: Compiled plugin model function
-        config: Model configuration
-        input_ids: Input token IDs
-        args: Parsed arguments
-        tokenizer: Tokenizer
-        max_seq_len: Maximum sequence length
-        
-    Returns:
-        Tuple of (generated tokens, timings if benchmark else None)
-    """
-    dtype = get_dtype_from_precision(args.precision)
-    kv_caches = create_kv_caches(config, max_seq_len, 1, DEVICE, dtype)
-    
-    gen_tokens, _ = generate_with_plugin(
-        model_func,
-        input_ids.clone(),
-        kv_caches,
-        args.num_tokens,
-        tokenizer.eos_token_id,
-        DEVICE,
+    print(f"Measuring performance over {iterations} iterations...")
+    for i in range(iterations):
+        start_time = timeit.default_timer()
+        _ = trt_model(*input_signature)
+        torch.cuda.synchronize()
+        end_time = timeit.default_timer()
+        iter_time = end_time - start_time
+        total_time += iter_time
+
+    avg_time = total_time / iterations
+    print(
+        f"Backend: {backend_name} Average time per iteration: {avg_time*1000:.4f} milliseconds"
     )
-    
-    if args.benchmark:
-        timings = []
-        for i in range(args.iterations):
-            elapsed_ms = benchmark_plugin_generation(
-                model_func,
-                config,
-                input_ids.shape[1],
-                args.num_tokens,
-                max_seq_len,
-                DEVICE,
-                dtype,
-                run_name=f"TensorRT-Plugin (Iter {i+1})",
-            )
-            timings.append(elapsed_ms / 1000.0)
-    else:
-        timings = None
-    
-    return gen_tokens, timings
-
-
-def run_pytorch_baseline(model, input_ids, args, tokenizer):
-    """
-    Run PyTorch baseline generation.
-    
-    Args:
-        model: PyTorch model
-        input_ids: Input token IDs
-        args: Parsed arguments
-        tokenizer: Tokenizer
-        
-    Returns:
-        Tuple of (generated tokens, timings if benchmark else None)
-    """
-    MAX_OUTPUT_SEQ_LENGTH = input_ids.shape[1] + args.num_tokens
-    
-    gen_tokens = generate(
-        model, input_ids.clone(), MAX_OUTPUT_SEQ_LENGTH, tokenizer.eos_token_id
+    print(
+        f"Backend: {backend_name} Average throughput: {1.0/avg_time:.2f} iterations/second"
     )
-    
-    if args.benchmark:
-        timings = time_generate(
-            generate,
-            model,
-            input_ids.clone(),
-            MAX_OUTPUT_SEQ_LENGTH,
-            tokenizer.eos_token_id,
-            iterations=args.iterations,
-        )
-    else:
-        timings = None
-    
-    return gen_tokens, timings
 
 
-def main():
+if __name__ == "__main__":
     arg_parser = argparse.ArgumentParser(
-        description="Run LLM inference with Torch-TensorRT"
+        description="Run inference on a model with random input values"
     )
-    
-    # Model configuration
     arg_parser.add_argument(
         "--model",
         type=str,
         default="meta-llama/Llama-3.2-1B-Instruct",
-        help="Name or path of the LLM model",
+        help="Name of LLM model",
     )
     arg_parser.add_argument(
         "--tokenizer",
         type=str,
         default="",
-        help="Name of LLM model tokenizer (defaults to model name)",
+        help="Name of LLM model tokenizer",
     )
     arg_parser.add_argument(
-        "--prompt",
-        type=str,
-        default="What is parallel programming?",
-        help="Input prompt for generation",
+        "--prompt", type=str, default="What is parallel programming ?", help="Prompt"
     )
     arg_parser.add_argument(
         "--precision",
         type=str,
         default="FP16",
-        choices=["FP16", "BF16", "FP32"],
-        help="Precision to use in the model",
+        help="Precision to use in the model. Options: FP16, BF16, FP32",
     )
-    
-    # Backend selection
     arg_parser.add_argument(
         "--backend",
         type=str,
         default="sdpa",
-        choices=["sdpa", "plugin"],
-        help="Backend for TensorRT compilation: 'sdpa' (SDPA lowering) or 'plugin' (attention plugin with KV cache)",
+        help="Backend to use. Options: sdpa, plugin",
     )
-    
-    # Static cache (only for SDPA backend)
     arg_parser.add_argument(
-        "--cache",
-        type=str,
-        default="",
-        choices=["", "static_v1", "static_v2"],
-        help="Type of KV cache to use (only applicable with 'sdpa' backend)",
+        "--iterations", type=int, default=5, help="no. of iterations to run"
     )
-    
-    # Generation settings
+    arg_parser.add_argument(
+        "--min_block_size", type=int, default=1, help="no. of iterations to run"
+    )
     arg_parser.add_argument(
         "--num_tokens",
         type=int,
         default=128,
-        help="Number of output tokens to generate",
-    )
-    
-    # Benchmark settings
-    arg_parser.add_argument(
-        "--benchmark",
-        action="store_true",
-        help="Enable benchmark mode (runs all backends: pytorch, sdpa, plugin)",
+        help="no. of output tokens to be generated",
     )
     arg_parser.add_argument(
-        "--iterations",
-        type=int,
-        default=5,
-        help="Number of iterations for benchmarking",
-    )
-    arg_parser.add_argument(
-        "--batch_size",
-        type=int,
-        default=1,
-        help="Batch size for benchmarking",
+        "--batch_size", type=int, default=1, help="Batch size used for benchmarking"
     )
     arg_parser.add_argument(
         "--isl",
         type=int,
         default=2048,
-        help="Input sequence length for benchmarking",
-    )
-    
-    # Other settings
-    arg_parser.add_argument(
-        "--min_block_size",
-        type=int,
-        default=1,
-        help="Minimum block size for TensorRT compilation",
-    )
-    arg_parser.add_argument(
-        "--cudagraph",
-        action="store_true",
-        help="Enable CUDA graphs",
-    )
-    arg_parser.add_argument(
-        "--debug",
-        action="store_true",
-        help="Enable debug logging",
+        help="Input sequence length used for benchmarking",
     )
     arg_parser.add_argument(
         "--enable_pytorch_run",
         action="store_true",
-        help="Enable PyTorch baseline run (for non-benchmark mode)",
+        help="Enable pytorch run (default: False)",
+    )
+    arg_parser.add_argument(
+        "--cache",
+        type=str,
+        default="",
+        help="Type of KV cache to use. Options: static_v1, static_v2",
+    )
+    arg_parser.add_argument(
+        "--cudagraph", action="store_true", help="Enable cudagraphs (default: False)"
+    )
+    arg_parser.add_argument(
+        "--debug", action="store_true", help="Enable debug (default: False)"
+    )
+    arg_parser.add_argument(
+        "--benchmark", action="store_true", help="Enable benchmark (default: False)"
     )
 
     args = arg_parser.parse_args()
     
     # Validate arguments
+    if args.backend == "plugin" and not PLUGIN_AVAILABLE:
+        raise RuntimeError("Plugin backend requested but plugin utilities are not available.")
     if args.cache and args.backend == "plugin":
         print("Warning: --cache is only applicable with 'sdpa' backend. Ignoring.")
         args.cache = ""
     
-    if args.backend == "plugin" and not PLUGIN_AVAILABLE:
-        raise RuntimeError("Plugin backend requested but plugin utilities are not available.")
-    
-    print(f"\n{'='*60}")
-    print(f"Configuration:")
-    print(f"  Model: {args.model}")
-    print(f"  Backend: {args.backend}")
-    print(f"  Precision: {args.precision}")
-    print(f"  Cache: {args.cache if args.cache else 'none'}")
-    print(f"  Benchmark: {args.benchmark}")
-    print(f"{'='*60}\n")
-    
     with torch.inference_mode():
+        model = get_model(args)
+
         tokenizer = AutoTokenizer.from_pretrained(args.tokenizer or args.model)
-        
-        # Prepare input
+
+        # Prepare input for benchmarking or evaluation
         if args.benchmark:
             input_ids = torch.randint(
                 1, 10000, (args.batch_size, args.isl), dtype=torch.int64
-            ).to(DEVICE)
+            ).to(model.device)
+            position_ids = torch.arange(input_ids.shape[1]).unsqueeze(0).to(DEVICE)
         else:
             model_inputs = tokenizer(args.prompt, return_tensors="pt")
             input_ids = model_inputs["input_ids"].to(DEVICE)
-        
+            position_ids = torch.arange(input_ids.shape[1]).unsqueeze(0).to(DEVICE)
+
         MAX_OUTPUT_SEQ_LENGTH = input_ids.shape[1] + args.num_tokens
-        
-        # =====================================================================
-        # BENCHMARK MODE: Run all backends
-        # =====================================================================
-        if args.benchmark:
-            results = {}
-            
-            # -----------------------------------------------------------------
-            # 1. PyTorch Baseline
-            # -----------------------------------------------------------------
-            print("\n" + "="*60)
-            print("Running PyTorch Baseline...")
-            print("="*60)
-            
-            pyt_model = get_model(args)
-            pyt_gen_tokens, pyt_timings = run_pytorch_baseline(
-                pyt_model, input_ids, args, tokenizer
+        # Pyt
+        pyt_gen_tokens = None
+        pyt_timings = None
+        pyt_stats = None
+
+        if args.enable_pytorch_run:
+            pyt_gen_tokens = generate(
+                model, input_ids.clone(), MAX_OUTPUT_SEQ_LENGTH, tokenizer.eos_token_id
             )
-            results["PyTorch"] = record_stats(
-                "PyTorch",
-                pyt_timings,
-                args.precision,
-                batch_size=args.batch_size,
-                compile_time_s=None,
-            )
-            del pyt_model
-            torch.cuda.empty_cache()
-            gc.collect()
+            if args.benchmark:
+                pyt_timings = time_generate(
+                    generate,
+                    model,
+                    input_ids.clone(),
+                    MAX_OUTPUT_SEQ_LENGTH,
+                    tokenizer.eos_token_id,
+                    iterations=args.iterations,
+                )
+                pyt_stats = record_stats(
+                    "PyTorch",
+                    pyt_timings,
+                    args.precision,
+                    batch_size=args.batch_size,
+                    compile_time_s=None,
+                )
+
+        # Backend selection: sdpa or plugin
+        if args.backend == "plugin":
+            # Plugin backend
+            if not PLUGIN_AVAILABLE:
+                raise RuntimeError("Plugin backend requested but not available")
             
-            # -----------------------------------------------------------------
-            # 2. SDPA Backend
-            # -----------------------------------------------------------------
-            print("\n" + "="*60)
-            print("Running SDPA Backend...")
-            print("="*60)
+            dtype = torch.float16 if args.precision == "FP16" else (torch.bfloat16 if args.precision == "BF16" else torch.float32)
+            config = model.config
+            max_seq_len = max(2048, MAX_OUTPUT_SEQ_LENGTH)
             
-            sdpa_model = get_model(args)
+            # Load plugin and register op
+            load_plugin()
+            register_plugin_op()
+            set_plugin_config_from_model(config, max_seq_len)
             
-            # Import static cache if needed
-            use_static_cache = args.cache in ["static_v1", "static_v2"]
-            if args.cache == "static_v1":
-                import static_cache_v1
-            elif args.cache == "static_v2":
-                import static_cache_v2
+            # Replace attention with plugin
+            model = replace_attention_with_plugin(model, config, max_seq_len, DEVICE, dtype)
+            wrapper = LLMPluginWrapper(model)
             
-            sdpa_trt_model = compile_sdpa_model(sdpa_model, input_ids, args)
+            # Compile plugin model
+            trt_model = compile_plugin_model(wrapper, config, max_seq_len, DEVICE, dtype, args.debug)
             
-            if args.cudagraph and use_static_cache:
-                torch_tensorrt.runtime.set_cudagraphs_mode(True)
+            # Create KV caches
+            kv_caches = create_kv_caches(config, max_seq_len, args.batch_size, DEVICE, dtype)
             
-            sdpa_gen_tokens, sdpa_timings = run_sdpa_generation(
-                sdpa_trt_model, input_ids, args, tokenizer, use_cache=use_static_cache
-            )
-            
-            cache_label = f" ({args.cache})" if args.cache else ""
-            results[f"TensorRT-SDPA{cache_label}"] = record_stats(
-                f"TensorRT-SDPA{cache_label}",
-                sdpa_timings,
-                args.precision,
-                batch_size=args.batch_size,
-                compile_time_s=None,
+            # Generate
+            trt_gen_tokens, _ = generate_with_plugin(
+                trt_model,
+                input_ids.clone(),
+                kv_caches,
+                args.num_tokens,
+                tokenizer.eos_token_id,
+                DEVICE,
             )
             
-            del sdpa_model, sdpa_trt_model
-            torch.cuda.empty_cache()
-            gc.collect()
-            
-            # -----------------------------------------------------------------
-            # 3. Plugin Backend (if available)
-            # -----------------------------------------------------------------
-            if PLUGIN_AVAILABLE:
-                print("\n" + "="*60)
-                print("Running Plugin Backend...")
-                print("="*60)
-                
-                try:
-                    # Load fresh model for plugin
-                    plugin_model = get_model(args)
-                    plugin_config = plugin_model.config
-                    
-                    plugin_trt_model, _ = compile_plugin_model_wrapper(
-                        plugin_model, args, max(2048, MAX_OUTPUT_SEQ_LENGTH)
+            if args.benchmark:
+                trt_timings = []
+                for i in range(args.iterations):
+                    elapsed_ms = benchmark_plugin_generation(
+                        trt_model,
+                        config,
+                        input_ids.shape[1],
+                        args.num_tokens,
+                        max_seq_len,
+                        DEVICE,
+                        dtype,
                     )
-                    
-                    plugin_gen_tokens, plugin_timings = run_plugin_generation(
-                        plugin_trt_model,
-                        plugin_config,
-                        input_ids,
-                        args,
-                        tokenizer,
-                        max(2048, MAX_OUTPUT_SEQ_LENGTH),
-                    )
-                    
-                    results["TensorRT-Plugin"] = record_stats(
-                        "TensorRT-Plugin",
-                        plugin_timings,
-                        args.precision,
-                        batch_size=args.batch_size,
-                        compile_time_s=None,
-                    )
-                except Exception as e:
-                    print(f"Plugin benchmark failed: {e}")
-            
-            # -----------------------------------------------------------------
-            # Print Results
-            # -----------------------------------------------------------------
-            print("\n" + "="*60)
-            print("BENCHMARK RESULTS")
-            print("="*60)
-            for name, stats in results.items():
-                print(f"\n========= {name} =========")
-                for key, value in stats.items():
-                    print(f"  {key}: {value}")
-        
-        # =====================================================================
-        # GENERATION MODE: Run selected backend only
-        # =====================================================================
+                    trt_timings.append(elapsed_ms / 1000.0)
         else:
-            pyt_gen_tokens = None
-            
-            # PyTorch baseline if requested
-            if args.enable_pytorch_run:
-                print("\nRunning PyTorch Baseline...")
-                pyt_model = get_model(args)
-                pyt_gen_tokens, _ = run_pytorch_baseline(
-                    pyt_model, input_ids, args, tokenizer
-                )
-                print_outputs("PyTorch", pyt_gen_tokens, tokenizer)
-                del pyt_model
-                torch.cuda.empty_cache()
-                gc.collect()
-            
-            # Run selected backend
-            if args.backend == "sdpa":
-                print("\nCompiling SDPA model...")
-                model = get_model(args)
-                
-                # Import static cache if needed
-                use_static_cache = args.cache in ["static_v1", "static_v2"]
-                if args.cache == "static_v1":
-                    import static_cache_v1
-                elif args.cache == "static_v2":
-                    import static_cache_v2
-                
-                trt_model = compile_sdpa_model(model, input_ids, args)
-                
-                if args.cudagraph and use_static_cache:
+            # SDPA backend (default)
+            if args.cache == "static_v1":
+                # This import is required to register static v1 KV cache transformations as lowering passes
+                import static_cache_v1
+            if args.cache == "static_v2":
+                # This import is required to register static v2 KV cache transformations as lowering passes
+                import static_cache_v2
+
+            # Compile the model with Torch-TensorRT
+            trt_model = compile_torchtrt(model, input_ids, args)
+
+            if args.cache == "static_v1" or args.cache == "static_v2":
+                if args.cudagraph:
+                    # Run a decoding loop with prefill and generate phases so that the CUDAGraph is recorded for both of these phases.
+                    # trt_input_signature = (input_ids.clone(),) + get_zeroed_kv_cache_inputs(trt_model)
                     torch_tensorrt.runtime.set_cudagraphs_mode(True)
-                
-                gen_tokens, _ = run_sdpa_generation(
-                    trt_model, input_ids, args, tokenizer, use_cache=use_static_cache
-                )
-                
-                cache_label = f" ({args.cache})" if args.cache else ""
-                print_outputs(f"TensorRT-SDPA{cache_label}", gen_tokens, tokenizer)
-                
-                if pyt_gen_tokens is not None:
-                    print(f"PyTorch and TensorRT outputs match: {torch.equal(pyt_gen_tokens, gen_tokens)}")
-                
-            elif args.backend == "plugin":
-                print("\nCompiling Plugin model...")
-                model = get_model(args)
-                config = model.config
-                
-                trt_model, _ = compile_plugin_model_wrapper(
-                    model, args, max(2048, MAX_OUTPUT_SEQ_LENGTH)
-                )
-                
-                gen_tokens, _ = run_plugin_generation(
+
+                trt_gen_tokens = generate_with_static_cache(
                     trt_model,
-                    config,
-                    input_ids,
-                    args,
-                    tokenizer,
-                    max(2048, MAX_OUTPUT_SEQ_LENGTH),
+                    input_ids.clone(),
+                    MAX_OUTPUT_SEQ_LENGTH,
+                    tokenizer.eos_token_id,
                 )
-                
-                print_outputs("TensorRT-Plugin", gen_tokens, tokenizer)
-                
-                if pyt_gen_tokens is not None:
-                    print(f"PyTorch and TensorRT outputs match: {torch.equal(pyt_gen_tokens, gen_tokens)}")
 
+                if args.benchmark:
+                    trt_timings = time_generate(
+                        generate_with_static_cache,
+                        trt_model,
+                        input_ids.clone(),
+                        MAX_OUTPUT_SEQ_LENGTH,
+                        tokenizer.eos_token_id,
+                        iterations=args.iterations,
+                    )
+            else:
+                trt_gen_tokens = generate(
+                    trt_model,
+                    input_ids.clone(),
+                    MAX_OUTPUT_SEQ_LENGTH,
+                    tokenizer.eos_token_id,
+                )
+                if args.benchmark:
+                    trt_timings = time_generate(
+                        generate,
+                        trt_model,
+                        input_ids.clone(),
+                        MAX_OUTPUT_SEQ_LENGTH,
+                        tokenizer.eos_token_id,
+                        iterations=args.iterations,
+                    )
 
-if __name__ == "__main__":
-    main()
+        if args.benchmark:
+            trt_stats = record_stats(
+                "TensorRT",
+                trt_timings,
+                args.precision,
+                batch_size=args.batch_size,
+                compile_time_s=None,
+            )
+
+        if not args.benchmark:
+            if args.enable_pytorch_run:
+                print_outputs("PyTorch", pyt_gen_tokens, tokenizer)
+
+            print_outputs("TensorRT", trt_gen_tokens, tokenizer)
+
+            if args.enable_pytorch_run:
+                print(
+                    f"PyTorch and TensorRT outputs match: {torch.equal(pyt_gen_tokens, trt_gen_tokens)}"
+                )
+
+        if args.benchmark:
+            if args.enable_pytorch_run:
+                print("=========PyTorch PERFORMANCE============ \n")
+                print(pyt_stats)
+            print("===================== \n")
+            print("=========TensorRT PERFORMANCE============ \n")
+            print(trt_stats)
