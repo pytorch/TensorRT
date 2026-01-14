@@ -1,14 +1,43 @@
+import glob
 import os
+import shutil
 import unittest
+
+# Check /dev/shm space BEFORE importing torch/NCCL
+# If insufficient, disable shared memory transport (use sockets instead)
+try:
+    _, _, free = shutil.disk_usage("/dev/shm")
+    free_mb = free / (1024 * 1024)
+    if free_mb < 40:  # NCCL needs ~33 MB per process from the CI error message
+        os.environ["NCCL_SHM_DISABLE"] = "1"
+        print(
+            f"[NCCL] /dev/shm has only {free_mb:.1f} MB free. Disabling shared memory transport."
+        )
+except Exception:
+    pass  # If check fails, let NCCL use default behavior
 
 import torch
 import torch.distributed as dist
 import torch.nn as nn
 from conversion.harness import DispatchTestCase
-from distributed_utils import set_environment_variables_pytest
+from distributed_utils import (
+    set_environment_variables_pytest_multi_process,
+    set_environment_variables_pytest_single_process,
+)
 from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
 from torch_tensorrt._utils import is_platform_supported_for_trtllm
+
+if "OMPI_COMM_WORLD_SIZE" in os.environ:
+    set_environment_variables_pytest_multi_process()
+else:
+    set_environment_variables_pytest_single_process()
+
+if not dist.is_initialized():
+    dist.init_process_group(
+        backend="nccl",
+        init_method="env://",
+    )
 
 
 class DistributedGatherModel(nn.Module):
@@ -48,17 +77,21 @@ class TestNcclOpsConverter(DispatchTestCase):
     )
     @classmethod
     def setUpClass(cls):
-        set_environment_variables_pytest()
-        cls.world_size = 1
-        if not dist.is_initialized():
-            dist.init_process_group(backend="nccl")
-        cls.group = dist.new_group(ranks=[0])
+        cls.world_size = int(os.environ.get("OMPI_COMM_WORLD_SIZE", 1))
+        cls.rank = int(os.environ.get("OMPI_COMM_WORLD_RANK", 0))
+        cls.group = dist.new_group(ranks=list(range(cls.world_size)))
         cls.group_name = cls.group.group_name
 
     @classmethod
     def tearDownClass(cls):
         if dist.is_initialized():
             dist.destroy_process_group()
+        # Clean up NCCL shared memory after tests complete
+        for f in glob.glob("/dev/shm/nccl-*"):
+            try:
+                os.remove(f)
+            except OSError:
+                pass
 
     @parameterized.expand([8])
     def test_nccl_ops_gather(self, linear_layer_dim):
