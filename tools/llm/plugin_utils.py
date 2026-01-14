@@ -85,10 +85,16 @@ def set_plugin_config_from_model(model_config: Any, max_seq_len: int = 2048) -> 
         model_config: HuggingFace model configuration object.
         max_seq_len: Maximum sequence length for KV cache.
     """
+    # Qwen3 has explicit head_dim in config that differs from hidden_size // num_attention_heads
+    if hasattr(model_config, 'head_dim') and model_config.head_dim is not None:
+        head_dim = model_config.head_dim
+    else:
+        head_dim = model_config.hidden_size // model_config.num_attention_heads
+    
     set_plugin_config(
         num_attention_heads=model_config.num_attention_heads,
         num_key_value_heads=model_config.num_key_value_heads,
-        head_dim=model_config.hidden_size // model_config.num_attention_heads,
+        head_dim=head_dim,
         max_seq_len=max_seq_len,
     )
 
@@ -261,6 +267,10 @@ class PluginAttention(nn.Module):
     
     This module wraps the projection layers from the original attention module
     and uses the xqa::attn plugin op for the attention computation.
+    
+    Supports:
+    - Qwen2.5, Llama: Standard attention
+    - Qwen3: Attention with QK Normalization (q_norm, k_norm)
     """
     
     def __init__(
@@ -285,9 +295,21 @@ class PluginAttention(nn.Module):
         self.v_proj = original_attn.v_proj
         self.o_proj = original_attn.o_proj
         
+        # Qwen3 has QK Normalization
+        self.q_norm = getattr(original_attn, 'q_norm', None)
+        self.k_norm = getattr(original_attn, 'k_norm', None)
+        
         self.num_heads = config.num_attention_heads
         self.num_key_value_heads = config.num_key_value_heads
-        self.head_dim = config.hidden_size // config.num_attention_heads
+        
+        # Qwen3 has explicit head_dim that may differ from hidden_size // num_attention_heads
+        if hasattr(config, 'head_dim') and config.head_dim is not None:
+            self.head_dim = config.head_dim
+        else:
+            self.head_dim = config.hidden_size // config.num_attention_heads
+        
+        # For Qwen3, attention output size is num_heads * head_dim, not hidden_size
+        self.attn_hidden_size = self.num_heads * self.head_dim
         self.hidden_size = config.hidden_size
         self.layer_idx = layer_idx
         self.register_buffer("rope_cache", rope_cache)
@@ -319,6 +341,20 @@ class PluginAttention(nn.Module):
         q = self.q_proj(hidden_states)
         k = self.k_proj(hidden_states)
         v = self.v_proj(hidden_states)
+        
+        # Qwen3: Apply QK Normalization if available
+        if self.q_norm is not None:
+            # Reshape for per-head normalization: [B, S, num_heads, head_dim]
+            q = q.view(batch_size, seq_len, self.num_heads, self.head_dim)
+            q = self.q_norm(q)
+            q = q.view(batch_size, seq_len, -1)
+        
+        if self.k_norm is not None:
+            # Reshape for per-head normalization: [B, S, num_kv_heads, head_dim]
+            k = k.view(batch_size, seq_len, self.num_key_value_heads, self.head_dim)
+            k = self.k_norm(k)
+            k = k.view(batch_size, seq_len, -1)
+        
         qkv = torch.cat([q, k, v], dim=-1)
         
         if ctx_len is None:
@@ -338,7 +374,8 @@ class PluginAttention(nn.Module):
             self.num_heads, self.num_key_value_heads, self.head_dim
         )
         
-        attn_out = attn_out.reshape(batch_size, seq_len, self.hidden_size)
+        # Use attn_hidden_size for reshape (may differ from hidden_size in Qwen3)
+        attn_out = attn_out.reshape(batch_size, seq_len, self.attn_hidden_size)
         output = self.o_proj(attn_out)
         return output, updated_kv
 
@@ -505,7 +542,11 @@ def replace_attention_with_plugin(
     if rotary_emb is None:
         raise ValueError("Cannot find rotary embedding in model")
     
-    head_dim = config.hidden_size // config.num_attention_heads
+    # Qwen3 has explicit head_dim that may differ from hidden_size // num_attention_heads
+    if hasattr(config, 'head_dim') and config.head_dim is not None:
+        head_dim = config.head_dim
+    else:
+        head_dim = config.hidden_size // config.num_attention_heads
     rope_cache = get_plugin_rope_cache(rotary_emb, max_seq_len, head_dim, device)
     
     # Get layers
@@ -552,7 +593,11 @@ def compile_plugin_model(
     # Prepare dummy inputs
     num_layers = config.num_hidden_layers
     num_kv_heads = config.num_key_value_heads
-    head_dim = config.hidden_size // config.num_attention_heads
+    # Qwen3 has explicit head_dim that may differ from hidden_size // num_attention_heads
+    if hasattr(config, 'head_dim') and config.head_dim is not None:
+        head_dim = config.head_dim
+    else:
+        head_dim = config.hidden_size // config.num_attention_heads
     
     dummy_input_ids = torch.tensor([[1, 2, 3]], device=device)
     dummy_pos_ids = torch.tensor([[0, 1, 2]], device=device)
@@ -622,7 +667,11 @@ def create_kv_caches(
     """
     num_layers = config.num_hidden_layers
     num_kv_heads = config.num_key_value_heads
-    head_dim = config.hidden_size // config.num_attention_heads
+    # Qwen3 has explicit head_dim that may differ from hidden_size // num_attention_heads
+    if hasattr(config, 'head_dim') and config.head_dim is not None:
+        head_dim = config.head_dim
+    else:
+        head_dim = config.hidden_size // config.num_attention_heads
     
     return [
         torch.zeros(batch_size, 2, num_kv_heads, max_seq_len, head_dim, dtype=dtype, device=device)
