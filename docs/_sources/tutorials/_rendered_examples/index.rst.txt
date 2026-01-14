@@ -38,7 +38,7 @@ Model Zoo
 * :ref:`_torch_export_llama2`: Compiling a Llama2 model using AOT workflow (`ir=dynamo`)
 * :ref:`_torch_export_sam2`: Compiling SAM2 model using AOT workflow (`ir=dynamo`)
 * :ref:`_torch_export_flux_dev`: Compiling FLUX.1-dev model using AOT workflow (`ir=dynamo`)
-
+* :ref:`debugger_example`: Debugging Torch-TensorRT Compilation
 
 
 .. raw:: html
@@ -60,6 +60,23 @@ Model Zoo
 .. raw:: html
 
       <div class="sphx-glr-thumbnail-title">Compiling Stable Diffusion model using the torch.compile backend</div>
+    </div>
+
+
+.. raw:: html
+
+    <div class="sphx-glr-thumbcontainer" tooltip="TensorRT conversion can perform many graph transformations and backend specific optimizations t...">
+
+.. only:: html
+
+  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_debugger_example_thumb.png
+    :alt:
+
+  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_debugger_example.py`
+
+.. raw:: html
+
+      <div class="sphx-glr-thumbnail-title">Debugging Torch-TensorRT Compilation</div>
     </div>
 
 
