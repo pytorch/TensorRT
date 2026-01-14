@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt.dynamo.runtime._PythonTorchTensorRTModule &mdash; Torch-TensorRT v2.10.0.dev0+2e6843e documentation</title>
+  <title>torch_tensorrt.dynamo.runtime._PythonTorchTensorRTModule &mdash; Torch-TensorRT v2.11.0.dev0+7c384ca documentation</title>
   
 
   
@@ -290,7 +290,7 @@
               
               
                 <div class="version">
-                  v2.10.0.dev0+2e6843e
+                  v2.11.0.dev0+7c384ca
                 </div>
               
             
@@ -707,9 +707,26 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">requires_output_allocator</span> <span class="o">=</span> <span class="n">requires_output_allocator</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">output_allocator</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">DynamicOutputAllocator</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">use_output_allocator_outputs</span> <span class="o">=</span> <span class="kc">False</span>
-
+        <span class="bp">self</span><span class="o">.</span><span class="n">device</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">current_device</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cudagraphs_enabled</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">runtime</span><span class="o">.</span><span class="n">get_cudagraphs_mode</span><span class="p">()</span>
+        <span class="c1"># If the output tensor is not owned by the engine (output_tensors_are_unowned=True), we need to create a new output tensor in each forward pass</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">output_tensors_are_unowned</span> <span class="o">=</span> <span class="kc">False</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">serialized_engine</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">settings</span><span class="o">.</span><span class="n">lazy_engine_init</span><span class="p">:</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">setup_engine</span><span class="p">()</span></div>
+
+<div class="viewcode-block" id="PythonTorchTensorRTModule.set_output_tensors_as_unowned"><a class="viewcode-back" href="../../../../py_api/runtime.html#torch_tensorrt.runtime.PythonTorchTensorRTModule.set_output_tensors_as_unowned">[docs]</a>    <span class="k">def</span><span class="w"> </span><span class="nf">set_output_tensors_as_unowned</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">enabled</span><span class="p">:</span> <span class="nb">bool</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Flag to set if the output tensors of this engine are solely owned by the Torch-TensorRT Runtime or if they might be shared with a user.</span>
+<span class="sd">        If the tensors are not owned by the runtime, then they must be recreated on every forward call which may have implications for performance.</span>
+<span class="sd">        Typically only the final engine in a graph requires output tensors to be unowned and there are performance gains to be had for intermediate engines to manage their own standing memory.</span>
+<span class="sd">        Therefore this should only be set to True for the final module in a graph and leave false for intermediate modules.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            enabled: bool</span>
+<span class="sd">                Whether to set the flag to True.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">output_tensors_are_unowned</span> <span class="o">=</span> <span class="n">enabled</span></div>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">get_streamable_device_memory_budget</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">engine</span><span class="o">.</span><span class="n">streamable_weights_size</span>
@@ -768,6 +785,7 @@
             <span class="n">dtype</span><span class="o">.</span><span class="n">_from</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">engine</span><span class="o">.</span><span class="n">get_tensor_dtype</span><span class="p">(</span><span class="n">input_name</span><span class="p">))</span>
             <span class="k">for</span> <span class="n">input_name</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">input_names</span>
         <span class="p">]</span>
+
         <span class="bp">self</span><span class="o">.</span><span class="n">input_shapes</span> <span class="o">=</span> <span class="p">[</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">engine</span><span class="o">.</span><span class="n">get_tensor_shape</span><span class="p">(</span><span class="n">input_name</span><span class="p">)</span> <span class="k">for</span> <span class="n">input_name</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">input_names</span>
         <span class="p">]</span>
@@ -785,6 +803,11 @@
 
         <span class="k">if</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">runtime</span><span class="o">.</span><span class="n">get_cudagraphs_mode</span><span class="p">():</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">cudagraph</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">CUDAGraph</span><span class="p">()</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">is_shape_inference_io</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="n">input_name</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">engine</span><span class="o">.</span><span class="n">is_shape_inference_io</span><span class="p">(</span><span class="n">input_name</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">input_name</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">input_names</span>
+        <span class="p">}</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_check_initialized</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">initialized</span><span class="p">:</span>
@@ -871,7 +894,7 @@
 
             <span class="c1"># For shape tensors, we use CPU pointers and for data tensors, we use GPU pointers</span>
             <span class="c1"># as per TensorRT requirements</span>
-            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">engine</span><span class="o">.</span><span class="n">is_shape_inference_io</span><span class="p">(</span><span class="n">input_name</span><span class="p">):</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_shape_inference_io</span><span class="p">[</span><span class="n">input_name</span><span class="p">]:</span>
                 <span class="c1"># Shape tensor inputs are casted to int64 explicitly</span>
                 <span class="c1"># Currently Torch CPU pointers are not working; numpy pointers are used instead</span>
                 <span class="c1"># to refer to underlying memory</span>
@@ -899,7 +922,7 @@
             <span class="n">output</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">empty</span><span class="p">(</span>
                 <span class="n">size</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">output_shapes</span><span class="p">[</span><span class="n">o</span><span class="p">],</span>
                 <span class="n">dtype</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">output_dtypes</span><span class="p">[</span><span class="n">o</span><span class="p">],</span>
-                <span class="n">device</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">current_device</span><span class="p">(),</span>
+                <span class="n">device</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">device</span><span class="p">,</span>
             <span class="p">)</span>
             <span class="n">outputs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">output</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">outputs</span>
@@ -1036,7 +1059,12 @@
 
                 <span class="bp">self</span><span class="o">.</span><span class="n">_caller_stream</span><span class="o">.</span><span class="n">wait_stream</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_engine_stream</span><span class="p">)</span>
 
-            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">use_pre_allocated_outputs</span><span class="p">:</span>
+            <span class="c1"># When the pre-allocated output mode is turned on, for intermediate modules, we only create the output in the first execution or when shape is changed.</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">use_pre_allocated_outputs</span> <span class="ow">and</span> <span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">output_tensors_are_unowned</span>
+                <span class="ow">or</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">pre_allocated_outputs</span>
+                <span class="ow">or</span> <span class="n">shape_changed</span>
+            <span class="p">):</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">pre_allocated_outputs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_output_tensors</span><span class="p">()</span>
 
             <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">cudagraphs_enabled</span><span class="p">:</span>
@@ -1239,13 +1267,13 @@
         <span class="c1"># Representation of input shapes to a given model</span>
         <span class="c1"># Shapes are concatenated as so:</span>
         <span class="c1"># x: (3, 4), y: (4, 5) --&gt; Key: (3,4)(4,5)</span>
-        <span class="n">tensor_inputs</span> <span class="o">=</span> <span class="p">[]</span>
-        <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">inputs</span><span class="p">:</span>
-            <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">t</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">):</span>
-                <span class="k">return</span> <span class="kc">True</span>
-            <span class="n">tensor_inputs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">t</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">all</span><span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">t</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">)</span> <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">inputs</span><span class="p">):</span>
+            <span class="k">return</span> <span class="kc">True</span>
+
         <span class="n">new_shape_key</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span>
-            <span class="nb">str</span><span class="p">(</span><span class="nb">tuple</span><span class="p">(</span><span class="n">t</span><span class="o">.</span><span class="n">shape</span><span class="p">))</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot; &quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span> <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">tensor_inputs</span>
+            <span class="nb">str</span><span class="p">(</span><span class="nb">tuple</span><span class="p">(</span><span class="n">t</span><span class="o">.</span><span class="n">shape</span><span class="p">))</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot; &quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">inputs</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">t</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">)</span>
         <span class="p">)</span>
 
         <span class="c1"># If the new shape key differs from the existing one,</span>
@@ -1255,7 +1283,10 @@
             <span class="bp">self</span><span class="o">.</span><span class="n">shape_key</span> <span class="o">=</span> <span class="n">new_shape_key</span>
             <span class="k">return</span> <span class="kc">True</span>
 
-        <span class="k">return</span> <span class="kc">False</span></div></div>
+        <span class="k">return</span> <span class="kc">False</span></div>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">are_output_tensors_unowned</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">output_tensors_are_unowned</span></div>
 </pre></div>
 
              </article>

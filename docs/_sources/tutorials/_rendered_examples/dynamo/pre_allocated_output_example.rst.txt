@@ -96,7 +96,7 @@ Define function to measure inference performance
 Load model and compile
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. GENERATED FROM PYTHON SOURCE LINES 65-86
+.. GENERATED FROM PYTHON SOURCE LINES 65-85
 
 .. code-block:: python
 
@@ -117,17 +117,16 @@ Load model and compile
     optimized_model = torch_tensorrt.compile(
         model,
         ir="dynamo",
-        enabled_precisions={torch.half},
         inputs=inputs,
     )
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 87-89
+.. GENERATED FROM PYTHON SOURCE LINES 86-88
 
 Enable/Disable pre-allocated output buffer feature using runtime api
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. GENERATED FROM PYTHON SOURCE LINES 89-114
+.. GENERATED FROM PYTHON SOURCE LINES 88-113
 
 .. code-block:: python
 

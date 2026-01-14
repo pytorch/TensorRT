@@ -1848,7 +1848,11 @@ class TestLowering(TestCase):
 
         # Validate that the results between Torch and Torch-TRT are similar
         trt_model = torch_tensorrt.dynamo.compile(
-            exported_program, inputs, enabled_precisions={torch.half}, min_block_size=1
+            exported_program,
+            inputs,
+            enabled_precisions={torch.half},
+            min_block_size=1,
+            use_explicit_typing=False,
         )
         torch.testing.assert_close(
             trt_model(*inputs),
@@ -1944,7 +1948,11 @@ class TestLowering(TestCase):
 
         # Validate that the results between Torch and Torch-TRT are similar
         trt_model = torch_tensorrt.dynamo.compile(
-            exported_program, inputs, enabled_precisions={torch.half}, min_block_size=1
+            exported_program,
+            inputs,
+            enabled_precisions={torch.half},
+            min_block_size=1,
+            use_explicit_typing=False,
         )
 
         inputs = [
@@ -2010,7 +2018,11 @@ class TestLowering(TestCase):
 
         # Validate that the results between Torch and Torch-TRT are similar
         trt_model = torch_tensorrt.dynamo.compile(
-            exported_program, inputs, enabled_precisions={torch.half}, min_block_size=1
+            exported_program,
+            inputs,
+            enabled_precisions={torch.half},
+            min_block_size=1,
+            use_explicit_typing=False,
         )
         torch.testing.assert_close(
             trt_model(*inputs),
@@ -2071,7 +2083,11 @@ class TestLowering(TestCase):
 
         # Validate that the results between Torch and Torch-TRT are similar
         trt_model = torch_tensorrt.dynamo.compile(
-            exported_program, inputs, enabled_precisions={torch.half}, min_block_size=1
+            exported_program,
+            inputs,
+            enabled_precisions={torch.half},
+            min_block_size=1,
+            use_explicit_typing=False,
         )
         torch.testing.assert_close(
             trt_model(*inputs),
@@ -2132,7 +2148,11 @@ class TestLowering(TestCase):
 
         # Validate that the results between Torch and Torch-TRT are similar
         trt_model = torch_tensorrt.dynamo.compile(
-            exported_program, inputs, enabled_precisions={torch.half}, min_block_size=1
+            exported_program,
+            inputs,
+            enabled_precisions={torch.half},
+            min_block_size=1,
+            use_explicit_typing=False,
         )
         torch.testing.assert_close(
             trt_model(*inputs),

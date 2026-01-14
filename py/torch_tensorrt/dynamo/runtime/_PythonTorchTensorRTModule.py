@@ -218,9 +218,26 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         self.requires_output_allocator = requires_output_allocator
         self.output_allocator: Optional[DynamicOutputAllocator] = None
         self.use_output_allocator_outputs = False
-
+        self.device = torch.cuda.current_device()
+        self.cudagraphs_enabled = torch_tensorrt.runtime.get_cudagraphs_mode()
+        # If the output tensor is not owned by the engine (output_tensors_are_unowned=True), we need to create a new output tensor in each forward pass
+        self.output_tensors_are_unowned = False
         if self.serialized_engine is not None and not self.settings.lazy_engine_init:
             self.setup_engine()
+
+    def set_output_tensors_as_unowned(self, enabled: bool) -> None:
+        """
+        Flag to set if the output tensors of this engine are solely owned by the Torch-TensorRT Runtime or if they might be shared with a user.
+        If the tensors are not owned by the runtime, then they must be recreated on every forward call which may have implications for performance.
+        Typically only the final engine in a graph requires output tensors to be unowned and there are performance gains to be had for intermediate engines to manage their own standing memory.
+        Therefore this should only be set to True for the final module in a graph and leave false for intermediate modules.
+
+        Args:
+            enabled: bool
+                Whether to set the flag to True.
+
+        """
+        self.output_tensors_are_unowned = enabled
 
     def get_streamable_device_memory_budget(self) -> Any:
         return self.engine.streamable_weights_size
@@ -279,6 +296,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
             dtype._from(self.engine.get_tensor_dtype(input_name))
             for input_name in self.input_names
         ]
+
         self.input_shapes = [
             self.engine.get_tensor_shape(input_name) for input_name in self.input_names
         ]
@@ -296,6 +314,11 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
 
         if torch_tensorrt.runtime.get_cudagraphs_mode():
             self.cudagraph = torch.cuda.CUDAGraph()
+
+        self.is_shape_inference_io = {
+            input_name: self.engine.is_shape_inference_io(input_name)
+            for input_name in self.input_names
+        }
 
     def _check_initialized(self) -> None:
         if not self.initialized:
@@ -382,7 +405,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
 
             # For shape tensors, we use CPU pointers and for data tensors, we use GPU pointers
             # as per TensorRT requirements
-            if self.engine.is_shape_inference_io(input_name):
+            if self.is_shape_inference_io[input_name]:
                 # Shape tensor inputs are casted to int64 explicitly
                 # Currently Torch CPU pointers are not working; numpy pointers are used instead
                 # to refer to underlying memory
@@ -410,7 +433,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
             output = torch.empty(
                 size=self.output_shapes[o],
                 dtype=self.output_dtypes[o],
-                device=torch.cuda.current_device(),
+                device=self.device,
             )
             outputs.append(output)
         return outputs
@@ -547,7 +570,12 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
 
                 self._caller_stream.wait_stream(self._engine_stream)
 
-            if self.use_pre_allocated_outputs:
+            # When the pre-allocated output mode is turned on, for intermediate modules, we only create the output in the first execution or when shape is changed.
+            if self.use_pre_allocated_outputs and (
+                self.output_tensors_are_unowned
+                or not self.pre_allocated_outputs
+                or shape_changed
+            ):
                 self.pre_allocated_outputs = self.create_output_tensors()
 
             if self.cudagraphs_enabled:
@@ -750,13 +778,13 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         # Representation of input shapes to a given model
         # Shapes are concatenated as so:
         # x: (3, 4), y: (4, 5) --> Key: (3,4)(4,5)
-        tensor_inputs = []
-        for t in inputs:
-            if not isinstance(t, torch.Tensor):
-                return True
-            tensor_inputs.append(t)
+        if not all(isinstance(t, torch.Tensor) for t in inputs):
+            return True
+
         new_shape_key = "".join(
-            str(tuple(t.shape)).replace(" ", "") for t in tensor_inputs
+            str(tuple(t.shape)).replace(" ", "")
+            for t in inputs
+            if isinstance(t, torch.Tensor)
         )
 
         # If the new shape key differs from the existing one,
@@ -767,3 +795,6 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
             return True
 
         return False
+
+    def are_output_tensors_unowned(self) -> bool:
+        return self.output_tensors_are_unowned

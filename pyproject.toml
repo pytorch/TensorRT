@@ -6,8 +6,7 @@ requires = [
     "ninja>=1.11.0",
     "pyyaml>=6.0",
     "cffi>=1.15.1",
-    "torch>=2.9.0.dev,<2.11.0; platform_machine != 'aarch64' or (platform_machine == 'aarch64' and 'tegra' not in platform_release)",
-    "torch>=2.8.0,<2.9.0; platform_machine == 'aarch64' and 'tegra' in platform_release",
+    "torch>=2.11.0.dev,<2.12.0",
     "pybind11==2.6.2",
 ]
 build-backend = "setuptools.build_meta"
@@ -33,7 +32,7 @@ classifiers = [
     "Topic :: Software Development :: Libraries",
 ]
 readme = { file = "README.md", content-type = "text/markdown" }
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 keywords = [
     "pytorch",
     "torch",
@@ -94,18 +93,20 @@ include-package-data = false
 
 [tool.uv]
 package = true
-environments = ["sys_platform == 'linux'", "sys_platform == 'windows'"]
+environments = ["sys_platform == 'linux'", "sys_platform == 'win32'"]
+required-environments = [
+    "sys_platform == 'linux' and python_version >= '3.10' and python_version <= '3.13' and platform_machine == 'x86_64'",
+    "sys_platform == 'win32' and python_version >= '3.10' and python_version <= '3.13' and platform_machine == 'AMD64'"
+]
 prerelease = "if-necessary-or-explicit"
 index-strategy = "unsafe-best-match"
 
 [tool.uv.sources]
 torch = [
-    { index = "pytorch-nightly-cu130", marker = "platform_machine != 'aarch64' or (platform_machine == 'aarch64' and 'tegra' not in platform_release)" },
-    { index = "jetson-containers", marker = "platform_machine == 'aarch64' and 'tegra' in platform_release" },
+    { index = "pytorch-nightly-cu130" },
 ]
 torchvision = [
-    { index = "pytorch-nightly-cu130", marker = "platform_machine != 'aarch64' or (platform_machine == 'aarch64' and 'tegra' not in platform_release)" },
-    { index = "jetson-containers", marker = "platform_machine == 'aarch64' and 'tegra' in platform_release" },
+    { index = "pytorch-nightly-cu130" },
 ]
 
 [[tool.uv.index]]
@@ -114,49 +115,54 @@ url = "https://download.pytorch.org/whl/nightly/cu130"
 explicit = false
 
 [[tool.uv.index]]
-name = "pytorch-nightly-cu129"
-url = "https://download.pytorch.org/whl/nightly/cu129"
+name = "pytorch-nightly-cu128"
+url = "https://download.pytorch.org/whl/nightly/cu128"
 explicit = false
 
 [[tool.uv.index]]
-name = "jetson-containers"
-url = "https://pypi.jetson-ai-lab.io/jp6/cu126"
+name = "pytorch-nightly-cu126"
+url = "https://download.pytorch.org/whl/nightly/cu126"
 explicit = false
+
+[[tool.uv.index]]
+name = "pytorch-test-cu130"
+url = "https://download.pytorch.org/whl/test/cu130"
+explicit = false
+
+[[tool.uv.index]]
+name = "pytorch-test-cu128"
+url = "https://download.pytorch.org/whl/test/cu128"
+explicit = false
+
+[[tool.uv.index]]
+name = "pytorch-test-cu126"
+url = "https://download.pytorch.org/whl/test/cu126"
+explicit = false
+
+[[tool.uv.index]]
+name = "pytorch-release-cu130"
+url = "https://download.pytorch.org/whl/release/cu130"
+explicit = false
+
+[[tool.uv.index]]
+name = "pytorch-release-cu128"
+url = "https://download.pytorch.org/whl/release/cu128"
+explicit = false
+
+[[tool.uv.index]]
+name = "pytorch-release-cu126"
+url = "https://download.pytorch.org/whl/release/cu126"
+explicit = false
+
+# [[tool.uv.index]]
+# name = "jetson-containers"
+# url = "https://pypi.jetson-ai-lab.io/jp6/cu126"
+# explicit = false
 
 [[tool.uv.index]]
 name = "nvidia"
 url = "https://pypi.nvidia.com"
 explicit = false
-
-# [[tool.uv.index]]
-# name = "pytorch-nightly-cu124"
-# url = "https://download.pytorch.org/whl/nightly/cu124"
-# explicit = true
-
-# [[tool.uv.index]]
-# name = "pytorch-nightly-cu118"
-# url = "https://download.pytorch.org/whl/nightly/cu118"
-# explicit = true
-
-# [[tool.uv.index]]
-# name = "pytorch-test-cu124"
-# url = "https://download.pytorch.org/whl/test/cu124"
-# explicit = false
-
-# [[tool.uv.index]]
-# name = "pytorch-test-cu118"
-# url = "https://download.pytorch.org/whl/test/cu118"
-# explicit = false
-
-# [[tool.uv.index]]
-# name = "pytorch-release-cu124"
-# url = "https://download.pytorch.org/whl/cu124"
-# explicit = false
-
-# [[tool.uv.index]]
-# name = "pytorch-release-cu118"
-# url = "https://download.pytorch.org/whl/cu118"
-# explicit = false
 
 
 [tool.ruff]

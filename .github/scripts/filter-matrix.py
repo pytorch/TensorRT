@@ -13,6 +13,10 @@ disabled_cuda_versions: List[str] = []
 # jetpack 6.2 only officially supports python 3.10 and cu126
 jetpack_python_versions: List[str] = ["3.10"]
 jetpack_cuda_versions: List[str] = ["cu126"]
+# rtx 1.2 currently only supports cu129 and cu130
+rtx_cuda_versions: List[str] = ["cu129", "cu130"]
+# trt 10.14.1 currently only supports cu129 and cu130
+trt_cuda_versions: List[str] = ["cu129", "cu130"]
 
 jetpack_container_image: str = "nvcr.io/nvidia/l4t-jetpack:r36.4.0"
 sbsa_container_image: str = "quay.io/pypa/manylinux_2_39_aarch64"
@@ -32,6 +36,7 @@ def filter_matrix_item(
     item: Dict[str, Any],
     is_jetpack: bool,
     limit_pr_builds: bool,
+    use_rtx: bool,
 ) -> bool:
     """Filter a single matrix item based on the build type and requirements."""
     if item["python_version"] in disabled_python_versions:
@@ -51,6 +56,12 @@ def filter_matrix_item(
             return True
         return False
     else:
+        if use_rtx:
+            if item["desired_cuda"] not in rtx_cuda_versions:
+                return False
+        else:
+            if item["desired_cuda"] not in trt_cuda_versions:
+                return False
         if item["gpu_arch_type"] == "cuda-aarch64":
             # pytorch image:pytorch/manylinuxaarch64-builder:cuda12.8 comes with glibc2.28
             # however, TensorRT requires glibc2.31 on aarch64 platform
@@ -85,6 +96,14 @@ def main(args: list[str]) -> None:
         default=os.getenv("LIMIT_PR_BUILDS", "false"),
     )
 
+    parser.add_argument(
+        "--use-rtx",
+        help="use rtx",
+        type=str,
+        choices=["true", "false"],
+        default="false",
+    )
+
     options = parser.parse_args(args)
     if options.matrix == "":
         raise ValueError("--matrix needs to be provided")
@@ -105,6 +124,7 @@ def main(args: list[str]) -> None:
             item,
             options.jetpack == "true",
             options.limit_pr_builds == "true",
+            options.use_rtx == "true",
         ):
             filtered_includes.append(item)
 

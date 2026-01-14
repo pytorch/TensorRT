@@ -25,6 +25,7 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     get_positive_dim,
     is_only_operator_on_placeholder,
 )
+from torch_tensorrt.dynamo.utils import DYNAMIC_DIM
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -2758,9 +2759,18 @@ def sort_validator(node: Node, settings: Optional[CompilationSettings] = None) -
 
 
 def topk_sort_validator(k: int) -> bool:
+
+    # topk layer supports dynamic k value but we cannot determine supported dynamic topk value at
+    # compile time.
+    if k == DYNAMIC_DIM or not isinstance(k, int):
+        _LOGGER.warning(
+            "[top_k validator] It's not expected for k to be a dynamic or data-dependent value. aten::topk will run in PyTorch"
+        )
+        return False
+
     if k > 3840:
-        _LOGGER.debug(
-            f"Currently only topk values up to 3840 are supported, got k={k}."
+        _LOGGER.warning(
+            f"[top_k validator] Currently only topk values up to 3840 are supported, got k={k}. Therefore, aten::topk will run in PyTorch"
         )
         return False
     return True

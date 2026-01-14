@@ -1,19 +1,30 @@
 from dataclasses import dataclass, field
 from typing import Any, Collection, Optional, Set, Tuple, Union
 
+import tensorrt as trt
+import torch
 from torch.fx.node import Target
 from torch_tensorrt._Device import Device
 from torch_tensorrt._enums import EngineCapability, dtype
 from torch_tensorrt.dynamo._defaults import (
     ASSUME_DYNAMIC_SHAPE_SUPPORT,
+    AUTOCAST_CALIBRATION_DATALOADER,
+    AUTOCAST_EXCLUDED_NODES,
+    AUTOCAST_EXCLUDED_OPS,
+    AUTOCAST_LOW_PRECISION_TYPE,
+    AUTOCAST_MAX_DEPTH_OF_REDUCTION,
+    AUTOCAST_MAX_OUTPUT_THRESHOLD,
     CACHE_BUILT_ENGINES,
+    CPU_MEMORY_BUDGET,
     DISABLE_TF32,
     DLA_GLOBAL_DRAM_SIZE,
     DLA_LOCAL_DRAM_SIZE,
     DLA_SRAM_SIZE,
     DRYRUN,
+    ENABLE_AUTOCAST,
     ENABLE_CROSS_COMPILE_FOR_WINDOWS,
     ENABLE_EXPERIMENTAL_DECOMPOSITIONS,
+    ENABLE_RESOURCE_PARTITIONING,
     ENABLE_WEIGHT_STREAMING,
     ENABLED_PRECISIONS,
     ENGINE_CAPABILITY,
@@ -97,6 +108,13 @@ class CompilationSettings:
         tiling_optimization_level (str): The optimization level of tiling strategies. A higher level allows TensorRT to spend more time searching for better tiling strategy. We currently support ["none", "fast", "moderate", "full"].
         l2_limit_for_tiling (int): The target L2 cache usage limit (in bytes) for tiling optimization (default is -1 which means no limit).
         use_distributed_mode_trace (bool):  Using aot_autograd to trace the graph. This is enabled when DTensors or distributed tensors are present in distributed model
+        enable_autocast (bool): Whether to enable autocast. If enabled, use_explicit_typing will be set to True.
+        autocast_low_precision_type (Optional[Union[torch.dtype, dtype]]): The precision to reduce to. We currently support torch.float16 and torch.bfloat16. Default is None, which means no low precision is used.
+        autocast_excluded_nodes (Collection[str]): The set of regex patterns to match user-specified node names that should remain in FP32. Default is [].
+        autocast_excluded_ops (Collection[Target]): The set of targets (ATen ops) that should remain in FP32. Default is [].
+        autocast_max_output_threshold (float): Maximum absolute value for node outputs, nodes with outputs greater than this value will remain in FP32. Default is 512.
+        autocast_max_depth_of_reduction (Optional[int]): Maximum depth of reduction allowed in low precision. Nodes with higher reduction depths will remain in FP32. This helps prevent excessive accuracy loss in operations particularly sensitive to reduced precision, as higher-depth reductions may amplify computation errors in low precision formats. If not provided, infinity will be used. Default is None.
+        autocast_calibration_dataloader (Optional[torch.utils.data.DataLoader]): The dataloader to use for autocast calibration. Default is None.
     """
 
     enabled_precisions: Set[dtype] = field(default_factory=lambda: ENABLED_PRECISIONS)
@@ -140,6 +158,21 @@ class CompilationSettings:
     l2_limit_for_tiling: int = L2_LIMIT_FOR_TILING
     use_distributed_mode_trace: bool = USE_DISTRIBUTED_MODE_TRACE
     offload_module_to_cpu: bool = OFFLOAD_MODULE_TO_CPU
+    enable_autocast: bool = ENABLE_AUTOCAST
+    autocast_low_precision_type: Optional[dtype] = AUTOCAST_LOW_PRECISION_TYPE
+    autocast_excluded_nodes: Collection[str] = field(
+        default_factory=lambda: AUTOCAST_EXCLUDED_NODES
+    )
+    autocast_excluded_ops: Collection[Target] = field(
+        default_factory=lambda: AUTOCAST_EXCLUDED_OPS
+    )
+    autocast_max_output_threshold: float = AUTOCAST_MAX_OUTPUT_THRESHOLD
+    autocast_max_depth_of_reduction: Optional[int] = AUTOCAST_MAX_DEPTH_OF_REDUCTION
+    autocast_calibration_dataloader: Optional[torch.utils.data.DataLoader] = (
+        AUTOCAST_CALIBRATION_DATALOADER
+    )
+    enable_resource_partitioning: bool = ENABLE_RESOURCE_PARTITIONING
+    cpu_memory_budget: int = CPU_MEMORY_BUDGET
 
     def __getstate__(self) -> dict[str, Any]:
         from torch_tensorrt.dynamo.conversion._ConverterRegistry import (
@@ -157,7 +190,8 @@ class CompilationSettings:
         self.__dict__.update(state)
 
 
-_SETTINGS_TO_BE_ENGINE_INVARIANT = (
+# If any of the following setting is changed, the engine should be rebuilt.
+_SETTINGS_TO_BE_ENGINE_INVARIANT = {
     "enabled_precisions",
     "max_aux_streams",
     "version_compatible",
@@ -167,12 +201,22 @@ _SETTINGS_TO_BE_ENGINE_INVARIANT = (
     "engine_capability",
     "hardware_compatible",
     "refit_identical_engine_weights",
-    "strip_engine_weights",  # TODO: @Evan to remove this after implementing caching weight-stripped engines as default?
     "immutable_weights",
     "enable_weight_streaming",
     "tiling_optimization_level",
     "l2_limit_for_tiling",
-)
+    "enable_autocast",
+    "autocast_low_precision_type",
+    "autocast_excluded_nodes",
+    "autocast_excluded_ops",
+    "autocast_max_output_threshold",
+    "autocast_max_depth_of_reduction",
+    "autocast_calibration_dataloader",
+}
+
+
+if not hasattr(trt.SerializationFlag, "INCLUDE_REFIT"):  # for TensorRT < 10.14
+    _SETTINGS_TO_BE_ENGINE_INVARIANT.add("strip_engine_weights")
 
 
 def settings_are_compatible(

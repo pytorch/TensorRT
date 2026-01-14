@@ -26,7 +26,7 @@ Model Zoo
 * :ref:`_torch_export_llama2`: Compiling a Llama2 model using AOT workflow (`ir=dynamo`)
 * :ref:`_torch_export_sam2`: Compiling SAM2 model using AOT workflow (`ir=dynamo`)
 * :ref:`_torch_export_flux_dev`: Compiling FLUX.1-dev model using AOT workflow (`ir=dynamo`)
-
+* :ref:`debugger_example`: Debugging Torch-TensorRT Compilation
 
 
 .. raw:: html
@@ -48,6 +48,23 @@ Model Zoo
 .. raw:: html
 
       <div class="sphx-glr-thumbnail-title">Compiling Stable Diffusion model using the torch.compile backend</div>
+    </div>
+
+
+.. raw:: html
+
+    <div class="sphx-glr-thumbcontainer" tooltip="TensorRT conversion can perform many graph transformations and backend specific optimizations t...">
+
+.. only:: html
+
+  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_debugger_example_thumb.png
+    :alt:
+
+  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_debugger_example.py`
+
+.. raw:: html
+
+      <div class="sphx-glr-thumbnail-title">Debugging Torch-TensorRT Compilation</div>
     </div>
 
 
@@ -206,6 +223,23 @@ Model Zoo
 
 .. raw:: html
 
+    <div class="sphx-glr-thumbcontainer" tooltip="This example demonstrates how to use Torch-TensorRT Autocast with PyTorch Autocast to compile a...">
+
+.. only:: html
+
+  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_autocast_example_thumb.png
+    :alt:
+
+  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_autocast_example.py`
+
+.. raw:: html
+
+      <div class="sphx-glr-thumbnail-title">An example of using Torch-TensorRT Autocast</div>
+    </div>
+
+
+.. raw:: html
+
     <div class="sphx-glr-thumbcontainer" tooltip="This example illustrates the state of the art model FLUX.1-dev optimized using Torch-TensorRT.">
 
 .. only:: html
@@ -257,18 +291,18 @@ Model Zoo
 
 .. raw:: html
 
-    <div class="sphx-glr-thumbcontainer" tooltip="If for some reason you want to change the conversion behavior of a specific PyTorch operation t...">
+    <div class="sphx-glr-thumbcontainer" tooltip="This example demonstrates compiling a model with a bounded CPU (host) memory budget using Torch...">
 
 .. only:: html
 
-  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_converter_overloading_thumb.png
+  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_low_cpu_memory_compilation_thumb.png
     :alt:
 
-  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_converter_overloading.py`
+  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_low_cpu_memory_compilation.py`
 
 .. raw:: html
 
-      <div class="sphx-glr-thumbnail-title">Overloading Torch-TensorRT Converters with Custom Converters</div>
+      <div class="sphx-glr-thumbnail-title">Low CPU Memory Compilation Example</div>
     </div>
 
 
@@ -286,6 +320,23 @@ Model Zoo
 .. raw:: html
 
       <div class="sphx-glr-thumbnail-title">Torch-TensorRT supports falling back to PyTorch implementations of operations in the case that Torch-TensorRT</div>
+    </div>
+
+
+.. raw:: html
+
+    <div class="sphx-glr-thumbcontainer" tooltip="If for some reason you want to change the conversion behavior of a specific PyTorch operation t...">
+
+.. only:: html
+
+  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_converter_overloading_thumb.png
+    :alt:
+
+  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_converter_overloading.py`
+
+.. raw:: html
+
+      <div class="sphx-glr-thumbnail-title">Overloading Torch-TensorRT Converters with Custom Converters</div>
     </div>
 
 
@@ -393,6 +444,23 @@ Model Zoo
 
 .. raw:: html
 
+    <div class="sphx-glr-thumbcontainer" tooltip="This example demonstrates how to use the NVIDIA Runtime Compilation (NVRTC) library to compile ...">
+
+.. only:: html
+
+  .. image:: /tutorials/_rendered_examples/dynamo/images/thumb/sphx_glr_nvrtc_aot_plugin_thumb.png
+    :alt:
+
+  :ref:`sphx_glr_tutorials__rendered_examples_dynamo_nvrtc_aot_plugin.py`
+
+.. raw:: html
+
+      <div class="sphx-glr-thumbnail-title">Using Custom Kernels with NVRTC in TensorRT AOT Plugins</div>
+    </div>
+
+
+.. raw:: html
+
     <div class="sphx-glr-thumbcontainer" tooltip="Automatically generate a TensorRT Plugin for RMSNorm module and apply it in Llama2 ============...">
 
 .. only:: html
@@ -434,6 +502,7 @@ Model Zoo
    :hidden:
 
    /tutorials/_rendered_examples/dynamo/torch_compile_stable_diffusion
+   /tutorials/_rendered_examples/dynamo/debugger_example
    /tutorials/_rendered_examples/dynamo/cross_runtime_compilation_for_windows
    /tutorials/_rendered_examples/dynamo/refit_engine_example
    /tutorials/_rendered_examples/dynamo/torch_compile_transformers_example
@@ -443,17 +512,20 @@ Model Zoo
    /tutorials/_rendered_examples/dynamo/torch_export_cudagraphs
    /tutorials/_rendered_examples/dynamo/pre_allocated_output_example
    /tutorials/_rendered_examples/dynamo/torch_compile_resnet_example
+   /tutorials/_rendered_examples/dynamo/autocast_example
    /tutorials/_rendered_examples/dynamo/torch_export_flux_dev
    /tutorials/_rendered_examples/dynamo/auto_generate_converters
    /tutorials/_rendered_examples/dynamo/auto_generate_plugins
-   /tutorials/_rendered_examples/dynamo/converter_overloading
+   /tutorials/_rendered_examples/dynamo/low_cpu_memory_compilation
    /tutorials/_rendered_examples/dynamo/aot_plugin
+   /tutorials/_rendered_examples/dynamo/converter_overloading
    /tutorials/_rendered_examples/dynamo/hierarchical_partitioner_example
    /tutorials/_rendered_examples/dynamo/mutable_torchtrt_module_example
    /tutorials/_rendered_examples/dynamo/weight_streaming_example
    /tutorials/_rendered_examples/dynamo/torch_export_sam2
    /tutorials/_rendered_examples/dynamo/vgg16_ptq
    /tutorials/_rendered_examples/dynamo/engine_caching_example
+   /tutorials/_rendered_examples/dynamo/nvrtc_aot_plugin
    /tutorials/_rendered_examples/dynamo/llama2_flashinfer_rmsnorm
    /tutorials/_rendered_examples/dynamo/custom_kernel_plugins
 
