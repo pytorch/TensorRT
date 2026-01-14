@@ -58,6 +58,7 @@ python run_vlm.py --model nvidia/Eagle2-2B --precision FP16 --num_tokens 128 --c
 - `--cache`: KV cache type (`static_v1`, `static_v2`, or empty for no KV caching).
 - `--benchmark`: Enable benchmarking mode.
 - `--enable_pytorch_run`: Also run and compare PyTorch baseline.
+- `--enable_cutile_attention`: use cutile attention kernel registered as QDP of TensorRT.
 
 ### Caching Strategies
 
