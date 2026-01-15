@@ -1082,13 +1082,15 @@ def compile_module(
             trt_module = getattr(partitioned_module, name)
             trt_module.setup_engine()
 
-    output_node = list(partitioned_module.graph.nodes)[-1]
-    for arg in output_node.args:
-        for output in arg:
-            target = output.target
-            if "_run_on_acc" not in str(target):
-                continue
-            getattr(partitioned_module, target).set_output_tensors_as_unowned(True)
+    # Only set output tensors as unowned if not in dryrun mode (TRT modules exist)
+    if not settings.dryrun:
+        output_node = list(partitioned_module.graph.nodes)[-1]
+        for arg in output_node.args:
+            for output in arg:
+                target = output.target
+                if "_run_on_acc" not in str(target):
+                    continue
+                getattr(partitioned_module, target).set_output_tensors_as_unowned(True)
 
     # Reset settings object to user specification after fallback to global partitioning mode
     if fast_partitioner_failed:
