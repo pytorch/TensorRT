@@ -417,16 +417,14 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                 )
                 tensor_to_bind = contiguous_inputs[i]
                 if tensor_to_bind.numel() == 0:
-                    # this is used to provide valid memory address to TRT
-                    dummy = torch.empty(
-                        1,
-                        dtype=tensor_to_bind.dtype,
-                        device=torch.cuda.current_device(),
-                    )
-                    tensor_to_bind = dummy
-                    if not hasattr(self, "_empty_input_buffers"):
-                        self._empty_input_buffers = []
-                    self._empty_input_buffers.append(dummy)
+                    # Use a single persistent placeholder for empty tensors (allocated once, reused)
+                    if not hasattr(self, "_empty_tensor_placeholder"):
+                        self._empty_tensor_placeholder = torch.empty(
+                            1,
+                            dtype=tensor_to_bind.dtype,
+                            device=torch.cuda.current_device(),
+                        )
+                    tensor_to_bind = self._empty_tensor_placeholder
                 if cudagraphs_enabled:
                     self._input_buffers[i].copy_(contiguous_inputs[i])
                     self.context.set_tensor_address(

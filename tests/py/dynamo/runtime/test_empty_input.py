@@ -182,5 +182,79 @@ class TestConcatEmptyTensor(TestCase):
         )
 
 
+class TestEmptyTensorMemoryLeak(TestCase):
+    """
+    Tests to verify that repeated inferences with empty tensors
+    do not cause memory leaks and produce correct results.
+    """
+
+    @parameterized.expand(
+        [
+            ("cpp_runtime", False),
+            ("python_runtime", True),
+        ]
+    )
+    def test_repeated_empty_tensor_no_leak_and_correct(self, _, use_python_runtime):
+        """
+        Run many inferences with empty tensor input to verify:
+        1. Memory doesn't grow (placeholder is reused, not reallocated)
+        2. Outputs are correct (placeholder doesn't corrupt results)
+        """
+        model = ConcatEmptyModel(dim=0).eval().cuda()
+
+        empty_input = torch.empty((0, 4), dtype=torch.float).cuda()
+        non_empty_input = torch.randn((3, 4), dtype=torch.float).cuda()
+        inputs = [empty_input, non_empty_input]
+
+        compiled_model = torchtrt.compile(
+            model,
+            "dynamo",
+            inputs,
+            min_block_size=1,
+            use_python_runtime=use_python_runtime,
+        )
+
+        # Record initial GPU memory
+        torch.cuda.synchronize()
+        torch.cuda.reset_peak_memory_stats()
+        initial_memory = torch.cuda.memory_allocated()
+
+        # Run many inferences with empty tensor
+        num_iterations = 1000
+        for i in range(num_iterations):
+            # Use different non_empty data each iteration to test correctness
+            non_empty_input = torch.randn((3, 4), dtype=torch.float).cuda()
+            inputs = [empty_input, non_empty_input]
+
+            ref_out = model(*inputs)
+            trt_out = compiled_model(*inputs)
+
+            # Verify correctness every 100 iterations (to keep test fast)
+            if i % 100 == 0:
+                self.assertEqual(ref_out.shape, trt_out.shape)
+                self.assertAlmostEqual(
+                    float(torch.max(torch.abs(ref_out - trt_out))),
+                    0,
+                    DECIMALS_OF_AGREEMENT,
+                    msg=f"Output mismatch at iteration {i}",
+                )
+
+        torch.cuda.synchronize()
+        final_memory = torch.cuda.memory_allocated()
+
+        # Memory growth should be minimal (not proportional to num_iterations)
+        memory_growth = final_memory - initial_memory
+        max_allowed_growth = 1024 * 1024  # 1 MB max threshold
+
+        print(f"Memory growth: {memory_growth} bytes")
+
+        self.assertLess(
+            memory_growth,
+            max_allowed_growth,
+            msg=f"Memory grew by {memory_growth} bytes after {num_iterations} iterations. "
+            f"Possible memory leak with empty tensor handling.",
+        )
+
+
 if __name__ == "__main__":
     run_tests()

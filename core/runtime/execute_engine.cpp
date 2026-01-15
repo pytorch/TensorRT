@@ -162,13 +162,13 @@ void setup_input_tensors(
         final_input = formatted_inputs.back();
         tensor_addr = final_input.data_ptr();
       }
-      // handle empty tensors→ TensorRT requires non-null address even if numel() = 0
-      size_t nbytes = final_input.numel() * final_input.element_size();
-      if (nbytes == 0 || tensor_addr == nullptr) {
-        void* dummy = nullptr;
-        cudaMalloc(&dummy, 1); // allocate 1 byte GPU buffer to satisfy TRT and get a non-null address
-        tensor_addr = dummy;
-        compiled_engine->empty_input_ptrs.push_back(dummy); // track to free later
+      // handle empty tensors → TensorRT requires non-null address even if numel() = 0
+      if (final_input.numel() == 0 || tensor_addr == nullptr) {
+        // Lazily allocate a single placeholder buffer, reused for all empty tensors
+        if (compiled_engine->empty_tensor_placeholder == nullptr) {
+          cudaMalloc(&compiled_engine->empty_tensor_placeholder, 1);
+        }
+        tensor_addr = compiled_engine->empty_tensor_placeholder;
       }
 
       TORCHTRT_CHECK(
