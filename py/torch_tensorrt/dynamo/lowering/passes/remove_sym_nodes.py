@@ -52,9 +52,10 @@ def replace_symint_with_sym_size(
             and isinstance(node.type, type)
             and issubclass(node.type, torch.SymInt)
         ):
-            ga = node.meta["grapharg"]
-            src = ga.source  # TensorPropertySource
-            symint_node_arg_dict[node] = (src.base.local_name, src.idx)
+            ga = node.meta.get("grapharg", None)
+            if ga is not None:
+                src = ga.source  # TensorPropertySource
+                symint_node_arg_dict[node] = (src.base.local_name, src.idx)
 
     # Replace SymInt placeholders with sym_size nodes
     for node in gm.graph.nodes:
@@ -63,14 +64,27 @@ def replace_symint_with_sym_size(
             and isinstance(node.type, type)
             and issubclass(node.type, torch.Tensor)
         ):
-            for symint_node, (arg_name, idx) in symint_node_arg_dict.items():
-                if node.target == "L_" + arg_name + "_":
-                    with gm.graph.inserting_after(node):
-                        size_node = gm.graph.call_function(
-                            torch.ops.aten.sym_size, args=(node, idx)
-                        )
-                    symint_node.replace_all_uses_with(size_node)
-                    # the symint_node is not used anymore, it will be removed in the outside of the function
+            ga = node.meta.get("grapharg", None)
+            if ga is not None:
+                src = ga.source
+                if hasattr(src, "local_name") and getattr(src, "is_input", False):
+                    node_local_name = src.local_name
+                    for symint_node, (
+                        symint_local_name,
+                        idx,
+                    ) in symint_node_arg_dict.items():
+                        if node_local_name == symint_local_name:
+                            with gm.graph.inserting_after(node):
+                                size_node = gm.graph.call_function(
+                                    torch.ops.aten.sym_size, args=(node, idx)
+                                )
+                            symint_node.replace_all_uses_with(size_node)
+                            logger.debug(
+                                f"The SymInt node {symint_node} is replaced with the sym_size node {size_node}"
+                            )
+                            # the symint_node is not used anymore, but it cannot be directly erased here
+                            # because it will cause the number of positional arguments mismatch error.
+                            # The node will be removed in the outside of the function
 
     gm.graph.lint()
     gm.recompile()
