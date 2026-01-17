@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Torch-TensorRT-RTX &mdash; Torch-TensorRT v2.11.0.dev0+a9cde96 documentation</title>
+  <title>Torch-TensorRT-RTX &mdash; Torch-TensorRT v2.11.0.dev0+61bbd69 documentation</title>
   
 
   
@@ -291,7 +291,7 @@
               
               
                 <div class="version">
-                  v2.11.0.dev0+a9cde96
+                  v2.11.0.dev0+61bbd69
                 </div>
               
             
@@ -531,7 +531,8 @@ sudo<span class="w"> </span>apt<span class="w"> </span>install<span class="w"> <
 </section>
 <section id="install-cuda-toolkit">
 <h3>Install CUDA Toolkit<a class="headerlink" href="#install-cuda-toolkit" title="Permalink to this heading">¶</a></h3>
-<p>Download and install the CUDA Toolkit from the <a class="reference external" href="https://developer.nvidia.com/cuda-downloads">NVIDIA Developer website</a>.</p>
+<p>Download and install the CUDA Toolkit from the <a class="reference external" href="https://developer.nvidia.com/cuda-downloads">NVIDIA Developer website</a>. Also download the Nvidia driver if necessary.
+_Note: If you are on Windows, but in Linux via WSL, you do not need to install drivers in Linux. WSL will automatically use the drivers installed in Windows._</p>
 <p><strong>Important:</strong> Check the required CUDA version in the <a class="reference external" href="https://github.com/pytorch/TensorRT/blob/main/MODULE.bazel">MODULE.bazel</a> file. You must install the exact CUDA toolkit version specified there (for example, at the time of writing, CUDA 13.0 is required).</p>
 <p>After installation, set the <code class="docutils literal notranslate"><span class="pre">CUDA_HOME</span></code> environment variable:</p>
 <div class="highlight-sh notranslate"><div class="highlight"><pre><span></span><span class="nb">export</span><span class="w"> </span><span class="nv">CUDA_HOME</span><span class="o">=</span>/usr/local/cuda
@@ -542,7 +543,10 @@ sudo<span class="w"> </span>apt<span class="w"> </span>install<span class="w"> <
 <section id="install-python-dependencies">
 <h3>Install Python Dependencies<a class="headerlink" href="#install-python-dependencies" title="Permalink to this heading">¶</a></h3>
 <p><strong>It is strongly recommended to use a virtual environment</strong> to avoid conflicts with system packages:</p>
-<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span><span class="c1"># Create a virtual environment</span>
+<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span><span class="c1"># Install venv</span>
+apt<span class="w"> </span>install<span class="w"> </span>python3.12-venv
+
+<span class="c1"># Create a virtual environment</span>
 python<span class="w"> </span>-m<span class="w"> </span>venv<span class="w"> </span>.venv
 
 <span class="c1"># Activate the virtual environment</span>
