@@ -26,10 +26,10 @@ pre_lowering_pass_list = [
     remove_detach,
     remove_assert_nodes,
     rule_based_autocast,
-    replace_fused_rms_norm,
 ]
 
 post_lowering_pass_list = [
+    replace_fused_rms_norm,
     remove_input_alias_fixing_clones,
     constant_fold,
     repair_input_as_output,
