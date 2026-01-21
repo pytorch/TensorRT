@@ -281,6 +281,14 @@ void TRTEngine::enable_profiling() {
   exec_ctx->setProfiler(trt_engine_profiler.get());
 }
 
+void TRTEngine::set_output_tensors_as_unowned(bool enable) {
+  this->output_tensors_are_unowned = enable;
+}
+
+bool TRTEngine::are_output_tensors_unowned() {
+  return this->output_tensors_are_unowned;
+}
+
 void TRTEngine::set_profile_format(std::string format) {
   if (format == "trex") {
     this->trt_engine_profiler->set_profile_format(TraceFormat::kTREX);
