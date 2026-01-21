@@ -30,10 +30,8 @@ def embedding(
 ) -> TRTTensor:
     indices_tensor = input
     embedding_tensor = weight
-    if isinstance(indices_tensor, torch.Tensor) and indices_tensor.dtype == torch.int64:
-        raise RuntimeError(
-            "The `embedding` op has indices_tensor dtype=int64. This is incorrect since it has to be int32 to run on TRT."
-        )
+    # Note: TensorRT's Gather layer supports both int32 and int64 indices
+    # https://docs.nvidia.com/deeplearning/tensorrt/latest/_static/c-api/classnvinfer1_1_1_i_gather_layer.html
     indices_tensor = get_trt_tensor(ctx, indices_tensor, f"{name}_indices_tensor")
     embedding_tensor = get_trt_tensor(ctx, embedding_tensor, f"{name}_embedding_tensor")
     # unsupported parameters
