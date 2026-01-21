@@ -247,7 +247,7 @@ def record_stats(backend, timings, precision, batch_size=1, compile_time_s=None)
 
     stats = {
         "Backend": backend,
-        "Precision": precision,
+        "Model Precision": precision,
         "Batch size": batch_size,
         "Median(FPS)": speed_med,
         "Mean(FPS)": speed_mean,

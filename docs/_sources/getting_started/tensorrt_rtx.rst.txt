@@ -53,7 +53,8 @@ Install Python development headers (required for building Python extensions):
 Install CUDA Toolkit
 ~~~~~~~~~~~~~~~~~~~~
 
-Download and install the CUDA Toolkit from the `NVIDIA Developer website <https://developer.nvidia.com/cuda-downloads>`_.
+Download and install the CUDA Toolkit from the `NVIDIA Developer website <https://developer.nvidia.com/cuda-downloads>`_. Also download the Nvidia driver if necessary.
+_Note: If you are on Windows, but in Linux via WSL, you do not need to install drivers in Linux. WSL will automatically use the drivers installed in Windows._
 
 **Important:** Check the required CUDA version in the `MODULE.bazel <https://github.com/pytorch/TensorRT/blob/main/MODULE.bazel>`_ file. You must install the exact CUDA toolkit version specified there (for example, at the time of writing, CUDA 13.0 is required).
 
@@ -70,6 +71,9 @@ Install Python Dependencies
 **It is strongly recommended to use a virtual environment** to avoid conflicts with system packages:
 
 .. code-block:: sh
+
+   # Install venv
+   apt install python3.12-venv
 
    # Create a virtual environment
    python -m venv .venv
