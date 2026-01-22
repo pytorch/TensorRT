@@ -98,14 +98,14 @@ http_archive(
 # Either place them in the distdir directory in third_party and use the --distdir flag
 # or modify the urls to "file:///<PATH TO TARBALL>/<TARBALL NAME>.tar.gz
 
-http_archive(
-    name = "tensorrt",
-    build_file = "@//third_party/tensorrt/archive:BUILD",
-    strip_prefix = "TensorRT-10.14.1.48",
-    urls = [
-        "https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.14.1/tars/TensorRT-10.14.1.48.Linux.x86_64-gnu.cuda-13.0.tar.gz",
-    ],
-)
+# http_archive(
+#    name = "tensorrt",
+#    build_file = "@//third_party/tensorrt/archive:BUILD",
+#    strip_prefix = "TensorRT-10.14.1.48",
+#    urls = [
+#        "https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.14.1/tars/TensorRT-10.14.1.48.Linux.x86_64-gnu.cuda-13.0.tar.gz",
+#    ],
+#)
 
 http_archive(
     name = "tensorrt_rtx",
@@ -164,8 +164,8 @@ http_archive(
 #    build_file = "third_party/libtorch/BUILD"
 #)
 
-#new_local_repository(
-#   name = "tensorrt",
-#   path = "/usr/",
-#   build_file = "@//third_party/tensorrt/local:BUILD"
-#)
+new_local_repository(
+   name = "tensorrt",
+   path = "/home/lanl/Downloads/cmake_build/packages/TensorRT-10.16.0.35",
+   build_file = "@//third_party/tensorrt/local:BUILD"
+)
