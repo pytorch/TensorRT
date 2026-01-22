@@ -154,7 +154,6 @@ jobs:
       USE_TRT_RTX: ${{ inputs.use-rtx }}
     name: build-wheel-${{ matrix.python_version }}-${{ matrix.desired_cuda }}-${{ matrix.gpu_arch_type }}-${{ inputs.architecture }}-${{ inputs.use-rtx }}-${{ inputs.is-jetpack }}
     runs-on: ${{ matrix.validation_runner }}
-    environment: ${{(inputs.trigger-event == 'schedule' || (inputs.trigger-event == 'push' && (startsWith(github.event.ref, 'refs/heads/nightly') || startsWith(github.event.ref, 'refs/tags/v')))) && 'pytorchbot-env' || ''}}
     container:
       image: ${{ matrix.container_image }}
       options: ${{ matrix.gpu_arch_type == 'cuda' && '--gpus all' || ' ' }}
