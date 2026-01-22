@@ -146,5 +146,65 @@ class TestWhereConverter(DispatchTestCase):
         self.run_test_with_dynamic_shape(Where(), input_specs)
 
 
+    def test_fp16_tensor_with_fp32_scalar(self):
+        """Test where with FP16 tensor and FP32 scalar - bug 5362431
+
+        This tests the scenario where nan_to_num is decomposed into where(),
+        with an FP16 input tensor and FP32 scalar replacement value.
+        TensorRT's ISelectLayer requires matching dtypes.
+        """
+
+        class Where(nn.Module):
+            def forward(self, condition, x):
+                # Scalar 0.0 is FP32, x is FP16
+                return torch.ops.aten.where.self(condition, 0.0, x)
+
+        inputX = torch.randn(5, 6, 7, dtype=torch.float16).cuda()
+        condition = inputX < 0
+        self.run_test(
+            Where(),
+            (condition, inputX),
+            use_dynamo_tracer=True,
+            enable_passes=True,
+        )
+
+    def test_nan_to_num_fp16_decomposition(self):
+        """Test nan_to_num with FP16 which decomposes to where - bug 5362431
+
+        nan_to_num decomposes into isnan() + where() operations.
+        When the input is FP16, the scalar replacement values (nan=0.0, etc.)
+        are FP32, causing a type mismatch in TensorRT's ISelectLayer.
+        """
+
+        class NanToNum(nn.Module):
+            def forward(self, x):
+                return torch.nan_to_num(x, nan=0.0, posinf=65504.0, neginf=-65504.0)
+
+        inputX = torch.randn(5, 6, 7, dtype=torch.float16).cuda()
+        self.run_test(
+            NanToNum(),
+            (inputX,),
+            use_dynamo_tracer=True,
+            enable_passes=True,
+        )
+
+    def test_where_fp16_inf_replacement(self):
+        """Test where replacing inf values with FP16 tensor - bug 5362431"""
+
+        class WhereInf(nn.Module):
+            def forward(self, x):
+                # Simulates posinf replacement in nan_to_num
+                condition = x == float("inf")
+                return torch.ops.aten.where.self(condition, 65504.0, x)
+
+        inputX = torch.randn(5, 6, 7, dtype=torch.float16).cuda()
+        self.run_test(
+            WhereInf(),
+            (inputX,),
+            use_dynamo_tracer=True,
+            enable_passes=True,
+        )
+
+
 if __name__ == "__main__":
     run_tests()
