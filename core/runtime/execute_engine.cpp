@@ -117,8 +117,6 @@ void setup_input_tensors(
     auto shape = core::util::toVec(dims);
     LOG_DEBUG("Input Name: " << name << " Shape: " << dims);
 
-    void* tensor_addr = nullptr;
-
     if (compiled_engine->cuda_engine->isShapeInferenceIO(name.c_str())) {
       // Shape tensor inputs are casted to int64 explicitly.
       // Refer to
@@ -156,23 +154,20 @@ void setup_input_tensors(
         // If using CUDAGraphs copy formatted input to the corresponding persistent input buffer
         compiled_engine->input_buffers[i].copy_(formatted_inputs.back(), true);
         final_input = compiled_engine->input_buffers[i];
-        tensor_addr = final_input.data_ptr();
       } else {
         // Otherwise use the formatted buffer directly
         final_input = formatted_inputs.back();
-        tensor_addr = final_input.data_ptr();
-      }
-      // handle empty tensors → TensorRT requires non-null address even if numel() = 0
-      if (final_input.numel() == 0 || tensor_addr == nullptr) {
-        // Lazily allocate a single placeholder buffer, reused for all empty tensors
-        if (compiled_engine->empty_tensor_placeholder == nullptr) {
-          cudaMalloc(&compiled_engine->empty_tensor_placeholder, 1);
-        }
-        tensor_addr = compiled_engine->empty_tensor_placeholder;
       }
 
+      // Get tensor address, using placeholder for empty tensors
+      // TensorRT requires non-null address even if numel() = 0
+      // empty_tensor_placeholder is pre-allocated in TRTEngine constructor
+      void* input_addr = (final_input.numel() == 0 || final_input.data_ptr() == nullptr)
+          ? compiled_engine->empty_tensor_placeholder
+          : final_input.data_ptr();
+
       TORCHTRT_CHECK(
-          compiled_engine->exec_ctx->setTensorAddress(name.c_str(), tensor_addr),
+          compiled_engine->exec_ctx->setTensorAddress(name.c_str(), input_addr),
           "Failed to bind tensor address for " << name);
     }
   }
