@@ -82,7 +82,7 @@ jobs:
   L0-dynamo-converter-tests:
     name: ${{ matrix.display-name }}
     needs: [filter-matrix, build]
-    if: ${{ (github.ref_name == 'main' || github.ref_name == 'nightly' || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success() }}
+    if: ${{ (github.ref_name == 'main' || github.ref_name == 'nightly' || startsWith(github.ref, 'refs/tags/v') || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success() }}
     strategy:
       fail-fast: false
       matrix:
@@ -113,7 +113,7 @@ jobs:
   L0-dynamo-core-tests:
     name: ${{ matrix.display-name }}
     needs: [filter-matrix, build]
-    if: ${{ (github.ref_name == 'main' || github.ref_name == 'nightly' || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success() }}
+    if: ${{ (github.ref_name == 'main' || github.ref_name == 'nightly' || startsWith(github.ref, 'refs/tags/v') || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success() }}
     strategy:
       fail-fast: false
       matrix:
@@ -147,7 +147,7 @@ jobs:
   L0-py-core-tests:
     name: ${{ matrix.display-name }}
     needs: [filter-matrix, build]
-    if: ${{ (github.ref_name == 'main' || github.ref_name == 'nightly' || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success() }}
+    if: ${{ (github.ref_name == 'main' || github.ref_name == 'nightly' || startsWith(github.ref, 'refs/tags/v') || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success() }}
     strategy:
       fail-fast: false
       matrix:
@@ -178,7 +178,7 @@ jobs:
   L1-dynamo-core-tests:
     name: ${{ matrix.display-name }}
     needs: [filter-matrix, build, L0-dynamo-converter-tests, L0-dynamo-core-tests, L0-py-core-tests]
-    if: ${{ (github.ref_name == 'main' || github.ref_name == 'nightly' || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success() }}
+    if: ${{ (github.ref_name == 'main' || github.ref_name == 'nightly' || startsWith(github.ref, 'refs/tags/v') || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success() }}
     strategy:
       fail-fast: false
       matrix:
@@ -211,7 +211,7 @@ jobs:
   L1-dynamo-compile-tests:
     name: ${{ matrix.display-name }}
     needs: [filter-matrix, build, L0-dynamo-converter-tests, L0-dynamo-core-tests, L0-py-core-tests]
-    if: ${{ (github.ref_name == 'main' || github.ref_name == 'nightly' || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success() }}
+    if: ${{ (github.ref_name == 'main' || github.ref_name == 'nightly' || startsWith(github.ref, 'refs/tags/v') || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success() }}
     strategy:
       fail-fast: false
       matrix:
@@ -242,7 +242,7 @@ jobs:
   L1-torch-compile-tests:
     name: ${{ matrix.display-name }}
     needs: [filter-matrix, build, L0-dynamo-converter-tests, L0-dynamo-core-tests, L0-py-core-tests]
-    if: ${{ (github.ref_name == 'main' || github.ref_name == 'nightly' || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success() }}
+    if: ${{ (github.ref_name == 'main' || github.ref_name == 'nightly' || startsWith(github.ref, 'refs/tags/v') || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success() }}
     strategy:
       fail-fast: false
       matrix:
@@ -276,7 +276,7 @@ jobs:
   L2-torch-compile-tests:
     name: ${{ matrix.display-name }}
     needs: [filter-matrix, build, L1-torch-compile-tests, L1-dynamo-compile-tests, L1-dynamo-core-tests]
-    if: ${{ (github.ref_name == 'main' || github.ref_name == 'nightly' || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success() }}
+    if: ${{ (github.ref_name == 'main' || github.ref_name == 'nightly' || startsWith(github.ref, 'refs/tags/v') || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success() }}
     strategy:
       fail-fast: false
       matrix:
@@ -308,7 +308,7 @@ jobs:
   L2-dynamo-compile-tests:
     name: ${{ matrix.display-name }}
     needs: [filter-matrix, build, L1-dynamo-compile-tests, L1-dynamo-core-tests, L1-torch-compile-tests]
-    if: ${{ (github.ref_name == 'main' || github.ref_name == 'nightly' || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success() }}
+    if: ${{ (github.ref_name == 'main' || github.ref_name == 'nightly' || startsWith(github.ref, 'refs/tags/v') || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success() }}
     strategy:
       fail-fast: false
       matrix:
@@ -340,7 +340,7 @@ jobs:
   L2-dynamo-core-tests:
     name: ${{ matrix.display-name }}
     needs: [filter-matrix, build, L1-dynamo-core-tests, L1-dynamo-compile-tests, L1-torch-compile-tests]
-    if: ${{ (github.ref_name == 'main' || github.ref_name == 'nightly' || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success() }}
+    if: ${{ (github.ref_name == 'main' || github.ref_name == 'nightly' || startsWith(github.ref, 'refs/tags/v') || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success() }}
     strategy:
       fail-fast: false
       matrix:
@@ -371,7 +371,7 @@ jobs:
   L2-dynamo-plugin-tests:
     name: ${{ matrix.display-name }}
     needs: [filter-matrix, build, L1-dynamo-core-tests, L1-dynamo-compile-tests, L1-torch-compile-tests]
-    if: ${{ (github.ref_name == 'main' || github.ref_name == 'nightly' || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success() }}
+    if: ${{ (github.ref_name == 'main' || github.ref_name == 'nightly' || startsWith(github.ref, 'refs/tags/v') || contains(github.event.pull_request.labels.*.name, 'Force All Tests[L0+L1+L2]')) && always() || success() }}
     strategy:
       fail-fast: false
       matrix:
