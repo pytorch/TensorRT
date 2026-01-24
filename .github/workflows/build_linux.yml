@@ -275,6 +275,9 @@ jobs:
           export PYTORCH_VERSION="$(${CONDA_RUN} pip show torch | grep ^Version: | sed 's/Version: *//' | sed 's/+.\+//')"
           ${CONDA_RUN} python setup.py clean
           echo "Successfully ran `python setup.py clean`"
+          nvinfer_lib_path=$(python -m pip show tensorrt | grep "Location" | awk '{print $2}')/tensorrt_libs
+          ldd $nvinfer_lib_path/libnvinfer.so.10
+          strings "$(g++ -print-file-name=libstdc++.so.6)" | grep -o 'GLIBCXX_[0-9.]*' | sort -V | uniq
           if [[ ${{ inputs.is-release-wheel }} == true || ${{ inputs.is-release-tarball }} == true ]]; then
               # release version for upload to pypi
               # BUILD_VERSION example: 2.4.0+cu121, we don't want the +cu121 part, so remove +cu121
