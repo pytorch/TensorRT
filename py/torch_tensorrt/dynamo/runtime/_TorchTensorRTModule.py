@@ -333,6 +333,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         Returns:
             torch.Tensor or Tuple(torch.Tensor): Result of the engine computation
         """
+        inputs = inputs[:-1]
         if self.engine is None:
             raise RuntimeError("Engine has not been setup yet.")
 

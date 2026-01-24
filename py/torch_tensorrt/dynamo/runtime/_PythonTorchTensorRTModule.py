@@ -474,6 +474,8 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
             self.output_allocator = DynamicOutputAllocator(output_dtypes_dict)
 
     def forward(self, *inputs: torch.Tensor) -> torch.Tensor | Tuple[torch.Tensor, ...]:
+        # The last input is the is_default_stream tensor, which only ensures the order of the graph execution.
+        inputs = inputs[:-1]
 
         def run_standard_execution() -> torch.Tensor | Tuple[torch.Tensor, ...]:
             shape_changed = self.validate_input_shapes(contiguous_inputs)
@@ -597,16 +599,12 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                     self.cudagraph.replay()  # type: ignore
 
                 else:
-                    import warnings
-
-                    with warnings.catch_warnings():
-                        try:
-                            self.context.execute_async_v3(
-                                torch.cuda.current_stream().cuda_stream
-                            )
-                        except Warning as e:
-                            breakpoint()
-                            print("warning ignored")
+                    assert (
+                        torch.cuda.current_stream() != torch.cuda.default_stream()
+                    ), "Current stream is the default stream"
+                    self.context.execute_async_v3(
+                        torch.cuda.current_stream().cuda_stream
+                    )
 
             # When the pre-allocated output mode is turned on, for intermediate modules, we only create the output in the first execution or when shape is changed.
             if self.use_pre_allocated_outputs and (
