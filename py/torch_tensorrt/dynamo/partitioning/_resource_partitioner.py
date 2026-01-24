@@ -237,6 +237,7 @@ class ResourcePartitioner(_SplitterBase):  # type: ignore
             else:
                 raise ValueError(
                     "CPU memory budget is too small to compile the model. "
+                    + f"used_rss: {psutil.Process().memory_info().rss // (1024 * 1024)} MB, "
                     + f"subgraph_size_budget: {subgraph_size_budget // (1024 * 1024)} MB, "
                     + f"CPU memory budget: {self.remaining_memory_budget // (1024 * 1024)} MB, Model size: {sum(sizes) // (1024 * 1024)} MB. "
                     + "Consider setting cpu_memory_budget to a larger value."
