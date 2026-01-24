@@ -12,7 +12,7 @@ RELEASE_PYTHON_VERSION = {
     "wheel": ["3.10", "3.11", "3.12", "3.13"],
     "tarball": ["3.11"],
 }
-sbsa_container_image: str = "quay.io/pypa/manylinux_2_34_aarch64"
+sbsa_container_image: str = "quay.io/pypa/manylinux_2_39_aarch64"
 
 CXX11_TARBALL_CONTAINER_IMAGE = {
     "cu130": "pytorch/libtorch-cxx11-builder:cuda13.0-main",

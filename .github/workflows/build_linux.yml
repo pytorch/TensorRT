@@ -412,5 +412,5 @@ jobs:
       PYPI_API_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}-${{inputs.is-release-wheel}}-${{inputs.is-release-tarball}}-${{inputs.use-rtx}}-${{inputs.architecture}}-${{inputs.is-jetpack}}-${{ inputs.repository }}-${{ github.event_name == 'workflow_dispatch' }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}-${{inputs.is-release-wheel}}-${{inputs.is-release-tarball}}-${{inputs.use-rtx}}-${{inputs.architecture}}-${{inputs.is-jetpack}}-${{ inputs.repository }}-${{ github.event_name == 'workflow_dispatch' }}-${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'no-tag' }}
   cancel-in-progress: true
