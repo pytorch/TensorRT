@@ -365,9 +365,14 @@ class TestTorchTensorRTModule(unittest.TestCase):
             TestTorchTensorRTModule._get_trt_mod(via_ts=True),
         ):
             trt_json = json.loads(trt_mod.get_layer_info())
-            [self.assertTrue(k in trt_json.keys()) for k in ["Layers", "Bindings"]]
-            self.assertTrue(len(trt_json["Layers"]) == num_layers)
-            self.assertTrue(len(trt_json["Bindings"]) == 2)
+            [
+                self.assertTrue(k in trt_json.keys(), f"Key {k} is missing")
+                for k in ["Layers", "Bindings"]
+            ]
+            self.assertTrue(
+                len(trt_json["Layers"], "Not enough layers found") == num_layers
+            )
+            self.assertTrue(len(trt_json["Bindings"], "Not enough bindings found") == 2)
 
 
 if __name__ == "__main__":
