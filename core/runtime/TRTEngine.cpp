@@ -300,7 +300,7 @@ void TRTEngine::set_profile_format(std::string format) {
 }
 
 std::string TRTEngine::get_engine_layer_info() {
-  auto inspector = cuda_engine->createEngineInspector();
+  auto inspector = make_trt(cuda_engine->createEngineInspector());
   return inspector->getEngineInformation(nvinfer1::LayerInformationFormat::kJSON);
 }
 
