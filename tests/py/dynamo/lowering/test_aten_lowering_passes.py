@@ -248,5 +248,35 @@ class TestComplexSubgraph(TestCase):
         torch._dynamo.reset()
 
 
+class TestRemoveSymIntNodes(TestCase):
+    def test_remove_sym_nodes(self):
+        class ModelContainSymIntNodes(torch.nn.Module):
+            def __init__(self, embed_dim: int):
+                super().__init__()
+                self.cls_token = torch.nn.Parameter(torch.randn(1, 1, embed_dim))
+                self.embed_dim = embed_dim
+                self.qkv_proj = torch.nn.Linear(self.embed_dim, self.embed_dim * 3)
+
+            def forward(self, x: torch.Tensor):
+                batch_size = x.shape[0]
+                cls_token = self.cls_token.expand(batch_size, -1, -1)
+                x = torch.cat([cls_token, x], dim=1)
+                x = self.qkv_proj(x)
+                reshaped_qkv = x.reshape(batch_size, x.size(1), 3, 12, -1)
+                return reshaped_qkv
+
+        model = ModelContainSymIntNodes(embed_dim=768).cuda().eval()
+        inputs = torch.randn(4, 196, 768).cuda()
+        torch._dynamo.mark_dynamic(inputs, index=0, min=2, max=32)
+        trt_module = torch.compile(
+            model,
+            backend="tensorrt",
+            options={"use_python_runtime": False, "min_block_size": 1},
+        )
+        out = trt_module(inputs)
+        # if the model can be successfully compiled, we regard the test as passed
+        self.assertTrue(True)
+
+
 if __name__ == "__main__":
     run_tests()
