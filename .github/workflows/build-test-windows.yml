@@ -421,7 +421,10 @@ jobs:
         set -euo pipefail
         pushd .
         cd tests/py/dynamo
-        ../../../packaging/vc_env_helper.bat python -m pytest -ra --junitxml=${RUNNER_TEST_RESULTS_DIR}/l2_dynamo_plugins_tests_results.xml automatic_plugin/
+        # do not test automatic plugin due to triton does not officially support windows
+        ../../../packaging/vc_env_helper.bat python -m pytest -ra \
+        --junitxml=${RUNNER_TEST_RESULTS_DIR}/l2_dynamo_plugins_tests_results.xml \
+        automatic_plugin/test_flashinfer_rmsnorm.py
         popd
 
   L2-torchscript-tests:
