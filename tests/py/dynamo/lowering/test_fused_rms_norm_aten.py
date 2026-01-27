@@ -305,6 +305,8 @@ class TestFusedRMSNormLoweringPass(DispatchTestCase):
         self.assertTrue(torch.allclose(trt_gm(*inputs)[0], RMSNorm()(*inputs)[0]))
         self.assertTrue(torch.allclose(trt_gm(*inputs)[1], RMSNorm()(*inputs)[1]))
 
+        torch._dynamo.reset()
+
 
 if __name__ == "__main__":
     run_tests()
