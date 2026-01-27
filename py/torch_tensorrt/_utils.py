@@ -76,6 +76,12 @@ def is_tegra_platform() -> bool:
     return False
 
 
+def is_orin() -> bool:
+    if torch.cuda.get_device_capability() in [(8, 7)]:
+        return True
+    return False
+
+
 def is_thor() -> bool:
     if torch.cuda.get_device_capability() in [(11, 0)]:
         return True
