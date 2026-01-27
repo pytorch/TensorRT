@@ -370,9 +370,9 @@ class TestTorchTensorRTModule(unittest.TestCase):
                 for k in ["Layers", "Bindings"]
             ]
             self.assertTrue(
-                len(trt_json["Layers"], "Not enough layers found") == num_layers
-            )
-            self.assertTrue(len(trt_json["Bindings"], "Not enough bindings found") == 2)
+                len(trt_json["Layers"]) == num_layers
+            ), "Not enough layers found"
+            self.assertTrue(len(trt_json["Bindings"]) == 2, "Not enough bindings found")
 
 
 if __name__ == "__main__":
