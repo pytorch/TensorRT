@@ -1,9 +1,9 @@
 import contextlib
 import operator
 from collections import defaultdict
-from collections.abc import Callable
 from typing import Any, Optional
 
+import sympy
 import torch
 import torch.fx
 from torch._dispatch.python import enable_python_dispatcher
@@ -15,14 +15,10 @@ from torch.fx.experimental.symbolic_shapes import (
     statically_known_true,
     sym_eq,
 )
-from torch.utils import _pytree as pytree
 from torch.utils._ordered_set import OrderedSet
-from torch.utils._pytree import tree_map
-from torch.utils.flop_counter import flop_registry
+
 
 # Adapted from torch._inductor.fx_utils.FakeTensorUpdater
-
-
 class FakeTensorUpdater:
     """
     The main idea here is that it's difficult to maintain accurate fake
@@ -50,20 +46,19 @@ class FakeTensorUpdater:
         for node in self.graph.nodes:
             self.processed_hashes.add(self.hash_node(node))
 
-    def hash_node(self, node: torch.fx.Node):
-        # todo(chilli): Not a great hash function
+    def hash_node(self, node: torch.fx.Node) -> tuple[torch.fx.Node, Any, Any, Any]:
         return (node, node.target, id(node.args), id(node.kwargs))
 
-    def incremental_update(self, fake_mode: FakeTensorMode):
+    def incremental_update(self, fake_mode: FakeTensorMode) -> None:
         """Update FakeTensors on self.graph. We will try to do the minimum amount of work."""
         existing_storages: defaultdict[Optional[int], int] = defaultdict(int)
         for node in self.graph.nodes:
             existing_storages[get_node_storage(node)] += 1
 
-        def is_intlist_same(new, old):
+        def is_intlist_same(new: Any, old: Any) -> Any:
             return statically_known_true(sym_eq(new, old))
 
-        def is_fake_tensor_same(new, old, *, node):
+        def is_fake_tensor_same(new: Any, old: Any, *, node: torch.fx.Node) -> Any:
             if type(new) is not type(old):
                 return False
             if isinstance(new, (list, tuple)):
@@ -76,9 +71,9 @@ class FakeTensorUpdater:
             if new is None:
                 return old is None
             if not isinstance(new, torch.Tensor):
-                assert isinstance(new, (torch.SymInt, torch.SymBool, torch.SymFloat)), (
-                    f"Unknown type {type(new)} in {self.graph}"
-                )
+                assert isinstance(
+                    new, (torch.SymInt, torch.SymBool, torch.SymFloat)
+                ), f"Unknown type {type(new)} in {self.graph}"
                 return (
                     new.node.shape_env._maybe_evaluate_static(
                         sympy.Eq(new.node.expr, old.node.expr)
@@ -101,7 +96,7 @@ class FakeTensorUpdater:
             if get_storage(new) == get_storage(old):
                 return True
 
-            def any_user_may_alias(node):
+            def any_user_may_alias(node: torch.fx.Node) -> bool:
                 if not isinstance(node.meta["val"], torch.Tensor):
                     # analysis too complicated on lists, can support in the future
                     return True
@@ -155,7 +150,7 @@ class FakeTensorUpdater:
 
             return False
 
-        def should_process_node(node):
+        def should_process_node(node: torch.fx.Node) -> bool:
             # node.target for nodes returning true from this function
             # are called under fake mode and does not work for inductor
             # lowerings. We check if the node.target is an aten operator

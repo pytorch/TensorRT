@@ -37,7 +37,6 @@ def process_fused_rms_norm_node(
     # Calculate dimensions to normalize over (similar to layer_norm)
     # normalized_shape specifies the last N dimensions
     x_dim = len(node.meta["val"][0].shape)
-    x_fake = node.meta["val"][0]
     dims_to_reduce = []
     for i in range(len(shape)):
         dims_to_reduce.append(x_dim - i - 1)
@@ -48,44 +47,32 @@ def process_fused_rms_norm_node(
             torch.ops.aten.mul.Tensor,
             args=(x, x),
         )
-        x_squared_fake = x_fake * x_fake
-        x_squared.meta["val"] = x_squared_fake
 
         x_squared_sum = gm.graph.call_function(
             torch.ops.aten.mean.dim,
             args=(x_squared, dims_to_reduce, True),
         )
-        x_squared_sum_fake = x_squared_fake.mean(dims_to_reduce, keepdim=True)
-        x_squared_sum.meta["val"] = x_squared_sum_fake
 
         x_squared_sum_eps = gm.graph.call_function(
             torch.ops.aten.add.Tensor,
             args=(x_squared_sum, eps),
         )
-        x_squared_sum_eps_fake = x_squared_sum_fake + eps
-        x_squared_sum_eps.meta["val"] = x_squared_sum_eps_fake
 
         x_squared_sum_eps_rsqrt = gm.graph.call_function(
             torch.ops.aten.rsqrt.default,
             args=(x_squared_sum_eps,),
         )
-        x_squared_sum_eps_rsqrt_fake = x_squared_sum_eps_fake.rsqrt()
-        x_squared_sum_eps_rsqrt.meta["val"] = x_squared_sum_eps_rsqrt_fake
 
         x_normalized = gm.graph.call_function(
             torch.ops.aten.mul.Tensor,
             args=(x, x_squared_sum_eps_rsqrt),
         )
-        x_normalized_fake = x_fake * x_squared_sum_eps_rsqrt_fake
-        x_normalized.meta["val"] = x_normalized_fake
 
         if weight is not None:
             x_normalized = gm.graph.call_function(
                 torch.ops.aten.mul.Tensor,
                 args=(x_normalized, weight),
             )
-            x_normalized_fake = x_normalized_fake * weight.meta["val"]
-            x_normalized.meta["val"] = x_normalized_fake
 
         for i, user in enumerate(list(node.users)):
             if user.op == "call_function" and user.target == operator.getitem:
