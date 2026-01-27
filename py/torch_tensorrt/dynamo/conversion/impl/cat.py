@@ -11,6 +11,7 @@ from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContex
 from torch_tensorrt.dynamo.conversion.converter_utils import (
     cast_trt_tensor,
     get_positive_dim,
+    get_trt_tensor,
     set_layer_name,
 )
 
@@ -46,15 +47,8 @@ def unify_and_concat_trt_tensors(
         elif isinstance(x, int) and not has_dynamic and not force_trt_output:
             t = x  # pure static path
         else:
-            const_arr = np.array([x], dtype=np.int32)
-            shape = (1,)
-            if not isinstance(x, int):
-                const_arr = np.array(x, dtype=np.int32)
-                shape = (x.numel(),)
-
-            layer = ctx.net.add_constant(shape, const_arr)
-            set_layer_name(layer, target, f"{name}_dim{i}_const")
-            t = layer.get_output(0)
+            # Use get_trt_tensor which handles empty tensors properly via create_constant
+            t = get_trt_tensor(ctx, x, f"{name}_input_{i}")
         trt_tensors.append(t)
 
     if not has_dynamic and not force_trt_output:

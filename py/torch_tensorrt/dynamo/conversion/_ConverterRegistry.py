@@ -442,6 +442,9 @@ class ConverterRegistry:
 
         # Iterate over all registries, validating the converter on the input node
         # If no capability_validator function is found, assume full coverage
+        # Track if a dynamo converter exists but all its validators failed
+        # This prevents falling back to obsolete FX converters when dynamo validators reject
+        dynamo_converter_failed_validation = False
         for registry, calling_convention in zip(
             self.registries, self.registry_calling_conventions
         ):
@@ -478,7 +481,18 @@ class ConverterRegistry:
                                 f"Skipping option {i} for {key}: (validator: {is_valid}, supports dynamic shapes: {candidate.supports_dynamic_shapes})"
                             )
                             continue
+                    # Reached here = all dynamo validators failed for this key
+                    # Don't fall back to FX - should fall back to PyTorch instead
+                    dynamo_converter_failed_validation = True
                 else:
+                    # FX converters (legacy, stored as single function)
+                    # Skip FX if dynamo converter exists but failed validation
+                    # This ensures validator decisions are respected
+                    if dynamo_converter_failed_validation:
+                        logger.debug(
+                            f"Skipping FX converter for {key}: dynamo converter exists but failed validation"
+                        )
+                        continue
                     # Assuming FX converters don't have dynamic shapes supported
                     if not node_has_dynamic_shapes(node):
                         return (
@@ -536,7 +550,7 @@ class ConverterRegistry:
     def get_all_converters_with_target(
         self, key: Target, return_registry_info: bool = False
     ) -> Tuple[
-        Union[List[Any], Dict[str, int], None]
+        List[Any], Optional[Dict[str, int]]
     ]:  # TODO: Narrow to ConverterImplSignature this when we can remove FX converters
         """Get all converters across all registries for the target
 
@@ -547,7 +561,7 @@ class ConverterRegistry:
 
         # Store count of number of registered converters per registry
         if return_registry_info:
-            registry_data = {name: 0 for name in self.registry_names}
+            registry_data = dict.fromkeys(self.registry_names, 0)
 
         for index, registry in enumerate(self.registries):
             if key in registry:
@@ -624,8 +638,10 @@ class ConverterRegistry:
 
 # Initialize dynamo converter registry with the FX and Dynamo aten registries
 # Note the Dynamo registry is listed first, for precedence
-registries = [
-    DYNAMO_ATEN_CONVERTERS,
+registries: List[
+    Dict[Target, Union[Callable[..., Any], Sequence[ConverterSupport]]]
+] = [
+    DYNAMO_ATEN_CONVERTERS,  # type: ignore[list-item]
 ]
 registry_names = ["Dynamo ATen Converters Registry"]
 registry_calling_conventions = [

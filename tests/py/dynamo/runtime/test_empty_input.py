@@ -126,7 +126,7 @@ class TestConcatEmptyTensor(TestCase):
             model,
             "dynamo",
             inputs,
-            min_block_size=5,
+            min_block_size=1,
             use_python_runtime=use_python_runtime,
         )
 
@@ -166,7 +166,7 @@ class TestConcatEmptyTensor(TestCase):
             model,
             "dynamo",
             inputs,
-            min_block_size=5,
+            min_block_size=1,
             use_python_runtime=use_python_runtime,
         )
 
