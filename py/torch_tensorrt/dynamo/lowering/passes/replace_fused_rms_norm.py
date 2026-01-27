@@ -1,4 +1,3 @@
-import copy
 import logging
 import operator
 
@@ -18,7 +17,7 @@ def replace_fused_rms_norm(
     count = 0
     for node in gm.graph.nodes:
         if node.target == torch.ops.aten._fused_rms_norm.default:
-            new_node = process_fused_rms_norm_node(node, gm)
+            x_normalized, rsqrt = process_fused_rms_norm_node(node, gm)
             count += 1
 
     logger.debug(f"Replaced {count} fused rms norm nodes:\n{gm.graph}")
@@ -30,7 +29,7 @@ def replace_fused_rms_norm(
 
 def process_fused_rms_norm_node(
     node: torch.fx.Node, gm: torch.fx.GraphModule
-) -> torch.fx.Node:
+) -> tuple[torch.fx.Node, torch.fx.Node]:
 
     x, shape, weight, eps = node.args[0], node.args[1], node.args[2], node.args[3]
     if eps is None:
@@ -38,6 +37,7 @@ def process_fused_rms_norm_node(
     # Calculate dimensions to normalize over (similar to layer_norm)
     # normalized_shape specifies the last N dimensions
     x_dim = len(node.meta["val"][0].shape)
+    x_fake = node.meta["val"][0]
     dims_to_reduce = []
     for i in range(len(shape)):
         dims_to_reduce.append(x_dim - i - 1)
@@ -48,38 +48,58 @@ def process_fused_rms_norm_node(
             torch.ops.aten.mul.Tensor,
             args=(x, x),
         )
+        x_squared_fake = x_fake * x_fake
+        x_squared.meta["val"] = x_squared_fake
+
         x_squared_sum = gm.graph.call_function(
             torch.ops.aten.mean.dim,
             args=(x_squared, dims_to_reduce, True),
         )
+        x_squared_sum_fake = x_squared_fake.mean(dims_to_reduce, keepdim=True)
+        x_squared_sum.meta["val"] = x_squared_sum_fake
+
         x_squared_sum_eps = gm.graph.call_function(
             torch.ops.aten.add.Tensor,
             args=(x_squared_sum, eps),
         )
-        x_squared_sum_eps_sqrt = gm.graph.call_function(
-            torch.ops.aten.sqrt.default,
+        x_squared_sum_eps_fake = x_squared_sum_fake + eps
+        x_squared_sum_eps.meta["val"] = x_squared_sum_eps_fake
+
+        x_squared_sum_eps_rsqrt = gm.graph.call_function(
+            torch.ops.aten.rsqrt.default,
             args=(x_squared_sum_eps,),
         )
+        x_squared_sum_eps_rsqrt_fake = x_squared_sum_eps_fake.rsqrt()
+        x_squared_sum_eps_rsqrt.meta["val"] = x_squared_sum_eps_rsqrt_fake
+
         x_normalized = gm.graph.call_function(
-            torch.ops.aten.div.Tensor,
-            args=(x, x_squared_sum_eps_sqrt),
+            torch.ops.aten.mul.Tensor,
+            args=(x, x_squared_sum_eps_rsqrt),
         )
+        x_normalized_fake = x_fake * x_squared_sum_eps_rsqrt_fake
+        x_normalized.meta["val"] = x_normalized_fake
+
         if weight is not None:
             x_normalized = gm.graph.call_function(
                 torch.ops.aten.mul.Tensor,
                 args=(x_normalized, weight),
             )
+            x_normalized_fake = x_normalized_fake * weight.meta["val"]
+            x_normalized.meta["val"] = x_normalized_fake
 
-        x_normalized.meta = {}
-
-        for user in list(node.users):
+        for i, user in enumerate(list(node.users)):
             if user.op == "call_function" and user.target == operator.getitem:
-                # If the getitem is extracting the first element (the output tensor)
-                if not x_normalized.meta:
-                    x_normalized.meta = copy.copy(node.meta)
-                user.replace_all_uses_with(x_normalized)
+                if i == 0:
+                    # If the getitem is extracting the first element (the output tensor)
+                    user.replace_all_uses_with(x_normalized)
+                else:
+                    user.replace_all_uses_with(x_squared_sum_eps_rsqrt)
+
+                logger.debug(
+                    f"Replaced {i}-th user of fused_rms_norm node [{user}] with lowered rms_norm output [{x_normalized if i == 0 else x_squared_sum_eps_rsqrt}]"
+                )
                 gm.graph.erase_node(user)
 
     gm.graph.erase_node(node)
 
-    return x_normalized
+    return x_normalized, x_squared_sum_eps_rsqrt

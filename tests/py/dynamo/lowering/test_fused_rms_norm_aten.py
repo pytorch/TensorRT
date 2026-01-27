@@ -1,4 +1,5 @@
 import torch
+import torch_tensorrt
 from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
 from torch_tensorrt import Input
@@ -6,9 +7,9 @@ from torch_tensorrt import Input
 from ..conversion.harness import DispatchTestCase
 
 
-class TestFusedRMSNormConverter(DispatchTestCase):
+class TestFusedRMSNormLoweringPass(DispatchTestCase):
     """
-    Tests for the aten._fused_rms_norm.default converter.
+    Tests for the aten._fused_rms_norm.default lowering pass.
     RMS Normalization formula: output = input / sqrt(mean(input^2) + eps) * weight
     The operation signature is: _fused_rms_norm(input, normalized_shape, weight, eps)
     Returns: (output, rstd) - where rstd is the reciprocal standard deviation
@@ -69,7 +70,7 @@ class TestFusedRMSNormConverter(DispatchTestCase):
     def test_rms_norm_without_weight(self, name, input_shape, normalized_shape):
         """
         Test RMS norm without weight parameter (weight=None).
-        This ensures the converter handles optional weight correctly.
+        This ensures the lowering pass handles optional weight correctly.
         """
 
         class RMSNorm(torch.nn.Module):
@@ -251,7 +252,7 @@ class TestFusedRMSNormConverter(DispatchTestCase):
     def test_rms_norm_flux_pattern(self):
         """
         Test RMS norm with pattern similar to FLUX and modern diffusion models.
-        This tests the actual use case that motivated the converter implementation.
+        This tests the actual use case that motivated the lowering pass implementation.
         """
 
         class RMSNorm(torch.nn.Module):
@@ -272,6 +273,37 @@ class TestFusedRMSNormConverter(DispatchTestCase):
             use_dynamo_tracer=True,
             enable_passes=True,
         )
+
+    def test_rms_norm_with_dynamic_shape_and_graph_break(self):
+        """
+        Test RMS norm with dynamic batch dimension and graph break.
+        This tests the lowering logic to handle graph breaks correctly.
+        """
+
+        class RMSNorm(torch.nn.Module):
+            def forward(self, x, weight):
+                return torch.ops.aten._fused_rms_norm.default(x, [128], weight, 1e-6)
+
+        inputs = (
+            torch.randn(1, 128).cuda(),
+            torch.randn(128).cuda(),
+        )
+
+        ep = torch.export.export(
+            RMSNorm().cuda(),
+            args=inputs,
+        )
+        trt_gm = torch_tensorrt.dynamo.compile(
+            ep,
+            inputs=inputs,
+            torch_executed_ops={torch.ops.aten.rsqrt.default},
+            truncate_double=True,
+            dryrun=False,
+            min_block_size=1,
+        )
+
+        self.assertTrue(torch.allclose(trt_gm(*inputs)[0], RMSNorm()(*inputs)[0]))
+        self.assertTrue(torch.allclose(trt_gm(*inputs)[1], RMSNorm()(*inputs)[1]))
 
 
 if __name__ == "__main__":
