@@ -20,7 +20,6 @@ from typing import (
 
 import tensorrt as trt
 import torch
-import torch_tensorrt
 from torch import SymBool, SymFloat, SymInt
 from torch._ops import OpOverloadPacket
 from torch.fx.node import Argument, Node, Target, _get_qualified_name
@@ -442,9 +441,6 @@ class ConverterRegistry:
 
         # Iterate over all registries, validating the converter on the input node
         # If no capability_validator function is found, assume full coverage
-        # Track if a dynamo converter exists but all its validators failed
-        # This prevents falling back to obsolete FX converters when dynamo validators reject
-        dynamo_converter_failed_validation = False
         for registry, calling_convention in zip(
             self.registries, self.registry_calling_conventions
         ):
@@ -481,18 +477,7 @@ class ConverterRegistry:
                                 f"Skipping option {i} for {key}: (validator: {is_valid}, supports dynamic shapes: {candidate.supports_dynamic_shapes})"
                             )
                             continue
-                    # Reached here = all dynamo validators failed for this key
-                    # Don't fall back to FX - should fall back to PyTorch instead
-                    dynamo_converter_failed_validation = True
                 else:
-                    # FX converters (legacy, stored as single function)
-                    # Skip FX if dynamo converter exists but failed validation
-                    # This ensures validator decisions are respected
-                    if dynamo_converter_failed_validation:
-                        logger.debug(
-                            f"Skipping FX converter for {key}: dynamo converter exists but failed validation"
-                        )
-                        continue
                     # Assuming FX converters don't have dynamic shapes supported
                     if not node_has_dynamic_shapes(node):
                         return (
@@ -636,8 +621,9 @@ class ConverterRegistry:
         return available_converters
 
 
-# Initialize dynamo converter registry with the FX and Dynamo aten registries
-# Note the Dynamo registry is listed first, for precedence
+# Initialize dynamo converter registry with Dynamo aten converters only
+# FX converters are not loaded here - they are legacy and should only be used
+# in the FX frontend, not as fallbacks in the dynamo frontend
 registries: List[
     Dict[Target, Union[Callable[..., Any], Sequence[ConverterSupport]]]
 ] = [
@@ -647,13 +633,6 @@ registry_names = ["Dynamo ATen Converters Registry"]
 registry_calling_conventions = [
     CallingConvention.CTX,
 ]
-if torch_tensorrt.ENABLED_FEATURES.fx_frontend:
-    from torch_tensorrt.fx.converter_registry import CONVERTERS as FX_CONVERTERS
-
-    registries.append(FX_CONVERTERS)
-    registry_names.append("FX Legacy ATen Converters Registry")
-    registry_calling_conventions.append(CallingConvention.LEGACY)
-
 
 DYNAMO_CONVERTERS: ConverterRegistry = ConverterRegistry(
     registries,

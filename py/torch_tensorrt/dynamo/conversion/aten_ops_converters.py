@@ -498,6 +498,24 @@ def aten_ops_symsize_int(
     return impl.shape.shape(ctx, target, SourceIR.ATEN, name, args[0], args[1])
 
 
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+    }
+)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.sym_numel.default, supports_dynamic_shapes=True
+)
+def aten_ops_sym_numel(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.shape.numel(ctx, target, SourceIR.ATEN, name, args[0])
+
+
 def index_dtype_validator(
     node: Node, settings: Optional[CompilationSettings] = None
 ) -> bool:
