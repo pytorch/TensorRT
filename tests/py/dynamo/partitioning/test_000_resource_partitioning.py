@@ -1,3 +1,4 @@
+import psutil
 import torch
 import torch.nn as nn
 from torch.fx.passes.splitter_base import Subgraph
@@ -79,7 +80,8 @@ class TestResourcePartitioning(TestCase):
             partitioner = ResourcePartitioner(
                 submodule,
                 submodule_name=name,
-                cpu_memory_budget=2 * 1024 * 1024 * 1024,
+                cpu_memory_budget=0.89 * 1024 * 1024 * 1024
+                + psutil.Process().memory_info().rss,  # 0.89GB + current memory usage
             )
             subgraphs = partitioner.put_nodes_into_subgraphs()
             new_subgraphs = []
