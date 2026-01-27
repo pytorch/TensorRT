@@ -219,6 +219,34 @@ def aten_ops_native_group_norm(
     )
 
 
+@dynamo_tensorrt_converter(
+    torch.ops.aten._fused_rms_norm.default,
+    supports_dynamic_shapes=True,
+)
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+    }
+)
+def aten_ops_fused_rms_norm(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.normalization.fused_rms_norm(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        input=args[0],
+        normalized_shape=args[1],
+        weight=args_bounds_check(args, 2),
+        eps=args_bounds_check(args, 3),
+    )
+
+
 def parse_cat_args(
     args: Tuple[Argument, ...], kwargs: Dict[str, Any]
 ) -> Tuple[List[Any], int]:
