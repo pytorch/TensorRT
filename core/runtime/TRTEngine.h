@@ -179,13 +179,14 @@ struct TRTEngine : torch::CustomClassHolder {
 
   // CUDAGraph-Related Functionality
   at::cuda::CUDAGraph cudagraph = {};
-  at::cuda::CUDAStream engine_stream = c10::cuda::getDefaultCUDAStream();
-  at::cuda::CUDAStream caller_stream = c10::cuda::getDefaultCUDAStream();
+  at::cuda::CUDAStream stream = c10::cuda::getDefaultCUDAStream();
+  int64_t current_device_id = at::cuda::current_device();
   std::vector<at::Tensor> input_buffers = {};
   std::vector<at::Tensor> output_buffers = {};
   std::string shape_key = "None";
   bool use_pre_allocated_outputs = false;
   std::vector<at::Tensor> pre_allocated_outputs;
+  std::vector<at::Tensor> allocated_outputs;
 
   // Output Allocator-Related Functionality
   bool requires_output_allocator = false; // engine requires output allocator
