@@ -29,6 +29,27 @@ class TestEmbeddingConverter(DispatchTestCase):
                 weights_tensor=torch.randn((5, 10), dtype=torch.float32),
                 sparse=True,
             ),
+            # int64 indices - TensorRT now supports int64 for gather operations
+            param(
+                test_name="1d_indices_int64",
+                indices_tensor=torch.tensor([3, 1, 2], dtype=torch.int64),
+                weights_tensor=torch.randn((5, 10), dtype=torch.float32),
+                sparse=False,
+            ),
+            param(
+                test_name="2d_indices_int64",
+                indices_tensor=torch.tensor([[3, 1, 2], [4, 1, 3]], dtype=torch.int64),
+                weights_tensor=torch.randn((5, 10), dtype=torch.float32),
+                sparse=True,
+            ),
+            param(
+                test_name="3d_indices_int64",
+                indices_tensor=torch.tensor(
+                    [[[0, 1], [2, 3]], [[3, 4], [4, 0]]], dtype=torch.int64
+                ),
+                weights_tensor=torch.randn((5, 10), dtype=torch.float32),
+                sparse=True,
+            ),
         ]
     )
     def test_embedding(
