@@ -262,7 +262,8 @@ def cat_validator(node: Node, settings: Optional[CompilationSettings] = None) ->
     Example valid case: cat([(3, 4), (0, 4)], dim=0) - same rank, properly shaped empty tensor for TRT
     Example invalid case: cat([(3, 4), (0,)], dim=0) - torch.tensor([]) with rank mismatch
     """
-    inputs = node.args[0]
+    # Use parse_cat_args to properly extract inputs (handles both args and kwargs patterns)
+    inputs, _ = parse_cat_args(node.args, node.kwargs)
 
     if len(inputs) < 2:
         return True
@@ -462,6 +463,27 @@ def aten_ops_relu(
         SourceIR.ATEN,
         name,
         args[0],
+    )
+
+
+@dynamo_tensorrt_converter(
+    torch.ops.aten.hardtanh.default, supports_dynamic_shapes=True
+)
+def aten_ops_hardtanh(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.activation.hardtanh(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        args_bounds_check(args, 1, -1.0),
+        args_bounds_check(args, 2, 1.0),
     )
 
 
