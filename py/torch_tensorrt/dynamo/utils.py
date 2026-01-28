@@ -26,6 +26,9 @@ import tensorrt as trt
 import torch
 from torch._subclasses.fake_tensor import FakeTensor
 from torch.fx.experimental.proxy_tensor import unset_fake_temporarily
+from torch.utils._sympy.numbers import int_oo
+
+from packaging import version
 from torch_tensorrt._Device import Device
 from torch_tensorrt._enums import dtype
 from torch_tensorrt._features import ENABLED_FEATURES
@@ -35,8 +38,6 @@ from torch_tensorrt.dynamo import _defaults
 from torch_tensorrt.dynamo._defaults import default_device
 from torch_tensorrt.dynamo._engine_cache import BaseEngineCache
 from torch_tensorrt.dynamo._settings import CompilationSettings
-
-from packaging import version
 
 from .types import TRTDataType
 
@@ -424,7 +425,11 @@ def extract_var_range_info(symbolic_integer: torch.SymInt) -> Dict[str, int]:
         or expr.xreplace(shape_env.var_to_val)
     )
     assert var_range, var_val
-    min_val, max_val = int(var_range.lower), int(var_range.upper)
+    min_val, max_val = (
+        int(var_range.lower),
+        int(var_range.upper) if var_range.upper != int_oo else None,
+    )
+
     # Torchdynamo 0/1 specialization outlier
     min_val = 1 if min_val == 2 else min_val
     min_max_opt = {}
@@ -699,8 +704,9 @@ def check_module_output(
     arg_inputs: Any,
     kwarg_inputs: Any = None,
 ) -> bool:
-    old_outputs, new_outputs = refitted_module(*arg_inputs), new_module(
-        *arg_inputs, **kwarg_inputs
+    old_outputs, new_outputs = (
+        refitted_module(*arg_inputs),
+        new_module(*arg_inputs, **kwarg_inputs),
     )
     if type(old_outputs) != type(new_outputs):
         logger.warning("The output types are different. Output check is skipped.")
@@ -803,9 +809,9 @@ def copy_metadata(match_and_replacements: List[Any]) -> None:
     """
     for match_and_replacement in match_and_replacements:
         anchor_node = match_and_replacement.nodes_map[match_and_replacement.anchor]
-        assert (
-            len(match_and_replacement.replacements) == 1
-        ), "Found more than 1 replacements for the anchor node."
+        assert len(match_and_replacement.replacements) == 1, (
+            "Found more than 1 replacements for the anchor node."
+        )
         replacement_node = match_and_replacement.replacements[0]
         replacement_node.meta = anchor_node.meta
 
