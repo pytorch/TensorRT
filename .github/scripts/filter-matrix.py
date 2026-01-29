@@ -71,6 +71,27 @@ def filter_matrix_item(
         return True
 
 
+def create_distributed_config(item: Dict[str, Any]) -> Dict[str, Any]:
+    """Create distributed test configuration from a regular config.
+
+    Takes a standard test config and modifies it for distributed testing:
+    - Changes runner to multi-GPU instance
+    - Adds num_gpus field
+    - Adds config marker
+    """
+    # Create a copy to avoid modifying the original
+    dist_item = item.copy()
+
+    # Override runner to use multi-GPU instance
+    dist_item["validation_runner"] = "linux.g4dn.12xlarge.nvidia.gpu"
+
+    # Add distributed-specific fields
+    dist_item["num_gpus"] = 2
+    dist_item["config"] = "distributed"
+
+    return dist_item
+
+
 def main(args: list[str]) -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -118,6 +139,7 @@ def main(args: list[str]) -> None:
 
     includes = matrix_dict["include"]
     filtered_includes = []
+    distributed_includes = []  # Separate list for distributed configs
 
     for item in includes:
         if filter_matrix_item(
@@ -127,8 +149,15 @@ def main(args: list[str]) -> None:
             options.use_rtx == "true",
         ):
             filtered_includes.append(item)
+            distributed_includes.append(create_distributed_config(item))
 
-    filtered_matrix_dict = {"include": filtered_includes}
+    # Output both regular and distributed configs
+    filtered_matrix_dict = {
+        "include": filtered_includes,
+        "distributed_include": distributed_includes,
+    }
+
+    # Output to stdout (consumed by GitHub Actions)
     print(json.dumps(filtered_matrix_dict))
 
 

@@ -5,6 +5,7 @@ import os
 import platform
 import sys
 import tempfile
+import time
 import urllib.request
 from pathlib import Path
 from typing import Any, Optional
@@ -12,7 +13,7 @@ from typing import Any, Optional
 import tensorrt as trt
 import torch
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("torch_tensorrt")
 
 _WHL_CPYTHON_VERSION = "cp310"
 _TENSORRT_LLM_VERSION_ = "0.17.0.post1"
@@ -154,13 +155,223 @@ def _extracted_dir_trtllm(platform_system: str, platform_machine: str) -> Path:
     )
 
 
+def extract_wheel_file(
+    wheel_path: Path, extract_dir: Path, plugin_lib_path: Path
+) -> None:
+    """
+    Safely extract a wheel file to a directory with a lock to prevent concurrent extraction.
+    """
+    rank = int(os.environ.get("OMPI_COMM_WORLD_RANK", 0))  # MPI rank from OpenMPI
+    torch.cuda.set_device(rank)
+    lock_file = extract_dir / ".extracting"
+
+    # Rank 0 performs extraction
+    if rank == 0:
+        logger.debug(
+            f"[Rank {rank}] Starting extraction of {wheel_path} to {extract_dir}"
+        )
+
+        # Check for stale/corrupt extraction and clean up if needed
+        if lock_file.exists():
+            try:
+                lock_age = time.time() - lock_file.stat().st_mtime
+                if lock_age > 300:  # 5 minutes
+                    logger.warning(
+                        f"[Rank {rank}] Detected stale lock file (age: {lock_age:.1f}s). "
+                        f"Previous extraction likely crashed. Cleaning up and retrying..."
+                    )
+                    # Clean up stale extraction
+                    import shutil
+
+                    if extract_dir.exists():
+                        shutil.rmtree(extract_dir, ignore_errors=True)
+                    logger.info(
+                        f"[Rank {rank}] Cleaned up stale extraction directory: {extract_dir}"
+                    )
+                elif not plugin_lib_path.exists():
+                    logger.warning(
+                        f"[Rank {rank}] Lock file exists but plugin missing. "
+                        f"Previous extraction incomplete. Cleaning up and retrying..."
+                    )
+                    # Clean up incomplete extraction
+                    import shutil
+
+                    if extract_dir.exists():
+                        shutil.rmtree(extract_dir, ignore_errors=True)
+                    logger.info(
+                        f"[Rank {rank}] Cleaned up incomplete extraction directory: {extract_dir}"
+                    )
+            except Exception as e:
+                logger.warning(f"[Rank {rank}] Error checking stale lock: {e}")
+
+        # If another job already finished earlier, skip immediately
+        if plugin_lib_path.exists():
+            logger.debug(
+                f"[Rank {rank}] Plugin already present at {plugin_lib_path}, skipping extraction"
+            )
+            return
+
+        logger.debug(f"[Rank {rank}] Checking wheel file exists: {wheel_path.exists()}")
+
+        try:
+            import zipfile
+
+            logger.debug(f"[Rank {rank}] Successfully imported zipfile")
+        except ImportError as e:
+            raise ImportError(
+                "zipfile module is required but not found. Please install zipfile"
+            )
+
+        # Create extraction directory first (needed for lock file)
+        extract_dir.mkdir(parents=True, exist_ok=True)
+
+        # Acquire lock atomically, portable across different platforms x86/arm/windows
+        # Only one process should be able to create the lock file with O_EXCL
+        logger.debug(f"[Rank {rank}] Attempting to acquire lock: {lock_file}")
+        acquire_start_time = time.time()
+        # Re-check in case extractor finished while we waited
+        if plugin_lib_path.exists():
+            logger.debug(
+                f"[Rank {rank}] Plugin appeared at {plugin_lib_path} during acquire, skipping extraction"
+            )
+            return
+        while True:
+            try:
+                lock_fd = os.open(str(lock_file), os.O_CREAT | os.O_EXCL | os.O_RDWR)
+                logger.debug(f"[Rank {rank}] Successfully acquired lock")
+                # write lock owner metadata for race condition time logging
+                try:
+                    lock_info = f"pid={os.getpid()} host={platform.node()} rank={rank} start={time.time()}\n"
+                    os.write(lock_fd, lock_info.encode("utf-8"))
+                    os.fsync(lock_fd)
+                except Exception:
+                    # Its fine if we fail to write metadata
+                    pass
+                break
+            except FileExistsError:
+                if time.time() - acquire_start_time > 300:
+                    if not plugin_lib_path.exists():
+                        logger.warning(
+                            f"[Rank {rank}] Timed out waiting for extraction lock at {lock_file} (>300s) and plugin not present at {plugin_lib_path}"
+                        )
+                    raise TimeoutError(
+                        f"[Rank {rank}] Timed out acquiring extraction lock at {lock_file}"
+                    )
+                time.sleep(0.5)
+
+        if plugin_lib_path.exists():
+            logger.debug(
+                f"[Rank {rank}] Plugin already present at {plugin_lib_path} after acquire, skipping extraction"
+            )
+            # Clean up lock and return, since lock already acquired
+            try:
+                if lock_fd is not None:
+                    os.close(lock_fd)
+            except Exception as e:
+                logger.debug(f"[Rank {rank}] Failed to close lock fd: {e}")
+            try:
+                lock_file.unlink(missing_ok=True)
+            except Exception as e:
+                logger.debug(f"[Rank {rank}] Failed to unlink lock file: {e}")
+            return
+        # With lock held, perform extraction
+        logger.debug(
+            f"[Rank {rank}] Lock acquired, starting extraction from {wheel_path}"
+        )
+        try:
+            with zipfile.ZipFile(wheel_path) as zip_ref:
+                zip_ref.extractall(extract_dir)
+            logger.debug(f"[Rank {rank}] Extraction complete: {extract_dir}")
+
+            # Delete wheel file after successful extraction (only Rank 0)
+            try:
+                wheel_path.unlink(missing_ok=True)
+                logger.debug(f"[Rank {rank}] Deleted wheel file: {wheel_path}")
+            except Exception as e:
+                logger.warning(
+                    f"[Rank {rank}] Could not delete wheel file {wheel_path}: {e}"
+                )
+
+        except FileNotFoundError as e:
+            logger.error(f"[Rank {rank}] Wheel file not found at {wheel_path}: {e}")
+            raise RuntimeError(
+                f"Failed to find downloaded wheel file at {wheel_path}"
+            ) from e
+        except zipfile.BadZipFile as e:
+            logger.error(f"[Rank {rank}] Invalid or corrupted wheel file: {e}")
+            raise RuntimeError(
+                "Downloaded wheel file is corrupted or not a valid zip archive"
+            ) from e
+        except Exception as e:
+            logger.error(f"[Rank {rank}] Unexpected error while extracting wheel: {e}")
+            raise RuntimeError(
+                "Unexpected error during extraction of TensorRT-LLM wheel"
+            ) from e
+        finally:
+            # Release lock, close file descriptorand remove lock file to signal completion
+            try:
+                os.close(lock_fd)
+            except Exception as e:
+                logger.debug(
+                    f"[Rank {rank}] Failed to close lock fd for {lock_file}: {e}",
+                    exc_info=e,
+                )
+            try:
+                lock_file.unlink(missing_ok=True)
+            except Exception as e:
+                logger.debug(
+                    f"[Rank {rank}] Failed to unlink lock file {lock_file}: {e}",
+                    exc_info=e,
+                )
+
+    else:
+        # Other ranks wait for extraction to complete.
+        # only check lock file - don't check plugin existence during extraction
+        # because plugin file may be partially written before extraction completes
+        observed_lock = False
+        wait_start_time = time.time()
+        while True:
+            if lock_file.exists():
+                observed_lock = True
+                logger.debug(
+                    f"[Rank {rank}] Waiting for extraction to finish at {extract_dir}..."
+                )
+            else:
+                if observed_lock:
+                    # Lock was present and now gone -> extraction finished
+                    logger.debug(
+                        f"[Rank {rank}] Lock file removed, extraction complete"
+                    )
+                    break
+                else:
+                    # Lock file never appeared - check if plugin already exists from previous run
+                    if plugin_lib_path.exists():
+                        logger.debug(
+                            f"[Rank {rank}] Plugin already exists from previous run, no extraction needed"
+                        )
+                        break
+                    # Lock not seen yet, keep waiting for Rank 0 to start
+                    logger.debug(
+                        f"[Rank {rank}] Waiting for extraction to start (no lock file yet)..."
+                    )
+
+            time.sleep(0.5)
+            if time.time() - wait_start_time > 600:
+                # 10 minute safeguard to avoid indefinite waits
+                logger.warning(
+                    f"[Rank {rank}] Timed out (>600s) waiting for extraction to finish at {extract_dir}; "
+                    f"lock_present={lock_file.exists()} plugin_present={plugin_lib_path.exists()}"
+                )
+                raise TimeoutError(
+                    f"[Rank {rank}] Timed out waiting for extraction to finish at {extract_dir}"
+                )
+
+
 def download_and_get_plugin_lib_path() -> Optional[str]:
     """
     Returns the path to the TensorRT‑LLM shared library, downloading and extracting if necessary.
-
     Args:
         platform (str): Platform identifier (e.g., 'linux_x86_64')
-
     Returns:
         Optional[str]: Path to shared library or None if operation fails.
     """
@@ -185,7 +396,6 @@ def download_and_get_plugin_lib_path() -> Optional[str]:
         return str(plugin_lib_path)
 
     wheel_path.parent.mkdir(parents=True, exist_ok=True)
-    extract_dir.mkdir(parents=True, exist_ok=True)
 
     if not wheel_path.exists():
         base_url = "https://pypi.nvidia.com/tensorrt-llm/"
@@ -205,43 +415,7 @@ def download_and_get_plugin_lib_path() -> Optional[str]:
         except OSError as e:
             logger.error(f"Local file write error: {e}")
 
-    try:
-        import zipfile
-    except ImportError as e:
-        raise ImportError(
-            "zipfile module is required but not found. Please install zipfile"
-        )
-    try:
-        with zipfile.ZipFile(wheel_path) as zip_ref:
-            zip_ref.extractall(extract_dir)
-            logger.debug(f"Extracted wheel to {extract_dir}")
-    except FileNotFoundError as e:
-        # This should capture the errors in the download failure above
-        logger.error(f"Wheel file not found at {wheel_path}: {e}")
-        raise RuntimeError(
-            f"Failed to find downloaded wheel file at {wheel_path}"
-        ) from e
-    except zipfile.BadZipFile as e:
-        logger.error(f"Invalid or corrupted wheel file: {e}")
-        raise RuntimeError(
-            "Downloaded wheel file is corrupted or not a valid zip archive"
-        ) from e
-    except Exception as e:
-        logger.error(f"Unexpected error while extracting wheel: {e}")
-        raise RuntimeError(
-            "Unexpected error during extraction of TensorRT-LLM wheel"
-        ) from e
-
-    try:
-        wheel_path.unlink(missing_ok=True)
-        logger.debug(f"Deleted wheel file: {wheel_path}")
-    except Exception as e:
-        logger.warning(f"Could not delete wheel file {wheel_path}: {e}")
-    if not plugin_lib_path.exists():
-        logger.error(
-            f"Plugin library not found at expected location: {plugin_lib_path}"
-        )
-        return None
+    extract_wheel_file(wheel_path, extract_dir, plugin_lib_path)
 
     return str(plugin_lib_path)
 
@@ -249,10 +423,8 @@ def download_and_get_plugin_lib_path() -> Optional[str]:
 def load_and_initialize_trtllm_plugin(plugin_lib_path: str) -> bool:
     """
     Loads and initializes the TensorRT-LLM plugin from the given shared library path.
-
     Args:
         plugin_lib_path (str): Path to the shared TensorRT-LLM plugin library.
-
     Returns:
         bool: True if successful, False otherwise.
     """
@@ -305,9 +477,32 @@ def load_tensorrt_llm_for_nccl() -> bool:
     Either the env variable TRTLLM_PLUGINS_PATH can specify the path
     Or the user can specify USE_TRTLLM_PLUGINS as either of (1, true, yes, on) to download the TRT-LLM distribution and load it
 
+    Environment Variables:
+    TRTLLM_PLUGINS_PATH: Path to pre-installed TensorRT-LLM plugin library
+    USE_TRTLLM_PLUGINS: Set to 1/true/yes/on to auto-download plugin
+    TRTLLM_FORCE_CLEANUP: Set to 1 to force cleanup of cached files on startup (useful after mpirunbus errors)
+
     Returns:
         bool: True if the plugin was successfully loaded and initialized, False otherwise.
     """
+    if os.environ.get("TRTLLM_FORCE_CLEANUP", "0").lower() in (
+        "1",
+        "true",
+        "yes",
+        "on",
+    ):
+        import shutil
+
+        cache_root = _cache_root()
+        if cache_root.exists():
+            logger.warning(
+                f"TRTLLM_FORCE_CLEANUP=1 detected. Cleaning up cache: {cache_root}"
+            )
+            shutil.rmtree(cache_root, ignore_errors=True)
+            logger.info(
+                "Cache cleaned up. Proceeding with fresh download/extraction..."
+            )
+
     if not is_platform_supported_for_trtllm():
         return False
     plugin_lib_path = os.environ.get("TRTLLM_PLUGINS_PATH")
