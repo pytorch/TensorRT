@@ -9,10 +9,6 @@ from torch_tensorrt import Input
 from .harness import DispatchTestCase
 
 
-@unittest.skipIf(
-    torch_tensorrt.ENABLED_FEATURES.tensorrt_rtx,
-    "hardtanh is implemented in fx, need to move to dynamo, skip for TensorRT-RTX for now",
-)
 class TestHardTanHConverter(DispatchTestCase):
     def test_hardtanh(self):
         class TestModule(nn.Module):

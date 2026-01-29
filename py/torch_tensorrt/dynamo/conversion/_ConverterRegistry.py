@@ -20,7 +20,6 @@ from typing import (
 
 import tensorrt as trt
 import torch
-import torch_tensorrt
 from torch import SymBool, SymFloat, SymInt
 from torch._ops import OpOverloadPacket
 from torch.fx.node import Argument, Node, Target, _get_qualified_name
@@ -536,7 +535,7 @@ class ConverterRegistry:
     def get_all_converters_with_target(
         self, key: Target, return_registry_info: bool = False
     ) -> Tuple[
-        Union[List[Any], Dict[str, int], None]
+        List[Any], Optional[Dict[str, int]]
     ]:  # TODO: Narrow to ConverterImplSignature this when we can remove FX converters
         """Get all converters across all registries for the target
 
@@ -547,7 +546,7 @@ class ConverterRegistry:
 
         # Store count of number of registered converters per registry
         if return_registry_info:
-            registry_data = {name: 0 for name in self.registry_names}
+            registry_data = dict.fromkeys(self.registry_names, 0)
 
         for index, registry in enumerate(self.registries):
             if key in registry:
@@ -622,22 +621,18 @@ class ConverterRegistry:
         return available_converters
 
 
-# Initialize dynamo converter registry with the FX and Dynamo aten registries
-# Note the Dynamo registry is listed first, for precedence
-registries = [
-    DYNAMO_ATEN_CONVERTERS,
+# Initialize dynamo converter registry with Dynamo aten converters only
+# FX converters are not loaded here - they are legacy and should only be used
+# in the FX frontend, not as fallbacks in the dynamo frontend
+registries: List[
+    Dict[Target, Union[Callable[..., Any], Sequence[ConverterSupport]]]
+] = [
+    DYNAMO_ATEN_CONVERTERS,  # type: ignore[list-item]
 ]
 registry_names = ["Dynamo ATen Converters Registry"]
 registry_calling_conventions = [
     CallingConvention.CTX,
 ]
-if torch_tensorrt.ENABLED_FEATURES.fx_frontend:
-    from torch_tensorrt.fx.converter_registry import CONVERTERS as FX_CONVERTERS
-
-    registries.append(FX_CONVERTERS)
-    registry_names.append("FX Legacy ATen Converters Registry")
-    registry_calling_conventions.append(CallingConvention.LEGACY)
-
 
 DYNAMO_CONVERTERS: ConverterRegistry = ConverterRegistry(
     registries,

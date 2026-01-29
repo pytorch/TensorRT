@@ -142,6 +142,9 @@ TRTEngine::TRTEngine(
   }
   TORCHTRT_CHECK((exec_ctx.get() != nullptr), "Unable to create TensorRT execution context");
 
+  // Pre-allocate placeholder for empty tensors (TensorRT requires non-null addresses)
+  cudaMalloc(&empty_tensor_placeholder, 1);
+
   runtime_states.old_cudagraphs = CUDAGRAPHS_MODE;
   runtime_states.old_pre_allocated_outputs = false;
   runtime_states.context_changed = false;
@@ -264,6 +267,9 @@ TRTEngine::~TRTEngine() {
   trt_engine_profiler.reset();
   exec_ctx.reset();
   cuda_engine.reset();
+  if (empty_tensor_placeholder) {
+    cudaFree(empty_tensor_placeholder);
+  }
   rt.reset();
 }
 

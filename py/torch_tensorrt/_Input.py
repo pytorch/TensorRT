@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import logging
 from enum import Enum
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import torch
 from torch_tensorrt._enums import dtype, memory_format
+
+logger = logging.getLogger(__name__)
 
 
 class Input(object):
@@ -148,6 +151,16 @@ class Input(object):
                     "max_shape": tuple(kwargs["max_shape"]),
                 }
                 self.shape_mode = Input._ShapeMode.DYNAMIC
+
+                # Warn if min_shape has any 0 dimension (empty tensor) - TensorRT doesn't support this
+                # @apbose: Is this warning necessary?
+                if any(dim == 0 for dim in self.shape["min_shape"]):
+                    logger.warning(
+                        f"min_shape contains a 0 dimension: {self.shape['min_shape']}. "
+                        "TensorRT does not support dynamic shapes with min dimension of 0 (empty tensors). "
+                        "TensorRT will internally clamp min dimensions to 1, which may cause runtime errors "
+                        "if you try to run inference with empty tensor inputs."
+                    )
 
         else:
             raise ValueError(
@@ -384,7 +397,7 @@ class Input(object):
                         dtype=self.dtype.to(torch.dtype, use_default=True)
                     )
                 else:
-                    RuntimeError(
+                    raise RuntimeError(
                         f"Input shape is dynamic but shapes are not provided as sequence (found: {self.shape})"
                     )
         else:
@@ -412,4 +425,3 @@ class Input(object):
                 raise ValueError(
                     "Requested an example tensor from a dynamic shaped input but did not specific which profile field to use."
                 )
-        raise

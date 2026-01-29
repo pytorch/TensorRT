@@ -350,3 +350,27 @@ def gelu(
         operation_type,
         input_val,
     )
+
+
+def hardtanh(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    input_val: TRTTensor,
+    min_val: float = -1.0,
+    max_val: float = 1.0,
+) -> TRTTensor:
+    # Ported from fx/converters/impl/activation.py
+    # dyn_range_fn removed as it's not used in dynamo's convert_activation base
+    operation_type = trt.ActivationType.CLIP
+    return convert_activation(
+        ctx,
+        target,
+        source_ir,
+        name,
+        operation_type,
+        input_val,
+        alpha=min_val,
+        beta=max_val,
+    )

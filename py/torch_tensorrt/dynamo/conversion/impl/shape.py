@@ -11,6 +11,7 @@ from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
 from torch_tensorrt.dynamo.conversion.converter_utils import (
     cast_trt_tensor,
+    get_axes_for_reduce_op,
     get_positive_dim,
     get_trt_tensor,
     set_layer_name,
@@ -55,6 +56,39 @@ def shape(
     input_shape = gather_layer.get_output(0)
 
     return input_shape
+
+
+def numel(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    input_val: TRTTensor,
+) -> TRTTensor:
+    """
+    Returns the total number of elements in the input tensor.
+    This is equivalent to torch.numel() or tensor.numel().
+
+    Implementation:
+    1. Get the shape of the input tensor via add_shape layer
+    2. Reduce with PROD operation over all dimensions to get total element count
+    """
+    # Get the shape tensor (1D tensor containing dimension sizes)
+    shape_layer = ctx.net.add_shape(input_val)
+    set_layer_name(shape_layer, target, name + "_shape", source_ir)
+    shape_tensor = shape_layer.get_output(0)
+
+    # Reduce with PROD over axis 0 (the only axis of the 1D shape tensor)
+    # This computes the product of all dimensions = total number of elements
+    reduce_layer = ctx.net.add_reduce(
+        shape_tensor,
+        trt.ReduceOperation.PROD,
+        axes=get_axes_for_reduce_op(0),
+        keep_dims=True,
+    )
+    set_layer_name(reduce_layer, target, name + "_reduce", source_ir)
+
+    return reduce_layer.get_output(0)
 
 
 def get_shape_with_dynamic_shape(
