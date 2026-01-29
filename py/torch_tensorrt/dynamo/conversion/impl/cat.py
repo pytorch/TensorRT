@@ -37,10 +37,27 @@ def unify_and_concat_trt_tensors(
         cast_dtype: Optional target dtype for casting TRT tensors.
         force_trt_output: If True, return TRT tensor even if all inputs are static ints. (True for concat operations)
     """
-    has_dynamic = any(not isinstance(x, int) for x in inputs)
+    # Normalize scalar tensors (0D) to Python values to avoid 0D vs 1D shape issues.
+    #
+    # eg case:
+    # torch.tensor(3) is a 0D tensor (shape=[])
+    # get_trt_tensor creates a 0D TRT constant for it (shape=trt.Dims())
+    # Python int 3 via get_trt_tensor creates a 1D TRT constant (shape=(1,))
+    # because to_torch(3) returns torch.tensor([3]) with shape (1,)
+    #
+    # By normalizing torch.tensor(3) -> 3, we ensure:
+    # 1. Pure static case: all ints -> returns list directly, no TRT ops needed (eg:upsample)
+    # 2. Mixed case: Python ints become 1D constants, compatible with other 1D tensors
+    normalized_inputs = []
+    for x in inputs:
+        if isinstance(x, (torch.Tensor, np.ndarray)) and x.ndim == 0:
+            normalized_inputs.append(x.item())
+        else:
+            normalized_inputs.append(x)
+    has_dynamic = any(not isinstance(x, int) for x in normalized_inputs)
     trt_tensors = []
 
-    for i, x in enumerate(inputs):
+    for i, x in enumerate(normalized_inputs):
         # convert to TRTTensor
         if isinstance(x, TRTTensor):
             t = x
@@ -78,13 +95,6 @@ def unify_and_concat_trt_tensors(
                         )
                     ).to(trt.DataType)
         final_dtype = promoted_type
-
-    # promote remaining ints to TRT consts before concat
-    for i, t in enumerate(trt_tensors):
-        if isinstance(t, int):
-            const = ctx.net.add_constant((1,), np.array([t], dtype=np.int32))
-            set_layer_name(const, target, f"{name}_static_{i}_const")
-            trt_tensors[i] = const.get_output(0)
 
     # final cast
     if final_dtype is not None:
