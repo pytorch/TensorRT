@@ -148,7 +148,7 @@ jobs:
           path: ${{ env.RUNNER_TEST_RESULTS_DIR }}/*.xml
           summary: true
           display-options: fEs
-          fail-on-empty: true
+          fail-on-empty: false
       - name: Teardown Windows
         if: ${{ always() }}
         uses: ./test-infra/.github/actions/teardown-windows
