@@ -67,7 +67,7 @@ TEST(Converters, ATenFakeQuantizePerChannelConvertsCorrectly) {
   const auto graph = R"IR(
     graph(%x.1 : Tensor):
         %22 : int = prim::Constant[value=-128]()
-        %14 : int = prim::Constant[value=4]()
+        %14 : int = prim::Constant[value=3]()
         %9 : None = prim::Constant()
         %35 : Device = prim::Constant[value="cuda:0"]()
         %6 : int = prim::Constant[value=6]()
