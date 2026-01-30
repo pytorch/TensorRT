@@ -262,7 +262,7 @@ class MutableTorchTensorRTModule(object):
             args, kwargs, result = self.run_info
             self.original_model.to(to_torch_device(self.trt_device))
             new_result = self.original_model(*args, **kwargs)
-            deallocate_module(self.original_model, delete_module=False)
+            deallocate_module(self.original_model)
             if check_output_equal(result, new_result):
                 self.refit_state.set_state(RefitFlag.LIVE)
                 return
@@ -311,7 +311,7 @@ class MutableTorchTensorRTModule(object):
             in_place=True,
         )
 
-        deallocate_module(self.original_model, delete_module=False)
+        deallocate_module(self.original_model)
 
     def get_exported_program(self) -> torch.export.ExportedProgram:
 
@@ -372,7 +372,7 @@ class MutableTorchTensorRTModule(object):
             **self.additional_settings,
         )
         if self.additional_settings.get("offload_module_to_cpu", False):
-            deallocate_module(self.original_model, delete_module=False)
+            deallocate_module(self.original_model)
         if self.enable_weight_streaming:
             self.set_weight_streaming_ctx(self.weight_streaming_budget)
 
@@ -738,7 +738,7 @@ class MutableTorchTensorRTModule(object):
         module.exp_program = torch.export.export(
             module.original_model, module.arg_inputs, kwargs=module.kwarg_inputs
         )
-        deallocate_module(module.original_model, delete_module=False)
+        deallocate_module(module.original_model)
         cls = module.__class__
         module.__class__ = type(
             module.original_model.__class__.__name__,

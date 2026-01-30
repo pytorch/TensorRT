@@ -127,14 +127,12 @@ def unified_dtype_converter(
         raise TypeError("%s is not a supported dtype" % dtype)
 
 
-def deallocate_module(module: torch.fx.GraphModule, delete_module: bool = True) -> None:
+def deallocate_module(module: torch.fx.GraphModule) -> None:
     """
     This is a helper function to delete the instance of module. We first move it to CPU and then
     delete the object. This function ensures the GPU memory occupied by the module is released effectively after this call
     """
     module.to(CPU_DEVICE)
-    if delete_module:
-        del module
     torch.cuda.empty_cache()
     gc.collect()
 
