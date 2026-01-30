@@ -4,6 +4,7 @@ from typing import Any, Dict, Optional, Sequence, Set, Tuple
 import torch
 from torch._subclasses.fake_tensor import FakeTensor
 from torch.fx.experimental.proxy_tensor import unset_fake_temporarily
+
 from torch_tensorrt._Input import Input
 from torch_tensorrt.dynamo.utils import contains_sym_int, extract_var_range_info
 
@@ -26,11 +27,21 @@ def construct_dynamic_input(
     min_shape = []
     opt_shape = []
     max_shape = []
-    for dim in input_shape:
+    for d, dim in enumerate(input_shape):
         if isinstance(dim, torch.SymInt):
             min_max_opt = extract_var_range_info(dim)
+            if min_max_opt["max"] is None:
+                logger.warning(
+                    f"Dynamic input {name} (shape: {input_shape}) has no max bound for dim {d}, attempting to use a sane default (max: min({min_max_opt['min']}) * 128). Please set an upper bound using torch._dynamo.mark_dynamic or torch.export.Dim"
+                )
+                min_max_opt["max"] = min_max_opt["min"] * 128
             min_shape.append(min_max_opt["min"])
             # if opt not exist, set it to the mean of min and max
+            if min_max_opt["opt"] is None:
+                logger.info(
+                    f"Dynamic input {name} (shape: {input_shape}) has no opt target i.e. which shape to specialize for, for dim {d}, attempting to use a sane default (opt: min({min_max_opt['min']}) + max({min_max_opt['max']}) / 2). If you want to specialized further, use torch_tensorrt.compile"
+                )
+                min_max_opt["opt"] = int(min_max_opt["min"] + min_max_opt["max"] / 2)
             opt_shape.append(
                 min_max_opt.get("opt", int(min_max_opt["min"] + min_max_opt["max"] / 2))
             )
@@ -61,7 +72,10 @@ def get_input(
     """
     if contains_sym_int(input_shape):
         return construct_dynamic_input(
-            input_shape, dtype, name=name, is_shape_tensor=is_shape_tensor
+            input_shape,
+            dtype,
+            name=name,
+            is_shape_tensor=is_shape_tensor,
         )
     else:
         return Input(
