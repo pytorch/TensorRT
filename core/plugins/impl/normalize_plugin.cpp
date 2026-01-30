@@ -14,170 +14,197 @@ namespace impl {
  */
 
 NormalizePlugin::NormalizePlugin(int32_t order, std::vector<int32_t> axes, int32_t keep_dims)
-    : order_(order), axes_(axes), keep_dims_(keep_dims) {}
-
-NormalizePlugin::NormalizePlugin(const char* data, size_t length) {
-  std::istringstream data_stream(std::string(data, length));
-
-  torch::serialize::InputArchive input_archive;
-  input_archive.load_from(data_stream);
-  {
-    torch::IValue value;
-    input_archive.read("order", value);
-    order_ = (int32_t)value.toInt();
-  }
-  {
-    torch::IValue value;
-    input_archive.read("axes", value);
-    auto values = value.toIntVector();
-    std::vector<int32_t> doubleVec(values.begin(), values.end());
-    // axes_ = doubleVec;
-    axes_.assign(doubleVec.begin(), doubleVec.end());
-  }
-  {
-    torch::IValue value;
-    input_archive.read("keep_dims", value);
-    keep_dims_ = (int32_t)value.toInt();
-  }
+    : order_(order), axes_(axes), keep_dims_(keep_dims) {
+  dtype_ = nvinfer1::DataType::kFLOAT;
+  setupSerialization();
 }
 
-int NormalizePlugin::getNbOutputs() const noexcept {
+NormalizePlugin::NormalizePlugin(const nvinfer1::PluginFieldCollection* fc) {
+  int32_t order = 0;
+  std::vector<int32_t> axes;
+  int32_t keep_dims = 0;
+  
+  for (int i = 0; i < fc->nbFields; i++) {
+    std::string field_name(fc->fields[i].name);
+    if (field_name.compare("order") == 0) {
+      order = *static_cast<const int32_t*>(fc->fields[i].data);
+    } else if (field_name.compare("axes") == 0) {
+      auto axes_values = static_cast<const int32_t*>(fc->fields[i].data);
+      axes.assign(axes_values, axes_values + fc->fields[i].length);
+    } else if (field_name.compare("keep_dims") == 0) {
+      keep_dims = *static_cast<const int32_t*>(fc->fields[i].data);
+    }
+  }
+  
+  order_ = order;
+  axes_ = axes;
+  keep_dims_ = keep_dims;
+  dtype_ = nvinfer1::DataType::kFLOAT;
+  setupSerialization();
+}
+
+void NormalizePlugin::setupSerialization() {
+  mDataToSerialize.clear();
+  mDataToSerialize.emplace_back("order", &order_, nvinfer1::PluginFieldType::kINT32, 1);
+  mDataToSerialize.emplace_back("axes", axes_.data(), nvinfer1::PluginFieldType::kINT32, axes_.size());
+  mDataToSerialize.emplace_back("keep_dims", &keep_dims_, nvinfer1::PluginFieldType::kINT32, 1);
+  mFCToSerialize.nbFields = mDataToSerialize.size();
+  mFCToSerialize.fields = mDataToSerialize.data();
+}
+
+// IPluginV3 methods
+nvinfer1::IPluginCapability* NormalizePlugin::getCapabilityInterface(nvinfer1::PluginCapabilityType type) noexcept {
+  switch (type) {
+    case nvinfer1::PluginCapabilityType::kCORE:
+      return static_cast<nvinfer1::IPluginV3OneCore*>(this);
+    case nvinfer1::PluginCapabilityType::kBUILD:
+      return static_cast<nvinfer1::IPluginV3OneBuild*>(this);
+    case nvinfer1::PluginCapabilityType::kRUNTIME:
+      return static_cast<nvinfer1::IPluginV3OneRuntime*>(this);
+  }
+  return nullptr;
+}
+
+nvinfer1::IPluginV3* NormalizePlugin::clone() noexcept {
+  auto plugin = new NormalizePlugin(order_, axes_, keep_dims_);
+  plugin->dtype_ = dtype_;
+  return plugin;
+}
+
+// IPluginV3OneCore methods
+nvinfer1::AsciiChar const* NormalizePlugin::getPluginName() const noexcept {
+  return plugin_name_.c_str();
+}
+
+nvinfer1::AsciiChar const* NormalizePlugin::getPluginVersion() const noexcept {
+  return plugin_version_.c_str();
+}
+
+nvinfer1::AsciiChar const* NormalizePlugin::getPluginNamespace() const noexcept {
+  return plugin_namespace_.c_str();
+}
+
+// IPluginV3OneBuild methods
+int32_t NormalizePlugin::getNbOutputs() const noexcept {
   return 1;
 }
 
-const char* NormalizePlugin::getPluginType() const noexcept {
-  return "NormalizePlugin";
+int32_t NormalizePlugin::configurePlugin(
+    nvinfer1::DynamicPluginTensorDesc const* in,
+    int32_t nbInputs,
+    nvinfer1::DynamicPluginTensorDesc const* out,
+    int32_t nbOutputs) noexcept {
+  dtype_ = nvinfer1::DataType::kFLOAT;
+  return 0;
 }
 
-const char* NormalizePlugin::getPluginVersion() const noexcept {
-  return "1";
+int32_t NormalizePlugin::getOutputDataTypes(
+    nvinfer1::DataType* outputTypes,
+    int32_t nbOutputs,
+    nvinfer1::DataType const* inputTypes,
+    int32_t nbInputs) const noexcept {
+  TORCHTRT_CHECK(nbOutputs == 1, "Expected 1 output");
+  outputTypes[0] = nvinfer1::DataType::kFLOAT;
+  return 0;
 }
 
-const char* NormalizePlugin::getPluginNamespace() const noexcept {
-  return "torch_tensorrt";
-}
-
-nvinfer1::IPluginV2DynamicExt* NormalizePlugin::clone() const noexcept {
-  return new NormalizePlugin(order_, axes_, keep_dims_);
-}
-
-nvinfer1::DimsExprs NormalizePlugin::getOutputDimensions(
-    int outputIndex,
-    const nvinfer1::DimsExprs* inputs,
-    int nbInputs,
+int32_t NormalizePlugin::getOutputShapes(
+    nvinfer1::DimsExprs const* inputs,
+    int32_t nbInputs,
+    nvinfer1::DimsExprs const* shapeInputs,
+    int32_t nbShapeInputs,
+    nvinfer1::DimsExprs* outputs,
+    int32_t nbOutputs,
     nvinfer1::IExprBuilder& exprBuilder) noexcept {
-  nvinfer1::DimsExprs output;
-  output.nbDims = keep_dims_ ? inputs[0].nbDims : inputs[0].nbDims - axes_.size();
+  
+  TORCHTRT_CHECK(nbInputs == 1, "Expected 1 input");
+  TORCHTRT_CHECK(nbOutputs == 1, "Expected 1 output");
+  
+  outputs[0].nbDims = keep_dims_ ? inputs[0].nbDims : inputs[0].nbDims - axes_.size();
 
   // For order-0 norm, when the norm dimension is None, it should normalize across all dimensions.
-  // TODO: For dim=None, the axes_ passed would have [0, 0, 0] which is obtained through loop counter in Torch-TensorRT.
-  // Resolve this. For dim=None case, change the axes_ inplace to range(0, axes_.size())
   bool isAxisNone = std::all_of(axes_.begin(), axes_.end(), [](int32_t i) { return i == 0; }) &&
       ((int32_t)axes_.size() == inputs[0].nbDims);
   if (isAxisNone) {
     std::iota(axes_.data(), axes_.data() + axes_.size(), 0);
   }
+  
   int64_t out_idx = 0;
   for (int64_t i = 0; i < inputs[0].nbDims; i++) {
     if (std::find(axes_.begin(), axes_.end(), i) != axes_.end()) {
       if (keep_dims_) {
-        output.d[out_idx] = exprBuilder.constant(1);
+        outputs[0].d[out_idx] = exprBuilder.constant(1);
         out_idx += 1;
       }
     } else {
       if (!isAxisNone) {
-        output.d[out_idx] = exprBuilder.constant(inputs[0].d[i]->getConstantValue());
+        outputs[0].d[out_idx] = exprBuilder.constant(inputs[0].d[i]->getConstantValue());
       } else {
-        output.d[out_idx] = exprBuilder.constant(1);
+        outputs[0].d[out_idx] = exprBuilder.constant(1);
       }
       out_idx += 1;
     }
   }
-
-  return output;
-}
-
-nvinfer1::DataType NormalizePlugin::getOutputDataType(int index, const nvinfer1::DataType* inputTypes, int nbInputs)
-    const noexcept {
-  return nvinfer1::DataType::kFLOAT;
-}
-
-int NormalizePlugin::initialize() noexcept {
+  
   return 0;
-}
-
-void NormalizePlugin::serialize(void* buffer) const noexcept {
-  std::string data = serializeToString();
-  size_t size = getSerializationSize();
-  data.copy((char*)buffer, size);
-}
-
-std::string NormalizePlugin::serializeToString() const noexcept {
-  torch::serialize::OutputArchive output_archive;
-  std::vector<int64_t> axesVec(axes_.begin(), axes_.end());
-  output_archive.write("order", torch::IValue((int64_t)order_));
-  output_archive.write("axes", torch::IValue(axesVec));
-  output_archive.write("keep_dims", torch::IValue((int64_t)keep_dims_));
-  std::ostringstream data_str;
-  output_archive.save_to(data_str);
-
-  return data_str.str();
-}
-
-size_t NormalizePlugin::getSerializationSize() const noexcept {
-  return serializeToString().size();
 }
 
 bool NormalizePlugin::supportsFormatCombination(
-    int pos,
-    const nvinfer1::PluginTensorDesc* inOut,
-    int nbInputs,
-    int nbOutputs) noexcept {
+    int32_t pos,
+    nvinfer1::DynamicPluginTensorDesc const* inOut,
+    int32_t nbInputs,
+    int32_t nbOutputs) noexcept {
+  
   if (pos < 0 || pos > 1) {
     LOG_ERROR("There should be exactly 2 connections to the plugin - 1 input, 1 output");
+    return false;
   }
   if (nbInputs != 1) {
     LOG_ERROR("Expected a single tensor as input to normalize plugin");
+    return false;
   }
   if (nbOutputs != 1) {
     LOG_ERROR("Expected a single tensor as output to normalize plugin");
+    return false;
   }
 
-  const nvinfer1::PluginTensorDesc& in = inOut[0];
+  const nvinfer1::DynamicPluginTensorDesc& in = inOut[0];
 
   if (pos == 0) {
-    return (in.type == nvinfer1::DataType::kFLOAT) && (in.format == nvinfer1::TensorFormat::kLINEAR);
+    return (in.desc.type == nvinfer1::DataType::kFLOAT) && (in.desc.format == nvinfer1::TensorFormat::kLINEAR);
   }
 
   // pos == 1, accessing information about output tensor
-  const nvinfer1::PluginTensorDesc& out = inOut[1];
+  const nvinfer1::DynamicPluginTensorDesc& out = inOut[1];
 
-  return (in.type == out.type) && (in.format == out.format);
-}
-
-void NormalizePlugin::configurePlugin(
-    const nvinfer1::DynamicPluginTensorDesc* in,
-    int nbInputs,
-    const nvinfer1::DynamicPluginTensorDesc* out,
-    int nbOutputs) noexcept {
-  dtype_ = nvinfer1::DataType::kFLOAT;
+  return (in.desc.type == out.desc.type) && (in.desc.format == out.desc.format);
 }
 
 size_t NormalizePlugin::getWorkspaceSize(
-    const nvinfer1::PluginTensorDesc* inputs,
-    int nbInputs,
-    const nvinfer1::PluginTensorDesc* outputs,
-    int nbOutputs) const noexcept {
+    nvinfer1::DynamicPluginTensorDesc const* inputs,
+    int32_t nbInputs,
+    nvinfer1::DynamicPluginTensorDesc const* outputs,
+    int32_t nbOutputs) const noexcept {
   return 0;
 }
 
-int NormalizePlugin::enqueue(
-    const nvinfer1::PluginTensorDesc* inputDesc,
-    const nvinfer1::PluginTensorDesc* outputDesc,
-    const void* const* inputs,
+// IPluginV3OneRuntime methods
+int32_t NormalizePlugin::onShapeChange(
+    nvinfer1::PluginTensorDesc const* in,
+    int32_t nbInputs,
+    nvinfer1::PluginTensorDesc const* out,
+    int32_t nbOutputs) noexcept {
+  return 0;
+}
+
+int32_t NormalizePlugin::enqueue(
+    nvinfer1::PluginTensorDesc const* inputDesc,
+    nvinfer1::PluginTensorDesc const* outputDesc,
+    void const* const* inputs,
     void* const* outputs,
     void* workspace,
     cudaStream_t stream) noexcept {
+  
   at::Tensor input =
       at::from_blob((void*)inputs[0], util::toVec(inputDesc->dims), [](void*) {}, {at::kCUDA}).to(torch::kFloat);
   at::Tensor output =
@@ -195,6 +222,7 @@ int NormalizePlugin::enqueue(
   std::vector<int64_t> axes_double(axes_.begin(), axes_.end());
   at::Tensor result = at::norm(input, (int64_t)order_, axes_double, (bool)keep_dims_);
   output.copy_(result);
+  
   cudaEvent_t torch_event;
   cudaEventCreate(&torch_event);
   cudaEventRecord(torch_event, torch_stream.stream());
@@ -204,6 +232,14 @@ int NormalizePlugin::enqueue(
   cudaEventDestroy(event);
   cudaEventDestroy(torch_event);
   return 0;
+}
+
+nvinfer1::IPluginV3* NormalizePlugin::attachToContext(nvinfer1::IPluginResourceContext* context) noexcept {
+  return clone();
+}
+
+nvinfer1::PluginFieldCollection const* NormalizePlugin::getFieldsToSerialize() noexcept {
+  return &mFCToSerialize;
 }
 
 /*
@@ -218,53 +254,30 @@ NormalizePluginCreator::NormalizePluginCreator() {
   mFC.fields = mPluginAttributes.data();
 }
 
-const char* NormalizePluginCreator::getPluginNamespace() const noexcept {
-  return "torch_tensorrt";
+nvinfer1::AsciiChar const* NormalizePluginCreator::getPluginNamespace() const noexcept {
+  return plugin_namespace_.c_str();
 }
 
-const char* NormalizePluginCreator::getPluginName() const noexcept {
-  return "NormalizePlugin";
+nvinfer1::AsciiChar const* NormalizePluginCreator::getPluginName() const noexcept {
+  return name_.c_str();
 }
 
-const char* NormalizePluginCreator::getPluginVersion() const noexcept {
-  return "1";
+nvinfer1::AsciiChar const* NormalizePluginCreator::getPluginVersion() const noexcept {
+  return plugin_version_.c_str();
 }
 
-nvinfer1::IPluginV2* NormalizePluginCreator::createPlugin(
-    const char* name,
-    const nvinfer1::PluginFieldCollection* fc) noexcept {
-  int32_t order = 0;
-  std::vector<int32_t> axes;
-  int32_t keep_dims = 0;
-  for (int i = 0; i < fc->nbFields; i++) {
-    std::string field_name(fc->fields[i].name);
-    if (field_name.compare("order") == 0) {
-      order = *static_cast<const int32_t*>(fc->fields[i].data);
-    } else if (field_name.compare("axes") == 0) {
-      auto axes_values = static_cast<const int32_t*>(fc->fields[i].data);
-      axes.assign(axes_values, axes_values + fc->fields[i].length);
-    } else if (field_name.compare("keep_dims") == 0) {
-      keep_dims = *static_cast<const int32_t*>(fc->fields[i].data);
-    }
-  }
-  NormalizePlugin* plugin = new NormalizePlugin(order, axes, keep_dims);
-  return plugin;
+nvinfer1::IPluginV3* NormalizePluginCreator::createPlugin(
+    nvinfer1::AsciiChar const* name,
+    nvinfer1::PluginFieldCollection const* fc,
+    nvinfer1::TensorRTPhase phase) noexcept {
+  return new NormalizePlugin(fc);
 }
 
-nvinfer1::IPluginV2* NormalizePluginCreator::deserializePlugin(
-    const char* name,
-    const void* serialData,
-    size_t serialLength) noexcept {
-  name_ = name;
-  auto plugin = new NormalizePlugin((const char*)serialData, serialLength);
-  return plugin;
+nvinfer1::PluginFieldCollection const* NormalizePluginCreator::getFieldNames() noexcept {
+  return &mFC;
 }
 
-const nvinfer1::PluginFieldCollection* NormalizePluginCreator::getFieldNames() noexcept {
-  return nullptr;
-}
-
-REGISTER_TORCHTRT_PLUGIN(NormalizePluginCreator);
+REGISTER_TORCHTRT_PLUGIN(NormalizePluginCreator, "NormalizePlugin", "1");
 
 } // namespace impl
 } // namespace plugins

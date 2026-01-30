@@ -9,112 +9,135 @@
 #include <vector>
 
 #include "NvInfer.h"
+#include "NvInferRuntime.h"
 #include "core/util/prelude.h"
 #include "torch/torch.h"
-
-// using namespace nvinfer1;
 
 namespace torch_tensorrt {
 namespace core {
 namespace plugins {
 namespace impl {
 
-class NormalizePlugin : public nvinfer1::IPluginV2DynamicExt {
+class NormalizePlugin : public nvinfer1::IPluginV3,
+                        public nvinfer1::IPluginV3OneCore,
+                        public nvinfer1::IPluginV3OneBuild,
+                        public nvinfer1::IPluginV3OneRuntime {
  private:
+  std::string plugin_name_{"NormalizePlugin"};
+  std::string plugin_namespace_{"torch_tensorrt"};
+  std::string plugin_version_{"1"};
+  
   nvinfer1::DataType dtype_;
   int32_t order_;
   std::vector<int32_t> axes_;
   int32_t keep_dims_;
+  
+  // Serialization fields
+  std::vector<nvinfer1::PluginField> mDataToSerialize;
+  nvinfer1::PluginFieldCollection mFCToSerialize;
 
  public:
   NormalizePlugin(int32_t order, std::vector<int32_t> axes, int32_t keep_dims);
 
-  NormalizePlugin(const char* data, size_t length);
+  NormalizePlugin(const nvinfer1::PluginFieldCollection* fc);
 
   NormalizePlugin() = delete;
 
-  int getNbOutputs() const noexcept override;
+  // IPluginV3 methods
+  nvinfer1::IPluginCapability* getCapabilityInterface(nvinfer1::PluginCapabilityType type) noexcept override;
+  
+  nvinfer1::IPluginV3* clone() noexcept override;
 
-  const char* getPluginType() const noexcept override;
+  // IPluginV3OneCore methods  
+  nvinfer1::AsciiChar const* getPluginName() const noexcept override;
 
-  const char* getPluginVersion() const noexcept override;
+  nvinfer1::AsciiChar const* getPluginVersion() const noexcept override;
 
-  const char* getPluginNamespace() const noexcept override;
+  nvinfer1::AsciiChar const* getPluginNamespace() const noexcept override;
 
-  void setPluginNamespace(const char* pluginNamespace) noexcept override{};
+  // IPluginV3OneBuild methods
+  int32_t configurePlugin(
+      nvinfer1::DynamicPluginTensorDesc const* in,
+      int32_t nbInputs,
+      nvinfer1::DynamicPluginTensorDesc const* out,
+      int32_t nbOutputs) noexcept override;
 
-  nvinfer1::IPluginV2DynamicExt* clone() const noexcept override;
+  int32_t getOutputDataTypes(
+      nvinfer1::DataType* outputTypes,
+      int32_t nbOutputs,
+      nvinfer1::DataType const* inputTypes,
+      int32_t nbInputs) const noexcept override;
 
-  nvinfer1::DimsExprs getOutputDimensions(
-      int outputIndex,
-      const nvinfer1::DimsExprs* inputs,
-      int nbInputs,
+  int32_t getOutputShapes(
+      nvinfer1::DimsExprs const* inputs,
+      int32_t nbInputs,
+      nvinfer1::DimsExprs const* shapeInputs,
+      int32_t nbShapeInputs,
+      nvinfer1::DimsExprs* outputs,
+      int32_t nbOutputs,
       nvinfer1::IExprBuilder& exprBuilder) noexcept override;
 
-  nvinfer1::DataType getOutputDataType(int index, const nvinfer1::DataType* inputTypes, int nbInputs)
-      const noexcept override;
+  bool supportsFormatCombination(
+      int32_t pos,
+      nvinfer1::DynamicPluginTensorDesc const* inOut,
+      int32_t nbInputs,
+      int32_t nbOutputs) noexcept override;
 
-  int initialize() noexcept override;
-
-  void terminate() noexcept override {}
-
-  void serialize(void* buffer) const noexcept;
-
-  std::string serializeToString() const noexcept;
-
-  size_t getSerializationSize() const noexcept override;
-
-  void destroy() noexcept override {}
-
-  bool supportsFormatCombination(int pos, const nvinfer1::PluginTensorDesc* inOut, int nbInputs, int nbOutputs) noexcept
-      override;
-
-  void configurePlugin(
-      const nvinfer1::DynamicPluginTensorDesc* in,
-      int nbInputs,
-      const nvinfer1::DynamicPluginTensorDesc* out,
-      int nbOutputs) noexcept override;
+  int32_t getNbOutputs() const noexcept override;
 
   size_t getWorkspaceSize(
-      const nvinfer1::PluginTensorDesc* inputs,
-      int nbInputs,
-      const nvinfer1::PluginTensorDesc* outputs,
-      int nbOutputs) const noexcept override;
+      nvinfer1::DynamicPluginTensorDesc const* inputs,
+      int32_t nbInputs,
+      nvinfer1::DynamicPluginTensorDesc const* outputs,
+      int32_t nbOutputs) const noexcept override;
 
-  int enqueue(
-      const nvinfer1::PluginTensorDesc* inputDesc,
-      const nvinfer1::PluginTensorDesc* outputDesc,
-      const void* const* inputs,
+  // IPluginV3OneRuntime methods
+  int32_t onShapeChange(
+      nvinfer1::PluginTensorDesc const* in,
+      int32_t nbInputs,
+      nvinfer1::PluginTensorDesc const* out,
+      int32_t nbOutputs) noexcept override;
+
+  int32_t enqueue(
+      nvinfer1::PluginTensorDesc const* inputDesc,
+      nvinfer1::PluginTensorDesc const* outputDesc,
+      void const* const* inputs,
       void* const* outputs,
       void* workspace,
       cudaStream_t stream) noexcept override;
+
+  nvinfer1::IPluginV3* attachToContext(nvinfer1::IPluginResourceContext* context) noexcept override;
+
+  nvinfer1::PluginFieldCollection const* getFieldsToSerialize() noexcept override;
+
+ protected:
+  // Helper to setup serialization
+  void setupSerialization();
 };
 
-class NormalizePluginCreator : public nvinfer1::IPluginCreator {
+class NormalizePluginCreator : public nvinfer1::IPluginCreatorV3One {
  private:
-  std::string name_;
+  std::string name_{"NormalizePlugin"};
+  std::string plugin_namespace_{"torch_tensorrt"};
+  std::string plugin_version_{"1"};
   std::vector<nvinfer1::PluginField> mPluginAttributes;
   nvinfer1::PluginFieldCollection mFC;
 
  public:
   NormalizePluginCreator();
 
-  const char* getPluginNamespace() const noexcept override;
+  nvinfer1::AsciiChar const* getPluginNamespace() const noexcept override;
 
-  void setPluginNamespace(const char* libNamespace) noexcept override{};
+  nvinfer1::AsciiChar const* getPluginName() const noexcept override;
 
-  const char* getPluginName() const noexcept override;
+  nvinfer1::AsciiChar const* getPluginVersion() const noexcept override;
 
-  const char* getPluginVersion() const noexcept override;
+  nvinfer1::IPluginV3* createPlugin(
+      nvinfer1::AsciiChar const* name,
+      nvinfer1::PluginFieldCollection const* fc,
+      nvinfer1::TensorRTPhase phase) noexcept override;
 
-  nvinfer1::IPluginV2* createPlugin(const char* name, const nvinfer1::PluginFieldCollection* fc) noexcept override;
-
-  // NormalizePlugin* createPlugin(const char* name, int32_t order, std::vector<int32_t> axes, int32_t keep_dims);
-
-  nvinfer1::IPluginV2* deserializePlugin(const char* name, const void* serialData, size_t serialLength) noexcept
-      override;
-
-  const nvinfer1::PluginFieldCollection* getFieldNames() noexcept override;
+  nvinfer1::PluginFieldCollection const* getFieldNames() noexcept override;
 };
 
 } // namespace impl

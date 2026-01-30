@@ -10,10 +10,10 @@ namespace core {
 namespace plugins {
 namespace impl {
 
-// Main registry for all flavours of plugins (eg: TRT plugins, Torch-TensorRT opensourced plugins)
-class TorchTRTPluginRegistry {
+// Initializer for TensorRT built-in plugins
+class TensorRTPluginInitializer {
  public:
-  TorchTRTPluginRegistry() {
+  TensorRTPluginInitializer() {
     // register libNvInferPlugins and Torch-TensorRT plugins
     // torch_tensorrt_logger logging level is set to kERROR and reset back to kDEBUG.
     // This is because initLibNvInferPlugins initializes only a subset of plugins and logs them.
@@ -48,7 +48,7 @@ class TorchTRTPluginRegistry {
 };
 
 namespace {
-static TorchTRTPluginRegistry plugin_registry;
+static TensorRTPluginInitializer plugin_initializer;
 }
 
 } // namespace impl

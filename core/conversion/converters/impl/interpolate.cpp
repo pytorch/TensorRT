@@ -1,6 +1,7 @@
 #include "NvInfer.h"
 #include "NvInferRuntimeCommon.h"
 #include "core/conversion/converters/converters.h"
+#include "core/plugins/plugins.h"
 #include "core/util/prelude.h"
 #include "torch/torch.h"
 
@@ -54,10 +55,10 @@ void create_plugin(
 
   fc.nbFields = f.size();
   fc.fields = f.data();
-  auto creator = getPluginRegistry()->getPluginCreator("Interpolate", "1", "torch_tensorrt");
-  auto interpolate_plugin = creator->createPlugin(name, &fc);
+  auto creator = plugins::impl::TorchTRTPluginRegistry::getInstance().getPluginCreator("Interpolate", "1");
+  auto interpolate_plugin = creator->createPlugin(name, &fc, nvinfer1::TensorRTPhase::kBUILD);
 
-  auto resize_layer = ctx->net->addPluginV2(reinterpret_cast<nvinfer1::ITensor* const*>(&in), 1, *interpolate_plugin);
+  auto resize_layer = ctx->net->addPluginV3(reinterpret_cast<nvinfer1::ITensor* const*>(&in), 1, nullptr, 0, *interpolate_plugin);
   TORCHTRT_CHECK(resize_layer, "Unable to create interpolation plugin from node" << *n);
 
   resize_layer->setName(util::node_info(n).c_str());

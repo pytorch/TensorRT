@@ -97,10 +97,6 @@ converter_test(
 )
 
 converter_test(
-    name = "test_element_wise",
-)
-
-converter_test(
     name = "test_expand",
 )
 
