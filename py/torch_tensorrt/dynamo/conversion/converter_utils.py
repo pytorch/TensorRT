@@ -477,6 +477,42 @@ def create_constant(
                     "Currently FP4 is only supported in TensorRT 10.8.0 and above"
                 )
         # Record the weight in ctx for refit and cpu memory reference
+        # TensorRT's add_constant doesn't support 0-element tensors,
+        # but TRT does support empty tensors at runtime.
+        # For empty constants, we create a larger constant and slice it to empty.
+        if torch_value.numel() == 0:
+            empty_shape = list(torch_value.shape)
+
+            # Create a placeholder shape where each dim is max(1, target_dim)
+            # This ensures we can slice to the target empty shape
+            # e.g., target [0, 4] -> placeholder [1, 4] -> slice to [0, 4]
+            placeholder_shape = [max(1, d) for d in empty_shape]
+            placeholder_numel = 1
+            for d in placeholder_shape:
+                placeholder_numel *= d
+
+            # Create placeholder constant with the required number of elements
+            placeholder_value = torch.zeros(placeholder_numel, dtype=torch_value.dtype)
+            placeholder_weights = to_trt_weights(
+                ctx, placeholder_value, f"{name}_placeholder", "CONSTANT", "CONSTANT"
+            )
+            placeholder_constant = ctx.net.add_constant(
+                tuple(placeholder_shape), placeholder_weights
+            )
+            placeholder_constant.name = f"{name}_placeholder"
+
+            # Slice to get the empty shape (at least one dimension is 0)
+            start = [0] * len(empty_shape)
+            stride = [1] * len(empty_shape)
+            slice_layer = ctx.net.add_slice(
+                placeholder_constant.get_output(0),
+                start=start,
+                shape=empty_shape,
+                stride=stride,
+            )
+            slice_layer.name = f"{name}_empty_slice"
+
+            return slice_layer.get_output(0)
 
         # Convert the torch.Tensor to a trt.Weights object
         trt_weights = to_trt_weights(ctx, torch_value, name, "CONSTANT", "CONSTANT")
