@@ -1088,16 +1088,8 @@ def aten_ops_slice(
     )
 
 
-def refit_validator(node: Node, settings: Optional[CompilationSettings] = None) -> bool:
-    # cumsum op is not refitable
-    if settings and not settings.immutable_weights:
-        return False
-    return True
-
-
 @dynamo_tensorrt_converter(
     torch.ops.aten.cumsum.default,
-    capability_validator=refit_validator,
     supports_dynamic_shapes=True,
 )
 @enforce_tensor_types(
