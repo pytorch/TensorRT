@@ -1,5 +1,6 @@
 from typing import Any, List
 
+import psutil
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -84,7 +85,9 @@ class TestResourcePartitioning(TestCase):
         )
 
         partitioned_module = resource_partition(
-            partitioned_module, cpu_memory_budget=2 * 1024 * 1024 * 1024  # 2GB,
+            partitioned_module,
+            cpu_memory_budget=0.89 * 1024 * 1024 * 1024
+            + psutil.Process().memory_info().rss,  # 0.89GB + current memory usage,
         )
 
         self.assertEqual(
@@ -166,7 +169,9 @@ class TestResourcePartitioning(TestCase):
         )
 
         partitioned_module = resource_partition(
-            partitioned_module, cpu_memory_budget=1.4 * 1024 * 1024 * 1024  # 1.4GB,
+            partitioned_module,
+            cpu_memory_budget=0.39 * 1024 * 1024 * 1024
+            + psutil.Process().memory_info().rss,  # 0.39GB + current memory usage,
         )
 
         assert (
@@ -298,7 +303,9 @@ class TestResourcePartitioning(TestCase):
         )
 
         partitioned_module = resource_partition(
-            partitioned_module, cpu_memory_budget=1.4 * 1024 * 1024 * 1024  # 1.4GB,
+            partitioned_module,
+            cpu_memory_budget=0.39 * 1024 * 1024 * 1024
+            + psutil.Process().memory_info().rss,  # 0.39GB + current memory usage,
         )
 
         assert (
@@ -396,7 +403,9 @@ class TestResourcePartitioning(TestCase):
         )
 
         partitioned_module = resource_partition(
-            partitioned_module, cpu_memory_budget=1.4 * 1024 * 1024 * 1024  # 1.4GB,
+            partitioned_module,
+            cpu_memory_budget=0.39 * 1024 * 1024 * 1024
+            + psutil.Process().memory_info().rss,  # 0.39GB + current memory usage,
         )
 
         assert (
