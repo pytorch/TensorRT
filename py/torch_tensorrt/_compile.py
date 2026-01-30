@@ -572,7 +572,7 @@ def load_cross_compiled_exported_program(file_path: str = "") -> Any:
     return dynamo_load_cross_compiled_exported_program(file_path)
 
 
-def load(file_path: str = "") -> Any:
+def load(file_path: str = "", extra_files: Optional[dict[str, Any]] = None) -> Any:
     """
     Load either a Torchscript model or ExportedProgram.
 
@@ -580,6 +580,13 @@ def load(file_path: str = "") -> Any:
 
     Arguments:
         file_path (str): Path to file on the disk
+        extra_files (dict[str, Any]): Extra files to load with the model
+
+    Example:
+    # Load with extra files.
+        extra_files = {"foo.txt": ""}  # values will be replaced with data
+        ep = torch.export.load("exported_program.pt2", extra_files=extra_files)
+        print(extra_files["foo.txt"])
 
     Raises:
         ValueError: If there is no file or the file is not either a TorchScript file or ExportedProgram file
@@ -614,6 +621,7 @@ def save(
     module: Any,
     file_path: str = "",
     *,
+    extra_files: Optional[dict[str, Any]] = None,
     output_format: str = "exported_program",
     inputs: Optional[Sequence[torch.Tensor | Input]] = None,
     arg_inputs: Optional[Sequence[torch.Tensor | Input]] = None,
@@ -857,7 +865,12 @@ def save(
                     "Provided model is a torch.export.ExportedProgram, inputs or arg_inputs is not necessary during save, it uses the inputs or arg_inputs provided during export and compile"
                 )
             if output_format == "exported_program":
-                torch.export.save(module, file_path, pickle_protocol=pickle_protocol)
+                torch.export.save(
+                    module,
+                    file_path,
+                    pickle_protocol=pickle_protocol,
+                    extra_files=extra_files,
+                )
             elif output_format == "aot_inductor":
                 inductor_configs = {}
                 if "inductor_configs" in kwargs:
@@ -878,7 +891,7 @@ def save(
             module_ts = torch.jit.trace(
                 module, arg_inputs, example_kwarg_inputs=kwarg_inputs
             )
-            torch.jit.save(module_ts, file_path)
+            torch.jit.save(module_ts, file_path, extra_files=extra_files)
         else:
             if not retrace:
                 from torch_tensorrt.dynamo._exporter import export
@@ -902,7 +915,10 @@ def save(
                 )
                 if output_format == "exported_program":
                     torch.export.save(
-                        exp_program, file_path, pickle_protocol=pickle_protocol
+                        exp_program,
+                        file_path,
+                        pickle_protocol=pickle_protocol,
+                        extra_files=extra_files,
                     )
                 elif output_format == "aot_inductor":
                     inductor_configs = {}
@@ -976,7 +992,10 @@ def save(
 
                 if output_format == "exported_program":
                     torch.export.save(
-                        exp_program, file_path, pickle_protocol=pickle_protocol
+                        exp_program,
+                        file_path,
+                        pickle_protocol=pickle_protocol,
+                        extra_files=extra_files,
                     )
                 elif output_format == "aot_inductor":
                     inductor_configs = {}
