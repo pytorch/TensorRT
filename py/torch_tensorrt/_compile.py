@@ -584,7 +584,7 @@ def load(file_path: str = "", extra_files: Optional[dict[str, Any]] = None) -> A
 
     Example:
     # Load with extra files.
-        extra_files = {"foo.txt": ""}  # values will be replaced with data
+        extra_files = {"foo.txt": ""}  # values will be replaced with serialized data
         ep = torch.export.load("exported_program.pt2", extra_files=extra_files)
         print(extra_files["foo.txt"])
 
@@ -621,7 +621,7 @@ def save(
     module: Any,
     file_path: str = "",
     *,
-    extra_files: Optional[dict[str, Any]] = None,
+    extra_files: Optional[dict[str, str]] = None,
     output_format: str = "exported_program",
     inputs: Optional[Sequence[torch.Tensor | Input]] = None,
     arg_inputs: Optional[Sequence[torch.Tensor | Input]] = None,
