@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import collections.abc
+import inspect
 import logging
 import platform
 import warnings
@@ -633,6 +634,18 @@ def save(
                 This flag is experimental for now.
         pickle_protocol (int): The pickle protocol to use to save the model. Default is 2. Increase this to 4 or higher for large models
     """
+
+    def export_save_with_kwargs(module: Any, **kwargs: Any) -> None:
+        fn_signature = inspect.signature(torch.export.save).parameters
+        save_kwargs = {k: v for k, v in kwargs.items() if k in fn_signature}
+        torch.export.save(
+            module,
+            file_path,
+            extra_files=extra_files,
+            pickle_protocol=pickle_protocol,
+            **save_kwargs,
+        )
+
     if isinstance(module, CudaGraphsTorchTensorRTModule):
         module = module.compiled_module
     module_type = _parse_module_type(module)
@@ -692,12 +705,7 @@ def save(
                     "Provided model is a torch.export.ExportedProgram, inputs or arg_inputs is not necessary during save, it uses the inputs or arg_inputs provided during export and compile"
                 )
             if output_format == "exported_program":
-                torch.export.save(
-                    module,
-                    file_path,
-                    pickle_protocol=pickle_protocol,
-                    extra_files=extra_files,
-                )
+                export_save_with_kwargs(module, **kwargs)
             elif output_format == "aot_inductor":
                 inductor_configs = {}
                 if "inductor_configs" in kwargs:
@@ -729,12 +737,7 @@ def save(
                     )
                 exp_program = export(module)
                 if output_format == "exported_program":
-                    torch.export.save(
-                        exp_program,
-                        file_path,
-                        pickle_protocol=pickle_protocol,
-                        extra_files=extra_files,
-                    )
+                    export_save_with_kwargs(exp_program, **kwargs)
                 elif output_format == "aot_inductor":
                     inductor_configs = {}
                     if "inductor_configs" in kwargs:
@@ -762,12 +765,7 @@ def save(
                 )
 
                 if output_format == "exported_program":
-                    torch.export.save(
-                        exp_program,
-                        file_path,
-                        pickle_protocol=pickle_protocol,
-                        extra_files=extra_files,
-                    )
+                    export_save_with_kwargs(exp_program, **kwargs)
                 elif output_format == "aot_inductor":
                     inductor_configs = {}
                     if "inductor_configs" in kwargs:
