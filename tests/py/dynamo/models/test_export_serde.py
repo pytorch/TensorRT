@@ -728,3 +728,59 @@ def test_save_load_aoti(ir, tmp_path):
         cos_sim > COSINE_THRESHOLD,
         msg=f"test_save_load_ts TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
     )
+
+
+@pytest.mark.unit
+def test_save_load_extra_files(ir, tmpdir):
+    """
+    This tests save/load API on Torchscript format (model still compiled using dynamo workflow)
+    """
+
+    class MyModule(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.conv = torch.nn.Conv2d(3, 16, 3, stride=1, bias=True)
+            self.relu = torch.nn.ReLU()
+
+        def forward(self, x):
+            conv = self.conv(x)
+            relu = self.relu(conv)
+            mul = relu * 0.5
+            return mul
+
+    ep_path = os.path.join(tmpdir, "trt.er")
+    model = MyModule().eval().cuda()
+    input = torch.randn((1, 3, 224, 224)).to("cuda")
+
+    trt_gm = torchtrt.compile(
+        model,
+        ir=ir,
+        inputs=[input],
+        min_block_size=1,
+        cache_built_engines=False,
+        reuse_cached_engines=False,
+    )
+    assertions.assertTrue(
+        isinstance(trt_gm, torch.fx.GraphModule),
+        msg=f"test_save_load_ts output type does not match with torch.fx.GraphModule",
+    )
+    outputs_trt = trt_gm(input)
+    # Save it as torchscript representation
+    torchtrt.save(
+        trt_gm,
+        ep_path,
+        output_format="exported_program",
+        inputs=[input],
+        extra_files={"metadata": "Saving with extra files"},
+    )
+
+    loaded_extra_files = {"metadata": None}
+    trt_ep_module = torchtrt.load(ep_path, extra_files=loaded_extra_files)
+    outputs_trt_deser = trt_ep_module.module()(input)
+
+    cos_sim = cosine_similarity(outputs_trt, outputs_trt_deser)
+    assertions.assertTrue(loaded_extra_files["metadata"] == "Saving with extra files")
+    assertions.assertTrue(
+        cos_sim > COSINE_THRESHOLD,
+        msg=f"test_save_load_ts TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
+    )
