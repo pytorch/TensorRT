@@ -779,7 +779,10 @@ def test_save_load_extra_files(ir, tmpdir):
     outputs_trt_deser = trt_ep_module.module()(input)
 
     cos_sim = cosine_similarity(outputs_trt, outputs_trt_deser)
-    assertions.assertTrue(loaded_extra_files["metadata"] == "Saving with extra files")
+    assertions.assertTrue(
+        loaded_extra_files["metadata"] == "Saving with extra files",
+        msg="Extra files not saved and loaded correctly",
+    )
     assertions.assertTrue(
         cos_sim > COSINE_THRESHOLD,
         msg=f"test_save_load_ts TRT outputs don't match with the original model. Cosine sim score: {cos_sim} Threshold: {COSINE_THRESHOLD}",
