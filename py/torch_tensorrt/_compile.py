@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import collections.abc
+import inspect
 import logging
 import platform
 import warnings
@@ -561,7 +562,9 @@ def load_cross_compiled_exported_program(file_path: str = "") -> Any:
     return dynamo_load_cross_compiled_exported_program(file_path)
 
 
-def load(file_path: str = "", extra_files: Optional[dict[str, Any]] = None) -> Any:
+def load(
+    file_path: str = "", extra_files: Optional[dict[str, Any]] = None, **kwargs: Any
+) -> Any:
     """
     Load either a Torchscript model or ExportedProgram.
 
@@ -582,7 +585,12 @@ def load(file_path: str = "", extra_files: Optional[dict[str, Any]] = None) -> A
     """
     try:
         logger.debug(f"Loading the provided file {file_path} using torch.jit.load()")
-        ts_module = torch.jit.load(file_path, extra_files=extra_files)
+        ts_module = function_overload_with_kwargs(
+            torch.jit.load,
+            file_path,
+            _extra_files=extra_files,
+            **kwargs,
+        )
         return ts_module
     except Exception:
         logger.info(
@@ -593,7 +601,12 @@ def load(file_path: str = "", extra_files: Optional[dict[str, Any]] = None) -> A
 
     try:
         logger.debug(f"Loading the provided file {file_path} using torch.export.load()")
-        exp_program = torch.export.load(file_path, extra_files=extra_files)
+        exp_program = function_overload_with_kwargs(
+            torch.export.load,
+            file_path,
+            extra_files=extra_files,
+            **kwargs,
+        )
         return exp_program
     except Exception:
         logger.info(
@@ -680,7 +693,13 @@ def save(
                 logger.warning(
                     "Provided model is a torch.jit.ScriptModule, inputs or arg_inputs is not necessary during save."
                 )
-            torch.jit.save(module, file_path, extra_files=extra_files)
+            function_overload_with_kwargs(
+                torch.jit.save,
+                module,
+                file_path,
+                _extra_files=extra_files,
+                **kwargs,
+            )
     elif module_type == _ModuleType.ep:
         if output_format == "torchscript":
             raise ValueError(
@@ -692,11 +711,13 @@ def save(
                     "Provided model is a torch.export.ExportedProgram, inputs or arg_inputs is not necessary during save, it uses the inputs or arg_inputs provided during export and compile"
                 )
             if output_format == "exported_program":
-                torch.export.save(
+                function_overload_with_kwargs(
+                    torch.export.save,
                     module,
                     file_path,
                     pickle_protocol=pickle_protocol,
                     extra_files=extra_files,
+                    **kwargs,
                 )
             elif output_format == "aot_inductor":
                 inductor_configs = {}
@@ -718,7 +739,13 @@ def save(
             module_ts = torch.jit.trace(
                 module, arg_inputs, example_kwarg_inputs=kwarg_inputs
             )
-            torch.jit.save(module_ts, file_path, extra_files=extra_files)
+            function_overload_with_kwargs(
+                torch.jit.save,
+                module_ts,
+                file_path,
+                _extra_files=extra_files,
+                **kwargs,
+            )
         else:
             if not retrace:
                 from torch_tensorrt.dynamo._exporter import export
@@ -729,11 +756,13 @@ def save(
                     )
                 exp_program = export(module)
                 if output_format == "exported_program":
-                    torch.export.save(
+                    function_overload_with_kwargs(
+                        torch.export.save,
                         exp_program,
                         file_path,
                         pickle_protocol=pickle_protocol,
                         extra_files=extra_files,
+                        **kwargs,
                     )
                 elif output_format == "aot_inductor":
                     inductor_configs = {}
@@ -762,11 +791,13 @@ def save(
                 )
 
                 if output_format == "exported_program":
-                    torch.export.save(
+                    function_overload_with_kwargs(
+                        torch.export.save,
                         exp_program,
                         file_path,
                         pickle_protocol=pickle_protocol,
                         extra_files=extra_files,
+                        **kwargs,
                     )
                 elif output_format == "aot_inductor":
                     inductor_configs = {}
@@ -782,3 +813,19 @@ def save(
                     raise RuntimeError(
                         "Attempted to serialize an exported program with an unsupported format. Exported programs support exported_program and aot_inductor"
                     )
+
+
+def function_overload_with_kwargs(
+    fn: Callable[..., Any], *args: Any, **kwargs: Any
+) -> Any:
+    fn_signature = inspect.signature(fn).parameters
+    fn_kwargs = {}
+    for k, v in kwargs.items():
+        if k in fn_signature:
+            fn_kwargs[k] = v
+        else:
+            logger.warning(
+                f"Keyword argument {k} is not a valid argument for {fn.__name__}"
+            )
+
+    return fn(*args, **fn_kwargs)
