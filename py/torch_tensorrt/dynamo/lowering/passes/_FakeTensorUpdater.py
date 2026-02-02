@@ -17,6 +17,12 @@ from torch.fx.experimental.symbolic_shapes import (
 )
 from torch.utils._ordered_set import OrderedSet
 
+# _generalized_scatter may not exist in all PyTorch versions
+try:
+    from torch._inductor.fx_passes.reinplace import _generalized_scatter
+except (ImportError, AttributeError):
+    _generalized_scatter = None
+
 
 # Adapted from torch._inductor.fx_utils.FakeTensorUpdater
 class FakeTensorUpdater:
@@ -159,8 +165,10 @@ class FakeTensorUpdater:
             return node.op == "call_function" and (
                 isinstance(node.target, torch._ops.OpOverload)
                 or node.target is operator.getitem
-                or node.target
-                is torch._inductor.fx_passes.reinplace._generalized_scatter
+                or (
+                    _generalized_scatter is not None
+                    and node.target is _generalized_scatter
+                )
             )
 
         to_process = OrderedSet[int]()
