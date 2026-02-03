@@ -149,18 +149,26 @@ void setup_input_tensors(
       TORCHTRT_CHECK(
           compiled_engine->exec_ctx->setInputShape(name.c_str(), dims), "Error while setting the input shape");
 
+      at::Tensor final_input;
       if (cudagraphs_enabled) {
         // If using CUDAGraphs copy formatted input to the corresponding persistent input buffer
         compiled_engine->input_buffers[i].copy_(formatted_inputs.back(), true);
-        TORCHTRT_CHECK(
-            compiled_engine->exec_ctx->setTensorAddress(name.c_str(), compiled_engine->input_buffers[i].data_ptr()),
-            "Error while setting the input tensor address for inputs");
+        final_input = compiled_engine->input_buffers[i];
       } else {
         // Otherwise use the formatted buffer directly
-        TORCHTRT_CHECK(
-            compiled_engine->exec_ctx->setTensorAddress(name.c_str(), formatted_inputs.back().data_ptr()),
-            "Error while setting the input tensor address for inputs");
+        final_input = formatted_inputs.back();
       }
+
+      // Get tensor address, using placeholder for empty tensors
+      // TensorRT requires non-null address even if numel() = 0
+      // empty_tensor_placeholder is pre-allocated in TRTEngine constructor
+      void* input_addr = (final_input.numel() == 0 || final_input.data_ptr() == nullptr)
+          ? compiled_engine->empty_tensor_placeholder
+          : final_input.data_ptr();
+
+      TORCHTRT_CHECK(
+          compiled_engine->exec_ctx->setTensorAddress(name.c_str(), input_addr),
+          "Failed to bind tensor address for " << name);
     }
   }
 }
@@ -201,6 +209,12 @@ void create_output_allocator(c10::intrusive_ptr<TRTEngine> compiled_engine) {
 }
 
 std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intrusive_ptr<TRTEngine> compiled_engine) {
+  torch::Tensor dynamic_workspace;
+  if (compiled_engine->resource_allocation_strategy == TRTEngine::ResourceAllocationStrategy::kDynamic) {
+    dynamic_workspace = torch::empty(compiled_engine->cuda_engine->getDeviceMemorySizeV2(), {torch::kCUDA});
+    compiled_engine->exec_ctx->setDeviceMemory(dynamic_workspace.data_ptr());
+  }
+
   auto run_standard_execution = [&]() {
     bool cudagraphs_enabled = (CUDAGRAPHS_MODE == SUBGRAPH_CUDAGRAPHS);
     bool shape_changed = _validate_shapes(inputs, compiled_engine);
