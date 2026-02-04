@@ -43,6 +43,7 @@ from torch_tensorrt.dynamo.lowering import (
 from torch_tensorrt.dynamo.partitioning._resource_partitioner import (
     resource_partition,
 )
+from torch_tensorrt.dynamo.runtime._stream_handler import handle_cuda_stream
 from torch_tensorrt.dynamo.utils import (
     deallocate_module,
     get_cpu_memory_usage,
@@ -786,7 +787,11 @@ def compile(
                 "Remaining GPU memory may not be enough to compile the TensorRT engine for this model resulting in an OOM error, Consider setting offload_module_to_cpu=True"
             )
     trt_gm = compile_module(
-        gm, trt_arg_inputs, trt_kwarg_inputs, settings, engine_cache
+        gm,
+        exported_program.example_inputs[0],
+        exported_program.example_inputs[1],
+        settings,
+        engine_cache,
     )
     return trt_gm
 
@@ -794,7 +799,7 @@ def compile(
 @fn_supports_debugger  # type: ignore[misc]
 def compile_module(
     gm: torch.fx.GraphModule,
-    sample_arg_inputs: Sequence[Input],
+    sample_arg_inputs: tuple[Any, ...],
     sample_kwarg_inputs: Optional[dict[Any, Any]] = None,
     settings: CompilationSettings = CompilationSettings(),
     engine_cache: Optional[BaseEngineCache] = None,
@@ -1097,6 +1102,8 @@ def compile_module(
                 if "_run_on_acc" not in str(target):
                     continue
                 getattr(partitioned_module, target).set_output_tensors_as_unowned(True)
+
+        handle_cuda_stream(partitioned_module, sample_arg_inputs, sample_kwarg_inputs)
 
     # Reset settings object to user specification after fallback to global partitioning mode
     if fast_partitioner_failed:

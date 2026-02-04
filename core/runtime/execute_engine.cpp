@@ -293,25 +293,15 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
       current_device_id = outputs[0].device().index(); // Done this way to avoid a call to cudart
     }
 
-    compiled_engine->caller_stream = c10::cuda::getCurrentCUDAStream(current_device_id);
-    if (compiled_engine->engine_stream == c10::cuda::getDefaultCUDAStream(current_device_id)) {
-      // Create a new stream if the engine stream is the default stream
-      compiled_engine->engine_stream = c10::cuda::getStreamFromPool(false, current_device_id);
-    }
+    compiled_engine->engine_stream = c10::cuda::getCurrentCUDAStream(current_device_id);
 
     { // Engine Execution (execute on engine stream)
-      c10::cuda::CUDAStreamGuard stream_guard(compiled_engine->engine_stream);
 
       std::unique_ptr<torch::autograd::profiler::RecordProfile> enqueue_profiler_guard;
       if (compiled_engine->profile_execution) {
         enqueue_profiler_guard =
             std::make_unique<torch::autograd::profiler::RecordProfile>(compiled_engine->enqueue_profile_path);
       }
-
-      // Block engine stream until results are available on caller stream
-      at::cuda::CUDAEvent caller_exec_complete;
-      caller_exec_complete.record(compiled_engine->caller_stream);
-      caller_exec_complete.block(compiled_engine->engine_stream);
 
       if (!cudagraphs_enabled) {
         // Direct execution uses the caller buffers directly
@@ -341,11 +331,6 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
          shape_changed)) {
       compiled_engine->pre_allocated_outputs = create_output_tensors(compiled_engine);
     }
-
-    // Block caller stream until engine execution is complete
-    at::cuda::CUDAEvent trt_exec_complete;
-    trt_exec_complete.record(compiled_engine->engine_stream);
-    trt_exec_complete.block(compiled_engine->caller_stream);
 
     if (cudagraphs_enabled) {
       // If in CUDAGraph mode, results need to be copied to the result buffers (on caller stream)

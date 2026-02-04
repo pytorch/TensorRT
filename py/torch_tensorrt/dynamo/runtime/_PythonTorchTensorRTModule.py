@@ -172,8 +172,6 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         self._input_buffers: List[torch.Tensor] = []
         self._output_buffers: List[torch.Tensor] = []
         self.cudagraph: Optional[torch.cuda.CUDAGraph] = None
-        self._caller_stream: Optional[torch.cuda.Stream] = None
-        self._engine_stream: Optional[torch.cuda.Stream] = None
 
         # TODO: Make the below a Dictionary {shape: cudagraph}
         self.shape_key: Optional[str] = None
@@ -544,41 +542,31 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                 if self.profiling_enabled
                 else nullcontext()
             ):
-                self._caller_stream = torch.cuda.current_stream()
-                if (
-                    self._engine_stream == torch.cuda.default_stream()
-                    or self._engine_stream is None
-                ):
-                    self._engine_stream = torch.cuda.Stream()
 
-                self._engine_stream.wait_stream(self._caller_stream)
+                if self.cudagraphs_enabled:
+                    if need_cudagraphs_record:
+                        self.cudagraph = torch.cuda.CUDAGraph()
 
-                with torch.cuda.stream(self._engine_stream):
-                    if self.cudagraphs_enabled:
-                        if need_cudagraphs_record:
-                            self.cudagraph = torch.cuda.CUDAGraph()
+                        if self.profiling_enabled:
+                            self.cudagraph.enable_debug_mode()
 
-                            if self.profiling_enabled:
-                                self.cudagraph.enable_debug_mode()
+                        with torch.cuda.graph(
+                            self.cudagraph, stream=torch.cuda.current_stream()
+                        ):
+                            self.context.execute_async_v3(
+                                torch.cuda.current_stream().cuda_stream
+                            )
 
-                            with torch.cuda.graph(
-                                self.cudagraph, stream=self._engine_stream
-                            ):
-                                self.context.execute_async_v3(
-                                    self._engine_stream.cuda_stream
-                                )
+                        if self.profiling_enabled:
+                            self.cudagraph.debug_dump(
+                                f"{DEBUG_LOGGING_DIR}/{self.name}_cudagraph.dot"
+                            )
+                    self.cudagraph.replay()  # type: ignore
 
-                            if self.profiling_enabled:
-                                self.cudagraph.debug_dump(
-                                    f"{DEBUG_LOGGING_DIR}/{self.name}_cudagraph.dot"
-                                )
-
-                        self.cudagraph.replay()  # type: ignore
-
-                    else:
-                        self.context.execute_async_v3(self._engine_stream.cuda_stream)
-
-                self._caller_stream.wait_stream(self._engine_stream)
+                else:
+                    self.context.execute_async_v3(
+                        torch.cuda.current_stream().cuda_stream
+                    )
 
             # When the pre-allocated output mode is turned on, for intermediate modules, we only create the output in the first execution or when shape is changed.
             if self.use_pre_allocated_outputs and (
@@ -638,21 +626,10 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
                 if self.profiling_enabled
                 else nullcontext()
             ):
-                self._caller_stream = torch.cuda.current_stream()
-                if (
-                    self._engine_stream == torch.cuda.default_stream()
-                    or self._engine_stream is None
-                ):
-                    self._engine_stream = torch.cuda.Stream()
 
-                self._engine_stream.wait_stream(self._caller_stream)
-
-                with torch.cuda.stream(self._engine_stream):
-                    self.context.execute_async_v3(
-                        self._engine_stream.cuda_stream
-                    )  # The OutputAllocator is called by execute_async_v3()
-
-                self._caller_stream.wait_stream(self._engine_stream)
+                self.context.execute_async_v3(
+                    torch.cuda.current_stream().cuda_stream
+                )  # The OutputAllocator is called by execute_async_v3()
 
             with (
                 torch.autograd.profiler.record_function(
