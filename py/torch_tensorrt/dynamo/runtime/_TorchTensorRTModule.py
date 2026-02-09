@@ -15,7 +15,7 @@ from torch_tensorrt._features import (
     needs_torch_tensorrt_runtime,
 )
 from torch_tensorrt.dynamo._settings import CompilationSettings
-
+import tensorrt
 logger = logging.getLogger(__name__)
 
 SerializedTensorRTEngineFmt = List[
@@ -138,6 +138,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         self.weight_name_map = weight_name_map
         self.serialized_engine = serialized_engine
         self.engine = None
+        self.context = None
         self.requires_output_allocator = requires_output_allocator
 
         if (
@@ -224,6 +225,12 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         if self.engine is not None:
             return
         self.engine = torch.classes.tensorrt.Engine(self._pack_engine_info())
+        if ENABLED_FEATURES.tensorrt_rtx:
+            runtime_config = self.engine.create_runtime_config()
+            runtime_config.set_execution_context_allocation_strategy(tensorrt.ExecutionContextAllocationStrategy.STATIC)
+            runtime_cache = runtime_config.create_runtime_cache()
+            runtime_config.set_runtime_cache(runtime_cache)
+            self.context =self.engine.create_execution_context(runtime_config)
 
     def encode_metadata(self, metadata: Any) -> str:
         metadata = copy.deepcopy(metadata)
