@@ -729,7 +729,7 @@ def check_output_equal(
         if len(output1) != len(output2):
             return False
         for a, b in zip(output1, output2):
-            if not check_output_equal(a, b):
+            if not check_output_equal(a, b, rtol, atol):
                 return False
             return True
 
@@ -737,7 +737,7 @@ def check_output_equal(
         if output1.keys() != output2.keys():
             return False
         for a, b in zip(output1.values(), output2.values()):
-            if not check_output_equal(a, b):
+            if not check_output_equal(a, b, rtol, atol):
                 return False
         return True
 
