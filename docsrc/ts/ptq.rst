@@ -3,6 +3,9 @@
 Post Training Quantization (PTQ)
 =================================
 
+.. warning::
+    This guide describes the legacy PTQ workflow for the TorchScript frontend. **For new projects, use the TensorRT Model Optimizer (modelopt) with the Dynamo frontend instead.** See :ref:`vgg16_ptq` for the recommended approach.
+
 Post Training Quantization (PTQ) is a technique to reduce the required computational resources for inference
 while still preserving the accuracy of your model by mapping the traditional FP32 activation space to a reduced
 INT8 space. TensorRT uses a calibration step which executes your model with sample data from the target domain
