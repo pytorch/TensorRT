@@ -2,6 +2,7 @@ from typing import List, Optional, Sequence, Union
 
 import numpy as np
 import tensorrt as trt
+from tensorrt import ITensor as TRTTensor
 import torch
 from torch.fx.node import Target
 
@@ -17,7 +18,7 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
 
 
 def _lc_input_dtype(
-    tensors: Sequence[trt.ITensor],
+    tensors: Sequence[TRTTensor],
     cast_dtype: Optional[Union[_enums.dtype, trt.DataType, np.dtype]] = None,
 ) -> Optional[trt.DataType]:
     if cast_dtype is not None:
@@ -50,10 +51,10 @@ def cat_itensors(
     ctx: ConversionContext,
     target: Target,
     name: str,
-    tensors: Sequence[trt.ITensor],
+    tensors: Sequence[TRTTensor],
     dim: int,
     cast_dtype: Optional[Union[_enums.dtype, trt.DataType, np.dtype]] = None,
-) -> trt.ITensor:
+) -> TRTTensor:
     common_dtype = _lc_input_dtype(tensors, cast_dtype)
     if common_dtype is not None:
         tensors = [
@@ -73,10 +74,10 @@ def cat(
     target: Target,
     source_ir: Optional[SourceIR],
     name: str,
-    input: Sequence[Union[trt.ITensor, torch.Tensor, np.ndarray]],
+    input: Sequence[Union[TRTTensor, torch.Tensor, np.ndarray]],
     dim: int,
     cast_dtype: Optional[Union[_enums.dtype, trt.DataType, np.dtype]] = None,
-) -> trt.ITensor:
+) -> TRTTensor:
     if len(input) > 0 and hasattr(input[0], "shape"):
         dim = get_positive_dim(dim, len(input[0].shape))
 
@@ -93,10 +94,10 @@ def _convert_to_shape_tensor(
     ctx: ConversionContext,
     target: Target,
     name: str,
-    value: Union[torch.Tensor, np.ndarray, trt.ITensor, int, float],
+    value: Union[torch.Tensor, np.ndarray, TRTTensor, int, float],
     index: int,
-) -> trt.ITensor:
-    if isinstance(value, trt.ITensor):
+) -> TRTTensor:
+    if isinstance(value, TRTTensor):
         return value
 
     # Convert to int32 for shape operations (shapes must be integers)
@@ -122,11 +123,11 @@ def unify_and_concat_trt_tensors(
     ctx: ConversionContext,
     target: Target,
     name: str,
-    inputs: Sequence[Union[int, np.ndarray, torch.Tensor, trt.ITensor]],
+    inputs: Sequence[Union[int, np.ndarray, torch.Tensor, TRTTensor]],
     concat_axis: int,
     cast_dtype: Optional[Union[_enums.dtype, trt.DataType, np.dtype]] = None,
     force_trt_output: bool = False,
-) -> Union[trt.ITensor, List[int]]:
+) -> Union[TRTTensor, List[int]]:
     all_ints = all(isinstance(x, int) for x in inputs)
     if all_ints and not force_trt_output:
         return list(inputs)
