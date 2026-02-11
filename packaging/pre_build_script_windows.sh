@@ -35,11 +35,12 @@ unzip fmt.zip
 cp -r fmt-12.0.0/include/fmt/ $TORCH_INSTALL_PATH/include/
 ls -lart $TORCH_INSTALL_PATH/include/fmt/
 
-# CU_UPPERBOUND eg:13.0 or 12.9
+# CU_UPPERBOUND eg:13.1 or 12.9
+
 # tensorrt tar for linux and windows are different across cuda version
 # for sbsa it is the same tar across cuda version
 if [[ ${CU_VERSION:2:2} == "13" ]]; then
-    export CU_UPPERBOUND="13.0"
+    export CU_UPPERBOUND="13.1"
 else
     export CU_UPPERBOUND="12.9"
 fi
