@@ -4,7 +4,7 @@ import base64
 import copy
 import logging
 import pickle
-from typing import Any, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import torch
 from torch_tensorrt._Device import Device
@@ -87,6 +87,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         settings: CompilationSettings = CompilationSettings(),  # Assumes engine was built with default compilation settings if object not passed
         weight_name_map: Optional[dict[Any, Any]] = None,
         requires_output_allocator: bool = False,
+        symbolic_shape_expressions: Optional[Dict[str, List[Dict[str, Any]]]] = None,
     ):
         """Takes a name, target device, serialized TensorRT engine, and binding names / order and constructs
         a PyTorch ``torch.nn.Module`` around it. Uses the Torch-TensorRT runtime extension to run the engines
@@ -106,6 +107,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
             settings (torch_tensorrt.dynamo.CompilationSettings): Settings used to compile engine, assumes engine was built with default compilation settings if object not passed
             weight_name_map (dict): Mapping of engine weight name to state_dict weight name
             requires_output_allocator (bool): Boolean flag indicating if the converter creates operators which require an Output Allocator to run (e.g. data dependent operators)
+            symbolic_shape_expressions (List[Any]): List of symbolic shape expressions for each input binding
 
         Example:
 
@@ -143,6 +145,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         self.engine = None
         self.requires_output_allocator = requires_output_allocator
         self.dynamically_allocate_resources = settings.dynamically_allocate_resources
+        self.symbolic_shape_expressions = symbolic_shape_expressions
 
         if (
             serialized_engine
@@ -160,6 +163,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         metadata = {
             "settings": self.settings,
             "weight_name_map": self.weight_name_map,
+            "inout_symexprs": self.symbolic_shape_expressions,
             "output_tensors_are_unowned": (
                 False
                 if self.engine is None
@@ -308,6 +312,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
             self.settings = metadata["settings"]
             self.weight_name_map = metadata["weight_name_map"]
             self.output_tensors_are_unowned = metadata["output_tensors_are_unowned"]
+            self.symbolic_shape_expression = metadata["inout_symexprs"]
             self.engine.set_output_tensors_as_unowned(self.output_tensors_are_unowned)
 
         else:

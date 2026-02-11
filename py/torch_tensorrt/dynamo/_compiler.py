@@ -568,7 +568,7 @@ def compile(
 
     if not kwargs.get("use_explicit_typing", False):
         warnings.warn(
-            "`use_explicit_typing` is deprecated. This setting will be removed and you should enable autocast instead.",
+            "`use_explicit_typing` is deprecated. use_explicit_types is now on by default, this setting will be removed and you should enable autocast to recover weak typing behavior.",
             DeprecationWarning,
             stacklevel=2,
         )
@@ -1046,7 +1046,6 @@ def compile_module(
             trt_modules[name] = trt_module
 
             if _debugger_config:
-
                 if _debugger_config.save_engine_profile:
                     if settings.use_python_runtime:
                         if _debugger_config.profile_format != "cudagraph":
@@ -1433,6 +1432,9 @@ def convert_exported_program_to_serialized_trt_engine(
             logger.warning(
                 "Remaining GPU memory may not be enough to compile the TensorRT engine for this model resulting in an OOM error, Consider setting offload_module_to_cpu=True"
             )
+
+    if trt_kwarg_inputs is None:
+        trt_kwarg_inputs = {}
 
     flattened_input_list = get_flat_args_with_check(
         exported_program, list(trt_arg_inputs), trt_kwarg_inputs
