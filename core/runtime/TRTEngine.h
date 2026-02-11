@@ -158,6 +158,7 @@ struct TRTEngine : torch::CustomClassHolder {
   void set_profile_format(std::string profile_format);
   void disable_profiling();
   std::string get_engine_layer_info();
+  std::string get_serialized_metadata();
 
   void dump_engine_layer_info_to_file(const std::string& path);
   void dump_engine_layer_info();
