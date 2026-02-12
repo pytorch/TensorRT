@@ -444,56 +444,6 @@ wheels = [
 ]
 
 [[package]]
-name = "cuda-toolkit"
-version = "13.0.0"
-source = { registry = "https://download.pytorch.org/whl/nightly/cu130" }
-resolution-markers = [
-    "(python_full_version >= '3.13' and platform_machine != 'AMD64' and sys_platform == 'win32') or (python_full_version >= '3.14' and platform_machine == 'AMD64' and sys_platform == 'win32')",
-    "python_full_version == '3.13.*' and platform_machine == 'AMD64' and sys_platform == 'win32'",
-    "python_full_version == '3.12.*' and platform_machine != 'AMD64' and sys_platform == 'win32'",
-    "python_full_version == '3.12.*' and platform_machine == 'AMD64' and sys_platform == 'win32'",
-    "python_full_version == '3.11.*' and platform_machine != 'AMD64' and sys_platform == 'win32'",
-    "python_full_version == '3.11.*' and platform_machine == 'AMD64' and sys_platform == 'win32'",
-    "python_full_version < '3.11' and platform_machine != 'AMD64' and sys_platform == 'win32'",
-    "python_full_version < '3.11' and platform_machine == 'AMD64' and sys_platform == 'win32'",
-]
-wheels = [
-    { url = "https://pypi.nvidia.com/cuda-toolkit/cuda_toolkit-13.0.0-py2.py3-none-any.whl", hash = "sha256:1441a1b592da533644bf4aa6062cceb8842afc059235640610a11617d6b41134" },
-]
-
-[package.optional-dependencies]
-cudart = [
-    { name = "nvidia-cuda-runtime", version = "13.0.48", source = { registry = "https://download.pytorch.org/whl/nightly/cu130" }, marker = "sys_platform == 'win32'" },
-]
-
-[[package]]
-name = "cuda-toolkit"
-version = "13.0.2"
-source = { registry = "https://download.pytorch.org/whl/nightly/cu130" }
-resolution-markers = [
-    "(python_full_version >= '3.13' and platform_machine != 'aarch64' and platform_machine != 'x86_64' and sys_platform == 'linux') or (python_full_version >= '3.13' and platform_machine == 'aarch64' and platform_python_implementation != 'CPython' and sys_platform == 'linux') or (python_full_version >= '3.15' and platform_machine == 'aarch64' and platform_python_implementation == 'CPython' and sys_platform == 'linux') or (python_full_version >= '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux')",
-    "python_full_version == '3.13.*' and platform_machine == 'x86_64' and sys_platform == 'linux'",
-    "python_full_version >= '3.13' and python_full_version < '3.15' and platform_machine == 'aarch64' and platform_python_implementation == 'CPython' and sys_platform == 'linux'",
-    "(python_full_version == '3.12.*' and platform_machine != 'aarch64' and platform_machine != 'x86_64' and sys_platform == 'linux') or (python_full_version == '3.12.*' and platform_machine == 'aarch64' and platform_python_implementation != 'CPython' and sys_platform == 'linux')",
-    "python_full_version == '3.12.*' and platform_machine == 'x86_64' and sys_platform == 'linux'",
-    "python_full_version == '3.12.*' and platform_machine == 'aarch64' and platform_python_implementation == 'CPython' and sys_platform == 'linux'",
-    "(python_full_version == '3.11.*' and platform_machine != 'aarch64' and platform_machine != 'x86_64' and sys_platform == 'linux') or (python_full_version == '3.11.*' and platform_machine == 'aarch64' and platform_python_implementation != 'CPython' and sys_platform == 'linux')",
-    "python_full_version == '3.11.*' and platform_machine == 'x86_64' and sys_platform == 'linux'",
-    "python_full_version == '3.11.*' and platform_machine == 'aarch64' and platform_python_implementation == 'CPython' and sys_platform == 'linux'",
-    "(python_full_version < '3.11' and platform_machine != 'aarch64' and platform_machine != 'x86_64' and sys_platform == 'linux') or (python_full_version < '3.11' and platform_machine == 'aarch64' and platform_python_implementation != 'CPython' and sys_platform == 'linux')",
-    "python_full_version < '3.11' and platform_machine == 'x86_64' and sys_platform == 'linux'",
-    "python_full_version < '3.11' and platform_machine == 'aarch64' and platform_python_implementation == 'CPython' and sys_platform == 'linux'",
-]
-wheels = [
-    { url = "https://pypi.nvidia.com/cuda-toolkit/cuda_toolkit-13.0.2-py2.py3-none-any.whl", hash = "sha256:b198824cf2f54003f50d64ada3a0f184b42ca0846c1c94192fa269ecd97a66eb" },
-]
-
-[package.optional-dependencies]
-cudart = [
-    { name = "nvidia-cuda-runtime", version = "13.0.96", source = { registry = "https://download.pytorch.org/whl/nightly/cu130" }, marker = "sys_platform == 'linux'" },
-]
-
-[[package]]
 name = "cupy-cuda12x"
 version = "13.6.0"
 source = { registry = "https://download.pytorch.org/whl/nightly/cu130" }
@@ -1587,52 +1537,11 @@ wheels = [
 
 [[package]]
 name = "nvidia-cuda-runtime"
-version = "13.0.48"
-source = { registry = "https://download.pytorch.org/whl/nightly/cu130" }
-resolution-markers = [
-    "(python_full_version >= '3.13' and platform_machine != 'AMD64' and sys_platform == 'win32') or (python_full_version >= '3.14' and platform_machine == 'AMD64' and sys_platform == 'win32')",
-    "python_full_version == '3.13.*' and platform_machine == 'AMD64' and sys_platform == 'win32'",
-    "python_full_version == '3.12.*' and platform_machine != 'AMD64' and sys_platform == 'win32'",
-    "python_full_version == '3.12.*' and platform_machine == 'AMD64' and sys_platform == 'win32'",
-    "python_full_version == '3.11.*' and platform_machine != 'AMD64' and sys_platform == 'win32'",
-    "python_full_version == '3.11.*' and platform_machine == 'AMD64' and sys_platform == 'win32'",
-    "python_full_version < '3.11' and platform_machine != 'AMD64' and sys_platform == 'win32'",
-    "python_full_version < '3.11' and platform_machine == 'AMD64' and sys_platform == 'win32'",
-]
-wheels = [
-    { url = "https://pypi.nvidia.com/nvidia-cuda-runtime/nvidia_cuda_runtime-13.0.48-py3-none-win_amd64.whl", hash = "sha256:03e581c7584b13e42ce175c774f46e1219e9c574f27fe88c2ccc75dd3f926ed7" },
-]
-
-[[package]]
-name = "nvidia-cuda-runtime"
 version = "13.0.96"
 source = { registry = "https://download.pytorch.org/whl/nightly/cu130" }
-resolution-markers = [
-    "(python_full_version >= '3.13' and platform_machine != 'aarch64' and platform_machine != 'x86_64' and sys_platform == 'linux') or (python_full_version >= '3.13' and platform_machine == 'aarch64' and platform_python_implementation != 'CPython' and sys_platform == 'linux') or (python_full_version >= '3.15' and platform_machine == 'aarch64' and platform_python_implementation == 'CPython' and sys_platform == 'linux') or (python_full_version >= '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux')",
-    "python_full_version == '3.13.*' and platform_machine == 'x86_64' and sys_platform == 'linux'",
-    "python_full_version >= '3.13' and python_full_version < '3.15' and platform_machine == 'aarch64' and platform_python_implementation == 'CPython' and sys_platform == 'linux'",
-    "(python_full_version == '3.12.*' and platform_machine != 'aarch64' and platform_machine != 'x86_64' and sys_platform == 'linux') or (python_full_version == '3.12.*' and platform_machine == 'aarch64' and platform_python_implementation != 'CPython' and sys_platform == 'linux')",
-    "python_full_version == '3.12.*' and platform_machine == 'x86_64' and sys_platform == 'linux'",
-    "python_full_version == '3.12.*' and platform_machine == 'aarch64' and platform_python_implementation == 'CPython' and sys_platform == 'linux'",
-    "(python_full_version == '3.11.*' and platform_machine != 'aarch64' and platform_machine != 'x86_64' and sys_platform == 'linux') or (python_full_version == '3.11.*' and platform_machine == 'aarch64' and platform_python_implementation != 'CPython' and sys_platform == 'linux')",
-    "python_full_version == '3.11.*' and platform_machine == 'x86_64' and sys_platform == 'linux'",
-    "python_full_version == '3.11.*' and platform_machine == 'aarch64' and platform_python_implementation == 'CPython' and sys_platform == 'linux'",
-    "(python_full_version < '3.11' and platform_machine != 'aarch64' and platform_machine != 'x86_64' and sys_platform == 'linux') or (python_full_version < '3.11' and platform_machine == 'aarch64' and platform_python_implementation != 'CPython' and sys_platform == 'linux')",
-    "python_full_version < '3.11' and platform_machine == 'x86_64' and sys_platform == 'linux'",
-    "python_full_version < '3.11' and platform_machine == 'aarch64' and platform_python_implementation == 'CPython' and sys_platform == 'linux'",
-]
 wheels = [
     { url = "https://pypi.nvidia.com/nvidia-cuda-runtime/nvidia_cuda_runtime-13.0.96-py3-none-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:ef9bcbe90493a2b9d810e43d249adb3d02e98dd30200d86607d8d02687c43f55" },
     { url = "https://pypi.nvidia.com/nvidia-cuda-runtime/nvidia_cuda_runtime-13.0.96-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:7f82250d7782aa23b6cfe765ecc7db554bd3c2870c43f3d1821f1d18aebf0548" },
-]
-
-[[package]]
-name = "nvidia-cuda-runtime-cu13"
-version = "0.0.0a0"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/a1/ff/89721c396000eda3b8c701110b4efd43d0fa0679123101c7792b02b9e11b/nvidia_cuda_runtime_cu13-0.0.0a0.tar.gz", hash = "sha256:5b1e8d14c87a1d812af6c3eb58fce35f58b3db29cb4fa748480dad18a7b0eade", size = 491, upload-time = "2025-04-09T19:19:47.944Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/14/2f/c9c617f8556e3b6e8c24880d91b8e7a7b242f32b85cf23602b029d705c05/nvidia_cuda_runtime_cu13-0.0.0a0-py2.py3-none-any.whl", hash = "sha256:6e892fd541a03d75de4457a46a1064f587d8b71cd3765f27d9f6bc1979ad2c2b", size = 1165, upload-time = "2025-04-09T19:16:26.086Z" },
 ]
 
 [[package]]
@@ -2971,54 +2880,50 @@ wheels = [
 
 [[package]]
 name = "tensorrt"
-version = "10.14.1.48.post1"
+version = "10.15.1.29"
 source = { registry = "https://pypi.nvidia.com/" }
 dependencies = [
     { name = "tensorrt-cu13", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
 ]
-sdist = { url = "https://pypi.nvidia.com/tensorrt/tensorrt-10.14.1.48.post1.tar.gz", hash = "sha256:5aed87c541fcef881f874fb5724eadbe291851fe2152c962b9cba57cafd4872b" }
+sdist = { url = "https://pypi.nvidia.com/tensorrt/tensorrt-10.15.1.29.tar.gz", hash = "sha256:a78fb34aee9695b81a7485ac0648859b802ff1faaac4bde743d9c51d7493204b" }
 
 [[package]]
 name = "tensorrt-cu13"
-version = "10.14.1.48.post1"
+version = "10.15.1.29"
 source = { registry = "https://pypi.nvidia.com/" }
 dependencies = [
     { name = "tensorrt-cu13-bindings", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
     { name = "tensorrt-cu13-libs", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
 ]
-sdist = { url = "https://pypi.nvidia.com/tensorrt-cu13/tensorrt_cu13-10.14.1.48.post1.tar.gz", hash = "sha256:f667aee4b4b908520820b824ada7b7168f29e2659aacee2d5ae42139c6cb884e" }
+sdist = { url = "https://pypi.nvidia.com/tensorrt-cu13/tensorrt_cu13-10.15.1.29.tar.gz", hash = "sha256:60edcdf1a68526732ea613c309283af036f418f6ebcbc8e18d24566b74d776e0" }
 
 [[package]]
 name = "tensorrt-cu13-bindings"
-version = "10.14.1.48.post1"
+version = "10.15.1.29"
 source = { registry = "https://pypi.nvidia.com/" }
 wheels = [
-    { url = "https://pypi.nvidia.com/tensorrt-cu13-bindings/tensorrt_cu13_bindings-10.14.1.48.post1-cp310-none-manylinux_2_28_x86_64.whl", hash = "sha256:d8f13ac102187c4a45d11cc671f7f7e59a01ec4e4f1c707fb748d30042a49416" },
-    { url = "https://pypi.nvidia.com/tensorrt-cu13-bindings/tensorrt_cu13_bindings-10.14.1.48.post1-cp310-none-manylinux_2_35_aarch64.whl", hash = "sha256:35e34a14411a24fde813471e4ef1882615992ee1e093c5c254f4fca070b98973" },
-    { url = "https://pypi.nvidia.com/tensorrt-cu13-bindings/tensorrt_cu13_bindings-10.14.1.48.post1-cp310-none-win_amd64.whl", hash = "sha256:8f8ee0d11ee6c3f53d80c768dd9a18b75f7325babb3022b549236bb524fc807a" },
-    { url = "https://pypi.nvidia.com/tensorrt-cu13-bindings/tensorrt_cu13_bindings-10.14.1.48.post1-cp311-none-manylinux_2_28_x86_64.whl", hash = "sha256:30e220ec5cd049709270e9c835d2d69ae5b05d5c269fc067e27155d2b1ba8ff5" },
-    { url = "https://pypi.nvidia.com/tensorrt-cu13-bindings/tensorrt_cu13_bindings-10.14.1.48.post1-cp311-none-manylinux_2_35_aarch64.whl", hash = "sha256:31a6f3d8217fa52533aecbe15073114fa26c2f7835d8d3c8b5371b22899c912a" },
-    { url = "https://pypi.nvidia.com/tensorrt-cu13-bindings/tensorrt_cu13_bindings-10.14.1.48.post1-cp311-none-win_amd64.whl", hash = "sha256:83c58af9c32e527567cf4927957126a487d8b89604822c2be2522bf3e348228b" },
-    { url = "https://pypi.nvidia.com/tensorrt-cu13-bindings/tensorrt_cu13_bindings-10.14.1.48.post1-cp312-none-manylinux_2_28_x86_64.whl", hash = "sha256:1a098123ddf9e69629d66320666efbb2e237db76cd4faf715b7377471b9f4275" },
-    { url = "https://pypi.nvidia.com/tensorrt-cu13-bindings/tensorrt_cu13_bindings-10.14.1.48.post1-cp312-none-manylinux_2_35_aarch64.whl", hash = "sha256:e8db2ddd753097b23e13bd29b61e24431db0724f6f143e917ef107a4f58dff43" },
-    { url = "https://pypi.nvidia.com/tensorrt-cu13-bindings/tensorrt_cu13_bindings-10.14.1.48.post1-cp312-none-win_amd64.whl", hash = "sha256:c762c813bcaddf88e0aae43f8fad2b8637d1088818e9684de2f5e17f773592b5" },
-    { url = "https://pypi.nvidia.com/tensorrt-cu13-bindings/tensorrt_cu13_bindings-10.14.1.48.post1-cp313-none-manylinux_2_28_x86_64.whl", hash = "sha256:51928aa2c11c08d4aa5425c60c7d866c088cffccd0f20a4c8addca9de930c603" },
-    { url = "https://pypi.nvidia.com/tensorrt-cu13-bindings/tensorrt_cu13_bindings-10.14.1.48.post1-cp313-none-manylinux_2_35_aarch64.whl", hash = "sha256:4984a8f841843a3b23c743a24c5d517cf2e3b5eb0c7186bd96791f011fd1dab1" },
-    { url = "https://pypi.nvidia.com/tensorrt-cu13-bindings/tensorrt_cu13_bindings-10.14.1.48.post1-cp313-none-win_amd64.whl", hash = "sha256:dd8bc2507717a6894d5ef26a4acad003657f8c8781370f45c5be19623d5587ae" },
+    { url = "https://pypi.nvidia.com/tensorrt-cu13-bindings/tensorrt_cu13_bindings-10.15.1.29-cp310-none-manylinux_2_28_x86_64.whl", hash = "sha256:af6a18dfe937d801474dbcf4a511771dc83991be9b2b1ef1cf519b8b631def46" },
+    { url = "https://pypi.nvidia.com/tensorrt-cu13-bindings/tensorrt_cu13_bindings-10.15.1.29-cp310-none-manylinux_2_35_aarch64.whl", hash = "sha256:04f4db7e418c24d913bb5c21a745b066747d80ec8fabe0921b70a259af284b83" },
+    { url = "https://pypi.nvidia.com/tensorrt-cu13-bindings/tensorrt_cu13_bindings-10.15.1.29-cp310-none-win_amd64.whl", hash = "sha256:5942b7b1fff3a7c1079e13e861766e86bf28825263debfd53333fbde286d692e" },
+    { url = "https://pypi.nvidia.com/tensorrt-cu13-bindings/tensorrt_cu13_bindings-10.15.1.29-cp311-none-manylinux_2_28_x86_64.whl", hash = "sha256:54ce62c2489e1022d79113d2af0df516f4fac9b4e511be766b45bcfe2ee2acbb" },
+    { url = "https://pypi.nvidia.com/tensorrt-cu13-bindings/tensorrt_cu13_bindings-10.15.1.29-cp311-none-manylinux_2_35_aarch64.whl", hash = "sha256:4e80e6e1bee6e6437cf60496a18132a3853ea0d8c591bf2f9838df130fa93a68" },
+    { url = "https://pypi.nvidia.com/tensorrt-cu13-bindings/tensorrt_cu13_bindings-10.15.1.29-cp311-none-win_amd64.whl", hash = "sha256:99025fc7938e6da0102af53a1639e843f2343ca4e19f5c6436f3fcf7af2c118f" },
+    { url = "https://pypi.nvidia.com/tensorrt-cu13-bindings/tensorrt_cu13_bindings-10.15.1.29-cp312-none-manylinux_2_28_x86_64.whl", hash = "sha256:7c17a2d83de68bb13531989d5f2edf4c2a7e710e41e8b5652f0d170d2893b1bc" },
+    { url = "https://pypi.nvidia.com/tensorrt-cu13-bindings/tensorrt_cu13_bindings-10.15.1.29-cp312-none-manylinux_2_35_aarch64.whl", hash = "sha256:503a623a015cfce5bf00477162be2e872fdf2397acaf840f75c9dd22f41d6672" },
+    { url = "https://pypi.nvidia.com/tensorrt-cu13-bindings/tensorrt_cu13_bindings-10.15.1.29-cp312-none-win_amd64.whl", hash = "sha256:7d9b34ac53b480102ce1b55ce6103b961c96997f2254d0c718ea69959b4f2bb4" },
+    { url = "https://pypi.nvidia.com/tensorrt-cu13-bindings/tensorrt_cu13_bindings-10.15.1.29-cp313-none-manylinux_2_28_x86_64.whl", hash = "sha256:4a065bbdc7d4ebd6c7e0fe635b9a9ed2b6b6431ba4cba5aa7f00c2d3eceb1ab8" },
+    { url = "https://pypi.nvidia.com/tensorrt-cu13-bindings/tensorrt_cu13_bindings-10.15.1.29-cp313-none-manylinux_2_35_aarch64.whl", hash = "sha256:5372daece50818dca9805a26ea3384d1acc3b5a84720e739646869367bfff331" },
+    { url = "https://pypi.nvidia.com/tensorrt-cu13-bindings/tensorrt_cu13_bindings-10.15.1.29-cp313-none-win_amd64.whl", hash = "sha256:5debe9bad8ee38e5332692c7b44429cdaaec08fe7274f5b9d74c0cfa136e206c" },
 ]
 
 [[package]]
 name = "tensorrt-cu13-libs"
-version = "10.14.1.48.post1"
+version = "10.15.1.29"
 source = { registry = "https://pypi.nvidia.com/" }
-dependencies = [
-    { name = "cuda-toolkit", version = "13.0.0", source = { registry = "https://download.pytorch.org/whl/nightly/cu130" }, extra = ["cudart"], marker = "sys_platform == 'win32'" },
-    { name = "cuda-toolkit", version = "13.0.2", source = { registry = "https://download.pytorch.org/whl/nightly/cu130" }, extra = ["cudart"], marker = "sys_platform == 'linux'" },
-]
 wheels = [
-    { url = "https://pypi.nvidia.com/tensorrt-cu13-libs/tensorrt_cu13_libs-10.14.1.48.post1-py2.py3-none-manylinux_2_28_x86_64.whl", hash = "sha256:f55d59e9f93ebe0967c4bc108fb4068e74cdbc50bef3e6c9936e92f21cf11352" },
-    { url = "https://pypi.nvidia.com/tensorrt-cu13-libs/tensorrt_cu13_libs-10.14.1.48.post1-py2.py3-none-manylinux_2_35_aarch64.whl", hash = "sha256:9b4bda1d803abbc2d5ff5c441725408130063d4cca049b64de36022217890319" },
-    { url = "https://pypi.nvidia.com/tensorrt-cu13-libs/tensorrt_cu13_libs-10.14.1.48.post1-py2.py3-none-win_amd64.whl", hash = "sha256:e982f57e3b0663bcadcfa1d3c040417cc912e44d02e5c57eff5f619497928cac" },
+    { url = "https://pypi.nvidia.com/tensorrt-cu13-libs/tensorrt_cu13_libs-10.15.1.29-py2.py3-none-manylinux_2_28_x86_64.whl", hash = "sha256:0619b60ba97425909c18442eb36cbe7f99b1a7eeb4ebf9c6b278e6e2c5ac6c3b" },
+    { url = "https://pypi.nvidia.com/tensorrt-cu13-libs/tensorrt_cu13_libs-10.15.1.29-py2.py3-none-manylinux_2_35_aarch64.whl", hash = "sha256:f2f6fdaba477ef5536e9932d7f0ce2952ab3c87c5d0fbf93f080388390cba1de" },
+    { url = "https://pypi.nvidia.com/tensorrt-cu13-libs/tensorrt_cu13_libs-10.15.1.29-py2.py3-none-win_amd64.whl", hash = "sha256:930cf4917b7a3b8174400c1cf9a2d40f81f0c97a844077b18ed308930806373d" },
 ]
 
 [[package]]
@@ -3114,7 +3019,7 @@ dependencies = [
     { name = "nvidia-cublas", marker = "sys_platform == 'linux'" },
     { name = "nvidia-cuda-cupti", marker = "sys_platform == 'linux'" },
     { name = "nvidia-cuda-nvrtc", marker = "sys_platform == 'linux'" },
-    { name = "nvidia-cuda-runtime", version = "13.0.96", source = { registry = "https://download.pytorch.org/whl/nightly/cu130" }, marker = "sys_platform == 'linux'" },
+    { name = "nvidia-cuda-runtime", marker = "sys_platform == 'linux'" },
     { name = "nvidia-cudnn-cu13", marker = "sys_platform == 'linux'" },
     { name = "nvidia-cufft", marker = "sys_platform == 'linux'" },
     { name = "nvidia-cufile", marker = "sys_platform == 'linux'" },
@@ -3155,7 +3060,6 @@ dependencies = [
     { name = "dllist", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
     { name = "numpy", version = "2.2.6", source = { registry = "https://download.pytorch.org/whl/nightly/cu130" }, marker = "(python_full_version < '3.11' and sys_platform == 'linux') or (python_full_version < '3.11' and sys_platform == 'win32')" },
     { name = "numpy", version = "2.3.5", source = { registry = "https://download.pytorch.org/whl/nightly/cu130" }, marker = "(python_full_version >= '3.11' and sys_platform == 'linux') or (python_full_version >= '3.11' and sys_platform == 'win32')" },
-    { name = "nvidia-cuda-runtime-cu13", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
     { name = "packaging", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
     { name = "psutil", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
     { name = "tensorrt", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
@@ -3198,13 +3102,12 @@ test = [
 requires-dist = [
     { name = "dllist" },
     { name = "numpy" },
-    { name = "nvidia-cuda-runtime-cu13", specifier = "==0.0.0a0" },
     { name = "packaging", specifier = ">=23" },
     { name = "psutil" },
-    { name = "tensorrt", specifier = ">=10.14.1,<10.15.0" },
-    { name = "tensorrt-cu13", specifier = ">=10.14.1,!=10.14.1.48,<10.15.0" },
-    { name = "tensorrt-cu13-bindings", specifier = ">=10.14.1,!=10.14.1.48,<10.15.0" },
-    { name = "tensorrt-cu13-libs", specifier = ">=10.14.1,!=10.14.1.48,<10.15.0" },
+    { name = "tensorrt", specifier = ">=10.15.1,<10.16.0" },
+    { name = "tensorrt-cu13", specifier = ">=10.15.1,<10.16.0" },
+    { name = "tensorrt-cu13-bindings", specifier = ">=10.15.1,<10.16.0" },
+    { name = "tensorrt-cu13-libs", specifier = ">=10.15.1,<10.16.0" },
     { name = "torch", specifier = ">=2.11.0.dev0,<2.12.0", index = "https://download.pytorch.org/whl/nightly/cu130" },
     { name = "typing-extensions", specifier = ">=4.7.0" },
 ]
