@@ -600,7 +600,7 @@ def get_positive_dim(
 
     return (
         positive_dim(dim)
-        if isinstance(dim, int)
+        if isinstance(dim, (int, torch.SymInt))
         else tuple(positive_dim(d) for d in dim)
     )
 

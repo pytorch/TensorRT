@@ -424,7 +424,11 @@ def extract_var_range_info(symbolic_integer: torch.SymInt) -> Dict[str, int]:
         or expr.xreplace(shape_env.var_to_val)
     )
     assert var_range, var_val
-    min_val, max_val = int(var_range.lower), int(var_range.upper)
+    min_val = int(var_range.lower)
+    try:
+        max_val = int(var_range.upper)
+    except (TypeError, AttributeError, ValueError, OverflowError):
+        max_val = 2**31 - 1
     # Torchdynamo 0/1 specialization outlier
     min_val = 1 if min_val == 2 else min_val
     min_max_opt = {}
