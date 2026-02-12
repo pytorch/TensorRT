@@ -1,6 +1,7 @@
 import ctypes
 import importlib
 import importlib.util
+import importlib.metadata
 import logging
 import os
 import platform
@@ -142,14 +143,29 @@ def alias_tensorrt() -> None:
     if package_imported:
         return
 
-    # in order not to break or change the existing behavior, we only build and run with tensorrt by default, tensorrt-rtx is for experiment only
-    # if we want to test with tensorrt-rtx, we have to build the wheel with --use-rtx and test with USE_TRT_RTX=true
-    # eg: USE_TRT_RTX=true python test.py
-    # in future, we can do dynamic linking either to tensorrt or tensorrt-rtx based on the gpu type
+    # Determine if this installation is the RTX variant based on the installed wheel name.
+    # This checks which distribution provides the `torch_tensorrt` package:
+    # - 'torch-tensorrt-rtx' => use tensorrt_rtx
+    # - 'torch-tensorrt'     => use tensorrt
     use_rtx = False
-    if (use_rtx_env_var := os.environ.get("USE_TRT_RTX")) is not None:
-        if use_rtx_env_var.lower() == "true":
+    try:
+        pkg_map = importlib.metadata.packages_distributions()
+        dist_names = pkg_map.get("torch_tensorrt", []) or []
+        normalized = {name.replace("_", "-").lower() for name in dist_names}
+        if "torch-tensorrt-rtx" in normalized:
             use_rtx = True
+    except Exception:
+        # Best-effort fallback: prefer standard tensorrt unless only tensorrt_rtx is available
+        try:
+            importlib.import_module("tensorrt")
+            use_rtx = False
+        except Exception:
+            try:
+                importlib.import_module("tensorrt_rtx")
+                use_rtx = True
+            except Exception:
+                use_rtx = False
+
     package_name = "tensorrt_rtx" if use_rtx else "tensorrt"
 
     if not use_rtx:

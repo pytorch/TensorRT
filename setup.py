@@ -7,6 +7,7 @@ import re
 import subprocess
 import sys
 import warnings
+import atexit
 from dataclasses import dataclass
 from datetime import datetime
 from distutils.cmd import Command
@@ -138,6 +139,33 @@ if (use_rtx_env_var := os.environ.get("USE_TRT_RTX")) is not None:
     if use_rtx_env_var == "1" or use_rtx_env_var.lower() == "true":
         USE_TRT_RTX = True
 
+# Distribution name: keep import package as `torch_tensorrt`, but vary project
+# name so wheels for RTX vs standard TensorRT are distinct.
+PROJECT_NAME = "torch_tensorrt_rtx" if USE_TRT_RTX else "torch_tensorrt"
+#
+# Ensure METADATA Name matches RTX vs standard build even with static pyproject.
+# We temporarily rewrite [project].name in pyproject.toml for the current build.
+#
+_pyproject_path = get_root_dir() / "pyproject.toml"
+_pyproject_backup = None
+if USE_TRT_RTX:
+    try:
+        _pyproject_backup = _pyproject_path.read_text(encoding="utf-8")
+        updated = []
+        for line in _pyproject_backup.splitlines(keepends=True):
+            if line.strip().startswith("name = ") and '"torch_tensorrt"' in line:
+                updated.append('name = "torch-tensorrt-rtx"\n')
+            else:
+                updated.append(line)
+        _new_content = "".join(updated)
+        if _new_content != _pyproject_backup:
+            _pyproject_path.write_text(_new_content, encoding="utf-8")
+            atexit.register(
+                lambda: _pyproject_path.write_text(_pyproject_backup, encoding="utf-8")
+            )
+    except Exception:
+        # Non-fatal; filename will still distinguish variants.
+        pass
 if (release_env_var := os.environ.get("RELEASE")) is not None:
     if release_env_var == "1":
         RELEASE = True
@@ -340,6 +368,12 @@ class BdistCommand(bdist_wheel):
             self.root_is_pure = False
 
     def run(self):
+        # Ensure wheel metadata/project name reflects RTX vs standard build,
+        # even when pyproject.toml provides static [project].name.
+        try:
+            self.distribution.metadata.name = PROJECT_NAME
+        except Exception:
+            pass
         if not PY_ONLY:
             build_libtorchtrt_cxx11_abi(develop=False, rt_only=NO_TS)
             copy_libtorchtrt(rt_only=NO_TS)
@@ -806,7 +840,7 @@ def get_requirements():
 
 
 setup(
-    name="torch_tensorrt",
+    name=PROJECT_NAME,
     ext_modules=ext_modules,
     version=__version__,
     cmdclass={
