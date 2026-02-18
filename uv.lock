@@ -2867,6 +2867,54 @@ wheels = [
 ]
 
 [[package]]
+name = "tensorrt"
+version = "10.15.1.29"
+source = { registry = "https://pypi.nvidia.com/" }
+dependencies = [
+    { name = "tensorrt-cu13", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
+]
+sdist = { url = "https://pypi.nvidia.com/tensorrt/tensorrt-10.15.1.29.tar.gz", hash = "sha256:a78fb34aee9695b81a7485ac0648859b802ff1faaac4bde743d9c51d7493204b" }
+
+[[package]]
+name = "tensorrt-cu13"
+version = "10.15.1.29"
+source = { registry = "https://pypi.nvidia.com/" }
+dependencies = [
+    { name = "tensorrt-cu13-bindings", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
+    { name = "tensorrt-cu13-libs", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
+]
+sdist = { url = "https://pypi.nvidia.com/tensorrt-cu13/tensorrt_cu13-10.15.1.29.tar.gz", hash = "sha256:60edcdf1a68526732ea613c309283af036f418f6ebcbc8e18d24566b74d776e0" }
+
+[[package]]
+name = "tensorrt-cu13-bindings"
+version = "10.15.1.29"
+source = { registry = "https://pypi.nvidia.com/" }
+wheels = [
+    { url = "https://pypi.nvidia.com/tensorrt-cu13-bindings/tensorrt_cu13_bindings-10.15.1.29-cp310-none-manylinux_2_28_x86_64.whl", hash = "sha256:af6a18dfe937d801474dbcf4a511771dc83991be9b2b1ef1cf519b8b631def46" },
+    { url = "https://pypi.nvidia.com/tensorrt-cu13-bindings/tensorrt_cu13_bindings-10.15.1.29-cp310-none-manylinux_2_35_aarch64.whl", hash = "sha256:04f4db7e418c24d913bb5c21a745b066747d80ec8fabe0921b70a259af284b83" },
+    { url = "https://pypi.nvidia.com/tensorrt-cu13-bindings/tensorrt_cu13_bindings-10.15.1.29-cp310-none-win_amd64.whl", hash = "sha256:5942b7b1fff3a7c1079e13e861766e86bf28825263debfd53333fbde286d692e" },
+    { url = "https://pypi.nvidia.com/tensorrt-cu13-bindings/tensorrt_cu13_bindings-10.15.1.29-cp311-none-manylinux_2_28_x86_64.whl", hash = "sha256:54ce62c2489e1022d79113d2af0df516f4fac9b4e511be766b45bcfe2ee2acbb" },
+    { url = "https://pypi.nvidia.com/tensorrt-cu13-bindings/tensorrt_cu13_bindings-10.15.1.29-cp311-none-manylinux_2_35_aarch64.whl", hash = "sha256:4e80e6e1bee6e6437cf60496a18132a3853ea0d8c591bf2f9838df130fa93a68" },
+    { url = "https://pypi.nvidia.com/tensorrt-cu13-bindings/tensorrt_cu13_bindings-10.15.1.29-cp311-none-win_amd64.whl", hash = "sha256:99025fc7938e6da0102af53a1639e843f2343ca4e19f5c6436f3fcf7af2c118f" },
+    { url = "https://pypi.nvidia.com/tensorrt-cu13-bindings/tensorrt_cu13_bindings-10.15.1.29-cp312-none-manylinux_2_28_x86_64.whl", hash = "sha256:7c17a2d83de68bb13531989d5f2edf4c2a7e710e41e8b5652f0d170d2893b1bc" },
+    { url = "https://pypi.nvidia.com/tensorrt-cu13-bindings/tensorrt_cu13_bindings-10.15.1.29-cp312-none-manylinux_2_35_aarch64.whl", hash = "sha256:503a623a015cfce5bf00477162be2e872fdf2397acaf840f75c9dd22f41d6672" },
+    { url = "https://pypi.nvidia.com/tensorrt-cu13-bindings/tensorrt_cu13_bindings-10.15.1.29-cp312-none-win_amd64.whl", hash = "sha256:7d9b34ac53b480102ce1b55ce6103b961c96997f2254d0c718ea69959b4f2bb4" },
+    { url = "https://pypi.nvidia.com/tensorrt-cu13-bindings/tensorrt_cu13_bindings-10.15.1.29-cp313-none-manylinux_2_28_x86_64.whl", hash = "sha256:4a065bbdc7d4ebd6c7e0fe635b9a9ed2b6b6431ba4cba5aa7f00c2d3eceb1ab8" },
+    { url = "https://pypi.nvidia.com/tensorrt-cu13-bindings/tensorrt_cu13_bindings-10.15.1.29-cp313-none-manylinux_2_35_aarch64.whl", hash = "sha256:5372daece50818dca9805a26ea3384d1acc3b5a84720e739646869367bfff331" },
+    { url = "https://pypi.nvidia.com/tensorrt-cu13-bindings/tensorrt_cu13_bindings-10.15.1.29-cp313-none-win_amd64.whl", hash = "sha256:5debe9bad8ee38e5332692c7b44429cdaaec08fe7274f5b9d74c0cfa136e206c" },
+]
+
+[[package]]
+name = "tensorrt-cu13-libs"
+version = "10.15.1.29"
+source = { registry = "https://pypi.nvidia.com/" }
+wheels = [
+    { url = "https://pypi.nvidia.com/tensorrt-cu13-libs/tensorrt_cu13_libs-10.15.1.29-py2.py3-none-manylinux_2_28_x86_64.whl", hash = "sha256:0619b60ba97425909c18442eb36cbe7f99b1a7eeb4ebf9c6b278e6e2c5ac6c3b" },
+    { url = "https://pypi.nvidia.com/tensorrt-cu13-libs/tensorrt_cu13_libs-10.15.1.29-py2.py3-none-manylinux_2_35_aarch64.whl", hash = "sha256:f2f6fdaba477ef5536e9932d7f0ce2952ab3c87c5d0fbf93f080388390cba1de" },
+    { url = "https://pypi.nvidia.com/tensorrt-cu13-libs/tensorrt_cu13_libs-10.15.1.29-py2.py3-none-win_amd64.whl", hash = "sha256:930cf4917b7a3b8174400c1cf9a2d40f81f0c97a844077b18ed308930806373d" },
+]
+
+[[package]]
 name = "timm"
 version = "1.0.22"
 source = { registry = "https://pypi.org/simple" }
@@ -2996,6 +3044,19 @@ wheels = [
 [[package]]
 name = "torch-tensorrt"
 source = { editable = "." }
+dependencies = [
+    { name = "dllist", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
+    { name = "numpy", version = "2.2.6", source = { registry = "https://download.pytorch.org/whl/nightly/cu130" }, marker = "(python_full_version < '3.11' and sys_platform == 'linux') or (python_full_version < '3.11' and sys_platform == 'win32')" },
+    { name = "numpy", version = "2.3.5", source = { registry = "https://download.pytorch.org/whl/nightly/cu130" }, marker = "(python_full_version >= '3.11' and sys_platform == 'linux') or (python_full_version >= '3.11' and sys_platform == 'win32')" },
+    { name = "packaging", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
+    { name = "psutil", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
+    { name = "tensorrt", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
+    { name = "tensorrt-cu13", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
+    { name = "tensorrt-cu13-bindings", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
+    { name = "tensorrt-cu13-libs", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
+    { name = "torch", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
+    { name = "typing-extensions", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
+]
 
 [package.dev-dependencies]
 debug = [
@@ -3026,6 +3087,18 @@ test = [
 ]
 
 [package.metadata]
+requires-dist = [
+    { name = "dllist" },
+    { name = "numpy" },
+    { name = "packaging", specifier = ">=23" },
+    { name = "psutil" },
+    { name = "tensorrt", specifier = ">=10.15.1,<10.16.0" },
+    { name = "tensorrt-cu13", specifier = ">=10.15.1,<10.16.0" },
+    { name = "tensorrt-cu13-bindings", specifier = ">=10.15.1,<10.16.0" },
+    { name = "tensorrt-cu13-libs", specifier = ">=10.15.1,<10.16.0" },
+    { name = "torch", specifier = ">=2.11.0.dev0,<2.12.0", index = "https://download.pytorch.org/whl/nightly/cu130" },
+    { name = "typing-extensions", specifier = ">=4.7.0" },
+]
 
 [package.metadata.requires-dev]
 debug = [

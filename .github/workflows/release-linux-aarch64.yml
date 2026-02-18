@@ -1,6 +1,7 @@
 name: Release aarch64 Linux wheels and tarball artifacts
 
 on:
+  pull_request:
   push:
     tags:
       # NOTE: Binary build pipelines should only get triggered on release candidate builds
@@ -128,5 +129,5 @@ jobs:
       architecture: "aarch64"
 
 concurrency:
-  group: ${{ github.workflow }}-aarch64-${{ github.event.pull_request.number || github.ref_name }}-${{ inputs.repository }}-${{ github.event_name == 'workflow_dispatch' }}-${{ inputs.job-name }}
+  group: ${{ github.workflow }}-aarch64-release-${{ github.event.pull_request.number || github.ref_name }}-${{ inputs.repository }}-${{ github.event_name == 'workflow_dispatch' }}-${{ inputs.job-name }}
   cancel-in-progress: true
