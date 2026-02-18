@@ -21,6 +21,12 @@ pip uninstall -y torch torchvision
 pip install --force-reinstall --pre ${TORCHVISION} --index-url ${INDEX_URL} --extra-index-url https://pypi.org/simple
 pip install --force-reinstall --pre ${TORCH} --index-url ${INDEX_URL} --extra-index-url https://pypi.org/simple
 
+# If CUDA 13 (cu13), prepend venv's NVIDIA CUDA 13 libs to LD_LIBRARY_PATH
+if [[ "${CU_VERSION}" == cu13* ]]; then
+    SITE_PACKAGES="$(python -c 'import sysconfig; print(sysconfig.get_path("platlib"))')"
+    export LD_LIBRARY_PATH="${SITE_PACKAGES}/nvidia/cu13/lib${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
+fi
+
 if [[ ${USE_TRT_RTX} == true ]]; then
     source .github/scripts/install-tensorrt-rtx.sh
     # tensorrt-rtx is not publicly available, so we need to install the wheel from the tar ball
