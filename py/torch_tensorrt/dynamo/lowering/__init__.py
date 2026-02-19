@@ -5,3 +5,4 @@ from ._decomposition_groups import (
 )
 from ._decompositions import get_decompositions  # noqa: F401
 from .passes import *
+from torch_tensorrt.dynamo.lowering._SubgraphBuilder import SubgraphBuilder
