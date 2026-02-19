@@ -16,7 +16,7 @@ Usage
 -----
 .. code-block:: bash
 
-    mpirun -n 2 --allow-run-as-root python tensor_parallel_simple_example.py
+    USE_TRTLLM_PLUGINS=1 mpirun -n 2 --allow-run-as-root python tensor_parallel_simple_example.py
 """
 
 import time
@@ -25,21 +25,30 @@ import tensorrt as trt
 import torch
 import torch.distributed as dist
 import torch.nn as nn
-import torch_tensorrt
 from tensor_parallel_initialize_dist import (
     cleanup_distributed_env,
+    get_tensor_parallel_device_mesh,
     initialize_distributed_env,
+    initialize_distributed_logger,
 )
+
+if not dist.is_initialized():
+    initialize_distributed_env()
+import torch_tensorrt
 from torch.distributed._tensor import Shard
 from torch.distributed.tensor.parallel import (
     ColwiseParallel,
     RowwiseParallel,
     parallelize_module,
 )
-
-device_mesh, _world_size, _rank, logger = initialize_distributed_env(
-    "./tensor_parallel_simple_example"
+from torch_tensorrt.dynamo.distributed.utils import (
+    get_tensor_parallel_device_mesh,
+    initialize_distributed_logger,
 )
+
+device_mesh, _world_size, _rank = get_tensor_parallel_device_mesh()
+logger = initialize_distributed_logger(_rank, "tensor_parallel_simple_example")
+
 
 """
 This example takes some code from https://github.com/pytorch/examples/blob/main/distributed/tensor_parallelism/tensor_parallel_example.py
