@@ -45,6 +45,7 @@ from torch_tensorrt.dynamo.partitioning._resource_partitioner import (
     resource_partition,
 )
 from torch_tensorrt.dynamo.utils import (
+    COMPLEX_TO_REAL_DTYPE,
     deallocate_module,
     get_cpu_memory_usage,
     get_flat_args_with_check,
@@ -808,6 +809,104 @@ def compile(
     return trt_gm
 
 
+def _insert_complex_io_adapters(
+    partitioned_module: torch.fx.GraphModule,
+    gm: torch.fx.GraphModule,
+    settings: CompilationSettings,
+) -> None:
+    """Insert view_as_real / view_as_complex boundary nodes for complex I/O.
+
+    complex_graph_detection rewrites complex subgraphs to real arithmetic before
+    partitioning, but when a model has complex inputs or outputs the outer wrapper
+    graph still needs adapters at the TRT block boundary:
+
+      Inputs:  insert view_as_real (+ optional cast for complex128+truncate_double)
+               after each placeholder that was unpacked by the rewriter.
+      Outputs: insert view_as_complex before the output node for each originally-complex
+               output that comes from a TRT block.
+
+    Leverages metadata that was captued when the complex rewriter pass was run
+    """
+    complex_input_names = gm.meta.get("complex_input_names", [])
+    complex_input_dtypes = gm.meta.get("complex_input_dtypes", {})
+    complex_output_indices = gm.meta.get("complex_output_indices", [])
+
+    if not complex_input_names and not complex_output_indices:
+        return
+
+    graph_modified = False
+
+    # --- Input boundary: view_as_real for complex inputs ---
+    # complex_graph_detection renames complex placeholder 'foo' to 'foo_unpacked_complex'
+    # with float dtype. The outer graph still has 'foo_unpacked_complex' as a placeholder,
+    # but the caller passes the original complex tensor. Insert view_as_real after
+    # each such placeholder so the graph unpacks it transparently.
+    reshaped_names = {f"{n}_unpacked_complex" for n in complex_input_names}
+    for node in list(partitioned_module.graph.nodes):
+        if node.op != "placeholder" or node.name not in reshaped_names:
+            continue
+        with partitioned_module.graph.inserting_after(node):
+            real_node = partitioned_module.graph.call_function(
+                torch.ops.aten.view_as_real.default, args=(node,)
+            )
+        # For complex128 with truncate_double, the rewriter produced float32
+        # TRT engine inputs but view_as_real gives float64 — add an explicit cast.
+        orig_name = node.name[: -len("_unpacked_complex")]
+        orig_dtype = complex_input_dtypes.get(orig_name, None)
+
+        if orig_dtype == torch.complex128 and settings.truncate_double:
+            logger.info(
+                f"Input '{orig_name}' is complex128 with truncate_double=True: unpacked "
+                f"float64 components will be cast to float32."
+            )
+            with partitioned_module.graph.inserting_after(real_node):
+                cast_node = partitioned_module.graph.call_function(
+                    torch.ops.aten.to.dtype,
+                    args=(real_node, torch.float32),
+                )
+            node.replace_all_uses_with(cast_node)
+            cast_node.args = (real_node, torch.float32)
+            real_node.args = (node,)
+            logger.info(
+                f"Inserted view_as_real + cast-to-float32 for complex128 input placeholder '{node.name}' (truncate_double=True)"
+            )
+        else:
+            node.replace_all_uses_with(real_node)
+            # fix the self-reference created by replace_all_uses_with
+            real_node.args = (node,)
+            logger.info(
+                f"Inserted view_as_real for complex input placeholder '{node.name}'"
+            )
+        graph_modified = True
+
+    # --- Output boundary: view_as_complex for complex outputs from TRT blocks ---
+    if complex_output_indices:
+        output_node = list(partitioned_module.graph.nodes)[-1]
+        outputs = list(output_node.args[0])
+        for idx in complex_output_indices:
+            if idx >= len(outputs):
+                continue
+            src = outputs[idx]
+            if not isinstance(src, torch.fx.Node):
+                continue
+            if src.op == "call_module" and "_run_on_acc" in str(src.target):
+                with partitioned_module.graph.inserting_before(output_node):
+                    complex_node = partitioned_module.graph.call_function(
+                        torch.ops.aten.view_as_complex.default, args=(src,)
+                    )
+                logger.info(
+                    f"Inserted view_as_complex for complex output index {idx} "
+                    f"from TRT block '{src.target}'"
+                )
+                outputs[idx] = complex_node
+                graph_modified = True
+        output_node.args = (tuple(outputs),)
+
+    if graph_modified:
+        partitioned_module.graph.lint()
+        partitioned_module.recompile()
+
+
 @fn_supports_debugger  # type: ignore[misc]
 def compile_module(
     gm: torch.fx.GraphModule,
@@ -1058,7 +1157,7 @@ def compile_module(
 
             trt_modules[name] = trt_module
 
-
+            if _debugger_config:
                 if _debugger_config.save_engine_profile:
                     if settings.use_python_runtime:
                         if _debugger_config.profile_format != "cudagraph":
@@ -1103,6 +1202,10 @@ def compile_module(
         if settings.lazy_engine_init and not settings.enable_cross_compile_for_windows:
             trt_module = getattr(partitioned_module, name)
             trt_module.setup_engine()
+
+    # Post-partition complex I/O boundary pass — runs in both normal and dryrun mode
+    # so the wrapper graph reflects the exact graph that will be executed/built.
+    _insert_complex_io_adapters(partitioned_module, gm, settings)
 
     # Only set output tensors as unowned if not in dryrun mode (TRT modules exist)
     if not settings.dryrun:

@@ -98,6 +98,12 @@ if is_tensorrt_version_supported("7.0"):
     }
 
 
+COMPLEX_TO_REAL_DTYPE: Dict[torch.dtype, torch.dtype] = {
+    torch.complex64: torch.float32,
+    torch.complex128: torch.float64,
+}
+
+
 def unified_dtype_converter(
     dtype: Union[TRTDataType, torch.dtype, np.dtype], to: Frameworks
 ) -> Union[np.dtype, torch.dtype, TRTDataType]:
@@ -312,6 +318,20 @@ def prepare_inputs(
             return inputs
 
         elif isinstance(inputs, (torch.Tensor, int, float, bool)):
+            if isinstance(inputs, torch.Tensor) and inputs.is_complex():
+                # Complex tensors are lowered to real tensors with an extra last
+                # dimension of size 2 (real, imag) by complex_graph_detection.
+                # Build an Input whose shape/dtype reflects the lowered representation
+                # while keeping the original complex tensor for tracing (torch.export
+                # needs the complex tensor to trace the model correctly).
+                real_view = torch.view_as_real(inputs.contiguous())
+                inp = Input.from_tensor(
+                    real_view, disable_memory_format_check=disable_memory_format_check
+                )
+                # Restore the original complex tensor so dynamo_trace can export
+                # the model with the correct input dtype.
+                inp.torch_tensor = inputs
+                return inp
             return Input.from_tensor(
                 torch.tensor(inputs),
                 disable_memory_format_check=disable_memory_format_check,
@@ -851,10 +871,13 @@ def get_output_dtypes(output: Any, truncate_double: bool = False) -> List[dtype]
         if "val" in output.meta:
             output_meta = output.meta["val"]
             if isinstance(output_meta, (FakeTensor, torch.Tensor)):
-                if truncate_double and output_meta.dtype == torch.float64:
+                out_dtype = output_meta.dtype
+                if out_dtype in COMPLEX_TO_REAL_DTYPE:
+                    out_dtype = COMPLEX_TO_REAL_DTYPE[out_dtype]
+                if truncate_double and out_dtype == torch.float64:
                     output_dtypes.append(dtype.float32)
                 else:
-                    output_dtypes.append(dtype._from(output_meta.dtype))
+                    output_dtypes.append(dtype._from(out_dtype))
             elif isinstance(output_meta, torch.SymInt):
                 output_dtypes.append(dtype.int64)
         elif "tensor_meta" in output.meta:

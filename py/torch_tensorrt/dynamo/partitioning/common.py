@@ -5,7 +5,11 @@ import torch
 from torch._subclasses.fake_tensor import FakeTensor
 from torch.fx.experimental.proxy_tensor import unset_fake_temporarily
 from torch_tensorrt._Input import Input
-from torch_tensorrt.dynamo.utils import contains_sym_int, extract_var_range_info
+from torch_tensorrt.dynamo.utils import (
+    COMPLEX_TO_REAL_DTYPE,
+    contains_sym_int,
+    extract_var_range_info,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -59,6 +63,17 @@ def get_input(
     """
     Based on type of dimensions in the input_shape, construct regular or dynamic shaped inputs
     """
+    if dtype in COMPLEX_TO_REAL_DTYPE:
+        real_dtype = COMPLEX_TO_REAL_DTYPE[dtype]
+        real_shape = torch.Size(list(input_shape) + [2])
+        logger.info(
+            f"Input '{name}' has complex dtype {dtype}. TensorRT does not support complex "
+            f"tensors natively; it will be implicitly unpacked to a real tensor of shape "
+            f"{real_shape} and dtype {real_dtype} (last dim = [real, imag])."
+        )
+        dtype = real_dtype
+        input_shape = real_shape
+
     if contains_sym_int(input_shape):
         return construct_dynamic_input(
             input_shape, dtype, name=name, is_shape_tensor=is_shape_tensor
