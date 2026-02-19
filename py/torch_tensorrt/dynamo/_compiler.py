@@ -10,6 +10,7 @@ from typing import Any, Collection, List, Optional, Sequence, Set, Tuple, Union
 import torch
 from torch.export import ExportedProgram
 from torch.fx.node import Target
+
 from torch_tensorrt._Device import Device
 from torch_tensorrt._enums import EngineCapability, dtype
 from torch_tensorrt._features import needs_cross_compile
@@ -383,6 +384,10 @@ def cross_compile_for_windows(
 
     # Move the weights in the state_dict to CPU
     if offload_module_to_cpu:
+        # NOTE: We only deallocate gm (the post-lowering graph) here.
+        # Calling exported_program.module() again would fail if post_lowering
+        # passes (e.g. static_cache_v2) added new graph inputs, because the
+        # ExportedProgram's example_inputs no longer match the modified signature.
         deallocate_module(gm)
         logger.info(
             "The PyTorch model was moved to the CPU to allocate all GPU memory to TensorRT. To retain the model on the GPU, set offload_module_to_cpu=False"
@@ -782,6 +787,10 @@ def compile(
 
     # Move the weights in the state_dict to CPU
     if offload_module_to_cpu:
+        # NOTE: We only deallocate gm (the post-lowering graph) here.
+        # Calling exported_program.module() again would fail if post_lowering
+        # passes (e.g. static_cache_v2) added new graph inputs, because the
+        # ExportedProgram's example_inputs no longer match the modified signature.
         deallocate_module(gm)
         logger.info(
             "The PyTorch model was moved to the CPU to allocate all GPU memory to TensorRT. To retain the model on the GPU, set offload_module_to_cpu=False"
@@ -1049,7 +1058,6 @@ def compile_module(
 
             trt_modules[name] = trt_module
 
-            if _debugger_config:
 
                 if _debugger_config.save_engine_profile:
                     if settings.use_python_runtime:
@@ -1427,6 +1435,10 @@ def convert_exported_program_to_serialized_trt_engine(
 
     # Move the weights in the state_dict to CPU
     if offload_module_to_cpu:
+        # NOTE: We only deallocate gm (the post-lowering graph) here.
+        # Calling exported_program.module() again would fail if post_lowering
+        # passes (e.g. static_cache_v2) added new graph inputs, because the
+        # ExportedProgram's example_inputs no longer match the modified signature.
         deallocate_module(exported_program.module())
         logger.info(
             "The PyTorch model was moved to the CPU to allocate all GPU memory to TensorRT. To retain the model on the GPU, set offload_module_to_cpu=False"

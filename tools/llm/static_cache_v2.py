@@ -110,9 +110,20 @@ def add_kv_cache_inputs(gm, fixed_kv: bool = True):
     else:
         max_seq_len = seq_len
 
-    from torch.fx.experimental.symbolic_shapes import ShapeEnv
+    # Use the existing fake_mode/shape_env from the graph so that the
+    # unbacked SymInts are registered in the same ShapeEnv used by the rest
+    # of the graph.  Creating a fresh ShapeEnv() here would cause KeyError
+    # when FakeTensorUpdater.incremental_update() tries to propagate metadata
+    # through slice nodes that use these SymInts.
+    from torch._export.utils import _detect_fake_mode_from_gm
 
-    shape_env = ShapeEnv()
+    fake_mode = _detect_fake_mode_from_gm(gm)
+    if fake_mode is not None and fake_mode.shape_env is not None:
+        shape_env = fake_mode.shape_env
+    else:
+        from torch.fx.experimental.symbolic_shapes import ShapeEnv
+        shape_env = ShapeEnv()
+
     # Create symbolic ints for start_idx and end_idx with range [0, seq_len] inclusive
     start_idx_unbacked_symint = shape_env.create_unbacked_symint()
     torch._check(start_idx_unbacked_symint >= 0)
