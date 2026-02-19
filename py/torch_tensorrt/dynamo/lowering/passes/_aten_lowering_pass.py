@@ -5,6 +5,7 @@ from typing import Any, Callable, Optional, Sequence, Union
 import torch
 from torch_tensorrt._utils import is_tegra_platform
 from torch_tensorrt.dynamo._settings import CompilationSettings
+from torch_tensorrt.dynamo.lowering.passes._FakeTensorUpdater import FakeTensorUpdater
 from torch_tensorrt.dynamo.lowering.passes.pass_utils import (
     trace_intermediate_node_outputs,
 )
@@ -129,7 +130,10 @@ def post_lowering(
     logging.debug(
         f"Invoking DynamoPassManager and applying lowering passes: {ATEN_POST_LOWERING_PASSES}"
     )
+    fake_tensor_updater = FakeTensorUpdater(gm.graph)
     gm = ATEN_POST_LOWERING_PASSES(gm, settings)
+    if (fake_mode := torch._export.utils._detect_fake_mode_from_gm(gm)) is not None:
+        fake_tensor_updater.incremental_update(fake_mode)
 
     return gm
 
