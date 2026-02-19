@@ -55,11 +55,14 @@ python run_vlm.py --model nvidia/Eagle2-2B --precision FP16 --num_tokens 128 --c
 - `--prompt`: Input prompt for generation.
 - `--image_path`: (Optional) Path to input image file for VLM models. If not provided, will use a sample image.
 - `--model_precision`: Precision of model weight/buffer (`FP16`, `BF16`, `FP32`).
-- `--quant_format`: (Optional) Quantization format (`fp8`, `nvfp4`) to apply.
+- `--quant_format`: (Optional) Quantization format (`int8`,  `fp8`, `nvfp4`) to apply.
+- `--quant_algo`: (Optional) Quantization algorithm (`max`, `smoothquant`), by default it is `max`.
+-  `--weight_only`: (Optional) weight only quantization flag, by default it is weight-and-activation quantization.
 - `--num_tokens`: Number of output tokens to generate.
 - `--cache`: KV cache type (`static_v1`, `static_v2`, or empty for no KV caching).
 - `--benchmark`: Enable benchmarking mode.
 - `--enable_pytorch_run`: Also run and compare PyTorch baseline.
+
 
 ### Quantization
 
@@ -74,6 +77,8 @@ If a model contains quantization configuration (detected automatically), the mod
 
 ```bash
 python run_llm.py --model nvidia/Llama-3.1-8B-Instruct-FP8 --prompt "What is parallel programming?" --model_precision FP16 --num_tokens 128
+python run_llm.py --model google/gemma-3-1b-it  --prompt "What is parallel programming?" --model_precision FP16 --quant_format int8 --quant_algo smoothquant --num_tokens 128
+python run_llm.py --model google/gemma-3-1b-it  --prompt "What is parallel programming?" --model_precision FP16 --quant_format int8 --weight-only --num_tokens 128
 ```
 
 **Expected output:**

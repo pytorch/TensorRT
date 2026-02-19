@@ -10,9 +10,12 @@ This script illustrates Torch-TensorRT workflow with dynamo backend on popular L
 import argparse
 import copy
 import json
+import logging
 import os
 import timeit
 from contextlib import nullcontext
+
+logger = logging.getLogger(__name__)
 
 # %%
 # Imports and Model Definition
@@ -22,6 +25,7 @@ import torch_tensorrt
 from modelopt.torch.quantization.utils import export_torch_mode
 from quantize_utils import (
     convert_linear_to_tensorrt_quantized,
+    load_int8_prequantized_model,
     load_quantization_config,
     quantize_model,
 )
@@ -55,32 +59,55 @@ def get_model(args):
         torch.nn.Module: The loaded and configured model ready for inference,
             moved to CUDA device with the specified precision
     """
-    with torch.no_grad():
-        model = (
-            AutoModelForCausalLM.from_pretrained(
-                args.model,
-                use_cache=False,
-                attn_implementation="sdpa",
-                ignore_mismatched_sizes=True,
-            )
-            .eval()
-            .cuda()
-        )
-        # register SDPA variant for the model
-        register_sdpa.enable_sdpa_converter(args.model, model.config)
+    # Expand user path (~) and check if it's a local directory
+    model_path = os.path.expanduser(args.model)
+    if os.path.isdir(model_path):
+        # Use local directory path
+        model_name_or_path = model_path
+    else:
+        # Use as Hugging Face repo ID
+        model_name_or_path = args.model
+    
+    # Check if this is a pre-quantized model before loading
+    hf_quant_config = load_quantization_config(model_name_or_path)
 
-    hf_quant_config = load_quantization_config(args.model)
+    with torch.no_grad():
+        # If it's a pre-quantized model, we need to load it differently
+        # because int8 weights can't be loaded directly by from_pretrained
+        is_int8_prequantized = False
+        if hf_quant_config is not None:
+            if hf_quant_config.get("quant_algo", None) in ["FP8", "NVFP4"]:
+                is_int8_prequantized = False
+            else:
+                is_int8_prequantized = True
+
+        if is_int8_prequantized:
+            # Load model structure first and and then dequantize the weights manually
+            model = load_int8_prequantized_model(
+                model_name_or_path, 
+                args.model_precision,
+                hf_quant_config,
+            )
+        else:
+            # Normal model loading
+            model = (
+                AutoModelForCausalLM.from_pretrained(
+                    model_name_or_path,
+                    use_cache=False,
+                    attn_implementation="sdpa",
+                    ignore_mismatched_sizes=True,
+                )
+                .eval()
+                .cuda()
+            )
+        
+        # register SDPA variant for the model
+        register_sdpa.enable_sdpa_converter(model_name_or_path, model.config)
+
     if hf_quant_config:
         model = convert_linear_to_tensorrt_quantized(
             model, args.model_precision, hf_quant_config
-        ).cuda()
-        print(
-            f"Model is {hf_quant_config['quant_algo']} pre-quantized hf model. Quantized linear layers are applied"
-        )
-        if args.quant_format:
-            raise RuntimeError(
-                f"Quantization cannot be applied for pre-quantized hf model"
-            )
+        ).to(DEVICE)
 
     if args.model_precision == "FP16":
         model = model.to(torch.float16)
@@ -260,15 +287,30 @@ if __name__ == "__main__":
     )
     arg_parser.add_argument(
         "--quant_format",
-        help=("Apply quantization format. Options: fp8, nvfp4 (default: None)"),
+        help=("Apply quantization format. Options: int8, fp8, nvfp4 (default: None)"),
         default=None,
+    )
+    arg_parser.add_argument(
+        "--quant_algo",
+        help=("Apply quantization algorithm: max, smoothquant (default: max)"),
+        default="max",
+    )
+    arg_parser.add_argument(
+        "--weight_only",
+        help=("Apply weight only quantization. True (default: False)"),
+       action="store_true",
     )
     args = arg_parser.parse_args()
 
     with torch.inference_mode():
         model = get_model(args)
 
-        tokenizer = AutoTokenizer.from_pretrained(args.tokenizer or args.model)
+        # Expand user path for tokenizer as well
+        tokenizer_path = args.tokenizer or args.model
+        tokenizer_path = os.path.expanduser(tokenizer_path)
+        if not os.path.isdir(tokenizer_path):
+            tokenizer_path = args.tokenizer or args.model
+        tokenizer = AutoTokenizer.from_pretrained(tokenizer_path)
         # Set pad token
         if tokenizer.pad_token is None:
             tokenizer.pad_token = tokenizer.eos_token
@@ -388,3 +430,5 @@ if __name__ == "__main__":
             print("===================== \n")
             print("=========TensorRT PERFORMANCE============ \n")
             print(trt_stats)
+
+# %%
