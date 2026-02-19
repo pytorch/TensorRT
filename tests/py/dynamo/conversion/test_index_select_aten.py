@@ -135,5 +135,114 @@ class TestIndexSelectConverter(DispatchTestCase):
                 )
 
 
+class TestIndexSelectInt64Converter(DispatchTestCase):
+    """Test cases for index_select with int64 indices.
+    TensorRT now supports int64 indices for gather operations.
+    https://docs.nvidia.com/deeplearning/tensorrt/latest/_static/c-api/classnvinfer1_1_1_i_gather_layer.html
+    """
+
+    @parameterized.expand(
+        [
+            ("1d_input_int64", (10,), 0, (1,)),
+            ("2d_input_dim_0_int64", (10, 3), 0, (0, 2)),
+            ("2d_input_dim_1_int64", (5, 10), 1, (1, 2, 3)),
+            ("3d_input_dim_0_int64", (10, 5, 10), 0, (0, 5)),
+            ("3d_input_dim_2_int64", (10, 5, 10), 2, (3, 3, 4)),
+            ("3d_input_dim_-1_int64", (10, 5, 10), -1, (3, 3, 4)),
+        ]
+    )
+    def test_index_select_int64(self, _, source_shape, dim, indices_val):
+        class TestIndexSelect(torch.nn.Module):
+            def forward(self, source_tensor, indices_tensor):
+                return torch.ops.aten.index_select.default(
+                    source_tensor, dim, indices_tensor
+                )
+
+        input = [
+            torch.randn(*source_shape, dtype=torch.float32),
+            torch.tensor([*indices_val], dtype=torch.int64),
+        ]
+
+        self.run_test(
+            TestIndexSelect(),
+            input,
+        )
+
+    @parameterized.expand(
+        [
+            param(
+                # 1d_source_tensor_int64_index
+                source_tensor=torch.randn((3,), dtype=torch.float32),
+                source_tensor_1=torch.randn((5,), dtype=torch.float32),
+                dynamic_shapes={
+                    "source_tensor": {0: torch.export.Dim("dyn_dim", min=3, max=6)},
+                    "indice_tensor": {},
+                },
+                dim=0,
+                indice_tensor=torch.tensor(
+                    [
+                        1,
+                    ],
+                    dtype=torch.int64,
+                ),
+            ),
+            param(
+                # 2d_source_tensor_int64_index
+                source_tensor=torch.randn((3, 3), dtype=torch.float32),
+                source_tensor_1=torch.randn((4, 6), dtype=torch.float32),
+                dynamic_shapes={
+                    "source_tensor": {
+                        0: torch.export.Dim("dyn_dim1", min=3, max=6),
+                        1: torch.export.Dim("dyn_dim2", min=2, max=7),
+                    },
+                    "indice_tensor": {},
+                },
+                dim=-1,
+                indice_tensor=torch.tensor([0, 2], dtype=torch.int64),
+            ),
+        ]
+    )
+    def test_index_select_int64_dynamic_shape(
+        self, source_tensor, source_tensor_1, dynamic_shapes, dim, indice_tensor
+    ):
+        class IndexSelect(torch.nn.Module):
+            def forward(self, source_tensor, indice_tensor):
+                return torch.ops.aten.index_select.default(
+                    source_tensor,
+                    dim,
+                    indice_tensor,
+                )
+
+        inputs = (source_tensor, indice_tensor)
+        mod = IndexSelect()
+
+        fx_mod = torch.export.export(mod, inputs, dynamic_shapes=dynamic_shapes)
+        trt_mod = torch_tensorrt.dynamo.compile(
+            fx_mod,
+            inputs=inputs,
+            enable_precisions=torch.float32,
+            min_block_size=1,
+            cache_built_engines=False,
+            reuse_cached_engines=False,
+        )
+        # use different shape of inputs for inference:
+        inputs = (source_tensor_1, indice_tensor)
+        with torch.no_grad():
+            cuda_inputs = []
+            for i in inputs:
+                cuda_inputs.append(i.cuda())
+            ref_outputs = mod(*cuda_inputs)
+            outputs = trt_mod(*cuda_inputs)
+            for out, ref in zip(outputs, ref_outputs):
+                torch.testing.assert_close(
+                    out,
+                    ref,
+                    rtol=RTOL,
+                    atol=ATOL,
+                    equal_nan=True,
+                    check_dtype=True,
+                )
+
+
 if __name__ == "__main__":
     run_tests()
