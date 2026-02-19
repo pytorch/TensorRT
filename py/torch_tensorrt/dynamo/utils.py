@@ -420,7 +420,7 @@ def extract_var_range_info(symbolic_integer: torch.SymInt) -> Dict[str, int]:
     var_range = shape_env.var_to_range.get(expr, None) or shape_env.bound_sympy(expr)
     var_val = (
         shape_env.var_to_val.get(expr, None)
-        or shape_env.unbacked_var_to_val.get(expr, None)
+        or shape_env.real_tensor_prop_unbacked_vals.get(expr, None)
         or expr.xreplace(shape_env.var_to_val)
     )
     assert var_range, var_val
