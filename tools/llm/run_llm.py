@@ -271,7 +271,7 @@ if __name__ == "__main__":
     arg_parser.add_argument(
         "--weight_only",
         help=("Apply weight only quantization. True (default: False)"),
-       action="store_true",
+        action="store_true",
     )
     args = arg_parser.parse_args()
 
