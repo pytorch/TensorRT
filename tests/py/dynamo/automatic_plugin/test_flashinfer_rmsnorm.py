@@ -11,32 +11,29 @@ from torch_tensorrt._enums import dtype
 
 from ..conversion.harness import DispatchTestCase
 
-if importlib.util.find_spec("flashinfer"):
+_flashinfer_available = importlib.util.find_spec("flashinfer") is not None
+
+if _flashinfer_available:
     import flashinfer
 
+    @torch.library.custom_op("flashinfer::rmsnorm", mutates_args=())  # type: ignore[misc]
+    def flashinfer_rmsnorm(
+        input: torch.Tensor, weight: torch.Tensor, eps: float = 1e-6
+    ) -> torch.Tensor:
+        return flashinfer.norm.rmsnorm(input, weight)
 
-@torch.library.custom_op("flashinfer::rmsnorm", mutates_args=())  # type: ignore[misc]
-def flashinfer_rmsnorm(
-    input: torch.Tensor, weight: torch.Tensor, eps: float = 1e-6
-) -> torch.Tensor:
-    return flashinfer.norm.rmsnorm(input, weight)
+    @torch.library.register_fake("flashinfer::rmsnorm")
+    def _(input: torch.Tensor, weight: torch.Tensor, b: float = 1e-6) -> torch.Tensor:
+        return input
 
-
-@torch.library.register_fake("flashinfer::rmsnorm")
-def _(input: torch.Tensor, weight: torch.Tensor, b: float = 1e-6) -> torch.Tensor:
-    return input
-
-
-if torch_tensorrt.ENABLED_FEATURES.qdp_plugin:
-    torch_tensorrt.dynamo.conversion.plugins.custom_op(
-        "flashinfer::rmsnorm", supports_dynamic_shapes=True
-    )
+    if torch_tensorrt.ENABLED_FEATURES.qdp_plugin:
+        torch_tensorrt.dynamo.conversion.plugins.custom_op(
+            "flashinfer::rmsnorm", supports_dynamic_shapes=True
+        )
 
 
-@unittest.skip("Not Available")
 @unittest.skipIf(
-    not importlib.util.find_spec("flashinfer")
-    or not torch_tensorrt.ENABLED_FEATURES.qdp_plugin,
+    not _flashinfer_available or not torch_tensorrt.ENABLED_FEATURES.qdp_plugin,
     "flashinfer not installed or QDP Plugin is not available",
 )
 class TestAutomaticPlugin(DispatchTestCase):
