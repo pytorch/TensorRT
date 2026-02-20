@@ -75,8 +75,14 @@ test = [
     "pytest-xdist",
     "parameterized>=0.2.0",
     "expecttest==0.1.6",
+]
+
+test-ext = [
     "timm>=1.0.3",
-    "transformers>=4.49.0",
+    "transformers>=4.53.1",
+    "torchvision>=0.26.0.dev,<0.27.0",
+    "flashinfer-python; python_version >'3.9' and python_version <'3.13'",
+    "nvidia-modelopt[all]>=0.27.1; python_version >'3.9' and python_version <'3.13'"
 ]
 
 quantization = ["nvidia-modelopt[all]>=0.27.1"]
@@ -90,6 +96,21 @@ Changelog = "https://github.com/pytorch/tensorrt/releases"
 [tool.setuptools]
 package-dir = { "" = "py" }
 include-package-data = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests/py"]
+norecursedirs = [
+    "bazel-*",
+    ".venv",
+    "__pycache__",
+    "*.egg-info",
+    "ts",
+    "distributed",
+    "examples",
+    "experiments",
+    "tools",
+    "modules",
+]
 
 [tool.uv]
 package = true

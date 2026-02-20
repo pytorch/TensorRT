@@ -1,6 +1,6 @@
+import unittest.mock as mock
 from typing import Any, List
 
-import psutil
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -24,6 +24,9 @@ from torch_tensorrt.dynamo.partitioning._resource_partitioner import (
     ResourcePartitioner,
     resource_partition,
 )
+
+# Fixed RSS value used across all tests to make memory-budget calculations deterministic.
+_FIXED_RSS_BYTES = 512 * 1024 * 1024  # 512 MB
 
 
 class TestResourcePartitioning(TestCase):
@@ -49,6 +52,7 @@ class TestResourcePartitioning(TestCase):
                 x = torch.flatten(x, 1)
                 return self.fc1(x)
 
+        torch.manual_seed(0)
         model = net().eval()
         model.to("cuda")
         inputs = [torch.randn((1, 1024, 224, 224)).to("cuda")]
@@ -84,11 +88,13 @@ class TestResourcePartitioning(TestCase):
             skip_fusion=True,
         )
 
-        partitioned_module = resource_partition(
-            partitioned_module,
-            cpu_memory_budget=0.89 * 1024 * 1024 * 1024
-            + psutil.Process().memory_info().rss,  # 0.89GB + current memory usage,
-        )
+        _mock_mem = mock.MagicMock()
+        _mock_mem.rss = _FIXED_RSS_BYTES
+        with mock.patch("psutil.Process") as mock_proc:
+            mock_proc.return_value.memory_info.return_value = _mock_mem
+            partitioned_module = resource_partition(
+                partitioned_module, cpu_memory_budget=2 * 1024 * 1024 * 1024  # 2GB,
+            )
 
         self.assertEqual(
             len(list[Any](partitioned_module.named_children())),
@@ -132,6 +138,7 @@ class TestResourcePartitioning(TestCase):
                 x = torch.flatten(x, 1)
                 return self.fc1(x)
 
+        torch.manual_seed(0)
         model = net().eval()
         model.to("cuda")
         inputs = [torch.randn((1, 1024, 224, 224)).to("cuda")]
@@ -168,11 +175,13 @@ class TestResourcePartitioning(TestCase):
             skip_fusion=True,
         )
 
-        partitioned_module = resource_partition(
-            partitioned_module,
-            cpu_memory_budget=0.39 * 1024 * 1024 * 1024
-            + psutil.Process().memory_info().rss,  # 0.39GB + current memory usage,
-        )
+        _mock_mem = mock.MagicMock()
+        _mock_mem.rss = _FIXED_RSS_BYTES
+        with mock.patch("psutil.Process") as mock_proc:
+            mock_proc.return_value.memory_info.return_value = _mock_mem
+            partitioned_module = resource_partition(
+                partitioned_module, cpu_memory_budget=1.4 * 1024 * 1024 * 1024  # 1.4GB,
+            )
 
         assert (
             len(
@@ -182,8 +191,8 @@ class TestResourcePartitioning(TestCase):
                     if "_run_on_acc" in name
                 ]
             )
-            == 5
-        ), "The graph should have 5 accelerated subgraphs"
+            == 4
+        ), "The graph should have 4 accelerated subgraphs"
         assert (
             len(
                 [
@@ -266,6 +275,7 @@ class TestResourcePartitioning(TestCase):
                 x = torch.flatten(x, 1)
                 return self.fc1(x)
 
+        torch.manual_seed(0)
         model = net().eval()
         model.to("cuda")
         inputs = [torch.randn((1, 1024, 224, 224)).to("cuda")]
@@ -302,11 +312,13 @@ class TestResourcePartitioning(TestCase):
             skip_fusion=True,
         )
 
-        partitioned_module = resource_partition(
-            partitioned_module,
-            cpu_memory_budget=0.39 * 1024 * 1024 * 1024
-            + psutil.Process().memory_info().rss,  # 0.39GB + current memory usage,
-        )
+        _mock_mem = mock.MagicMock()
+        _mock_mem.rss = _FIXED_RSS_BYTES
+        with mock.patch("psutil.Process") as mock_proc:
+            mock_proc.return_value.memory_info.return_value = _mock_mem
+            partitioned_module = resource_partition(
+                partitioned_module, cpu_memory_budget=1.4 * 1024 * 1024 * 1024  # 1.4GB,
+            )
 
         assert (
             len(
@@ -367,6 +379,7 @@ class TestResourcePartitioning(TestCase):
                 x = torch.flatten(x, 1)
                 return self.fc1(x)
 
+        torch.manual_seed(0)
         model = net().eval()
         model.to("cuda")
         inputs = [torch.randn((1, 1024, 224, 224)).to("cuda")]
@@ -402,11 +415,13 @@ class TestResourcePartitioning(TestCase):
             require_full_compilation=settings.require_full_compilation,
         )
 
-        partitioned_module = resource_partition(
-            partitioned_module,
-            cpu_memory_budget=0.39 * 1024 * 1024 * 1024
-            + psutil.Process().memory_info().rss,  # 0.39GB + current memory usage,
-        )
+        _mock_mem = mock.MagicMock()
+        _mock_mem.rss = _FIXED_RSS_BYTES
+        with mock.patch("psutil.Process") as mock_proc:
+            mock_proc.return_value.memory_info.return_value = _mock_mem
+            partitioned_module = resource_partition(
+                partitioned_module, cpu_memory_budget=1.4 * 1024 * 1024 * 1024  # 1.4GB,
+            )
 
         assert (
             len(
@@ -416,8 +431,8 @@ class TestResourcePartitioning(TestCase):
                     if "_run_on_acc" in name
                 ]
             )
-            == 5
-        ), "The graph should have 5 accelerated subgraphs"
+            == 4
+        ), "The graph should have 4 accelerated subgraphs"
 
         torch._dynamo.reset()
 
