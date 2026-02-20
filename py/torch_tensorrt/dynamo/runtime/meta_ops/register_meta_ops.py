@@ -89,9 +89,16 @@ def fake_tensorrt_execute_engine(
                     output_sym_int = ctx.new_dynamic_size(min=min_val, max=max_val)
                     # Update var to val (hint)
                     output_sym_int_shape_env = output_sym_int.node.shape_env
-                    output_sym_int_shape_env.set_unbacked_var_to_val(
-                        output_sym_int.node.expr, opt_val
+                    # PyTorch adb73cc: set_unbacked_var_to_val -> set_real_tensor_prop_unbacked_vals
+                    set_var_val = getattr(
+                        output_sym_int_shape_env,
+                        "set_real_tensor_prop_unbacked_vals",
+                        None,
+                    ) or getattr(
+                        output_sym_int_shape_env, "set_unbacked_var_to_val", None
                     )
+                    if set_var_val is not None:
+                        set_var_val(output_sym_int.node.expr, opt_val)
                     output_shape.append(output_sym_int)
                 else:
                     output_shape.append(min_val)
