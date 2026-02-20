@@ -408,9 +408,6 @@ def test_base_int8(ir, dtype):
     import modelopt.torch.quantization as mtq
     from modelopt.torch.quantization.utils import export_torch_mode
 
-    if torchtrt.ENABLED_FEATURES.tensorrt_rtx and dtype == torch.bfloat16:
-        pytest.skip("TensorRT-RTX does not support bfloat16")
-
     class SimpleNetwork(torch.nn.Module):
         def __init__(self):
             super(SimpleNetwork, self).__init__()
@@ -468,9 +465,6 @@ def test_base_int8(ir, dtype):
 def test_base_int8_dynamic_shape(ir, dtype):
     import modelopt.torch.quantization as mtq
     from modelopt.torch.quantization.utils import export_torch_mode
-
-    if torchtrt.ENABLED_FEATURES.tensorrt_rtx and dtype == torch.bfloat16:
-        pytest.skip("TensorRT-RTX does not support bfloat16")
 
     class SimpleNetwork(torch.nn.Module):
         def __init__(self):
