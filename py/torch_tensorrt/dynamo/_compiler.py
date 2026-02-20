@@ -1452,11 +1452,13 @@ def convert_exported_program_to_serialized_trt_engine(
             f"Conversion of module {gm} not currently fully supported or convertible!",
             exc_info=True,
         )
+        raise
     except Exception as e:
         logger.error(
             f"While interpreting the module got an error: {e}",
             exc_info=True,
         )
+        raise
 
     serialized_engine: bytes = interpreter_result.serialized_engine
     return serialized_engine
