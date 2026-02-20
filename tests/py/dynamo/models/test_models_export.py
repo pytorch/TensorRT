@@ -386,6 +386,7 @@ def test_base_fp8(ir):
                 exp_program,
                 inputs=[input_tensor],
                 enabled_precisions={torch.float8_e4m3fn},
+                use_explicit_typing=False,
                 min_block_size=1,
                 cache_built_engines=False,
                 reuse_cached_engines=False,
