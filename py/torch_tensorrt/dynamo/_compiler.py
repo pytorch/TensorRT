@@ -373,10 +373,8 @@ def cross_compile_for_windows(
     gm = exported_program.module()
     logger.debug("Input graph: " + str(gm.graph))
 
-    # Move the weights in the state_dict to CPU. We should do this before post_lowering for KV cache support.
-    if offload_module_to_cpu:
-        deallocate_module(exported_program.module())
-    # Apply lowering on the graph module
+    # Apply lowering on the graph module. Note: constant_fold runs inside post_lowering and requires
+    # module parameters to still be on GPU, so we must not deallocate before this call.
     gm = post_lowering(gm, settings)
     logger.debug(f"CPU memory usage after post_lowering: {get_cpu_memory_usage()} MB")
     logger.debug("Lowered Input graph: " + str(gm.graph))
@@ -772,10 +770,8 @@ def compile(
     # Move the weights in the state_dict to CPU
     logger.debug("Input graph: " + str(gm.graph))
 
-    # Move the weights in the state_dict to CPU. We should do this before post_lowering for KV cache support.
-    if offload_module_to_cpu:
-        deallocate_module(exported_program.module())
-    # Apply lowering on the graph module
+    # Apply lowering on the graph module. Note: constant_fold runs inside post_lowering and requires
+    # module parameters to still be on GPU, so we must not deallocate before this call.
     gm = post_lowering(gm, settings)
     logger.debug(f"CPU memory usage after post_lowering: {get_cpu_memory_usage()} MB")
     logger.debug("Lowered Input graph: " + str(gm.graph))
