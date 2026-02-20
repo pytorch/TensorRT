@@ -1,7 +1,7 @@
 """
 .. _tensor_parallel_simple_example:
 
-Torch Parallel Distributed example for simple model
+Tensor Parallel Distributed Inference with Torch-TensorRT
 =========================================
 
 Below example shows how to use Torch-TensorRT backend for distributed inference with tensor parallelism.
@@ -25,20 +25,23 @@ import tensorrt as trt
 import torch
 import torch.distributed as dist
 import torch.nn as nn
-import torch_tensorrt
 from tensor_parallel_initialize_dist import (
     cleanup_distributed_env,
+    get_tensor_parallel_device_mesh,
     initialize_distributed_env,
 )
+
+# Initialize distributed environment and logger BEFORE importing torch_tensorrt
+# This ensures logging is configured before any import-time log messages
+device_mesh, _world_size, _rank, logger = initialize_distributed_env(
+    "tensor_parallel_simple_example"
+)
+
 from torch.distributed._tensor import Shard
 from torch.distributed.tensor.parallel import (
     ColwiseParallel,
     RowwiseParallel,
     parallelize_module,
-)
-
-device_mesh, _world_size, _rank, logger = initialize_distributed_env(
-    "./tensor_parallel_simple_example"
 )
 
 """

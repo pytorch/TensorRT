@@ -3,7 +3,7 @@
 Tensor Parallel Initialize Distributed Environment
 ==================================================
 
-This module provides functions to initialize and clean up the distributed environment for tensor parallel distributed inference.
+This module provides functions to initialize and clean up the distributed environment for tensor parallel distributed inference. These utilities are useful for tensor parallel distributed inference examples using torch.distributed.
 """
 
 import logging
@@ -14,32 +14,68 @@ import numpy as np
 import tensorrt as trt
 import torch
 import torch.distributed as dist
-from torch.distributed._tensor.device_mesh import init_device_mesh
+from torch.distributed._tensor.device_mesh import DeviceMesh, init_device_mesh
 
 
-def find_repo_root(max_depth=10):
-    dir_path = os.path.dirname(os.path.realpath(__file__))
-    for i in range(max_depth):
-        files = os.listdir(dir_path)
-        if "MODULE.bazel" in files:
-            return dir_path
-        else:
-            dir_path = os.path.dirname(dir_path)
+def initialize_logger(
+    rank, logger_file_name, file_level=logging.DEBUG, console_level=logging.INFO
+):
+    """Initialize rank-specific Torch-TensorRT logger with configurable handler levels.
 
-    raise RuntimeError("Could not find repo root")
+    Logger level is set to DEBUG (pass-through), handlers control filtering for files and stream buffers
 
+    Args:
+        rank: Process rank for multi-GPU
+        logger_file_name: Base name for log file (will add _rank.log)
+        file_level: What goes to file - default DEBUG (everything)
+        console_level: What prints to console - default INFO (clean output)
+    """
+    logger = logging.getLogger("torch_tensorrt")
+    logger.setLevel(logging.DEBUG)
+    logger.handlers.clear()
 
-def initialize_logger(rank, logger_file_name):
-    logger = logging.getLogger()
-    logger.setLevel(logging.INFO)
+    # File handler
     fh = logging.FileHandler(logger_file_name + f"_{rank}.log", mode="w")
-    fh.setLevel(logging.INFO)
+    fh.setLevel(file_level)
+    fh.setFormatter(
+        logging.Formatter(
+            f"[Rank {rank}] %(asctime)s - %(name)s - %(levelname)s - %(message)s"
+        )
+    )
     logger.addHandler(fh)
+
+    # console handler
+    ch = logging.StreamHandler()
+    ch.setLevel(
+        console_level
+    )  # Console handler controls what's printed in console output
+    ch.setFormatter(logging.Formatter(f"[Rank {rank}] %(levelname)s: %(message)s"))
+    logger.addHandler(ch)
+
+    # safegauard though not reqd
+    logger.propagate = False
     return logger
 
 
 # This is required for env initialization since we use mpirun
-def initialize_distributed_env(logger_file_name, rank=0, world_size=1, port=29500):
+def initialize_distributed_env(
+    logger_file_name,
+    rank=0,
+    world_size=1,
+    port=29500,
+    file_level="debug",
+    console_level="info",
+):
+    """Initialize distributed environment with handler-based logging.
+
+    Args:
+        logger_file_name: Base name for log files
+        rank: Initial rank (overridden by OMPI env vars)
+        world_size: Initial world size (overridden by OMPI env vars)
+        port: Master port for distributed communication
+        file_level: File handler level - "debug", "info", "warning" (default: "debug")
+        console_level: Console handler level - "debug", "info", "warning" (default: "info")
+    """
     local_rank = int(
         os.environ.get("OMPI_COMM_WORLD_LOCAL_RANK", rank % torch.cuda.device_count())
     )
@@ -50,9 +86,6 @@ def initialize_distributed_env(logger_file_name, rank=0, world_size=1, port=2950
     os.environ["WORLD_SIZE"] = str(world_size)
     os.environ["MASTER_ADDR"] = "127.0.0.1"
     os.environ["MASTER_PORT"] = str(port)
-    os.environ["TRTLLM_PLUGINS_PATH"] = (
-        find_repo_root() + "/lib/libnvinfer_plugin_tensorrt_llm.so"
-    )
 
     # Necessary to assign a device to each rank.
     torch.cuda.set_device(local_rank)
@@ -66,11 +99,38 @@ def initialize_distributed_env(logger_file_name, rank=0, world_size=1, port=2950
     device_mesh = init_device_mesh(device_type="cuda", mesh_shape=(world_size,))
     rank = device_mesh.get_rank()
     assert rank == local_rank
-    logger = initialize_logger(rank, logger_file_name)
+    # Convert string handler levels to logging constants
+    level_map = {
+        "debug": logging.DEBUG,
+        "info": logging.INFO,
+        "warning": logging.WARNING,
+        "error": logging.ERROR,
+    }
+    file_level_int = level_map.get(file_level.lower(), logging.DEBUG)
+    console_level_int = level_map.get(console_level.lower(), logging.INFO)
+
+    # Initialize logger with handler-specific levels
+    # Logger itself is always DEBUG - handlers do the filtering
+    logger = initialize_logger(
+        rank,
+        logger_file_name,
+        file_level=file_level_int,
+        console_level=console_level_int,
+    )
     device_id = (
         rank % torch.cuda.device_count()
     )  # Ensure each rank gets a unique device
     torch.cuda.set_device(device_id)
+
+    # Set C++ TensorRT runtime log level based on most verbose handler
+    # Use the most verbose level to ensure all important logs are captured
+    cpp_level = min(file_level_int, console_level_int)
+    try:
+        import torch_tensorrt.logging as torchtrt_logging
+
+        torchtrt_logging.set_level(cpp_level)
+    except Exception as e:
+        logger.warning(f"Could not set C++ TensorRT log level: {e}")
 
     return device_mesh, world_size, rank, logger
 
@@ -79,3 +139,28 @@ def cleanup_distributed_env():
     """Clean up distributed process group to prevent resource leaks."""
     if dist.is_initialized():
         dist.destroy_process_group()
+
+
+def check_tensor_parallel_device_number(world_size: int) -> None:
+    if world_size % 2 != 0:
+        raise ValueError(
+            f"TP examples require even number of GPUs, but got {world_size} gpus"
+        )
+
+
+def get_tensor_parallel_device_mesh(
+    rank: int = 0, world_size: int = 1
+) -> tuple[DeviceMesh, int, int]:
+    local_rank = int(
+        os.environ.get("OMPI_COMM_WORLD_LOCAL_RANK", rank % torch.cuda.device_count())
+    )
+    world_size = int(os.environ.get("OMPI_COMM_WORLD_SIZE", world_size))
+    device_mesh = init_device_mesh(device_type="cuda", mesh_shape=(world_size,))
+    rank = device_mesh.get_rank()
+    assert rank == local_rank
+    device_id = (
+        rank % torch.cuda.device_count()
+    )  # Ensure each rank gets a unique device
+    torch.cuda.set_device(device_id)
+
+    return device_mesh, world_size, rank
