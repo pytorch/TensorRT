@@ -55,8 +55,10 @@ _TRTLLM_AVAIL = load_tensorrt_llm_for_nccl()
 if importlib.util.find_spec("tensorrt.plugin") and importlib.util.find_spec(
     "tensorrt.plugin._lib"
 ):
-    # there is a bug in tensorrt 10.15.* that causes the plugin to not work, disable it for now
-    if tensorrt.__version__.startswith("10.15."):
+    # there is a bug in tensorrt 10.14.* and 10.15.* that causes the plugin to not work, disable it for now
+    if tensorrt.__version__.startswith("10.15.") or tensorrt.__version__.startswith(
+        "10.14."
+    ):
         _QDP_PLUGIN_AVAIL = False
     else:
         _QDP_PLUGIN_AVAIL = True
