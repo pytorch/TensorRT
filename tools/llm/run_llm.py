@@ -260,8 +260,18 @@ if __name__ == "__main__":
     )
     arg_parser.add_argument(
         "--quant_format",
-        help=("Apply quantization format. Options: fp8, nvfp4 (default: None)"),
+        help=("Apply quantization format. Options: int8, fp8, nvfp4 (default: None)"),
         default=None,
+    )
+    arg_parser.add_argument(
+        "--quant_algo",
+        help=("Apply quantization algorithm: max, smoothquant (default: max)"),
+        default="max",
+    )
+    arg_parser.add_argument(
+        "--weight_only",
+        help=("Apply weight only quantization. True (default: False)"),
+        action="store_true",
     )
     args = arg_parser.parse_args()
 

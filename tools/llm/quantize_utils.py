@@ -56,7 +56,20 @@ def quantize_model(model, args, tokenizer):
         num_samples=512,
         device="cuda:0",
     )
-    if args.quant_format == "fp8":
+    if args.quant_format == "int8":
+        if args.quant_algo == "smoothquant":
+            if args.weight_only:
+                raise RuntimeError(
+                    "SmoothQuant is supported for weight-and-activation quantization, weight-only flag should not be set"
+                )
+            quant_cfg = mtq.INT8_SMOOTHQUANT_CFG
+        elif args.weight_only:
+            quant_cfg = mtq.INT8_WEIGHT_ONLY_CFG
+        else:
+            raise RuntimeError(
+                f"Unsupported args.quant_algo: {args.quant_algo} and args.weight_only: {args.weight_only} for int8 quantization"
+            )
+    elif args.quant_format == "fp8":
         quant_cfg = mtq.FP8_DEFAULT_CFG
     elif args.quant_format == "nvfp4":
         quant_cfg = mtq.NVFP4_DEFAULT_CFG
