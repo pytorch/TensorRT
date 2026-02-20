@@ -15,7 +15,7 @@ def pytest_addoption(parser):
             choices=["dynamo", "torch_compile"],
         )
     except ValueError:
-        pass  # --ir already registered by another conftest (e.g. models/conftest.py)
+        pass  # --ir already registered by another conftest
 
 
 @pytest.fixture

@@ -1,4 +1,5 @@
-import psutil
+import unittest.mock as mock
+
 import torch
 import torch.nn as nn
 from torch.fx.passes.splitter_base import Subgraph
@@ -15,6 +16,9 @@ from torch_tensorrt.dynamo.lowering.passes import post_lowering, pre_export_lowe
 from torch_tensorrt.dynamo.partitioning._resource_partitioner import (
     ResourcePartitioner,
 )
+
+# Fixed RSS value to make memory-budget calculations deterministic.
+_FIXED_RSS_BYTES = 512 * 1024 * 1024  # 512 MB
 
 
 class TestResourcePartitioning(TestCase):
@@ -35,6 +39,7 @@ class TestResourcePartitioning(TestCase):
                 x = self.fc(x)
                 return x
 
+        torch.manual_seed(0)
         model = net().eval()
         model.to("cuda")
         inputs = [torch.randn((1, 3, 224, 224)).to("cuda")]
@@ -77,12 +82,15 @@ class TestResourcePartitioning(TestCase):
                 or "_run_on_acc" not in name
             ):
                 continue
-            partitioner = ResourcePartitioner(
-                submodule,
-                submodule_name=name,
-                cpu_memory_budget=0.89 * 1024 * 1024 * 1024
-                + psutil.Process().memory_info().rss,  # 0.89GB + current memory usage
-            )
+            _mock_mem = mock.MagicMock()
+            _mock_mem.rss = _FIXED_RSS_BYTES
+            with mock.patch("psutil.Process") as mock_proc:
+                mock_proc.return_value.memory_info.return_value = _mock_mem
+                partitioner = ResourcePartitioner(
+                    submodule,
+                    submodule_name=name,
+                    cpu_memory_budget=2 * 1024 * 1024 * 1024,
+                )
             subgraphs = partitioner.put_nodes_into_subgraphs()
             new_subgraphs = []
             current_subgraph = []

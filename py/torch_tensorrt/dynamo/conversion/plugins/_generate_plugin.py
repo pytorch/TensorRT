@@ -120,7 +120,6 @@ def _generate_plugin(plugin_name: str) -> None:
         tensor_args = [elem for elem in args if isinstance(elem, trtp.TensorDesc)]
 
         for tensor_arg in tensor_args:
-
             sample = {f"{i}": 5 for i in range(tensor_arg.ndim)}
             syms_arg = [
                 mksym(shape_env, v, LocalSource(k), DimDynamic.DYNAMIC)
@@ -209,16 +208,22 @@ def _generate_plugin(plugin_name: str) -> None:
 
     plugin_impl_code = compile(plugin_impl_func, "<string>", "exec")
 
-    globals()["_generic_plugin_impl"] = _generic_plugin_impl
+    # Use a per-plugin globals dict so each plugin gets its own isolated
+    # _generic_plugin_impl binding. Writing to the shared module globals()
+    # causes cross-plugin contamination when multiple plugins are registered
+    # in the same process.
+    plugin_globals = {**globals(), "_generic_plugin_impl": _generic_plugin_impl}
 
-    plugin_impl = FunctionType(plugin_impl_code.co_consts[0], globals(), "plugin_impl")
+    plugin_impl = FunctionType(
+        plugin_impl_code.co_consts[0], plugin_globals, "plugin_impl"
+    )
 
     plugin_impl.__annotations__ = impl_func_annotation
 
     trtp.impl(plugin_name)(plugin_impl)
 
 
-@needs_qdp_plugin
+@needs_qdp_plugin  # type: ignore
 def generate_plugin(plugin_name: str) -> None:
     """
     Generate the Plugin using external kernels and TensorRT Quick Deployable Plugin APIs.
