@@ -1,6 +1,6 @@
 module(
     name = "torch_tensorrt",
-    version = "2.11.0a0",
+    version = "2.12.0a0",
     repo_name = "org_pytorch_tensorrt",
 )
 
