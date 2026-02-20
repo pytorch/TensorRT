@@ -418,10 +418,21 @@ def extract_var_range_info(symbolic_integer: torch.SymInt) -> Dict[str, int]:
     # https://pytorch.org/docs/stable/generated/torch.fx.experimental.symbolic_shapes.ShapeEnv.html#torch.fx.experimental.symbolic_shapes.ShapeEnv.bound_sympy
     # expr.xreplace replaces the symbolic variables with their current values and computes the expression.
     var_range = shape_env.var_to_range.get(expr, None) or shape_env.bound_sympy(expr)
+    # PyTorch commit adb73cc: var_to_val->backed_var_to_val, unbacked_var_to_val->real_tensor_prop_unbacked_vals
+    var_to_val_map = getattr(shape_env, "backed_var_to_val", None) or getattr(
+        shape_env, "var_to_val", None
+    )
+    if var_to_val_map is None:
+        var_to_val_map = {}
+    unbacked_map = getattr(
+        shape_env, "real_tensor_prop_unbacked_vals", None
+    ) or getattr(shape_env, "unbacked_var_to_val", None)
+    if unbacked_map is None:
+        unbacked_map = {}
     var_val = (
-        shape_env.var_to_val.get(expr, None)
-        or shape_env.real_tensor_prop_unbacked_vals.get(expr, None)
-        or expr.xreplace(shape_env.var_to_val)
+        var_to_val_map.get(expr, None)
+        or unbacked_map.get(expr, None)
+        or expr.xreplace(var_to_val_map)
     )
     assert var_range, var_val
     min_val, max_val = int(var_range.lower), int(var_range.upper)

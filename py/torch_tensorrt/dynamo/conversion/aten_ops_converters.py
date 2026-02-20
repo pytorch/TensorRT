@@ -998,8 +998,8 @@ def aten_ops_gather(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.scatter.src)
-@dynamo_tensorrt_converter(torch.ops.aten.scatter.value)
+@dynamo_tensorrt_converter(torch.ops.aten.scatter.src, supports_dynamic_shapes=True)
+@dynamo_tensorrt_converter(torch.ops.aten.scatter.value, supports_dynamic_shapes=True)
 @enforce_tensor_types(
     {
         0: (TRTTensor,),
