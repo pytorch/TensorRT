@@ -67,7 +67,7 @@ def get_model(args):
     else:
         # Use as Hugging Face repo ID
         model_name_or_path = args.model
-    
+
     # Check if this is a pre-quantized model before loading
     hf_quant_config = load_quantization_config(model_name_or_path)
 
@@ -82,9 +82,9 @@ def get_model(args):
                 is_int8_prequantized = True
 
         if is_int8_prequantized:
-            # Load model structure first and and then dequantize the weights manually
+            # Load model structure first and then dequantize the weights manually
             model = load_int8_prequantized_model(
-                model_name_or_path, 
+                model_name_or_path,
                 args.model_precision,
                 hf_quant_config,
             )
@@ -100,7 +100,7 @@ def get_model(args):
                 .eval()
                 .cuda()
             )
-        
+
         # register SDPA variant for the model
         register_sdpa.enable_sdpa_converter(model_name_or_path, model.config)
 
@@ -298,7 +298,7 @@ if __name__ == "__main__":
     arg_parser.add_argument(
         "--weight_only",
         help=("Apply weight only quantization. True (default: False)"),
-       action="store_true",
+        action="store_true",
     )
     args = arg_parser.parse_args()
 
