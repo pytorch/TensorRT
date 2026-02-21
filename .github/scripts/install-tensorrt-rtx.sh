@@ -2,7 +2,7 @@
 install_tensorrt_rtx() {
     if [[ ${USE_TRT_RTX} == true ]]; then
         if [[ ${CU_VERSION:2:2} == "13" ]]; then
-            export CU_UPPERBOUND="13.0"
+            export CU_UPPERBOUND="13.1"
         else
             export CU_UPPERBOUND="12.9"
         fi
