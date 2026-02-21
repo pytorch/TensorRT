@@ -9,20 +9,19 @@ operations in attention models with rotary embeddings across multiple GPUs.
 
 """
 
-import logging
-import os
 import time
 
 import torch
-import torch_tensorrt
 from rotary_embedding import RotaryAttention, parallel_rotary_block
 from tensor_parallel_initialize_dist import (
     cleanup_distributed_env,
     initialize_distributed_env,
 )
 
+# Initialize distributed environment and logger BEFORE importing torch_tensorrt
+# This ensures logging is configured before any import-time log messages
 device_mesh, _world_size, _rank, logger = initialize_distributed_env(
-    "./tensor_parallel_rotary_embedding"
+    "tensor_parallel_rotary_embedding"
 )
 
 

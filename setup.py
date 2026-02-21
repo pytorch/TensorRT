@@ -790,7 +790,7 @@ def get_x86_64_requirements(base_requirements):
         requirements = requirements + ["torch>=2.11.0.dev,<2.12.0"]
         if USE_TRT_RTX:
             return requirements + [
-                "tensorrt_rtx>=1.2.0.54",
+                "tensorrt_rtx>=1.3.0.35",
             ]
         else:
             requirements = requirements + [
