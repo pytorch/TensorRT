@@ -6,7 +6,7 @@ install_tensorrt_rtx() {
         else
             export CU_UPPERBOUND="12.9"
         fi
-        TRT_RTX_VERSION=1.2.0.54
+        TRT_RTX_VERSION=1.3.0.35
         install_wheel_or_not=${1:-false}
         echo "It is the tensorrt-rtx build, install tensorrt-rtx with install_wheel_or_not:${install_wheel_or_not}"
         PLATFORM=$(python -c "import sys; print(sys.platform)")
@@ -20,7 +20,7 @@ install_tensorrt_rtx() {
         # python version is like 3.11, we need to convert it to cp311
         CPYTHON_TAG="cp${PYTHON_VERSION//./}"
         if [[ ${PLATFORM} == win32 ]]; then
-            curl -L https://developer.nvidia.com/downloads/trt/rtx_sdk/secure/1.2/tensorrt-rtx-${TRT_RTX_VERSION}-win10-amd64-cuda-${CU_UPPERBOUND}-release-external.zip -o tensorrt-rtx-${TRT_RTX_VERSION}.win10-amd64-cuda-${CU_UPPERBOUND}.zip
+            curl -L https://developer.nvidia.com/downloads/trt/rtx_sdk/secure/1.3/tensorrt-rtx-${TRT_RTX_VERSION}-win10-amd64-cuda-${CU_UPPERBOUND}-release-external.zip -o tensorrt-rtx-${TRT_RTX_VERSION}.win10-amd64-cuda-${CU_UPPERBOUND}.zip
             unzip tensorrt-rtx-${TRT_RTX_VERSION}.win10-amd64-cuda-${CU_UPPERBOUND}.zip
             rtx_lib_dir=${PWD}/TensorRT-RTX-${TRT_RTX_VERSION}/lib
             rtx_bin_dir=${PWD}/TensorRT-RTX-${TRT_RTX_VERSION}/bin
@@ -32,7 +32,7 @@ install_tensorrt_rtx() {
             # clean up the downloaded rtx zip
             rm tensorrt-rtx*.zip
         else
-            curl -L https://developer.nvidia.com/downloads/trt/rtx_sdk/secure/1.2/tensorrt-rtx-${TRT_RTX_VERSION}-linux-x86_64-cuda-${CU_UPPERBOUND}-release-external.tar.gz -o tensorrt-rtx-${TRT_RTX_VERSION}-linux-x86_64-cuda-${CU_UPPERBOUND}-release-external.tar.gz
+            curl -L https://developer.nvidia.com/downloads/trt/rtx_sdk/secure/1.3/tensorrt-rtx-${TRT_RTX_VERSION}-linux-x86_64-cuda-${CU_UPPERBOUND}-release-external.tar.gz -o tensorrt-rtx-${TRT_RTX_VERSION}-linux-x86_64-cuda-${CU_UPPERBOUND}-release-external.tar.gz
             tar -xzf tensorrt-rtx-${TRT_RTX_VERSION}-linux-x86_64-cuda-${CU_UPPERBOUND}-release-external.tar.gz
             rtx_lib_dir=${PWD}/TensorRT-RTX-${TRT_RTX_VERSION}/lib
             rtx_bin_dir=${PWD}/TensorRT-RTX-${TRT_RTX_VERSION}/bin
