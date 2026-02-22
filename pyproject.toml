@@ -6,7 +6,7 @@ requires = [
     "ninja>=1.11.0",
     "pyyaml>=6.0",
     "cffi>=1.15.1",
-    "torch>=2.11.0.dev,<2.12.0",
+    "torch>=2.11.0,<2.12.0",
     "pybind11==2.6.2",
 ]
 build-backend = "setuptools.build_meta"
@@ -124,10 +124,10 @@ index-strategy = "unsafe-best-match"
 
 [tool.uv.sources]
 torch = [
-    { index = "pytorch-nightly-cu130" },
+    { index = "pytorch-test-cu130" },
 ]
 torchvision = [
-    { index = "pytorch-nightly-cu130" },
+    { index = "pytorch-test-cu130" },
 ]
 
 [[tool.uv.index]]
