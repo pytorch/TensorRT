@@ -1,4 +1,5 @@
 import contextlib
+import ctypes
 import functools
 import logging
 import os
@@ -34,6 +35,7 @@ class Debugger:
         capture_fx_graph_after: Optional[List[str]] = None,
         save_engine_profile: bool = False,
         capture_tensorrt_api_recording: bool = False,
+        capture_tensorrt_api_recording_json_file: str = "",
         profile_format: str = "perfetto",
         engine_builder_monitor: bool = True,
         logging_dir: str = DEBUG_LOGGING_DIR,
@@ -54,6 +56,8 @@ class Debugger:
             capture_tensorrt_api_recording (bool): Whether to enable the capture TensorRT API recording feature, when this is enabled, it will output the catputure TensorRT API recording in the /tmp/torch_tensorrt_{current_user}/shim directory.
                 It is part of the TensorRT capture and replay feature, the captured output will be able to replay for debug purpose.
                 Defaults to False.
+            capture_tensorrt_api_recording_json_file (str, optional): the JSON file to save the captured TensorRT API recording.
+                If not set, the captured TensorRT API recording will be saved in the current working directory.
             profile_format (str): Format for profiling data. Choose from 'perfetto', 'trex', 'cudagraph'.
                 If you need to generate engine graph using the profiling files, set it to 'trex' and use the C++ runtime.
                 If you need to generate cudagraph visualization, set it to 'cudagraph'.
@@ -71,6 +75,7 @@ class Debugger:
             log_level=log_level,
             save_engine_profile=save_engine_profile,
             capture_tensorrt_api_recording=capture_tensorrt_api_recording,
+            capture_tensorrt_api_recording_json_file=capture_tensorrt_api_recording_json_file,
             engine_builder_monitor=engine_builder_monitor,
             logging_dir=logging_dir,
             profile_format=profile_format,
@@ -103,17 +108,21 @@ class Debugger:
                 _LOGGER.warning(
                     f"Capturing TensorRT API calls is only supported on Linux, therefore ignoring the capture_tensorrt_api_recording setting for {sys.platform}"
                 )
+                self.cfg.capture_tensorrt_api_recording = False
             elif ENABLED_FEATURES.tensorrt_rtx:
                 _LOGGER.warning(
                     "Capturing TensorRT API calls is not supported for TensorRT-RTX, therefore ignoring the capture_tensorrt_api_recording setting"
                 )
+                self.cfg.capture_tensorrt_api_recording = False
             else:
                 env_flag = os.environ.get("TORCHTRT_ENABLE_TENSORRT_API_CAPTURE", None)
                 if env_flag is None or (env_flag != "1" and env_flag.lower() != "true"):
                     _LOGGER.warning(
                         "In order to capture TensorRT API calls, please invoke the script with environment variable TORCHTRT_ENABLE_TENSORRT_API_CAPTURE=1"
                     )
-                _LOGGER.info("Capturing TensorRT API calls feature is enabled")
+                    self.cfg.capture_tensorrt_api_recording = False
+                else:
+                    _LOGGER.info("Capturing TensorRT API calls feature is enabled")
 
     def __enter__(self) -> None:
         self.original_lvl = _LOGGER.getEffectiveLevel()
@@ -165,6 +174,8 @@ class Debugger:
             )
             for c in _DEBUG_ENABLED_CLS
         ]
+
+        self.set_capture_tensorrt_api_recording_json_file()
 
     def __exit__(self, exc_type: Any, exc_value: Any, exc_tb: Any) -> None:
 
@@ -224,3 +235,41 @@ class Debugger:
             }
             config["loggers"][""]["handlers"].append("file")
         return config
+
+    def set_capture_tensorrt_api_recording_json_file(self) -> None:
+        if self.cfg.capture_tensorrt_api_recording is False:
+            return
+        if self.cfg.capture_tensorrt_api_recording_json_file == "":
+            return
+
+        if os.path.isdir(self.cfg.capture_tensorrt_api_recording_json_file):
+            self.cfg.capture_tensorrt_api_recording_json_file = os.path.join(
+                self.cfg.capture_tensorrt_api_recording_json_file, "capture.json"
+            )
+
+        if os.path.isfile(self.cfg.capture_tensorrt_api_recording_json_file):
+            os.remove(self.cfg.capture_tensorrt_api_recording_json_file)
+
+        nvinfer_lib = os.environ.get("TRT_SHIM_NVINFER_LIB_NAME", None)
+        if nvinfer_lib is None:
+            _LOGGER.warning(
+                "TRT_SHIM_NVINFER_LIB_NAME is not set, therefore capturing TensorRT API recording is not supported"
+            )
+            return
+        lib_path = os.path.dirname(nvinfer_lib)
+        shim_path = os.path.join(lib_path, "libtensorrt_shim.so")
+        if not os.path.isfile(shim_path):
+            _LOGGER.warning(
+                f"libtensorrt_shim.so is not found in the {lib_path} directory, therefore capturing TensorRT API recording is not supported"
+            )
+            return
+        try:
+            shim_lib = ctypes.CDLL(shim_path, mode=ctypes.RTLD_GLOBAL)
+            shim_lib.trtShimSetOutputJsonFile(
+                self.cfg.capture_tensorrt_api_recording_json_file.encode("utf-8")
+            )
+        except Exception as e:
+            _LOGGER.warning(
+                f"Failed to set the output JSON file for TensorRT API recording: {e}"
+            )
+            return

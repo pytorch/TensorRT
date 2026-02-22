@@ -8,6 +8,7 @@ class DebuggerConfig:
     log_level: str = "debug"
     save_engine_profile: bool = False
     capture_tensorrt_api_recording: bool = False
+    capture_tensorrt_api_recording_json_file: str = ""
     engine_builder_monitor: bool = True
     logging_dir: str = DEBUG_LOGGING_DIR
     profile_format: str = "perfetto"

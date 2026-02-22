@@ -1,6 +1,6 @@
 module(
     name = "torch_tensorrt",
-    version = "2.12.0a0",
+    version = "2.11.0a0",
     repo_name = "org_pytorch_tensorrt",
 )
 
@@ -98,14 +98,14 @@ http_archive(
 # Either place them in the distdir directory in third_party and use the --distdir flag
 # or modify the urls to "file:///<PATH TO TARBALL>/<TARBALL NAME>.tar.gz
 
-http_archive(
-    name = "tensorrt",
-    build_file = "@//third_party/tensorrt/archive:BUILD",
-    strip_prefix = "TensorRT-10.15.1.29",
-    urls = [
-        "https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.15.1/tars/TensorRT-10.15.1.29.Linux.x86_64-gnu.cuda-13.1.tar.gz",
-    ],
-)
+#http_archive(
+#    name = "tensorrt",
+#    build_file = "@//third_party/tensorrt/archive:BUILD",
+#    strip_prefix = "TensorRT-10.15.1.29",
+#    urls = [
+#        "https://developer.nvidia.com/downloads/compute/machine-learning/tensorrt/10.15.1/tars/TensorRT-10.15.1.29.Linux.x86_64-gnu.cuda-13.1.tar.gz",
+#    ],
+#)
 
 http_archive(
     name = "tensorrt_rtx",
@@ -167,5 +167,5 @@ http_archive(
 new_local_repository(
     name = "tensorrt",
     build_file = "@//third_party/tensorrt/local:BUILD",
-    path = "/home/lanl/Downloads/cmake_build/packages/TensorRT-10.16.0.35",
+    path = "/home/lanl/Downloads/cmake_build/packages/TensorRT-10.16.0.46",
 )

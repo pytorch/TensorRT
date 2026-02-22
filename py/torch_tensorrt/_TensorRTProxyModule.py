@@ -1,12 +1,11 @@
 import ctypes
 import importlib
-import importlib.util
 import importlib.metadata
+import importlib.util
 import logging
 import os
 import platform
 import sys
-import tempfile
 from types import ModuleType
 from typing import Any, Dict, List
 
@@ -54,6 +53,7 @@ def enable_capture_tensorrt_api_recording() -> None:
     elif platform.uname().processor == "aarch64":
         linux_lib_path.append("/usr/lib/aarch64-linux-gnu")
 
+    tensorrt_lib_path = None
     for path in linux_lib_path:
         if os.path.isfile(os.path.join(path, "libtensorrt_shim.so")):
             try:
@@ -74,24 +74,7 @@ def enable_capture_tensorrt_api_recording() -> None:
         os.environ["TRT_SHIM_NVINFER_LIB_NAME"] = os.path.join(
             tensorrt_lib_path, "libnvinfer.so"
         )
-        import pwd
-
-        current_user = pwd.getpwuid(os.getuid())[0]
-        shim_temp_dir = os.path.join(
-            tempfile.gettempdir(), f"torch_tensorrt_{current_user}/shim"
-        )
-        os.makedirs(shim_temp_dir, exist_ok=True)
-        json_file_name = os.path.join(shim_temp_dir, "shim.json")
-        os.environ["TRT_SHIM_OUTPUT_JSON_FILE"] = json_file_name
-        bin_file_name = os.path.join(shim_temp_dir, "shim.bin")
-        # if exists, delete the file, so that we can capture the new one
-        if os.path.exists(json_file_name):
-            os.remove(json_file_name)
-        if os.path.exists(bin_file_name):
-            os.remove(bin_file_name)
-        _LOGGER.info(
-            f"Capturing TensorRT API calls feature is enabled and the captured output is in the {shim_temp_dir} directory"
-        )
+        _LOGGER.info("Capturing TensorRT API calls feature is enabled")
 
 
 # TensorRTProxyModule is a proxy module that allows us to register the tensorrt or tensorrt-rtx package
