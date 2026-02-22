@@ -1,4 +1,4 @@
-name: Release Windows wheels artifacts
+name: RTX - Release x86_64 Linux wheels and tarball artifacts
 
 on:
   push:
@@ -19,13 +19,13 @@ jobs:
     if: ${{ contains(github.event.pull_request.labels.*.name, 'build-release-artifacts') || startsWith(github.event.ref, 'refs/tags/v') }}
     with:
       package-type: wheel
-      os: windows
+      os: linux
       test-infra-repository: pytorch/test-infra
       test-infra-ref: main
       with-rocm: false
       with-cpu: false
 
-  generate-release-zip-matrix:
+  generate-release-tarball-matrix:
     needs: [generate-matrix]
     outputs:
       matrix: ${{ steps.generate.outputs.matrix }}
@@ -37,17 +37,44 @@ jobs:
       - uses: actions/checkout@v6
         with:
           repository: pytorch/tensorrt
-      - name: Generate release tarball matrix
+      - name: Generate release matrix
         id: generate
         run: |
           set -eou pipefail
           MATRIX_BLOB=${{ toJSON(needs.generate-matrix.outputs.matrix) }}
           MATRIX_BLOB="$(python3 .github/scripts/generate-release-matrix.py --tarball_matrix "${MATRIX_BLOB}")"
           echo "${MATRIX_BLOB}"
-          substitute_matrix="$(echo "${MATRIX_BLOB}" | sed -e 's/windows.g4dn.xlarge/windows.g5.4xlarge.nvidia.gpu/g')"
+          echo "matrix=${MATRIX_BLOB}" >> "${GITHUB_OUTPUT}"
 
-          echo matrix="$(echo "${substitute_matrix}")" >> ${GITHUB_OUTPUT}
-
+  release-cxx11-tarball-artifacts:
+    needs: [generate-release-tarball-matrix]
+    name: RTX - Release x86_64 torch-tensorrt cxx11 tarball artifacts
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - repository: pytorch/tensorrt
+            package-name: torch_tensorrt
+            pre-script: packaging/pre_build_script.sh
+            env-var-script: packaging/env_vars.txt
+            post-script: packaging/post_build_script.sh
+            smoke-test-script: packaging/smoke_test_script.sh
+            is-release-tarball: "true"
+    uses: ./.github/workflows/build_linux.yml
+    with:
+      repository: ${{ matrix.repository }}
+      ref: ""
+      test-infra-repository: pytorch/test-infra
+      test-infra-ref: main
+      build-matrix: ${{ needs.generate-release-tarball-matrix.outputs.matrix }}
+      pre-script: ${{ matrix.pre-script }}
+      env-var-script: ${{ matrix.env-var-script }}
+      post-script: ${{ matrix.post-script }}
+      package-name: ${{ matrix.package-name }}
+      smoke-test-script: ${{ matrix.smoke-test-script }}
+      trigger-event: ${{ github.event_name }}
+      is-release-tarball: true
+      use-rtx: true
 
   generate-release-wheel-matrix:
     needs: [generate-matrix]
@@ -61,61 +88,30 @@ jobs:
       - uses: actions/checkout@v6
         with:
           repository: pytorch/tensorrt
-      - name: Generate release wheel matrix
+      - name: Generate release matrix
         id: generate
         run: |
           set -eou pipefail
           MATRIX_BLOB=${{ toJSON(needs.generate-matrix.outputs.matrix) }}
           MATRIX_BLOB="$(python3 .github/scripts/generate-release-matrix.py --wheel_matrix "${MATRIX_BLOB}")"
-          echo "****MATRIX_BLOB****"
           echo "${MATRIX_BLOB}"
-
-          substitute_matrix="$(echo "${MATRIX_BLOB}" | sed -e 's/windows.g4dn.xlarge/windows.g5.4xlarge.nvidia.gpu/g')"
-          echo "****substitute_matrix****"
-          echo "${substitute_matrix}"
-          echo "matrix=${substitute_matrix}" >> "${GITHUB_OUTPUT}"
-
-
-  release-cxx11-zip-artifacts:
-    needs: [generate-release-zip-matrix]
-    name: Release Windows torch-tensorrt cxx11 zip artifacts
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - repository: pytorch/tensorrt
-            package-name: torch_tensorrt
-            pre-script: packaging/pre_build_script_windows.sh
-            env-script: packaging/vc_env_helper.bat
-            smoke-test-script: packaging/smoke_test_windows.py
-            is-release-tarball: true
-    uses: ./.github/workflows/build_windows.yml
-    with:
-      repository: ${{ matrix.repository }}
-      ref: ""
-      test-infra-repository: pytorch/test-infra
-      test-infra-ref: main
-      build-matrix: ${{ needs.generate-release-zip-matrix.outputs.matrix }}
-      pre-script: ${{ matrix.pre-script }}
-      env-script: ${{ matrix.env-var-script }}
-      package-name: ${{ matrix.package-name }}
-      smoke-test-script: ${{ matrix.smoke-test-script }}
-      is-release-tarball: true
+          echo "matrix=${MATRIX_BLOB}" >> "${GITHUB_OUTPUT}"
 
   release-wheel-artifacts:
+    name: RTX - Release x86_64 torch-tensorrt wheel artifacts
     needs: [generate-release-wheel-matrix]
-    name: Release Windows torch-tensorrt wheel artifacts
     strategy:
       fail-fast: false
       matrix:
         include:
           - repository: pytorch/tensorrt
-            pre-script: packaging/pre_build_script_windows.sh
-            env-script: packaging/vc_env_helper.bat
-            smoke-test-script: packaging/smoke_test_windows.py
             package-name: torch_tensorrt
-            is-release-wheel: true
-    uses: ./.github/workflows/build_windows.yml
+            pre-script: packaging/pre_build_script.sh
+            env-var-script: packaging/env_vars.txt
+            post-script: packaging/post_build_script.sh
+            smoke-test-script: packaging/smoke_test_script.sh
+            is-release-wheel:  true
+    uses: ./.github/workflows/build_linux.yml
     with:
       repository: ${{ matrix.repository }}
       ref: ""
@@ -123,10 +119,13 @@ jobs:
       test-infra-ref: main
       build-matrix: ${{ needs.generate-release-wheel-matrix.outputs.matrix }}
       pre-script: ${{ matrix.pre-script }}
-      env-script: ${{ matrix.env-script }}
-      smoke-test-script: ${{ matrix.smoke-test-script }}
+      env-var-script: ${{ matrix.env-var-script }}
+      post-script: ${{ matrix.post-script }}
       package-name: ${{ matrix.package-name }}
+      smoke-test-script: ${{ matrix.smoke-test-script }}
+      trigger-event: ${{ github.event_name }}
       is-release-wheel: true
+      use-rtx: true
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref_name }}-${{ inputs.repository }}-${{ github.event_name == 'workflow_dispatch' }}-${{ inputs.job-name }}
+  group: ${{ github.workflow }}-x86_64-release-${{ github.event.pull_request.number || github.ref_name }}-${{ inputs.repository }}-${{ github.event_name == 'workflow_dispatch' }}-${{ inputs.job-name }}-rtx
   cancel-in-progress: true

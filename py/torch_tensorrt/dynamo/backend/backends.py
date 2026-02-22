@@ -118,9 +118,10 @@ def _pretraced_backend(
         fake_mode = detect_fake_mode(sample_inputs)
 
         # Place backend tracing within FakeTensor context allowing nonfake Tensors
-        with unittest.mock.patch.object(
-            fake_mode, "allow_non_fake_inputs", True
-        ), fake_mode:
+        with (
+            unittest.mock.patch.object(fake_mode, "allow_non_fake_inputs", True),
+            fake_mode,
+        ):
             repair_input_aliasing(gm, settings)
 
             # Remove sym_int placeholders and inputs
@@ -170,7 +171,7 @@ def _pretraced_backend(
                 engine_cache=engine_cache,
             )
             return trt_compiled
-    except (AssertionError, RuntimeError):
+    except (AssertionError, RuntimeError, TypeError):
         if not settings.pass_through_build_failures:
             logger.warning(
                 "TRT conversion failed on the subgraph. See trace above. "

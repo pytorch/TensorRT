@@ -1,4 +1,4 @@
-name: Release Windows wheels artifacts
+name: RTX - Release Windows wheels artifacts
 
 on:
   push:
@@ -78,7 +78,7 @@ jobs:
 
   release-cxx11-zip-artifacts:
     needs: [generate-release-zip-matrix]
-    name: Release Windows torch-tensorrt cxx11 zip artifacts
+    name: RTX - Release Windows torch-tensorrt cxx11 zip artifacts
     strategy:
       fail-fast: false
       matrix:
@@ -101,10 +101,11 @@ jobs:
       package-name: ${{ matrix.package-name }}
       smoke-test-script: ${{ matrix.smoke-test-script }}
       is-release-tarball: true
+      use-rtx: true
 
   release-wheel-artifacts:
     needs: [generate-release-wheel-matrix]
-    name: Release Windows torch-tensorrt wheel artifacts
+    name: RTX - Release Windows torch-tensorrt wheel artifacts
     strategy:
       fail-fast: false
       matrix:
@@ -127,6 +128,7 @@ jobs:
       smoke-test-script: ${{ matrix.smoke-test-script }}
       package-name: ${{ matrix.package-name }}
       is-release-wheel: true
+      use-rtx: true
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref_name }}-${{ inputs.repository }}-${{ github.event_name == 'workflow_dispatch' }}-${{ inputs.job-name }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref_name }}-${{ inputs.repository }}-${{ github.event_name == 'workflow_dispatch' }}-${{ inputs.job-name }}-rtx
   cancel-in-progress: true
