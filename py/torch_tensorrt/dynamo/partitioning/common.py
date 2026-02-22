@@ -31,7 +31,7 @@ def construct_dynamic_input(
         if isinstance(dim, torch.SymInt):
             min_max_opt = extract_var_range_info(dim)
             unwrapped_min_max_opt: Dict[str, int] = {}
-            if min_max_opt["min"] is None:
+            if "min" not in min_max_opt or min_max_opt["min"] is None:
                 logger.warning(
                     f"Dynamic input {name} (shape: {input_shape}) has no min bound for dim {d}, attempting to use a sane default (min: 1). Please set a lower bound using torch._dynamo.mark_dynamic or torch.export.Dim"
                 )
@@ -39,7 +39,7 @@ def construct_dynamic_input(
             else:
                 unwrapped_min_max_opt["min"] = min_max_opt["min"]
 
-            if min_max_opt["max"] is None:
+            if "max" not in min_max_opt or min_max_opt["max"] is None:
                 logger.warning(
                     f"Dynamic input {name} (shape: {input_shape}) has no max bound for dim {d}, attempting to use a sane default (max: min({unwrapped_min_max_opt['min']}) * 2^16). Please set an upper bound using torch._dynamo.mark_dynamic or torch.export.Dim"
                 )
@@ -48,11 +48,11 @@ def construct_dynamic_input(
                 unwrapped_min_max_opt["max"] = min_max_opt["max"]
 
             # if opt not exist, set it to the mean of min and max
-            if min_max_opt["opt"] is None:
+            if "opt" not in min_max_opt or min_max_opt["opt"] is None:
                 logger.info(
                     f"Dynamic input {name} (shape: {input_shape}) has no opt target i.e. which shape to specialize for, for dim {d}, attempting to use a sane default (opt: min({min_max_opt['min']}) + max({min_max_opt['max']}) / 2). If you want to specialized further, use torch_tensorrt.compile"
                 )
-                min_max_opt["opt"] = int(
+                unwrapped_min_max_opt["opt"] = int(
                     unwrapped_min_max_opt["min"] + unwrapped_min_max_opt["max"] / 2
                 )
             else:
