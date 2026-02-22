@@ -9,6 +9,7 @@ This script illustrates Torch-TensorRT workflow with dynamo backend on popular L
 
 import argparse
 import copy
+import json
 import os
 import timeit
 from contextlib import nullcontext
@@ -18,6 +19,12 @@ from contextlib import nullcontext
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 import torch
 import torch_tensorrt
+from modelopt.torch.quantization.utils import export_torch_mode
+from quantize_utils import (
+    convert_linear_to_tensorrt_quantized,
+    load_quantization_config,
+    quantize_model,
+)
 from torchtrt_ext import register_sdpa
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from utils import (
@@ -54,6 +61,7 @@ def get_model(args):
                 args.model,
                 use_cache=False,
                 attn_implementation="sdpa",
+                ignore_mismatched_sizes=True,
             )
             .eval()
             .cuda()
@@ -61,9 +69,22 @@ def get_model(args):
         # register SDPA variant for the model
         register_sdpa.enable_sdpa_converter(args.model, model.config)
 
-    if args.precision == "FP16":
+    hf_quant_config = load_quantization_config(args.model)
+    if hf_quant_config:
+        model = convert_linear_to_tensorrt_quantized(
+            model, args.model_precision, hf_quant_config
+        ).cuda()
+        print(
+            f"Model is {hf_quant_config['quant_algo']} pre-quantized hf model. Quantized linear layers are applied"
+        )
+        if args.quant_format:
+            raise RuntimeError(
+                f"Quantization cannot be applied for pre-quantized hf model"
+            )
+
+    if args.model_precision == "FP16":
         model = model.to(torch.float16)
-    elif args.precision == "BF16":
+    elif args.model_precision == "BF16":
         model = model.to(torch.bfloat16)
     else:
         model = model.to(torch.float32)
@@ -93,16 +114,17 @@ def compile_torchtrt(model, input_ids, args):
             for optimized inference
     """
     max_seq_len = input_ids.shape[1] + args.num_tokens
-    ep = export_llm(model, input_ids, max_seq_len=max_seq_len)
+    with export_torch_mode():
+        ep = export_llm(model, input_ids, max_seq_len=max_seq_len)
     position_ids = torch.arange(input_ids.shape[1]).unsqueeze(0).to(DEVICE)
     # Set precision specific flags
     use_fp32_acc = False
     use_explicit_typing = False
-    if args.precision == "FP16":
+    if args.model_precision == "FP16":
         enabled_precisions = {torch.float32}
         use_fp32_acc = True
         use_explicit_typing = True
-    elif args.precision == "BF16":
+    elif args.model_precision == "BF16":
         enabled_precisions = {torch.bfloat16}
         use_fp32_acc = False
     else:
@@ -190,7 +212,7 @@ if __name__ == "__main__":
         "--prompt", type=str, default="What is parallel programming ?", help="Prompt"
     )
     arg_parser.add_argument(
-        "--precision",
+        "--model_precision",
         type=str,
         default="FP16",
         help="Precision to use in the model. Options: FP16, BF16, FP32",
@@ -236,13 +258,30 @@ if __name__ == "__main__":
     arg_parser.add_argument(
         "--benchmark", action="store_true", help="Enable benchmark (default: False)"
     )
-
+    arg_parser.add_argument(
+        "--quant_format",
+        help=("Apply quantization format. Options: int8, fp8, nvfp4 (default: None)"),
+        default=None,
+    )
+    arg_parser.add_argument(
+        "--quant_algo",
+        help=("Apply quantization algorithm: max, smoothquant (default: max)"),
+        default="max",
+    )
+    arg_parser.add_argument(
+        "--weight_only",
+        help=("Apply weight only quantization. True (default: False)"),
+        action="store_true",
+    )
     args = arg_parser.parse_args()
+
     with torch.inference_mode():
         model = get_model(args)
 
         tokenizer = AutoTokenizer.from_pretrained(args.tokenizer or args.model)
-
+        # Set pad token
+        if tokenizer.pad_token is None:
+            tokenizer.pad_token = tokenizer.eos_token
         # Prepare input for benchmarking or evaluation
         if args.benchmark:
             input_ids = torch.randint(
@@ -260,6 +299,8 @@ if __name__ == "__main__":
         pyt_timings = None
         pyt_stats = None
 
+        if args.quant_format != None:
+            model = quantize_model(model, args, tokenizer)
         if args.enable_pytorch_run:
             pyt_gen_tokens = generate(
                 model, input_ids.clone(), MAX_OUTPUT_SEQ_LENGTH, tokenizer.eos_token_id
@@ -276,7 +317,7 @@ if __name__ == "__main__":
                 pyt_stats = record_stats(
                     "PyTorch",
                     pyt_timings,
-                    args.precision,
+                    args.model_precision,
                     batch_size=args.batch_size,
                     compile_time_s=None,
                 )
@@ -334,7 +375,7 @@ if __name__ == "__main__":
             trt_stats = record_stats(
                 "TensorRT",
                 trt_timings,
-                args.precision,
+                args.model_precision,
                 batch_size=args.batch_size,
                 compile_time_s=None,
             )

@@ -4,15 +4,18 @@ import pytest
 
 
 def pytest_addoption(parser):
-    parser.addoption(
-        "--ir",
-        metavar="Internal Representation",
-        nargs=1,
-        type=str,
-        required=False,
-        help="IR to compile with",
-        choices=["dynamo", "torch_compile"],
-    )
+    try:
+        parser.addoption(
+            "--ir",
+            metavar="Internal Representation",
+            nargs=1,
+            type=str,
+            required=False,
+            help="IR to compile with",
+            choices=["dynamo", "torch_compile"],
+        )
+    except ValueError:
+        pass  # --ir already registered by another conftest (e.g. models/conftest.py)
 
 
 @pytest.fixture

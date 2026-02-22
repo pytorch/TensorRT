@@ -356,6 +356,7 @@ int main(int argc, char** argv) {
   }
 
   if (enabled_precisions) {
+    compile_settings.enabled_precisions.clear();
     for (const auto& precision : args::get(enabled_precisions)) {
       auto dtype = torchtrtc::parserutil::parse_dtype(precision);
       if (dtype == torchtrt::DataType::kFloat) {

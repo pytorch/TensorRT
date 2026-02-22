@@ -251,8 +251,61 @@ def parse_cat_args(
     return input_tensors, dim
 
 
+def cat_validator(node: Node, settings: Optional[CompilationSettings] = None) -> bool:
+    """
+    Validator for torch.cat operation with empty tensor handling.
+
+    PyTorch allows torch.tensor([]) (shape (0,)) to be concatenated with higher-dimensional
+    tensors, but TensorRT requires all inputs to have the same rank. This validator catches
+    this specific edge case.
+
+    Example valid case: cat([(3, 4), (0, 4)], dim=0) - same rank, properly shaped empty tensor for TRT
+    Example invalid case: cat([(3, 4), (0,)], dim=0) - torch.tensor([]) with rank mismatch
+    """
+    # Use parse_cat_args to properly extract inputs (handles both args and kwargs patterns)
+    inputs, _ = parse_cat_args(node.args, node.kwargs)
+
+    if len(inputs) < 2:
+        return True
+
+    # Collect metadata for all inputs
+    input_metas = []
+    for inp in inputs:
+        if isinstance(inp, TRTTensor):
+            # TRTTensor has shape directly
+            input_metas.append(inp.shape)
+        else:
+            # For nodes, get metadata
+            meta = getattr(inp, "meta", {}).get("tensor_meta")
+            if meta is None:
+                # Can't validate without metadata, allow it
+                return True
+            shape = tuple(meta.shape)
+            input_metas.append(shape)
+
+    # Check for the specific problematic case:
+    # 1D empty tensor (0,) being concatenated with higher-dimensional tensors
+    ranks = [len(shape) for shape in input_metas]
+    # If all ranks are the same, it's fine (PyTorch and TensorRT both handle this)
+    if len(set(ranks)) == 1:
+        return True
+    # If ranks differ, check if we have a 1D empty tensor (0,) in the mix
+    # This is the torch.tensor([]) case that PyTorch allows but TensorRT doesn't
+    for i, shape in enumerate(input_metas):
+        if shape == (0,) or (len(shape) == 1 and shape[0] == 0):
+            # Found a 1D empty tensor with rank mismatch
+            _LOGGER.debug(
+                f"Concatenation rejected by TRT, torch.tensor([]) or 1D empty tensor at position {i} "
+                f"PyTorch allows this but TensorRT requires all inputs to have the same rank. "
+                f"Use torch.empty((0, ...)) with explicit dimensions matching other inputs instead. Falling back to Pytorch"
+            )
+            return False
+    return True
+
+
 @dynamo_tensorrt_converter(
     torch.ops.aten.cat.default,
+    capability_validator=cat_validator,
     supports_dynamic_shapes=True,
 )
 def aten_ops_cat(
@@ -413,6 +466,27 @@ def aten_ops_relu(
     )
 
 
+@dynamo_tensorrt_converter(
+    torch.ops.aten.hardtanh.default, supports_dynamic_shapes=True
+)
+def aten_ops_hardtanh(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.activation.hardtanh(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        args[0],
+        args_bounds_check(args, 1, -1.0),
+        args_bounds_check(args, 2, 1.0),
+    )
+
+
 @dynamo_tensorrt_converter(torch.ops.aten.sigmoid.default, supports_dynamic_shapes=True)
 def aten_ops_sigmoid(
     ctx: ConversionContext,
@@ -444,6 +518,24 @@ def aten_ops_symsize_int(
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     return impl.shape.shape(ctx, target, SourceIR.ATEN, name, args[0], args[1])
+
+
+@enforce_tensor_types(
+    {
+        0: (TRTTensor,),
+    }
+)
+@dynamo_tensorrt_converter(
+    torch.ops.aten.sym_numel.default, supports_dynamic_shapes=True
+)
+def aten_ops_sym_numel(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    return impl.shape.numel(ctx, target, SourceIR.ATEN, name, args[0])
 
 
 def index_dtype_validator(
@@ -906,8 +998,8 @@ def aten_ops_gather(
     )
 
 
-@dynamo_tensorrt_converter(torch.ops.aten.scatter.src)
-@dynamo_tensorrt_converter(torch.ops.aten.scatter.value)
+@dynamo_tensorrt_converter(torch.ops.aten.scatter.src, supports_dynamic_shapes=True)
+@dynamo_tensorrt_converter(torch.ops.aten.scatter.value, supports_dynamic_shapes=True)
 @enforce_tensor_types(
     {
         0: (TRTTensor,),

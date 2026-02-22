@@ -14,6 +14,7 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     cast_trt_tensor,
     get_positive_dim,
     get_trt_tensor,
+    has_dynamic_shape,
     set_layer_name,
     to_numpy,
 )
@@ -498,14 +499,30 @@ def scatter(
         index = cast_trt_tensor(ctx, index, trt.int32, name + "_cast_index_tensor")
     dim = get_positive_dim(dim, len(input_shape))
     src_tensor = src
-    # scatter.value
+    # scatter.value - need to create a tensor filled with the scalar value
     if isinstance(src, (int, float)):
-        src_tensor = get_trt_tensor(
-            ctx, src * np.ones(index_shape_list), name + "_value_tensor"
-        )
-        src_tensor = cast_trt_tensor(
-            ctx, src_tensor, input.dtype, name + "_cast_value_tensor"
-        )
+        if has_dynamic_shape(index_shape):
+            # Dynamic shape: get index shape at runtime and use impl.full operation
+            shape_layer = ctx.net.add_shape(index)
+            set_layer_name(shape_layer, target, name + "_index_shape", source_ir)
+            shape_tensor = shape_layer.get_output(0)
+            src_tensor = impl.full.full(
+                ctx,
+                target,
+                source_ir,
+                name + "_fill_value",
+                shape_tensor,
+                src,
+                input.dtype,
+            )
+        else:
+            # Static shape: use numpy to create the filled tensor
+            src_tensor = get_trt_tensor(
+                ctx, src * np.ones(index_shape_list), name + "_value_tensor"
+            )
+            src_tensor = cast_trt_tensor(
+                ctx, src_tensor, input.dtype, name + "_cast_value_tensor"
+            )
     # scatter.src
     elif not (isinstance(src, TRTTensor)):
         src_tensor = get_trt_tensor(ctx, src, name + "_src_tensor")

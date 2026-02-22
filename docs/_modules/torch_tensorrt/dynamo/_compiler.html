@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt.dynamo._compiler &mdash; Torch-TensorRT v2.10.0.dev0+093e8dc documentation</title>
+  <title>torch_tensorrt.dynamo._compiler &mdash; Torch-TensorRT v2.11.0.dev0+f60963f documentation</title>
   
 
   
@@ -290,7 +290,7 @@
               
               
                 <div class="version">
-                  v2.10.0.dev0+093e8dc
+                  v2.11.0.dev0+f60963f
                 </div>
               
             
@@ -1571,13 +1571,15 @@
             <span class="n">trt_module</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">partitioned_module</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span>
             <span class="n">trt_module</span><span class="o">.</span><span class="n">setup_engine</span><span class="p">()</span>
 
-    <span class="n">output_node</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">partitioned_module</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">nodes</span><span class="p">)[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
-    <span class="k">for</span> <span class="n">arg</span> <span class="ow">in</span> <span class="n">output_node</span><span class="o">.</span><span class="n">args</span><span class="p">:</span>
-        <span class="k">for</span> <span class="n">output</span> <span class="ow">in</span> <span class="n">arg</span><span class="p">:</span>
-            <span class="n">target</span> <span class="o">=</span> <span class="n">output</span><span class="o">.</span><span class="n">target</span>
-            <span class="k">if</span> <span class="s2">&quot;_run_on_acc&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="nb">str</span><span class="p">(</span><span class="n">target</span><span class="p">):</span>
-                <span class="k">continue</span>
-            <span class="nb">getattr</span><span class="p">(</span><span class="n">partitioned_module</span><span class="p">,</span> <span class="n">target</span><span class="p">)</span><span class="o">.</span><span class="n">set_output_tensors_as_unowned</span><span class="p">(</span><span class="kc">True</span><span class="p">)</span>
+    <span class="c1"># Only set output tensors as unowned if not in dryrun mode (TRT modules exist)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">settings</span><span class="o">.</span><span class="n">dryrun</span><span class="p">:</span>
+        <span class="n">output_node</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">partitioned_module</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">nodes</span><span class="p">)[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+        <span class="k">for</span> <span class="n">arg</span> <span class="ow">in</span> <span class="n">output_node</span><span class="o">.</span><span class="n">args</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">output</span> <span class="ow">in</span> <span class="n">arg</span><span class="p">:</span>
+                <span class="n">target</span> <span class="o">=</span> <span class="n">output</span><span class="o">.</span><span class="n">target</span>
+                <span class="k">if</span> <span class="s2">&quot;_run_on_acc&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="nb">str</span><span class="p">(</span><span class="n">target</span><span class="p">):</span>
+                    <span class="k">continue</span>
+                <span class="nb">getattr</span><span class="p">(</span><span class="n">partitioned_module</span><span class="p">,</span> <span class="n">target</span><span class="p">)</span><span class="o">.</span><span class="n">set_output_tensors_as_unowned</span><span class="p">(</span><span class="kc">True</span><span class="p">)</span>
 
     <span class="c1"># Reset settings object to user specification after fallback to global partitioning mode</span>
     <span class="k">if</span> <span class="n">fast_partitioner_failed</span><span class="p">:</span>

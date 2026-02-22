@@ -1,5 +1,7 @@
+import importlib
 import os
 import sys
+import unittest
 
 import pytest
 import torch
@@ -9,13 +11,17 @@ from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
 sys.path.append(os.path.join(os.path.dirname(__file__), "../../../../tools/llm"))
 import argparse
 
-from run_llm import compile_torchtrt
-from torchtrt_ext import register_sdpa
-
 
 @pytest.mark.unit
 @pytest.mark.parametrize("precision", ["FP16", "BF16", "FP32"])
+@unittest.skipIf(
+    not importlib.util.find_spec("modelopt"),
+    "ModelOpt is required to run this test",
+)
 def test_llm_decoder_layer(precision):
+    from run_llm import compile_torchtrt
+    from torchtrt_ext import register_sdpa
+
     if torch_tensorrt.ENABLED_FEATURES.tensorrt_rtx and precision == "BF16":
         pytest.skip("TensorRT-RTX does not support bfloat16, skipping test")
     with torch.inference_mode():
@@ -23,15 +29,15 @@ def test_llm_decoder_layer(precision):
         args.debug = False
         args.num_tokens = 128
         args.model = "Qwen/Qwen2.5-0.5B-Instruct"
-        args.precision = precision
+        args.model_precision = precision
         args.min_block_size = 1
         args.prompt = "What is parallel programming ?"
-        if args.precision == "FP16":
+        if args.model_precision == "FP16":
             dtype = torch.float16
-        elif args.precision == "BF16":
+        elif args.model_precision == "BF16":
             dtype = torch.bfloat16
         else:
-            args.precision = "FP32"
+            args.model_precision = "FP32"
             dtype = torch.float32
 
         model = (

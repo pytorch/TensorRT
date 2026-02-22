@@ -110,6 +110,7 @@ def cross_compile_for_windows(
     use_distributed_mode_trace: bool = _defaults.USE_DISTRIBUTED_MODE_TRACE,
     enable_resource_partitioning: bool = _defaults.ENABLE_RESOURCE_PARTITIONING,
     cpu_memory_budget: Optional[int] = _defaults.CPU_MEMORY_BUDGET,
+    dynamically_allocate_resources: bool = _defaults.DYNAMICALLY_ALLOCATE_RESOURCES,
     **kwargs: Any,
 ) -> torch.fx.GraphModule:
     """Compile an ExportedProgram module using TensorRT in Linux for Inference in Windows
@@ -186,6 +187,7 @@ def cross_compile_for_windows(
         use_distributed_mode_trace (bool):  Using aot_autograd to trace the graph. This is enabled when DTensors or distributed tensors are present in distributed model
         enable_resource_partitioning (bool): Enable resource-aware partitioning. This is useful when the model is large and the CPU memory is limited.
         cpu_memory_budget (Optional[int]): The maximum amount of CPU memory to use for the compilation. If the compilation requires more memory than this budget, the compilation will fail.
+        dynamically_allocate_resources (bool): Dynamically allocate resources during engine execution.
         **kwargs: Any,
     Returns:
         torch.fx.GraphModule: Compiled FX Module, when run it will execute via TensorRT
@@ -343,6 +345,7 @@ def cross_compile_for_windows(
         "use_distributed_mode_trace": use_distributed_mode_trace,
         "enable_resource_partitioning": enable_resource_partitioning,
         "cpu_memory_budget": cpu_memory_budget,
+        "dynamically_allocate_resources": dynamically_allocate_resources,
     }
 
     # disable the following settings is not supported for cross compilation for windows feature
@@ -370,15 +373,19 @@ def cross_compile_for_windows(
     gm = exported_program.module()
     logger.debug("Input graph: " + str(gm.graph))
 
-    # Apply lowering on the graph module
+    # Apply lowering on the graph module. Note: constant_fold runs inside post_lowering and requires
+    # module parameters to still be on GPU, so we must not deallocate before this call.
     gm = post_lowering(gm, settings)
+    logger.debug(f"CPU memory usage after post_lowering: {get_cpu_memory_usage()} MB")
     logger.debug("Lowered Input graph: " + str(gm.graph))
+
     # Move the weights in the state_dict to CPU
     if offload_module_to_cpu:
-        deallocate_module(exported_program.module(), delete_module=False)
+        deallocate_module(gm)
         logger.info(
             "The PyTorch model was moved to the CPU to allocate all GPU memory to TensorRT. To retain the model on the GPU, set offload_module_to_cpu=False"
         )
+        logger.debug(f"CPU memory usage after CPU offload: {get_cpu_memory_usage()} MB")
     else:
         remaining_memory, total_memory = torch.cuda.mem_get_info()
         if remaining_memory < total_memory // 2:
@@ -459,6 +466,7 @@ def compile(
     ] = _defaults.AUTOCAST_CALIBRATION_DATALOADER,
     cpu_memory_budget: Optional[int] = _defaults.CPU_MEMORY_BUDGET,
     enable_resource_partitioning: bool = _defaults.ENABLE_RESOURCE_PARTITIONING,
+    dynamically_allocate_resources: bool = _defaults.DYNAMICALLY_ALLOCATE_RESOURCES,
     **kwargs: Any,
 ) -> torch.fx.GraphModule:
     """Compile an ExportedProgram module for NVIDIA GPUs using TensorRT
@@ -545,6 +553,7 @@ def compile(
         autocast_calibration_dataloader (Optional[torch.utils.data.DataLoader]): The dataloader to use for autocast calibration. Default is None.
         enable_resource_partitioning (bool): Enable resource-aware partitioning. This is useful when the model is large and the CPU memory is limited.
         cpu_memory_budget (Optional[int]): The maximum amount of CPU memory to use for the compilation. If the compilation requires more memory than this budget, the compilation will fail.
+        dynamically_allocate_resources (bool): Dynamically allocate resources during engine execution.
         **kwargs: Any,
     Returns:
         torch.fx.GraphModule: Compiled FX Module, when run it will execute via TensorRT
@@ -747,6 +756,7 @@ def compile(
         "autocast_calibration_dataloader": autocast_calibration_dataloader,
         "enable_resource_partitioning": enable_resource_partitioning,
         "cpu_memory_budget": cpu_memory_budget,
+        "dynamically_allocate_resources": dynamically_allocate_resources,
     }
     logger.debug(f"CPU memory usage before lowering: {get_cpu_memory_usage()} MB")
     settings = CompilationSettings(**compilation_options)
@@ -760,15 +770,15 @@ def compile(
     # Move the weights in the state_dict to CPU
     logger.debug("Input graph: " + str(gm.graph))
 
-    # Apply lowering on the graph module
+    # Apply lowering on the graph module. Note: constant_fold runs inside post_lowering and requires
+    # module parameters to still be on GPU, so we must not deallocate before this call.
     gm = post_lowering(gm, settings)
     logger.debug(f"CPU memory usage after post_lowering: {get_cpu_memory_usage()} MB")
     logger.debug("Lowered Input graph: " + str(gm.graph))
 
     # Move the weights in the state_dict to CPU
     if offload_module_to_cpu:
-        deallocate_module(gm, delete_module=False)
-        deallocate_module(exported_program.module(), delete_module=False)
+        deallocate_module(gm)
         logger.info(
             "The PyTorch model was moved to the CPU to allocate all GPU memory to TensorRT. To retain the model on the GPU, set offload_module_to_cpu=False"
         )
@@ -1082,13 +1092,15 @@ def compile_module(
             trt_module = getattr(partitioned_module, name)
             trt_module.setup_engine()
 
-    output_node = list(partitioned_module.graph.nodes)[-1]
-    for arg in output_node.args:
-        for output in arg:
-            target = output.target
-            if "_run_on_acc" not in str(target):
-                continue
-            getattr(partitioned_module, target).set_output_tensors_as_unowned(True)
+    # Only set output tensors as unowned if not in dryrun mode (TRT modules exist)
+    if not settings.dryrun:
+        output_node = list(partitioned_module.graph.nodes)[-1]
+        for arg in output_node.args:
+            for output in arg:
+                target = output.target
+                if "_run_on_acc" not in str(target):
+                    continue
+                getattr(partitioned_module, target).set_output_tensors_as_unowned(True)
 
     # Reset settings object to user specification after fallback to global partitioning mode
     if fast_partitioner_failed:
@@ -1411,7 +1423,7 @@ def convert_exported_program_to_serialized_trt_engine(
 
     # Move the weights in the state_dict to CPU
     if offload_module_to_cpu:
-        deallocate_module(exported_program.module(), delete_module=False)
+        deallocate_module(exported_program.module())
         logger.info(
             "The PyTorch model was moved to the CPU to allocate all GPU memory to TensorRT. To retain the model on the GPU, set offload_module_to_cpu=False"
         )

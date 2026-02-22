@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Torch-TensorRT-RTX &mdash; Torch-TensorRT v2.10.0.dev0+093e8dc documentation</title>
+  <title>Torch-TensorRT-RTX &mdash; Torch-TensorRT v2.11.0.dev0+f60963f documentation</title>
   
 
   
@@ -291,7 +291,7 @@
               
               
                 <div class="version">
-                  v2.10.0.dev0+093e8dc
+                  v2.11.0.dev0+f60963f
                 </div>
               
             
@@ -512,6 +512,74 @@ Torch-TensorRT by default uses standard TensorRT during the build and run.</p>
 </section>
 <section id="prerequisites">
 <h2>Prerequisites<a class="headerlink" href="#prerequisites" title="Permalink to this heading">¶</a></h2>
+<section id="clone-the-repository">
+<h3>Clone the Repository<a class="headerlink" href="#clone-the-repository" title="Permalink to this heading">¶</a></h3>
+<p>First, clone the Torch-TensorRT repository:</p>
+<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/pytorch/TensorRT.git
+<span class="nb">cd</span><span class="w"> </span>TensorRT
+</pre></div>
+</div>
+</section>
+<section id="install-system-dependencies">
+<h3>Install System Dependencies<a class="headerlink" href="#install-system-dependencies" title="Permalink to this heading">¶</a></h3>
+<p><strong>In Linux:</strong></p>
+<p>Install Python development headers (required for building Python extensions):</p>
+<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span><span class="c1"># For Python 3.12 (adjust version number based on your Python version)</span>
+sudo<span class="w"> </span>apt<span class="w"> </span>install<span class="w"> </span>python3.12-dev
+</pre></div>
+</div>
+</section>
+<section id="install-cuda-toolkit">
+<h3>Install CUDA Toolkit<a class="headerlink" href="#install-cuda-toolkit" title="Permalink to this heading">¶</a></h3>
+<p>Download and install the CUDA Toolkit from the <a class="reference external" href="https://developer.nvidia.com/cuda-downloads">NVIDIA Developer website</a>. Also download the Nvidia driver if necessary.
+_Note: If you are on Windows, but in Linux via WSL, you do not need to install drivers in Linux. WSL will automatically use the drivers installed in Windows._</p>
+<p><strong>Important:</strong> Check the required CUDA version in the <a class="reference external" href="https://github.com/pytorch/TensorRT/blob/main/MODULE.bazel">MODULE.bazel</a> file. You must install the exact CUDA toolkit version specified there (for example, at the time of writing, CUDA 13.0 is required).</p>
+<p>After installation, set the <code class="docutils literal notranslate"><span class="pre">CUDA_HOME</span></code> environment variable:</p>
+<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span><span class="nb">export</span><span class="w"> </span><span class="nv">CUDA_HOME</span><span class="o">=</span>/usr/local/cuda
+<span class="c1"># Add this to your ~/.bashrc or ~/.zshrc to make it persistent</span>
+</pre></div>
+</div>
+</section>
+<section id="install-python-dependencies">
+<h3>Install Python Dependencies<a class="headerlink" href="#install-python-dependencies" title="Permalink to this heading">¶</a></h3>
+<p><strong>It is strongly recommended to use a virtual environment</strong> to avoid conflicts with system packages:</p>
+<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span><span class="c1"># Install venv</span>
+apt<span class="w"> </span>install<span class="w"> </span>python3.12-venv
+
+<span class="c1"># Create a virtual environment</span>
+python<span class="w"> </span>-m<span class="w"> </span>venv<span class="w"> </span>.venv
+
+<span class="c1"># Activate the virtual environment</span>
+<span class="nb">source</span><span class="w"> </span>.venv/bin/activate<span class="w">  </span><span class="c1"># On Linux/Mac</span>
+<span class="c1"># OR on Windows:</span>
+<span class="c1"># .venv\Scripts\activate</span>
+</pre></div>
+</div>
+<p>Before building, install the required Python packages:</p>
+<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span><span class="c1"># Install setuptools (provides distutils)</span>
+pip<span class="w"> </span>install<span class="w"> </span>setuptools
+
+<span class="c1"># Install PyTorch</span>
+<span class="c1"># Note: If you are building Torch-TensorRT at tip-of-tree, you need to install the latest PyTorch nightly build rather than the stable release. See below for details.</span>
+pip<span class="w"> </span>install<span class="w"> </span>torch<span class="w"> </span>torchvision
+
+<span class="c1"># Install PyTorch nightly build (check CUDA version in MODULE.bazel)</span>
+<span class="c1"># Replace cuXXX with your CUDA version (e.g., cu130 for CUDA 13.0)</span>
+<span class="c1"># pip install --pre torch torchvision --index-url https://download.pytorch.org/whl/nightly/cuXXX</span>
+
+<span class="c1"># Install additional build dependencies</span>
+pip<span class="w"> </span>install<span class="w"> </span>pyyaml<span class="w"> </span>numpy
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The PyTorch version requirement is defined in <a class="reference external" href="https://github.com/pytorch/TensorRT/blob/main/pyproject.toml">pyproject.toml</a> (build requirements) and <a class="reference external" href="https://github.com/pytorch/TensorRT/blob/main/setup.py">setup.py</a> (runtime requirements). If you encounter version-related errors during installation, refer to these files for the exact version constraints.</p>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Remember to activate the virtual environment (<code class="docutils literal notranslate"><span class="pre">source</span> <span class="pre">.venv/bin/activate</span></code>) whenever you work with this project or run the build commands.</p>
+</div>
+</section>
 <section id="install-bazel">
 <h3>Install Bazel<a class="headerlink" href="#install-bazel" title="Permalink to this heading">¶</a></h3>
 <p>Bazel is required to build the wheel with TensorRT-RTX.</p>
@@ -561,18 +629,28 @@ python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </sp
 <h2>Build Torch-TensorRT with TensorRT-RTX<a class="headerlink" href="#build-torch-tensorrt-with-tensorrt-rtx" title="Permalink to this heading">¶</a></h2>
 <section id="build-locally-with-tensorrt-rtx">
 <h3>Build Locally with TensorRT-RTX<a class="headerlink" href="#build-locally-with-tensorrt-rtx" title="Permalink to this heading">¶</a></h3>
+<p>Before building, ensure you have completed all the prerequisite steps above, including:</p>
+<ul class="simple">
+<li><p>Cloning the repository</p></li>
+<li><p>Installing Python dependencies (setuptools, torch, pyyaml, numpy)</p></li>
+<li><p>Setting CUDA_HOME environment variable</p></li>
+<li><p>Installing the correct CUDA toolkit version</p></li>
+<li><p>Installing Python development headers</p></li>
+<li><p>Installing Bazel</p></li>
+</ul>
+<p>Then build the wheel:</p>
 <div class="highlight-sh notranslate"><div class="highlight"><pre><span></span><span class="c1"># If you have previously built with standard TensorRT, make sure to clean the build environment,</span>
 <span class="c1"># otherwise it will use the existing .so built with standard TensorRT, which is not compatible with TensorRT-RTX.</span>
 python<span class="w"> </span>setup.py<span class="w"> </span>clean
 bazel<span class="w"> </span>clean<span class="w"> </span>--expunge
-<span class="c1">#remove everything under build directory,</span>
+<span class="c1"># Remove everything under build directory</span>
 rm<span class="w"> </span>-rf<span class="w"> </span>build/*
 
 <span class="c1"># Build wheel with TensorRT-RTX</span>
 python<span class="w"> </span>setup.py<span class="w"> </span>bdist_wheel<span class="w"> </span>--use-rtx
 
-<span class="c1"># Install the wheel</span>
-python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>dist/torch-tensorrt-*.whl
+<span class="c1"># Install the wheel (note: the wheel filename uses underscores, not hyphens)</span>
+python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>dist/torch_tensorrt-*.whl
 </pre></div>
 </div>
 </section>
@@ -586,6 +664,43 @@ python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </sp
 </section>
 <section id="troubleshooting">
 <h2>Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permalink to this heading">¶</a></h2>
+<section id="common-issues">
+<h3>Common Issues<a class="headerlink" href="#common-issues" title="Permalink to this heading">¶</a></h3>
+<p><strong>Missing distutils module</strong></p>
+<p>If you encounter <code class="docutils literal notranslate"><span class="pre">ModuleNotFoundError:</span> <span class="pre">No</span> <span class="pre">module</span> <span class="pre">named</span> <span class="pre">'distutils'</span></code>, install setuptools:</p>
+<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>setuptools
+</pre></div>
+</div>
+<p><strong>Missing CUDA_HOME environment variable</strong></p>
+<p>If you encounter <code class="docutils literal notranslate"><span class="pre">OSError:</span> <span class="pre">CUDA_HOME</span> <span class="pre">environment</span> <span class="pre">variable</span> <span class="pre">is</span> <span class="pre">not</span> <span class="pre">set</span></code>, set the CUDA_HOME path:</p>
+<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span><span class="nb">export</span><span class="w"> </span><span class="nv">CUDA_HOME</span><span class="o">=</span>/usr/local/cuda
+</pre></div>
+</div>
+<p><strong>CUDA version mismatch</strong></p>
+<p>If you encounter errors about CUDA paths not existing (e.g., <code class="docutils literal notranslate"><span class="pre">/usr/local/cuda-X.Y/</span> <span class="pre">does</span> <span class="pre">not</span> <span class="pre">exist</span></code>), ensure you have the correct CUDA version installed. Check the required version in <a class="reference external" href="https://github.com/pytorch/TensorRT/blob/main/MODULE.bazel">MODULE.bazel</a>. You may need to:</p>
+<ol class="arabic simple">
+<li><p>Update your NVIDIA drivers</p></li>
+<li><p>Download and install the specific CUDA toolkit version required by MODULE.bazel</p></li>
+<li><p>Clean and rebuild after installing the correct version</p></li>
+</ol>
+<p><strong>PyTorch version mismatch</strong></p>
+<p>If you encounter an error like <code class="docutils literal notranslate"><span class="pre">ERROR:</span> <span class="pre">No</span> <span class="pre">matching</span> <span class="pre">distribution</span> <span class="pre">found</span> <span class="pre">for</span> <span class="pre">torch&lt;X.Y.Z,&gt;=X.Y.Z.dev</span></code> (for example, <code class="docutils literal notranslate"><span class="pre">torch&lt;2.11.0,&gt;=2.10.0.dev</span></code>), you need to install a compatible PyTorch nightly version.</p>
+<p>First, check the exact version constraint in <a class="reference external" href="https://github.com/pytorch/TensorRT/blob/main/pyproject.toml">pyproject.toml</a>, then install with that constraint:</p>
+<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span><span class="c1"># Example: if pyproject.toml requires torch&gt;=2.10.0.dev,&lt;2.11.0</span>
+<span class="c1"># and MODULE.bazel specifies CUDA 13.0 (cu130):</span>
+pip<span class="w"> </span>install<span class="w"> </span>--pre<span class="w"> </span><span class="s2">&quot;torch&gt;=2.10.0.dev,&lt;2.11.0&quot;</span><span class="w"> </span>torchvision<span class="w"> </span>--index-url<span class="w"> </span>https://download.pytorch.org/whl/nightly/cu130
+</pre></div>
+</div>
+<p>Replace the version constraint and CUDA version (cuXXX) according to your project’s requirements.</p>
+<p><strong>Missing Python development headers</strong></p>
+<p>If you encounter <code class="docutils literal notranslate"><span class="pre">fatal</span> <span class="pre">error:</span> <span class="pre">Python.h:</span> <span class="pre">No</span> <span class="pre">such</span> <span class="pre">file</span> <span class="pre">or</span> <span class="pre">directory</span></code>, install the Python development package:</p>
+<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span><span class="c1"># For Python 3.12 (adjust version based on your Python)</span>
+sudo<span class="w"> </span>apt<span class="w"> </span>install<span class="w"> </span>python3.12-dev
+</pre></div>
+</div>
+</section>
+<section id="verifying-tensorrt-rtx-linkage">
+<h3>Verifying TensorRT-RTX Linkage<a class="headerlink" href="#verifying-tensorrt-rtx-linkage" title="Permalink to this heading">¶</a></h3>
 <p>If you encounter load or link errors, check if <cite>tensorrt_rtx</cite> is linked correctly.
 If not, clean up the environment and rebuild.</p>
 <p><strong>In Linux:</strong></p>
@@ -605,6 +720,7 @@ ldd<span class="w"> </span><span class="nv">$trt_install_path</span>/lib/libtorc
 dumpbin<span class="w"> </span>/DEPENDENTS<span class="w"> </span>torchtrt.dll
 </pre></div>
 </div>
+</section>
 </section>
 </section>
 
@@ -648,6 +764,10 @@ dumpbin<span class="w"> </span>/DEPENDENTS<span class="w"> </span>torchtrt.dll
 </ul>
 </li>
 <li><a class="reference internal" href="#prerequisites">Prerequisites</a><ul>
+<li><a class="reference internal" href="#clone-the-repository">Clone the Repository</a></li>
+<li><a class="reference internal" href="#install-system-dependencies">Install System Dependencies</a></li>
+<li><a class="reference internal" href="#install-cuda-toolkit">Install CUDA Toolkit</a></li>
+<li><a class="reference internal" href="#install-python-dependencies">Install Python Dependencies</a></li>
 <li><a class="reference internal" href="#install-bazel">Install Bazel</a></li>
 <li><a class="reference internal" href="#install-tensorrt-rtx-tarball">Install TensorRT-RTX Tarball</a></li>
 <li><a class="reference internal" href="#install-tensorrt-rtx-wheel">Install TensorRT-RTX Wheel</a></li>
@@ -658,7 +778,11 @@ dumpbin<span class="w"> </span>/DEPENDENTS<span class="w"> </span>torchtrt.dll
 </ul>
 </li>
 <li><a class="reference internal" href="#quick-start">Quick Start</a></li>
-<li><a class="reference internal" href="#troubleshooting">Troubleshooting</a></li>
+<li><a class="reference internal" href="#troubleshooting">Troubleshooting</a><ul>
+<li><a class="reference internal" href="#common-issues">Common Issues</a></li>
+<li><a class="reference internal" href="#verifying-tensorrt-rtx-linkage">Verifying TensorRT-RTX Linkage</a></li>
+</ul>
+</li>
 </ul>
 </li>
 </ul>
