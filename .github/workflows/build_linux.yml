@@ -397,9 +397,9 @@ jobs:
     needs: build
     name: upload-wheel-${{ matrix.python_version }}-${{ matrix.desired_cuda }}-${{ matrix.gpu_arch_type }}-${{ inputs.is-jetpack }}
     uses: pytorch/test-infra/.github/workflows/_binary_upload.yml@main
-    #  if it is not jetpack nor rtx, then upload to pytorch index
+    #  if it is not jetpack, then upload to pytorch index
     # if it is the release wheel or tarball, then skip upload to pytorch index
-    if: ${{ inputs.is-jetpack == false && inputs.use-rtx == false && inputs.is-release-wheel == false && inputs.is-release-tarball == false }}
+    if: ${{ inputs.is-jetpack == false && inputs.is-release-wheel == false && inputs.is-release-tarball == false }}
     with:
       repository: ${{ inputs.repository }}
       ref: ${{ inputs.ref }}
