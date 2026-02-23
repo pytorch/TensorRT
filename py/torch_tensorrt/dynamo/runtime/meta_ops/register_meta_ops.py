@@ -1,9 +1,163 @@
 import base64
-from collections import defaultdict
-from typing import Any, List
+import logging
+from typing import Any, Dict, List
 
 import torch
-from torch_tensorrt.dynamo.utils import input_is_dynamic, unwrap_tensor_shape
+from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import TorchTensorRTModule
+
+logger = logging.getLogger(__name__)
+
+
+def _apply_symbolic_shape_expressions(
+    inputs: List[torch.Tensor], shape_info: Dict[str, List[Dict[str, Any]]]
+) -> List[torch.Tensor]:
+    """
+    Apply symbolic shape expressions to create output fake tensors.
+
+    This applies the shape expressions captured at compile time to the current
+    input fake tensors' symbolic context, using the input alignment to map
+    symbolic dimensions.
+
+    Args:
+        inputs: Input fake tensors with current symbolic shapes
+        shape_info: Dict with 'inputs' and 'outputs' keys containing shape_exprs and dtype info
+
+    Returns:
+        List of output fake tensors with symbolic shapes
+    """
+    from torch._guards import detect_fake_mode
+
+    logger.debug(
+        f"[torch.ops.tensorrt.execute_engine]: Meta kernel found the following input FakeTensors: {inputs}"
+    )
+
+    input_info = shape_info.get("inputs", [])
+    output_info = shape_info.get("outputs", [])
+
+    fake_mode = detect_fake_mode(inputs)
+    if fake_mode is None:
+        # No fake mode - shouldn't happen, but fall back to concrete shapes
+        outputs = []
+        for info in output_info:
+            shape = [
+                int(s) if not hasattr(s, "is_Symbol") else 1
+                for s in info["shape_exprs"]
+            ]
+            outputs.append(
+                torch.empty(shape, dtype=info["dtype"], device=inputs[0].device)
+            )
+        return outputs
+
+    # Build a mapping from compile-time symbolic expressions to runtime SymInts
+    # by aligning captured input info with actual runtime input tensors
+    symbol_to_symint = {}
+    symbol_to_concrete = {}
+    shape_env = None
+
+    # Align inputs: for each captured input, match it with the corresponding runtime input
+    for idx, (inp_tensor, inp_info) in enumerate(zip(inputs, input_info)):
+        for d, s in zip(inp_tensor.shape, inp_info["shape_exprs"]):
+            if isinstance(d, torch.SymInt):
+                symbol_to_symint[s] = d
+                if shape_env is None:
+                    shape_env = d.node.shape_env
+
+            elif isinstance(d, int):
+                symbol_to_concrete[s] = d
+
+            logger.debug(
+                f"[torch.ops.tensorrt.execute_engine]: Meta kernel captured and mapped symbol from input {inp_tensor} (compile time symbol: {s}, new symbol: {d})"
+            )
+
+    # Create output fake tensors with symbolic shapes
+    logger.debug(f"Deserialized output shape expressions: {output_info}")
+    outputs = []
+    with fake_mode:
+        for output_num, info in enumerate(output_info):
+            output_shape = []
+            for expr in info["shape_exprs"]:
+                if isinstance(expr, int):
+                    # Concrete dimension
+                    output_shape.append(expr)
+                else:
+                    logger.debug(f"Symbolic expression: {expr}")
+                    # Symbolic expression (sympy expr)
+
+                    # Check if this expression uses any symbols that are now concrete
+                    has_concrete_symbols = any(
+                        sym in symbol_to_concrete for sym in expr.free_symbols
+                    )
+
+                    if has_concrete_symbols:
+                        # Case 2: Some compile-time symbols are now concrete ints
+                        # Evaluate the expression to a concrete value
+                        try:
+                            # Build substitution dict with concrete values
+                            subs_dict = {}
+                            for sym in expr.free_symbols:
+                                if sym in symbol_to_concrete:
+                                    subs_dict[sym] = symbol_to_concrete[sym]
+                                elif sym in symbol_to_symint:
+                                    subs_dict[sym] = symbol_to_symint[sym].node.hint
+                                else:
+                                    subs_dict[sym] = sym
+
+                            val = expr.subs(subs_dict)
+                            concrete_dim = int(val)
+                            output_shape.append(concrete_dim)
+                            logger.debug(
+                                f"Evaluated {expr} to concrete value {concrete_dim} using concrete mappings"
+                            )
+                        except Exception as e:
+                            raise RuntimeError(
+                                f"[torch.ops.tensorrt.execute_engine]: Failed to evaluate symbolic expression {expr} "
+                                f"with concrete values. Free symbols: {expr.free_symbols}, "
+                                f"Concrete mappings: {symbol_to_concrete}, "
+                                f"SymInt mappings: {list(symbol_to_symint.keys())}. Error: {e}"
+                            )
+                    elif expr in symbol_to_symint:
+                        # Case 1a: Direct mapping - compile-time symbol is represented by runtime SymInt
+                        output_shape.append(symbol_to_symint[expr])
+                        logger.debug(
+                            f"Reused SymInt from input: {expr} -> {symbol_to_symint[expr]}"
+                        )
+                    elif shape_env is not None:
+                        # Case 1b: Create new SymInt from expression using existing SymInts
+                        try:
+                            # Calculate hint by substituting known values
+                            hint_val = expr.subs(
+                                {
+                                    sym: symbol_to_symint[sym].node.hint
+                                    for sym in expr.free_symbols
+                                    if sym in symbol_to_symint
+                                }
+                            )
+                            hint = int(hint_val) if hint_val.is_number else None
+
+                            # Create new SymInt from the expression
+                            output_symint = shape_env.create_symintnode(expr, hint=hint)
+                            output_shape.append(output_symint)
+                            logger.debug(
+                                f"Created new SymInt for {expr} with hint {hint}"
+                            )
+                        except Exception as e:
+                            raise RuntimeError(
+                                f"[torch.ops.tensorrt.execute_engine]: Failed to create SymInt for expression {expr}. "
+                                f"Error: {e}"
+                            )
+                    else:
+                        raise RuntimeError(
+                            "[torch.ops.tensorrt.execute_engine]: No shape_env available during meta kernel execution"
+                        )
+
+            outputs.append(
+                torch.empty(output_shape, dtype=info["dtype"], device=inputs[0].device)
+            )
+    logger.debug(
+        f"[torch.ops.tensorrt.execute_engine]: Meta kernel found the following output FakeTensors: {outputs}"
+    )
+
+    return outputs
 
 
 @torch.library.register_fake("aten::cudnn_grid_sampler")  # type: ignore
@@ -40,78 +194,36 @@ def fake_tensorrt_execute_engine(
     inputs: List[torch.Tensor], fake_trt_engine: Any
 ) -> Any:
     """
-    We infer outputs using the TRT engine and inputs and return fake tensors in this meta kernel.
+    Meta kernel for TensorRT engine execution.
+
+    Uses symbolic shape expressions captured at compile time to correctly infer
+    output shapes while preserving symbolic SymInt relationships.
     """
-    # Here's what we are doing
-    # 1) Check if inputs are dynamic (they have sym ints in their shapes)
-    # 2) For dynamic inputs, we gather min_input_shape and max_input shape for all inputs
-    # 3) For the above min and max input shape, capture the corresponding min and max output shape using TensorRT's set/get shapes mechanism
-    # 4) Create a new symbolic fake tensor using min and max output shape for each output and return them
-    # 5) For static inputs, the output shape will be static and we won't need to create sym ints
-    is_dynamic_execution = input_is_dynamic(inputs)
-    if is_dynamic_execution:
-        modes = ["min", "max", "opt"]
-    else:
-        modes = ["opt"]
 
-    # Get the TRTEngine class and infer output shapes based on input shapes
-    trt_engine = fake_trt_engine.real_obj
-    outputs_mode_dict = defaultdict(list)
-    for mode in modes:
-        input_shapes = [unwrap_tensor_shape(input, mode=mode) for input in inputs]
-        proxy_outputs = trt_engine.infer_outputs(input_shapes)
-        outputs_mode_dict[mode].extend(proxy_outputs)
-
-    # Store the number of outputs
-    if {"min", "max"}.issubset(outputs_mode_dict):
-        assert len(outputs_mode_dict["min"]) == len(outputs_mode_dict["max"])
-        num_outputs = len(outputs_mode_dict["min"])
-    elif "opt" in outputs_mode_dict:
-        num_outputs = len(outputs_mode_dict["opt"])
-
-    fake_outputs = []
-    for out_idx in range(num_outputs):
-        output_shape = []
-        if is_dynamic_execution:
-            # Create output symbolic shape using unbacked symint.
-            # Note: We can't establish a relationship b/w incoming input symbolic shape (eg: s0)
-            # and TensorRT's output shape (represented as unbacked u0). This situation doesn't seem
-            # to affect compilation results / serialization during our testing.
-            output_min_shape = outputs_mode_dict["min"][out_idx].size()
-            output_opt_shape = outputs_mode_dict["opt"][out_idx].size()
-            output_max_shape = outputs_mode_dict["max"][out_idx].size()
-
-            ctx = torch._custom_ops.get_ctx()
-            for min_val, opt_val, max_val in zip(
-                output_min_shape, output_opt_shape, output_max_shape
-            ):
-                if min_val != max_val:
-                    output_sym_int = ctx.new_dynamic_size(min=min_val, max=max_val)
-                    # Update var to val (hint)
-                    output_sym_int_shape_env = output_sym_int.node.shape_env
-                    # PyTorch adb73cc: set_unbacked_var_to_val -> set_real_tensor_prop_unbacked_vals
-                    set_var_val = getattr(
-                        output_sym_int_shape_env,
-                        "set_real_tensor_prop_unbacked_vals",
-                        None,
-                    ) or getattr(
-                        output_sym_int_shape_env, "set_unbacked_var_to_val", None
-                    )
-                    if set_var_val is not None:
-                        set_var_val(output_sym_int.node.expr, opt_val)
-                    output_shape.append(output_sym_int)
-                else:
-                    output_shape.append(min_val)
-        else:
-            output_shape.extend(outputs_mode_dict["opt"][out_idx].size())
-        fake_outputs.append(
-            torch.empty(
-                output_shape,
-                dtype=outputs_mode_dict["opt"][out_idx].dtype,
-                device=inputs[0].device,
-            )
+    metadata = None
+    if hasattr(fake_trt_engine, "real_obj"):
+        # Wrapped C++ engine with real_obj
+        trt_engine = fake_trt_engine.real_obj
+        metadata = TorchTensorRTModule.decode_metadata(
+            trt_engine.get_serialized_metadata()
         )
-    return fake_outputs
+    else:
+        metadata = TorchTensorRTModule.decode_metadata(
+            fake_trt_engine.get_serialized_metadata()
+        )
+
+    shape_info = metadata.get("inout_symexprs") if metadata else None
+
+    if shape_info:
+        # Apply the symbolic shape expressions to create output fake tensors
+        # shape_info now contains both 'inputs' and 'outputs' keys
+        return _apply_symbolic_shape_expressions(inputs, shape_info)
+    else:
+        raise RuntimeError(
+            "No symbolic shape expressions found in TensorRT engine metadata. "
+            "This engine may have been compiled with an older version of Torch-TensorRT. "
+            "Please recompile your model."
+        )
 
 
 @torch._library.register_fake_class("tensorrt::Engine")
@@ -182,6 +294,9 @@ class FakeTRTEngine:
 
     def reset_captured_graph(self) -> Any:
         pass
+
+    def get_serialized_metadata(self) -> Any:
+        return self.serialized_metadata
 
     def __setstate__(self, serialized_state: List[str]) -> Any:
         pass

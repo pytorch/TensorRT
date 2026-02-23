@@ -325,6 +325,10 @@ std::string TRTEngine::get_engine_layer_info() {
   return inspector->getEngineInformation(nvinfer1::LayerInformationFormat::kJSON);
 }
 
+std::string TRTEngine::get_serialized_metadata() {
+  return this->serialized_metadata;
+}
+
 std::vector<at::Tensor> TRTEngine::infer_outputs(std::vector<std::vector<int64_t>> input_shapes) {
   std::vector<at::Tensor> outputs;
   TORCHTRT_CHECK(
