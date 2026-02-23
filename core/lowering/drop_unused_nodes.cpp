@@ -1,13 +1,7 @@
 #include "torch/csrc/jit/ir/ir.h"
 
 namespace torch {
-namespace jit {
-
-namespace prim {
-using namespace ::c10::prim;
-} // namespace prim
-
-} // namespace jit
+namespace jit {} // namespace jit
 } // namespace torch
 
 namespace torch_tensorrt {
