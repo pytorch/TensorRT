@@ -261,10 +261,17 @@ def cross_compile_for_windows(
     if use_explicit_typing:
         if len(enabled_precisions) != 1 or not any(
             x in enabled_precisions
-            for x in {torch.float32, dtype.f32, torch.float4_e2m1fn_x2, dtype.f4}
+            for x in {
+                torch.float32,
+                dtype.f32,
+                torch.float4_e2m1fn_x2,
+                dtype.f4,
+                torch.float8_e4m3fn,
+                dtype.f8,
+            }
         ):
             raise AssertionError(
-                f"use_explicit_typing was set to True, however found that enabled_precisions was also specified (saw: {enabled_precisions}, expected: dtype.f32, dtype.f4). enabled_precisions should not be used when use_explicit_typing=True"
+                f"use_explicit_typing was set to True, however found that enabled_precisions was also specified (saw: {enabled_precisions}, expected: dtype.f32, dtype.f4, dtype.f8). enabled_precisions should not be used when use_explicit_typing=True"
             )
 
     if use_fp32_acc:
@@ -641,10 +648,17 @@ def compile(
     if use_explicit_typing:
         if len(enabled_precisions) != 1 or not any(
             x in enabled_precisions
-            for x in {torch.float32, dtype.f32, torch.float4_e2m1fn_x2, dtype.f4}
+            for x in {
+                torch.float32,
+                dtype.f32,
+                torch.float4_e2m1fn_x2,
+                dtype.f4,
+                torch.float8_e4m3fn,
+                dtype.f8,
+            }
         ):
             raise AssertionError(
-                f"use_explicit_typing was set to True, however found that enabled_precisions was also specified (saw: {enabled_precisions}, expected: dtype.f32, dtype.f4). enabled_precisions should not be used when use_explicit_typing=True"
+                f"use_explicit_typing was set to True, however found that enabled_precisions was also specified (saw: {enabled_precisions}, expected: dtype.f32, dtype.f4, dtype.f8). enabled_precisions should not be used when use_explicit_typing=True"
             )
 
     if autocast_low_precision_type is not None:
@@ -1310,10 +1324,17 @@ def convert_exported_program_to_serialized_trt_engine(
     if use_explicit_typing:
         if len(enabled_precisions) != 1 or not any(
             x in enabled_precisions
-            for x in {torch.float32, dtype.f32, torch.float4_e2m1fn_x2, dtype.f4}
+            for x in {
+                torch.float32,
+                dtype.f32,
+                torch.float4_e2m1fn_x2,
+                dtype.f4,
+                torch.float8_e4m3fn,
+                dtype.f8,
+            }
         ):
             raise AssertionError(
-                f"use_explicit_typing was set to True, however found that enabled_precisions was also specified (saw: {enabled_precisions}, expected: dtype.f32, dtype.f4). enabled_precisions should not be used when use_explicit_typing=True"
+                f"use_explicit_typing was set to True, however found that enabled_precisions was also specified (saw: {enabled_precisions}, expected: dtype.f32, dtype.f4, dtype.f8). enabled_precisions should not be used when use_explicit_typing=True"
             )
 
     if use_fp32_acc:
@@ -1447,18 +1468,20 @@ def convert_exported_program_to_serialized_trt_engine(
             settings=settings,
             engine_cache=engine_cache,
         )
-    except UnsupportedOperatorException:
+    except UnsupportedOperatorException as e:
         logger.error(
             f"Conversion of module {gm} not currently fully supported or convertible!",
             exc_info=True,
         )
-        raise
+        raise UnsupportedOperatorException(
+            f"Conversion of module {gm} not currently fully supported or convertible!"
+        ) from e
     except Exception as e:
         logger.error(
             f"While interpreting the module got an error: {e}",
             exc_info=True,
         )
-        raise
+        raise RuntimeError(f"While interpreting the module got an error: {e}") from e
 
     serialized_engine: bytes = interpreter_result.serialized_engine
     return serialized_engine
