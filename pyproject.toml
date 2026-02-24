@@ -85,6 +85,17 @@ test-ext = [
     "nvidia-modelopt[all]>=0.27.1; python_version >'3.9' and python_version <'3.13'"
 ]
 
+docs = [
+    "sphinx==5.0.1",
+    "sphinx-gallery==0.13.0",
+    "breathe==4.34.0",
+    "exhale==0.3.7",
+    "pytorch_sphinx_theme @ git+https://github.com/pytorch/pytorch_sphinx_theme.git",
+    "nbsphinx==0.9.3",
+    "docutils==0.17.1",
+    "pillow",
+]
+
 quantization = ["nvidia-modelopt[all]>=0.27.1"]
 
 [project.urls]

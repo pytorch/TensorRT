@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Saving models compiled with Torch-TensorRT &mdash; Torch-TensorRT v2.11.0.dev0+f60963f documentation</title>
+  <title>Saving models compiled with Torch-TensorRT &mdash; Torch-TensorRT v2.12.0.dev0+a8f2127 documentation</title>
   
 
   
@@ -293,7 +293,7 @@
               
               
                 <div class="version">
-                  v2.11.0.dev0+f60963f
+                  v2.12.0.dev0+a8f2127
                 </div>
               
             
@@ -340,6 +340,7 @@
 <p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/torch_compile_advanced_usage.html">Torch Compile Advanced Usage</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/compile_with_dynamic_inputs.html">Compiling Models with Dynamic Input Shapes</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/vgg16_ptq.html">Deploy Quantized Models using Torch-TensorRT</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/engine_caching_example.html">Engine Caching</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/engine_caching_bert_example.html">Engine Caching (BERT)</a></li>
@@ -352,6 +353,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/auto_generate_plugins.html">Automatically Generate a Plugin for a Custom Kernel</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/mutable_torchtrt_module_example.html">Mutable Torch TensorRT Module</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/weight_streaming_example.html">Weight Streaming</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/dynamic_memory_allocation.html">Dynamic Memory Allocation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../tutorials/_rendered_examples/dynamo/pre_allocated_output_example.html">Pre-allocated output buffer</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Dynamo Frontend</span></p>
@@ -521,6 +523,89 @@ specifying the <cite>output_format</cite> flag. Here are the options <cite>outpu
 <span class="n">model</span><span class="p">(</span><span class="o">*</span><span class="n">inputs</span><span class="p">)</span>
 </pre></div>
 </div>
+<section id="saving-models-with-dynamic-shapes">
+<h4>Saving Models with Dynamic Shapes<a class="headerlink" href="#saving-models-with-dynamic-shapes" title="Permalink to this heading">¶</a></h4>
+<p>When saving models compiled with dynamic shapes, you have two methods to preserve
+the dynamic shape specifications:</p>
+<p><strong>Method 1: Using torch.export.Dim (explicit)</strong></p>
+<p>Provide explicit <code class="docutils literal notranslate"><span class="pre">dynamic_shapes</span></code> parameter following torch.export’s pattern:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch_tensorrt</span>
+
+<span class="n">model</span> <span class="o">=</span> <span class="n">MyModel</span><span class="p">()</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
+<span class="n">example_input</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">((</span><span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">))</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
+
+<span class="c1"># Define dynamic batch dimension</span>
+<span class="n">dyn_batch</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">Dim</span><span class="p">(</span><span class="s2">&quot;batch&quot;</span><span class="p">,</span> <span class="nb">min</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="nb">max</span><span class="o">=</span><span class="mi">32</span><span class="p">)</span>
+<span class="n">dynamic_shapes</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;x&quot;</span><span class="p">:</span> <span class="p">{</span><span class="mi">0</span><span class="p">:</span> <span class="n">dyn_batch</span><span class="p">}}</span>
+
+<span class="c1"># Export with dynamic shapes</span>
+<span class="n">exp_program</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">export</span><span class="p">(</span>
+    <span class="n">model</span><span class="p">,</span> <span class="p">(</span><span class="n">example_input</span><span class="p">,),</span>
+    <span class="n">dynamic_shapes</span><span class="o">=</span><span class="n">dynamic_shapes</span><span class="p">,</span>
+    <span class="n">strict</span><span class="o">=</span><span class="kc">False</span>
+<span class="p">)</span>
+
+<span class="c1"># Compile with dynamic input specifications</span>
+<span class="n">trt_gm</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">dynamo</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span>
+    <span class="n">exp_program</span><span class="p">,</span>
+    <span class="n">inputs</span><span class="o">=</span><span class="p">[</span><span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">Input</span><span class="p">(</span>
+        <span class="n">min_shape</span><span class="o">=</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">),</span>
+        <span class="n">opt_shape</span><span class="o">=</span><span class="p">(</span><span class="mi">8</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">),</span>
+        <span class="n">max_shape</span><span class="o">=</span><span class="p">(</span><span class="mi">32</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">),</span>
+    <span class="p">)]</span>
+<span class="p">)</span>
+
+<span class="c1"># Save with dynamic_shapes to preserve dynamic behavior</span>
+<span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">save</span><span class="p">(</span>
+    <span class="n">trt_gm</span><span class="p">,</span>
+    <span class="s2">&quot;trt_dynamic.ep&quot;</span><span class="p">,</span>
+    <span class="n">arg_inputs</span><span class="o">=</span><span class="p">[</span><span class="n">example_input</span><span class="p">],</span>
+    <span class="n">dynamic_shapes</span><span class="o">=</span><span class="n">dynamic_shapes</span>  <span class="c1"># Same as used during export</span>
+<span class="p">)</span>
+
+<span class="c1"># Load and use with different batch sizes</span>
+<span class="n">loaded_model</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s2">&quot;trt_dynamic.ep&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">module</span><span class="p">()</span>
+<span class="n">output_bs4</span> <span class="o">=</span> <span class="n">loaded_model</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">)</span><span class="o">.</span><span class="n">cuda</span><span class="p">())</span>
+<span class="n">output_bs16</span> <span class="o">=</span> <span class="n">loaded_model</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">16</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">)</span><span class="o">.</span><span class="n">cuda</span><span class="p">())</span>
+</pre></div>
+</div>
+<p><strong>Method 2: Using torch_tensorrt.Input</strong></p>
+<p>Pass <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.Input</span></code> objects with min/opt/max shapes directly, and the
+dynamic shapes will be inferred automatically:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch_tensorrt</span>
+
+<span class="n">model</span> <span class="o">=</span> <span class="n">MyModel</span><span class="p">()</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
+
+<span class="c1"># Define Input with dynamic shapes</span>
+<span class="n">inputs</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">Input</span><span class="p">(</span>
+        <span class="n">min_shape</span><span class="o">=</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">),</span>
+        <span class="n">opt_shape</span><span class="o">=</span><span class="p">(</span><span class="mi">8</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">),</span>
+        <span class="n">max_shape</span><span class="o">=</span><span class="p">(</span><span class="mi">32</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">),</span>
+        <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float32</span><span class="p">,</span>
+        <span class="n">name</span><span class="o">=</span><span class="s2">&quot;x&quot;</span>  <span class="c1"># Optional: provides better dimension naming</span>
+    <span class="p">)</span>
+<span class="p">]</span>
+
+<span class="c1"># Compile with Torch-TensorRT</span>
+<span class="n">trt_gm</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">ir</span><span class="o">=</span><span class="s2">&quot;dynamo&quot;</span><span class="p">,</span> <span class="n">inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">)</span>
+
+<span class="c1"># Save with Input objects - dynamic_shapes inferred automatically!</span>
+<span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">save</span><span class="p">(</span>
+    <span class="n">trt_gm</span><span class="p">,</span>
+    <span class="s2">&quot;trt_dynamic.ep&quot;</span><span class="p">,</span>
+    <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span>  <span class="c1"># Dynamic shapes inferred from Input objects</span>
+<span class="p">)</span>
+
+<span class="c1"># Load and use with different batch sizes</span>
+<span class="n">loaded_model</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s2">&quot;trt_dynamic.ep&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">module</span><span class="p">()</span>
+<span class="n">output_bs4</span> <span class="o">=</span> <span class="n">loaded_model</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">)</span><span class="o">.</span><span class="n">cuda</span><span class="p">())</span>
+<span class="n">output_bs16</span> <span class="o">=</span> <span class="n">loaded_model</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">16</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">)</span><span class="o">.</span><span class="n">cuda</span><span class="p">())</span>
+</pre></div>
+</div>
+</section>
 </section>
 <section id="b-torchscript">
 <h3>b) Torchscript<a class="headerlink" href="#b-torchscript" title="Permalink to this heading">¶</a></h3>
@@ -640,7 +725,10 @@ to generate kernels for components that will not be run in TensorRT.</p>
               <ul>
 <li><a class="reference internal" href="#">Saving models compiled with Torch-TensorRT</a><ul>
 <li><a class="reference internal" href="#dynamo-ir">Dynamo IR</a><ul>
-<li><a class="reference internal" href="#a-exportedprogram">a) ExportedProgram</a></li>
+<li><a class="reference internal" href="#a-exportedprogram">a) ExportedProgram</a><ul>
+<li><a class="reference internal" href="#saving-models-with-dynamic-shapes">Saving Models with Dynamic Shapes</a></li>
+</ul>
+</li>
 <li><a class="reference internal" href="#b-torchscript">b) Torchscript</a></li>
 </ul>
 </li>

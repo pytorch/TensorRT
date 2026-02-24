@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt._compile &mdash; Torch-TensorRT v2.11.0.dev0+f60963f documentation</title>
+  <title>torch_tensorrt._compile &mdash; Torch-TensorRT v2.12.0.dev0+a8f2127 documentation</title>
   
 
   
@@ -290,7 +290,7 @@
               
               
                 <div class="version">
-                  v2.11.0.dev0+f60963f
+                  v2.12.0.dev0+a8f2127
                 </div>
               
             
@@ -337,6 +337,7 @@
 <p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/torch_compile_advanced_usage.html">Torch Compile Advanced Usage</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/compile_with_dynamic_inputs.html">Compiling Models with Dynamic Input Shapes</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/vgg16_ptq.html">Deploy Quantized Models using Torch-TensorRT</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/engine_caching_example.html">Engine Caching</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/engine_caching_bert_example.html">Engine Caching (BERT)</a></li>
@@ -349,6 +350,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/auto_generate_plugins.html">Automatically Generate a Plugin for a Custom Kernel</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/mutable_torchtrt_module_example.html">Mutable Torch TensorRT Module</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/weight_streaming_example.html">Weight Streaming</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/dynamic_memory_allocation.html">Dynamic Memory Allocation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/pre_allocated_output_example.html">Pre-allocated output buffer</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Dynamo Frontend</span></p>
@@ -494,7 +496,7 @@
 <span class="kn">import</span><span class="w"> </span><span class="nn">platform</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">warnings</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">enum</span><span class="w"> </span><span class="kn">import</span> <span class="n">Enum</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Callable</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Sequence</span><span class="p">,</span> <span class="n">Set</span><span class="p">,</span> <span class="n">Union</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Callable</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Sequence</span><span class="p">,</span> <span class="n">Set</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">,</span> <span class="n">Union</span>
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt._enums</span><span class="w"> </span><span class="kn">import</span> <span class="n">dtype</span>
@@ -512,9 +514,9 @@
     <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.fx.lower</span><span class="w"> </span><span class="kn">import</span> <span class="nb">compile</span> <span class="k">as</span> <span class="n">fx_compile</span>
     <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.fx.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">LowerPrecision</span>
 
-    <span class="n">InputType</span> <span class="o">=</span> <span class="n">Union</span><span class="p">[</span><span class="n">Input</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">InputTensorSpec</span><span class="p">]</span>
-<span class="k">else</span><span class="p">:</span>
     <span class="n">InputType</span> <span class="o">=</span> <span class="n">Union</span><span class="p">[</span><span class="n">Input</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]</span>
+<span class="k">else</span><span class="p">:</span>
+    <span class="n">InputType</span> <span class="o">=</span> <span class="n">Union</span><span class="p">[</span><span class="n">Input</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]</span>  <span class="c1"># type: ignore</span>
 
 <span class="k">if</span> <span class="n">ENABLED_FEATURES</span><span class="o">.</span><span class="n">torchscript_frontend</span><span class="p">:</span>
     <span class="kn">import</span><span class="w"> </span><span class="nn">torch_tensorrt.ts</span>
@@ -538,7 +540,13 @@
     <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo._compiler</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
         <span class="n">save_cross_compiled_exported_program</span> <span class="k">as</span> <span class="n">dynamo_save_cross_compiled_exported_program</span><span class="p">,</span>
     <span class="p">)</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo._defaults</span><span class="w"> </span><span class="kn">import</span> <span class="n">default_device</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo._tracer</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+        <span class="n">get_dynamic_shapes_args</span><span class="p">,</span>
+        <span class="n">get_dynamic_shapes_kwargs</span><span class="p">,</span>
+    <span class="p">)</span>
     <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo._tracer</span><span class="w"> </span><span class="kn">import</span> <span class="n">trace</span> <span class="k">as</span> <span class="n">dynamo_trace</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_torch_inputs</span>
 
 <span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
 
@@ -664,7 +672,7 @@
     <span class="n">ir</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;default&quot;</span><span class="p">,</span>
     <span class="n">inputs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Sequence</span><span class="p">[</span><span class="n">InputType</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">arg_inputs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Sequence</span><span class="p">[</span><span class="n">Sequence</span><span class="p">[</span><span class="n">Any</span><span class="p">]]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-    <span class="n">kwarg_inputs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">kwarg_inputs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">enabled_precisions</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Set</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">dtype</span><span class="p">]]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="p">(</span>
@@ -790,13 +798,18 @@
         <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">arg_inputs</span><span class="p">,</span> <span class="n">collections</span><span class="o">.</span><span class="n">abc</span><span class="o">.</span><span class="n">Sequence</span><span class="p">):</span>
             <span class="n">arg_inputs</span> <span class="o">=</span> <span class="p">[</span><span class="n">arg_inputs</span><span class="p">]</span>  <span class="c1"># type: ignore</span>
 
-        <span class="c1"># Export the module</span>
         <span class="n">torchtrt_arg_inputs</span> <span class="o">=</span> <span class="n">prepare_inputs</span><span class="p">(</span><span class="n">arg_inputs</span><span class="p">)</span>
         <span class="n">torchtrt_kwarg_inputs</span> <span class="o">=</span> <span class="n">prepare_inputs</span><span class="p">(</span><span class="n">kwarg_inputs</span><span class="p">)</span>
 
-        <span class="n">exp_program</span> <span class="o">=</span> <span class="n">dynamo_trace</span><span class="p">(</span>
-            <span class="n">module</span><span class="p">,</span> <span class="n">torchtrt_arg_inputs</span><span class="p">,</span> <span class="n">kwarg_inputs</span><span class="o">=</span><span class="n">torchtrt_kwarg_inputs</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span>
-        <span class="p">)</span>
+        <span class="k">if</span> <span class="n">module_type</span> <span class="o">==</span> <span class="n">_ModuleType</span><span class="o">.</span><span class="n">ep</span><span class="p">:</span>
+            <span class="n">exp_program</span> <span class="o">=</span> <span class="n">module</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">exp_program</span> <span class="o">=</span> <span class="n">dynamo_trace</span><span class="p">(</span>
+                <span class="n">module</span><span class="p">,</span>
+                <span class="n">torchtrt_arg_inputs</span><span class="p">,</span>
+                <span class="n">kwarg_inputs</span><span class="o">=</span><span class="n">torchtrt_kwarg_inputs</span><span class="p">,</span>
+                <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
+            <span class="p">)</span>
         <span class="n">trt_graph_module</span> <span class="o">=</span> <span class="n">dynamo_compile</span><span class="p">(</span>
             <span class="n">exp_program</span><span class="p">,</span>
             <span class="n">arg_inputs</span><span class="o">=</span><span class="n">torchtrt_arg_inputs</span><span class="p">,</span>
@@ -812,7 +825,7 @@
         <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;Module is an unknown format or the ir requested is unknown&quot;</span><span class="p">)</span></div>
 
 
-<span class="nd">@needs_cross_compile</span>
+<span class="nd">@needs_cross_compile</span>  <span class="c1"># type: ignore[misc]</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">cross_compile_for_windows</span><span class="p">(</span>
     <span class="n">module</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">,</span>
     <span class="n">file_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
@@ -1062,16 +1075,6 @@
 <span class="sd">    Raises:</span>
 <span class="sd">        ValueError: If there is no file or the file is not either a TorchScript file or ExportedProgram file</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="k">try</span><span class="p">:</span>
-        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Loading the provided file </span><span class="si">{</span><span class="n">file_path</span><span class="si">}</span><span class="s2"> using torch.jit.load()&quot;</span><span class="p">)</span>
-        <span class="n">ts_module</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">file_path</span><span class="p">)</span>
-        <span class="k">return</span> <span class="n">ts_module</span>
-    <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
-        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
-            <span class="sa">f</span><span class="s2">&quot;Loading the provided file </span><span class="si">{</span><span class="n">file_path</span><span class="si">}</span><span class="s2"> via torch.jit.load() failed with the following error&quot;</span><span class="p">,</span>
-            <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-        <span class="p">)</span>
-        <span class="k">pass</span>
 
     <span class="k">try</span><span class="p">:</span>
         <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Loading the provided file </span><span class="si">{</span><span class="n">file_path</span><span class="si">}</span><span class="s2"> using torch.export.load()&quot;</span><span class="p">)</span>
@@ -1080,6 +1083,17 @@
     <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
         <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
             <span class="sa">f</span><span class="s2">&quot;Loading the provided file </span><span class="si">{</span><span class="n">file_path</span><span class="si">}</span><span class="s2"> via torch.export.load() failed with the following error&quot;</span><span class="p">,</span>
+            <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="k">pass</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Loading the provided file </span><span class="si">{</span><span class="n">file_path</span><span class="si">}</span><span class="s2"> using torch.jit.load()&quot;</span><span class="p">)</span>
+        <span class="n">ts_module</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">file_path</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">ts_module</span>
+    <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Loading the provided file </span><span class="si">{</span><span class="n">file_path</span><span class="si">}</span><span class="s2"> via torch.jit.load() (after failing to load with torch.export.load()) failed with the following error&quot;</span><span class="p">,</span>
             <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
         <span class="p">)</span>
         <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
@@ -1092,11 +1106,13 @@
     <span class="n">file_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span><span class="p">,</span>
     <span class="o">*</span><span class="p">,</span>
     <span class="n">output_format</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;exported_program&quot;</span><span class="p">,</span>
-    <span class="n">inputs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Sequence</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-    <span class="n">arg_inputs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Sequence</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-    <span class="n">kwarg_inputs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">inputs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Sequence</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span> <span class="o">|</span> <span class="n">Input</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">arg_inputs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Sequence</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span> <span class="o">|</span> <span class="n">Input</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">kwarg_inputs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">retrace</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="n">use_legacy_exporter</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">bool</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">pickle_protocol</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">2</span><span class="p">,</span>
+    <span class="n">dynamic_shapes</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
@@ -1104,23 +1120,88 @@
 
 <span class="sd">    Arguments:</span>
 <span class="sd">        module (Optional(torch.jit.ScriptModule | torch.export.ExportedProgram | torch.fx.GraphModule | CudaGraphsTorchTensorRTModule)): Compiled Torch-TensorRT module</span>
-<span class="sd">        inputs (torch.Tensor): Torch input tensors</span>
-<span class="sd">        arg_inputs (Tuple[Any, ...]): Same as inputs. Alias for better understanding with kwarg_inputs.</span>
-<span class="sd">        kwarg_inputs (dict[Any, ...]): Optional, kwarg inputs to the module forward function.</span>
+<span class="sd">        inputs (Union[torch.Tensor, torch_tensorrt.Input]): Torch input tensors or Input specifications</span>
+<span class="sd">        arg_inputs (Tuple[Union[torch.Tensor, torch_tensorrt.Input], ...]): Same as inputs. Alias for better understanding with kwarg_inputs.</span>
+<span class="sd">        kwarg_inputs (dict[str, Union[torch.Tensor, torch_tensorrt.Input]]): Optional, kwarg inputs to the module forward function.</span>
 <span class="sd">        output_format (str): Format to save the model. Options include exported_program | torchscript | aot_inductor.</span>
 <span class="sd">        retrace (bool): When the module type is a fx.GraphModule, this option re-exports the graph using torch.export.export(strict=False) to save it.</span>
-<span class="sd">                This flag is experimental for now.</span>
+
+<span class="sd">                For TRT-compiled modules with dynamic shapes, both retrace=True and retrace=False are supported:</span>
+
+<span class="sd">                - **retrace=True**: Automatically detects symbolic shape metadata in the TRT module and preserves it</span>
+<span class="sd">                  without retracing. This is the recommended approach as it maintains the exact symbolic shapes</span>
+<span class="sd">                  from the original compilation.</span>
+
+<span class="sd">                - **retrace=False**: Directly serializes the existing graph metadata without any re-export.</span>
+<span class="sd">                  This is faster but may not be compatible with all torch.export consumers.</span>
+
+<span class="sd">                For static shape models, retrace=True performs a standard torch.export.export() call.</span>
+
+<span class="sd">        use_legacy_exporter (Optional[bool]): Override the exporter used when serializing a torch.fx.GraphModule.</span>
+<span class="sd">                By default (None) the choice is made automatically:</span>
+
+<span class="sd">                - ``retrace=False`` always uses the legacy exporter (pure graph surgery, no re-execution).</span>
+<span class="sd">                - ``retrace=True`` with dynamic shapes uses ``torch.export.export`` on the inlined graph,</span>
+<span class="sd">                  which produces a fully standards-compliant ExportedProgram.</span>
+
+<span class="sd">                Set to ``True`` to force the legacy exporter regardless of ``retrace``.</span>
+<span class="sd">                Set to ``False`` to force ``torch.export.export`` on the inlined graph; this requires</span>
+<span class="sd">                example inputs and a live CUDA device.</span>
+
 <span class="sd">        pickle_protocol (int): The pickle protocol to use to save the model. Default is 2. Increase this to 4 or higher for large models</span>
+<span class="sd">        dynamic_shapes (Optional[Union[dict[str, Any], tuple[Any, ...]]]): Dynamic shape specifications for re-exporting the model.</span>
+
+<span class="sd">                **Method 1: Explicit dynamic_shapes (torch.export style)**</span>
+
+<span class="sd">                Provide explicit torch.export.Dim specifications::</span>
+
+<span class="sd">                    # For a single input with dynamic batch dimension</span>
+<span class="sd">                    dyn_batch = torch.export.Dim(&quot;batch&quot;, min=1, max=32)</span>
+<span class="sd">                    dynamic_shapes = {&quot;x&quot;: {0: dyn_batch}}</span>
+<span class="sd">                    torch_tensorrt.save(model, &quot;model.ep&quot;, arg_inputs=[example_tensor], dynamic_shapes=dynamic_shapes)</span>
+
+<span class="sd">                    # For multiple inputs</span>
+<span class="sd">                    dynamic_shapes = ({&quot;x&quot;: {0: dyn_batch}}, {&quot;y&quot;: {0: dyn_batch}})</span>
+
+<span class="sd">                **Method 2: Inferred from torch_tensorrt.Input**</span>
+
+<span class="sd">                Pass torch_tensorrt.Input objects with min/opt/max shapes in arg_inputs/kwarg_inputs,</span>
+<span class="sd">                and dynamic_shapes will be inferred automatically::</span>
+
+<span class="sd">                    inputs = [</span>
+<span class="sd">                        torch_tensorrt.Input(</span>
+<span class="sd">                            min_shape=(1, 3, 224, 224),</span>
+<span class="sd">                            opt_shape=(8, 3, 224, 224),</span>
+<span class="sd">                            max_shape=(32, 3, 224, 224),</span>
+<span class="sd">                            name=&quot;x&quot;  # Optional: name for better dim naming</span>
+<span class="sd">                        )</span>
+<span class="sd">                    ]</span>
+<span class="sd">                    torch_tensorrt.save(model, &quot;model.ep&quot;, arg_inputs=inputs)  # dynamic_shapes inferred!</span>
+
+<span class="sd">                **Important Limitations:**</span>
+
+<span class="sd">                - Automatic inference creates **separate Dim objects for each input**. If your model requires</span>
+<span class="sd">                  multiple inputs to share the same dimension (e.g., matching batch sizes), you MUST use</span>
+<span class="sd">                  Method 1 with explicit shared Dim objects::</span>
+
+<span class="sd">                      batch = torch.export.Dim(&quot;batch&quot;, min=1, max=8)</span>
+<span class="sd">                      dynamic_shapes = {&quot;x&quot;: {0: batch}, &quot;mask&quot;: {0: batch}}  # Shared batch dimension</span>
+
+<span class="sd">                - Automatic inference is **disabled for mixed Input/Tensor inputs** to avoid spurious</span>
+<span class="sd">                  equality constraints. Use explicit dynamic_shapes for these cases.</span>
+
+<span class="sd">                - If both dynamic_shapes and Input objects are provided, the explicit dynamic_shapes</span>
+<span class="sd">                  parameter takes precedence.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">module</span><span class="p">,</span> <span class="n">CudaGraphsTorchTensorRTModule</span><span class="p">):</span>
         <span class="n">module</span> <span class="o">=</span> <span class="n">module</span><span class="o">.</span><span class="n">compiled_module</span>
     <span class="n">module_type</span> <span class="o">=</span> <span class="n">_parse_module_type</span><span class="p">(</span><span class="n">module</span><span class="p">)</span>
     <span class="n">accepted_formats</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;exported_program&quot;</span><span class="p">,</span> <span class="s2">&quot;torchscript&quot;</span><span class="p">,</span> <span class="s2">&quot;aot_inductor&quot;</span><span class="p">}</span>
     <span class="k">if</span> <span class="n">arg_inputs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="ow">not</span> <span class="nb">all</span><span class="p">(</span>
-        <span class="nb">isinstance</span><span class="p">(</span><span class="nb">input</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">)</span> <span class="k">for</span> <span class="nb">input</span> <span class="ow">in</span> <span class="n">arg_inputs</span>
+        <span class="nb">isinstance</span><span class="p">(</span><span class="nb">input</span><span class="p">,</span> <span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">Input</span><span class="p">))</span> <span class="k">for</span> <span class="nb">input</span> <span class="ow">in</span> <span class="n">arg_inputs</span>
     <span class="p">):</span>
         <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-            <span class="s2">&quot;Not all inputs provided are torch.tensors. Please provide torch.tensors as inputs&quot;</span>
+            <span class="s2">&quot;Not all inputs provided are torch.Tensor or torch_tensorrt.Input objects. Please provide inputs of a valid type&quot;</span>
         <span class="p">)</span>
     <span class="k">if</span> <span class="n">arg_inputs</span> <span class="ow">and</span> <span class="n">inputs</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">AssertionError</span><span class="p">(</span>
@@ -1134,6 +1215,106 @@
 
     <span class="k">if</span> <span class="n">kwarg_inputs</span> <span class="ow">and</span> <span class="nb">any</span><span class="p">(</span><span class="n">value</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">for</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">kwarg_inputs</span><span class="o">.</span><span class="n">values</span><span class="p">()):</span>
         <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;kwargs should not include None.&quot;</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_all_are_input_objects</span><span class="p">(</span><span class="n">obj</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Recursively check if all elements in nested collections are Input objects.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="n">Input</span><span class="p">):</span>
+            <span class="k">return</span> <span class="kc">True</span>
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="p">(</span><span class="nb">list</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">)):</span>
+            <span class="k">return</span> <span class="nb">all</span><span class="p">(</span><span class="n">_all_are_input_objects</span><span class="p">(</span><span class="n">item</span><span class="p">)</span> <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">obj</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
+            <span class="k">return</span> <span class="nb">all</span><span class="p">(</span><span class="n">_all_are_input_objects</span><span class="p">(</span><span class="n">value</span><span class="p">)</span> <span class="k">for</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">obj</span><span class="o">.</span><span class="n">values</span><span class="p">())</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># Not an Input object or collection</span>
+            <span class="k">return</span> <span class="kc">False</span>
+
+    <span class="n">all_inputs_are_input_objects</span> <span class="o">=</span> <span class="n">_all_are_input_objects</span><span class="p">(</span><span class="n">arg_inputs</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">kwarg_inputs</span><span class="p">:</span>
+        <span class="n">all_inputs_are_input_objects</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">all_inputs_are_input_objects</span> <span class="ow">and</span> <span class="n">_all_are_input_objects</span><span class="p">(</span><span class="n">kwarg_inputs</span><span class="p">)</span>
+        <span class="p">)</span>
+
+    <span class="c1"># Infer dynamic_shapes from Input objects if not explicitly provided</span>
+    <span class="c1"># Only infer if ALL inputs are Input objects (not mixed with Tensors)</span>
+    <span class="c1">#</span>
+    <span class="c1"># Why? When we have mixed Input/Tensor inputs, torch.export may detect that</span>
+    <span class="c1"># a dynamic Input&#39;s dimension always equals a static Tensor&#39;s dimension during</span>
+    <span class="c1"># tracing, and enforce an equality constraint. Since we create separate Dim</span>
+    <span class="c1"># objects for each input, this causes a constraint violation. Users must use</span>
+    <span class="c1"># explicit dynamic_shapes for these cases.</span>
+
+    <span class="c1"># Warn if user provides both dynamic_shapes and Input objects with dynamic shapes</span>
+
+    <span class="n">arg_tensors</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span> <span class="o">|</span> <span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="p">()</span>
+    <span class="n">kwarg_tensors</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+
+    <span class="k">if</span> <span class="n">all_inputs_are_input_objects</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">dynamic_shapes</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">has_dynamic_input_objects</span> <span class="o">=</span> <span class="nb">any</span><span class="p">(</span>
+                <span class="nb">isinstance</span><span class="p">(</span><span class="n">inp</span><span class="p">,</span> <span class="n">Input</span><span class="p">)</span> <span class="ow">and</span> <span class="n">inp</span><span class="o">.</span><span class="n">shape_mode</span> <span class="o">==</span> <span class="n">Input</span><span class="o">.</span><span class="n">_ShapeMode</span><span class="o">.</span><span class="n">DYNAMIC</span>
+                <span class="k">for</span> <span class="n">inp</span> <span class="ow">in</span> <span class="n">arg_inputs</span>  <span class="c1"># type: ignore[union-attr]</span>
+            <span class="p">)</span>
+            <span class="k">if</span> <span class="n">kwarg_inputs</span><span class="p">:</span>
+                <span class="n">has_dynamic_input_objects</span> <span class="o">=</span> <span class="n">has_dynamic_input_objects</span> <span class="ow">or</span> <span class="nb">any</span><span class="p">(</span>
+                    <span class="nb">isinstance</span><span class="p">(</span><span class="n">inp</span><span class="p">,</span> <span class="n">Input</span><span class="p">)</span>
+                    <span class="ow">and</span> <span class="n">inp</span><span class="o">.</span><span class="n">shape_mode</span> <span class="o">==</span> <span class="n">Input</span><span class="o">.</span><span class="n">_ShapeMode</span><span class="o">.</span><span class="n">DYNAMIC</span>
+                    <span class="k">for</span> <span class="n">inp</span> <span class="ow">in</span> <span class="n">kwarg_inputs</span><span class="o">.</span><span class="n">values</span><span class="p">()</span>
+                <span class="p">)</span>
+            <span class="k">if</span> <span class="n">has_dynamic_input_objects</span><span class="p">:</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                    <span class="s2">&quot;Both explicit dynamic_shapes and torch_tensorrt.Input objects with min/opt/max shapes were provided. &quot;</span>
+                    <span class="s2">&quot;The explicit dynamic_shapes parameter takes precedence and Input shape specifications will be ignored.&quot;</span>
+                <span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">inferred_dynamic_shapes</span> <span class="o">=</span> <span class="n">get_dynamic_shapes_args</span><span class="p">(</span><span class="n">module</span><span class="p">,</span> <span class="n">arg_inputs</span><span class="p">)</span>
+            <span class="n">inferred_dynamic_shapes</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">get_dynamic_shapes_kwargs</span><span class="p">(</span><span class="n">kwarg_inputs</span><span class="p">))</span>
+
+            <span class="k">if</span> <span class="n">inferred_dynamic_shapes</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">dynamic_shapes</span> <span class="o">=</span> <span class="n">inferred_dynamic_shapes</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;Inferred dynamic_shapes from torch_tensorrt.Input objects with min/opt/max specifications: </span><span class="si">{</span><span class="n">dynamic_shapes</span><span class="si">}</span><span class="s2">&quot;</span>
+                <span class="p">)</span>
+
+        <span class="n">arg_tensors</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">get_torch_inputs</span><span class="p">(</span><span class="n">arg_inputs</span><span class="p">,</span> <span class="n">default_device</span><span class="p">()))</span>  <span class="c1"># type: ignore</span>
+        <span class="n">kwarg_tensors</span> <span class="o">=</span> <span class="n">get_torch_inputs</span><span class="p">(</span><span class="n">kwarg_inputs</span><span class="p">,</span> <span class="n">default_device</span><span class="p">())</span>  <span class="c1"># type: ignore</span>
+
+    <span class="k">else</span><span class="p">:</span>
+        <span class="c1"># Mixed case: some inputs are Tensors, some are Input objects</span>
+        <span class="c1"># Extract tensors from Input objects and use provided tensors as-is</span>
+        <span class="k">def</span><span class="w"> </span><span class="nf">_extract_tensor</span><span class="p">(</span><span class="n">obj</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+<span class="w">            </span><span class="sd">&quot;&quot;&quot;Recursively extract tensors from Input objects or pass through tensors.&quot;&quot;&quot;</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="n">Input</span><span class="p">):</span>
+                <span class="k">if</span> <span class="p">(</span>
+                    <span class="n">obj</span><span class="o">.</span><span class="n">shape_mode</span> <span class="o">==</span> <span class="n">Input</span><span class="o">.</span><span class="n">_ShapeMode</span><span class="o">.</span><span class="n">DYNAMIC</span>
+                    <span class="ow">and</span> <span class="n">dynamic_shapes</span> <span class="ow">is</span> <span class="kc">None</span>
+                <span class="p">):</span>
+                    <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                        <span class="s2">&quot;Mixed torch.Tensor and torch_tensorrt.Input objects provided in the example arguments without explicit dynamic_shapes. &quot;</span>
+                        <span class="s2">&quot;We cannot infer the dynamic shape specs from these mixed cases &quot;</span>
+                        <span class="s2">&quot;Consider providing explicit dynamic_shapes parameter or using Input objects for all inputs.&quot;</span>
+                    <span class="p">)</span>
+                <span class="k">return</span> <span class="n">obj</span><span class="o">.</span><span class="n">example_tensor</span><span class="p">()</span>
+            <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">):</span>
+                <span class="k">return</span> <span class="n">obj</span>
+            <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="p">(</span><span class="nb">list</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">)):</span>
+                <span class="n">extracted</span> <span class="o">=</span> <span class="p">[</span><span class="n">_extract_tensor</span><span class="p">(</span><span class="n">item</span><span class="p">)</span> <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">obj</span><span class="p">]</span>
+                <span class="k">return</span> <span class="nb">type</span><span class="p">(</span><span class="n">obj</span><span class="p">)(</span><span class="n">extracted</span><span class="p">)</span>
+            <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
+                <span class="k">return</span> <span class="p">{</span><span class="n">key</span><span class="p">:</span> <span class="n">_extract_tensor</span><span class="p">(</span><span class="n">value</span><span class="p">)</span> <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">obj</span><span class="o">.</span><span class="n">items</span><span class="p">()}</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;Unsupported input type: </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">obj</span><span class="p">)</span><span class="si">}</span><span class="s2">. Expected torch.Tensor or torch_tensorrt.Input&quot;</span>
+                <span class="p">)</span>
+
+        <span class="n">arg_tensors</span> <span class="o">=</span> <span class="n">_extract_tensor</span><span class="p">(</span><span class="n">arg_inputs</span><span class="p">)</span> <span class="k">if</span> <span class="n">arg_inputs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="p">()</span>
+        <span class="n">kwarg_tensors</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">_extract_tensor</span><span class="p">(</span><span class="n">kwarg_inputs</span><span class="p">)</span> <span class="k">if</span> <span class="n">kwarg_inputs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="p">{}</span>
+        <span class="p">)</span>
+
+    <span class="c1"># Extract tensors from Input objects for actual execution</span>
+    <span class="c1"># When inferring dynamic shapes, use different sizes for args vs kwargs to avoid</span>
+    <span class="c1"># torch.export detecting spurious equality constraints</span>
+
     <span class="k">if</span> <span class="n">output_format</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">accepted_formats</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
             <span class="sa">f</span><span class="s2">&quot;Provided output_format </span><span class="si">{</span><span class="n">output_format</span><span class="si">}</span><span class="s2"> is not supported. Supported options are exported_program | torchscript&quot;</span>
@@ -1155,10 +1336,6 @@
                 <span class="s2">&quot;Provided model is a torch.jit.ScriptModule but the output_format specified is not torchscript. Other output formats are not supported&quot;</span>
             <span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
-            <span class="k">if</span> <span class="n">arg_inputs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-                <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
-                    <span class="s2">&quot;Provided model is a torch.jit.ScriptModule, inputs or arg_inputs is not necessary during save.&quot;</span>
-                <span class="p">)</span>
             <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">module</span><span class="p">,</span> <span class="n">file_path</span><span class="p">)</span>
     <span class="k">elif</span> <span class="n">module_type</span> <span class="o">==</span> <span class="n">_ModuleType</span><span class="o">.</span><span class="n">ep</span><span class="p">:</span>
         <span class="k">if</span> <span class="n">output_format</span> <span class="o">==</span> <span class="s2">&quot;torchscript&quot;</span><span class="p">:</span>
@@ -1201,7 +1378,19 @@
                     <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
                         <span class="s2">&quot;Provided model is a torch.fx.GraphModule and retrace is False, inputs or arg_inputs is not necessary during save.&quot;</span>
                     <span class="p">)</span>
-                <span class="n">exp_program</span> <span class="o">=</span> <span class="n">export</span><span class="p">(</span><span class="n">module</span><span class="p">)</span>
+
+                <span class="c1"># Default for retrace=False is the legacy exporter (pure graph surgery,</span>
+                <span class="c1"># no re-execution). Override with use_legacy_exporter if provided.</span>
+                <span class="n">_use_legacy</span> <span class="o">=</span> <span class="p">(</span>
+                    <span class="n">use_legacy_exporter</span> <span class="k">if</span> <span class="n">use_legacy_exporter</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="kc">True</span>
+                <span class="p">)</span>
+                <span class="n">exp_program</span> <span class="o">=</span> <span class="n">export</span><span class="p">(</span>
+                    <span class="n">module</span><span class="p">,</span>
+                    <span class="n">arg_inputs</span><span class="o">=</span><span class="n">arg_tensors</span><span class="p">,</span>
+                    <span class="n">kwarg_inputs</span><span class="o">=</span><span class="n">kwarg_tensors</span><span class="p">,</span>
+                    <span class="n">dynamic_shapes</span><span class="o">=</span><span class="n">dynamic_shapes</span><span class="p">,</span>
+                    <span class="n">use_legacy_exporter</span><span class="o">=</span><span class="n">_use_legacy</span><span class="p">,</span>
+                <span class="p">)</span>
                 <span class="k">if</span> <span class="n">output_format</span> <span class="o">==</span> <span class="s2">&quot;exported_program&quot;</span><span class="p">:</span>
                     <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">save</span><span class="p">(</span>
                         <span class="n">exp_program</span><span class="p">,</span> <span class="n">file_path</span><span class="p">,</span> <span class="n">pickle_protocol</span><span class="o">=</span><span class="n">pickle_protocol</span>
@@ -1221,16 +1410,60 @@
                         <span class="s2">&quot;Attempted to serialize an exported program with an unsupported format. Exported programs support exported_program and aot_inductor&quot;</span>
                     <span class="p">)</span>
             <span class="k">else</span><span class="p">:</span>
-                <span class="k">if</span> <span class="n">arg_inputs</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-                    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                        <span class="s2">&quot;Provided model is a torch.fx.GraphModule and retrace is True, however the inputs or arg_inputs are empty. Please provide valid torch.tensors as inputs or arg_inputs to trace and save the model&quot;</span>
-                    <span class="p">)</span>
-                <span class="n">exp_program</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">export</span><span class="p">(</span>
-                    <span class="n">module</span><span class="p">,</span>
-                    <span class="nb">tuple</span><span class="p">(</span><span class="n">arg_inputs</span><span class="p">),</span>
-                    <span class="n">kwargs</span><span class="o">=</span><span class="n">kwarg_inputs</span><span class="p">,</span>
-                    <span class="n">strict</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                <span class="c1"># When retrace=True with a TRT-compiled GraphModule that has dynamic shapes,</span>
+                <span class="c1"># use torch.export.export on the inlined graph to get a fully</span>
+                <span class="c1"># standards-compliant ExportedProgram. Override with use_legacy_exporter</span>
+                <span class="c1"># if provided.</span>
+                <span class="n">has_symbolic_metadata</span> <span class="o">=</span> <span class="nb">any</span><span class="p">(</span>
+                    <span class="nb">isinstance</span><span class="p">(</span><span class="n">dim</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">SymInt</span><span class="p">)</span>
+                    <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">module</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">nodes</span>
+                    <span class="k">if</span> <span class="n">node</span><span class="o">.</span><span class="n">op</span> <span class="o">==</span> <span class="s2">&quot;placeholder&quot;</span> <span class="ow">and</span> <span class="s2">&quot;val&quot;</span> <span class="ow">in</span> <span class="n">node</span><span class="o">.</span><span class="n">meta</span>
+                    <span class="k">for</span> <span class="n">dim</span> <span class="ow">in</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">&quot;val&quot;</span><span class="p">],</span> <span class="s2">&quot;shape&quot;</span><span class="p">,</span> <span class="p">[])</span>
                 <span class="p">)</span>
+                <span class="k">if</span> <span class="n">has_symbolic_metadata</span> <span class="ow">and</span> <span class="n">dynamic_shapes</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                    <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo._exporter</span><span class="w"> </span><span class="kn">import</span> <span class="n">export</span>
+
+                    <span class="k">if</span> <span class="n">arg_inputs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+                            <span class="s2">&quot;Provided model is a torch.fx.GraphModule with dynamic shapes and retrace is True. &quot;</span>
+                            <span class="s2">&quot;Using existing symbolic metadata instead of retracing. Input specs are not necessary.&quot;</span>
+                        <span class="p">)</span>
+                    <span class="c1"># Default for this path is the non-legacy exporter.</span>
+                    <span class="n">_use_legacy</span> <span class="o">=</span> <span class="p">(</span>
+                        <span class="n">use_legacy_exporter</span>
+                        <span class="k">if</span> <span class="n">use_legacy_exporter</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+                        <span class="k">else</span> <span class="kc">False</span>
+                    <span class="p">)</span>
+                    <span class="n">exp_program</span> <span class="o">=</span> <span class="n">export</span><span class="p">(</span>
+                        <span class="n">module</span><span class="p">,</span>
+                        <span class="n">arg_inputs</span><span class="o">=</span><span class="n">arg_tensors</span><span class="p">,</span>
+                        <span class="n">kwarg_inputs</span><span class="o">=</span><span class="n">kwarg_tensors</span><span class="p">,</span>
+                        <span class="n">dynamic_shapes</span><span class="o">=</span><span class="n">dynamic_shapes</span><span class="p">,</span>
+                        <span class="n">use_legacy_exporter</span><span class="o">=</span><span class="n">_use_legacy</span><span class="p">,</span>
+                    <span class="p">)</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="c1"># Regular GraphModule or no dynamic shapes - retrace normally</span>
+                    <span class="k">if</span> <span class="n">has_symbolic_metadata</span><span class="p">:</span>
+                        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                            <span class="s2">&quot;The provided module has symbolic metadata and retrace is True, however there is no dynamic shapes information available either explicitly or derived from arg/kwarg inputs (torch_tensorrt.Input) &quot;</span>
+                            <span class="s2">&quot;This may lead to incorrect tracing and overly restrictive shape guards when the exported program is loaded. Please specify the dynamic shapes either explicitly or derived from arg/kwarg inputs&quot;</span>
+                        <span class="p">)</span>
+
+                    <span class="k">if</span> <span class="p">(</span><span class="n">arg_inputs</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">arg_inputs</span> <span class="o">==</span> <span class="p">())</span> <span class="ow">and</span> <span class="p">(</span>
+                        <span class="n">kwarg_tensors</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">kwarg_tensors</span> <span class="o">==</span> <span class="p">{}</span>
+                    <span class="p">):</span>
+                        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                            <span class="s2">&quot;Provided model is a torch.fx.GraphModule without existing shape metadata and retrace is True, however no inputs specs were provided. &quot;</span>
+                            <span class="s2">&quot;Please provide valid torch.Tensors or torch_tensorrt.Input objects as inputs to retrace and save the model&quot;</span>
+                        <span class="p">)</span>
+
+                    <span class="n">exp_program</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">export</span><span class="p">(</span>
+                        <span class="n">module</span><span class="p">,</span>
+                        <span class="n">args</span><span class="o">=</span><span class="nb">tuple</span><span class="p">(</span><span class="n">arg_tensors</span><span class="p">),</span>
+                        <span class="n">kwargs</span><span class="o">=</span><span class="n">kwarg_tensors</span><span class="p">,</span>
+                        <span class="n">dynamic_shapes</span><span class="o">=</span><span class="n">dynamic_shapes</span><span class="p">,</span>
+                        <span class="n">strict</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                    <span class="p">)</span>
 
                 <span class="k">if</span> <span class="n">output_format</span> <span class="o">==</span> <span class="s2">&quot;exported_program&quot;</span><span class="p">:</span>
                     <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">save</span><span class="p">(</span>

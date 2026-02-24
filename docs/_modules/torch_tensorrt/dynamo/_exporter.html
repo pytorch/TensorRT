@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt.dynamo._exporter &mdash; Torch-TensorRT v2.11.0.dev0+f60963f documentation</title>
+  <title>torch_tensorrt.dynamo._exporter &mdash; Torch-TensorRT v2.12.0.dev0+a8f2127 documentation</title>
   
 
   
@@ -290,7 +290,7 @@
               
               
                 <div class="version">
-                  v2.11.0.dev0+f60963f
+                  v2.12.0.dev0+a8f2127
                 </div>
               
             
@@ -337,6 +337,7 @@
 <p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/torch_compile_advanced_usage.html">Torch Compile Advanced Usage</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/compile_with_dynamic_inputs.html">Compiling Models with Dynamic Input Shapes</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/vgg16_ptq.html">Deploy Quantized Models using Torch-TensorRT</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/engine_caching_example.html">Engine Caching</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/engine_caching_bert_example.html">Engine Caching (BERT)</a></li>
@@ -349,6 +350,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/auto_generate_plugins.html">Automatically Generate a Plugin for a Custom Kernel</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/mutable_torchtrt_module_example.html">Mutable Torch TensorRT Module</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/weight_streaming_example.html">Weight Streaming</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/dynamic_memory_allocation.html">Dynamic Memory Allocation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/pre_allocated_output_example.html">Pre-allocated output buffer</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Dynamo Frontend</span></p>
@@ -493,9 +495,11 @@
 <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Sequence</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">,</span> <span class="n">cast</span>
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch._export.non_strict_utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">make_constraints</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch._guards</span><span class="w"> </span><span class="kn">import</span> <span class="n">detect_fake_mode</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch._subclasses.fake_tensor</span><span class="w"> </span><span class="kn">import</span> <span class="n">FakeTensor</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch.export</span><span class="w"> </span><span class="kn">import</span> <span class="n">ExportedProgram</span><span class="p">,</span> <span class="n">ExportGraphSignature</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch.export._trace</span><span class="w"> </span><span class="kn">import</span> <span class="n">_combine_args</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch.export.exported_program</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
     <span class="n">CustomObjArgument</span><span class="p">,</span>
     <span class="n">InputKind</span><span class="p">,</span>
@@ -511,7 +515,12 @@
 
 <div class="viewcode-block" id="export"><a class="viewcode-back" href="../../../py_api/dynamo.html#torch_tensorrt.dynamo.export">[docs]</a><span class="k">def</span><span class="w"> </span><span class="nf">export</span><span class="p">(</span>
     <span class="n">gm</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">,</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">arg_inputs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Sequence</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">kwarg_inputs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">dynamic_shapes</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">cross_compile_module</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">bool</span><span class="p">]</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">use_legacy_exporter</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">bool</span><span class="p">]</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ExportedProgram</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Export the result of TensorRT compilation into the desired output format.</span>
 
@@ -521,8 +530,25 @@
 <span class="sd">        cross_compile_module (bool): Flag to indicated whether it is cross_compilation enabled or not</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">patched_module</span> <span class="o">=</span> <span class="n">transform</span><span class="p">(</span><span class="n">gm</span><span class="p">,</span> <span class="n">cross_compile_module</span><span class="p">)</span>
-    <span class="n">exp_program</span> <span class="o">=</span> <span class="n">create_trt_exp_program</span><span class="p">(</span><span class="n">patched_module</span><span class="p">)</span>
-    <span class="k">return</span> <span class="n">exp_program</span></div>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">use_legacy_exporter</span><span class="p">:</span>
+        <span class="n">args</span> <span class="o">=</span> <span class="p">()</span>
+        <span class="k">if</span> <span class="n">arg_inputs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">args</span> <span class="o">=</span> <span class="n">arg_inputs</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">arg_inputs</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">)</span> <span class="k">else</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">arg_inputs</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">export</span><span class="p">(</span>
+            <span class="n">patched_module</span><span class="p">,</span>
+            <span class="n">args</span><span class="o">=</span><span class="n">args</span><span class="p">,</span>
+            <span class="n">kwargs</span><span class="o">=</span><span class="n">kwarg_inputs</span><span class="p">,</span>
+            <span class="n">dynamic_shapes</span><span class="o">=</span><span class="n">dynamic_shapes</span><span class="p">,</span>
+        <span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">exp_program</span> <span class="o">=</span> <span class="n">create_trt_exp_program</span><span class="p">(</span>
+            <span class="n">patched_module</span><span class="p">,</span>
+            <span class="n">arg_inputs</span><span class="o">=</span><span class="n">arg_inputs</span><span class="p">,</span>
+            <span class="n">kwarg_inputs</span><span class="o">=</span><span class="n">kwarg_inputs</span><span class="p">,</span>
+            <span class="n">dynamic_shapes</span><span class="o">=</span><span class="n">dynamic_shapes</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">exp_program</span></div>
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">transform</span><span class="p">(</span>
@@ -633,7 +659,6 @@
                 <span class="n">const_placeholder_node</span> <span class="o">=</span> <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">placeholder</span><span class="p">(</span><span class="n">const_placeholder_name</span><span class="p">)</span>
                 <span class="c1"># Copy the node meta into this new placeholder node</span>
                 <span class="n">const_placeholder_node</span><span class="o">.</span><span class="n">meta</span> <span class="o">=</span> <span class="n">node</span><span class="o">.</span><span class="n">meta</span>
-
                 <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">lift_val</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">):</span>
                     <span class="n">const_placeholder_node</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">&quot;val&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">cast</span><span class="p">(</span>
                         <span class="n">FakeTensor</span><span class="p">,</span>
@@ -759,7 +784,26 @@
                         <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">erase_node</span><span class="p">(</span><span class="n">gm_added_placeholder_inputs</span><span class="p">[</span><span class="n">idx</span><span class="p">])</span>
 
                 <span class="c1"># Replace the pytorch submodule node (call_module) with the inlined subgraph output</span>
-                <span class="n">gm_node</span><span class="o">.</span><span class="n">replace_all_uses_with</span><span class="p">(</span><span class="n">submodule_output</span><span class="p">)</span>
+                <span class="c1"># Special handling when submodule returns multiple outputs (tuple)</span>
+                <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">submodule_output</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">):</span>
+                    <span class="c1"># The fallback module has multiple outputs</span>
+                    <span class="c1"># Find getitem nodes that extract from this module call and replace them directly</span>
+                    <span class="n">getitem_users</span> <span class="o">=</span> <span class="p">[</span>
+                        <span class="n">user</span>
+                        <span class="k">for</span> <span class="n">user</span> <span class="ow">in</span> <span class="nb">list</span><span class="p">(</span><span class="n">gm_node</span><span class="o">.</span><span class="n">users</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span>
+                        <span class="k">if</span> <span class="n">user</span><span class="o">.</span><span class="n">op</span> <span class="o">==</span> <span class="s2">&quot;call_function&quot;</span>
+                        <span class="ow">and</span> <span class="n">user</span><span class="o">.</span><span class="n">target</span> <span class="ow">is</span> <span class="n">operator</span><span class="o">.</span><span class="n">getitem</span>
+                    <span class="p">]</span>
+                    <span class="k">for</span> <span class="n">user</span> <span class="ow">in</span> <span class="n">getitem_users</span><span class="p">:</span>
+                        <span class="c1"># getitem extracts element idx from the tuple</span>
+                        <span class="n">_</span><span class="p">,</span> <span class="n">idx</span> <span class="o">=</span> <span class="n">user</span><span class="o">.</span><span class="n">args</span>
+                        <span class="c1"># Replace this getitem with the actual node from the tuple</span>
+                        <span class="n">user</span><span class="o">.</span><span class="n">replace_all_uses_with</span><span class="p">(</span><span class="n">submodule_output</span><span class="p">[</span><span class="n">idx</span><span class="p">])</span>
+                        <span class="c1"># Erase the getitem node since it&#39;s no longer needed</span>
+                        <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">erase_node</span><span class="p">(</span><span class="n">user</span><span class="p">)</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="c1"># Single output - normal replacement</span>
+                    <span class="n">gm_node</span><span class="o">.</span><span class="n">replace_all_uses_with</span><span class="p">(</span><span class="n">submodule_output</span><span class="p">)</span>
 
                 <span class="c1"># copy the attributes of the submodule into gm (graph_copy doesn&#39;t do this)</span>
                 <span class="n">copy_submodule_attributes</span><span class="p">(</span><span class="n">gm</span><span class="p">,</span> <span class="n">submodule</span><span class="p">,</span> <span class="n">gm_node</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
@@ -792,6 +836,10 @@
 
 <span class="k">def</span><span class="w"> </span><span class="nf">create_trt_exp_program</span><span class="p">(</span>
     <span class="n">gm</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">,</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">arg_inputs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Sequence</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">kwarg_inputs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">dynamic_shapes</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">]]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ExportedProgram</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Creates a new Exported Program. This function takes an torch.fx.GraphModule which has TRT engines</span>
 <span class="sd">    and constructs an Exported Program object with the new IO node names and state_dict</span>
@@ -827,6 +875,65 @@
         <span class="p">)</span>
     <span class="p">]</span>
 
+    <span class="c1"># Compute range_constraints from the placeholder SymInt shapes before lift(),</span>
+    <span class="c1"># while the graph still has only user-input placeholders (num_lifted=0).</span>
+    <span class="c1">#</span>
+    <span class="c1"># Two paths:</span>
+    <span class="c1">#   1. dynamic_shapes + example inputs available: delegate to make_constraints()</span>
+    <span class="c1">#      from torch._export, which maps Dim(min, max) specs onto the SymInt</span>
+    <span class="c1">#      expressions from the fake tensors.  make_constraints() requires</span>
+    <span class="c1">#      gm.meta[&quot;inline_constraints&quot;] to be a dict; TRT graph modules don&#39;t</span>
+    <span class="c1">#      set it so we default it to {} if absent.</span>
+    <span class="c1">#   2. No dynamic_shapes (or no example inputs): harvest every SymInt free</span>
+    <span class="c1">#      symbol from placeholder meta[&quot;val&quot;] shapes and look up its bound</span>
+    <span class="c1">#      directly in the shape_env.  This is the retrace=False path where the</span>
+    <span class="c1">#      caller didn&#39;t supply inputs.</span>
+    <span class="n">fake_mode</span> <span class="o">=</span> <span class="n">detect_fake_mode</span><span class="p">(</span>
+        <span class="nb">tuple</span><span class="p">(</span>
+            <span class="n">node</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">&quot;val&quot;</span><span class="p">]</span>
+            <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">nodes</span>
+            <span class="k">if</span> <span class="n">node</span><span class="o">.</span><span class="n">op</span> <span class="o">==</span> <span class="s2">&quot;placeholder&quot;</span> <span class="ow">and</span> <span class="s2">&quot;val&quot;</span> <span class="ow">in</span> <span class="n">node</span><span class="o">.</span><span class="n">meta</span>
+        <span class="p">)</span>
+    <span class="p">)</span>
+    <span class="n">range_constraints</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">if</span> <span class="n">fake_mode</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">fake_mode</span><span class="o">.</span><span class="n">shape_env</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">has_inputs</span> <span class="o">=</span> <span class="p">(</span><span class="n">arg_inputs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">arg_inputs</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">)</span> <span class="ow">or</span> <span class="nb">bool</span><span class="p">(</span>
+            <span class="n">kwarg_inputs</span>
+        <span class="p">)</span>
+        <span class="k">if</span> <span class="n">dynamic_shapes</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">has_inputs</span><span class="p">:</span>
+            <span class="c1"># Path 1: use make_constraints to honor user-specified Dim bounds.</span>
+            <span class="k">if</span> <span class="s2">&quot;inline_constraints&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">gm</span><span class="o">.</span><span class="n">meta</span><span class="p">:</span>
+                <span class="n">gm</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">&quot;inline_constraints&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+            <span class="n">combined_args</span> <span class="o">=</span> <span class="n">_combine_args</span><span class="p">(</span>
+                <span class="n">gm</span><span class="p">,</span>
+                <span class="nb">tuple</span><span class="p">(</span><span class="n">arg_inputs</span><span class="p">)</span> <span class="k">if</span> <span class="n">arg_inputs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="p">(),</span>
+                <span class="n">kwarg_inputs</span> <span class="ow">or</span> <span class="p">{},</span>
+            <span class="p">)</span>
+            <span class="n">range_constraints</span> <span class="o">=</span> <span class="n">make_constraints</span><span class="p">(</span>
+                <span class="n">fake_mode</span><span class="p">,</span>
+                <span class="n">gm</span><span class="p">,</span>
+                <span class="n">combined_args</span><span class="p">,</span>
+                <span class="n">dynamic_shapes</span><span class="p">,</span>
+                <span class="n">num_lifted_inputs</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
+            <span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># Path 2: harvest bounds from shape_env for any SymInt dims present.</span>
+            <span class="n">shape_env</span> <span class="o">=</span> <span class="n">fake_mode</span><span class="o">.</span><span class="n">shape_env</span>
+            <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">nodes</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">node</span><span class="o">.</span><span class="n">op</span> <span class="o">!=</span> <span class="s2">&quot;placeholder&quot;</span> <span class="ow">or</span> <span class="s2">&quot;val&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">node</span><span class="o">.</span><span class="n">meta</span><span class="p">:</span>
+                    <span class="k">continue</span>
+                <span class="n">val</span> <span class="o">=</span> <span class="n">node</span><span class="o">.</span><span class="n">meta</span><span class="p">[</span><span class="s2">&quot;val&quot;</span><span class="p">]</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">val</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">):</span>
+                    <span class="k">continue</span>
+                <span class="k">for</span> <span class="n">d</span> <span class="ow">in</span> <span class="n">val</span><span class="o">.</span><span class="n">shape</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">d</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">SymInt</span><span class="p">):</span>
+                        <span class="k">for</span> <span class="n">sym</span> <span class="ow">in</span> <span class="n">d</span><span class="o">.</span><span class="n">node</span><span class="o">.</span><span class="n">expr</span><span class="o">.</span><span class="n">free_symbols</span><span class="p">:</span>
+                            <span class="k">if</span> <span class="p">(</span>
+                                <span class="n">sym</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">range_constraints</span>
+                                <span class="ow">and</span> <span class="n">sym</span> <span class="ow">in</span> <span class="n">shape_env</span><span class="o">.</span><span class="n">var_to_range</span>
+                            <span class="p">):</span>
+                                <span class="n">range_constraints</span><span class="p">[</span><span class="n">sym</span><span class="p">]</span> <span class="o">=</span> <span class="n">shape_env</span><span class="o">.</span><span class="n">var_to_range</span><span class="p">[</span><span class="n">sym</span><span class="p">]</span>
+
     <span class="c1"># Lift parameters/buffers/constants in the graph</span>
     <span class="c1"># torch.export serialization expects them to be lifted</span>
     <span class="n">gm</span><span class="p">,</span> <span class="n">trt_graph_signature</span><span class="p">,</span> <span class="n">state_dict</span><span class="p">,</span> <span class="n">constants</span> <span class="o">=</span> <span class="n">lift</span><span class="p">(</span><span class="n">gm</span><span class="p">,</span> <span class="n">trt_graph_signature</span><span class="p">)</span>
@@ -836,7 +943,7 @@
         <span class="n">graph</span><span class="o">=</span><span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="p">,</span>
         <span class="n">graph_signature</span><span class="o">=</span><span class="n">trt_graph_signature</span><span class="p">,</span>
         <span class="n">state_dict</span><span class="o">=</span><span class="n">state_dict</span><span class="p">,</span>
-        <span class="n">range_constraints</span><span class="o">=</span><span class="p">{},</span>
+        <span class="n">range_constraints</span><span class="o">=</span><span class="n">range_constraints</span><span class="p">,</span>
         <span class="n">module_call_graph</span><span class="o">=</span><span class="n">module_call_graph</span><span class="p">,</span>
         <span class="n">constants</span><span class="o">=</span><span class="n">constants</span><span class="p">,</span>
     <span class="p">)</span>
@@ -881,6 +988,8 @@
             <span class="k">else</span><span class="p">:</span>
                 <span class="c1"># for the normal workflow: use the execute_engine node</span>
                 <span class="n">engine_name</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">_engine&quot;</span>
+                <span class="c1"># TODO: THROWS SOME WARNING ABOUT A LACK OF UNDERLYING REFERENCE TO THE OWNING GRAPH MODULE</span>
+                <span class="c1"># SAYS THERES 3 OPTIONS, SUBMODULE, PARAMETER, OR BUFFER, BUFFER SEEMS THE BEST BUT I THINK ITS KEYED TO TENSORS</span>
                 <span class="nb">setattr</span><span class="p">(</span><span class="n">gm</span><span class="p">,</span> <span class="n">engine_name</span><span class="p">,</span> <span class="n">trt_module</span><span class="o">.</span><span class="n">engine</span><span class="p">)</span>
                 <span class="n">engine_node</span> <span class="o">=</span> <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">get_attr</span><span class="p">(</span><span class="n">engine_name</span><span class="p">)</span>
 

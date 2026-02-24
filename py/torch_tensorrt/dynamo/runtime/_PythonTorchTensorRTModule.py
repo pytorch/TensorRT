@@ -4,7 +4,6 @@ import logging
 from contextlib import nullcontext
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
-import tensorrt as trt
 import torch
 import torch_tensorrt
 from torch.nn import Module
@@ -21,6 +20,8 @@ from torch_tensorrt.runtime._utils import (
     _select_rt_device,
     multi_gpu_device_check,
 )
+
+import tensorrt as trt
 
 logger = logging.getLogger(__name__)
 
@@ -131,6 +132,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         settings: CompilationSettings = CompilationSettings(),
         weight_name_map: Optional[dict[Any, Any]] = None,
         requires_output_allocator: bool = False,
+        symbolic_shape_expressions: Optional[Dict[str, List[Dict[str, Any]]]] = None,
         _debugger_config: Optional[DebuggerConfig] = None,
     ):
         """Takes a name, target device, serialized TensorRT engine, and binding names / order and constructs
@@ -146,6 +148,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
             settings (torch_tensorrt.dynamo.CompilationSettings): Settings used to compile engine, assumes engine was built with default compilation settings if object not passed
             weight_name_map (dict): Mapping of engine weight name to state_dict weight name
             requires_output_allocator (bool): Boolean flag indicating if the converter creates operators which require an Output Allocator to run (e.g. data dependent operators)
+            symbolic_shape_expressions (List[str]): List of symbolic shape expressions for each output binding
 
         Example:
 
@@ -222,6 +225,7 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         self.cudagraphs_enabled = torch_tensorrt.runtime.get_cudagraphs_mode()
         # If the output tensor is not owned by the engine (output_tensors_are_unowned=True), we need to create a new output tensor in each forward pass
         self.output_tensors_are_unowned = False
+        self.symbolic_shape_expressions = symbolic_shape_expressions
         if self.serialized_engine is not None and not self.settings.lazy_engine_init:
             self.setup_engine()
 
@@ -462,7 +466,6 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
             self.output_allocator = DynamicOutputAllocator(output_dtypes_dict)
 
     def forward(self, *inputs: torch.Tensor) -> torch.Tensor | Tuple[torch.Tensor, ...]:
-
         def run_standard_execution() -> torch.Tensor | Tuple[torch.Tensor, ...]:
             shape_changed = self.validate_input_shapes(contiguous_inputs)
             (

@@ -2,15 +2,17 @@ from __future__ import annotations
 
 import io
 import logging
-from typing import Any, List, NamedTuple, Optional, Sequence
+from typing import Any, Dict, List, NamedTuple, Optional, Sequence
 
-import tensorrt as trt
 import torch
 from torch_tensorrt._enums import dtype
 from torch_tensorrt._features import ENABLED_FEATURES
 from torch_tensorrt._Input import Input
 from torch_tensorrt.dynamo._engine_cache import BaseEngineCache
 from torch_tensorrt.dynamo._settings import CompilationSettings, settings_are_compatible
+from torch_tensorrt.dynamo.conversion._symbolic_shape_capture import (
+    extract_symbolic_shape_expressions,
+)
 from torch_tensorrt.dynamo.conversion._TRTInterpreter import (
     TRTInterpreter,
     TRTInterpreterResult,
@@ -23,6 +25,8 @@ from torch_tensorrt.dynamo.utils import (
 )
 from torch_tensorrt.logging import TRT_LOGGER
 
+import tensorrt as trt
+
 logger = logging.getLogger(__name__)
 
 
@@ -32,6 +36,7 @@ class SerializedInterpreterResult(NamedTuple):
     output_names: Sequence[str]
     weight_name_map: Optional[dict[Any, Any]]
     requires_output_allocator: bool
+    symbolic_shape_expressions: Dict[str, List[Dict[str, Any]]]
 
 
 def infer_module_output_dtypes(
@@ -44,7 +49,7 @@ def infer_module_output_dtypes(
     """
     outputs = [node for node in module.graph.nodes if node.op == "output"]
     outputs = outputs[0].args
-    return get_output_dtypes(outputs, truncate_double)  # type: ignore[no-any-return]
+    return get_output_dtypes(outputs, truncate_double)
 
 
 def insert_engine_to_cache(
@@ -101,6 +106,7 @@ def pull_cached_engine(
     engine_cache: BaseEngineCache,
     settings: CompilationSettings,
     inputs: Sequence[Input],
+    symbolic_shape_expressions: Dict[str, List[Dict[str, Any]]],
 ) -> Optional[SerializedInterpreterResult]:
     if hash_val is None:
         logger.warning(
@@ -183,6 +189,7 @@ def pull_cached_engine(
             output_names=output_names,
             weight_name_map=weight_name_map,
             requires_output_allocator=requires_output_allocator,
+            symbolic_shape_expressions=symbolic_shape_expressions,
         )
     return None
 
@@ -202,6 +209,12 @@ def interpret_module_to_result(
     Returns:
         SerializedInterpreterResult
     """
+
+    symbolic_shape_expressions = extract_symbolic_shape_expressions(module)
+    if symbolic_shape_expressions is None:
+        raise RuntimeError(
+            "Failed to extract symbolic shape expressions from source FX graph partition"
+        )
 
     # engine_cache could be None if:
     # 1) engine_cache is not passed in when calling this function like convert_exported_program_to_serialized_trt_engine etc., or
@@ -235,13 +248,22 @@ def interpret_module_to_result(
             )
         else:
             serialized_interpreter_result = pull_cached_engine(
-                hash_val, module, engine_cache, settings, inputs
+                hash_val,
+                module,
+                engine_cache,
+                settings,
+                inputs,
+                symbolic_shape_expressions,
             )
             if serialized_interpreter_result is not None:  # hit the cache
                 return serialized_interpreter_result
 
     output_dtypes = infer_module_output_dtypes(
         module, truncate_double=settings.truncate_double
+    )
+
+    logger.debug(
+        f"Extracted symbolic shape expressions: {len(symbolic_shape_expressions) if symbolic_shape_expressions else 0} outputs"
     )
 
     interpreter = TRTInterpreter(
@@ -295,6 +317,7 @@ def interpret_module_to_result(
         output_names=interpreter_result.output_names,
         weight_name_map=interpreter_result.weight_name_map,
         requires_output_allocator=interpreter_result.requires_output_allocator,
+        symbolic_shape_expressions=symbolic_shape_expressions,
     )
 
     return serialized_interpreter_result
@@ -343,4 +366,5 @@ def convert_module(
         settings=settings,
         weight_name_map=serialized_interpreter_result.weight_name_map,
         requires_output_allocator=serialized_interpreter_result.requires_output_allocator,
+        symbolic_shape_expressions=serialized_interpreter_result.symbolic_shape_expressions,
     )
