@@ -80,7 +80,7 @@ Optional Input Arguments to `torch_tensorrt.compile`
 Compilation with `torch_tensorrt.compile`
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. GENERATED FROM PYTHON SOURCE LINES 45-57
+.. GENERATED FROM PYTHON SOURCE LINES 45-58
 
 .. code-block:: python
 
@@ -90,6 +90,7 @@ Compilation with `torch_tensorrt.compile`
         model,
         ir="torch_compile",
         inputs=inputs,
+        use_explicit_typing=False,
         enabled_precisions=enabled_precisions,
         workspace_size=workspace_size,
         min_block_size=min_block_size,
@@ -97,17 +98,17 @@ Compilation with `torch_tensorrt.compile`
     )
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 58-60
+.. GENERATED FROM PYTHON SOURCE LINES 59-61
 
 Equivalently, we could have run the above via the torch.compile frontend, as so:
 `optimized_model = torch.compile(model, backend="torch_tensorrt", options={"enabled_precisions": enabled_precisions, ...}); optimized_model(*inputs)`
 
-.. GENERATED FROM PYTHON SOURCE LINES 62-64
+.. GENERATED FROM PYTHON SOURCE LINES 63-65
 
 Inference
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. GENERATED FROM PYTHON SOURCE LINES 64-70
+.. GENERATED FROM PYTHON SOURCE LINES 65-71
 
 .. code-block:: python
 
@@ -118,7 +119,7 @@ Inference
         new_outputs = optimized_model(*new_inputs)
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 71-77
+.. GENERATED FROM PYTHON SOURCE LINES 72-78
 
 .. code-block:: python
 
@@ -129,12 +130,12 @@ Inference
         new_batch_size_outputs = optimized_model(*new_batch_size_inputs)
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 78-80
+.. GENERATED FROM PYTHON SOURCE LINES 79-81
 
 Avoid recompilation by specifying dynamic shapes before Torch-TRT compilation
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. GENERATED FROM PYTHON SOURCE LINES 80-123
+.. GENERATED FROM PYTHON SOURCE LINES 81-126
 
 .. code-block:: python
 
@@ -147,6 +148,7 @@ Avoid recompilation by specifying dynamic shapes before Torch-TRT compilation
         model,
         ir="torch_compile",
         inputs=inputs_bs8,
+        use_explicit_typing=False,
         enabled_precisions=enabled_precisions,
         workspace_size=workspace_size,
         min_block_size=min_block_size,
@@ -172,6 +174,7 @@ Avoid recompilation by specifying dynamic shapes before Torch-TRT compilation
                 dtype=torch.half,
             )
         ],
+        "use_explicit_typing": False,
         "enabled_precisions": enabled_precisions,
         "ir": "dynamo",
     }

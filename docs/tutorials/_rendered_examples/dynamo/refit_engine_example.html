@@ -10,7 +10,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Refitting Torch-TensorRT Programs with New Weights &mdash; Torch-TensorRT v2.11.0.dev0+f60963f documentation</title>
+  <title>Refitting Torch-TensorRT Programs with New Weights &mdash; Torch-TensorRT v2.12.0.dev0+a8f2127 documentation</title>
   
 
   
@@ -293,7 +293,7 @@
               
               
                 <div class="version">
-                  v2.11.0.dev0+f60963f
+                  v2.12.0.dev0+a8f2127
                 </div>
               
             
@@ -340,6 +340,7 @@
 <p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="torch_compile_advanced_usage.html">Torch Compile Advanced Usage</a></li>
+<li class="toctree-l1"><a class="reference internal" href="compile_with_dynamic_inputs.html">Compiling Models with Dynamic Input Shapes</a></li>
 <li class="toctree-l1"><a class="reference internal" href="vgg16_ptq.html">Deploy Quantized Models using Torch-TensorRT</a></li>
 <li class="toctree-l1"><a class="reference internal" href="engine_caching_example.html">Engine Caching</a></li>
 <li class="toctree-l1"><a class="reference internal" href="engine_caching_bert_example.html">Engine Caching (BERT)</a></li>
@@ -352,6 +353,7 @@
 <li class="toctree-l1"><a class="reference internal" href="auto_generate_plugins.html">Automatically Generate a Plugin for a Custom Kernel</a></li>
 <li class="toctree-l1"><a class="reference internal" href="mutable_torchtrt_module_example.html">Mutable Torch TensorRT Module</a></li>
 <li class="toctree-l1"><a class="reference internal" href="weight_streaming_example.html">Weight Streaming</a></li>
+<li class="toctree-l1"><a class="reference internal" href="dynamic_memory_allocation.html">Dynamic Memory Allocation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="pre_allocated_output_example.html">Pre-allocated output buffer</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Dynamo Frontend</span></p>
@@ -585,8 +587,9 @@ function is used to update the weights of the compiled module with the new weigh
 
 <span class="c1"># Check the output</span>
 <span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
-    <span class="n">expected_outputs</span><span class="p">,</span> <span class="n">refitted_outputs</span> <span class="o">=</span> <span class="n">exp_program2</span><span class="o">.</span><span class="n">module</span><span class="p">()(</span><span class="o">*</span><span class="n">inputs</span><span class="p">),</span> <span class="n">new_trt_gm</span><span class="p">(</span>
-        <span class="o">*</span><span class="n">inputs</span>
+    <span class="n">expected_outputs</span><span class="p">,</span> <span class="n">refitted_outputs</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">exp_program2</span><span class="o">.</span><span class="n">module</span><span class="p">()(</span><span class="o">*</span><span class="n">inputs</span><span class="p">),</span>
+        <span class="n">new_trt_gm</span><span class="p">(</span><span class="o">*</span><span class="n">inputs</span><span class="p">),</span>
     <span class="p">)</span>
     <span class="k">for</span> <span class="n">expected_output</span><span class="p">,</span> <span class="n">refitted_output</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">expected_outputs</span><span class="p">,</span> <span class="n">refitted_outputs</span><span class="p">):</span>
         <span class="k">assert</span> <span class="n">torch</span><span class="o">.</span><span class="n">allclose</span><span class="p">(</span>

@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt.dynamo.runtime._MutableTorchTensorRTModule &mdash; Torch-TensorRT v2.11.0.dev0+f60963f documentation</title>
+  <title>torch_tensorrt.dynamo.runtime._MutableTorchTensorRTModule &mdash; Torch-TensorRT v2.12.0.dev0+a8f2127 documentation</title>
   
 
   
@@ -290,7 +290,7 @@
               
               
                 <div class="version">
-                  v2.11.0.dev0+f60963f
+                  v2.12.0.dev0+a8f2127
                 </div>
               
             
@@ -337,6 +337,7 @@
 <p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../../../tutorials/_rendered_examples/dynamo/torch_compile_advanced_usage.html">Torch Compile Advanced Usage</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../tutorials/_rendered_examples/dynamo/compile_with_dynamic_inputs.html">Compiling Models with Dynamic Input Shapes</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../../tutorials/_rendered_examples/dynamo/vgg16_ptq.html">Deploy Quantized Models using Torch-TensorRT</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../../tutorials/_rendered_examples/dynamo/engine_caching_example.html">Engine Caching</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../../tutorials/_rendered_examples/dynamo/engine_caching_bert_example.html">Engine Caching (BERT)</a></li>
@@ -349,6 +350,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../../../../tutorials/_rendered_examples/dynamo/auto_generate_plugins.html">Automatically Generate a Plugin for a Custom Kernel</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../../tutorials/_rendered_examples/dynamo/mutable_torchtrt_module_example.html">Mutable Torch TensorRT Module</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../../tutorials/_rendered_examples/dynamo/weight_streaming_example.html">Weight Streaming</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../tutorials/_rendered_examples/dynamo/dynamic_memory_allocation.html">Dynamic Memory Allocation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../../tutorials/_rendered_examples/dynamo/pre_allocated_output_example.html">Pre-allocated output buffer</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Dynamo Frontend</span></p>
@@ -751,7 +753,7 @@
             <span class="n">args</span><span class="p">,</span> <span class="n">kwargs</span><span class="p">,</span> <span class="n">result</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">run_info</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">original_model</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">to_torch_device</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">trt_device</span><span class="p">))</span>
             <span class="n">new_result</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">original_model</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
-            <span class="n">deallocate_module</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">original_model</span><span class="p">,</span> <span class="n">delete_module</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+            <span class="n">deallocate_module</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">original_model</span><span class="p">)</span>
             <span class="k">if</span> <span class="n">check_output_equal</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="n">new_result</span><span class="p">):</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">refit_state</span><span class="o">.</span><span class="n">set_state</span><span class="p">(</span><span class="n">RefitFlag</span><span class="o">.</span><span class="n">LIVE</span><span class="p">)</span>
                 <span class="k">return</span>
@@ -800,7 +802,7 @@
             <span class="n">in_place</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
         <span class="p">)</span>
 
-        <span class="n">deallocate_module</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">original_model</span><span class="p">,</span> <span class="n">delete_module</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span></div>
+        <span class="n">deallocate_module</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">original_model</span><span class="p">)</span></div>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">get_exported_program</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">ExportedProgram</span><span class="p">:</span>
 
@@ -861,7 +863,7 @@
             <span class="o">**</span><span class="bp">self</span><span class="o">.</span><span class="n">additional_settings</span><span class="p">,</span>
         <span class="p">)</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">additional_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;offload_module_to_cpu&quot;</span><span class="p">,</span> <span class="kc">False</span><span class="p">):</span>
-            <span class="n">deallocate_module</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">original_model</span><span class="p">,</span> <span class="n">delete_module</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+            <span class="n">deallocate_module</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">original_model</span><span class="p">)</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">enable_weight_streaming</span><span class="p">:</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">set_weight_streaming_ctx</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">weight_streaming_budget</span><span class="p">)</span></div>
 
@@ -1227,7 +1229,7 @@
         <span class="n">module</span><span class="o">.</span><span class="n">exp_program</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">export</span><span class="p">(</span>
             <span class="n">module</span><span class="o">.</span><span class="n">original_model</span><span class="p">,</span> <span class="n">module</span><span class="o">.</span><span class="n">arg_inputs</span><span class="p">,</span> <span class="n">kwargs</span><span class="o">=</span><span class="n">module</span><span class="o">.</span><span class="n">kwarg_inputs</span>
         <span class="p">)</span>
-        <span class="n">deallocate_module</span><span class="p">(</span><span class="n">module</span><span class="o">.</span><span class="n">original_model</span><span class="p">,</span> <span class="n">delete_module</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="n">deallocate_module</span><span class="p">(</span><span class="n">module</span><span class="o">.</span><span class="n">original_model</span><span class="p">)</span>
         <span class="bp">cls</span> <span class="o">=</span> <span class="n">module</span><span class="o">.</span><span class="vm">__class__</span>
         <span class="n">module</span><span class="o">.</span><span class="vm">__class__</span> <span class="o">=</span> <span class="nb">type</span><span class="p">(</span>
             <span class="n">module</span><span class="o">.</span><span class="n">original_model</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span><span class="p">,</span>

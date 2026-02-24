@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt.dynamo.runtime._TorchTensorRTModule &mdash; Torch-TensorRT v2.11.0.dev0+f60963f documentation</title>
+  <title>torch_tensorrt.dynamo.runtime._TorchTensorRTModule &mdash; Torch-TensorRT v2.12.0.dev0+a8f2127 documentation</title>
   
 
   
@@ -290,7 +290,7 @@
               
               
                 <div class="version">
-                  v2.11.0.dev0+f60963f
+                  v2.12.0.dev0+a8f2127
                 </div>
               
             
@@ -337,6 +337,7 @@
 <p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../../../tutorials/_rendered_examples/dynamo/torch_compile_advanced_usage.html">Torch Compile Advanced Usage</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../tutorials/_rendered_examples/dynamo/compile_with_dynamic_inputs.html">Compiling Models with Dynamic Input Shapes</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../../tutorials/_rendered_examples/dynamo/vgg16_ptq.html">Deploy Quantized Models using Torch-TensorRT</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../../tutorials/_rendered_examples/dynamo/engine_caching_example.html">Engine Caching</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../../tutorials/_rendered_examples/dynamo/engine_caching_bert_example.html">Engine Caching (BERT)</a></li>
@@ -349,6 +350,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../../../../tutorials/_rendered_examples/dynamo/auto_generate_plugins.html">Automatically Generate a Plugin for a Custom Kernel</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../../tutorials/_rendered_examples/dynamo/mutable_torchtrt_module_example.html">Mutable Torch TensorRT Module</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../../tutorials/_rendered_examples/dynamo/weight_streaming_example.html">Weight Streaming</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../tutorials/_rendered_examples/dynamo/dynamic_memory_allocation.html">Dynamic Memory Allocation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../../tutorials/_rendered_examples/dynamo/pre_allocated_output_example.html">Pre-allocated output buffer</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Dynamo Frontend</span></p>
@@ -493,7 +495,7 @@
 <span class="kn">import</span><span class="w"> </span><span class="nn">copy</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">pickle</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">,</span> <span class="n">Union</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">,</span> <span class="n">Union</span>
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt._Device</span><span class="w"> </span><span class="kn">import</span> <span class="n">Device</span>
@@ -539,7 +541,10 @@
     <span class="n">REQUIRES_OUTPUT_ALLOCATOR_IDX</span> <span class="o">=</span> <span class="p">(</span>
         <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">REQUIRES_OUTPUT_ALLOCATOR_IDX</span><span class="p">()</span>
     <span class="p">)</span>  <span class="c1"># 9</span>
-    <span class="n">SERIALIZATION_LEN</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">SERIALIZATION_LEN</span><span class="p">()</span>  <span class="c1"># 10</span>
+    <span class="n">RESOURCE_ALLOCATION_STRATEGY_IDX</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">RESOURCE_ALLOCATION_STRATEGY_IDX</span><span class="p">()</span>
+    <span class="p">)</span>  <span class="c1"># 10</span>
+    <span class="n">SERIALIZATION_LEN</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">SERIALIZATION_LEN</span><span class="p">()</span>  <span class="c1"># 11</span>
 
 
 <div class="viewcode-block" id="TorchTensorRTModule"><a class="viewcode-back" href="../../../../py_api/runtime.html#torch_tensorrt.runtime.TorchTensorRTModule">[docs]</a><span class="nd">@for_all_methods</span><span class="p">(</span><span class="n">needs_torch_tensorrt_runtime</span><span class="p">)</span>
@@ -573,6 +578,7 @@
         <span class="n">settings</span><span class="p">:</span> <span class="n">CompilationSettings</span> <span class="o">=</span> <span class="n">CompilationSettings</span><span class="p">(),</span>  <span class="c1"># Assumes engine was built with default compilation settings if object not passed</span>
         <span class="n">weight_name_map</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">requires_output_allocator</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="n">symbolic_shape_expressions</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">List</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Takes a name, target device, serialized TensorRT engine, and binding names / order and constructs</span>
 <span class="sd">        a PyTorch ``torch.nn.Module`` around it. Uses the Torch-TensorRT runtime extension to run the engines</span>
@@ -592,6 +598,7 @@
 <span class="sd">            settings (torch_tensorrt.dynamo.CompilationSettings): Settings used to compile engine, assumes engine was built with default compilation settings if object not passed</span>
 <span class="sd">            weight_name_map (dict): Mapping of engine weight name to state_dict weight name</span>
 <span class="sd">            requires_output_allocator (bool): Boolean flag indicating if the converter creates operators which require an Output Allocator to run (e.g. data dependent operators)</span>
+<span class="sd">            symbolic_shape_expressions (List[Any]): List of symbolic shape expressions for each input binding</span>
 
 <span class="sd">        Example:</span>
 
@@ -628,6 +635,8 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">serialized_engine</span> <span class="o">=</span> <span class="n">serialized_engine</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">engine</span> <span class="o">=</span> <span class="kc">None</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">requires_output_allocator</span> <span class="o">=</span> <span class="n">requires_output_allocator</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">dynamically_allocate_resources</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">dynamically_allocate_resources</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">symbolic_shape_expressions</span> <span class="o">=</span> <span class="n">symbolic_shape_expressions</span>
 
         <span class="k">if</span> <span class="p">(</span>
             <span class="n">serialized_engine</span>
@@ -645,6 +654,7 @@
         <span class="n">metadata</span> <span class="o">=</span> <span class="p">{</span>
             <span class="s2">&quot;settings&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">settings</span><span class="p">,</span>
             <span class="s2">&quot;weight_name_map&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">weight_name_map</span><span class="p">,</span>
+            <span class="s2">&quot;inout_symexprs&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">symbolic_shape_expressions</span><span class="p">,</span>
             <span class="s2">&quot;output_tensors_are_unowned&quot;</span><span class="p">:</span> <span class="p">(</span>
                 <span class="kc">False</span>
                 <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">engine</span> <span class="ow">is</span> <span class="kc">None</span>
@@ -678,6 +688,12 @@
         <span class="n">engine_info</span><span class="p">[</span><span class="n">REQUIRES_OUTPUT_ALLOCATOR_IDX</span><span class="p">]</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span>
             <span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">requires_output_allocator</span><span class="p">)</span>
         <span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;PROVIDED RESOURCE ALLOCATION STRATEGY: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">dynamically_allocate_resources</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="p">)</span>
+        <span class="n">engine_info</span><span class="p">[</span><span class="n">RESOURCE_ALLOCATION_STRATEGY_IDX</span><span class="p">]</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span>
+            <span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">dynamically_allocate_resources</span><span class="p">)</span>
+        <span class="p">)</span>
 
         <span class="k">return</span> <span class="n">engine_info</span>
 
@@ -705,6 +721,14 @@
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_reset_captured_graph</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">engine</span><span class="o">.</span><span class="n">reset_captured_graph</span><span class="p">()</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">use_dynamically_allocated_resources</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">dynamically_allocate_resources</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">dynamically_allocate_resources</span> <span class="o">=</span> <span class="n">dynamically_allocate_resources</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">engine</span><span class="o">.</span><span class="n">use_dynamically_allocated_resources</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">dynamically_allocate_resources</span>
+        <span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">setup_engine</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
@@ -779,6 +803,7 @@
             <span class="bp">self</span><span class="o">.</span><span class="n">settings</span> <span class="o">=</span> <span class="n">metadata</span><span class="p">[</span><span class="s2">&quot;settings&quot;</span><span class="p">]</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">weight_name_map</span> <span class="o">=</span> <span class="n">metadata</span><span class="p">[</span><span class="s2">&quot;weight_name_map&quot;</span><span class="p">]</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">output_tensors_are_unowned</span> <span class="o">=</span> <span class="n">metadata</span><span class="p">[</span><span class="s2">&quot;output_tensors_are_unowned&quot;</span><span class="p">]</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">symbolic_shape_expression</span> <span class="o">=</span> <span class="n">metadata</span><span class="p">[</span><span class="s2">&quot;inout_symexprs&quot;</span><span class="p">]</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">engine</span><span class="o">.</span><span class="n">set_output_tensors_as_unowned</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">output_tensors_are_unowned</span><span class="p">)</span>
 
         <span class="k">else</span><span class="p">:</span>

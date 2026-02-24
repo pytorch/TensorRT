@@ -58,6 +58,7 @@ Tutorials
 ------------
 
 * :ref:`torch_compile_advanced_usage`
+* :ref:`compile_with_dynamic_inputs`
 * :ref:`vgg16_ptq`
 * :ref:`engine_caching_example`
 * :ref:`engine_caching_bert_example`
@@ -70,6 +71,7 @@ Tutorials
 * :ref:`auto_generate_plugins`
 * :ref:`mutable_torchtrt_module_example`
 * :ref:`weight_streaming_example`
+* :ref:`dynamic_memory_allocation`
 * :ref:`pre_allocated_output_example`
 * :ref:`debugger_example`
 
@@ -79,6 +81,7 @@ Tutorials
    :hidden:
 
    tutorials/_rendered_examples/dynamo/torch_compile_advanced_usage
+   tutorials/_rendered_examples/dynamo/compile_with_dynamic_inputs
    tutorials/_rendered_examples/dynamo/vgg16_ptq
    tutorials/_rendered_examples/dynamo/engine_caching_example
    tutorials/_rendered_examples/dynamo/engine_caching_bert_example
@@ -91,6 +94,7 @@ Tutorials
    tutorials/_rendered_examples/dynamo/auto_generate_plugins
    tutorials/_rendered_examples/dynamo/mutable_torchtrt_module_example
    tutorials/_rendered_examples/dynamo/weight_streaming_example
+   tutorials/_rendered_examples/dynamo/dynamic_memory_allocation
    tutorials/_rendered_examples/dynamo/pre_allocated_output_example
 
 Dynamo Frontend

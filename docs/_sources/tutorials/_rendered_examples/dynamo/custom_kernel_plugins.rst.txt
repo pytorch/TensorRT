@@ -574,7 +574,7 @@ Using Torch-TensorRT to Insert the Kernel
 Now with our TensorRT plugin, we can create a converter so that Torch-TensorRT knows to insert our plugin in place of our custom circular padding operator.
 More information on writing converters can be found `here <https://pytorch.org/TensorRT/contributors/dynamo_converters.html>`_
 
-.. GENERATED FROM PYTHON SOURCE LINES 505-566
+.. GENERATED FROM PYTHON SOURCE LINES 505-564
 
 .. code-block:: python
 
@@ -590,9 +590,7 @@ More information on writing converters can be found `here <https://pytorch.org/T
     from torch_tensorrt.fx.converters.converter_utils import set_layer_name
 
 
-    @dynamo_tensorrt_converter(
-        torch.ops.torchtrt_ex.triton_circular_pad.default
-    )  # type: ignore
+    @dynamo_tensorrt_converter(torch.ops.torchtrt_ex.triton_circular_pad.default)  # type: ignore
     # Recall the schema defined above:
     # torch.ops.torchtrt_ex.triton_circular_pad.default(Tensor x, IntList padding) -> Tensor
     def circular_padding_converter(
@@ -640,11 +638,11 @@ More information on writing converters can be found `here <https://pytorch.org/T
 
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 567-568
+.. GENERATED FROM PYTHON SOURCE LINES 565-566
 
 Finally, we are now able to fully compile our model
 
-.. GENERATED FROM PYTHON SOURCE LINES 568-574
+.. GENERATED FROM PYTHON SOURCE LINES 566-572
 
 .. code-block:: python
 
@@ -655,7 +653,7 @@ Finally, we are now able to fully compile our model
         min_block_size=1,
     )
 
-.. GENERATED FROM PYTHON SOURCE LINES 575-607
+.. GENERATED FROM PYTHON SOURCE LINES 573-605
 
 .. code-block:: none
 
@@ -690,11 +688,11 @@ Finally, we are now able to fully compile our model
          - For minimal graph segmentation, select min_block_size=2 which would generate 1 TRT engine(s)
          - The current level of graph segmentation is equivalent to selecting min_block_size=2 which generates 1 TRT engine(s)
 
-.. GENERATED FROM PYTHON SOURCE LINES 609-610
+.. GENERATED FROM PYTHON SOURCE LINES 607-608
 
 As you can see, now there is only one subgraph created for the TensorRT engine that contains both our custom kernel and the native convolution operator.
 
-.. GENERATED FROM PYTHON SOURCE LINES 610-614
+.. GENERATED FROM PYTHON SOURCE LINES 608-612
 
 .. code-block:: python
 
@@ -703,7 +701,7 @@ As you can see, now there is only one subgraph created for the TensorRT engine t
         print(trt_model(ex_input))
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 615-636
+.. GENERATED FROM PYTHON SOURCE LINES 613-634
 
 .. code-block:: none
 
@@ -727,11 +725,11 @@ As you can see, now there is only one subgraph created for the TensorRT engine t
           [-4.3668, -4.1006, -5.1447],
           [-5.0352, -4.7689, -5.8131]]]], device='cuda:0')
 
-.. GENERATED FROM PYTHON SOURCE LINES 639-640
+.. GENERATED FROM PYTHON SOURCE LINES 637-638
 
 We can verify our implementation is run correctly by both TensorRT and PyTorch
 
-.. GENERATED FROM PYTHON SOURCE LINES 640-644
+.. GENERATED FROM PYTHON SOURCE LINES 638-642
 
 .. code-block:: python
 
@@ -740,7 +738,7 @@ We can verify our implementation is run correctly by both TensorRT and PyTorch
         print(my_model(ex_input) - trt_model(ex_input))
 
 
-.. GENERATED FROM PYTHON SOURCE LINES 645-666
+.. GENERATED FROM PYTHON SOURCE LINES 643-664
 
 .. code-block:: none
 

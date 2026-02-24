@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt.dynamo._compiler &mdash; Torch-TensorRT v2.11.0.dev0+f60963f documentation</title>
+  <title>torch_tensorrt.dynamo._compiler &mdash; Torch-TensorRT v2.12.0.dev0+a8f2127 documentation</title>
   
 
   
@@ -290,7 +290,7 @@
               
               
                 <div class="version">
-                  v2.11.0.dev0+f60963f
+                  v2.12.0.dev0+a8f2127
                 </div>
               
             
@@ -337,6 +337,7 @@
 <p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/torch_compile_advanced_usage.html">Torch Compile Advanced Usage</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/compile_with_dynamic_inputs.html">Compiling Models with Dynamic Input Shapes</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/vgg16_ptq.html">Deploy Quantized Models using Torch-TensorRT</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/engine_caching_example.html">Engine Caching</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/engine_caching_bert_example.html">Engine Caching (BERT)</a></li>
@@ -349,6 +350,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/auto_generate_plugins.html">Automatically Generate a Plugin for a Custom Kernel</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/mutable_torchtrt_module_example.html">Mutable Torch TensorRT Module</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/weight_streaming_example.html">Weight Streaming</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/dynamic_memory_allocation.html">Dynamic Memory Allocation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../tutorials/_rendered_examples/dynamo/pre_allocated_output_example.html">Pre-allocated output buffer</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Dynamo Frontend</span></p>
@@ -599,6 +601,7 @@
     <span class="n">use_distributed_mode_trace</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">USE_DISTRIBUTED_MODE_TRACE</span><span class="p">,</span>
     <span class="n">enable_resource_partitioning</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">ENABLE_RESOURCE_PARTITIONING</span><span class="p">,</span>
     <span class="n">cpu_memory_budget</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">CPU_MEMORY_BUDGET</span><span class="p">,</span>
+    <span class="n">dynamically_allocate_resources</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">DYNAMICALLY_ALLOCATE_RESOURCES</span><span class="p">,</span>
     <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Compile an ExportedProgram module using TensorRT in Linux for Inference in Windows</span>
@@ -675,6 +678,7 @@
 <span class="sd">        use_distributed_mode_trace (bool):  Using aot_autograd to trace the graph. This is enabled when DTensors or distributed tensors are present in distributed model</span>
 <span class="sd">        enable_resource_partitioning (bool): Enable resource-aware partitioning. This is useful when the model is large and the CPU memory is limited.</span>
 <span class="sd">        cpu_memory_budget (Optional[int]): The maximum amount of CPU memory to use for the compilation. If the compilation requires more memory than this budget, the compilation will fail.</span>
+<span class="sd">        dynamically_allocate_resources (bool): Dynamically allocate resources during engine execution.</span>
 <span class="sd">        **kwargs: Any,</span>
 <span class="sd">    Returns:</span>
 <span class="sd">        torch.fx.GraphModule: Compiled FX Module, when run it will execute via TensorRT</span>
@@ -832,6 +836,7 @@
         <span class="s2">&quot;use_distributed_mode_trace&quot;</span><span class="p">:</span> <span class="n">use_distributed_mode_trace</span><span class="p">,</span>
         <span class="s2">&quot;enable_resource_partitioning&quot;</span><span class="p">:</span> <span class="n">enable_resource_partitioning</span><span class="p">,</span>
         <span class="s2">&quot;cpu_memory_budget&quot;</span><span class="p">:</span> <span class="n">cpu_memory_budget</span><span class="p">,</span>
+        <span class="s2">&quot;dynamically_allocate_resources&quot;</span><span class="p">:</span> <span class="n">dynamically_allocate_resources</span><span class="p">,</span>
     <span class="p">}</span>
 
     <span class="c1"># disable the following settings is not supported for cross compilation for windows feature</span>
@@ -859,15 +864,19 @@
     <span class="n">gm</span> <span class="o">=</span> <span class="n">exported_program</span><span class="o">.</span><span class="n">module</span><span class="p">()</span>
     <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Input graph: &quot;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="p">))</span>
 
-    <span class="c1"># Apply lowering on the graph module</span>
+    <span class="c1"># Apply lowering on the graph module. Note: constant_fold runs inside post_lowering and requires</span>
+    <span class="c1"># module parameters to still be on GPU, so we must not deallocate before this call.</span>
     <span class="n">gm</span> <span class="o">=</span> <span class="n">post_lowering</span><span class="p">(</span><span class="n">gm</span><span class="p">,</span> <span class="n">settings</span><span class="p">)</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;CPU memory usage after post_lowering: </span><span class="si">{</span><span class="n">get_cpu_memory_usage</span><span class="p">()</span><span class="si">}</span><span class="s2"> MB&quot;</span><span class="p">)</span>
     <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Lowered Input graph: &quot;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="p">))</span>
+
     <span class="c1"># Move the weights in the state_dict to CPU</span>
     <span class="k">if</span> <span class="n">offload_module_to_cpu</span><span class="p">:</span>
-        <span class="n">deallocate_module</span><span class="p">(</span><span class="n">exported_program</span><span class="o">.</span><span class="n">module</span><span class="p">(),</span> <span class="n">delete_module</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="n">deallocate_module</span><span class="p">(</span><span class="n">gm</span><span class="p">)</span>
         <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
             <span class="s2">&quot;The PyTorch model was moved to the CPU to allocate all GPU memory to TensorRT. To retain the model on the GPU, set offload_module_to_cpu=False&quot;</span>
         <span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;CPU memory usage after CPU offload: </span><span class="si">{</span><span class="n">get_cpu_memory_usage</span><span class="p">()</span><span class="si">}</span><span class="s2"> MB&quot;</span><span class="p">)</span>
     <span class="k">else</span><span class="p">:</span>
         <span class="n">remaining_memory</span><span class="p">,</span> <span class="n">total_memory</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">mem_get_info</span><span class="p">()</span>
         <span class="k">if</span> <span class="n">remaining_memory</span> <span class="o">&lt;</span> <span class="n">total_memory</span> <span class="o">//</span> <span class="mi">2</span><span class="p">:</span>
@@ -948,6 +957,7 @@
     <span class="p">]</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">AUTOCAST_CALIBRATION_DATALOADER</span><span class="p">,</span>
     <span class="n">cpu_memory_budget</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">CPU_MEMORY_BUDGET</span><span class="p">,</span>
     <span class="n">enable_resource_partitioning</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">ENABLE_RESOURCE_PARTITIONING</span><span class="p">,</span>
+    <span class="n">dynamically_allocate_resources</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">_defaults</span><span class="o">.</span><span class="n">DYNAMICALLY_ALLOCATE_RESOURCES</span><span class="p">,</span>
     <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Compile an ExportedProgram module for NVIDIA GPUs using TensorRT</span>
@@ -1034,6 +1044,7 @@
 <span class="sd">        autocast_calibration_dataloader (Optional[torch.utils.data.DataLoader]): The dataloader to use for autocast calibration. Default is None.</span>
 <span class="sd">        enable_resource_partitioning (bool): Enable resource-aware partitioning. This is useful when the model is large and the CPU memory is limited.</span>
 <span class="sd">        cpu_memory_budget (Optional[int]): The maximum amount of CPU memory to use for the compilation. If the compilation requires more memory than this budget, the compilation will fail.</span>
+<span class="sd">        dynamically_allocate_resources (bool): Dynamically allocate resources during engine execution.</span>
 <span class="sd">        **kwargs: Any,</span>
 <span class="sd">    Returns:</span>
 <span class="sd">        torch.fx.GraphModule: Compiled FX Module, when run it will execute via TensorRT</span>
@@ -1048,7 +1059,7 @@
 
     <span class="k">if</span> <span class="ow">not</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;use_explicit_typing&quot;</span><span class="p">,</span> <span class="kc">False</span><span class="p">):</span>
         <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
-            <span class="s2">&quot;`use_explicit_typing` is deprecated. This setting will be removed and you should enable autocast instead.&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;`use_explicit_typing` is deprecated. use_explicit_types is now on by default, this setting will be removed and you should enable autocast to recover weak typing behavior.&quot;</span><span class="p">,</span>
             <span class="ne">DeprecationWarning</span><span class="p">,</span>
             <span class="n">stacklevel</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
         <span class="p">)</span>
@@ -1236,6 +1247,7 @@
         <span class="s2">&quot;autocast_calibration_dataloader&quot;</span><span class="p">:</span> <span class="n">autocast_calibration_dataloader</span><span class="p">,</span>
         <span class="s2">&quot;enable_resource_partitioning&quot;</span><span class="p">:</span> <span class="n">enable_resource_partitioning</span><span class="p">,</span>
         <span class="s2">&quot;cpu_memory_budget&quot;</span><span class="p">:</span> <span class="n">cpu_memory_budget</span><span class="p">,</span>
+        <span class="s2">&quot;dynamically_allocate_resources&quot;</span><span class="p">:</span> <span class="n">dynamically_allocate_resources</span><span class="p">,</span>
     <span class="p">}</span>
     <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;CPU memory usage before lowering: </span><span class="si">{</span><span class="n">get_cpu_memory_usage</span><span class="p">()</span><span class="si">}</span><span class="s2"> MB&quot;</span><span class="p">)</span>
     <span class="n">settings</span> <span class="o">=</span> <span class="n">CompilationSettings</span><span class="p">(</span><span class="o">**</span><span class="n">compilation_options</span><span class="p">)</span>
@@ -1249,15 +1261,15 @@
     <span class="c1"># Move the weights in the state_dict to CPU</span>
     <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Input graph: &quot;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="p">))</span>
 
-    <span class="c1"># Apply lowering on the graph module</span>
+    <span class="c1"># Apply lowering on the graph module. Note: constant_fold runs inside post_lowering and requires</span>
+    <span class="c1"># module parameters to still be on GPU, so we must not deallocate before this call.</span>
     <span class="n">gm</span> <span class="o">=</span> <span class="n">post_lowering</span><span class="p">(</span><span class="n">gm</span><span class="p">,</span> <span class="n">settings</span><span class="p">)</span>
     <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;CPU memory usage after post_lowering: </span><span class="si">{</span><span class="n">get_cpu_memory_usage</span><span class="p">()</span><span class="si">}</span><span class="s2"> MB&quot;</span><span class="p">)</span>
     <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Lowered Input graph: &quot;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="p">))</span>
 
     <span class="c1"># Move the weights in the state_dict to CPU</span>
     <span class="k">if</span> <span class="n">offload_module_to_cpu</span><span class="p">:</span>
-        <span class="n">deallocate_module</span><span class="p">(</span><span class="n">gm</span><span class="p">,</span> <span class="n">delete_module</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
-        <span class="n">deallocate_module</span><span class="p">(</span><span class="n">exported_program</span><span class="o">.</span><span class="n">module</span><span class="p">(),</span> <span class="n">delete_module</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="n">deallocate_module</span><span class="p">(</span><span class="n">gm</span><span class="p">)</span>
         <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
             <span class="s2">&quot;The PyTorch model was moved to the CPU to allocate all GPU memory to TensorRT. To retain the model on the GPU, set offload_module_to_cpu=False&quot;</span>
         <span class="p">)</span>
@@ -1525,7 +1537,6 @@
             <span class="n">trt_modules</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">trt_module</span>
 
             <span class="k">if</span> <span class="n">_debugger_config</span><span class="p">:</span>
-
                 <span class="k">if</span> <span class="n">_debugger_config</span><span class="o">.</span><span class="n">save_engine_profile</span><span class="p">:</span>
                     <span class="k">if</span> <span class="n">settings</span><span class="o">.</span><span class="n">use_python_runtime</span><span class="p">:</span>
                         <span class="k">if</span> <span class="n">_debugger_config</span><span class="o">.</span><span class="n">profile_format</span> <span class="o">!=</span> <span class="s2">&quot;cudagraph&quot;</span><span class="p">:</span>
@@ -1902,7 +1913,7 @@
 
     <span class="c1"># Move the weights in the state_dict to CPU</span>
     <span class="k">if</span> <span class="n">offload_module_to_cpu</span><span class="p">:</span>
-        <span class="n">deallocate_module</span><span class="p">(</span><span class="n">exported_program</span><span class="o">.</span><span class="n">module</span><span class="p">(),</span> <span class="n">delete_module</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="n">deallocate_module</span><span class="p">(</span><span class="n">exported_program</span><span class="o">.</span><span class="n">module</span><span class="p">())</span>
         <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
             <span class="s2">&quot;The PyTorch model was moved to the CPU to allocate all GPU memory to TensorRT. To retain the model on the GPU, set offload_module_to_cpu=False&quot;</span>
         <span class="p">)</span>
@@ -1912,6 +1923,9 @@
             <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
                 <span class="s2">&quot;Remaining GPU memory may not be enough to compile the TensorRT engine for this model resulting in an OOM error, Consider setting offload_module_to_cpu=True&quot;</span>
             <span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">trt_kwarg_inputs</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">trt_kwarg_inputs</span> <span class="o">=</span> <span class="p">{}</span>
 
     <span class="n">flattened_input_list</span> <span class="o">=</span> <span class="n">get_flat_args_with_check</span><span class="p">(</span>
         <span class="n">exported_program</span><span class="p">,</span> <span class="nb">list</span><span class="p">(</span><span class="n">trt_arg_inputs</span><span class="p">),</span> <span class="n">trt_kwarg_inputs</span>
