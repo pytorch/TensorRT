@@ -135,7 +135,6 @@ def test_resnet18_cpu_offload(ir):
             msg="Model should be offloaded to CPU",
         )
         model.cuda()
-        trt_mod.cuda()
     cos_sim = cosine_similarity(model(input), trt_mod(input))
     assertions.assertTrue(
         cos_sim > COSINE_THRESHOLD,
@@ -374,7 +373,6 @@ def test_bert_base_uncased_cpu_offload(ir):
             msg="Model should be offloaded to CPU",
         )
         model.cuda()
-        trt_mod.cuda()
 
     model_outputs = model(input, input2)
     trt_model_outputs = trt_mod(input, input2)
