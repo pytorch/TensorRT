@@ -312,7 +312,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
             self.settings = metadata["settings"]
             self.weight_name_map = metadata["weight_name_map"]
             self.output_tensors_are_unowned = metadata["output_tensors_are_unowned"]
-            self.symbolic_shape_expression = metadata["inout_symexprs"]
+            self.symbolic_shape_expressions = metadata["inout_symexprs"]
             self.engine.set_output_tensors_as_unowned(self.output_tensors_are_unowned)
 
         else:
