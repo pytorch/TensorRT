@@ -261,17 +261,10 @@ def cross_compile_for_windows(
     if use_explicit_typing:
         if len(enabled_precisions) != 1 or not any(
             x in enabled_precisions
-            for x in {
-                torch.float32,
-                dtype.f32,
-                torch.float4_e2m1fn_x2,
-                dtype.f4,
-                torch.float8_e4m3fn,
-                dtype.f8,
-            }
+            for x in {torch.float32, dtype.f32, torch.float4_e2m1fn_x2, dtype.f4}
         ):
             raise AssertionError(
-                f"use_explicit_typing was set to True, however found that enabled_precisions was also specified (saw: {enabled_precisions}, expected: dtype.f32, dtype.f4, dtype.f8). enabled_precisions should not be used when use_explicit_typing=True"
+                f"use_explicit_typing was set to True, however found that enabled_precisions was also specified (saw: {enabled_precisions}, expected: dtype.f32, dtype.f4). enabled_precisions should not be used when use_explicit_typing=True"
             )
 
     if use_fp32_acc:
@@ -648,17 +641,10 @@ def compile(
     if use_explicit_typing:
         if len(enabled_precisions) != 1 or not any(
             x in enabled_precisions
-            for x in {
-                torch.float32,
-                dtype.f32,
-                torch.float4_e2m1fn_x2,
-                dtype.f4,
-                torch.float8_e4m3fn,
-                dtype.f8,
-            }
+            for x in {torch.float32, dtype.f32, torch.float4_e2m1fn_x2, dtype.f4}
         ):
             raise AssertionError(
-                f"use_explicit_typing was set to True, however found that enabled_precisions was also specified (saw: {enabled_precisions}, expected: dtype.f32, dtype.f4, dtype.f8). enabled_precisions should not be used when use_explicit_typing=True"
+                f"use_explicit_typing was set to True, however found that enabled_precisions was also specified (saw: {enabled_precisions}, expected: dtype.f32, dtype.f4). enabled_precisions should not be used when use_explicit_typing=True"
             )
 
     if autocast_low_precision_type is not None:
@@ -1324,17 +1310,10 @@ def convert_exported_program_to_serialized_trt_engine(
     if use_explicit_typing:
         if len(enabled_precisions) != 1 or not any(
             x in enabled_precisions
-            for x in {
-                torch.float32,
-                dtype.f32,
-                torch.float4_e2m1fn_x2,
-                dtype.f4,
-                torch.float8_e4m3fn,
-                dtype.f8,
-            }
+            for x in {torch.float32, dtype.f32, torch.float4_e2m1fn_x2, dtype.f4}
         ):
             raise AssertionError(
-                f"use_explicit_typing was set to True, however found that enabled_precisions was also specified (saw: {enabled_precisions}, expected: dtype.f32, dtype.f4, dtype.f8). enabled_precisions should not be used when use_explicit_typing=True"
+                f"use_explicit_typing was set to True, however found that enabled_precisions was also specified (saw: {enabled_precisions}, expected: dtype.f32, dtype.f4). enabled_precisions should not be used when use_explicit_typing=True"
             )
 
     if use_fp32_acc:
