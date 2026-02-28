@@ -22,6 +22,7 @@ from typing import (
 import numpy as np
 import psutil
 import sympy
+import tensorrt as trt
 import torch
 from torch._subclasses.fake_tensor import FakeTensor
 from torch.fx.experimental.proxy_tensor import unset_fake_temporarily
@@ -36,7 +37,6 @@ from torch_tensorrt.dynamo._defaults import default_device
 from torch_tensorrt.dynamo._engine_cache import BaseEngineCache
 from torch_tensorrt.dynamo._settings import CompilationSettings
 
-import tensorrt as trt
 from packaging import version
 
 from .types import TRTDataType
@@ -855,7 +855,10 @@ def get_output_dtypes(output: Any, truncate_double: bool = False) -> List[dtype]
     if isinstance(output, torch.fx.node.Node):
         if "val" in output.meta:
             output_meta = output.meta["val"]
-            if isinstance(output_meta, (FakeTensor, torch.Tensor)):
+            if output_meta is None:
+                # Placeholder output (e.g. unused slot in flash attention return tuple)
+                pass
+            elif isinstance(output_meta, (FakeTensor, torch.Tensor)):
                 if truncate_double and output_meta.dtype == torch.float64:
                     output_dtypes.append(dtype.float32)
                 else:
@@ -871,7 +874,9 @@ def get_output_dtypes(output: Any, truncate_double: bool = False) -> List[dtype]
             )
     elif isinstance(output, (tuple, list)):
         for ele in output:
-            output_dtypes.extend(get_output_dtypes(ele))
+            # Only recurse into Node; skip None and non-Node (e.g. int constants)
+            if isinstance(ele, torch.fx.node.Node):
+                output_dtypes.extend(get_output_dtypes(ele))
     else:
         raise ValueError(
             f"got unexpected type {type(output)}, expected type is a torch.fx.node.Node or a tuple/list of torch.fx.node.Node"
