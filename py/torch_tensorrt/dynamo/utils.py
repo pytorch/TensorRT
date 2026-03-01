@@ -874,9 +874,7 @@ def get_output_dtypes(output: Any, truncate_double: bool = False) -> List[dtype]
             )
     elif isinstance(output, (tuple, list)):
         for ele in output:
-            # Only recurse into Node; skip None and non-Node (e.g. int constants)
-            if isinstance(ele, torch.fx.node.Node):
-                output_dtypes.extend(get_output_dtypes(ele))
+            output_dtypes.extend(get_output_dtypes(ele))
     else:
         raise ValueError(
             f"got unexpected type {type(output)}, expected type is a torch.fx.node.Node or a tuple/list of torch.fx.node.Node"
