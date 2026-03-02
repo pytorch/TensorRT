@@ -3,11 +3,8 @@ import unittest
 import torch
 import torch.nn as nn
 from parameterized import parameterized
-from torch.export import Dim
 from torch.testing._internal.common_utils import run_tests
-from torch_tensorrt import Input
 
-from ..testing_utilities import DECIMALS_OF_AGREEMENT
 from .harness import DispatchTestCase
 
 
@@ -32,6 +29,7 @@ class TestScaledDotProductAttention(DispatchTestCase):
             atol=1e-2,
             precision=torch.float16,
             enable_passes=True,
+            decompose_attention=True,
         )
 
 
@@ -67,6 +65,7 @@ class TestFlashAttention(DispatchTestCase):
             atol=1e-2,
             precision=torch.float16,
             enable_passes=True,
+            decompose_attention=True,
         )
 
 
@@ -99,6 +98,7 @@ class TestEfficientAttention(DispatchTestCase):
             atol=1e-2,
             precision=torch.float16,
             enable_passes=True,
+            decompose_attention=True,
         )
 
 

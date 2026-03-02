@@ -3792,3 +3792,115 @@ def aten_ops_linear(
         weight=args[1],
         bias=args_bounds_check(args, 2, None),
     )
+
+
+@dynamo_tensorrt_converter(
+    torch.ops.aten.scaled_dot_product_attention.default,
+    supports_dynamic_shapes=True,
+)
+def aten_ops_scaled_dot_product_attention(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    # scaled_dot_product_attention(Tensor query, Tensor key, Tensor value, Tensor? attn_mask=None, float dropout_p=0.0, bool is_causal=False, *, float? scale=None, bool enable_gqa=False) -> Tensor
+    return impl.attention.scaled_dot_product_attention(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        query=args[0],
+        key=args[1],
+        value=args[2],
+        attn_mask=args_bounds_check(args, 3, None),
+        dropout_p=args_bounds_check(args, 4, 0.0),
+        is_causal=args_bounds_check(args, 5, False),
+        scale=kwargs.get("scale", None),
+        enable_gqa=kwargs.get("enable_gqa", False),
+    )
+
+
+@dynamo_tensorrt_converter(
+    torch.ops.aten._scaled_dot_product_flash_attention.default,
+    supports_dynamic_shapes=True,
+)
+def aten_ops_scaled_dot_product_flash_attention(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    # _scaled_dot_product_flash_attention(Tensor query, Tensor key, Tensor value, float dropout_p=0.0, bool is_causal=False, bool return_debug_mask=False, *, float? scale=None) -> (Tensor output, Tensor logsumexp, Tensor cum_seq_q, Tensor cum_seq_k, SymInt max_q, SymInt max_k, Tensor rng_state, Tensor unused, Tensor debug_attn_mask)
+    return impl.attention.scaled_dot_product_flash_attention(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        query=args[0],
+        key=args[1],
+        value=args[2],
+        dropout_p=args_bounds_check(args, 3, 0.0),
+        is_causal=args_bounds_check(args, 4, False),
+        return_debug_mask=args_bounds_check(args, 5, False),
+        scale=kwargs.get("scale", None),
+    )
+
+
+@dynamo_tensorrt_converter(
+    torch.ops.aten._scaled_dot_product_efficient_attention.default,
+    supports_dynamic_shapes=True,
+)
+def aten_ops_scaled_dot_product_efficient_attention(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    # _scaled_dot_product_efficient_attention(Tensor query, Tensor key, Tensor value, Tensor? attn_bias, bool compute_log_sumexp, float dropout_p=0.0, bool is_causal=False, *, float? scale=None) -> (Tensor output, Tensor log_sumexp, Tensor philox_seed, Tensor philox_offset)
+    return impl.attention.scaled_dot_product_efficient_attention(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        query=args[0],
+        key=args[1],
+        value=args[2],
+        attn_bias=args_bounds_check(args, 3, None),
+        compute_log_sumexp=args_bounds_check(args, 4, False),
+        dropout_p=args_bounds_check(args, 5, 0.0),
+        is_causal=args_bounds_check(args, 6, False),
+        scale=kwargs.get("scale", None),
+    )
+
+
+@dynamo_tensorrt_converter(
+    torch.ops.aten._scaled_dot_product_cudnn_attention.default,
+    supports_dynamic_shapes=True,
+)
+def aten_ops_scaled_dot_product_cudnn_attention(
+    ctx: ConversionContext,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    # _scaled_dot_product_cudnn_attention(Tensor query, Tensor key, Tensor value, Tensor? attn_bias, bool compute_log_sumexp, float dropout_p=0.0, bool is_causal=False, bool return_debug_mask=False, *, float? scale=None) -> (Tensor output, Tensor logsumexp, Tensor cum_seq_q, Tensor cum_seq_k, SymInt max_q, SymInt max_k, Tensor philox_seed, Tensor philox_offset, Tensor debug_attn_mask)
+    return impl.attention.scaled_dot_product_cudnn_attention(
+        ctx,
+        target,
+        SourceIR.ATEN,
+        name,
+        query=args[0],
+        key=args[1],
+        value=args[2],
+        attn_bias=args_bounds_check(args, 3, None),
+        compute_log_sumexp=args_bounds_check(args, 4, False),
+        dropout_p=args_bounds_check(args, 5, 0.0),
+        is_causal=args_bounds_check(args, 6, False),
+        return_debug_mask=args_bounds_check(args, 7, False),
+        scale=kwargs.get("scale", None),
+    )

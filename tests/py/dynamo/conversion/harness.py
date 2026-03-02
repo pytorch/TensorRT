@@ -385,7 +385,7 @@ class DispatchTestCase(TRTTestCase):
             if enable_passes:
                 exported_program = pre_export_lowering(exported_program, settings)
                 exported_program = exported_program.run_decompositions(
-                    get_decompositions(False)
+                    get_decompositions(False, settings.decompose_attention)
                 )
             fx_module = exported_program.module()
         else:
@@ -421,6 +421,7 @@ class DispatchTestCase(TRTTestCase):
         int32_reqd=False,
         immutable_weights=True,
         use_explicit_typing=False,
+        decompose_attention=False,
     ):
         # TODO: lan to remove this and set use_dynamo_traccer to True by default
         # once all the converter test files are moved to use_dynamo_tracer
@@ -432,6 +433,7 @@ class DispatchTestCase(TRTTestCase):
             truncate_double=True,
             immutable_weights=immutable_weights,
             use_explicit_typing=use_explicit_typing,
+            decompose_attention=decompose_attention,
         )
 
         mod = self.generate_graph(
