@@ -1835,7 +1835,11 @@ class TestLowering(TestCase):
         exported_program = torch.export.export(TestModule(), tuple(inputs))
         fx_graph = exported_program.module()
         unexpected_ops_seen, _ = lower_graph_testing(
-            fx_graph, inputs, unexpected_ops=unexpected_ops, min_block_size=1
+            fx_graph,
+            inputs,
+            unexpected_ops=unexpected_ops,
+            min_block_size=1,
+            decompose_attention=True,
         )
 
         self.assertEqual(
@@ -1850,9 +1854,9 @@ class TestLowering(TestCase):
         trt_model = torch_tensorrt.dynamo.compile(
             exported_program,
             inputs,
-            enabled_precisions={torch.half},
             min_block_size=1,
-            use_explicit_typing=False,
+            use_explicit_typing=True,
+            decompose_attention=True,
         )
         torch.testing.assert_close(
             trt_model(*inputs),
@@ -1950,9 +1954,9 @@ class TestLowering(TestCase):
         trt_model = torch_tensorrt.dynamo.compile(
             exported_program,
             inputs,
-            enabled_precisions={torch.half},
             min_block_size=1,
-            use_explicit_typing=False,
+            use_explicit_typing=True,
+            decompose_attention=True,
         )
 
         inputs = [
@@ -2005,7 +2009,11 @@ class TestLowering(TestCase):
         exported_program = torch.export.export(TestModule(), tuple(inputs))
         fx_graph = exported_program.module()
         unexpected_ops_seen, _ = lower_graph_testing(
-            fx_graph, inputs, unexpected_ops=unexpected_ops, min_block_size=1
+            fx_graph,
+            inputs,
+            unexpected_ops=unexpected_ops,
+            min_block_size=1,
+            decompose_attention=True,
         )
 
         self.assertEqual(
@@ -2020,9 +2028,9 @@ class TestLowering(TestCase):
         trt_model = torch_tensorrt.dynamo.compile(
             exported_program,
             inputs,
-            enabled_precisions={torch.half},
             min_block_size=1,
-            use_explicit_typing=False,
+            use_explicit_typing=True,
+            decompose_attention=True,
         )
         torch.testing.assert_close(
             trt_model(*inputs),
@@ -2070,7 +2078,11 @@ class TestLowering(TestCase):
         exported_program = torch.export.export(TestModule(), tuple(inputs))
         fx_graph = exported_program.module()
         unexpected_ops_seen, _ = lower_graph_testing(
-            fx_graph, inputs, unexpected_ops=unexpected_ops, min_block_size=1
+            fx_graph,
+            inputs,
+            unexpected_ops=unexpected_ops,
+            min_block_size=1,
+            decompose_attention=True,
         )
 
         self.assertEqual(
@@ -2085,9 +2097,9 @@ class TestLowering(TestCase):
         trt_model = torch_tensorrt.dynamo.compile(
             exported_program,
             inputs,
-            enabled_precisions={torch.half},
             min_block_size=1,
-            use_explicit_typing=False,
+            use_explicit_typing=True,
+            decompose_attention=True,
         )
         torch.testing.assert_close(
             trt_model(*inputs),
@@ -2135,7 +2147,11 @@ class TestLowering(TestCase):
         exported_program = torch.export.export(TestModule(), tuple(inputs))
         fx_graph = exported_program.module()
         unexpected_ops_seen, _ = lower_graph_testing(
-            fx_graph, inputs, unexpected_ops=unexpected_ops, min_block_size=1
+            fx_graph,
+            inputs,
+            unexpected_ops=unexpected_ops,
+            min_block_size=1,
+            decompose_attention=True,
         )
 
         self.assertEqual(
@@ -2150,9 +2166,9 @@ class TestLowering(TestCase):
         trt_model = torch_tensorrt.dynamo.compile(
             exported_program,
             inputs,
-            enabled_precisions={torch.half},
             min_block_size=1,
-            use_explicit_typing=False,
+            use_explicit_typing=True,
+            decompose_attention=True,
         )
         torch.testing.assert_close(
             trt_model(*inputs),
