@@ -636,21 +636,27 @@ def masked_scatter_decomposition(
     return replaced.view(input_b.shape)
 
 
+ATTENTION_DECOMPOSITION_OPS = {
+    aten.scaled_dot_product_attention.default,
+    aten._scaled_dot_product_flash_attention.default,
+    aten._scaled_dot_product_efficient_attention.default,
+    aten._scaled_dot_product_cudnn_attention.default,
+}
+
+
 def get_decompositions(
     enable_experimental_decompositions: bool = False,
     decompose_attention: bool = False,
 ) -> Dict[OpOverload, Callable[[Any], Any]]:
-    if not decompose_attention:
-        TORCH_TRT_DECOMPOSITIONS.pop(aten.scaled_dot_product_attention.default, None)
-        TORCH_TRT_DECOMPOSITIONS.pop(
-            aten._scaled_dot_product_flash_attention.default, None
-        )
-        TORCH_TRT_DECOMPOSITIONS.pop(
-            aten._scaled_dot_product_efficient_attention.default, None
-        )
-        TORCH_TRT_DECOMPOSITIONS.pop(
-            aten._scaled_dot_product_cudnn_attention.default, None
-        )
+    trt_decomps = (
+        TORCH_TRT_DECOMPOSITIONS
+        if decompose_attention
+        else {
+            k: v
+            for k, v in TORCH_TRT_DECOMPOSITIONS.items()
+            if k not in ATTENTION_DECOMPOSITION_OPS
+        }
+    )
 
     if enable_experimental_decompositions:
         CORE_ATEN_DECOMPOSITIONS_FILTERED: Dict[OpOverload, Callable[[Any], Any]] = {
@@ -658,7 +664,7 @@ def get_decompositions(
             for decomp in _core_aten_decompositions
             if decomp not in torch_disabled_decompositions
         }
-        return {**CORE_ATEN_DECOMPOSITIONS_FILTERED, **TORCH_TRT_DECOMPOSITIONS}
+        return {**CORE_ATEN_DECOMPOSITIONS_FILTERED, **trt_decomps}
     else:
         # changes made here due to torch2.6 changes https://github.com/pytorch/pytorch/pull/135080
         decomp_table = {}
@@ -674,5 +680,5 @@ def get_decompositions(
         return {
             **ENABLED_TORCH_DECOMPOSITIONS,
             **DECOMP_TABLE_FILTERED,
-            **TORCH_TRT_DECOMPOSITIONS,
+            **trt_decomps,
         }
