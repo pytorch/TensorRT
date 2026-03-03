@@ -102,7 +102,9 @@ def compile(
     """
 
     warnings.warn(
-        'The torchscript frontend for Torch-TensorRT has been deprecated, please plan on porting to the dynamo frontend (torch_tensorrt.compile(..., ir="dynamo"). Torchscript will continue to be a supported deployment format via post compilation torchscript tracing, see: https://pytorch.org/TensorRT/user_guide/saving_models.html for more details',
+        'The TorchScript frontend for Torch-TensorRT has been deprecated and is scheduled for removal alongside TorchScript in PyTorch 2.14. '
+        'Please migrate to the dynamo frontend (torch_tensorrt.compile(..., ir="dynamo")). '
+        'For deployment beyond PyTorch, consider AOTInductor (torch.export + torch._inductor.aot_compile) or ExecuTorch.',
         DeprecationWarning,
         stacklevel=2,
     )
@@ -243,7 +245,9 @@ def convert_method_to_trt_engine(
         bytes: Serialized TensorRT engine, can either be saved to a file or deserialized via TensorRT APIs
     """
     warnings.warn(
-        'The torchscript frontend for Torch-TensorRT has been deprecated, please plan on porting to the dynamo frontend (torch_tensorrt.convert_method_to_trt_engine(..., ir="dynamo"). Torchscript will continue to be a supported deployment format via post compilation torchscript tracing, see: https://pytorch.org/TensorRT/user_guide/saving_models.html for more details',
+        'The TorchScript frontend for Torch-TensorRT has been deprecated and is scheduled for removal alongside TorchScript in PyTorch 2.14. '
+        'Please migrate to the dynamo frontend (torch_tensorrt.convert_method_to_trt_engine(..., ir="dynamo")). '
+        'For deployment beyond PyTorch, consider AOTInductor (torch.export + torch._inductor.aot_compile) or ExecuTorch.',
         DeprecationWarning,
         stacklevel=2,
     )
