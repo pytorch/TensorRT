@@ -229,6 +229,16 @@ sources and the recommended commands:
 
     NOTE: For all of the above cases you must correctly declare the source of PyTorch you intend to use in your WORKSPACE file for both Python and C++ builds. See below for more information
 
+Platform-specific Installation
+---------------------------------
+
+.. toctree::
+   :maxdepth: 1
+
+   jetpack
+   tensorrt_rtx
+   capture_and_replay
+
 
 
 Building on Windows

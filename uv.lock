@@ -55,6 +55,18 @@ wheels = [
 ]
 
 [[package]]
+name = "accessible-pygments"
+version = "0.0.5"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pygments", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/bc/c1/bbac6a50d02774f91572938964c582fff4270eee73ab822a4aeea4d8b11b/accessible_pygments-0.0.5.tar.gz", hash = "sha256:40918d3e6a2b619ad424cb91e556bd3bd8865443d9f22f1dcdf79e33c8046872", size = 1377899, upload-time = "2024-05-10T11:23:10.216Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/8d/3f/95338030883d8c8b91223b4e21744b04d11b161a3ef117295d8241f50ab4/accessible_pygments-0.0.5-py3-none-any.whl", hash = "sha256:88ae3211e68a1d0b011504b2ffc1691feafce124b845bd072ab6f9f66f34d4b7", size = 1395903, upload-time = "2024-05-10T11:23:08.421Z" },
+]
+
+[[package]]
 name = "aiohappyeyeballs"
 version = "2.6.1"
 source = { registry = "https://pypi.org/simple" }
@@ -332,15 +344,14 @@ css = [
 
 [[package]]
 name = "breathe"
-version = "4.34.0"
+version = "4.36.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "docutils", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
     { name = "sphinx", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/ff/24/12938b8549a84d500a0717f50302bd9b87893d8ed4e0b6c12a8952ff0c41/breathe-4.34.0.tar.gz", hash = "sha256:ac0768a5e84addad3e632028fe67749c567aba2b29088493b64c2c1634bcdba1", size = 83184, upload-time = "2022-06-20T18:52:33.732Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/01/56/99bf7d0799d95ad485d95596dc01c2a5b3dda58ebf50a94f6f73b33bacdf/breathe-4.36.0.tar.gz", hash = "sha256:14860b73118ac140b7a3f55446890c777d1b67149cb024279fe3710dad7f535c", size = 154842, upload-time = "2025-02-22T18:36:03.36Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/e8/6b/1385608a27653b6f02047d23f365f5dde7a54a266a0b3358b578c9a747b9/breathe-4.34.0-py3-none-any.whl", hash = "sha256:48804dcf0e607a89fb6ad88c729ef12743a42db03ae9489be4ef8f7c4011774a", size = 92755, upload-time = "2022-06-20T18:52:31.438Z" },
+    { url = "https://files.pythonhosted.org/packages/2c/bc/d67ef1e11ed6e6343c135bf605aa9d5734ff0cc77eb42a2a41f182abc9d9/breathe-4.36.0-py3-none-any.whl", hash = "sha256:af85436f1f09e842bd1fd95617281211c635f8768d245ff830c59b979888d1d5", size = 97231, upload-time = "2025-02-22T18:36:01.087Z" },
 ]
 
 [[package]]
@@ -774,11 +785,11 @@ wheels = [
 
 [[package]]
 name = "docutils"
-version = "0.17.1"
+version = "0.20"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/4c/17/559b4d020f4b46e0287a2eddf2d8ebf76318fd3bd495f1625414b052fdc9/docutils-0.17.1.tar.gz", hash = "sha256:686577d2e4c32380bb50cbb22f575ed742d58168cee37e99117a854bcd88f125", size = 2016138, upload-time = "2021-04-17T14:13:28.434Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/e6/a9/8ddfaa7a9414e42520e0041d1354ebda699e4eb1b47e2f1b6d8bda66aba6/docutils-0.20.tar.gz", hash = "sha256:f75a5a52fbcacd81b47e42888ad2b380748aaccfb3f13af0fe69deb759f01eb6", size = 2075678, upload-time = "2023-05-09T18:01:06.509Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/4c/5e/6003a0d1f37725ec2ebd4046b657abb9372202655f96e76795dca8c0063c/docutils-0.17.1-py2.py3-none-any.whl", hash = "sha256:cf316c8370a737a022b72b56874f6602acf974a37a9fba42ec2876387549fc61", size = 575533, upload-time = "2021-04-17T14:13:24.796Z" },
+    { url = "https://files.pythonhosted.org/packages/41/3b/11740ed0f36e408ff3d5bd259af0c3330d899c17562f9964b7fbc90756f9/docutils-0.20-py3-none-any.whl", hash = "sha256:a428f10de4de4774389734c986a01b4af2d802d26717108b0f1b9356862937c5", size = 577945, upload-time = "2023-05-09T18:01:02.091Z" },
 ]
 
 [[package]]
@@ -3072,6 +3083,25 @@ wheels = [
 ]
 
 [[package]]
+name = "pydata-sphinx-theme"
+version = "0.15.4"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "accessible-pygments", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
+    { name = "babel", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
+    { name = "beautifulsoup4", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
+    { name = "docutils", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
+    { name = "packaging", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
+    { name = "pygments", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
+    { name = "sphinx", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
+    { name = "typing-extensions", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/67/ea/3ab478cccacc2e8ef69892c42c44ae547bae089f356c4b47caf61730958d/pydata_sphinx_theme-0.15.4.tar.gz", hash = "sha256:7762ec0ac59df3acecf49fd2f889e1b4565dbce8b88b2e29ee06fdd90645a06d", size = 2400673, upload-time = "2024-06-25T19:28:45.041Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/e7/d3/c622950d87a2ffd1654208733b5bd1c5645930014abed8f4c0d74863988b/pydata_sphinx_theme-0.15.4-py3-none-any.whl", hash = "sha256:2136ad0e9500d0949f96167e63f3e298620040aea8f9c74621959eda5d4cf8e6", size = 4640157, upload-time = "2024-06-25T19:28:42.383Z" },
+]
+
+[[package]]
 name = "pydot"
 version = "4.0.1"
 source = { registry = "https://pypi.org/simple" }
@@ -3162,11 +3192,16 @@ wheels = [
 ]
 
 [[package]]
-name = "pytorch-sphinx-theme"
-version = "0.0.24"
-source = { git = "https://github.com/pytorch/pytorch_sphinx_theme.git#3c6201c4c17ee8c81e423b60a806c3ef79dfea05" }
+name = "pytorch-sphinx-theme2"
+version = "0.4.4"
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
+    { name = "pydata-sphinx-theme", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
     { name = "sphinx", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/8a/f1/8a4216ffeee23a00290663965ec935592c8ce0c38638379262f132fa031d/pytorch_sphinx_theme2-0.4.4.tar.gz", hash = "sha256:2aef15e6efd5c41ac84a65e5ec3d903b0b7eedfc91acdc1c226d79215c3ad02c", size = 295131, upload-time = "2026-02-13T17:02:55.139Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/e3/1e/999dab3c6c306bd6715f5a59d7ac64294895e78daada5c2eaeab7da3e4c2/pytorch_sphinx_theme2-0.4.4-py3-none-any.whl", hash = "sha256:1d000e592f86fc41b7bc3c2fd501627d7ca68897f9a7cf64618d74e9a57edf82", size = 319836, upload-time = "2026-02-13T17:02:53.355Z" },
 ]
 
 [[package]]
@@ -3690,7 +3725,7 @@ wheels = [
 
 [[package]]
 name = "sphinx"
-version = "5.0.1"
+version = "7.2.6"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "alabaster", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
@@ -3710,9 +3745,9 @@ dependencies = [
     { name = "sphinxcontrib-qthelp", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
     { name = "sphinxcontrib-serializinghtml", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/9c/4e/a1a978d4b4f0de4632e2f00e67472a6135346b35c142dea873e8e92803c1/Sphinx-5.0.1.tar.gz", hash = "sha256:f4da1187785a5bc7312cc271b0e867a93946c319d106363e102936a3d9857306", size = 6728011, upload-time = "2022-06-02T18:12:37.878Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/73/8e/6e51da4b26665b4b92b1944ea18b2d9c825e753e19180cc5bdc818d0ed3b/sphinx-7.2.6.tar.gz", hash = "sha256:9a5160e1ea90688d5963ba09a2dcd8bdd526620edbb65c328728f1b2228d5ab5", size = 7015183, upload-time = "2023-09-13T23:13:25.589Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/5a/bc/7c06c6c68a85e57a7ea5b3274c1adc221591addb164b5136009fb0fee8f4/Sphinx-5.0.1-py3-none-any.whl", hash = "sha256:36aa2a3c2f6d5230be94585bc5d74badd5f9ed8f3388b8eedc1726fe45b1ad30", size = 3125272, upload-time = "2022-06-02T18:12:32.234Z" },
+    { url = "https://files.pythonhosted.org/packages/b2/b6/8ed35256aa530a9d3da15d20bdc0ba888d5364441bb50a5a83ee7827affe/sphinx-7.2.6-py3-none-any.whl", hash = "sha256:1e09160a40b956dc623c910118fa636da93bd3ca0b9876a7b3df90f07d691560", size = 3207959, upload-time = "2023-09-13T23:13:23.467Z" },
 ]
 
 [[package]]
@@ -4024,7 +4059,7 @@ docs = [
     { name = "exhale", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
     { name = "nbsphinx", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
     { name = "pillow", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
-    { name = "pytorch-sphinx-theme", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
+    { name = "pytorch-sphinx-theme2", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
     { name = "sphinx", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
     { name = "sphinx-gallery", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
 ]
@@ -4077,13 +4112,13 @@ dev = [
     { name = "typos" },
 ]
 docs = [
-    { name = "breathe", specifier = "==4.34.0" },
-    { name = "docutils", specifier = "==0.17.1" },
+    { name = "breathe", specifier = "==4.36.0" },
+    { name = "docutils", specifier = "==0.20" },
     { name = "exhale", specifier = "==0.3.7" },
     { name = "nbsphinx", specifier = "==0.9.3" },
     { name = "pillow" },
-    { name = "pytorch-sphinx-theme", git = "https://github.com/pytorch/pytorch_sphinx_theme.git" },
-    { name = "sphinx", specifier = "==5.0.1" },
+    { name = "pytorch-sphinx-theme2", specifier = "==0.4.4" },
+    { name = "sphinx", specifier = "==7.2.6" },
     { name = "sphinx-gallery", specifier = "==0.13.0" },
 ]
 quantization = [{ name = "nvidia-modelopt", extras = ["all"], specifier = ">=0.27.1" }]

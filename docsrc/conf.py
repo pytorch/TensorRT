@@ -15,7 +15,7 @@ import sys
 
 sys.path.append(os.path.join(os.path.dirname(__name__), "../py"))
 
-import pytorch_sphinx_theme
+import pytorch_sphinx_theme2
 import torch
 import torch_tensorrt
 from docutils import nodes
@@ -28,9 +28,13 @@ project = "Torch-TensorRT"
 copyright = "2024, NVIDIA Corporation"
 author = "NVIDIA Corporation"
 
-version = f"v{torch_tensorrt.__version__}"
+_raw_version = torch_tensorrt.__version__
+version = f"v{_raw_version}"
 # The full version, including alpha/beta/rc tags
-release = f"v{torch_tensorrt.__version__}"
+release = f"v{_raw_version}"
+# Dev/nightly builds include a git hash (e.g. v2.12.0.dev0+abc1234) which doesn't
+# match any entry in versions.json — map those to "main" for the version switcher.
+_version_match = "main" if ("dev" in _raw_version or "+" in _raw_version) else version
 
 # -- General configuration ---------------------------------------------------
 
@@ -76,8 +80,6 @@ todo_include_todos = True
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 #
-html_theme = "pytorch_sphinx_theme"
-
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
@@ -90,10 +92,19 @@ html_css_files = [
 ]
 
 # sphinx-gallery configuration
+# Explicitly list which example subdirectories to render so we don't accidentally
+# pick up legacy FX, raw triton client scripts, or training-only utilities.
 sphinx_gallery_conf = {
-    "examples_dirs": "../examples",
-    "gallery_dirs": "tutorials/_rendered_examples/",
-    "ignore_pattern": r"(triton/\w*.py)|(utils.py)",
+    "examples_dirs": [
+        "../examples/dynamo",
+        "../examples/distributed_inference",
+    ],
+    "gallery_dirs": [
+        "tutorials/_rendered_examples/dynamo",
+        "tutorials/_rendered_examples/distributed_inference",
+    ],
+    # Exclude pure utility modules that aren't standalone runnable examples.
+    "ignore_pattern": r"(utils\.py|rotary_embedding\.py|tensor_parallel_initialize_dist\.py)",
 }
 
 # Setup the breathe extension
@@ -115,61 +126,52 @@ exhale_args = {
     "exhaleDoxygenStdin": "INPUT = ../cpp/include",
 }
 
+# Override the default "<page> — <project> <version> documentation" title,
+# which produces the redundant "Torch-TensorRT — Torch-TensorRT vX documentation".
+html_title = "Torch-TensorRT"
+
 html_show_sourcelink = True
+html_context = {
+    "github_user": "pytorch",
+    "github_repo": "TensorRT",
+    "github_version": "main",
+    "doc_path": "docsrc",
+}
 html_sidebars = {
-    "**": ["logo-text.html", "globaltoc.html", "localtoc.html", "searchbox.html"]
+    "**": ["sidebar-nav-bs"],
 }
 
-# extensions.append("sphinx_material")
-html_theme_path = [pytorch_sphinx_theme.get_html_theme_path()]
-# html_context = sphinx_material.get_html_context()
-html_theme = "pytorch_sphinx_theme"
+html_theme_path = [pytorch_sphinx_theme2.get_html_theme_path()]
+html_theme = "pytorch_sphinx_theme2"
 
-# Material theme options (see theme.conf for more information)
 html_theme_options = {
-    # Set the name of the project to appear in the navigation.
-    "nav_title": "Torch-TensorRT",
-    # Specify a base_url used to generate sitemap.xml. If not
-    # specified, then no sitemap will be built.
-    "base_url": "https://nvidia.github.io/Torch-TensorRT/",
-    # Set the color and the accent color
-    "theme_color": "84bd00",
-    "color_primary": "light-green",
-    "color_accent": "light-green",
-    "html_minify": False,
-    "html_prettify": True,
-    "css_minify": True,
-    "logo_icon": "&#xe86f",
-    # Set the repo location to get a badge with stats
-    "repo_url": "https://github.com/pytorch/TensorRT/",
-    "repo_name": "Torch-TensorRT",
-    # Visible levels of the global TOC; -1 means unlimited
-    "globaltoc_depth": 1,
-    # If False, expand all TOC entries
-    "globaltoc_collapse": False,
-    # If True, show hidden TOC entries
-    "globaltoc_includehidden": True,
-    "master_doc": True,
-    "version_info": {
-        "main": "https://pytorch.org/TensorRT/",
-        "v2.3.0": "https://pytorch.org/TensorRT/v2.3.0",
-        "v2.2.0": "https://pytorch.org/TensorRT/v2.2.0",
-        "v2.1.0": "https://pytorch.org/TensorRT/v2.1.0",
-        "v1.4.0": "https://pytorch.org/TensorRT/v1.4.0",
-        "v1.3.0": "https://pytorch.org/TensorRT/v1.3.0",
-        "v1.2.0": "https://pytorch.org/TensorRT/v1.2.0",
-        "v1.1.1": "https://nvidia.github.io/Torch-TensorRT/v1.1.1",
-        "v1.1.0": "https://nvidia.github.io/Torch-TensorRT/v1.1.0/",
-        "v1.0.0": "https://nvidia.github.io/Torch-TensorRT/v1.0.0/",
-        "v0.4.1": "https://nvidia.github.io/Torch-TensorRT/v0.4.1/",
-        "v0.4.0": "https://nvidia.github.io/Torch-TensorRT/v0.4.0/",
-        "v0.3.0": "https://nvidia.github.io/Torch-TensorRT/v0.3.0/",
-        "v0.2.0": "https://nvidia.github.io/Torch-TensorRT/v0.2.0/",
-        "v0.1.0": "https://nvidia.github.io/Torch-TensorRT/v0.1.0/",
-        "v0.0.3": "https://nvidia.github.io/Torch-TensorRT/v0.0.3/",
-        "v0.0.2": "https://nvidia.github.io/Torch-TensorRT/v0.0.2/",
-        "v0.0.1": "https://nvidia.github.io/Torch-TensorRT/v0.0.1/",
+    "pytorch_project": "docs",
+    "collapse_navigation": False,
+    "display_version": True,
+    "show_toc_level": 2,
+    "use_edit_page_button": True,
+    "version_switcher": {
+        # Use the raw GitHub URL so the dropdown works in all environments
+        # (local preview, staging, production) — pytorch.org only works once deployed.
+        "json_url": "https://pytorch.org/TensorRT/versions.json",
+        "version_match": _version_match,
     },
+    "icon_links": [
+        {
+            "name": "GitHub",
+            "url": "https://github.com/pytorch/TensorRT/",
+            "icon": "fa-brands fa-github",
+        },
+    ],
+    "navbar_start": ["navbar-logo", "version-switcher"],
+    "navbar_center": ["navbar-nav"],
+    "navbar_end": ["search-button", "theme-switcher", "navbar-icon-links"],
+    "navbar_align": "left",
+    "show_version_warning_banner": False,
+    "article_header_end": [],
+    "article_footer_items": [],
+    "footer_start": ["copyright"],
+    "footer_end": [],
 }
 
 # Tell sphinx what the primary language being documented is.

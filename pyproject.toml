@@ -86,13 +86,13 @@ test-ext = [
 ]
 
 docs = [
-    "sphinx==5.0.1",
+    "sphinx==7.2.6",
     "sphinx-gallery==0.13.0",
-    "breathe==4.34.0",
+    "breathe==4.36.0",
     "exhale==0.3.7",
-    "pytorch_sphinx_theme @ git+https://github.com/pytorch/pytorch_sphinx_theme.git",
+    "pytorch_sphinx_theme2==0.4.4",
     "nbsphinx==0.9.3",
-    "docutils==0.17.1",
+    "docutils==0.20",
     "pillow",
 ]
 
