@@ -162,11 +162,6 @@ def scaled_dot_product_attention(
     Returns:
         TRTTensor: Attention output tensor with shape [batch, heads, seq_len, head_dim]
     """
-    assert enable_gqa is False, "enable_gqa is not supported yet"
-    assert (
-        tuple(query.shape) == tuple(key.shape) == tuple(value.shape)
-    ), "query, key, and value must have the same shape"
-
     if scale is None:
         # 1 / math.sqrt(query.size(-1))
         q_dim = impl.shape.shape(ctx, target, source_ir, f"{name}_shape_q", query, -1)
@@ -259,11 +254,6 @@ def scaled_dot_product_flash_attention(
     Optional[TRTTensor],
     Optional[TRTTensor],
 ]:
-    assert return_debug_mask is False, "return_debug_mask is not supported yet"
-    assert (
-        tuple(query.shape) == tuple(key.shape) == tuple(value.shape)
-    ), "query, key, and value must have the same shape"
-
     if scale is None:
         # 1 / math.sqrt(query.size(-1))
         q_dim = impl.shape.shape(ctx, target, source_ir, f"{name}_shape_q", query, -1)
@@ -314,11 +304,6 @@ def scaled_dot_product_efficient_attention(
     is_causal: bool = False,
     scale: Optional[float] = None,
 ) -> Tuple[TRTTensor, Optional[TRTTensor], Optional[TRTTensor], Optional[TRTTensor]]:
-    assert compute_log_sumexp is False, "compute_log_sumexp is not supported yet"
-    assert (
-        tuple(query.shape) == tuple(key.shape) == tuple(value.shape)
-    ), "query, key, and value must have the same shape"
-
     if scale is None:
         # 1 / math.sqrt(query.size(-1))
         q_dim = impl.shape.shape(ctx, target, source_ir, f"{name}_shape_q", query, -1)
@@ -406,8 +391,6 @@ def scaled_dot_product_cudnn_attention(
     Optional[TRTTensor],
     Optional[TRTTensor],
 ]:
-    assert return_debug_mask is False, "return_debug_mask is not supported yet"
-
     output, _, _, _ = scaled_dot_product_efficient_attention(
         ctx,
         target,
