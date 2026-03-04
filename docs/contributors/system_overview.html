@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../_static/documentation_options.js?v=50a6ff61"></script>
+    <script src="../_static/documentation_options.js?v=9e89f000"></script>
     <script src="../_static/doctools.js?v=888ff710"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -431,7 +431,8 @@ document.write(`
 <nav class="bd-docs-nav bd-links"
      aria-label="Section Navigation">
   <p class="bd-links__title" role="heading" aria-level="1">Section Navigation</p>
-  <div class="bd-toc-item navbar-nav"><ul class="current nav bd-sidenav">
+  <div class="bd-toc-item navbar-nav"><p aria-level="2" class="caption" role="heading"><span class="caption-text">Architecture</span></p>
+<ul class="current nav bd-sidenav">
 <li class="toctree-l1 current active"><a class="current reference internal" href="#">System Overview</a></li>
 <li class="toctree-l1 has-children"><a class="reference internal" href="phases.html">Compiler Phases</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
 <li class="toctree-l2"><a class="reference internal" href="lowering.html">Lowering Phase</a></li>
@@ -444,6 +445,17 @@ document.write(`
 <li class="toctree-l1"><a class="reference internal" href="observer.html">Observer / Callback System</a></li>
 <li class="toctree-l1"><a class="reference internal" href="ts_converters.html">Writing TorchScript Converters</a></li>
 <li class="toctree-l1"><a class="reference internal" href="useful_links.html">Useful Links for Torch-TensorRT Development</a></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">Feature Design</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="engine_caching.html">Engine Caching</a></li>
+<li class="toctree-l1"><a class="reference internal" href="weight_refit.html">Weight Refit</a></li>
+<li class="toctree-l1"><a class="reference internal" href="cuda_graphs.html">CUDAGraphs</a></li>
+<li class="toctree-l1"><a class="reference internal" href="dynamic_shapes.html">Dynamic Shape Support</a></li>
+<li class="toctree-l1"><a class="reference internal" href="complex_number_support.html">Complex Number Support</a></li>
+<li class="toctree-l1"><a class="reference internal" href="dynamic_memory_allocation.html">Dynamic Memory Allocation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="autocast.html">Autocast and Precision Management</a></li>
+<li class="toctree-l1"><a class="reference internal" href="export_serialization.html">Export and Serialization</a></li>
 </ul>
 </div>
 </nav></div>
