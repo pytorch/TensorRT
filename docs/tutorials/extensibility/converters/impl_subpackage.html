@@ -1,0 +1,949 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../../../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>The impl/ Building-Block Library &#8212; Torch-TensorRT</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../../../_static/styles/theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../../../_static/styles/bootstrap.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../../../_static/styles/pydata-sphinx-theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+
+  
+  <link href="../../../_static/vendor/fontawesome/6.5.2/css/all.min.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+  <link rel="preload" as="font" type="font/woff2" crossorigin href="../../../_static/vendor/fontawesome/6.5.2/webfonts/fa-solid-900.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../../../_static/vendor/fontawesome/6.5.2/webfonts/fa-brands-400.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../../../_static/vendor/fontawesome/6.5.2/webfonts/fa-regular-400.woff2" />
+
+    <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=72e443bf" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/sg_gallery.css?v=61a4c737" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/sg_gallery-binder.css?v=f4aeca0c" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/sg_gallery-dataframe.css?v=e5fbc548" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/sg_gallery-rendered-html.css?v=1277b6f3" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/collapsible-lists/css/tree_view.css?v=a885cde7" />
+    <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/katex@0.10.0-beta/dist/katex.min.css" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/css/custom.css?v=0cb2b9ef" />
+  
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../../../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b" />
+<link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
+  <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+    <script src="../../../_static/documentation_options.js?v=5e5b2ac4"></script>
+    <script src="../../../_static/doctools.js?v=888ff710"></script>
+    <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
+    <script src="../../../_static/collapsible-lists/js/apply-collapsible-lists.js?v=660e4f45"></script>
+    <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'tutorials/extensibility/converters/impl_subpackage';</script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+    <link rel="next" title="Automatically Generate a Converter for a Custom Kernel" href="../../_rendered_examples/dynamo/auto_generate_converters.html" />
+    <link rel="prev" title="Converter Registry Internals" href="converter_registry.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-primary-sidebar-checkbox"/>
+  <label class="overlay overlay-primary" for="pst-primary-sidebar-checkbox"></label>
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-secondary-sidebar-checkbox"/>
+  <label class="overlay overlay-secondary" for="pst-secondary-sidebar-checkbox"></label>
+  
+  <div class="search-button__wrapper">
+    <div class="search-button__overlay"></div>
+    <div class="search-button__search-container">
+<form class="bd-search d-flex align-items-center"
+      action="../../../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         id="search-input"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form></div>
+  </div>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+<div class="bd-header__inner bd-page-width">
+  <button class="pst-navbar-icon sidebar-toggle primary-toggle" aria-label="Site navigation">
+    <span class="fa-solid fa-bars"></span>
+  </button>
+  
+  
+  <div class=" navbar-header-items__start">
+    
+      <div class="navbar-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../../../index.html">
+  
+  
+  
+  
+  
+  
+    <p class="title logo__title">Torch-TensorRT</p>
+  
+</a></div>
+    
+      <div class="navbar-item">
+<script>
+document.write(`
+  <div class="version-switcher__container dropdown">
+    <button id="pst-version-switcher-button-2"
+      type="button"
+      class="version-switcher__button btn btn-sm dropdown-toggle"
+      data-bs-toggle="dropdown"
+      aria-haspopup="listbox"
+      aria-controls="pst-version-switcher-list-2"
+      aria-label="Version switcher list"
+    >
+      Choose version  <!-- this text may get changed later by javascript -->
+      <span class="caret"></span>
+    </button>
+    <div id="pst-version-switcher-list-2"
+      class="version-switcher__menu dropdown-menu list-group-flush py-0"
+      role="listbox" aria-labelledby="pst-version-switcher-button-2">
+      <!-- dropdown will be populated by javascript on page load -->
+    </div>
+  </div>
+`);
+</script></div>
+    
+  </div>
+  
+  <div class=" navbar-header-items">
+    
+    <div class="me-auto navbar-header-items__center">
+      
+        <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../getting_started/installation.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../user_guide/index.html">
+    User Guide
+  </a>
+</li>
+
+
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="../../advanced_usage.html">
+    Advanced Usage
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../model_zoo.html">
+    Model Zoo
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../api_reference.html">
+    API Reference
+  </a>
+</li>
+
+            <li class="nav-item dropdown">
+                <button class="btn dropdown-toggle nav-item" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-controls="pst-nav-more-links">
+                    More
+                </button>
+                <ul id="pst-nav-more-links" class="dropdown-menu">
+                    
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../debugging/index.html">
+    Debugging
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../contributing.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../legacy.html">
+    Legacy Frontends
+  </a>
+</li>
+
+                </ul>
+            </li>
+            
+  </ul>
+</nav></div>
+      
+    </div>
+    
+    
+    <div class="navbar-header-items__end">
+      
+      
+        <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm pst-navbar-icon search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+  </button>
+`);
+</script></div>
+      
+        <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="theme-switch fa-solid fa-sun fa-lg" data-mode="light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg" data-mode="dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"></i>
+  </button>
+`);
+</script></div>
+      
+        <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/pytorch/TensorRT/" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+</ul></div>
+      
+    </div>
+    
+  </div>
+  
+  
+
+  
+    <button class="pst-navbar-icon sidebar-toggle secondary-toggle" aria-label="On this page">
+      <span class="fa-solid fa-outdent"></span>
+    </button>
+  
+</div>
+
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <div class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+      <div class="sidebar-header-items__center">
+        
+          
+          
+            <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../getting_started/installation.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../user_guide/index.html">
+    User Guide
+  </a>
+</li>
+
+
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="../../advanced_usage.html">
+    Advanced Usage
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../model_zoo.html">
+    Model Zoo
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../api_reference.html">
+    API Reference
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../debugging/index.html">
+    Debugging
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../contributing.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../legacy.html">
+    Legacy Frontends
+  </a>
+</li>
+
+  </ul>
+</nav></div>
+          
+        
+      </div>
+    
+    
+    
+      <div class="sidebar-header-items__end">
+        
+          <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm pst-navbar-icon search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+  </button>
+`);
+</script></div>
+        
+          <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="theme-switch fa-solid fa-sun fa-lg" data-mode="light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg" data-mode="dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"></i>
+  </button>
+`);
+</script></div>
+        
+          <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/pytorch/TensorRT/" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+</ul></div>
+        
+      </div>
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+<nav class="bd-docs-nav bd-links"
+     aria-label="Section Navigation">
+  <p class="bd-links__title" role="heading" aria-level="1">Section Navigation</p>
+  <div class="bd-toc-item navbar-nav"><ul class="current nav bd-sidenav">
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../huggingface/index.html">HuggingFace Models</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../huggingface/compile_hf_models.html">Compiling LLM models from Huggingface</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../_rendered_examples/dynamo/torch_compile_stable_diffusion.html">Compiling Stable Diffusion model using the <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code> backend</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../_rendered_examples/dynamo/torch_export_flux_dev.html">Compiling FLUX.1-dev model using the Torch-TensorRT dynamo backend</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../_rendered_examples/dynamo/mutable_torchtrt_module_example.html">Mutable Torch TensorRT Module</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 current active has-children"><a class="reference internal" href="../index.html">Extensibility</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l2 current active has-children"><a class="reference internal" href="index.html">Converters</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="dynamo_converters.html">Writing Dynamo Converters</a></li>
+<li class="toctree-l3"><a class="reference internal" href="converter_registry.html">Converter Registry Internals</a></li>
+<li class="toctree-l3 current active"><a class="current reference internal" href="#">The <code class="docutils literal notranslate"><span class="pre">impl/</span></code> Building-Block Library</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../_rendered_examples/dynamo/auto_generate_converters.html">Automatically Generate a Converter for a Custom Kernel</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../_rendered_examples/dynamo/converter_overloading.html">Overloading Torch-TensorRT Converters with Custom Converters</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../lowering/index.html">Lowering Passes</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../lowering/writing_dynamo_aten_lowering_passes.html">Writing Dynamo ATen Lowering Passes</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../plugins/index.html">Plugins</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../plugins/plugins.html">Plugin System</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../_rendered_examples/dynamo/auto_generate_plugins.html">Automatically Generate a Plugin for a Custom Kernel</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../_rendered_examples/dynamo/custom_kernel_plugins.html">Using Custom Kernels within TensorRT Engines with Torch-TensorRT</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../_rendered_examples/dynamo/aot_plugin.html">Automatically Generate a TensorRT AOT Plugin</a></li>
+
+
+
+
+
+
+<li class="toctree-l3"><a class="reference internal" href="../../_rendered_examples/dynamo/nvrtc_aot_plugin.html">Using Custom Kernels with NVRTC in TensorRT AOT Plugins</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../resource_memory/index.html">Resource &amp; Memory Management</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../resource_memory/resource_management.html">Resource Management</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../resource_memory/engine_cache.html">Engine Caching</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../_rendered_examples/dynamo/engine_caching_example.html">Engine Caching</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../_rendered_examples/dynamo/engine_caching_bert_example.html">Engine Caching (BERT)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../_rendered_examples/dynamo/weight_streaming_example.html">Weight Streaming</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../_rendered_examples/dynamo/dynamic_memory_allocation.html">Dynamic Memory Allocation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../_rendered_examples/dynamo/low_cpu_memory_compilation.html">Low CPU Memory Compilation Example</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../compilation_analysis/index.html">Compilation &amp; Graph Analysis</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../compilation_analysis/trace.html">Tracing Models with <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.dynamo.trace</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../compilation_analysis/dryrun.html">Dryrun Mode</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../_rendered_examples/dynamo/hierarchical_partitioner_example.html">Hierarchical Partitioner Example</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../weight_refit/index.html">Weight Refitting &amp; LoRA</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../weight_refit/refit.html">Refitting TensorRT Engines with Updated Weights</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../_rendered_examples/dynamo/refit_engine_example.html">Refitting Torch-TensorRT Programs with New Weights</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../runtime_opt/index.html">Runtime Optimization</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../runtime_opt/cuda_graphs.html">CUDAGraphs and the Output Allocator</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../_rendered_examples/dynamo/torch_export_cudagraphs.html">Torch Export with Cudagraphs</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../_rendered_examples/dynamo/pre_allocated_output_example.html">Pre-allocated output buffer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../runtime_opt/python_runtime.html">Python Runtime</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../deployment/index.html">Deployment</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../deployment/serving_torch_tensorrt_with_triton.html">Serving a Torch-TensorRT model with Triton</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../deployment/cross_compile_windows.html">Cross-Compiling for Windows</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../_rendered_examples/dynamo/cross_runtime_compilation_for_windows.html">Cross runtime compilation for windows example</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../deployment/distributed_inference.html">Distributed Inference</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../deployment/complex_tensors.html">Complex Tensor Support</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../_rendered_examples/distributed_inference/index.html">Distributed Inference</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../_rendered_examples/distributed_inference/data_parallel_stable_diffusion.html">Torch-TensorRT Distributed Inference</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../_rendered_examples/distributed_inference/data_parallel_gpt2.html">Torch-TensorRT Distributed Inference</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../_rendered_examples/distributed_inference/tensor_parallel_simple_example.html">Tensor Parallel Distributed Inference with Torch-TensorRT</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../indices/supported_ops.html">Operators Supported</a></li>
+</ul>
+</div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+  
+  <div id="rtd-footer-container"></div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item">
+
+
+
+
+
+<nav aria-label="Breadcrumb" class="d-print-none">
+  <ul class="bd-breadcrumbs">
+    
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="../../../index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+    
+    <li class="breadcrumb-item"><a href="../../advanced_usage.html" class="nav-link">Advanced Usage</a></li>
+    
+    
+    <li class="breadcrumb-item"><i class="fa-solid fa-ellipsis"></i></li>
+    
+    
+    <li class="breadcrumb-item"><a href="index.html" class="nav-link">Converters</a></li>
+    
+    <li class="breadcrumb-item active" aria-current="page">The <code...</li>
+  </ul>
+</nav>
+</div>
+      
+    </div>
+  
+  
+</div>
+</div>
+              
+              
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section id="the-impl-building-block-library">
+<span id="impl-subpackage"></span><h1>The <code class="docutils literal notranslate"><span class="pre">impl/</span></code> Building-Block Library<a class="headerlink" href="#the-impl-building-block-library" title="Link to this heading">#</a></h1>
+<p><code class="docutils literal notranslate"><span class="pre">torch_tensorrt.dynamo.conversion.impl</span></code> is a library of pre-built TRT layer
+primitives that converter authors can compose rather than writing raw
+<code class="docutils literal notranslate"><span class="pre">trt.INetworkDefinition</span></code> API calls. Each module handles shape broadcasting,
+type coercion, and naming boilerplate internally.</p>
+<p>All modules are available directly under <code class="docutils literal notranslate"><span class="pre">impl</span></code>:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.conversion</span><span class="w"> </span><span class="kn">import</span> <span class="n">impl</span>
+
+<span class="c1"># example: compose a GeLU approximation</span>
+<span class="n">x_sq</span> <span class="o">=</span> <span class="n">impl</span><span class="o">.</span><span class="n">elementwise</span><span class="o">.</span><span class="n">mul</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="n">target</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;x_sq&quot;</span><span class="p">,</span> <span class="n">source_ir</span><span class="o">=</span><span class="n">SourceIR</span><span class="o">.</span><span class="n">ATEN</span><span class="p">,</span>
+                            <span class="n">lhs_val</span><span class="o">=</span><span class="n">x</span><span class="p">,</span> <span class="n">rhs_val</span><span class="o">=</span><span class="n">x</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>The standard call signature for most <code class="docutils literal notranslate"><span class="pre">impl</span></code> functions is:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">op</span><span class="p">(</span>
+    <span class="n">ctx</span><span class="p">:</span> <span class="n">ConversionContext</span><span class="p">,</span>
+    <span class="n">target</span><span class="p">:</span> <span class="n">Target</span><span class="p">,</span>
+    <span class="n">source_ir</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">SourceIR</span><span class="p">],</span>
+    <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="c1"># ... op-specific args ...</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TRTTensor</span><span class="p">:</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">source_ir</span></code> is the <a class="reference internal" href="#source-ir"><span class="std std-ref">SourceIR</span></a> enum value that identifies which
+IR level this call originated from (used for debug naming). Pass
+<code class="docutils literal notranslate"><span class="pre">SourceIR.ATEN</span></code> from ATen converters.</p>
+<hr class="docutils" />
+<section id="module-reference">
+<h2>Module Reference<a class="headerlink" href="#module-reference" title="Link to this heading">#</a></h2>
+<section id="activation">
+<h3>activation<a class="headerlink" href="#activation" title="Link to this heading">#</a></h3>
+<p><strong>``impl.activation``</strong> — Standard activation functions.</p>
+<p>Functions: <code class="docutils literal notranslate"><span class="pre">relu</span></code>, <code class="docutils literal notranslate"><span class="pre">sigmoid</span></code>, <code class="docutils literal notranslate"><span class="pre">tanh</span></code>, <code class="docutils literal notranslate"><span class="pre">leaky_relu</span></code>, <code class="docutils literal notranslate"><span class="pre">elu</span></code>, <code class="docutils literal notranslate"><span class="pre">selu</span></code>,
+<code class="docutils literal notranslate"><span class="pre">softsign</span></code>, <code class="docutils literal notranslate"><span class="pre">softplus</span></code>, <code class="docutils literal notranslate"><span class="pre">gelu</span></code>, <code class="docutils literal notranslate"><span class="pre">hard_sigmoid</span></code>, <code class="docutils literal notranslate"><span class="pre">hard_swish</span></code>,
+<code class="docutils literal notranslate"><span class="pre">prelu</span></code>, <code class="docutils literal notranslate"><span class="pre">hardshrink</span></code>, <code class="docutils literal notranslate"><span class="pre">softshrink</span></code>, <code class="docutils literal notranslate"><span class="pre">tanhshrink</span></code>.</p>
+<p>Each function wraps <code class="docutils literal notranslate"><span class="pre">ctx.net.add_activation()</span></code> with the appropriate
+<code class="docutils literal notranslate"><span class="pre">trt.ActivationType</span></code> and handles dynamic range propagation for INT8.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">out</span> <span class="o">=</span> <span class="n">impl</span><span class="o">.</span><span class="n">activation</span><span class="o">.</span><span class="n">relu</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="n">target</span><span class="p">,</span> <span class="n">SourceIR</span><span class="o">.</span><span class="n">ATEN</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">input_val</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="addmm">
+<h3>addmm<a class="headerlink" href="#addmm" title="Link to this heading">#</a></h3>
+<p><strong>``impl.addmm``</strong> — Fused add + matrix multiply (<code class="docutils literal notranslate"><span class="pre">beta</span> <span class="pre">*</span> <span class="pre">input</span> <span class="pre">+</span> <span class="pre">alpha</span> <span class="pre">*</span> <span class="pre">(mat1</span> <span class="pre">&#64;</span> <span class="pre">mat2)</span></code>).
+Uses <code class="docutils literal notranslate"><span class="pre">add_matrix_multiply</span></code> + <code class="docutils literal notranslate"><span class="pre">add_elementwise</span></code> with scale factors.</p>
+</section>
+<section id="arange">
+<h3>arange<a class="headerlink" href="#arange" title="Link to this heading">#</a></h3>
+<p><strong>``impl.arange``</strong> — Generates a 1-D range tensor (<code class="docutils literal notranslate"><span class="pre">torch.arange</span></code> semantics).
+Implemented via TRT’s <code class="docutils literal notranslate"><span class="pre">IFillLayer</span></code> with <code class="docutils literal notranslate"><span class="pre">LINSPACE</span></code> fill.</p>
+</section>
+<section id="cast">
+<h3>cast<a class="headerlink" href="#cast" title="Link to this heading">#</a></h3>
+<p><strong>``impl.cast``</strong> — Explicit dtype casts. Wraps <code class="docutils literal notranslate"><span class="pre">IIdentityLayer</span></code> with
+<code class="docutils literal notranslate"><span class="pre">set_output_type()</span></code>. Used internally by the autocast pass and type-enforcement
+decorators.</p>
+</section>
+<section id="cat">
+<h3>cat<a class="headerlink" href="#cat" title="Link to this heading">#</a></h3>
+<p><strong>``impl.cat``</strong> — Tensor concatenation along a given dimension.
+Wraps <code class="docutils literal notranslate"><span class="pre">ctx.net.add_concatenation()</span></code>.</p>
+</section>
+<section id="conv-deconv">
+<h3>conv / deconv<a class="headerlink" href="#conv-deconv" title="Link to this heading">#</a></h3>
+<p><strong>``impl.conv``</strong> / <strong>``impl.deconv``</strong> — Convolution and transposed convolution.
+Wraps <code class="docutils literal notranslate"><span class="pre">add_convolution_nd</span></code> / <code class="docutils literal notranslate"><span class="pre">add_deconvolution_nd</span></code>, handles 1D/2D/3D,
+padding modes, dilation, groups, and optional bias.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">out</span> <span class="o">=</span> <span class="n">impl</span><span class="o">.</span><span class="n">conv</span><span class="o">.</span><span class="n">convolution</span><span class="p">(</span>
+    <span class="n">ctx</span><span class="p">,</span> <span class="n">target</span><span class="p">,</span> <span class="n">SourceIR</span><span class="o">.</span><span class="n">ATEN</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span>
+    <span class="nb">input</span><span class="o">=</span><span class="n">x</span><span class="p">,</span> <span class="n">weight</span><span class="o">=</span><span class="n">w</span><span class="p">,</span> <span class="n">bias</span><span class="o">=</span><span class="n">b</span><span class="p">,</span>
+    <span class="n">stride</span><span class="o">=</span><span class="n">stride</span><span class="p">,</span> <span class="n">padding</span><span class="o">=</span><span class="n">padding</span><span class="p">,</span> <span class="n">dilation</span><span class="o">=</span><span class="n">dilation</span><span class="p">,</span> <span class="n">groups</span><span class="o">=</span><span class="n">groups</span><span class="p">,</span>
+    <span class="n">transposed</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">output_padding</span><span class="o">=</span><span class="n">output_padding</span><span class="p">,</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="dynamic-block-quantize">
+<h3>dynamic_block_quantize<a class="headerlink" href="#dynamic-block-quantize" title="Link to this heading">#</a></h3>
+<p><strong>``impl.dynamic_block_quantize``</strong> — Block-wise dynamic quantization helpers for
+FP8 and FP4 workflows. Wraps TRT’s quantization layers.</p>
+</section>
+<section id="elementwise">
+<h3>elementwise<a class="headerlink" href="#elementwise" title="Link to this heading">#</a></h3>
+<p><strong>``impl.elementwise``</strong> — Element-wise binary and unary operations.</p>
+<p>Binary ops: <code class="docutils literal notranslate"><span class="pre">add</span></code>, <code class="docutils literal notranslate"><span class="pre">sub</span></code>, <code class="docutils literal notranslate"><span class="pre">mul</span></code>, <code class="docutils literal notranslate"><span class="pre">div</span></code>, <code class="docutils literal notranslate"><span class="pre">pow</span></code>, <code class="docutils literal notranslate"><span class="pre">floor_div</span></code>,
+<code class="docutils literal notranslate"><span class="pre">trunc_div</span></code>, <code class="docutils literal notranslate"><span class="pre">fmod</span></code>, <code class="docutils literal notranslate"><span class="pre">logical_and</span></code>, <code class="docutils literal notranslate"><span class="pre">logical_or</span></code>, <code class="docutils literal notranslate"><span class="pre">logical_xor</span></code>,
+<code class="docutils literal notranslate"><span class="pre">bitwise_and</span></code>, <code class="docutils literal notranslate"><span class="pre">bitwise_or</span></code>, <code class="docutils literal notranslate"><span class="pre">bitwise_xor</span></code>, <code class="docutils literal notranslate"><span class="pre">eq</span></code>, <code class="docutils literal notranslate"><span class="pre">ne</span></code>, <code class="docutils literal notranslate"><span class="pre">gt</span></code>,
+<code class="docutils literal notranslate"><span class="pre">ge</span></code>, <code class="docutils literal notranslate"><span class="pre">lt</span></code>, <code class="docutils literal notranslate"><span class="pre">le</span></code>, <code class="docutils literal notranslate"><span class="pre">max</span></code>, <code class="docutils literal notranslate"><span class="pre">min</span></code>.</p>
+<p>Unary ops: <code class="docutils literal notranslate"><span class="pre">abs</span></code>, <code class="docutils literal notranslate"><span class="pre">neg</span></code>, <code class="docutils literal notranslate"><span class="pre">floor</span></code>, <code class="docutils literal notranslate"><span class="pre">ceil</span></code>, <code class="docutils literal notranslate"><span class="pre">round</span></code>, <code class="docutils literal notranslate"><span class="pre">sqrt</span></code>,
+<code class="docutils literal notranslate"><span class="pre">rsqrt</span></code>, <code class="docutils literal notranslate"><span class="pre">exp</span></code>, <code class="docutils literal notranslate"><span class="pre">log</span></code>, <code class="docutils literal notranslate"><span class="pre">sin</span></code>, <code class="docutils literal notranslate"><span class="pre">cos</span></code>, <code class="docutils literal notranslate"><span class="pre">tan</span></code>, <code class="docutils literal notranslate"><span class="pre">asin</span></code>, <code class="docutils literal notranslate"><span class="pre">acos</span></code>,
+<code class="docutils literal notranslate"><span class="pre">atan</span></code>, <code class="docutils literal notranslate"><span class="pre">sinh</span></code>, <code class="docutils literal notranslate"><span class="pre">cosh</span></code>, <code class="docutils literal notranslate"><span class="pre">sign</span></code>, <code class="docutils literal notranslate"><span class="pre">not_</span></code>.</p>
+<p>All binary ops handle scalar arguments and broadcasting via
+<code class="docutils literal notranslate"><span class="pre">get_trt_tensor</span></code>/<code class="docutils literal notranslate"><span class="pre">broadcastable_fn</span></code> utilities.</p>
+</section>
+<section id="embedding">
+<h3>embedding<a class="headerlink" href="#embedding" title="Link to this heading">#</a></h3>
+<p><strong>``impl.embedding``</strong> — Implements <code class="docutils literal notranslate"><span class="pre">torch.nn.Embedding</span></code> and
+<code class="docutils literal notranslate"><span class="pre">torch.nn.EmbeddingBag</span></code> via <code class="docutils literal notranslate"><span class="pre">add_gather</span></code> (index gather on the weight matrix).</p>
+</section>
+<section id="full">
+<h3>full<a class="headerlink" href="#full" title="Link to this heading">#</a></h3>
+<p><strong>``impl.full``</strong> — Creates constant fill tensors (<code class="docutils literal notranslate"><span class="pre">torch.full</span></code>, <code class="docutils literal notranslate"><span class="pre">torch.zeros</span></code>,
+<code class="docutils literal notranslate"><span class="pre">torch.ones</span></code>) via <code class="docutils literal notranslate"><span class="pre">IFillLayer</span></code>.</p>
+</section>
+<section id="grid">
+<h3>grid<a class="headerlink" href="#grid" title="Link to this heading">#</a></h3>
+<p><strong>``impl.grid``</strong> — Grid sampling (<code class="docutils literal notranslate"><span class="pre">torch.nn.functional.grid_sample</span></code>) via
+TRT’s <code class="docutils literal notranslate"><span class="pre">IGridSampleLayer</span></code>.</p>
+</section>
+<section id="linear">
+<h3>linear<a class="headerlink" href="#linear" title="Link to this heading">#</a></h3>
+<p><strong>``impl.linear``</strong> — Fully-connected layer (<code class="docutils literal notranslate"><span class="pre">torch.nn.Linear</span></code>).
+Wraps <code class="docutils literal notranslate"><span class="pre">add_matrix_multiply</span></code> + optional <code class="docutils literal notranslate"><span class="pre">add_elementwise</span></code> for bias.</p>
+</section>
+<section id="matmul">
+<h3>matmul<a class="headerlink" href="#matmul" title="Link to this heading">#</a></h3>
+<p><strong>``impl.matmul``</strong> — General matrix multiplication. Handles batched matmul,
+dot products, and outer products by reshaping inputs before calling
+<code class="docutils literal notranslate"><span class="pre">add_matrix_multiply</span></code>.</p>
+</section>
+<section id="nccl-ops">
+<h3>nccl_ops<a class="headerlink" href="#nccl-ops" title="Link to this heading">#</a></h3>
+<p><strong>``impl.nccl_ops``</strong> — Fused NCCL collective wrappers for distributed inference
+(<code class="docutils literal notranslate"><span class="pre">all_gather</span></code>, <code class="docutils literal notranslate"><span class="pre">reduce_scatter</span></code>). Used by the <code class="docutils literal notranslate"><span class="pre">fuse_distributed_ops</span></code> lowering
+pass.</p>
+</section>
+<section id="normalization">
+<h3>normalization<a class="headerlink" href="#normalization" title="Link to this heading">#</a></h3>
+<p><strong>``impl.normalization``</strong> — Normalization layers: <code class="docutils literal notranslate"><span class="pre">batch_norm</span></code>,
+<code class="docutils literal notranslate"><span class="pre">layer_norm</span></code>, <code class="docutils literal notranslate"><span class="pre">group_norm</span></code>, <code class="docutils literal notranslate"><span class="pre">instance_norm</span></code>, <code class="docutils literal notranslate"><span class="pre">rms_norm</span></code>.</p>
+<p><code class="docutils literal notranslate"><span class="pre">batch_norm</span></code> handles constant-folded running stats (for inference) and
+delegates to <code class="docutils literal notranslate"><span class="pre">add_scale</span></code> for the affine transform.</p>
+</section>
+<section id="pad">
+<h3>pad<a class="headerlink" href="#pad" title="Link to this heading">#</a></h3>
+<p><strong>``impl.pad``</strong> — Tensor padding: <code class="docutils literal notranslate"><span class="pre">constant_pad</span></code>, <code class="docutils literal notranslate"><span class="pre">reflection_pad</span></code>,
+<code class="docutils literal notranslate"><span class="pre">replication_pad</span></code>. Wraps <code class="docutils literal notranslate"><span class="pre">add_padding_nd</span></code> or <code class="docutils literal notranslate"><span class="pre">add_slice</span></code> depending on
+padding mode.</p>
+</section>
+<section id="permutation">
+<h3>permutation<a class="headerlink" href="#permutation" title="Link to this heading">#</a></h3>
+<p><strong>``impl.permutation``</strong> — <code class="docutils literal notranslate"><span class="pre">transpose</span></code>, <code class="docutils literal notranslate"><span class="pre">permute</span></code>. Wraps <code class="docutils literal notranslate"><span class="pre">add_shuffle</span></code>
+with a permuted reshape.</p>
+</section>
+<section id="pool">
+<h3>pool<a class="headerlink" href="#pool" title="Link to this heading">#</a></h3>
+<p><strong>``impl.pool``</strong> — Pooling: <code class="docutils literal notranslate"><span class="pre">avg_pool</span></code>, <code class="docutils literal notranslate"><span class="pre">max_pool</span></code>,
+<code class="docutils literal notranslate"><span class="pre">adaptive_avg_pool</span></code>, <code class="docutils literal notranslate"><span class="pre">adaptive_max_pool</span></code>. Handles 1D/2D/3D and the
+<code class="docutils literal notranslate"><span class="pre">ceil_mode</span></code> / <code class="docutils literal notranslate"><span class="pre">count_include_pad</span></code> options via <code class="docutils literal notranslate"><span class="pre">add_pooling_nd</span></code>.</p>
+</section>
+<section id="prelu">
+<h3>prelu<a class="headerlink" href="#prelu" title="Link to this heading">#</a></h3>
+<p><strong>``impl.prelu``</strong> — Parametric ReLU. Implemented as
+<code class="docutils literal notranslate"><span class="pre">max(0,</span> <span class="pre">x)</span> <span class="pre">+</span> <span class="pre">slope</span> <span class="pre">*</span> <span class="pre">min(0,</span> <span class="pre">x)</span></code> using elementwise ops.</p>
+</section>
+<section id="quantize">
+<h3>quantize<a class="headerlink" href="#quantize" title="Link to this heading">#</a></h3>
+<p><strong>``impl.quantize``</strong> — Quantize / dequantize layers for INT8 and FP8
+calibration workflows. Wraps <code class="docutils literal notranslate"><span class="pre">add_quantize</span></code> / <code class="docutils literal notranslate"><span class="pre">add_dequantize</span></code>.</p>
+</section>
+<section id="reduce">
+<h3>reduce<a class="headerlink" href="#reduce" title="Link to this heading">#</a></h3>
+<p><strong>``impl.reduce``</strong> — Reduction operations: <code class="docutils literal notranslate"><span class="pre">sum</span></code>, <code class="docutils literal notranslate"><span class="pre">mean</span></code>, <code class="docutils literal notranslate"><span class="pre">max</span></code>,
+<code class="docutils literal notranslate"><span class="pre">min</span></code>, <code class="docutils literal notranslate"><span class="pre">prod</span></code>, <code class="docutils literal notranslate"><span class="pre">any</span></code>, <code class="docutils literal notranslate"><span class="pre">all</span></code>, <code class="docutils literal notranslate"><span class="pre">norm</span></code>, <code class="docutils literal notranslate"><span class="pre">var</span></code>, <code class="docutils literal notranslate"><span class="pre">std</span></code>.
+Wraps <code class="docutils literal notranslate"><span class="pre">add_reduce</span></code> with appropriate <code class="docutils literal notranslate"><span class="pre">trt.ReduceOperation</span></code>.</p>
+</section>
+<section id="select">
+<h3>select<a class="headerlink" href="#select" title="Link to this heading">#</a></h3>
+<p><strong>``impl.select``</strong> — Index selection and slicing primitives: <code class="docutils literal notranslate"><span class="pre">gather</span></code>,
+<code class="docutils literal notranslate"><span class="pre">index</span></code>, <code class="docutils literal notranslate"><span class="pre">index_select</span></code>, <code class="docutils literal notranslate"><span class="pre">gather_nd</span></code>. Wraps <code class="docutils literal notranslate"><span class="pre">add_gather</span></code> variants.</p>
+</section>
+<section id="shape">
+<h3>shape<a class="headerlink" href="#shape" title="Link to this heading">#</a></h3>
+<p><strong>``impl.shape``</strong> — Shape introspection: <code class="docutils literal notranslate"><span class="pre">size</span></code>, <code class="docutils literal notranslate"><span class="pre">numel</span></code>, <code class="docutils literal notranslate"><span class="pre">shape</span></code>.
+Returns <code class="docutils literal notranslate"><span class="pre">ITensor</span></code> objects holding shape values for use in dynamic-shape graphs.</p>
+</section>
+<section id="shuffle">
+<h3>shuffle<a class="headerlink" href="#shuffle" title="Link to this heading">#</a></h3>
+<p><strong>``impl.shuffle``</strong> — Reshape and view via <code class="docutils literal notranslate"><span class="pre">add_shuffle</span></code>. Used by converters
+for <code class="docutils literal notranslate"><span class="pre">view</span></code>, <code class="docutils literal notranslate"><span class="pre">reshape</span></code>, <code class="docutils literal notranslate"><span class="pre">flatten</span></code>, <code class="docutils literal notranslate"><span class="pre">unsqueeze</span></code>, <code class="docutils literal notranslate"><span class="pre">squeeze</span></code>.</p>
+</section>
+<section id="slice">
+<h3>slice<a class="headerlink" href="#slice" title="Link to this heading">#</a></h3>
+<p><strong>``impl.slice``</strong> (available but not listed in <code class="docutils literal notranslate"><span class="pre">__init__.py</span></code> directly)
+— Slicing and strided access via <code class="docutils literal notranslate"><span class="pre">add_slice</span></code>. Used by converters for
+<code class="docutils literal notranslate"><span class="pre">aten.slice.Tensor</span></code> and <code class="docutils literal notranslate"><span class="pre">aten.select.int</span></code>.</p>
+</section>
+<section id="split">
+<h3>split<a class="headerlink" href="#split" title="Link to this heading">#</a></h3>
+<p><strong>``impl.split``</strong> — Splits a tensor into chunks along a dimension.
+Implemented via repeated <code class="docutils literal notranslate"><span class="pre">add_slice</span></code>.</p>
+</section>
+<section id="squeeze-unsqueeze">
+<h3>squeeze / unsqueeze<a class="headerlink" href="#squeeze-unsqueeze" title="Link to this heading">#</a></h3>
+<p><strong>``impl.squeeze``</strong> / <strong>``impl.unsqueeze``</strong> — Remove / add size-1 dimensions.
+Both delegate to <code class="docutils literal notranslate"><span class="pre">impl.shuffle</span></code> with a reshaped output spec.</p>
+</section>
+<section id="topk">
+<h3>topk<a class="headerlink" href="#topk" title="Link to this heading">#</a></h3>
+<p><strong>``impl.topk``</strong> — <code class="docutils literal notranslate"><span class="pre">torch.topk</span></code>. Wraps <code class="docutils literal notranslate"><span class="pre">add_topk</span></code> with ascending/descending
+support.</p>
+</section>
+<section id="upsample">
+<h3>upsample<a class="headerlink" href="#upsample" title="Link to this heading">#</a></h3>
+<p><strong>``impl.upsample``</strong> — <code class="docutils literal notranslate"><span class="pre">torch.nn.functional.interpolate</span></code> (nearest and bilinear).
+Wraps <code class="docutils literal notranslate"><span class="pre">add_resize</span></code> with the appropriate resize mode.</p>
+</section>
+</section>
+<hr class="docutils" />
+<section id="sourceir">
+<h2>SourceIR<a class="headerlink" href="#sourceir" title="Link to this heading">#</a></h2>
+<p id="source-ir">Every <code class="docutils literal notranslate"><span class="pre">impl</span></code> function takes a <code class="docutils literal notranslate"><span class="pre">source_ir:</span> <span class="pre">Optional[SourceIR]</span></code> argument that tags
+the origin of the call for debug layer naming:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">SourceIR</span><span class="p">(</span><span class="n">Enum</span><span class="p">):</span>
+    <span class="n">ATEN</span>    <span class="o">=</span> <span class="n">auto</span><span class="p">()</span>   <span class="c1"># Called from an ATen converter</span>
+    <span class="n">TORCHSCRIPT</span> <span class="o">=</span> <span class="n">auto</span><span class="p">()</span>  <span class="c1"># Called from a TorchScript converter (legacy)</span>
+    <span class="n">NN</span>      <span class="o">=</span> <span class="n">auto</span><span class="p">()</span>   <span class="c1"># Called from an nn.Module-level converter</span>
+    <span class="n">ACC</span>     <span class="o">=</span> <span class="n">auto</span><span class="p">()</span>   <span class="c1"># Called from an ACC (operator fusion) converter</span>
+    <span class="n">PRIM</span>    <span class="o">=</span> <span class="n">auto</span><span class="p">()</span>   <span class="c1"># Called from a prims-level converter</span>
+    <span class="n">CORE_ATEN</span> <span class="o">=</span> <span class="n">auto</span><span class="p">()</span> <span class="c1"># Called from a Core ATen op converter</span>
+    <span class="n">UNKNOWN</span> <span class="o">=</span> <span class="n">auto</span><span class="p">()</span>
+</pre></div>
+</div>
+<p>The value is appended to the generated TRT layer name, making engine profiling and
+debugging easier. Always pass the appropriate value — use <code class="docutils literal notranslate"><span class="pre">SourceIR.ATEN</span></code> for all
+standard ATen-based converters.</p>
+</section>
+</section>
+
+
+                </article>
+              
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="converter_registry.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">Converter Registry Internals</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="../../_rendered_examples/dynamo/auto_generate_converters.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">Automatically Generate a Converter for a Custom Kernel</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <div class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+<div
+    id="pst-page-navigation-heading-2"
+    class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> On this page
+  </div>
+  <nav class="bd-toc-nav page-toc" aria-labelledby="pst-page-navigation-heading-2">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#module-reference">Module Reference</a><ul class="visible nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#activation">activation</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#addmm">addmm</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#arange">arange</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#cast">cast</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#cat">cat</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#conv-deconv">conv / deconv</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#dynamic-block-quantize">dynamic_block_quantize</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#elementwise">elementwise</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#embedding">embedding</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#full">full</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#grid">grid</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#linear">linear</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#matmul">matmul</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#nccl-ops">nccl_ops</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#normalization">normalization</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pad">pad</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#permutation">permutation</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#pool">pool</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#prelu">prelu</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#quantize">quantize</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#reduce">reduce</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#select">select</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#shape">shape</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#shuffle">shuffle</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#slice">slice</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#split">split</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#squeeze-unsqueeze">squeeze / unsqueeze</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#topk">topk</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#upsample">upsample</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#sourceir">SourceIR</a></li>
+</ul>
+  </nav></div>
+
+  <div class="sidebar-secondary-item">
+
+  
+  <div class="tocsection editthispage">
+    <a href="https://github.com/pytorch/TensorRT/edit/main/docsrc/tutorials/extensibility/converters/impl_subpackage.rst">
+      <i class="fa-solid fa-pencil"></i>
+      
+      
+        
+          Edit on GitHub
+        
+      
+    </a>
+  </div>
+</div>
+
+  <div class="sidebar-secondary-item">
+
+  <div class="tocsection sourcelink">
+    <a href="../../../_sources/tutorials/extensibility/converters/impl_subpackage.rst.txt">
+      <i class="fa-solid fa-file-lines"></i> Show Source
+    </a>
+  </div>
+</div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+          </footer>
+        
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script src="../../../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b"></script>
+<script src="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+  
+    <div class="footer-items__start">
+      
+        <div class="footer-item">
+
+  <p class="copyright">
+    
+      © Copyright 2024, NVIDIA Corporation.
+      <br/>
+    
+  </p>
+</div>
+      
+    </div>
+  
+  
+  
+</div>
+
+  </footer>
+  </body>
+</html>

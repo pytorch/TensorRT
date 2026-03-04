@@ -1,0 +1,882 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Serving a Torch-TensorRT model with Triton &#8212; Torch-TensorRT</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../../_static/styles/theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../../_static/styles/bootstrap.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../../_static/styles/pydata-sphinx-theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+
+  
+  <link href="../../_static/vendor/fontawesome/6.5.2/css/all.min.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+  <link rel="preload" as="font" type="font/woff2" crossorigin href="../../_static/vendor/fontawesome/6.5.2/webfonts/fa-solid-900.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../../_static/vendor/fontawesome/6.5.2/webfonts/fa-brands-400.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../../_static/vendor/fontawesome/6.5.2/webfonts/fa-regular-400.woff2" />
+
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=72e443bf" />
+    <link rel="stylesheet" type="text/css" href="../../_static/sg_gallery.css?v=61a4c737" />
+    <link rel="stylesheet" type="text/css" href="../../_static/sg_gallery-binder.css?v=f4aeca0c" />
+    <link rel="stylesheet" type="text/css" href="../../_static/sg_gallery-dataframe.css?v=e5fbc548" />
+    <link rel="stylesheet" type="text/css" href="../../_static/sg_gallery-rendered-html.css?v=1277b6f3" />
+    <link rel="stylesheet" type="text/css" href="../../_static/collapsible-lists/css/tree_view.css?v=a885cde7" />
+    <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/katex@0.10.0-beta/dist/katex.min.css" />
+    <link rel="stylesheet" type="text/css" href="../../_static/css/custom.css?v=0cb2b9ef" />
+  
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b" />
+<link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
+  <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+    <script src="../../_static/documentation_options.js?v=5e5b2ac4"></script>
+    <script src="../../_static/doctools.js?v=888ff710"></script>
+    <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
+    <script src="../../_static/collapsible-lists/js/apply-collapsible-lists.js?v=660e4f45"></script>
+    <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'tutorials/deployment/serving_torch_tensorrt_with_triton';</script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="Cross-Compiling for Windows" href="cross_compile_windows.html" />
+    <link rel="prev" title="Deployment" href="index.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-primary-sidebar-checkbox"/>
+  <label class="overlay overlay-primary" for="pst-primary-sidebar-checkbox"></label>
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-secondary-sidebar-checkbox"/>
+  <label class="overlay overlay-secondary" for="pst-secondary-sidebar-checkbox"></label>
+  
+  <div class="search-button__wrapper">
+    <div class="search-button__overlay"></div>
+    <div class="search-button__search-container">
+<form class="bd-search d-flex align-items-center"
+      action="../../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         id="search-input"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form></div>
+  </div>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+<div class="bd-header__inner bd-page-width">
+  <button class="pst-navbar-icon sidebar-toggle primary-toggle" aria-label="Site navigation">
+    <span class="fa-solid fa-bars"></span>
+  </button>
+  
+  
+  <div class=" navbar-header-items__start">
+    
+      <div class="navbar-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../../index.html">
+  
+  
+  
+  
+  
+  
+    <p class="title logo__title">Torch-TensorRT</p>
+  
+</a></div>
+    
+      <div class="navbar-item">
+<script>
+document.write(`
+  <div class="version-switcher__container dropdown">
+    <button id="pst-version-switcher-button-2"
+      type="button"
+      class="version-switcher__button btn btn-sm dropdown-toggle"
+      data-bs-toggle="dropdown"
+      aria-haspopup="listbox"
+      aria-controls="pst-version-switcher-list-2"
+      aria-label="Version switcher list"
+    >
+      Choose version  <!-- this text may get changed later by javascript -->
+      <span class="caret"></span>
+    </button>
+    <div id="pst-version-switcher-list-2"
+      class="version-switcher__menu dropdown-menu list-group-flush py-0"
+      role="listbox" aria-labelledby="pst-version-switcher-button-2">
+      <!-- dropdown will be populated by javascript on page load -->
+    </div>
+  </div>
+`);
+</script></div>
+    
+  </div>
+  
+  <div class=" navbar-header-items">
+    
+    <div class="me-auto navbar-header-items__center">
+      
+        <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../getting_started/installation.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../user_guide/index.html">
+    User Guide
+  </a>
+</li>
+
+
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="../advanced_usage.html">
+    Advanced Usage
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../model_zoo.html">
+    Model Zoo
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../api_reference.html">
+    API Reference
+  </a>
+</li>
+
+            <li class="nav-item dropdown">
+                <button class="btn dropdown-toggle nav-item" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-controls="pst-nav-more-links">
+                    More
+                </button>
+                <ul id="pst-nav-more-links" class="dropdown-menu">
+                    
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../debugging/index.html">
+    Debugging
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../contributing.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../legacy.html">
+    Legacy Frontends
+  </a>
+</li>
+
+                </ul>
+            </li>
+            
+  </ul>
+</nav></div>
+      
+    </div>
+    
+    
+    <div class="navbar-header-items__end">
+      
+      
+        <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm pst-navbar-icon search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+  </button>
+`);
+</script></div>
+      
+        <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="theme-switch fa-solid fa-sun fa-lg" data-mode="light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg" data-mode="dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"></i>
+  </button>
+`);
+</script></div>
+      
+        <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/pytorch/TensorRT/" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+</ul></div>
+      
+    </div>
+    
+  </div>
+  
+  
+
+  
+    <button class="pst-navbar-icon sidebar-toggle secondary-toggle" aria-label="On this page">
+      <span class="fa-solid fa-outdent"></span>
+    </button>
+  
+</div>
+
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <div class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+      <div class="sidebar-header-items__center">
+        
+          
+          
+            <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../getting_started/installation.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../user_guide/index.html">
+    User Guide
+  </a>
+</li>
+
+
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="../advanced_usage.html">
+    Advanced Usage
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../model_zoo.html">
+    Model Zoo
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../api_reference.html">
+    API Reference
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../debugging/index.html">
+    Debugging
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../contributing.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../legacy.html">
+    Legacy Frontends
+  </a>
+</li>
+
+  </ul>
+</nav></div>
+          
+        
+      </div>
+    
+    
+    
+      <div class="sidebar-header-items__end">
+        
+          <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm pst-navbar-icon search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+  </button>
+`);
+</script></div>
+        
+          <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="theme-switch fa-solid fa-sun fa-lg" data-mode="light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg" data-mode="dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"></i>
+  </button>
+`);
+</script></div>
+        
+          <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/pytorch/TensorRT/" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+</ul></div>
+        
+      </div>
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+<nav class="bd-docs-nav bd-links"
+     aria-label="Section Navigation">
+  <p class="bd-links__title" role="heading" aria-level="1">Section Navigation</p>
+  <div class="bd-toc-item navbar-nav"><ul class="current nav bd-sidenav">
+<li class="toctree-l1 has-children"><a class="reference internal" href="../huggingface/index.html">HuggingFace Models</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../huggingface/compile_hf_models.html">Compiling LLM models from Huggingface</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../_rendered_examples/dynamo/torch_compile_stable_diffusion.html">Compiling Stable Diffusion model using the <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code> backend</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../_rendered_examples/dynamo/torch_export_flux_dev.html">Compiling FLUX.1-dev model using the Torch-TensorRT dynamo backend</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../_rendered_examples/dynamo/mutable_torchtrt_module_example.html">Mutable Torch TensorRT Module</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../extensibility/index.html">Extensibility</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../extensibility/converters/index.html">Converters</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../extensibility/converters/dynamo_converters.html">Writing Dynamo Converters</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../extensibility/converters/converter_registry.html">Converter Registry Internals</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../extensibility/converters/impl_subpackage.html">The <code class="docutils literal notranslate"><span class="pre">impl/</span></code> Building-Block Library</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../_rendered_examples/dynamo/auto_generate_converters.html">Automatically Generate a Converter for a Custom Kernel</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../_rendered_examples/dynamo/converter_overloading.html">Overloading Torch-TensorRT Converters with Custom Converters</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../extensibility/lowering/index.html">Lowering Passes</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../extensibility/lowering/writing_dynamo_aten_lowering_passes.html">Writing Dynamo ATen Lowering Passes</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../extensibility/plugins/index.html">Plugins</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../extensibility/plugins/plugins.html">Plugin System</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../_rendered_examples/dynamo/auto_generate_plugins.html">Automatically Generate a Plugin for a Custom Kernel</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../_rendered_examples/dynamo/custom_kernel_plugins.html">Using Custom Kernels within TensorRT Engines with Torch-TensorRT</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../_rendered_examples/dynamo/aot_plugin.html">Automatically Generate a TensorRT AOT Plugin</a></li>
+
+
+
+
+
+
+<li class="toctree-l3"><a class="reference internal" href="../_rendered_examples/dynamo/nvrtc_aot_plugin.html">Using Custom Kernels with NVRTC in TensorRT AOT Plugins</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../resource_memory/index.html">Resource &amp; Memory Management</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../resource_memory/resource_management.html">Resource Management</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../resource_memory/engine_cache.html">Engine Caching</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../_rendered_examples/dynamo/engine_caching_example.html">Engine Caching</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../_rendered_examples/dynamo/engine_caching_bert_example.html">Engine Caching (BERT)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../_rendered_examples/dynamo/weight_streaming_example.html">Weight Streaming</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../_rendered_examples/dynamo/dynamic_memory_allocation.html">Dynamic Memory Allocation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../_rendered_examples/dynamo/low_cpu_memory_compilation.html">Low CPU Memory Compilation Example</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../compilation_analysis/index.html">Compilation &amp; Graph Analysis</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../compilation_analysis/trace.html">Tracing Models with <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.dynamo.trace</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="../compilation_analysis/dryrun.html">Dryrun Mode</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../_rendered_examples/dynamo/hierarchical_partitioner_example.html">Hierarchical Partitioner Example</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../weight_refit/index.html">Weight Refitting &amp; LoRA</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../weight_refit/refit.html">Refitting TensorRT Engines with Updated Weights</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../_rendered_examples/dynamo/refit_engine_example.html">Refitting Torch-TensorRT Programs with New Weights</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../runtime_opt/index.html">Runtime Optimization</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../runtime_opt/cuda_graphs.html">CUDAGraphs and the Output Allocator</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../_rendered_examples/dynamo/torch_export_cudagraphs.html">Torch Export with Cudagraphs</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../_rendered_examples/dynamo/pre_allocated_output_example.html">Pre-allocated output buffer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../runtime_opt/python_runtime.html">Python Runtime</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 current active has-children"><a class="reference internal" href="index.html">Deployment</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l2 current active"><a class="current reference internal" href="#">Serving a Torch-TensorRT model with Triton</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cross_compile_windows.html">Cross-Compiling for Windows</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../_rendered_examples/dynamo/cross_runtime_compilation_for_windows.html">Cross runtime compilation for windows example</a></li>
+<li class="toctree-l2"><a class="reference internal" href="distributed_inference.html">Distributed Inference</a></li>
+<li class="toctree-l2"><a class="reference internal" href="complex_tensors.html">Complex Tensor Support</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../_rendered_examples/distributed_inference/index.html">Distributed Inference</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../_rendered_examples/distributed_inference/data_parallel_stable_diffusion.html">Torch-TensorRT Distributed Inference</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../_rendered_examples/distributed_inference/data_parallel_gpt2.html">Torch-TensorRT Distributed Inference</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../_rendered_examples/distributed_inference/tensor_parallel_simple_example.html">Tensor Parallel Distributed Inference with Torch-TensorRT</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1"><a class="reference internal" href="../../indices/supported_ops.html">Operators Supported</a></li>
+</ul>
+</div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+  
+  <div id="rtd-footer-container"></div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item">
+
+
+
+<nav aria-label="Breadcrumb" class="d-print-none">
+  <ul class="bd-breadcrumbs">
+    
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="../../index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+    
+    <li class="breadcrumb-item"><a href="../advanced_usage.html" class="nav-link">Advanced Usage</a></li>
+    
+    
+    <li class="breadcrumb-item"><a href="index.html" class="nav-link">Deployment</a></li>
+    
+    <li class="breadcrumb-item active" aria-current="page">Serving a...</li>
+  </ul>
+</nav>
+</div>
+      
+    </div>
+  
+  
+</div>
+</div>
+              
+              
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section id="serving-a-torch-tensorrt-model-with-triton">
+<span id="serving-torch-tensorrt-with-triton"></span><h1>Serving a Torch-TensorRT model with Triton<a class="headerlink" href="#serving-a-torch-tensorrt-model-with-triton" title="Link to this heading">#</a></h1>
+<p>Optimization and deployment go hand in hand in a discussion about Machine
+Learning infrastructure. Once network level optimization are done
+to get the maximum performance, the next step would be to deploy it.</p>
+<p>However, serving this optimized model comes with its own set of considerations
+and challenges like: building an infrastructure to support concurrent model
+executions, supporting clients over HTTP or gRPC and more.</p>
+<p>The <a class="reference external" href="https://github.com/triton-inference-server/server">Triton Inference Server</a>
+solves the aforementioned and more. Let’s discuss step-by-step, the process of
+optimizing a model with Torch-TensorRT, deploying it on Triton Inference
+Server, and building a client to query the model.</p>
+<section id="step-1-optimize-your-model-with-torch-tensorrt">
+<h2>Step 1: Optimize your model with Torch-TensorRT<a class="headerlink" href="#step-1-optimize-your-model-with-torch-tensorrt" title="Link to this heading">#</a></h2>
+<p>Most Torch-TensorRT users will be familiar with this step. For the purpose of
+this demonstration, we will be using a ResNet50 model from Torchhub.</p>
+<p>We will be working in the <code class="docutils literal notranslate"><span class="pre">//examples/triton</span></code> directory which contains the scripts used in this tutorial.</p>
+<p>First pull the <a class="reference external" href="https://catalog.ngc.nvidia.com/orgs/nvidia/containers/pytorch">NGC PyTorch Docker container</a>. You may need to create
+an account and get the API key from <a class="reference external" href="https://ngc.nvidia.com/setup/">here</a>.
+Sign up and login with your key (follow the instructions
+<a class="reference external" href="https://ngc.nvidia.com/setup/api-key">here</a> after signing up).</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="cp"># YY.MM is the yy:mm for the publishing tag for NVIDIA&#39;s Pytorch</span>
+<span class="cp"># container; eg. 24.08</span>
+<span class="cp"># NOTE: Use the publishing tag for both the PyTorch container and the Triton Containers</span>
+
+<span class="n">docker</span><span class="w"> </span><span class="n">run</span><span class="w"> </span><span class="o">-</span><span class="n">it</span><span class="w"> </span><span class="o">--</span><span class="n">gpus</span><span class="w"> </span><span class="n">all</span><span class="w"> </span><span class="o">-</span><span class="n">v</span><span class="w"> </span><span class="n">$</span><span class="p">{</span><span class="n">PWD</span><span class="p">}</span><span class="o">:/</span><span class="n">scratch_space</span><span class="w"> </span><span class="n">nvcr</span><span class="p">.</span><span class="n">io</span><span class="o">/</span><span class="n">nvidia</span><span class="o">/</span><span class="n">pytorch</span><span class="o">:</span><span class="n">YY</span><span class="p">.</span><span class="n">MM</span><span class="o">-</span><span class="n">py3</span>
+<span class="n">cd</span><span class="w"> </span><span class="o">/</span><span class="n">scratch_space</span>
+</pre></div>
+</div>
+<p>With the container we can export the model in to the correct directory in our Triton model repository. This export script uses the <strong>Dynamo</strong> frontend for Torch-TensorRT to compile the PyTorch model to TensorRT. Then we save the model using <strong>TorchScript</strong> as a serialization format which is supported by Triton.</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="k">import</span><span class="w"> </span><span class="n">torch</span>
+<span class="k">import</span><span class="w"> </span><span class="n">torch_tensorrt</span><span class="w"> </span><span class="n">as</span><span class="w"> </span><span class="n">torchtrt</span>
+<span class="k">import</span><span class="w"> </span><span class="n">torchvision</span>
+
+<span class="k">import</span><span class="w"> </span><span class="n">torch</span>
+<span class="k">import</span><span class="w"> </span><span class="n">torch_tensorrt</span>
+<span class="n">torch</span><span class="p">.</span><span class="n">hub</span><span class="p">.</span><span class="n">_validate_not_a_forked_repo</span><span class="o">=</span><span class="n">lambda</span><span class="w"> </span><span class="n">a</span><span class="p">,</span><span class="n">b</span><span class="p">,</span><span class="n">c</span><span class="o">:</span><span class="w"> </span><span class="n">True</span>
+
+<span class="cp"># load model</span>
+<span class="n">model</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">torch</span><span class="p">.</span><span class="n">hub</span><span class="p">.</span><span class="n">load</span><span class="p">(</span><span class="err">&#39;</span><span class="n">pytorch</span><span class="o">/</span><span class="n">vision</span><span class="o">:</span><span class="n">v0</span><span class="mf">.10.0</span><span class="err">&#39;</span><span class="p">,</span><span class="w"> </span><span class="err">&#39;</span><span class="n">resnet50</span><span class="err">&#39;</span><span class="p">,</span><span class="w"> </span><span class="n">pretrained</span><span class="o">=</span><span class="n">True</span><span class="p">).</span><span class="n">eval</span><span class="p">().</span><span class="n">to</span><span class="p">(</span><span class="s">&quot;cuda&quot;</span><span class="p">)</span>
+
+<span class="cp"># Compile with Torch TensorRT;</span>
+<span class="n">trt_model</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">torch_tensorrt</span><span class="p">.</span><span class="n">compile</span><span class="p">(</span><span class="n">model</span><span class="p">,</span>
+<span class="w">    </span><span class="n">arg_inputs</span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="n">torch_tensorrt</span><span class="p">.</span><span class="n">Input</span><span class="p">((</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="mi">224</span><span class="p">,</span><span class="w"> </span><span class="mi">224</span><span class="p">))],</span>
+<span class="w">    </span><span class="n">use_explicit_typing</span><span class="o">=</span><span class="n">True</span><span class="w">  </span><span class="err">#</span><span class="w"> </span><span class="n">enabled_precisions</span><span class="w"> </span><span class="n">deprecated</span><span class="p">;</span><span class="w"> </span><span class="n">use</span><span class="w"> </span><span class="n">model</span><span class="p">.</span><span class="n">half</span><span class="p">()</span><span class="w"> </span><span class="k">for</span><span class="w"> </span><span class="n">FP16</span>
+<span class="p">)</span>
+
+<span class="n">ts_trt_model</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">torch</span><span class="p">.</span><span class="n">jit</span><span class="p">.</span><span class="n">trace</span><span class="p">(</span><span class="n">trt_model</span><span class="p">,</span><span class="w"> </span><span class="n">torch</span><span class="p">.</span><span class="n">rand</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="mi">224</span><span class="p">,</span><span class="w"> </span><span class="mi">224</span><span class="p">).</span><span class="n">to</span><span class="p">(</span><span class="s">&quot;cuda&quot;</span><span class="p">))</span>
+
+<span class="cp"># Save the model</span>
+<span class="n">torch</span><span class="p">.</span><span class="n">jit</span><span class="p">.</span><span class="n">save</span><span class="p">(</span><span class="n">ts_trt_model</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;/triton_example/model_repository/resnet50/1/model.pt&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>You can run the script with the following command (from <code class="docutils literal notranslate"><span class="pre">//examples/triton</span></code>)</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="n">docker</span><span class="w"> </span><span class="n">run</span><span class="w"> </span><span class="o">--</span><span class="n">gpus</span><span class="w"> </span><span class="n">all</span><span class="w"> </span><span class="o">-</span><span class="n">it</span><span class="w"> </span><span class="o">--</span><span class="n">rm</span><span class="w"> </span><span class="o">-</span><span class="n">v</span><span class="w"> </span><span class="n">$</span><span class="p">{</span><span class="n">PWD</span><span class="p">}</span><span class="o">:/</span><span class="n">triton_example</span><span class="w"> </span><span class="n">nvcr</span><span class="p">.</span><span class="n">io</span><span class="o">/</span><span class="n">nvidia</span><span class="o">/</span><span class="n">pytorch</span><span class="o">:</span><span class="n">YY</span><span class="p">.</span><span class="n">MM</span><span class="o">-</span><span class="n">py3</span><span class="w"> </span><span class="n">python</span><span class="w"> </span><span class="o">/</span><span class="n">triton_example</span><span class="o">/</span><span class="k">export</span><span class="p">.</span><span class="n">py</span>
+</pre></div>
+</div>
+<p>This will save the serialized TorchScript version of the ResNet model in the right directory in the model repository.</p>
+</section>
+<section id="step-2-set-up-triton-inference-server">
+<h2>Step 2: Set Up Triton Inference Server<a class="headerlink" href="#step-2-set-up-triton-inference-server" title="Link to this heading">#</a></h2>
+<p>If you are new to the Triton Inference Server and want to learn more, we
+highly recommend to checking our <a class="reference external" href="https://github.com/triton-inference-server">Github
+Repository</a>.</p>
+<p>To use Triton, we need to make a model repository. A model repository, as the
+name suggests, is a repository of the models the Inference server hosts. While
+Triton can serve models from multiple repositories, in this example, we will
+discuss the simplest possible form of the model repository.</p>
+<p>The structure of this repository should look something like this:</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="n">model_repository</span>
+<span class="o">|</span>
+<span class="o">+--</span><span class="w"> </span><span class="n">resnet50</span>
+<span class="w">    </span><span class="o">|</span>
+<span class="w">    </span><span class="o">+--</span><span class="w"> </span><span class="n">config</span><span class="p">.</span><span class="n">pbtxt</span>
+<span class="w">    </span><span class="o">+--</span><span class="w"> </span><span class="mi">1</span>
+<span class="w">        </span><span class="o">|</span>
+<span class="w">        </span><span class="o">+--</span><span class="w"> </span><span class="n">model</span><span class="p">.</span><span class="n">pt</span>
+</pre></div>
+</div>
+<p>There are two files that Triton requires to serve the model: the model itself
+and a model configuration file which is typically provided in <code class="docutils literal notranslate"><span class="pre">config.pbtxt</span></code>.
+For the model we prepared in step 1, the following configuration can be used:</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="nl">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;resnet50&quot;</span>
+<span class="nl">backend</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;pytorch&quot;</span>
+<span class="nl">max_batch_size</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="mi">0</span>
+<span class="n">input</span><span class="w"> </span><span class="p">[</span>
+<span class="w">  </span><span class="p">{</span>
+<span class="w">    </span><span class="nl">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;x&quot;</span>
+<span class="w">    </span><span class="nl">data_type</span><span class="p">:</span><span class="w"> </span><span class="n">TYPE_FP32</span>
+<span class="w">    </span><span class="nl">dims</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="mi">224</span><span class="p">,</span><span class="w"> </span><span class="mi">224</span><span class="w"> </span><span class="p">]</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="p">]</span>
+<span class="n">output</span><span class="w"> </span><span class="p">[</span>
+<span class="w">  </span><span class="p">{</span>
+<span class="w">    </span><span class="nl">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;output0&quot;</span>
+<span class="w">    </span><span class="nl">data_type</span><span class="p">:</span><span class="w"> </span><span class="n">TYPE_FP32</span>
+<span class="w">    </span><span class="nl">dims</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">1000</span><span class="p">]</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="p">]</span>
+</pre></div>
+</div>
+<p>The <code class="docutils literal notranslate"><span class="pre">config.pbtxt</span></code> file is used to describe the exact model configuration
+with details like the names and shapes of the input and output layer(s),
+datatypes, scheduling and batching details and more. If you are new to Triton,
+we highly encourage you to check out this <a class="reference external" href="https://github.com/triton-inference-server/server/blob/main/docs/model_configuration.md">section of our
+documentation</a>
+for more details.</p>
+<p>With the model repository setup, we can proceed to launch the Triton server
+with the docker command below. Refer <a class="reference external" href="https://catalog.ngc.nvidia.com/orgs/nvidia/containers/tritonserver">this page</a> for the pull tag for the container.</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="cp"># Make sure that the TensorRT version in the Triton container</span>
+<span class="cp"># and TensorRT version in the environment used to optimize the model</span>
+<span class="cp"># are the same. Roughly, like publishing tags should have the same TensorRT version</span>
+
+<span class="n">docker</span><span class="w"> </span><span class="n">run</span><span class="w"> </span><span class="o">--</span><span class="n">gpus</span><span class="w"> </span><span class="n">all</span><span class="w"> </span><span class="o">--</span><span class="n">rm</span><span class="w"> </span><span class="o">-</span><span class="n">p</span><span class="w"> </span><span class="mi">8000</span><span class="o">:</span><span class="mi">8000</span><span class="w"> </span><span class="o">-</span><span class="n">p</span><span class="w"> </span><span class="mi">8001</span><span class="o">:</span><span class="mi">8001</span><span class="w"> </span><span class="o">-</span><span class="n">p</span><span class="w"> </span><span class="mi">8002</span><span class="o">:</span><span class="mi">8002</span><span class="w"> </span><span class="o">-</span><span class="n">v</span><span class="w"> </span><span class="n">$</span><span class="p">{</span><span class="n">PWD</span><span class="p">}</span><span class="o">:/</span><span class="n">triton_example</span><span class="w"> </span><span class="n">nvcr</span><span class="p">.</span><span class="n">io</span><span class="o">/</span><span class="n">nvidia</span><span class="o">/</span><span class="n">tritonserver</span><span class="o">:</span><span class="n">YY</span><span class="p">.</span><span class="n">MM</span><span class="o">-</span><span class="n">py3</span><span class="w"> </span><span class="n">tritonserver</span><span class="w"> </span><span class="o">--</span><span class="n">model</span><span class="o">-</span><span class="n">repository</span><span class="o">=/</span><span class="n">triton_example</span><span class="o">/</span><span class="n">model_repository</span>
+</pre></div>
+</div>
+<p>This should spin up a Triton Inference server. Next step, building a simple
+http client to query the server.</p>
+</section>
+<section id="step-3-building-a-triton-client-to-query-the-servers">
+<h2>Step 3: Building a Triton Client to Query the Servers<a class="headerlink" href="#step-3-building-a-triton-client-to-query-the-servers" title="Link to this heading">#</a></h2>
+<p>Before proceeding, make sure to have a sample image on hand. If you don’t
+have one, download an example image to test inference. In this section, we
+will be going over a very basic client. For a variety of more fleshed out
+examples, refer to the <a class="reference external" href="https://github.com/triton-inference-server/client/tree/main/src/python/examples">Triton Client Repository</a></p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="n">wget</span><span class="w">  </span><span class="o">-</span><span class="n">O</span><span class="w"> </span><span class="n">img1</span><span class="p">.</span><span class="n">jpg</span><span class="w"> </span><span class="s">&quot;https://www.hakaimagazine.com/wp-content/uploads/header-gulf-birds.jpg&quot;</span>
+</pre></div>
+</div>
+<p>We then need to install dependencies for building a python client. These will
+change from client to client. For a full list of all languages supported by Triton,
+please refer to <a class="reference external" href="https://github.com/triton-inference-server/client">Triton’s client repository</a>.</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="n">pip</span><span class="w"> </span><span class="n">install</span><span class="w"> </span><span class="n">torchvision</span>
+<span class="n">pip</span><span class="w"> </span><span class="n">install</span><span class="w"> </span><span class="n">attrdict</span>
+<span class="n">pip</span><span class="w"> </span><span class="n">install</span><span class="w"> </span><span class="n">nvidia</span><span class="o">-</span><span class="n">pyindex</span>
+<span class="n">pip</span><span class="w"> </span><span class="n">install</span><span class="w"> </span><span class="n">tritonclient</span><span class="p">[</span><span class="n">all</span><span class="p">]</span>
+</pre></div>
+</div>
+<p>Let’s jump into the client. Firstly, we write a small preprocessing function to
+resize and normalize the query image.</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="k">import</span><span class="w"> </span><span class="n">numpy</span><span class="w"> </span><span class="n">as</span><span class="w"> </span><span class="n">np</span>
+<span class="n">from</span><span class="w"> </span><span class="n">torchvision</span><span class="w"> </span><span class="k">import</span><span class="w"> </span><span class="n">transforms</span>
+<span class="n">from</span><span class="w"> </span><span class="n">PIL</span><span class="w"> </span><span class="k">import</span><span class="w"> </span><span class="n">Image</span>
+<span class="k">import</span><span class="w"> </span><span class="n">tritonclient</span><span class="p">.</span><span class="n">http</span><span class="w"> </span><span class="n">as</span><span class="w"> </span><span class="n">httpclient</span>
+<span class="n">from</span><span class="w"> </span><span class="n">tritonclient</span><span class="p">.</span><span class="n">utils</span><span class="w"> </span><span class="k">import</span><span class="w"> </span><span class="n">triton_to_np_dtype</span>
+
+<span class="cp"># preprocessing function</span>
+<span class="n">def</span><span class="w"> </span><span class="n">rn50_preprocess</span><span class="p">(</span><span class="n">img_path</span><span class="o">=</span><span class="s">&quot;/triton_example/img1.jpg&quot;</span><span class="p">)</span><span class="o">:</span>
+<span class="w">  </span><span class="n">img</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Image</span><span class="p">.</span><span class="n">open</span><span class="p">(</span><span class="n">img_path</span><span class="p">)</span>
+<span class="w">  </span><span class="n">preprocess</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">transforms</span><span class="p">.</span><span class="n">Compose</span><span class="p">(</span>
+<span class="w">      </span><span class="p">[</span>
+<span class="w">          </span><span class="n">transforms</span><span class="p">.</span><span class="n">Resize</span><span class="p">(</span><span class="mi">256</span><span class="p">),</span>
+<span class="w">          </span><span class="n">transforms</span><span class="p">.</span><span class="n">CenterCrop</span><span class="p">(</span><span class="mi">224</span><span class="p">),</span>
+<span class="w">          </span><span class="n">transforms</span><span class="p">.</span><span class="n">ToTensor</span><span class="p">(),</span>
+<span class="w">          </span><span class="n">transforms</span><span class="p">.</span><span class="n">Normalize</span><span class="p">(</span><span class="n">mean</span><span class="o">=</span><span class="p">[</span><span class="mf">0.485</span><span class="p">,</span><span class="w"> </span><span class="mf">0.456</span><span class="p">,</span><span class="w"> </span><span class="mf">0.406</span><span class="p">],</span><span class="w"> </span><span class="n">std</span><span class="o">=</span><span class="p">[</span><span class="mf">0.229</span><span class="p">,</span><span class="w"> </span><span class="mf">0.224</span><span class="p">,</span><span class="w"> </span><span class="mf">0.225</span><span class="p">]),</span>
+<span class="w">      </span><span class="p">]</span>
+<span class="w">  </span><span class="p">)</span>
+<span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="n">preprocess</span><span class="p">(</span><span class="n">img</span><span class="p">).</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">0</span><span class="p">).</span><span class="n">numpy</span><span class="p">()</span>
+
+<span class="w"> </span><span class="n">transformed_img</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rn50_preprocess</span><span class="p">()</span>
+</pre></div>
+</div>
+<p>Building a client requires three basic points. Firstly, we setup a connection
+with the Triton Inference Server.</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="cp"># Setting up client</span>
+<span class="n">client</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">httpclient</span><span class="p">.</span><span class="n">InferenceServerClient</span><span class="p">(</span><span class="n">url</span><span class="o">=</span><span class="s">&quot;localhost:8000&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Secondly, we specify the names of the input and output layer(s) of our model. This can be obtained during export and should already be specified in your <code class="docutils literal notranslate"><span class="pre">config.pbtxt</span></code></p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="n">inputs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">httpclient</span><span class="p">.</span><span class="n">InferInput</span><span class="p">(</span><span class="s">&quot;x&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">transformed_img</span><span class="p">.</span><span class="n">shape</span><span class="p">,</span><span class="w"> </span><span class="n">datatype</span><span class="o">=</span><span class="s">&quot;FP32&quot;</span><span class="p">)</span>
+<span class="n">inputs</span><span class="p">.</span><span class="n">set_data_from_numpy</span><span class="p">(</span><span class="n">transformed_img</span><span class="p">,</span><span class="w"> </span><span class="n">binary_data</span><span class="o">=</span><span class="n">True</span><span class="p">)</span>
+
+<span class="n">outputs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">httpclient</span><span class="p">.</span><span class="n">InferRequestedOutput</span><span class="p">(</span><span class="s">&quot;output0&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">binary_data</span><span class="o">=</span><span class="n">True</span><span class="p">,</span><span class="w"> </span><span class="n">class_count</span><span class="o">=</span><span class="mi">1000</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Lastly, we send an inference request to the Triton Inference Server.</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="cp"># Querying the server</span>
+<span class="n">results</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">client</span><span class="p">.</span><span class="n">infer</span><span class="p">(</span><span class="n">model_name</span><span class="o">=</span><span class="s">&quot;resnet50&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">inputs</span><span class="o">=</span><span class="p">[</span><span class="n">inputs</span><span class="p">],</span><span class="w"> </span><span class="n">outputs</span><span class="o">=</span><span class="p">[</span><span class="n">outputs</span><span class="p">])</span>
+<span class="n">inference_output</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">results</span><span class="p">.</span><span class="n">as_numpy</span><span class="p">(</span><span class="err">&#39;</span><span class="n">output0</span><span class="err">&#39;</span><span class="p">)</span>
+<span class="n">print</span><span class="p">(</span><span class="n">inference_output</span><span class="p">[</span><span class="o">:</span><span class="mi">5</span><span class="p">])</span>
+</pre></div>
+</div>
+<p>The output should look like below:</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="p">[</span><span class="n">b</span><span class="err">&#39;</span><span class="mf">12.468750</span><span class="o">:</span><span class="mi">90</span><span class="err">&#39;</span><span class="w"> </span><span class="n">b</span><span class="err">&#39;</span><span class="mf">11.523438</span><span class="o">:</span><span class="mi">92</span><span class="err">&#39;</span><span class="w"> </span><span class="n">b</span><span class="err">&#39;</span><span class="mf">9.664062</span><span class="o">:</span><span class="mi">14</span><span class="err">&#39;</span><span class="w"> </span><span class="n">b</span><span class="err">&#39;</span><span class="mf">8.429688</span><span class="o">:</span><span class="mi">136</span><span class="err">&#39;</span>
+<span class="w"> </span><span class="n">b</span><span class="err">&#39;</span><span class="mf">8.234375</span><span class="o">:</span><span class="mi">11</span><span class="err">&#39;</span><span class="p">]</span>
+</pre></div>
+</div>
+<p>The output format here is <code class="docutils literal notranslate"><span class="pre">&lt;confidence_score&gt;:&lt;classification_index&gt;</span></code>.
+To learn how to map these to the label names and more, refer to Triton Inference Server’s
+<a class="reference external" href="https://github.com/triton-inference-server/server/blob/main/docs/protocol/extension_classification.md">documentation</a>.</p>
+<p>You can try out this client quickly using</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="cp"># Remember to use the same publishing tag for all steps (e.g. 24.08)</span>
+
+<span class="n">docker</span><span class="w"> </span><span class="n">run</span><span class="w"> </span><span class="o">-</span><span class="n">it</span><span class="w"> </span><span class="o">--</span><span class="n">net</span><span class="o">=</span><span class="n">host</span><span class="w"> </span><span class="o">-</span><span class="n">v</span><span class="w"> </span><span class="n">$</span><span class="p">{</span><span class="n">PWD</span><span class="p">}</span><span class="o">:/</span><span class="n">triton_example</span><span class="w"> </span><span class="n">nvcr</span><span class="p">.</span><span class="n">io</span><span class="o">/</span><span class="n">nvidia</span><span class="o">/</span><span class="n">tritonserver</span><span class="o">:</span><span class="n">YY</span><span class="p">.</span><span class="n">MM</span><span class="o">-</span><span class="n">py3</span><span class="o">-</span><span class="n">sdk</span><span class="w"> </span><span class="n">bash</span><span class="w"> </span><span class="o">-</span><span class="n">c</span><span class="w"> </span><span class="s">&quot;pip install torchvision &amp;&amp; python /triton_example/client.py&quot;</span>
+</pre></div>
+</div>
+</section>
+</section>
+
+
+                </article>
+              
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="index.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">Deployment</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="cross_compile_windows.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">Cross-Compiling for Windows</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <div class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+<div
+    id="pst-page-navigation-heading-2"
+    class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> On this page
+  </div>
+  <nav class="bd-toc-nav page-toc" aria-labelledby="pst-page-navigation-heading-2">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#step-1-optimize-your-model-with-torch-tensorrt">Step 1: Optimize your model with Torch-TensorRT</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#step-2-set-up-triton-inference-server">Step 2: Set Up Triton Inference Server</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#step-3-building-a-triton-client-to-query-the-servers">Step 3: Building a Triton Client to Query the Servers</a></li>
+</ul>
+  </nav></div>
+
+  <div class="sidebar-secondary-item">
+
+  
+  <div class="tocsection editthispage">
+    <a href="https://github.com/pytorch/TensorRT/edit/main/docsrc/tutorials/deployment/serving_torch_tensorrt_with_triton.rst">
+      <i class="fa-solid fa-pencil"></i>
+      
+      
+        
+          Edit on GitHub
+        
+      
+    </a>
+  </div>
+</div>
+
+  <div class="sidebar-secondary-item">
+
+  <div class="tocsection sourcelink">
+    <a href="../../_sources/tutorials/deployment/serving_torch_tensorrt_with_triton.rst.txt">
+      <i class="fa-solid fa-file-lines"></i> Show Source
+    </a>
+  </div>
+</div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+          </footer>
+        
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script src="../../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b"></script>
+<script src="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+  
+    <div class="footer-items__start">
+      
+        <div class="footer-item">
+
+  <p class="copyright">
+    
+      © Copyright 2024, NVIDIA Corporation.
+      <br/>
+    
+  </p>
+</div>
+      
+    </div>
+  
+  
+  
+</div>
+
+  </footer>
+  </body>
+</html>

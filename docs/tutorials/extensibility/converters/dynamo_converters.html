@@ -1,0 +1,819 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../../../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Writing Dynamo Converters &#8212; Torch-TensorRT</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../../../_static/styles/theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../../../_static/styles/bootstrap.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../../../_static/styles/pydata-sphinx-theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+
+  
+  <link href="../../../_static/vendor/fontawesome/6.5.2/css/all.min.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+  <link rel="preload" as="font" type="font/woff2" crossorigin href="../../../_static/vendor/fontawesome/6.5.2/webfonts/fa-solid-900.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../../../_static/vendor/fontawesome/6.5.2/webfonts/fa-brands-400.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../../../_static/vendor/fontawesome/6.5.2/webfonts/fa-regular-400.woff2" />
+
+    <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=72e443bf" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/sg_gallery.css?v=61a4c737" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/sg_gallery-binder.css?v=f4aeca0c" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/sg_gallery-dataframe.css?v=e5fbc548" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/sg_gallery-rendered-html.css?v=1277b6f3" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/collapsible-lists/css/tree_view.css?v=a885cde7" />
+    <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/katex@0.10.0-beta/dist/katex.min.css" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/css/custom.css?v=0cb2b9ef" />
+  
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../../../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b" />
+<link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
+  <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+    <script src="../../../_static/documentation_options.js?v=5e5b2ac4"></script>
+    <script src="../../../_static/doctools.js?v=888ff710"></script>
+    <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
+    <script src="../../../_static/collapsible-lists/js/apply-collapsible-lists.js?v=660e4f45"></script>
+    <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'tutorials/extensibility/converters/dynamo_converters';</script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+    <link rel="next" title="Converter Registry Internals" href="converter_registry.html" />
+    <link rel="prev" title="Converters" href="index.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-primary-sidebar-checkbox"/>
+  <label class="overlay overlay-primary" for="pst-primary-sidebar-checkbox"></label>
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-secondary-sidebar-checkbox"/>
+  <label class="overlay overlay-secondary" for="pst-secondary-sidebar-checkbox"></label>
+  
+  <div class="search-button__wrapper">
+    <div class="search-button__overlay"></div>
+    <div class="search-button__search-container">
+<form class="bd-search d-flex align-items-center"
+      action="../../../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         id="search-input"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form></div>
+  </div>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+<div class="bd-header__inner bd-page-width">
+  <button class="pst-navbar-icon sidebar-toggle primary-toggle" aria-label="Site navigation">
+    <span class="fa-solid fa-bars"></span>
+  </button>
+  
+  
+  <div class=" navbar-header-items__start">
+    
+      <div class="navbar-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../../../index.html">
+  
+  
+  
+  
+  
+  
+    <p class="title logo__title">Torch-TensorRT</p>
+  
+</a></div>
+    
+      <div class="navbar-item">
+<script>
+document.write(`
+  <div class="version-switcher__container dropdown">
+    <button id="pst-version-switcher-button-2"
+      type="button"
+      class="version-switcher__button btn btn-sm dropdown-toggle"
+      data-bs-toggle="dropdown"
+      aria-haspopup="listbox"
+      aria-controls="pst-version-switcher-list-2"
+      aria-label="Version switcher list"
+    >
+      Choose version  <!-- this text may get changed later by javascript -->
+      <span class="caret"></span>
+    </button>
+    <div id="pst-version-switcher-list-2"
+      class="version-switcher__menu dropdown-menu list-group-flush py-0"
+      role="listbox" aria-labelledby="pst-version-switcher-button-2">
+      <!-- dropdown will be populated by javascript on page load -->
+    </div>
+  </div>
+`);
+</script></div>
+    
+  </div>
+  
+  <div class=" navbar-header-items">
+    
+    <div class="me-auto navbar-header-items__center">
+      
+        <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../getting_started/installation.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../user_guide/index.html">
+    User Guide
+  </a>
+</li>
+
+
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="../../advanced_usage.html">
+    Advanced Usage
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../model_zoo.html">
+    Model Zoo
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../api_reference.html">
+    API Reference
+  </a>
+</li>
+
+            <li class="nav-item dropdown">
+                <button class="btn dropdown-toggle nav-item" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-controls="pst-nav-more-links">
+                    More
+                </button>
+                <ul id="pst-nav-more-links" class="dropdown-menu">
+                    
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../debugging/index.html">
+    Debugging
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../contributing.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../legacy.html">
+    Legacy Frontends
+  </a>
+</li>
+
+                </ul>
+            </li>
+            
+  </ul>
+</nav></div>
+      
+    </div>
+    
+    
+    <div class="navbar-header-items__end">
+      
+      
+        <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm pst-navbar-icon search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+  </button>
+`);
+</script></div>
+      
+        <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="theme-switch fa-solid fa-sun fa-lg" data-mode="light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg" data-mode="dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"></i>
+  </button>
+`);
+</script></div>
+      
+        <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/pytorch/TensorRT/" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+</ul></div>
+      
+    </div>
+    
+  </div>
+  
+  
+
+  
+    <button class="pst-navbar-icon sidebar-toggle secondary-toggle" aria-label="On this page">
+      <span class="fa-solid fa-outdent"></span>
+    </button>
+  
+</div>
+
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <div class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+      <div class="sidebar-header-items__center">
+        
+          
+          
+            <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../getting_started/installation.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../user_guide/index.html">
+    User Guide
+  </a>
+</li>
+
+
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="../../advanced_usage.html">
+    Advanced Usage
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../model_zoo.html">
+    Model Zoo
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../api_reference.html">
+    API Reference
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../debugging/index.html">
+    Debugging
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../contributing.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../legacy.html">
+    Legacy Frontends
+  </a>
+</li>
+
+  </ul>
+</nav></div>
+          
+        
+      </div>
+    
+    
+    
+      <div class="sidebar-header-items__end">
+        
+          <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm pst-navbar-icon search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+  </button>
+`);
+</script></div>
+        
+          <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="theme-switch fa-solid fa-sun fa-lg" data-mode="light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg" data-mode="dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"></i>
+  </button>
+`);
+</script></div>
+        
+          <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/pytorch/TensorRT/" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+</ul></div>
+        
+      </div>
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+<nav class="bd-docs-nav bd-links"
+     aria-label="Section Navigation">
+  <p class="bd-links__title" role="heading" aria-level="1">Section Navigation</p>
+  <div class="bd-toc-item navbar-nav"><ul class="current nav bd-sidenav">
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../huggingface/index.html">HuggingFace Models</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../huggingface/compile_hf_models.html">Compiling LLM models from Huggingface</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../_rendered_examples/dynamo/torch_compile_stable_diffusion.html">Compiling Stable Diffusion model using the <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code> backend</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../_rendered_examples/dynamo/torch_export_flux_dev.html">Compiling FLUX.1-dev model using the Torch-TensorRT dynamo backend</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../_rendered_examples/dynamo/mutable_torchtrt_module_example.html">Mutable Torch TensorRT Module</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 current active has-children"><a class="reference internal" href="../index.html">Extensibility</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l2 current active has-children"><a class="reference internal" href="index.html">Converters</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l3 current active"><a class="current reference internal" href="#">Writing Dynamo Converters</a></li>
+<li class="toctree-l3"><a class="reference internal" href="converter_registry.html">Converter Registry Internals</a></li>
+<li class="toctree-l3"><a class="reference internal" href="impl_subpackage.html">The <code class="docutils literal notranslate"><span class="pre">impl/</span></code> Building-Block Library</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../_rendered_examples/dynamo/auto_generate_converters.html">Automatically Generate a Converter for a Custom Kernel</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../_rendered_examples/dynamo/converter_overloading.html">Overloading Torch-TensorRT Converters with Custom Converters</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../lowering/index.html">Lowering Passes</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../lowering/writing_dynamo_aten_lowering_passes.html">Writing Dynamo ATen Lowering Passes</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../plugins/index.html">Plugins</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../plugins/plugins.html">Plugin System</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../_rendered_examples/dynamo/auto_generate_plugins.html">Automatically Generate a Plugin for a Custom Kernel</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../_rendered_examples/dynamo/custom_kernel_plugins.html">Using Custom Kernels within TensorRT Engines with Torch-TensorRT</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../_rendered_examples/dynamo/aot_plugin.html">Automatically Generate a TensorRT AOT Plugin</a></li>
+
+
+
+
+
+
+<li class="toctree-l3"><a class="reference internal" href="../../_rendered_examples/dynamo/nvrtc_aot_plugin.html">Using Custom Kernels with NVRTC in TensorRT AOT Plugins</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../resource_memory/index.html">Resource &amp; Memory Management</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../resource_memory/resource_management.html">Resource Management</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../resource_memory/engine_cache.html">Engine Caching</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../_rendered_examples/dynamo/engine_caching_example.html">Engine Caching</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../_rendered_examples/dynamo/engine_caching_bert_example.html">Engine Caching (BERT)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../_rendered_examples/dynamo/weight_streaming_example.html">Weight Streaming</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../_rendered_examples/dynamo/dynamic_memory_allocation.html">Dynamic Memory Allocation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../_rendered_examples/dynamo/low_cpu_memory_compilation.html">Low CPU Memory Compilation Example</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../compilation_analysis/index.html">Compilation &amp; Graph Analysis</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../compilation_analysis/trace.html">Tracing Models with <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.dynamo.trace</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../compilation_analysis/dryrun.html">Dryrun Mode</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../_rendered_examples/dynamo/hierarchical_partitioner_example.html">Hierarchical Partitioner Example</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../weight_refit/index.html">Weight Refitting &amp; LoRA</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../weight_refit/refit.html">Refitting TensorRT Engines with Updated Weights</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../_rendered_examples/dynamo/refit_engine_example.html">Refitting Torch-TensorRT Programs with New Weights</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../runtime_opt/index.html">Runtime Optimization</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../runtime_opt/cuda_graphs.html">CUDAGraphs and the Output Allocator</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../_rendered_examples/dynamo/torch_export_cudagraphs.html">Torch Export with Cudagraphs</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../_rendered_examples/dynamo/pre_allocated_output_example.html">Pre-allocated output buffer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../runtime_opt/python_runtime.html">Python Runtime</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../deployment/index.html">Deployment</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../deployment/serving_torch_tensorrt_with_triton.html">Serving a Torch-TensorRT model with Triton</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../deployment/cross_compile_windows.html">Cross-Compiling for Windows</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../_rendered_examples/dynamo/cross_runtime_compilation_for_windows.html">Cross runtime compilation for windows example</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../deployment/distributed_inference.html">Distributed Inference</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../deployment/complex_tensors.html">Complex Tensor Support</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../_rendered_examples/distributed_inference/index.html">Distributed Inference</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../_rendered_examples/distributed_inference/data_parallel_stable_diffusion.html">Torch-TensorRT Distributed Inference</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../_rendered_examples/distributed_inference/data_parallel_gpt2.html">Torch-TensorRT Distributed Inference</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../_rendered_examples/distributed_inference/tensor_parallel_simple_example.html">Tensor Parallel Distributed Inference with Torch-TensorRT</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../indices/supported_ops.html">Operators Supported</a></li>
+</ul>
+</div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+  
+  <div id="rtd-footer-container"></div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item">
+
+
+
+
+
+<nav aria-label="Breadcrumb" class="d-print-none">
+  <ul class="bd-breadcrumbs">
+    
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="../../../index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+    
+    <li class="breadcrumb-item"><a href="../../advanced_usage.html" class="nav-link">Advanced Usage</a></li>
+    
+    
+    <li class="breadcrumb-item"><i class="fa-solid fa-ellipsis"></i></li>
+    
+    
+    <li class="breadcrumb-item"><a href="index.html" class="nav-link">Converters</a></li>
+    
+    <li class="breadcrumb-item active" aria-current="page">Writing...</li>
+  </ul>
+</nav>
+</div>
+      
+    </div>
+  
+  
+</div>
+</div>
+              
+              
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section id="writing-dynamo-converters">
+<span id="dynamo-converters"></span><h1>Writing Dynamo Converters<a class="headerlink" href="#writing-dynamo-converters" title="Link to this heading">#</a></h1>
+<p>The dynamo converter library in Torch-TensorRT is located in <code class="docutils literal notranslate"><span class="pre">TensorRT/py/torch_tensorrt/dynamo/conversion</span></code>.</p>
+<section id="converter-implementation">
+<h2>Converter implementation<a class="headerlink" href="#converter-implementation" title="Link to this heading">#</a></h2>
+<section id="registration">
+<h3>Registration<a class="headerlink" href="#registration" title="Link to this heading">#</a></h3>
+<p>A converter is a function decrorated with  <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.dynamo.dynamo_tensorrt_converter</span></code> that follows the function signature:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="nd">@torch_tensorrt</span><span class="o">.</span><span class="n">dynamo</span><span class="o">.</span><span class="n">conversion</span><span class="o">.</span><span class="n">dynamo_tensorrt_converter</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">aten</span><span class="o">.</span><span class="n">leaky_relu</span><span class="o">.</span><span class="n">default</span><span class="p">)</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">leaky_relu_converter</span><span class="p">(</span>
+    <span class="n">ctx</span><span class="p">:</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">dynamo</span><span class="o">.</span><span class="n">conversion</span><span class="o">.</span><span class="n">ConversionCtx</span><span class="p">,</span>
+    <span class="n">target</span><span class="p">:</span> <span class="n">Target</span><span class="p">,</span>
+    <span class="n">args</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Argument</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span>
+    <span class="n">kwargs</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Argument</span><span class="p">],</span>
+    <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Union</span><span class="p">[</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">ITensor</span><span class="p">,</span> <span class="n">Sequence</span><span class="p">[</span><span class="n">tensorrt</span><span class="o">.</span><span class="n">ITensor</span><span class="p">]]:</span>
+</pre></div>
+</div>
+<p>The decorator takes a number of arguments:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">key</span></code>: Node target for which the converter is implemented for (for example, torch.ops.aten.leaky_relu.default)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">enabled</span></code>: Whether the converter should be enabled as a converter that can be used in the converter registry</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">capability_validator</span></code>: A lambda that can take a <code class="docutils literal notranslate"><span class="pre">torch.fx.Node</span></code> and determine if the converter can properly handle this Node. If the validator returns <code class="docutils literal notranslate"><span class="pre">False</span></code>, the subgraph partitioner will make sure this Node is run in PyTorch in the compiled graph.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">priority</span></code>: Allows developers to override existing converters in the converter registry</p></li>
+</ul>
+</div></blockquote>
+<p>All that is required for a converter is the key.</p>
+<p>The function body is responsible for taking the current state of the network and adding the next subgraph to perform the op specified in the decorator with TensorRT operations.
+The function is provided arguments as the native PyTorch op would be provided with the added case of numpy arrays for frozen Tensor attributes or TensorRT ITensors which are output Tensors of previous nodes, corresponding to edges/output Tensors of intermediate operations in the graph.
+To determine the types expected as well as the return type of the converter, look at the
+definition of the op being converted. In the case of <code class="docutils literal notranslate"><span class="pre">aten</span></code> operations,
+<a class="reference external" href="https://github.com/pytorch/pytorch/blob/main/aten/src/ATen/native/native_functions.yaml">native_functions.yaml</a>
+is the source of truth. The
+<a class="reference external" href="https://docs.pytorch.org/docs/stable/user_guide/torch_compiler/torch.compiler_ir.html">Core ATen IR</a>
+documentation describes which ops belong to the core opset that Torch-TensorRT targets.
+Since many converters a developer may write are a composition of lower level operators, instead of needing to implement the converter in raw TensorRT, the <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.dynamo.conversion.impl</span></code> subpackage contains many implementations of operations that can be chained to create a TensorRT subgraph.</p>
+<blockquote>
+<div><ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">ctx</span></code> : The current state of the compiler. Converters primarily will manipulate ctx.net which is the <code class="docutils literal notranslate"><span class="pre">tensorrt.INetworkDefinition</span></code> being constructed. Additional metadata including user provided settings is available in this struct as well.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">target</span></code>: Target key in the <code class="docutils literal notranslate"><span class="pre">call_module</span></code> or <code class="docutils literal notranslate"><span class="pre">call_function</span></code> above. eg: <code class="docutils literal notranslate"><span class="pre">torch.ops.aten_.leaky_relu.default</span></code>. Note that <code class="docutils literal notranslate"><span class="pre">torch.ops.aten._leaky_relu</span></code> is the <code class="docutils literal notranslate"><span class="pre">OpOverloadPacket</span></code> while <code class="docutils literal notranslate"><span class="pre">torch.ops.aten_.leaky_relu.default</span></code> is <code class="docutils literal notranslate"><span class="pre">OpOverload</span></code>.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">args</span></code>: The arguments being passed to a particular Node (as collected by the <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.dynamo.conversion.TRTInterpreter</span></code>). These arguments along with the kwargs are to be used to construct a specific TensorRT subgraph representing the current node in the INetworkDefinition.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">kwargs</span></code>: The arguments being passed to a particular Node (as collected by the <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.dynamo.conversion.TRTInterpreter</span></code>).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">name</span></code>: String containing the name of the target</p></li>
+</ul>
+</div></blockquote>
+<p>The function is expected to return the <code class="docutils literal notranslate"><span class="pre">tensorrt.ITensor</span></code> or some collection of <code class="docutils literal notranslate"><span class="pre">tensorrt.ITensor</span></code> for use in the <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.dynamo.conversion.TRTInterpreter</span></code> matching the output signature of the operation being converted</p>
+</section>
+<section id="capability-validation">
+<h3>Capability Validation<a class="headerlink" href="#capability-validation" title="Link to this heading">#</a></h3>
+<p>There are some converters which have special cases to be accounted for. In those cases, one should use <code class="docutils literal notranslate"><span class="pre">capability_validators</span></code> to register the converter using <code class="docutils literal notranslate"><span class="pre">&#64;dynamo_tensorrt_converter</span></code>
+We illustrate this through <code class="docutils literal notranslate"><span class="pre">torch.ops.aten.embedding.default</span></code>. It has parameters - <code class="docutils literal notranslate"><span class="pre">scale_grad_by_freq</span></code> and <code class="docutils literal notranslate"><span class="pre">sparse</span></code> which are not currently supported by the implementation.
+In such cases we can write validator <code class="docutils literal notranslate"><span class="pre">embedding_param_validator</span></code> which implements that given those parameters the converter is not supported and register the converter by</p>
+</section>
+<section id="type-contract">
+<h3>Type Contract<a class="headerlink" href="#type-contract" title="Link to this heading">#</a></h3>
+<p>The function is expected to follow the type contract established by the signature. This includes accepting the union of valid PyTorch types + numpy arrays for constant tensors and TensorRT ITensors.
+In the case that only a subset of types is supported in the converter, you can also add the <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.dynamo.conversion.converter_utils.enforce_tensor_types</span></code>, which allows you to specify a dictionary mapping between input positions and types that those inputs can take. Where possible the decorator will convert inputs to match these types preferring the order provided.
+<code class="docutils literal notranslate"><span class="pre">int</span></code> keys in the dictionary will refer to positional arguments in <code class="docutils literal notranslate"><span class="pre">args</span></code>. <code class="docutils literal notranslate"><span class="pre">str</span></code> keys will refer to keyword arguments in <code class="docutils literal notranslate"><span class="pre">kwargs</span></code>.</p>
+</section>
+<section id="example-convolution">
+<h3>Example: <code class="docutils literal notranslate"><span class="pre">Convolution</span></code><a class="headerlink" href="#example-convolution" title="Link to this heading">#</a></h3>
+<p>The default convolution converter both uses a capability validator and type enforcement to prevent being run in unsupported situations.
+The capability validator is run during partitioning to determine if a particular convolution node can be converted to TensorRT or needs to run in PyTorch. Here the validator ensures that the convolution is no greater than 3D.
+The type enforcer will autocast before the converter is called, inputs to the supported type in the converter, thereby limiting the number of cases an author must handle.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="nd">@dynamo_tensorrt_converter</span><span class="p">(</span>
+    <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">aten</span><span class="o">.</span><span class="n">convolution</span><span class="o">.</span><span class="n">default</span><span class="p">,</span> <span class="n">capability_validator</span><span class="o">=</span><span class="k">lambda</span> <span class="n">conv_node</span><span class="p">:</span> <span class="n">conv_node</span><span class="o">.</span><span class="n">args</span><span class="p">[</span><span class="mi">7</span><span class="p">]</span> <span class="ow">in</span> <span class="p">([</span><span class="mi">0</span><span class="p">],</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">])</span>
+<span class="p">)</span>  <span class="c1"># type: ignore[misc]</span>
+<span class="nd">@enforce_tensor_types</span><span class="p">(</span>
+    <span class="p">{</span>
+        <span class="mi">0</span><span class="p">:</span> <span class="p">(</span><span class="n">TRTTensor</span><span class="p">,),</span>
+        <span class="mi">1</span><span class="p">:</span> <span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">TRTTensor</span><span class="p">),</span>
+        <span class="mi">2</span><span class="p">:</span> <span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">TRTTensor</span><span class="p">),</span>
+    <span class="p">}</span>
+<span class="p">)</span>  <span class="c1"># type: ignore[misc]</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">aten_ops_convolution</span><span class="p">(</span>
+    <span class="n">ctx</span><span class="p">:</span> <span class="n">ConversionContext</span><span class="p">,</span>
+    <span class="n">target</span><span class="p">:</span> <span class="n">Target</span><span class="p">,</span>
+    <span class="n">args</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Argument</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span>
+    <span class="n">kwargs</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Argument</span><span class="p">],</span>
+    <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Union</span><span class="p">[</span><span class="n">TRTTensor</span><span class="p">,</span> <span class="n">Sequence</span><span class="p">[</span><span class="n">TRTTensor</span><span class="p">]]:</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="evaluators">
+<h2>Evaluators<a class="headerlink" href="#evaluators" title="Link to this heading">#</a></h2>
+<p>Some operations do not produce TensorRT subgraphs as a side-effect. These are termed evaluators.</p>
+<blockquote>
+<div><p>Example: <code class="docutils literal notranslate"><span class="pre">operator.getitem</span></code></p>
+<p>Evaluators are categorized as so since they do not make any modification to the graph. This is implemented in <code class="docutils literal notranslate"><span class="pre">py/torch_tensorrt/dynamo/conversion/op_evaluators.py</span></code>, with the corresponding <code class="docutils literal notranslate"><span class="pre">capbility_validator</span></code>.
+The opcode is <code class="docutils literal notranslate"><span class="pre">operator.getitem</span></code>.</p>
+</div></blockquote>
+</section>
+<section id="operator-decomposition">
+<h2>Operator Decomposition<a class="headerlink" href="#operator-decomposition" title="Link to this heading">#</a></h2>
+<p>There are some converters which can be decomposed into suboperations in PyTorch and need not have separate converter registration.
+Such converters can be implemented via a decomposition</p>
+<section id="example-addmm">
+<h3>Example: <code class="docutils literal notranslate"><span class="pre">addmm</span></code><a class="headerlink" href="#example-addmm" title="Link to this heading">#</a></h3>
+<p>The decompositions are registered via <code class="docutils literal notranslate"><span class="pre">register_torch_trt_decomposition</span></code> decorator
+We define <code class="docutils literal notranslate"><span class="pre">addmm_replacement</span></code> and replace it with the torch ops, which will have their corresponding converters called.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="nd">@torch_tensorrt</span><span class="o">.</span><span class="n">dynamo</span><span class="o">.</span><span class="n">lowering</span><span class="o">.</span><span class="n">register_torch_trt_decomposition</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">aten</span><span class="o">.</span><span class="n">addmm</span><span class="p">)</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">addmm_replacement</span><span class="p">(</span>
+    <span class="n">input_</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">mat1</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">mat2</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">beta</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mi">1</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">:</span>
+    <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">add</span><span class="p">(</span>
+        <span class="n">torch</span><span class="o">.</span><span class="n">mul</span><span class="p">(</span><span class="n">input_</span><span class="p">,</span> <span class="n">beta</span><span class="p">),</span> <span class="n">torch</span><span class="o">.</span><span class="n">mul</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">matmul</span><span class="p">(</span><span class="n">mat1</span><span class="p">,</span> <span class="n">mat2</span><span class="p">),</span> <span class="n">alpha</span><span class="p">)</span>
+    <span class="p">)</span>
+</pre></div>
+</div>
+<p>You can modify the decompositions run by editing <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.dynamo.lowering.torch_enabled_decompositions</span></code> and <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.dynamo.lowering.torch_disabled_decompositions</span></code></p>
+<blockquote>
+<div><p>Note: <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.dynamo.lowering.torch_enabled_decompositions</span></code> and <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.dynamo.lowering.torch_disabled_decompositions</span></code> must be disjoint sets and that the decompositions already defined in <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.dynamo.lowering</span></code> will take precedence over torch lowering ops.</p>
+</div></blockquote>
+<p>Much of the time, this is significantly easier than implementing a converter. So where possible, this is what should be tried first.</p>
+</section>
+</section>
+</section>
+
+
+                </article>
+              
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="index.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">Converters</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="converter_registry.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">Converter Registry Internals</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <div class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+<div
+    id="pst-page-navigation-heading-2"
+    class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> On this page
+  </div>
+  <nav class="bd-toc-nav page-toc" aria-labelledby="pst-page-navigation-heading-2">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#converter-implementation">Converter implementation</a><ul class="visible nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#registration">Registration</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#capability-validation">Capability Validation</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#type-contract">Type Contract</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#example-convolution">Example: <code class="docutils literal notranslate"><span class="pre">Convolution</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#evaluators">Evaluators</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#operator-decomposition">Operator Decomposition</a><ul class="visible nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#example-addmm">Example: <code class="docutils literal notranslate"><span class="pre">addmm</span></code></a></li>
+</ul>
+</li>
+</ul>
+  </nav></div>
+
+  <div class="sidebar-secondary-item">
+
+  
+  <div class="tocsection editthispage">
+    <a href="https://github.com/pytorch/TensorRT/edit/main/docsrc/tutorials/extensibility/converters/dynamo_converters.rst">
+      <i class="fa-solid fa-pencil"></i>
+      
+      
+        
+          Edit on GitHub
+        
+      
+    </a>
+  </div>
+</div>
+
+  <div class="sidebar-secondary-item">
+
+  <div class="tocsection sourcelink">
+    <a href="../../../_sources/tutorials/extensibility/converters/dynamo_converters.rst.txt">
+      <i class="fa-solid fa-file-lines"></i> Show Source
+    </a>
+  </div>
+</div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+          </footer>
+        
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script src="../../../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b"></script>
+<script src="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+  
+    <div class="footer-items__start">
+      
+        <div class="footer-item">
+
+  <p class="copyright">
+    
+      © Copyright 2024, NVIDIA Corporation.
+      <br/>
+    
+  </p>
+</div>
+      
+    </div>
+  
+  
+  
+</div>
+
+  </footer>
+  </body>
+</html>

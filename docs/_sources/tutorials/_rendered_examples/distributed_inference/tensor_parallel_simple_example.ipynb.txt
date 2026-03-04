@@ -1,0 +1,43 @@
+{
+  "cells": [
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "\n\n# Tensor Parallel Distributed Inference with Torch-TensorRT\n\nBelow example shows how to use Torch-TensorRT backend for distributed inference with tensor parallelism.\n\nThis example demonstrates:\n    - Setting up distributed environment for tensor parallelism\n    - Model sharding across multiple GPUs\n    - Compilation with Torch-TensorRT\n    - Distributed inference execution\n\n## Usage\n```bash\nmpirun -n 2 --allow-run-as-root python tensor_parallel_simple_example.py\n```\n"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": null,
+      "metadata": {
+        "collapsed": false
+      },
+      "outputs": [],
+      "source": [
+        "import time\n\nimport tensorrt as trt\nimport torch\nimport torch.distributed as dist\nimport torch.nn as nn\nfrom tensor_parallel_initialize_dist import (\n    cleanup_distributed_env,\n    get_tensor_parallel_device_mesh,\n    initialize_distributed_env,\n)\n\n# Initialize distributed environment and logger BEFORE importing torch_tensorrt\n# This ensures logging is configured before any import-time log messages\ndevice_mesh, _world_size, _rank, logger = initialize_distributed_env(\n    \"tensor_parallel_simple_example\"\n)\n\nfrom torch.distributed._tensor import Shard\nfrom torch.distributed.tensor.parallel import (\n    ColwiseParallel,\n    RowwiseParallel,\n    parallelize_module,\n)\n\n\"\"\"\nThis example takes some code from https://github.com/pytorch/examples/blob/main/distributed/tensor_parallelism/tensor_parallel_example.py\n\"\"\"\n\n\nclass ToyModel(nn.Module):\n    \"\"\"MLP based model\"\"\"\n\n    def __init__(self):\n        super(ToyModel, self).__init__()\n        self.in_proj = nn.Linear(10, 3200)\n        self.relu = nn.ReLU()\n        self.out_proj = nn.Linear(3200, 1600)\n        self.in_proj2 = nn.Linear(1600, 500)\n        self.out_proj2 = nn.Linear(500, 100)\n\n    def forward(self, x):\n        x = self.out_proj(self.relu(self.in_proj(x)))\n        x = self.relu(x)\n        x = self.out_proj2(self.relu(self.in_proj2(x)))\n        return x\n\n\nlogger.info(f\"Starting PyTorch TP example on rank {_rank}.\")\nassert (\n    _world_size % 2 == 0\n), f\"TP examples require even number of GPUs, but got {_world_size} gpus\"\n\n\n# # create model and move it to GPU - init\"cuda\"_mesh has already mapped GPU ids.\ntp_model = ToyModel().to(\"cuda\")\n\n\n# Custom parallelization plan for the model\ntp_model = parallelize_module(\n    module=tp_model,\n    device_mesh=device_mesh,\n    parallelize_plan={\n        \"in_proj\": ColwiseParallel(input_layouts=Shard(0)),\n        \"out_proj\": RowwiseParallel(output_layouts=Shard(0)),\n        \"in_proj2\": ColwiseParallel(input_layouts=Shard(0)),\n        \"out_proj2\": RowwiseParallel(output_layouts=Shard(0)),\n    },\n)\ntorch.manual_seed(0)\ninp = torch.rand(20, 10, device=\"cuda\")\npython_result = tp_model(inp)\n\nbackend = \"torch_tensorrt\"\ntp_model = torch.compile(\n    tp_model,\n    backend=backend,\n    options={\n        \"truncate_long_and_double\": True,\n        \"enabled_precisions\": {torch.float32, torch.float16},\n        \"use_python_runtime\": True,\n        \"min_block_size\": 1,\n        \"use_distributed_mode_trace\": True,\n    },\n    dynamic=None,\n)\n\n# For TP, input needs to be same across all TP ranks.\n# Setting the random seed is to mimic the behavior of dataloader.\ntorch.manual_seed(0)\ninp = torch.rand(20, 10, device=\"cuda\")\nstart = time.time()\noutput = tp_model(inp)\nend = time.time()\nlogger.info(f\"Compilation time is {end - start}\")\nassert (python_result - output).std() < 0.01, \"Result is not correct.\"\n\n# This cleans up the distributed process group\ncleanup_distributed_env()"
+      ]
+    }
+  ],
+  "metadata": {
+    "kernelspec": {
+      "display_name": "Python 3",
+      "language": "python",
+      "name": "python3"
+    },
+    "language_info": {
+      "codemirror_mode": {
+        "name": "ipython",
+        "version": 3
+      },
+      "file_extension": ".py",
+      "mimetype": "text/x-python",
+      "name": "python",
+      "nbconvert_exporter": "python",
+      "pygments_lexer": "ipython3",
+      "version": "3.11.14"
+    }
+  },
+  "nbformat": 4,
+  "nbformat_minor": 0
+}

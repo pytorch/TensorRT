@@ -1,0 +1,93 @@
+[
+  {
+    "name": "main (latest)",
+    "version": "main",
+    "url": "https://pytorch.org/TensorRT/",
+    "preferred": true
+  },
+  {
+    "name": "v2.3.0",
+    "version": "v2.3.0",
+    "url": "https://pytorch.org/TensorRT/v2.3.0/"
+  },
+  {
+    "name": "v2.2.0",
+    "version": "v2.2.0",
+    "url": "https://pytorch.org/TensorRT/v2.2.0/"
+  },
+  {
+    "name": "v2.1.0",
+    "version": "v2.1.0",
+    "url": "https://pytorch.org/TensorRT/v2.1.0/"
+  },
+  {
+    "name": "v1.4.0",
+    "version": "v1.4.0",
+    "url": "https://pytorch.org/TensorRT/v1.4.0/"
+  },
+  {
+    "name": "v1.3.0",
+    "version": "v1.3.0",
+    "url": "https://pytorch.org/TensorRT/v1.3.0/"
+  },
+  {
+    "name": "v1.2.0",
+    "version": "v1.2.0",
+    "url": "https://pytorch.org/TensorRT/v1.2.0/"
+  },
+  {
+    "name": "v1.1.1",
+    "version": "v1.1.1",
+    "url": "https://nvidia.github.io/Torch-TensorRT/v1.1.1/"
+  },
+  {
+    "name": "v1.1.0",
+    "version": "v1.1.0",
+    "url": "https://nvidia.github.io/Torch-TensorRT/v1.1.0/"
+  },
+  {
+    "name": "v1.0.0",
+    "version": "v1.0.0",
+    "url": "https://nvidia.github.io/Torch-TensorRT/v1.0.0/"
+  },
+  {
+    "name": "v0.4.1",
+    "version": "v0.4.1",
+    "url": "https://nvidia.github.io/Torch-TensorRT/v0.4.1/"
+  },
+  {
+    "name": "v0.4.0",
+    "version": "v0.4.0",
+    "url": "https://nvidia.github.io/Torch-TensorRT/v0.4.0/"
+  },
+  {
+    "name": "v0.3.0",
+    "version": "v0.3.0",
+    "url": "https://nvidia.github.io/Torch-TensorRT/v0.3.0/"
+  },
+  {
+    "name": "v0.2.0",
+    "version": "v0.2.0",
+    "url": "https://nvidia.github.io/Torch-TensorRT/v0.2.0/"
+  },
+  {
+    "name": "v0.1.0",
+    "version": "v0.1.0",
+    "url": "https://nvidia.github.io/Torch-TensorRT/v0.1.0/"
+  },
+  {
+    "name": "v0.0.3",
+    "version": "v0.0.3",
+    "url": "https://nvidia.github.io/Torch-TensorRT/v0.0.3/"
+  },
+  {
+    "name": "v0.0.2",
+    "version": "v0.0.2",
+    "url": "https://nvidia.github.io/Torch-TensorRT/v0.0.2/"
+  },
+  {
+    "name": "v0.0.1",
+    "version": "v0.0.1",
+    "url": "https://nvidia.github.io/Torch-TensorRT/v0.0.1/"
+  }
+]

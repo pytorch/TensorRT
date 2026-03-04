@@ -1,0 +1,801 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Built-in Dynamo Lowering Passes &#8212; Torch-TensorRT</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../_static/styles/theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../_static/styles/bootstrap.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../_static/styles/pydata-sphinx-theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+
+  
+  <link href="../_static/vendor/fontawesome/6.5.2/css/all.min.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+  <link rel="preload" as="font" type="font/woff2" crossorigin href="../_static/vendor/fontawesome/6.5.2/webfonts/fa-solid-900.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../_static/vendor/fontawesome/6.5.2/webfonts/fa-brands-400.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../_static/vendor/fontawesome/6.5.2/webfonts/fa-regular-400.woff2" />
+
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=72e443bf" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery.css?v=61a4c737" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-binder.css?v=f4aeca0c" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-dataframe.css?v=e5fbc548" />
+    <link rel="stylesheet" type="text/css" href="../_static/sg_gallery-rendered-html.css?v=1277b6f3" />
+    <link rel="stylesheet" type="text/css" href="../_static/collapsible-lists/css/tree_view.css?v=a885cde7" />
+    <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/katex@0.10.0-beta/dist/katex.min.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css?v=0cb2b9ef" />
+  
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b" />
+<link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
+  <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+    <script src="../_static/documentation_options.js?v=5e5b2ac4"></script>
+    <script src="../_static/doctools.js?v=888ff710"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
+    <script src="../_static/collapsible-lists/js/apply-collapsible-lists.js?v=660e4f45"></script>
+    <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'contributors/lowering_passes';</script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Observer / Callback System" href="observer.html" />
+    <link rel="prev" title="Runtime Phase" href="runtime.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-primary-sidebar-checkbox"/>
+  <label class="overlay overlay-primary" for="pst-primary-sidebar-checkbox"></label>
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-secondary-sidebar-checkbox"/>
+  <label class="overlay overlay-secondary" for="pst-secondary-sidebar-checkbox"></label>
+  
+  <div class="search-button__wrapper">
+    <div class="search-button__overlay"></div>
+    <div class="search-button__search-container">
+<form class="bd-search d-flex align-items-center"
+      action="../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         id="search-input"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form></div>
+  </div>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+<div class="bd-header__inner bd-page-width">
+  <button class="pst-navbar-icon sidebar-toggle primary-toggle" aria-label="Site navigation">
+    <span class="fa-solid fa-bars"></span>
+  </button>
+  
+  
+  <div class=" navbar-header-items__start">
+    
+      <div class="navbar-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../index.html">
+  
+  
+  
+  
+  
+  
+    <p class="title logo__title">Torch-TensorRT</p>
+  
+</a></div>
+    
+      <div class="navbar-item">
+<script>
+document.write(`
+  <div class="version-switcher__container dropdown">
+    <button id="pst-version-switcher-button-2"
+      type="button"
+      class="version-switcher__button btn btn-sm dropdown-toggle"
+      data-bs-toggle="dropdown"
+      aria-haspopup="listbox"
+      aria-controls="pst-version-switcher-list-2"
+      aria-label="Version switcher list"
+    >
+      Choose version  <!-- this text may get changed later by javascript -->
+      <span class="caret"></span>
+    </button>
+    <div id="pst-version-switcher-list-2"
+      class="version-switcher__menu dropdown-menu list-group-flush py-0"
+      role="listbox" aria-labelledby="pst-version-switcher-button-2">
+      <!-- dropdown will be populated by javascript on page load -->
+    </div>
+  </div>
+`);
+</script></div>
+    
+  </div>
+  
+  <div class=" navbar-header-items">
+    
+    <div class="me-auto navbar-header-items__center">
+      
+        <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../getting_started/installation.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../user_guide/index.html">
+    User Guide
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../tutorials/advanced_usage.html">
+    Advanced Usage
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../tutorials/model_zoo.html">
+    Model Zoo
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../api_reference.html">
+    API Reference
+  </a>
+</li>
+
+            <li class="nav-item dropdown">
+                <button class="btn dropdown-toggle nav-item" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-controls="pst-nav-more-links">
+                    More
+                </button>
+                <ul id="pst-nav-more-links" class="dropdown-menu">
+                    
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../debugging/index.html">
+    Debugging
+  </a>
+</li>
+
+
+<li class=" current active">
+  <a class="nav-link dropdown-item nav-internal" href="../contributing.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../legacy.html">
+    Legacy Frontends
+  </a>
+</li>
+
+                </ul>
+            </li>
+            
+  </ul>
+</nav></div>
+      
+    </div>
+    
+    
+    <div class="navbar-header-items__end">
+      
+      
+        <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm pst-navbar-icon search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+  </button>
+`);
+</script></div>
+      
+        <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="theme-switch fa-solid fa-sun fa-lg" data-mode="light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg" data-mode="dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"></i>
+  </button>
+`);
+</script></div>
+      
+        <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/pytorch/TensorRT/" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+</ul></div>
+      
+    </div>
+    
+  </div>
+  
+  
+
+  
+    <button class="pst-navbar-icon sidebar-toggle secondary-toggle" aria-label="On this page">
+      <span class="fa-solid fa-outdent"></span>
+    </button>
+  
+</div>
+
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <div class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+      <div class="sidebar-header-items__center">
+        
+          
+          
+            <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../getting_started/installation.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../user_guide/index.html">
+    User Guide
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../tutorials/advanced_usage.html">
+    Advanced Usage
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../tutorials/model_zoo.html">
+    Model Zoo
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../api_reference.html">
+    API Reference
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../debugging/index.html">
+    Debugging
+  </a>
+</li>
+
+
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="../contributing.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../legacy.html">
+    Legacy Frontends
+  </a>
+</li>
+
+  </ul>
+</nav></div>
+          
+        
+      </div>
+    
+    
+    
+      <div class="sidebar-header-items__end">
+        
+          <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm pst-navbar-icon search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+  </button>
+`);
+</script></div>
+        
+          <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="theme-switch fa-solid fa-sun fa-lg" data-mode="light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg" data-mode="dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"></i>
+  </button>
+`);
+</script></div>
+        
+          <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/pytorch/TensorRT/" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+</ul></div>
+        
+      </div>
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+<nav class="bd-docs-nav bd-links"
+     aria-label="Section Navigation">
+  <p class="bd-links__title" role="heading" aria-level="1">Section Navigation</p>
+  <div class="bd-toc-item navbar-nav"><ul class="current nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="system_overview.html">System Overview</a></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="phases.html">Compiler Phases</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="lowering.html">Lowering Phase</a></li>
+<li class="toctree-l2"><a class="reference internal" href="partitioning.html">Partitioning Phase</a></li>
+<li class="toctree-l2"><a class="reference internal" href="conversion.html">Conversion Phase</a></li>
+<li class="toctree-l2"><a class="reference internal" href="runtime.html">Runtime Phase</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 current active"><a class="current reference internal" href="#">Built-in Dynamo Lowering Passes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="observer.html">Observer / Callback System</a></li>
+<li class="toctree-l1"><a class="reference internal" href="ts_converters.html">Writing TorchScript Converters</a></li>
+<li class="toctree-l1"><a class="reference internal" href="useful_links.html">Useful Links for Torch-TensorRT Development</a></li>
+</ul>
+</div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+  
+  <div id="rtd-footer-container"></div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item">
+
+
+
+<nav aria-label="Breadcrumb" class="d-print-none">
+  <ul class="bd-breadcrumbs">
+    
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="../index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+    
+    <li class="breadcrumb-item"><a href="../contributing.html" class="nav-link">Contributing</a></li>
+    
+    <li class="breadcrumb-item active" aria-current="page">Built-in...</li>
+  </ul>
+</nav>
+</div>
+      
+    </div>
+  
+  
+</div>
+</div>
+              
+              
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section id="built-in-dynamo-lowering-passes">
+<span id="lowering-passes-catalog"></span><h1>Built-in Dynamo Lowering Passes<a class="headerlink" href="#built-in-dynamo-lowering-passes" title="Link to this heading">#</a></h1>
+<p>This page catalogues every built-in lowering pass in
+<code class="docutils literal notranslate"><span class="pre">torch_tensorrt.dynamo.lowering.passes</span></code>. Passes run sequentially on the FX graph
+before partitioning. The ordering is fixed by the pass manager in
+<code class="docutils literal notranslate"><span class="pre">pass_manager.py</span></code>; use the <code class="docutils literal notranslate"><span class="pre">&#64;_aten_lowering_pass(index=N)</span></code> decorator to insert
+custom passes at a specific position.</p>
+<p>For a guide on writing new passes see <a class="reference internal" href="../tutorials/extensibility/lowering/writing_dynamo_aten_lowering_passes.html#writing-dynamo-aten-lowering-passes"><span class="std std-ref">Writing Dynamo ATen Lowering Passes</span></a>.</p>
+<hr class="docutils" />
+<section id="pass-registry-and-custom-passes">
+<h2>Pass Registry and Custom Passes<a class="headerlink" href="#pass-registry-and-custom-passes" title="Link to this heading">#</a></h2>
+<p>Every pass is registered via the <code class="docutils literal notranslate"><span class="pre">&#64;_aten_lowering_pass</span></code> decorator:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.lowering.passes</span><span class="w"> </span><span class="kn">import</span> <span class="n">_aten_lowering_pass</span>
+
+<span class="nd">@_aten_lowering_pass</span><span class="p">(</span><span class="n">index</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>   <span class="c1"># insert at the front</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">my_custom_pass</span><span class="p">(</span>
+    <span class="n">gm</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">,</span>
+    <span class="n">settings</span><span class="p">:</span> <span class="n">CompilationSettings</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">:</span>
+    <span class="c1"># modify gm.graph in-place</span>
+    <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">lint</span><span class="p">()</span>
+    <span class="n">gm</span><span class="o">.</span><span class="n">recompile</span><span class="p">()</span>
+    <span class="k">return</span> <span class="n">gm</span>
+</pre></div>
+</div>
+<p>Omitting <code class="docutils literal notranslate"><span class="pre">index</span></code> appends the pass to the end of the list. After structural changes
+always call <code class="docutils literal notranslate"><span class="pre">gm.graph.lint()</span></code> and <code class="docutils literal notranslate"><span class="pre">gm.recompile()</span></code>, or use the helper:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.lowering.passes</span><span class="w"> </span><span class="kn">import</span> <span class="n">clean_up_graph_after_modifications</span>
+<span class="n">clean_up_graph_after_modifications</span><span class="p">(</span><span class="n">gm</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<hr class="docutils" />
+<section id="built-in-passes">
+<h2>Built-in Passes<a class="headerlink" href="#built-in-passes" title="Link to this heading">#</a></h2>
+<section id="repair-input-aliasing">
+<h3>repair_input_aliasing<a class="headerlink" href="#repair-input-aliasing" title="Link to this heading">#</a></h3>
+<p><strong>File</strong>: <code class="docutils literal notranslate"><span class="pre">repair_input_aliasing.py</span></code></p>
+<p>Inserts <code class="docutils literal notranslate"><span class="pre">clone</span></code> nodes immediately ahead of every input placeholder before the
+lowering pipeline runs. This prevents mutation/aliasing bugs that can occur during
+tracing when a downstream pass reads a placeholder that an earlier pass has silently
+modified in-place (<a class="reference external" href="https://github.com/pytorch/pytorch/issues/108079">pytorch#108079</a>).</p>
+<p>This pass is always paired with <code class="docutils literal notranslate"><span class="pre">remove_input_alias_fixing_clones</span></code> which strips the
+clones again after the pipeline that required them has finished.</p>
+</section>
+<section id="remove-assert-nodes">
+<h3>remove_assert_nodes<a class="headerlink" href="#remove-assert-nodes" title="Link to this heading">#</a></h3>
+<p><strong>File</strong>: <code class="docutils literal notranslate"><span class="pre">remove_assert_nodes.py</span></code></p>
+<p>Removes <code class="docutils literal notranslate"><span class="pre">torch.ops.aten._assert_scalar</span></code> and <code class="docutils literal notranslate"><span class="pre">torch.ops.aten._assert_tensor_metadata</span></code>
+nodes. These guard nodes are valid Python-side contracts but have no equivalent in TRT
+and would cause conversion to fail if left in the graph.</p>
+</section>
+<section id="remove-detach">
+<h3>remove_detach<a class="headerlink" href="#remove-detach" title="Link to this heading">#</a></h3>
+<p><strong>File</strong>: <code class="docutils literal notranslate"><span class="pre">remove_detach.py</span></code></p>
+<p>Replaces <code class="docutils literal notranslate"><span class="pre">aten.detach</span></code> nodes with their input. <code class="docutils literal notranslate"><span class="pre">detach</span></code> is a no-op at inference
+time since TensorRT has no autograd concept; keeping it in the graph would require a
+converter that does nothing.</p>
+</section>
+<section id="constant-folding">
+<h3>constant_folding<a class="headerlink" href="#constant-folding" title="Link to this heading">#</a></h3>
+<p><strong>File</strong>: <code class="docutils literal notranslate"><span class="pre">constant_folding.py</span></code></p>
+<p>Evaluates all subexpressions whose inputs are compile-time constants and replaces them
+with <code class="docutils literal notranslate"><span class="pre">get_attr</span></code> nodes holding the folded result. Adapted from PyTorch Inductor’s
+<code class="docutils literal notranslate"><span class="pre">freezing.py</span></code>.</p>
+<p>Benefits:</p>
+<ul class="simple">
+<li><p>Reduces engine build time — fewer nodes for TRT to optimize.</p></li>
+<li><p>Can eliminate entire branches (e.g., shape computations on static inputs).</p></li>
+<li><p>Converts intermediate tensors to registered parameters, allowing them to be treated
+as frozen weights in the TRT engine.</p></li>
+</ul>
+</section>
+<section id="remove-num-users-is-0-nodes">
+<h3>remove_num_users_is_0_nodes<a class="headerlink" href="#remove-num-users-is-0-nodes" title="Link to this heading">#</a></h3>
+<p><strong>File</strong>: <code class="docutils literal notranslate"><span class="pre">remove_num_users_is_0_nodes.py</span></code></p>
+<p>Dead-code elimination: removes any <code class="docutils literal notranslate"><span class="pre">call_function</span></code> or <code class="docutils literal notranslate"><span class="pre">call_method</span></code> node whose
+output has zero consumers (i.e., <code class="docutils literal notranslate"><span class="pre">len(node.users)</span> <span class="pre">==</span> <span class="pre">0</span></code>). Runs after
+<code class="docutils literal notranslate"><span class="pre">constant_folding</span></code> which may produce dead nodes as a side effect.</p>
+</section>
+<section id="remove-input-alias-fixing-clones">
+<h3>remove_input_alias_fixing_clones<a class="headerlink" href="#remove-input-alias-fixing-clones" title="Link to this heading">#</a></h3>
+<p><strong>File</strong>: <code class="docutils literal notranslate"><span class="pre">remove_input_alias_fixing_clones.py</span></code></p>
+<p>The counterpart of <code class="docutils literal notranslate"><span class="pre">repair_input_aliasing</span></code>. Removes the temporary <code class="docutils literal notranslate"><span class="pre">clone</span></code> nodes
+once the passes that needed aliasing protection have completed. The pair ensures the
+graph presented to the partitioner and converter is clone-free.</p>
+</section>
+<section id="repair-input-as-output">
+<h3>repair_input_as_output<a class="headerlink" href="#repair-input-as-output" title="Link to this heading">#</a></h3>
+<p><strong>File</strong>: <code class="docutils literal notranslate"><span class="pre">repair_input_as_output.py</span></code></p>
+<p>TensorRT does not allow a network’s input tensor to be directly returned as an output —
+doing so would require TRT to copy the input, which it refuses. This pass detects any
+placeholder node that appears in the graph’s output tuple and inserts an
+<code class="docutils literal notranslate"><span class="pre">aten.clone</span></code> (identity copy) so that the output is a distinct tensor.</p>
+</section>
+<section id="fuse-distributed-ops">
+<h3>fuse_distributed_ops<a class="headerlink" href="#fuse-distributed-ops" title="Link to this heading">#</a></h3>
+<p><strong>File</strong>: <code class="docutils literal notranslate"><span class="pre">fuse_distributed_ops.py</span></code></p>
+<p>Fuses distributed communication pairs into single atomic operations:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">all_gather_into_tensor</span></code> + <code class="docutils literal notranslate"><span class="pre">wait_tensor</span></code> → <code class="docutils literal notranslate"><span class="pre">tensorrt_fused_nccl_all_gather_op</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">reduce_scatter_tensor</span></code> + <code class="docutils literal notranslate"><span class="pre">wait_tensor</span></code> → <code class="docutils literal notranslate"><span class="pre">tensorrt_fused_nccl_reduce_scatter_op</span></code></p></li>
+</ul>
+<p>The fused forms expose the full gather/scatter as a single node that a single TRT plugin
+can implement, avoiding a TRT↔PyTorch transition mid-communication. Only active when
+<code class="docutils literal notranslate"><span class="pre">use_distributed_mode_trace=True</span></code>.</p>
+</section>
+<section id="fuse-prims-broadcast">
+<h3>fuse_prims_broadcast<a class="headerlink" href="#fuse-prims-broadcast" title="Link to this heading">#</a></h3>
+<p><strong>File</strong>: <code class="docutils literal notranslate"><span class="pre">fuse_prims_broadcast.py</span></code></p>
+<p>Rewrites <code class="docutils literal notranslate"><span class="pre">prims.sum</span></code> + <code class="docutils literal notranslate"><span class="pre">prims.broadcast_in_dim</span></code> patterns into their ATen
+equivalents (<code class="docutils literal notranslate"><span class="pre">aten.sum</span></code> with <code class="docutils literal notranslate"><span class="pre">keepdim=True</span></code>). The <code class="docutils literal notranslate"><span class="pre">prims</span></code> namespace is the
+low-level decomposition layer below Core ATen; most converters target ATen, so this
+pass lifts prims patterns back up to ATen for better converter coverage.</p>
+</section>
+<section id="replace-max-pool-with-indices">
+<h3>replace_max_pool_with_indices<a class="headerlink" href="#replace-max-pool-with-indices" title="Link to this heading">#</a></h3>
+<p><strong>File</strong>: <code class="docutils literal notranslate"><span class="pre">replace_max_pool_with_indices.py</span></code></p>
+<p>Replaces <code class="docutils literal notranslate"><span class="pre">aten.max_pool{1,2,3}d_with_indices</span></code> + <code class="docutils literal notranslate"><span class="pre">aten.getitem[0]</span></code> sequences with
+the simpler <code class="docutils literal notranslate"><span class="pre">aten.max_pool{1,2,3}d</span></code> variants when only the values (not the indices)
+are consumed. The <code class="docutils literal notranslate"><span class="pre">*_with_indices</span></code> variants are harder for TRT to optimize; this
+simplification enables the direct <code class="docutils literal notranslate"><span class="pre">INetworkDefinition::addPoolingNd</span></code> path.</p>
+</section>
+<section id="rule-based-autocast">
+<h3>rule_based_autocast<a class="headerlink" href="#rule-based-autocast" title="Link to this heading">#</a></h3>
+<p><strong>File</strong>: <code class="docutils literal notranslate"><span class="pre">rule_based_autocast.py</span></code></p>
+<p>When <code class="docutils literal notranslate"><span class="pre">enable_autocast=True</span></code> in <code class="docutils literal notranslate"><span class="pre">CompilationSettings</span></code>, this pass inserts precision
+cast nodes into the graph based on a set of rules:</p>
+<ol class="arabic simple">
+<li><p><strong>Output range check</strong> — nodes whose outputs exceed <code class="docutils literal notranslate"><span class="pre">autocast_max_output_threshold</span></code>
+are kept in FP32 (guarded against overflow).</p></li>
+<li><p><strong>Reduction depth check</strong> — nodes with reduction depth exceeding
+<code class="docutils literal notranslate"><span class="pre">autocast_max_depth_of_reduction</span></code> are kept in FP32 (guarded against accumulated
+error).</p></li>
+<li><p><strong>Name exclusions</strong> — nodes matching any pattern in <code class="docutils literal notranslate"><span class="pre">autocast_excluded_nodes</span></code> are
+kept in FP32.</p></li>
+<li><p><strong>Op exclusions</strong> — nodes with targets in <code class="docutils literal notranslate"><span class="pre">autocast_excluded_ops</span></code> are kept in FP32.</p></li>
+<li><p><strong>Calibration</strong> — if <code class="docutils literal notranslate"><span class="pre">autocast_calibration_dataloader</span></code> is provided, actual output
+ranges are measured by running the model on calibration data before applying the
+threshold check.</p></li>
+</ol>
+<p>The pass inserts explicit <code class="docutils literal notranslate"><span class="pre">aten._to_copy</span></code> cast nodes around qualified operations to
+reduce them to <code class="docutils literal notranslate"><span class="pre">autocast_low_precision_type</span></code> (FP16 or BF16).</p>
+</section>
+<section id="remove-sym-nodes">
+<h3>remove_sym_nodes<a class="headerlink" href="#remove-sym-nodes" title="Link to this heading">#</a></h3>
+<p><strong>File</strong>: <code class="docutils literal notranslate"><span class="pre">remove_sym_nodes.py</span></code></p>
+<p>Removes <code class="docutils literal notranslate"><span class="pre">sym_int</span></code> placeholder nodes that <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code> with <code class="docutils literal notranslate"><span class="pre">dynamic=True</span></code>
+inserts to represent symbolic integer values. These nodes carry shape information for
+the tracing engine but have no runtime meaning for TRT. The pass replaces references
+to symbolic integers with <code class="docutils literal notranslate"><span class="pre">aten.sym_size</span></code> queries on the concrete tensors, preserving
+shape information while eliminating nodes TRT cannot process.</p>
+</section>
+<section id="complex-graph-rewrite">
+<h3>complex_graph_rewrite<a class="headerlink" href="#complex-graph-rewrite" title="Link to this heading">#</a></h3>
+<p><strong>File</strong>: <code class="docutils literal notranslate"><span class="pre">complex_graph_rewrite.py</span></code></p>
+<p>TensorRT has no complex-number dtype support. This pass detects subgraphs that operate
+on <code class="docutils literal notranslate"><span class="pre">complex64</span></code>/<code class="docutils literal notranslate"><span class="pre">complex128</span></code> tensors and rewrites them to equivalent real arithmetic:</p>
+<ul class="simple">
+<li><p><strong>Input placeholders</strong> with complex dtype are replaced by float placeholders with an
+appended trailing <code class="docutils literal notranslate"><span class="pre">2</span></code> dimension (<code class="docutils literal notranslate"><span class="pre">view_as_real</span></code> layout).</p></li>
+<li><p><strong>``get_attr`` buffers</strong> with complex dtype are unpacked into a float buffer of shape
+<code class="docutils literal notranslate"><span class="pre">(*original_shape,</span> <span class="pre">2)</span></code>.</p></li>
+<li><p><strong>``aten.mul``</strong> between complex-typed nodes is rewritten to
+<code class="docutils literal notranslate"><span class="pre">(ac</span> <span class="pre">-</span> <span class="pre">bd)</span> <span class="pre">+</span> <span class="pre">(ad</span> <span class="pre">+</span> <span class="pre">bc)i</span></code> real arithmetic.</p></li>
+<li><p><strong>``aten.view_as_real``</strong> and <strong>``aten.view_as_complex``</strong> nodes are erased (they
+become identity operations after the rewrite).</p></li>
+</ul>
+<p>See <span class="xref std std-ref">complex_tensor_lowering</span> (MEMORY.md) for invariants and limitations.</p>
+</section>
+</section>
+</section>
+
+
+                </article>
+              
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="runtime.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">Runtime Phase</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="observer.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">Observer / Callback System</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <div class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+<div
+    id="pst-page-navigation-heading-2"
+    class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> On this page
+  </div>
+  <nav class="bd-toc-nav page-toc" aria-labelledby="pst-page-navigation-heading-2">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#pass-registry-and-custom-passes">Pass Registry and Custom Passes</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#built-in-passes">Built-in Passes</a><ul class="visible nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#repair-input-aliasing">repair_input_aliasing</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#remove-assert-nodes">remove_assert_nodes</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#remove-detach">remove_detach</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#constant-folding">constant_folding</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#remove-num-users-is-0-nodes">remove_num_users_is_0_nodes</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#remove-input-alias-fixing-clones">remove_input_alias_fixing_clones</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#repair-input-as-output">repair_input_as_output</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#fuse-distributed-ops">fuse_distributed_ops</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#fuse-prims-broadcast">fuse_prims_broadcast</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#replace-max-pool-with-indices">replace_max_pool_with_indices</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#rule-based-autocast">rule_based_autocast</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#remove-sym-nodes">remove_sym_nodes</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#complex-graph-rewrite">complex_graph_rewrite</a></li>
+</ul>
+</li>
+</ul>
+  </nav></div>
+
+  <div class="sidebar-secondary-item">
+
+  
+  <div class="tocsection editthispage">
+    <a href="https://github.com/pytorch/TensorRT/edit/main/docsrc/contributors/lowering_passes.rst">
+      <i class="fa-solid fa-pencil"></i>
+      
+      
+        
+          Edit on GitHub
+        
+      
+    </a>
+  </div>
+</div>
+
+  <div class="sidebar-secondary-item">
+
+  <div class="tocsection sourcelink">
+    <a href="../_sources/contributors/lowering_passes.rst.txt">
+      <i class="fa-solid fa-file-lines"></i> Show Source
+    </a>
+  </div>
+</div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+          </footer>
+        
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script src="../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b"></script>
+<script src="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+  
+    <div class="footer-items__start">
+      
+        <div class="footer-item">
+
+  <p class="copyright">
+    
+      © Copyright 2024, NVIDIA Corporation.
+      <br/>
+    
+  </p>
+</div>
+      
+    </div>
+  
+  
+  
+</div>
+
+  </footer>
+  </body>
+</html>
