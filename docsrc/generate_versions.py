@@ -16,6 +16,46 @@ VERSIONS = [
         "preferred": True,
     },
     {
+        "name": "v2.10.0",
+        "version": "v2.10.0",
+        "url": "https://pytorch.org/TensorRT/v2.10.0/",
+    },
+    {
+        "name": "v2.9.0",
+        "version": "v2.9.0",
+        "url": "https://pytorch.org/TensorRT/v2.9.0/",
+    },
+    {
+        "name": "v2.8.0",
+        "version": "v2.8.0",
+        "url": "https://pytorch.org/TensorRT/v2.8.0/",
+    },
+    {
+        "name": "v2.7.0",
+        "version": "v2.7.0",
+        "url": "https://pytorch.org/TensorRT/v2.7.0/",
+    },
+    {
+        "name": "v2.6.1",
+        "version": "v2.6.1",
+        "url": "https://pytorch.org/TensorRT/v2.6.1/",
+    },
+    {
+        "name": "v2.6.0",
+        "version": "v2.6.0",
+        "url": "https://pytorch.org/TensorRT/v2.6.0/",
+    },
+    {
+        "name": "v2.5.0",
+        "version": "v2.5.0",
+        "url": "https://pytorch.org/TensorRT/v2.5.0/",
+    },
+    {
+        "name": "v2.4.0",
+        "version": "v2.4.0",
+        "url": "https://pytorch.org/TensorRT/v2.4.0/",
+    },
+    {
         "name": "v2.3.0",
         "version": "v2.3.0",
         "url": "https://pytorch.org/TensorRT/v2.3.0/",
