@@ -1,0 +1,17 @@
+.. _exhale_class_classtorch__tensorrt_1_1TensorFormat:
+
+Class TensorFormat
+==================
+
+- Defined in :ref:`file_cpp_include_torch_tensorrt_torch_tensorrt.h`
+
+
+Class Documentation
+-------------------
+
+
+.. doxygenclass:: torch_tensorrt::TensorFormat
+   :project: Torch-TensorRT
+   :members:
+   :protected-members:
+   :undoc-members:
