@@ -8,4 +8,4 @@ fine-tuned checkpoints, and EMA weight updates.
    :maxdepth: 1
 
    refit
-   ../_rendered_examples/dynamo/refit_engine_example
+   Example: Refitting Programs with New Weights <../_rendered_examples/dynamo/refit_engine_example>

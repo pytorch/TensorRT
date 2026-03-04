@@ -8,6 +8,6 @@ pre-allocated output buffers, and the Python runtime module.
    :maxdepth: 1
 
    cuda_graphs
-   ../_rendered_examples/dynamo/torch_export_cudagraphs
-   ../_rendered_examples/dynamo/pre_allocated_output_example
+   Example: Torch Export with Cudagraphs <../_rendered_examples/dynamo/torch_export_cudagraphs>
+   Example: Pre-allocated output buffer <../_rendered_examples/dynamo/pre_allocated_output_example>
    python_runtime

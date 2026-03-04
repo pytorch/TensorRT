@@ -150,10 +150,10 @@ html_theme_options = {
     "display_version": True,
     "show_toc_level": 2,
     "use_edit_page_button": True,
-    "version_switcher": {
+    "switcher": {
         # Use the raw GitHub URL so the dropdown works in all environments
-        # (local preview, staging, production) — pytorch.org only works once deployed.
-        "json_url": "https://pytorch.org/TensorRT/versions.json",
+        # (local preview, staging, production) — docs.pytorch.org only works once deployed.
+        "json_url": "https://raw.githubusercontent.com/pytorch/TensorRT/refs/heads/main/docs/versions.json",
         "version_match": _version_match,
     },
     "icon_links": [
