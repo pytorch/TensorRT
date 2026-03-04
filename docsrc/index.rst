@@ -147,6 +147,7 @@ Model Zoo
 * :ref:`torch_compile_transformer`
 * :ref:`torch_compile_stable_diffusion`
 * :ref:`compile_hf_models`
+* :ref:`compile_groot`
 * :ref:`torch_compile_gpt2`
 * :ref:`torch_export_gpt2`
 * :ref:`torch_export_sam2`
@@ -161,6 +162,7 @@ Model Zoo
    tutorials/_rendered_examples/dynamo/torch_compile_transformers_example
    tutorials/_rendered_examples/dynamo/torch_compile_stable_diffusion
    tutorials/compile_hf_models
+   tutorials/compile_groot
    tutorials/_rendered_examples/distributed_inference/data_parallel_gpt2
    tutorials/_rendered_examples/distributed_inference/data_parallel_stable_diffusion
    tutorials/_rendered_examples/dynamo/torch_compile_gpt2
