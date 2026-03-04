@@ -1,0 +1,14 @@
+.. _exhale_function_namespacetorch__tensorrt_1_1torchscript_1a5b405fd3bf3c8fc2e2a54cbbab979797:
+
+Function torch_tensorrt::torchscript::check_method_operator_support
+===================================================================
+
+.. did not find file this was defined in
+
+
+Function Documentation
+----------------------
+
+
+.. doxygenfunction:: torch_tensorrt::torchscript::check_method_operator_support(const torch::jit::Module&, std::string)
+   :project: Torch-TensorRT
