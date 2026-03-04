@@ -43,13 +43,19 @@
 <link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../_static/documentation_options.js?v=5e5b2ac4"></script>
+    <script src="../../_static/documentation_options.js?v=0d57c06b"></script>
     <script src="../../_static/doctools.js?v=888ff710"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
     <script src="../../_static/collapsible-lists/js/apply-collapsible-lists.js?v=660e4f45"></script>
     <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
     <script>DOCUMENTATION_OPTIONS.pagename = 'tutorials/huggingface/compile_hf_models';</script>
+    <script>
+        DOCUMENTATION_OPTIONS.theme_version = '0.15.4';
+        DOCUMENTATION_OPTIONS.theme_switcher_json_url = 'https://raw.githubusercontent.com/pytorch/TensorRT/refs/heads/main/docs/versions.json';
+        DOCUMENTATION_OPTIONS.theme_switcher_version_match = 'main';
+        DOCUMENTATION_OPTIONS.show_version_warning_banner = false;
+        </script>
     <link rel="index" title="Index" href="../../genindex.html" />
     <link rel="search" title="Search" href="../../search.html" />
     <link rel="next" title="Compiling Stable Diffusion model using the torch.compile backend" href="../_rendered_examples/dynamo/torch_compile_stable_diffusion.html" />
@@ -428,9 +434,9 @@ document.write(`
   <div class="bd-toc-item navbar-nav"><ul class="current nav bd-sidenav">
 <li class="toctree-l1 current active has-children"><a class="reference internal" href="index.html">HuggingFace Models</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
 <li class="toctree-l2 current active"><a class="current reference internal" href="#">Compiling LLM models from Huggingface</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../_rendered_examples/dynamo/torch_compile_stable_diffusion.html">Compiling Stable Diffusion model using the <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code> backend</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../_rendered_examples/dynamo/torch_export_flux_dev.html">Compiling FLUX.1-dev model using the Torch-TensorRT dynamo backend</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../_rendered_examples/dynamo/mutable_torchtrt_module_example.html">Mutable Torch TensorRT Module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../_rendered_examples/dynamo/torch_compile_stable_diffusion.html">Example: Compiling Stable Diffusion with torch.compile</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../_rendered_examples/dynamo/torch_export_flux_dev.html">Example: Compiling FLUX.1-dev with the dynamo backend</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../_rendered_examples/dynamo/mutable_torchtrt_module_example.html">Example: Mutable Torch TensorRT Module</a></li>
 </ul>
 </details></li>
 <li class="toctree-l1 has-children"><a class="reference internal" href="../extensibility/index.html">Extensibility</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
@@ -438,8 +444,8 @@ document.write(`
 <li class="toctree-l3"><a class="reference internal" href="../extensibility/converters/dynamo_converters.html">Writing Dynamo Converters</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../extensibility/converters/converter_registry.html">Converter Registry Internals</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../extensibility/converters/impl_subpackage.html">The <code class="docutils literal notranslate"><span class="pre">impl/</span></code> Building-Block Library</a></li>
-<li class="toctree-l3"><a class="reference internal" href="../_rendered_examples/dynamo/auto_generate_converters.html">Automatically Generate a Converter for a Custom Kernel</a></li>
-<li class="toctree-l3"><a class="reference internal" href="../_rendered_examples/dynamo/converter_overloading.html">Overloading Torch-TensorRT Converters with Custom Converters</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../_rendered_examples/dynamo/auto_generate_converters.html">Example: Auto-generate a Converter for a Custom Kernel</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../_rendered_examples/dynamo/converter_overloading.html">Example: Overloading Converters with Custom Converters</a></li>
 </ul>
 </details></li>
 <li class="toctree-l2 has-children"><a class="reference internal" href="../extensibility/lowering/index.html">Lowering Passes</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
@@ -448,8 +454,8 @@ document.write(`
 </details></li>
 <li class="toctree-l2 has-children"><a class="reference internal" href="../extensibility/plugins/index.html">Plugins</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
 <li class="toctree-l3"><a class="reference internal" href="../extensibility/plugins/plugins.html">Plugin System</a></li>
-<li class="toctree-l3"><a class="reference internal" href="../_rendered_examples/dynamo/auto_generate_plugins.html">Automatically Generate a Plugin for a Custom Kernel</a></li>
-<li class="toctree-l3"><a class="reference internal" href="../_rendered_examples/dynamo/custom_kernel_plugins.html">Using Custom Kernels within TensorRT Engines with Torch-TensorRT</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../_rendered_examples/dynamo/auto_generate_plugins.html">Example: Auto-generate a Plugin for a Custom Kernel</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../_rendered_examples/dynamo/custom_kernel_plugins.html">Example: Using Custom Kernels within TensorRT Engines</a></li>
 <li class="toctree-l3"><a class="reference internal" href="../_rendered_examples/dynamo/aot_plugin.html">Automatically Generate a TensorRT AOT Plugin</a></li>
 
 
@@ -457,7 +463,7 @@ document.write(`
 
 
 
-<li class="toctree-l3"><a class="reference internal" href="../_rendered_examples/dynamo/nvrtc_aot_plugin.html">Using Custom Kernels with NVRTC in TensorRT AOT Plugins</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../_rendered_examples/dynamo/nvrtc_aot_plugin.html">Example: Custom Kernels with NVRTC in TensorRT AOT Plugins</a></li>
 </ul>
 </details></li>
 </ul>
@@ -465,40 +471,40 @@ document.write(`
 <li class="toctree-l1 has-children"><a class="reference internal" href="../resource_memory/index.html">Resource &amp; Memory Management</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
 <li class="toctree-l2"><a class="reference internal" href="../resource_memory/resource_management.html">Resource Management</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../resource_memory/engine_cache.html">Engine Caching</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../_rendered_examples/dynamo/engine_caching_example.html">Engine Caching</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../_rendered_examples/dynamo/engine_caching_bert_example.html">Engine Caching (BERT)</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../_rendered_examples/dynamo/weight_streaming_example.html">Weight Streaming</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../_rendered_examples/dynamo/dynamic_memory_allocation.html">Dynamic Memory Allocation</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../_rendered_examples/dynamo/low_cpu_memory_compilation.html">Low CPU Memory Compilation Example</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../_rendered_examples/dynamo/engine_caching_example.html">Example: Engine Caching</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../_rendered_examples/dynamo/engine_caching_bert_example.html">Example: Engine Caching (BERT)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../_rendered_examples/dynamo/weight_streaming_example.html">Example: Weight Streaming</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../_rendered_examples/dynamo/dynamic_memory_allocation.html">Example: Dynamic Memory Allocation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../_rendered_examples/dynamo/low_cpu_memory_compilation.html">Example: Low CPU Memory Compilation</a></li>
 </ul>
 </details></li>
 <li class="toctree-l1 has-children"><a class="reference internal" href="../compilation_analysis/index.html">Compilation &amp; Graph Analysis</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
 <li class="toctree-l2"><a class="reference internal" href="../compilation_analysis/trace.html">Tracing Models with <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.dynamo.trace</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="../compilation_analysis/dryrun.html">Dryrun Mode</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../_rendered_examples/dynamo/hierarchical_partitioner_example.html">Hierarchical Partitioner Example</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../_rendered_examples/dynamo/hierarchical_partitioner_example.html">Example: Hierarchical Partitioner</a></li>
 </ul>
 </details></li>
 <li class="toctree-l1 has-children"><a class="reference internal" href="../weight_refit/index.html">Weight Refitting &amp; LoRA</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
 <li class="toctree-l2"><a class="reference internal" href="../weight_refit/refit.html">Refitting TensorRT Engines with Updated Weights</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../_rendered_examples/dynamo/refit_engine_example.html">Refitting Torch-TensorRT Programs with New Weights</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../_rendered_examples/dynamo/refit_engine_example.html">Example: Refitting Programs with New Weights</a></li>
 </ul>
 </details></li>
 <li class="toctree-l1 has-children"><a class="reference internal" href="../runtime_opt/index.html">Runtime Optimization</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
 <li class="toctree-l2"><a class="reference internal" href="../runtime_opt/cuda_graphs.html">CUDAGraphs and the Output Allocator</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../_rendered_examples/dynamo/torch_export_cudagraphs.html">Torch Export with Cudagraphs</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../_rendered_examples/dynamo/pre_allocated_output_example.html">Pre-allocated output buffer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../_rendered_examples/dynamo/torch_export_cudagraphs.html">Example: Torch Export with Cudagraphs</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../_rendered_examples/dynamo/pre_allocated_output_example.html">Example: Pre-allocated output buffer</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../runtime_opt/python_runtime.html">Python Runtime</a></li>
 </ul>
 </details></li>
 <li class="toctree-l1 has-children"><a class="reference internal" href="../deployment/index.html">Deployment</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
 <li class="toctree-l2"><a class="reference internal" href="../deployment/serving_torch_tensorrt_with_triton.html">Serving a Torch-TensorRT model with Triton</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../deployment/cross_compile_windows.html">Cross-Compiling for Windows</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../_rendered_examples/dynamo/cross_runtime_compilation_for_windows.html">Cross runtime compilation for windows example</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../_rendered_examples/dynamo/cross_runtime_compilation_for_windows.html">Example: Cross-runtime Compilation for Windows</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../deployment/distributed_inference.html">Distributed Inference</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../deployment/complex_tensors.html">Complex Tensor Support</a></li>
 </ul>
 </details></li>
-<li class="toctree-l1 has-children"><a class="reference internal" href="../_rendered_examples/distributed_inference/index.html">Distributed Inference</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../_rendered_examples/distributed_inference/index.html">Example: Distributed Inference</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
 <li class="toctree-l2"><a class="reference internal" href="../_rendered_examples/distributed_inference/data_parallel_stable_diffusion.html">Torch-TensorRT Distributed Inference</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../_rendered_examples/distributed_inference/data_parallel_gpt2.html">Torch-TensorRT Distributed Inference</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../_rendered_examples/distributed_inference/tensor_parallel_simple_example.html">Tensor Parallel Distributed Inference with Torch-TensorRT</a></li>

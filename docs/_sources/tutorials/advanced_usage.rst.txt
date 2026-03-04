@@ -14,5 +14,5 @@ dynamic shapes, weight streaming, debugging, and more.
    weight_refit/index
    runtime_opt/index
    deployment/index
-   _rendered_examples/distributed_inference/index
+   Example: Distributed Inference <_rendered_examples/distributed_inference/index>
    ../indices/supported_ops

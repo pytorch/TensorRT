@@ -9,8 +9,8 @@ dynamic memory allocation, and low-CPU-memory compilation.
 
    resource_management
    engine_cache
-   ../_rendered_examples/dynamo/engine_caching_example
-   ../_rendered_examples/dynamo/engine_caching_bert_example
-   ../_rendered_examples/dynamo/weight_streaming_example
-   ../_rendered_examples/dynamo/dynamic_memory_allocation
-   ../_rendered_examples/dynamo/low_cpu_memory_compilation
+   Example: Engine Caching <../_rendered_examples/dynamo/engine_caching_example>
+   Example: Engine Caching (BERT) <../_rendered_examples/dynamo/engine_caching_bert_example>
+   Example: Weight Streaming <../_rendered_examples/dynamo/weight_streaming_example>
+   Example: Dynamic Memory Allocation <../_rendered_examples/dynamo/dynamic_memory_allocation>
+   Example: Low CPU Memory Compilation <../_rendered_examples/dynamo/low_cpu_memory_compilation>

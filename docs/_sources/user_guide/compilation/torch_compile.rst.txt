@@ -31,7 +31,7 @@ Customizable Settings
 .. autoclass:: CompilationSettings
 
 Custom Setting Usage
-^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^
 
 .. code-block:: python
 

@@ -10,4 +10,4 @@ See also :ref:`torch_tensorrt_logging_py` for the logging API reference.
    troubleshooting
    debugger
    capture_and_replay
-   ../tutorials/_rendered_examples/dynamo/debugger_example
+   Example: Debugging Torch-TensorRT Compilation <../tutorials/_rendered_examples/dynamo/debugger_example>

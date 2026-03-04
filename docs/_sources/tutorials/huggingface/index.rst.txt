@@ -10,6 +10,6 @@ the Mutable Torch-TensorRT Module.
    :maxdepth: 1
 
    compile_hf_models
-   ../_rendered_examples/dynamo/torch_compile_stable_diffusion
-   ../_rendered_examples/dynamo/torch_export_flux_dev
-   ../_rendered_examples/dynamo/mutable_torchtrt_module_example
+   Example: Compiling Stable Diffusion with torch.compile <../_rendered_examples/dynamo/torch_compile_stable_diffusion>
+   Example: Compiling FLUX.1-dev with the dynamo backend <../_rendered_examples/dynamo/torch_export_flux_dev>
+   Example: Mutable Torch TensorRT Module <../_rendered_examples/dynamo/mutable_torchtrt_module_example>
