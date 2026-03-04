@@ -3,12 +3,42 @@
 Plugin System
 =============
 
-Torch-TensorRT's plugin system lets you compile custom PyTorch ops — registered via
-``torch.library`` — into TensorRT engines using TRT's
-`Quick Deployable Plugin (QDP) <https://docs.nvidia.com/deeplearning/tensorrt/developer-guide/index.html#extending-tensorrt-with-custom-layers>`_
-API (requires TensorRT ≥ 10.7).
+Torch-TensorRT's plugin system lets you run custom kernels *inside* a TensorRT engine,
+avoiding graph breaks and their associated overhead. There are three main approaches
+depending on your kernel language and performance requirements:
 
-The flow is:
+.. list-table::
+   :widths: 20 25 15 40
+   :header-rows: 1
+
+   * - Approach
+     - Kernel language
+     - Execution
+     - Example
+   * - QDP auto-generate (JIT)
+     - Triton
+     - JIT callback into Python at runtime
+     - :ref:`auto_generate_plugins`
+   * - QDP auto-generate (AOT)
+     - Triton
+     - Pre-compiled PTX embedded in engine
+     - :ref:`aot_plugin`
+   * - QDP auto-generate (AOT)
+     - CUDA C++ via NVRTC
+     - Pre-compiled PTX embedded in engine
+     - :ref:`nvrtc_aot_plugin`
+   * - Manual (legacy)
+     - Triton / any
+     - JIT callback into Python at runtime
+     - :ref:`custom_kernel_plugins`
+
+The **QDP (Quick Deployable Plugin)** path (TensorRT ≥ 10.7) is the recommended
+approach. It uses ``torch.library`` to register your custom op and
+``_generate_plugin_converter`` to automatically create the Torch-TensorRT converter.
+The **manual** path requires writing both the TRT plugin and the converter by hand,
+and is retained for compatibility with older workflows.
+
+The flow for the QDP path is:
 
 1. Register a custom op with ``torch.library`` and implement it as a TRT QDP plugin.
 2. Call ``_generate_plugin_converter`` to automatically create a Torch-TensorRT
@@ -85,8 +115,12 @@ Parameters
 
 ----
 
-For complete end-to-end examples see :ref:`auto_generate_plugins` (Triton kernel, JIT plugin)
-and :ref:`aot_plugin` (AOT-compiled plugin for serialized engines).
+For complete end-to-end examples see:
+
+* :ref:`auto_generate_plugins` — Triton kernel, QDP JIT plugin
+* :ref:`aot_plugin` — Triton kernel, QDP AOT plugin (pre-compiled PTX, no Python overhead at runtime)
+* :ref:`nvrtc_aot_plugin` — CUDA C++ kernel compiled with NVRTC, QDP AOT plugin
+* :ref:`custom_kernel_plugins` — manual plugin + converter registration (legacy approach)
 
 ----
 

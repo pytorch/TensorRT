@@ -9,4 +9,4 @@ during compilation.
 
    trace
    dryrun
-   ../_rendered_examples/dynamo/hierarchical_partitioner_example
+   Example: Hierarchical Partitioner <../_rendered_examples/dynamo/hierarchical_partitioner_example>

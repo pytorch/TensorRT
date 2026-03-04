@@ -14,5 +14,5 @@ correctly, handle unsupported operators, and deploy on specialized hardware (DLA
    serialized_engine
    aot_inductor
    mutable_module
-   ../../tutorials/_rendered_examples/dynamo/save_dynamic_shapes_example
-   ../../tutorials/_rendered_examples/dynamo/save_dynamic_shapes_both_methods
+   Example: Saving and Loading Models with Dynamic Shapes <../../tutorials/_rendered_examples/dynamo/save_dynamic_shapes_example>
+   Example: Saving Models with Dynamic Shapes - Both Methods <../../tutorials/_rendered_examples/dynamo/save_dynamic_shapes_both_methods>

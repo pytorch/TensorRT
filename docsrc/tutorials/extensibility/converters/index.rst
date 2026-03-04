@@ -10,5 +10,5 @@ to TensorRT layers.
    dynamo_converters
    converter_registry
    impl_subpackage
-   ../../_rendered_examples/dynamo/auto_generate_converters
-   ../../_rendered_examples/dynamo/converter_overloading
+   Example: Auto-generate a Converter for a Custom Kernel <../../_rendered_examples/dynamo/auto_generate_converters>
+   Example: Overloading Converters with Custom Converters <../../_rendered_examples/dynamo/converter_overloading>
