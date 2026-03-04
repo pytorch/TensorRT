@@ -1,13 +1,14 @@
 .. _saving_models:
 
 Saving models compiled with Torch-TensorRT
-====================================
-.. currentmodule:: torch_tensorrt.dynamo
+==========================================
 
-.. automodule:: torch_tensorrt.dynamo
-   :members:
-   :undoc-members:
-   :show-inheritance:
+.. note::
+
+    ``torch.compile(backend="torch_tensorrt")`` uses **JIT compilation** — engines are
+    built on first call and cannot be saved directly. To serialize a TRT engine to disk,
+    use the AOT path: ``torch_tensorrt.compile(model, ir="dynamo", ...)`` followed by
+    ``torch_tensorrt.save()``. See `Saving torch.compile models`_ below for details.
 
 Saving models compiled with Torch-TensorRT can be done using `torch_tensorrt.save` API.
 
@@ -35,8 +36,8 @@ Here's an example usage
     model = MyModel().eval().cuda()
     inputs = [torch.randn((1, 3, 224, 224)).cuda()]
     # trt_ep is a torch.fx.GraphModule object
-    trt_gm = torch_tensorrt.compile(model, ir="dynamo", inputs=inputs)
-    torch_tensorrt.save(trt_gm, "trt.ep", inputs=inputs)
+    trt_gm = torch_tensorrt.compile(model, ir="dynamo", arg_inputs=inputs)
+    torch_tensorrt.save(trt_gm, "trt.ep", arg_inputs=inputs)
 
     # Later, you can load it and run inference
     model = torch.export.load("trt.ep").module()
@@ -75,7 +76,7 @@ Provide explicit ``dynamic_shapes`` parameter following torch.export's pattern:
     # Compile with dynamic input specifications
     trt_gm = torch_tensorrt.dynamo.compile(
         exp_program,
-        inputs=[torch_tensorrt.Input(
+        arg_inputs=[torch_tensorrt.Input(
             min_shape=(1, 3, 224, 224),
             opt_shape=(8, 3, 224, 224),
             max_shape=(32, 3, 224, 224),
@@ -119,7 +120,7 @@ dynamic shapes will be inferred automatically:
     ]
 
     # Compile with Torch-TensorRT
-    trt_gm = torch_tensorrt.compile(model, ir="dynamo", inputs=inputs)
+    trt_gm = torch_tensorrt.compile(model, ir="dynamo", arg_inputs=inputs)
 
     # Save with Input objects - dynamic_shapes inferred automatically!
     torch_tensorrt.save(
@@ -192,13 +193,12 @@ Here's an example usage
     model = torch_tensorrt.load(<file_path>).module()
     model(*inputs)
 
-b) PT2 Format
+b) PT2 Format (AOTInductor)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-PT2 is a new format that allows models to be run outside of Python in the future. It utilizes `AOTInductor <https://docs.pytorch.org/docs/main/torch.compiler_aot_inductor.html>`_
-to generate kernels for components that will not be run in TensorRT.
-
-Here's an example on how to save and load Torch-TensorRT Module using AOTInductor in Python
+PT2 packages the model using `AOTInductor <https://docs.pytorch.org/docs/main/torch.compiler_aot_inductor.html>`_,
+which compiles non-TRT subgraphs into native CUDA kernels. The resulting ``.pt2`` file
+can be loaded in Python or C++ without a Torch-TensorRT runtime dependency.
 
 .. code-block:: python
 
@@ -207,10 +207,75 @@ Here's an example on how to save and load Torch-TensorRT Module using AOTInducto
 
     model = MyModel().eval().cuda()
     inputs = [torch.randn((1, 3, 224, 224)).cuda()]
-    # trt_ep is a torch.fx.GraphModule object
-    trt_gm = torch_tensorrt.compile(model, ir="dynamo", inputs=inputs)
-    torch_tensorrt.save(trt_gm, "trt.pt2", arg_inputs=inputs, output_format="aot_inductor", retrace=True)
+    trt_gm = torch_tensorrt.compile(model, ir="dynamo", arg_inputs=inputs)
+    torch_tensorrt.save(trt_gm, "trt.pt2", arg_inputs=inputs,
+                        output_format="aot_inductor", retrace=True)
 
-    # Later, you can load it and run inference
+    # Load without Torch-TensorRT at inference time
     model = torch._inductor.aoti_load_package("trt.pt2")
     model(*inputs)
+
+For dynamic shapes, C++ deployment, and a full comparison with the ExportedProgram format,
+see :ref:`aot_inductor`.
+
+
+Saving torch.compile models
+-----------------------------
+
+``torch.compile(backend="torch_tensorrt")`` is a **JIT** path — TRT engines are built
+lazily on the first call and live in memory only. There is no direct way to call
+``torch_tensorrt.save()`` on a ``torch.compile``-compiled model.
+
+**Workaround: switch to the AOT path**
+
+Replace ``torch.compile`` with ``torch_tensorrt.compile(ir="dynamo")`` to get a
+serializable ``torch.fx.GraphModule``:
+
+.. code-block:: python
+
+    import torch
+    import torch_tensorrt
+
+    model = MyModel().eval().cuda()
+    inputs = [torch.randn((1, 3, 224, 224)).cuda()]
+
+    # JIT path — NOT serializable
+    # jit_model = torch.compile(model, backend="torch_tensorrt", ...)
+
+    # AOT path — produces a serializable GraphModule
+    trt_gm = torch_tensorrt.compile(
+        model,
+        ir="dynamo",
+        arg_inputs=inputs,
+        use_explicit_typing=True,
+    )
+
+    # Save to disk
+    torch_tensorrt.save(trt_gm, "model.ep", arg_inputs=inputs)
+
+    # Reload and run — no recompilation needed
+    loaded = torch_tensorrt.load("model.ep").module()
+    output = loaded(*inputs)
+
+The ``ir="dynamo"`` path supports all the same compilation options as
+``torch.compile(backend="torch_tensorrt")``. The key differences are:
+
+.. list-table::
+   :widths: 30 35 35
+   :header-rows: 1
+
+   * - Feature
+     - ``torch.compile`` (JIT)
+     - ``ir="dynamo"`` (AOT)
+   * - Compilation timing
+     - On first call
+     - Explicit compile step
+   * - Auto-recompile on shape change
+     - Yes
+     - No (fixed shapes unless dynamic Input used)
+   * - Serializable to disk
+     - No
+     - Yes (``torch_tensorrt.save``)
+   * - C++ deployment
+     - No
+     - Yes (via ExportedProgram or PT2 format)

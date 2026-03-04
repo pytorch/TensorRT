@@ -37,7 +37,12 @@ All that is required for a converter is the key.
 
 The function body is responsible for taking the current state of the network and adding the next subgraph to perform the op specified in the decorator with TensorRT operations.
 The function is provided arguments as the native PyTorch op would be provided with the added case of numpy arrays for frozen Tensor attributes or TensorRT ITensors which are output Tensors of previous nodes, corresponding to edges/output Tensors of intermediate operations in the graph.
-To determine the types expected as well as the return type of the converter, look at the definition of the op being converted. In the case of ``aten`` operations, this file will be the source of truth: https://github.com/pytorch/pytorch/blob/main/aten/src/ATen/native/native_functions.yaml
+To determine the types expected as well as the return type of the converter, look at the
+definition of the op being converted. In the case of ``aten`` operations,
+`native_functions.yaml <https://github.com/pytorch/pytorch/blob/main/aten/src/ATen/native/native_functions.yaml>`_
+is the source of truth. The
+`Core ATen IR <https://docs.pytorch.org/docs/stable/user_guide/torch_compiler/torch.compiler_ir.html>`_
+documentation describes which ops belong to the core opset that Torch-TensorRT targets.
 Since many converters a developer may write are a composition of lower level operators, instead of needing to implement the converter in raw TensorRT, the ``torch_tensorrt.dynamo.conversion.impl`` subpackage contains many implementations of operations that can be chained to create a TensorRT subgraph.
 
     * ``ctx`` : The current state of the compiler. Converters primarily will manipulate ctx.net which is the ``tensorrt.INetworkDefinition`` being constructed. Additional metadata including user provided settings is available in this struct as well.

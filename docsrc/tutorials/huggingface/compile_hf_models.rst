@@ -20,7 +20,7 @@ The ``tools/llm`` directory provides the following tools to compile LLM models f
 * **run_llm.py**: Main entry point for model compilation, generating outputs, and benchmarking
 * **run_vlm.py**: Entry point for compiling and benchmarking Visual Language Models (VLMs)
 * **Static Cache Utilities**: ``static_cache_v1.py`` and ``static_cache_v2.py`` for KV cache optimization
-* **SDPA Attention**: ``sdpa_converter.py`` and ``register_sdpa.py`` for registering scaled dot-product attention converter and lowering pass.
+* **SDPA Attention**: ``sdpa_converter.py`` and ``register_sdpa.py`` for registering a scaled dot-product attention converter and lowering pass.
 * **Testing Components**: Model-specific test files for validation
 * **Utility Functions**: ``utils.py`` and ``cache_utils.py`` for common operations
 
@@ -216,7 +216,7 @@ The above code is actually implemented as a FX graph transformation pass. We reg
 Static Cache v2
 ^^^^^^^^^^^^^^^^
 
-The ``static_cache_v2.py`` is similar to ``static_cache_v1.py`` but it uses less number of slice operations. It implements KV cache in the model graph as follows: 
+The ``static_cache_v2.py`` is similar to ``static_cache_v1.py`` but uses fewer slice operations. It implements KV cache in the model graph as follows: 
 
 .. code-block:: python
 
@@ -236,8 +236,8 @@ The ``static_cache_v2.py`` is similar to ``static_cache_v1.py`` but it uses less
             return attn_output, new_key_cache, new_value_cache
 
 In the above code, we concatenate the existing key/value cache with current key/value of the token. We use this to directly compute the attention and update the key/value cache inserting the current key/value.
-The above code is actually implemented as a FX graph transformation pass. We register it as a Torch-TensorRT lowering pass using the decorator ``@_aten_lowering_pass`` when we import the ``static_cache_v1.py`` module.
-The definitons of ``start_idx`` and ``end_idx`` are the same as ``static_cache_v1.py``.
+The above code is actually implemented as a FX graph transformation pass. We register it as a Torch-TensorRT lowering pass using the decorator ``@_aten_lowering_pass`` when we import the ``static_cache_v2.py`` module.
+The definitions of ``start_idx`` and ``end_idx`` are the same as ``static_cache_v1.py``.
 
 After the model is compiled with static KV cache, the input signature of the model is changed. The new input signature is ``(input_ids, position_ids, key_cache_0, value_cache_0, ..., start_idx, end_idx)``. 
 The number of key/value cache tensors is equal to the number of attention heads in the model. We can use the ``generate_with_static_cache`` function to generate the outputs.

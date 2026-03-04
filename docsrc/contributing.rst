@@ -8,8 +8,8 @@ understanding the system architecture, and managing resources.
    :maxdepth: 1
 
    contributors/system_overview
-   contributors/dynamo_converters
-   contributors/writing_dynamo_aten_lowering_passes
+   contributors/phases
+   contributors/lowering_passes
+   contributors/observer
    contributors/ts_converters
    contributors/useful_links
-   contributors/resource_management

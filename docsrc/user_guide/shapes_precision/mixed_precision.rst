@@ -41,7 +41,7 @@ the kernels for layers which result in the best performance (i.e., weak typing i
     inputs = [torch.randn((1, 10), dtype=torch.float32).cuda()]
     mod = MyModule().eval().cuda()
     ep = torch.export.export(mod, tuple(inputs))
-    trt_gm = torch_tensorrt.dynamo.compile(ep, inputs=inputs)
+    trt_gm = torch_tensorrt.dynamo.compile(ep, arg_inputs=inputs)
 
     # Debug log info
     # Layers:
@@ -60,7 +60,7 @@ the ``linear2`` layer will run in FP16 and other layers will run in FP32 as show
     inputs = [torch.randn((1, 10), dtype=torch.float32).cuda()]
     mod = MyModule().eval().cuda()
     ep = torch.export.export(mod, tuple(inputs))
-    trt_gm = torch_tensorrt.dynamo.compile(ep, inputs=inputs, use_explicit_typing=True)
+    trt_gm = torch_tensorrt.dynamo.compile(ep, arg_inputs=inputs, use_explicit_typing=True)
 
     # Debug log info
     # Layers:
@@ -119,9 +119,9 @@ For example,
     mod = MyModule().eval().cuda()
     ep = torch.export.export(mod, tuple(inputs))
     trt_gm = torch_tensorrt.dynamo.compile(
-        ep, 
-        inputs=inputs, 
-        enable_autocast=True, 
+        ep,
+        arg_inputs=inputs,
+        enable_autocast=True,
         use_explicit_typing=True,
         autocast_low_precision_type=torch.float16,
         autocast_excluded_nodes={"^linear2$"},
@@ -149,7 +149,7 @@ When ``use_fp32_acc=True`` is set, Torch-TensorRT will attempt to use FP32 accum
     ep = torch.export.export(mod, tuple(inputs))
     trt_gm = torch_tensorrt.dynamo.compile(
         ep,
-        inputs=inputs,
+        arg_inputs=inputs,
         use_fp32_acc=True,
         use_explicit_typing=True,  # Explicit typing must be enabled
     )

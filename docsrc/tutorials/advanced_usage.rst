@@ -7,6 +7,12 @@ dynamic shapes, weight streaming, debugging, and more.
 .. toctree::
    :maxdepth: 2
 
-   _rendered_examples/dynamo/index
+   huggingface/index
+   extensibility/index
+   resource_memory/index
+   compilation_analysis/index
+   weight_refit/index
+   runtime_opt/index
+   deployment/index
    _rendered_examples/distributed_inference/index
-   serving_torch_tensorrt_with_triton
+   ../indices/supported_ops

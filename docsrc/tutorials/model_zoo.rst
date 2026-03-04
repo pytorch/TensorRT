@@ -5,33 +5,26 @@ End-to-end compilation examples for popular models across vision, language, and
 generative AI. Each example shows how to compile the model with Torch-TensorRT
 and benchmark against eager PyTorch.
 
-Vision
-------
+.. toctree::
+   :maxdepth: 1
+   :caption: Vision
 
-* :doc:`ResNet (image classification) <_rendered_examples/dynamo/torch_compile_resnet_example>`
-* :doc:`BERT (transformer) <_rendered_examples/dynamo/torch_compile_transformers_example>`
+   _rendered_examples/dynamo/torch_compile_resnet_example
+   _rendered_examples/dynamo/torch_compile_transformers_example
+   _rendered_examples/dynamo/engine_caching_bert_example
 
-Generative AI
--------------
+.. toctree::
+   :maxdepth: 1
+   :caption: Generative AI
 
-* :doc:`GPT-2 (text generation) <_rendered_examples/dynamo/torch_compile_gpt2>`
-* :doc:`Stable Diffusion (image generation) <_rendered_examples/dynamo/torch_compile_stable_diffusion>`
-* :doc:`FLUX.1-dev (image generation) <_rendered_examples/dynamo/torch_export_flux_dev>`
-* :doc:`SAM2 (segmentation) <_rendered_examples/dynamo/torch_export_sam2>`
+   _rendered_examples/dynamo/torch_compile_gpt2
+   _rendered_examples/dynamo/torch_export_sam2
+   _rendered_examples/dynamo/llama2_flashinfer_rmsnorm
 
-HuggingFace Models
-------------------
+For diffusion models see :doc:`HuggingFace Models <huggingface/index>`.
 
-* :doc:`Compiling HuggingFace models <compile_hf_models>`
+.. toctree::
+   :maxdepth: 1
+   :caption: Notebooks
 
-Distributed Inference
----------------------
-
-* :doc:`Data-parallel GPT-2 <_rendered_examples/distributed_inference/data_parallel_gpt2>`
-* :doc:`Data-parallel Stable Diffusion <_rendered_examples/distributed_inference/data_parallel_stable_diffusion>`
-* :doc:`Tensor-parallel simple example <_rendered_examples/distributed_inference/tensor_parallel_simple_example>`
-
-Notebooks
----------
-
-* :doc:`Jupyter notebooks <notebooks>`
+   notebooks

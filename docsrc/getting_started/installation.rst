@@ -237,7 +237,6 @@ Platform-specific Installation
 
    jetpack
    tensorrt_rtx
-   capture_and_replay
 
 
 

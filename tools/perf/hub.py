@@ -140,13 +140,9 @@ def main():
             if manifest["version"] == torch_version:
                 version_matches = True
             else:
-                print(
-                    "Torch version: {} mismatches \
+                print("Torch version: {} mismatches \
                 with manifest's version: {}. Re-downloading \
-                all models".format(
-                        torch_version, manifest["version"]
-                    )
-                )
+                all models".format(torch_version, manifest["version"]))
 
                 # Overwrite the manifest version as current torch version
                 manifest["version"] = torch_version

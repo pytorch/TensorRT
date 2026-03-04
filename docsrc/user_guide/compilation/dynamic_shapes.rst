@@ -134,7 +134,7 @@ The dynamic shape specifications will be inferred automatically:
     ]
 
     # Compile with dynamic shapes
-    trt_model = torch_tensorrt.compile(model, ir="dynamo", inputs=inputs)
+    trt_model = torch_tensorrt.compile(model, ir="dynamo", arg_inputs=inputs)
 
     # Save - dynamic shapes inferred automatically!
     torch_tensorrt.save(trt_model, "model.ep", arg_inputs=inputs)
@@ -173,7 +173,7 @@ using ``torch.export.Dim``:
     # Compile
     trt_model = torch_tensorrt.dynamo.compile(
         exp_program,
-        inputs=[torch_tensorrt.Input(
+        arg_inputs=[torch_tensorrt.Input(
             min_shape=(1, 3, 224, 224),
             opt_shape=(8, 3, 224, 224),
             max_shape=(32, 3, 224, 224),
@@ -213,7 +213,7 @@ Both methods support multiple dynamic dimensions (e.g., dynamic batch, height, a
         )
     ]
 
-    trt_model = torch_tensorrt.compile(model, ir="dynamo", inputs=inputs)
+    trt_model = torch_tensorrt.compile(model, ir="dynamo", arg_inputs=inputs)
     torch_tensorrt.save(trt_model, "model.ep", arg_inputs=inputs)  # All 3 dims inferred!
 
     # Load and test with various sizes
