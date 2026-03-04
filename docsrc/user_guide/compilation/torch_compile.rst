@@ -46,7 +46,7 @@ Custom Setting Usage
                                              "optimization_level": 4,
                                              "use_python_runtime": False,})
 
-.. note:: Quantization/INT8 support is slated for a future release; currently, we support FP16 and FP32 precision layers.
+.. note:: Supported precisions include FP32, FP16, BF16, INT8, FP8, and FP4. INT8/FP8 quantization requires the `ModelOpt <https://github.com/NVIDIA/TensorRT-Model-Optimizer>`_ library and a quantized model. FP4 requires TensorRT >= 10.8.0.
 
 Compilation
 -----------------

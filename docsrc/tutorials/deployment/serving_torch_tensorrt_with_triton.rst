@@ -55,8 +55,8 @@ With the container we can export the model in to the correct directory in our Tr
 
   # Compile with Torch TensorRT;
   trt_model = torch_tensorrt.compile(model,
-      inputs= [torch_tensorrt.Input((1, 3, 224, 224))],
-      enabled_precisions= {torch_tensorrt.dtype.f16}
+      arg_inputs= [torch_tensorrt.Input((1, 3, 224, 224))],
+      use_explicit_typing=True  # enabled_precisions deprecated; use model.half() for FP16
   )
 
   ts_trt_model = torch.jit.trace(trt_model, torch.rand(1, 3, 224, 224).to("cuda"))

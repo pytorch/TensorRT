@@ -1,5 +1,5 @@
-Introduction
-============
+Capture and Replay
+==================
 
 This toolchain captures TensorRT network creation and build parameters at runtime via a shim, then deterministically replays them to reproduce an engine build. Use it to debug or reproduce builds independent of the originating framework.
 
@@ -45,5 +45,3 @@ Notes
 - Ensure the ``libnvinfer.so`` used by the shim matches the TensorRT version in your environment.
 - If multiple TensorRT versions are installed, prefer absolute paths as shown above.
 - Currently, it is not supported to capture multiple engines, in case of graph break, only the first engine will be captured.
-
-

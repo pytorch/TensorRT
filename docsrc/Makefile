@@ -44,6 +44,7 @@ html:
 	mkdir -p $(DESTDIR)
 	cp -r $(BUILDDIR)/html/* $(DESTDIR)
 	touch $(DESTDIR)/.nojekyll
+	python3 generate_versions.py ../docs/versions.json
 
 .PHONY: help clean check_clean html Makefile
 

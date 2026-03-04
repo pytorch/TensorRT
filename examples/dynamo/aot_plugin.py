@@ -2,31 +2,30 @@
 .. _aot_plugin:
 Automatically Generate a TensorRT AOT Plugin
 ===================================================================
-We are going to demonstrate how to automatically generate a plugin for a custom kernel using Torch-TensorRT using
-the new Python based plugin system in TensorRT 10.7.
 
-Torch-TensorRT supports falling back to PyTorch implementations of operations in the case that Torch-TensorRT
-does not know how to compile them in TensorRT. However, this comes at the cost of a graph break and will reduce the performance of the model.
-The easiest way to fix lack of support for ops is by adding a decomposition (see:
-`Writing lowering passes for the Dynamo frontend <https://pytorch.org/TensorRT/contributors/writing_dynamo_aten_lowering_passes.html>`_) - which defines the operator
-in terms of PyTorch ops that are supported in Torch-TensorRT or a converter (see:
-`Writing converters for the Dynamo frontend <https://pytorch.org/TensorRT/contributors/dynamo_converters.html>`_) - which defines the operator in terms of TensorRT operators.
+This example builds on :ref:`auto_generate_plugins` by showing the *AOT* (Ahead-of-Time)
+plugin path. Instead of calling back into Python at TRT engine runtime (JIT), the
+Triton kernel is compiled to PTX at *plugin registration time* and the binary is
+embedded in the TRT engine. This eliminates all Python overhead during inference.
 
-In some cases there isn't a great way to do either of these, perhaps because the operator is a custom kernel that is not part of standard PyTorch or
-TensorRT cannot support it natively.
+**JIT vs AOT — the key difference:**
 
-For these cases, it is possible to use a TensorRT plugin to replace the operator **inside** the TensorRT engine, thereby avoiding
-the performance and resource overhead from a graph break.
+* **JIT plugin** (``generate_plugin`` default): TRT holds a Python callback. At runtime
+  it converts TRT tensor handles to ``torch.Tensor``, calls your op, copies results
+  back. Simple, but adds Python overhead per inference call.
 
-Previously this involved a complex process in not only building a performant kernel but setting it up to run in TensorRT (see: `Using Custom Kernels within TensorRT Engines with Torch-TensorRT <https://pytorch.org/TensorRT/tutorials/_rendered_examples/dynamo/custom_kernel_plugins.html>`_).
-As of TensorRT 10.7, there is a new Python native plugin system which greatly streamlines this process. This
-plugin system also allows Torch-TensorRT to automatically generate the necessary conversion code to convert the
-operation in PyTorch to TensorRT.
+* **AOT plugin** (this example): At registration time ``@trtp.aot_impl`` compiles the
+  Triton kernel to PTX/CUBIN and returns the binary plus kernel launch parameters.
+  TRT embeds that binary in the engine. At runtime TRT launches the kernel directly —
+  no Python, no tensor conversion, no copying. Also required for serialized engines
+  that will run without a Python environment (e.g. C++ deployment).
 
-In addition, Torch-TensorRT provides automatic generation of TensorRT plugin feature (see: `Automatically Generate a Plugin for a Custom Kernel <https://docs.pytorch.org/TensorRT/tutorials/_rendered_examples/dynamo/auto_generate_plugins.html>`_).
-However, the above methods generates a JIT plugin that might not satisfy user's performance requirements.
-To support that, Torch-TensorRT provides auto generation of TensorRT AOT Plugin which raps a function to define an Ahead-of-Time (AOT) implementation for a plugin already registered.
-This provides a performance boost comparing to JIT plugin.
+**When to use AOT:**
+
+* Performance-critical inference paths.
+* Engines that must be serialized and loaded in C++.
+* Any case where you need ``use_aot_if_available=True`` and want the guarantee that
+  the AOT path is actually taken.
 """
 
 import argparse
@@ -42,6 +41,15 @@ import triton.language as tl
 trt_logger = trt.Logger(trt.Logger.VERBOSE)
 
 
+# %%
+# Step 1: Define the Triton Kernel
+# -----------------------------------------
+#
+# Same as the JIT example — the kernel is pure Triton. The difference is how it
+# gets compiled: in the JIT path ``add_one_kernel[grid](...)`` is called at runtime;
+# in the AOT path it is compiled to PTX inside ``@trtp.aot_impl`` below.
+
+
 @triton.jit
 def add_one_kernel(x_ptr, n_elements, y_ptr, BLOCK_SIZE: tl.constexpr):
     pid = tl.program_id(0)
@@ -53,23 +61,23 @@ def add_one_kernel(x_ptr, n_elements, y_ptr, BLOCK_SIZE: tl.constexpr):
     tl.store(y_ptr + offsets, output, mask=mask)
 
 
+# %%
+# Step 2: Register the PyTorch op
+# -----------------------------------------
+#
+# Identical to the JIT example. The meta-kernel (``register_fake``) is still needed:
+# TRT uses the shape-descriptor from ``@trtp.register`` (below) for graph-build-time
+# shape inference, but Dynamo's tracing and Torch-TensorRT's partitioner still need
+# the fake kernel.
+
+
 @torch.library.custom_op("my::add_one", mutates_args=())  # type: ignore[misc]
 def add_one(X: torch.Tensor) -> torch.Tensor:
-    # Ensure the tensors are on the GPU
     assert X.is_cuda
-
-    # Create output tensor
     Y = torch.empty_like(X)
-
-    # Define block size
     BLOCK_SIZE = 256
-
-    # Grid of programs
     grid = lambda meta: (triton.cdiv(X.numel(), meta["BLOCK_SIZE"]),)
-
-    # Launch the kernel
     add_one_kernel[grid](X, X.numel(), Y, BLOCK_SIZE=BLOCK_SIZE)
-
     return Y
 
 
@@ -78,9 +86,49 @@ def _(X: torch.Tensor) -> torch.Tensor:
     return X
 
 
+# %%
+# Step 3: Register the QDP Shape Descriptor
+# -----------------------------------------
+#
+# ``@trtp.register`` manually registers the plugin *shape descriptor* in TensorRT's
+# ``QDP_REGISTRY`` under the key ``"my::add_one"``. This is different from
+# ``generate_plugin``, which auto-generates the descriptor from the fake kernel.
+#
+# The function receives ``trtp.TensorDesc`` objects describing input shapes/dtypes,
+# and must return a tuple of ``trtp.TensorDesc`` for outputs.
+# ``X.like()`` means "same shape and dtype as X" — shorthand for elementwise ops.
+#
+# Registering manually here (instead of calling ``generate_plugin``) is required for
+# AOT plugins because we need to associate our own ``@trtp.aot_impl`` with the plugin
+# entry. ``generate_plugin`` would create its own JIT impl and close the entry.
+
+
 @trtp.register("my::add_one")
 def add_plugin_desc(X: trtp.TensorDesc) -> Tuple[trtp.TensorDesc]:
+    # Output has the same shape and dtype as the input.
     return X.like()
+
+
+# %%
+# Step 4: Register the AOT Implementation
+# -----------------------------------------
+#
+# ``@trtp.aot_impl`` is called **once at registration time** (not at inference time).
+# It must compile the kernel to a binary and return everything TRT needs to launch it:
+#
+# * ``compiled_kernel.metadata.name`` — the kernel function name in the PTX/CUBIN.
+# * ``compiled_kernel.asm["ptx"]`` — the PTX source string (or CUBIN bytes).
+#   TRT embeds this binary in the serialized engine.
+# * ``launch_params`` — grid/block dims and shared memory. These can be symbolic
+#   (using ``trtp.SymExprs``) so the same engine works across batch sizes.
+# * ``extra_args`` — additional scalar arguments passed at launch. Here ``N`` (number
+#   of elements) is a ``SymInt32`` that TRT evaluates from the actual input shape at
+#   runtime.
+#
+# TRT stores the compiled binary in ``QDP_REGISTRY["my::add_one"].aot_impl_func``.
+# When ``generate_plugin_converter`` is later called with ``use_aot_if_available=True``
+# it detects ``aot_impl_func is not None`` and sets ``aot=True`` on the plugin layer,
+# causing TRT to use the binary path instead of a Python callback.
 
 
 @trtp.aot_impl("my::add_one")
@@ -89,9 +137,13 @@ def add_plugin_aot_impl(
 ) -> Tuple[
     Union[str, bytes], Union[str, bytes], trtp.KernelLaunchParams, trtp.SymExprs
 ]:
+    # Choose the pointer type based on the input dtype.
     type_str = "fp32" if X.dtype == trt.float32 else "fp16"
 
     block_size = 256
+    # Compile the Triton kernel to PTX now, at registration time.
+    # ``ASTSource`` describes the kernel's input types and constexprs without
+    # running it — Triton compiles it to architecture-specific PTX/CUBIN.
     src = triton.compiler.ASTSource(
         fn=add_one_kernel,
         signature={
@@ -103,29 +155,43 @@ def add_plugin_aot_impl(
             "BLOCK_SIZE": block_size,
         },
     )
-
     compiled_kernel = triton.compile(src)
 
+    # Build symbolic launch parameters.
+    # ``X.shape_expr.numel()`` is a symbolic expression for the total number of
+    # elements — TRT will evaluate it to a concrete integer at engine runtime.
     N = X.shape_expr.numel()
     launch_params = trtp.KernelLaunchParams()
+    launch_params.grid_x = trtp.cdiv(N, block_size)  # number of thread blocks
+    launch_params.block_x = compiled_kernel.metadata.num_warps * 32  # threads per block
+    launch_params.shared_mem = compiled_kernel.metadata.shared  # bytes of shared mem
 
-    # grid dims
-    launch_params.grid_x = trtp.cdiv(N, block_size)
-    # block dims
-    launch_params.block_x = compiled_kernel.metadata.num_warps * 32
-    # shared memory
-    launch_params.shared_mem = compiled_kernel.metadata.shared
-
+    # ``extra_args`` are scalar arguments appended to the kernel's argument list at
+    # launch. Here ``n_elements`` is passed as a 32-bit symbolic integer so TRT
+    # evaluates it from the actual tensor size at runtime.
     extra_args = trtp.SymIntExprs(1)
     extra_args[0] = trtp.SymInt32(N)
 
     return (
-        compiled_kernel.metadata.name,
-        compiled_kernel.asm["ptx"],
+        compiled_kernel.metadata.name,  # kernel function name in PTX
+        compiled_kernel.asm["ptx"],  # PTX source — embedded in TRT engine
         launch_params,
         extra_args,
     )
 
+
+# %%
+# Step 5: Generate the Converter
+# -----------------------------------------
+#
+# Unlike the JIT example, we do **not** call ``generate_plugin`` here — the shape
+# descriptor and AOT impl are already registered manually above.
+# We only need the converter that bridges the Torch op to the TRT network layer.
+#
+# ``generate_plugin_converter`` finds ``"my::add_one"`` in ``QDP_REGISTRY``, sees
+# that ``aot_impl_func is not None``, and creates a converter that calls
+# ``ctx.net.add_plugin(plugin, aot=True)``. The ``aot=True`` flag instructs TRT to
+# use the pre-compiled PTX rather than a Python JIT callback at runtime.
 
 torch_tensorrt.dynamo.conversion.plugins.generate_plugin_converter(
     "my::add_one",
@@ -135,13 +201,21 @@ torch_tensorrt.dynamo.conversion.plugins.generate_plugin_converter(
 )
 
 
+# %%
+# Step 6: Compile and Run
+# -----------------------------------------
+#
+# Compilation is identical to the JIT example. The difference is what happens at
+# inference time: TRT launches the pre-compiled PTX kernel directly on the GPU with
+# no Python involvement.
+
+
 class MyModel(torch.nn.Module):
     def __init__(self):
         super().__init__()
 
     def forward(self, X: torch.Tensor) -> torch.Tensor:
         res = torch.ops.my.add_one.default(X)
-
         return res
 
 

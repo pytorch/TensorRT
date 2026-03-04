@@ -43,18 +43,21 @@ jobs:
             - name: Build Python Package
               run: |
                   python3 -m pip install --pre . --extra-index-url https://download.pytorch.org/whl/nightly/cu130
+            - name: Install uv
+              run: |
+                  curl -LsSf https://astral.sh/uv/install.sh | sh
+                  echo "$HOME/.local/bin" >> $GITHUB_PATH
             - name: Generate New Docs
               run: |
-                  cd docsrc
                   dnf clean all
                   dnf makecache --refresh
                   dnf install yum-utils -y
                   dnf config-manager --set-enabled powertools
                   dnf update --skip-broken --nobest -y
                   dnf install -y doxygen pandoc
-                  python3 -m pip install -r requirements.txt
+                  uv pip install --system -r docsrc/requirements.txt
                   python3 -c "import torch_tensorrt; print(torch_tensorrt.__version__)"
-                  make html
+                  cd docsrc && make html
                   cd ..
             - uses: stefanzweifel/git-auto-commit-action@v4
               with:
