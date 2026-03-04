@@ -15,6 +15,7 @@ You need to have CUDA, PyTorch, and TensorRT (python package is sufficient) inst
 
     * https://developer.nvidia.com/cuda
     * https://pytorch.org
+    * TensorRT 10.0 or later (TensorRT 10.12+ recommended for latest features like explicit typing)
 
 
 Installing Torch-TensorRT
@@ -208,9 +209,9 @@ A tarball with the include files and library can then be found in ``bazel-bin``
 Choosing the Right ABI
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
-For the old versions, there were two ABI options to compile Torch-TensorRT which were incompatible with each other, 
-pre-cxx11-abi and cxx11-abi. The complexity came from the different distributions of PyTorch. Fortunately, PyTorch 
-has switched to cxx11-abi for all distributions. Below is a table with general pairings of PyTorch distribution 
+For the old versions, there were two ABI options to compile Torch-TensorRT which were incompatible with each other,
+pre-cxx11-abi and cxx11-abi. The complexity came from the different distributions of PyTorch. Fortunately, PyTorch
+has switched to cxx11-abi for all distributions. Below is a table with general pairings of PyTorch distribution
 sources and the recommended commands:
 
 +-------------------------------------------------------------+----------------------------------------------------------+--------------------------------------------------------------------+
