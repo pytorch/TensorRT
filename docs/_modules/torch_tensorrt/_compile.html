@@ -9,7 +9,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>torch_tensorrt._compile &mdash; Torch-TensorRT v2.12.0.dev0+e19ea76 documentation</title>
+  <title>torch_tensorrt._compile &mdash; Torch-TensorRT v2.12.0.dev0+70c6abb documentation</title>
   
 
   
@@ -290,7 +290,7 @@
               
               
                 <div class="version">
-                  v2.12.0.dev0+e19ea76
+                  v2.12.0.dev0+70c6abb
                 </div>
               
             
@@ -492,6 +492,7 @@
 <span></span><span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">collections.abc</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">inspect</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">platform</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">warnings</span>
@@ -1063,7 +1064,9 @@
     <span class="k">return</span> <span class="n">dynamo_load_cross_compiled_exported_program</span><span class="p">(</span><span class="n">file_path</span><span class="p">)</span></div>
 
 
-<div class="viewcode-block" id="load"><a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.load">[docs]</a><span class="k">def</span><span class="w"> </span><span class="nf">load</span><span class="p">(</span><span class="n">file_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+<div class="viewcode-block" id="load"><a class="viewcode-back" href="../../py_api/torch_tensorrt.html#torch_tensorrt.load">[docs]</a><span class="k">def</span><span class="w"> </span><span class="nf">load</span><span class="p">(</span>
+    <span class="n">file_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span><span class="p">,</span> <span class="n">extra_files</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Load either a Torchscript model or ExportedProgram.</span>
 
@@ -1071,15 +1074,27 @@
 
 <span class="sd">    Arguments:</span>
 <span class="sd">        file_path (str): Path to file on the disk</span>
+<span class="sd">        extra_files (dict[str, Any]): Extra files to load with the model</span>
+
+<span class="sd">    Example:</span>
+<span class="sd">    # Load with extra files.</span>
+<span class="sd">        extra_files = {&quot;foo.txt&quot;: &quot;&quot;}  # values will be replaced with serialized data</span>
+<span class="sd">        ep = torch.export.load(&quot;exported_program.pt2&quot;, extra_files=extra_files)</span>
+<span class="sd">        print(extra_files[&quot;foo.txt&quot;])</span>
 
 <span class="sd">    Raises:</span>
 <span class="sd">        ValueError: If there is no file or the file is not either a TorchScript file or ExportedProgram file</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="k">try</span><span class="p">:</span>
-        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Loading the provided file </span><span class="si">{</span><span class="n">file_path</span><span class="si">}</span><span class="s2"> using torch.export.load()&quot;</span><span class="p">)</span>
-        <span class="n">exp_program</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">file_path</span><span class="p">)</span>
-        <span class="k">return</span> <span class="n">exp_program</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Loading the provided file </span><span class="si">{</span><span class="n">file_path</span><span class="si">}</span><span class="s2"> using torch.jit.load()&quot;</span><span class="p">)</span>
+        <span class="n">ts_module</span> <span class="o">=</span> <span class="n">function_overload_with_kwargs</span><span class="p">(</span>
+            <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">load</span><span class="p">,</span>
+            <span class="n">file_path</span><span class="p">,</span>
+            <span class="n">extra_files</span><span class="o">=</span><span class="n">extra_files</span><span class="p">,</span>
+            <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">ts_module</span>
     <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
         <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
             <span class="sa">f</span><span class="s2">&quot;Loading the provided file </span><span class="si">{</span><span class="n">file_path</span><span class="si">}</span><span class="s2"> via torch.export.load() failed with the following error&quot;</span><span class="p">,</span>
@@ -1088,9 +1103,14 @@
         <span class="k">pass</span>
 
     <span class="k">try</span><span class="p">:</span>
-        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Loading the provided file </span><span class="si">{</span><span class="n">file_path</span><span class="si">}</span><span class="s2"> using torch.jit.load()&quot;</span><span class="p">)</span>
-        <span class="n">ts_module</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">file_path</span><span class="p">)</span>
-        <span class="k">return</span> <span class="n">ts_module</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Loading the provided file </span><span class="si">{</span><span class="n">file_path</span><span class="si">}</span><span class="s2"> using torch.export.load()&quot;</span><span class="p">)</span>
+        <span class="n">exp_program</span> <span class="o">=</span> <span class="n">function_overload_with_kwargs</span><span class="p">(</span>
+            <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">load</span><span class="p">,</span>
+            <span class="n">file_path</span><span class="p">,</span>
+            <span class="n">_extra_files</span><span class="o">=</span><span class="n">extra_files</span><span class="p">,</span>
+            <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">exp_program</span>
     <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
         <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
             <span class="sa">f</span><span class="s2">&quot;Loading the provided file </span><span class="si">{</span><span class="n">file_path</span><span class="si">}</span><span class="s2"> via torch.jit.load() (after failing to load with torch.export.load()) failed with the following error&quot;</span><span class="p">,</span>
@@ -1105,6 +1125,7 @@
     <span class="n">module</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
     <span class="n">file_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span><span class="p">,</span>
     <span class="o">*</span><span class="p">,</span>
+    <span class="n">extra_files</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">output_format</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;exported_program&quot;</span><span class="p">,</span>
     <span class="n">inputs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Sequence</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span> <span class="o">|</span> <span class="n">Input</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">arg_inputs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Sequence</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span> <span class="o">|</span> <span class="n">Input</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -1336,7 +1357,17 @@
                 <span class="s2">&quot;Provided model is a torch.jit.ScriptModule but the output_format specified is not torchscript. Other output formats are not supported&quot;</span>
             <span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
-            <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">module</span><span class="p">,</span> <span class="n">file_path</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">arg_inputs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                    <span class="s2">&quot;Provided model is a torch.jit.ScriptModule, inputs or arg_inputs is not necessary during save.&quot;</span>
+                <span class="p">)</span>
+            <span class="n">function_overload_with_kwargs</span><span class="p">(</span>
+                <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">save</span><span class="p">,</span>
+                <span class="n">module</span><span class="p">,</span>
+                <span class="n">file_path</span><span class="p">,</span>
+                <span class="n">_extra_files</span><span class="o">=</span><span class="n">extra_files</span><span class="p">,</span>
+                <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
+            <span class="p">)</span>
     <span class="k">elif</span> <span class="n">module_type</span> <span class="o">==</span> <span class="n">_ModuleType</span><span class="o">.</span><span class="n">ep</span><span class="p">:</span>
         <span class="k">if</span> <span class="n">output_format</span> <span class="o">==</span> <span class="s2">&quot;torchscript&quot;</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
@@ -1348,7 +1379,14 @@
                     <span class="s2">&quot;Provided model is a torch.export.ExportedProgram, inputs or arg_inputs is not necessary during save, it uses the inputs or arg_inputs provided during export and compile&quot;</span>
                 <span class="p">)</span>
             <span class="k">if</span> <span class="n">output_format</span> <span class="o">==</span> <span class="s2">&quot;exported_program&quot;</span><span class="p">:</span>
-                <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">module</span><span class="p">,</span> <span class="n">file_path</span><span class="p">,</span> <span class="n">pickle_protocol</span><span class="o">=</span><span class="n">pickle_protocol</span><span class="p">)</span>
+                <span class="n">function_overload_with_kwargs</span><span class="p">(</span>
+                    <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">save</span><span class="p">,</span>
+                    <span class="n">module</span><span class="p">,</span>
+                    <span class="n">file_path</span><span class="p">,</span>
+                    <span class="n">pickle_protocol</span><span class="o">=</span><span class="n">pickle_protocol</span><span class="p">,</span>
+                    <span class="n">extra_files</span><span class="o">=</span><span class="n">extra_files</span><span class="p">,</span>
+                    <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
+                <span class="p">)</span>
             <span class="k">elif</span> <span class="n">output_format</span> <span class="o">==</span> <span class="s2">&quot;aot_inductor&quot;</span><span class="p">:</span>
                 <span class="n">inductor_configs</span> <span class="o">=</span> <span class="p">{}</span>
                 <span class="k">if</span> <span class="s2">&quot;inductor_configs&quot;</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">:</span>
@@ -1369,7 +1407,13 @@
             <span class="n">module_ts</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">trace</span><span class="p">(</span>
                 <span class="n">module</span><span class="p">,</span> <span class="n">arg_inputs</span><span class="p">,</span> <span class="n">example_kwarg_inputs</span><span class="o">=</span><span class="n">kwarg_inputs</span>
             <span class="p">)</span>
-            <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">module_ts</span><span class="p">,</span> <span class="n">file_path</span><span class="p">)</span>
+            <span class="n">function_overload_with_kwargs</span><span class="p">(</span>
+                <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">save</span><span class="p">,</span>
+                <span class="n">module_ts</span><span class="p">,</span>
+                <span class="n">file_path</span><span class="p">,</span>
+                <span class="n">_extra_files</span><span class="o">=</span><span class="n">extra_files</span><span class="p">,</span>
+                <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
+            <span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="k">if</span> <span class="ow">not</span> <span class="n">retrace</span><span class="p">:</span>
                 <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo._exporter</span><span class="w"> </span><span class="kn">import</span> <span class="n">export</span>
@@ -1392,8 +1436,13 @@
                     <span class="n">use_legacy_exporter</span><span class="o">=</span><span class="n">_use_legacy</span><span class="p">,</span>
                 <span class="p">)</span>
                 <span class="k">if</span> <span class="n">output_format</span> <span class="o">==</span> <span class="s2">&quot;exported_program&quot;</span><span class="p">:</span>
-                    <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">save</span><span class="p">(</span>
-                        <span class="n">exp_program</span><span class="p">,</span> <span class="n">file_path</span><span class="p">,</span> <span class="n">pickle_protocol</span><span class="o">=</span><span class="n">pickle_protocol</span>
+                    <span class="n">function_overload_with_kwargs</span><span class="p">(</span>
+                        <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">save</span><span class="p">,</span>
+                        <span class="n">exp_program</span><span class="p">,</span>
+                        <span class="n">file_path</span><span class="p">,</span>
+                        <span class="n">pickle_protocol</span><span class="o">=</span><span class="n">pickle_protocol</span><span class="p">,</span>
+                        <span class="n">extra_files</span><span class="o">=</span><span class="n">extra_files</span><span class="p">,</span>
+                        <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
                     <span class="p">)</span>
                 <span class="k">elif</span> <span class="n">output_format</span> <span class="o">==</span> <span class="s2">&quot;aot_inductor&quot;</span><span class="p">:</span>
                     <span class="n">inductor_configs</span> <span class="o">=</span> <span class="p">{}</span>
@@ -1466,8 +1515,13 @@
                     <span class="p">)</span>
 
                 <span class="k">if</span> <span class="n">output_format</span> <span class="o">==</span> <span class="s2">&quot;exported_program&quot;</span><span class="p">:</span>
-                    <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">save</span><span class="p">(</span>
-                        <span class="n">exp_program</span><span class="p">,</span> <span class="n">file_path</span><span class="p">,</span> <span class="n">pickle_protocol</span><span class="o">=</span><span class="n">pickle_protocol</span>
+                    <span class="n">function_overload_with_kwargs</span><span class="p">(</span>
+                        <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">save</span><span class="p">,</span>
+                        <span class="n">exp_program</span><span class="p">,</span>
+                        <span class="n">file_path</span><span class="p">,</span>
+                        <span class="n">pickle_protocol</span><span class="o">=</span><span class="n">pickle_protocol</span><span class="p">,</span>
+                        <span class="n">extra_files</span><span class="o">=</span><span class="n">extra_files</span><span class="p">,</span>
+                        <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
                     <span class="p">)</span>
                 <span class="k">elif</span> <span class="n">output_format</span> <span class="o">==</span> <span class="s2">&quot;aot_inductor&quot;</span><span class="p">:</span>
                     <span class="n">inductor_configs</span> <span class="o">=</span> <span class="p">{}</span>
@@ -1483,6 +1537,22 @@
                     <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
                         <span class="s2">&quot;Attempted to serialize an exported program with an unsupported format. Exported programs support exported_program and aot_inductor&quot;</span>
                     <span class="p">)</span></div>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">function_overload_with_kwargs</span><span class="p">(</span>
+    <span class="n">fn</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span> <span class="o">*</span><span class="n">args</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+    <span class="n">fn_signature</span> <span class="o">=</span> <span class="n">inspect</span><span class="o">.</span><span class="n">signature</span><span class="p">(</span><span class="n">fn</span><span class="p">)</span><span class="o">.</span><span class="n">parameters</span>
+    <span class="n">fn_kwargs</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="k">if</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">fn_signature</span><span class="p">:</span>
+            <span class="n">fn_kwargs</span><span class="p">[</span><span class="n">k</span><span class="p">]</span> <span class="o">=</span> <span class="n">v</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Keyword argument </span><span class="si">{</span><span class="n">k</span><span class="si">}</span><span class="s2"> is not a valid argument for </span><span class="si">{</span><span class="n">fn</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">fn</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">fn_kwargs</span><span class="p">)</span>
 </pre></div>
 
              </article>
