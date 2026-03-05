@@ -25,10 +25,12 @@ jobs:
       - uses: actions/checkout@v6
         with:
           ref: ${{ github.event.pull_request.head.sha }}
-      - name: Set up Python 3.9
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+      - name: Set up Python 3.11
         uses: actions/setup-python@v6
         with:
-          python-version: '3.9'
+          python-version: '3.11'
       - name: Setup env
         run: |
           sudo ln -s $GITHUB_EVENT_PATH /GITHUB_EVENT.json
@@ -36,8 +38,8 @@ jobs:
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
       - name: Install dependencies
         run: |
-          pip3 install -r $GITHUB_WORKSPACE/.github/scripts/requirements.txt
-          pip3 install -r $GITHUB_WORKSPACE/requirements-dev.txt
+          uv pip install --system -r $GITHUB_WORKSPACE/.github/scripts/requirements.txt
+          python3 -c "import tomllib, subprocess; deps = tomllib.load(open('pyproject.toml', 'rb'))['dependency-groups']['lint']; subprocess.run(['uv', 'pip', 'install', '--system'] + deps, check=True)"
       - name: Lint C++
         run: |
           cd $GITHUB_WORKSPACE
@@ -65,10 +67,12 @@ jobs:
       - uses: actions/checkout@v6
         with:
           ref: ${{ github.event.pull_request.head.sha }}
-      - name: Set up Python 3.9
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+      - name: Set up Python 3.11
         uses: actions/setup-python@v6
         with:
-          python-version: '3.9'
+          python-version: '3.11'
       - name: Setup env
         run: |
           sudo ln -s $GITHUB_EVENT_PATH /GITHUB_EVENT.json
@@ -76,8 +80,8 @@ jobs:
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
       - name: Install dependencies
         run: |
-          pip3 install -r $GITHUB_WORKSPACE/.github/scripts/requirements.txt
-          pip3 install -r $GITHUB_WORKSPACE/requirements-dev.txt
+          uv pip install --system -r $GITHUB_WORKSPACE/.github/scripts/requirements.txt
+          python3 -c "import tomllib, subprocess; deps = tomllib.load(open('pyproject.toml', 'rb'))['dependency-groups']['lint']; subprocess.run(['uv', 'pip', 'install', '--system'] + deps, check=True)"
       - name: Lint Python
         run: |
           cd $GITHUB_WORKSPACE
