@@ -4,7 +4,8 @@
 Dynamo Compile Advanced Usage
 ======================================================
 
-This interactive script is intended as an overview of the process by which `torch_tensorrt.dynamo.compile` works, and how it integrates with the new `torch.compile` API."""
+This interactive script is intended as an overview of the process by which `torch_tensorrt.dynamo.compile` works, and how it integrates with the new `torch.compile` API.
+"""
 
 # %%
 # Imports and Model Definition
