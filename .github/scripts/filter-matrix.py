@@ -16,7 +16,7 @@ jetpack_cuda_versions: List[str] = ["cu126"]
 # rtx 1.2 currently only supports cu129 and cu130
 rtx_cuda_versions: List[str] = ["cu129", "cu130"]
 # trt 10.14.1 currently only supports cu129 and cu130
-trt_cuda_versions: List[str] = ["cu129", "cu130"]
+trt_cuda_versions: List[str] = ["cu126", "cu128", "cu129", "cu130"]
 
 jetpack_container_image: str = "nvcr.io/nvidia/l4t-jetpack:r36.4.0"
 sbsa_container_image: str = "quay.io/pypa/manylinux_2_39_aarch64"

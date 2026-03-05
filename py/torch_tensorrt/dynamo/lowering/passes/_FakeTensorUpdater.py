@@ -17,6 +17,15 @@ from torch.fx.experimental.symbolic_shapes import (
 )
 from torch.utils._ordered_set import OrderedSet
 
+# Try to import reinplace module - may not be available in all PyTorch builds
+try:
+    import importlib
+
+    reinplace_module = importlib.import_module("torch._inductor.fx_passes.reinplace")
+    _generalized_scatter = getattr(reinplace_module, "_generalized_scatter", None)
+except Exception:
+    _generalized_scatter = None
+
 
 # Adapted from torch._inductor.fx_utils.FakeTensorUpdater
 class FakeTensorUpdater:
@@ -159,8 +168,10 @@ class FakeTensorUpdater:
             return node.op == "call_function" and (
                 isinstance(node.target, torch._ops.OpOverload)
                 or node.target is operator.getitem
-                or node.target
-                is torch._inductor.fx_passes.reinplace._generalized_scatter
+                or (
+                    _generalized_scatter is not None
+                    and node.target is _generalized_scatter
+                )
             )
 
         to_process = OrderedSet[int]()
