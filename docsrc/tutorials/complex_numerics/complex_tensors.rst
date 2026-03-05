@@ -11,6 +11,12 @@ compilation.
 This page explains what the rewriter does, which patterns are supported, and what
 limitations to be aware of when compiling models with complex inputs.
 
+.. seealso::
+
+   :doc:`../_rendered_examples/dynamo/torch_export_3d_rope` — a runnable
+   end-to-end example compiling a video-transformer 3D RoPE attention block
+   (CogVideoX / Wan / HunyuanVideo style) with dynamic T×H×W shapes.
+
 ----
 
 How the Rewriter Works
