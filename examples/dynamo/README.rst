@@ -26,3 +26,4 @@ Model Zoo
 * :ref:`_torch_export_sam2`: Compiling SAM2 model using AOT workflow (`ir=dynamo`)
 * :ref:`_torch_export_flux_dev`: Compiling FLUX.1-dev model using AOT workflow (`ir=dynamo`)
 * :ref:`debugger_example`: Debugging Torch-TensorRT Compilation
+* :ref:`torch_export_3d_rope`: Compiling a 3D RoPE video-transformer block with complex numerics support
