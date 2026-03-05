@@ -1,0 +1,890 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Handling Unsupported Operators &#8212; Torch-TensorRT</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../../_static/styles/theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../../_static/styles/bootstrap.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../../_static/styles/pydata-sphinx-theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+
+  
+  <link href="../../_static/vendor/fontawesome/6.5.2/css/all.min.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+  <link rel="preload" as="font" type="font/woff2" crossorigin href="../../_static/vendor/fontawesome/6.5.2/webfonts/fa-solid-900.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../../_static/vendor/fontawesome/6.5.2/webfonts/fa-brands-400.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../../_static/vendor/fontawesome/6.5.2/webfonts/fa-regular-400.woff2" />
+
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=72e443bf" />
+    <link rel="stylesheet" type="text/css" href="../../_static/sg_gallery.css?v=61a4c737" />
+    <link rel="stylesheet" type="text/css" href="../../_static/sg_gallery-binder.css?v=f4aeca0c" />
+    <link rel="stylesheet" type="text/css" href="../../_static/sg_gallery-dataframe.css?v=e5fbc548" />
+    <link rel="stylesheet" type="text/css" href="../../_static/sg_gallery-rendered-html.css?v=1277b6f3" />
+    <link rel="stylesheet" type="text/css" href="../../_static/collapsible-lists/css/tree_view.css?v=a885cde7" />
+    <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/katex@0.10.0-beta/dist/katex.min.css" />
+    <link rel="stylesheet" type="text/css" href="../../_static/css/custom.css?v=0cb2b9ef" />
+  
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b" />
+<link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
+  <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+    <script src="../../_static/documentation_options.js?v=9e89f000"></script>
+    <script src="../../_static/doctools.js?v=888ff710"></script>
+    <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
+    <script src="../../_static/collapsible-lists/js/apply-collapsible-lists.js?v=660e4f45"></script>
+    <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'user_guide/compilation/unsupported_ops';</script>
+    <script>
+        DOCUMENTATION_OPTIONS.theme_version = '0.15.4';
+        DOCUMENTATION_OPTIONS.theme_switcher_json_url = 'https://raw.githubusercontent.com/pytorch/TensorRT/refs/heads/main/docs/versions.json';
+        DOCUMENTATION_OPTIONS.theme_switcher_version_match = 'main';
+        DOCUMENTATION_OPTIONS.show_version_warning_banner = false;
+        </script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="Precision &amp; Quantization" href="../shapes_precision/index.html" />
+    <link rel="prev" title="Compiling Models with Dynamic Input Shapes" href="../../tutorials/_rendered_examples/dynamo/compile_with_dynamic_inputs.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-primary-sidebar-checkbox"/>
+  <label class="overlay overlay-primary" for="pst-primary-sidebar-checkbox"></label>
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-secondary-sidebar-checkbox"/>
+  <label class="overlay overlay-secondary" for="pst-secondary-sidebar-checkbox"></label>
+  
+  <div class="search-button__wrapper">
+    <div class="search-button__overlay"></div>
+    <div class="search-button__search-container">
+<form class="bd-search d-flex align-items-center"
+      action="../../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         id="search-input"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form></div>
+  </div>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+<div class="bd-header__inner bd-page-width">
+  <button class="pst-navbar-icon sidebar-toggle primary-toggle" aria-label="Site navigation">
+    <span class="fa-solid fa-bars"></span>
+  </button>
+  
+  
+  <div class=" navbar-header-items__start">
+    
+      <div class="navbar-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../../index.html">
+  
+  
+  
+  
+  
+  
+    <p class="title logo__title">Torch-TensorRT</p>
+  
+</a></div>
+    
+      <div class="navbar-item">
+<script>
+document.write(`
+  <div class="version-switcher__container dropdown">
+    <button id="pst-version-switcher-button-2"
+      type="button"
+      class="version-switcher__button btn btn-sm dropdown-toggle"
+      data-bs-toggle="dropdown"
+      aria-haspopup="listbox"
+      aria-controls="pst-version-switcher-list-2"
+      aria-label="Version switcher list"
+    >
+      Choose version  <!-- this text may get changed later by javascript -->
+      <span class="caret"></span>
+    </button>
+    <div id="pst-version-switcher-list-2"
+      class="version-switcher__menu dropdown-menu list-group-flush py-0"
+      role="listbox" aria-labelledby="pst-version-switcher-button-2">
+      <!-- dropdown will be populated by javascript on page load -->
+    </div>
+  </div>
+`);
+</script></div>
+    
+  </div>
+  
+  <div class=" navbar-header-items">
+    
+    <div class="me-auto navbar-header-items__center">
+      
+        <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../getting_started/installation.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="../index.html">
+    User Guide
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../tutorials/advanced_usage.html">
+    Advanced Usage
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../tutorials/model_zoo.html">
+    Model Zoo
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../api_reference.html">
+    API Reference
+  </a>
+</li>
+
+            <li class="nav-item dropdown">
+                <button class="btn dropdown-toggle nav-item" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-controls="pst-nav-more-links">
+                    More
+                </button>
+                <ul id="pst-nav-more-links" class="dropdown-menu">
+                    
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../debugging/index.html">
+    Debugging
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../contributing.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../legacy.html">
+    Legacy Frontends
+  </a>
+</li>
+
+                </ul>
+            </li>
+            
+  </ul>
+</nav></div>
+      
+    </div>
+    
+    
+    <div class="navbar-header-items__end">
+      
+      
+        <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm pst-navbar-icon search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+  </button>
+`);
+</script></div>
+      
+        <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="theme-switch fa-solid fa-sun fa-lg" data-mode="light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg" data-mode="dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"></i>
+  </button>
+`);
+</script></div>
+      
+        <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/pytorch/TensorRT/" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+</ul></div>
+      
+    </div>
+    
+  </div>
+  
+  
+
+  
+    <button class="pst-navbar-icon sidebar-toggle secondary-toggle" aria-label="On this page">
+      <span class="fa-solid fa-outdent"></span>
+    </button>
+  
+</div>
+
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <div class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+      <div class="sidebar-header-items__center">
+        
+          
+          
+            <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../getting_started/installation.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="../index.html">
+    User Guide
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../tutorials/advanced_usage.html">
+    Advanced Usage
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../tutorials/model_zoo.html">
+    Model Zoo
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../api_reference.html">
+    API Reference
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../debugging/index.html">
+    Debugging
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../contributing.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../legacy.html">
+    Legacy Frontends
+  </a>
+</li>
+
+  </ul>
+</nav></div>
+          
+        
+      </div>
+    
+    
+    
+      <div class="sidebar-header-items__end">
+        
+          <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm pst-navbar-icon search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+  </button>
+`);
+</script></div>
+        
+          <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="theme-switch fa-solid fa-sun fa-lg" data-mode="light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg" data-mode="dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"></i>
+  </button>
+`);
+</script></div>
+        
+          <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/pytorch/TensorRT/" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+</ul></div>
+        
+      </div>
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+<nav class="bd-docs-nav bd-links"
+     aria-label="Section Navigation">
+  <p class="bd-links__title" role="heading" aria-level="1">Section Navigation</p>
+  <div class="bd-toc-item navbar-nav"><ul class="current nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../torch_tensorrt_explained.html">Torch-TensorRT Explained</a></li>
+<li class="toctree-l1 current active has-children"><a class="reference internal" href="index.html">Compilation</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="torch_compile.html">TensorRT Backend for <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/torch_compile_advanced_usage.html">Example: Torch Compile Advanced Usage</a></li>
+<li class="toctree-l2"><a class="reference internal" href="dynamo_export.html">Compiling Exported Programs with Torch-TensorRT</a></li>
+<li class="toctree-l2"><a class="reference internal" href="compilation_settings.html">CompilationSettings Reference</a></li>
+<li class="toctree-l2"><a class="reference internal" href="dynamic_shapes.html">Dynamic shapes with Torch-TensorRT</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/compile_with_dynamic_inputs.html">Example: Compiling Models with Dynamic Input Shapes</a></li>
+<li class="toctree-l2 current active"><a class="current reference internal" href="#">Handling Unsupported Operators</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../shapes_precision/index.html">Precision &amp; Quantization</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../shapes_precision/mixed_precision.html">Compile Mixed Precision models with Torch-TensorRT</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/autocast_example.html">An example of using Torch-TensorRT Autocast</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../shapes_precision/quantization.html">Quantization (INT8 / FP8 / FP4)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/vgg16_ptq.html">Deploy Quantized Models using Torch-TensorRT</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../runtime_performance/index.html">Runtime &amp; Serialization</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../runtime_performance/runtime.html">Deploying Torch-TensorRT Programs</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../runtime_performance/runtime_api.html">Runtime API</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../runtime_performance/using_dla.html">DLA</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../runtime_performance/saving_models.html">Saving models compiled with Torch-TensorRT</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../runtime_performance/serialized_engine.html">Extracting a Raw TensorRT Engine</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../runtime_performance/aot_inductor.html">AOTInductor Deployment</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../runtime_performance/mutable_module.html">MutableTorchTensorRTModule</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/save_dynamic_shapes_example.html">Example: Saving and Loading Models with Dynamic Shapes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/save_dynamic_shapes_both_methods.html">Example: Saving Models with Dynamic Shapes - Both Methods</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1"><a class="reference internal" href="../performance_tuning.html">Performance Tuning Guide</a></li>
+</ul>
+</div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+  
+  <div id="rtd-footer-container"></div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item">
+
+
+
+<nav aria-label="Breadcrumb" class="d-print-none">
+  <ul class="bd-breadcrumbs">
+    
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="../../index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+    
+    <li class="breadcrumb-item"><a href="../index.html" class="nav-link">User Guide</a></li>
+    
+    
+    <li class="breadcrumb-item"><a href="index.html" class="nav-link">Compilation</a></li>
+    
+    <li class="breadcrumb-item active" aria-current="page">Handling...</li>
+  </ul>
+</nav>
+</div>
+      
+    </div>
+  
+  
+</div>
+</div>
+              
+              
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section id="handling-unsupported-operators">
+<span id="unsupported-ops"></span><h1>Handling Unsupported Operators<a class="headerlink" href="#handling-unsupported-operators" title="Link to this heading">#</a></h1>
+<p>When Torch-TensorRT encounters an operator it cannot convert to a TRT layer, it has
+several options. This guide explains what happens by default and how to handle each case.</p>
+<hr class="docutils" />
+<section id="what-happens-by-default">
+<h2>What Happens by Default<a class="headerlink" href="#what-happens-by-default" title="Link to this heading">#</a></h2>
+<p>Torch-TensorRT partitions the FX graph into TRT-convertible and non-convertible
+subgraphs. Ops with no converter fall back to <strong>PyTorch</strong> automatically — they run in
+eager mode as part of a <code class="docutils literal notranslate"><span class="pre">PyTorch</span></code> subgraph between two TRT subgraphs.</p>
+<p>Use <a class="reference internal" href="../../tutorials/compilation_analysis/dryrun.html#dryrun"><span class="std std-ref">Dryrun Mode</span></a> to see the partition layout before committing to a full compile:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">trt_model</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span>
+    <span class="n">model</span><span class="p">,</span> <span class="n">ir</span><span class="o">=</span><span class="s2">&quot;dynamo&quot;</span><span class="p">,</span> <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">,</span>
+    <span class="n">dryrun</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p>The dryrun output shows which ops triggered fallback and where the TRT/PyTorch boundary
+is. A few PyTorch fallback ops embedded in a large TRT block typically have negligible
+performance impact.</p>
+</section>
+<hr class="docutils" />
+<section id="option-1-accept-the-fallback-most-common">
+<h2>Option 1: Accept the Fallback (Most Common)<a class="headerlink" href="#option-1-accept-the-fallback-most-common" title="Link to this heading">#</a></h2>
+<p>If an op runs correctly in PyTorch and the fallback is infrequent relative to the rest
+of the model, just leave it. Many custom attention mechanisms, preprocessing ops, and
+postprocessing steps fall into this category.</p>
+<p><strong>FlashAttention</strong> is a common example. The <code class="docutils literal notranslate"><span class="pre">flash_attn</span></code> package registers custom
+CUDA kernels that are not in TRT’s op set. Torch-TensorRT will fall back those kernels
+to PyTorch, while the rest of the model (embeddings, FFN layers, etc.) runs in TRT:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch_tensorrt</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">flash_attn</span><span class="w"> </span><span class="kn">import</span> <span class="n">flash_attn_func</span>  <span class="c1"># custom CUDA kernel</span>
+
+<span class="k">class</span><span class="w"> </span><span class="nc">ModelWithFlashAttn</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">q</span><span class="p">,</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
+        <span class="c1"># flash_attn falls back to PyTorch automatically</span>
+        <span class="n">attn_out</span> <span class="o">=</span> <span class="n">flash_attn_func</span><span class="p">(</span><span class="n">q</span><span class="p">,</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span><span class="p">)</span>
+        <span class="c1"># other ops can still run in TRT</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">ffn</span><span class="p">(</span><span class="n">attn_out</span> <span class="o">+</span> <span class="n">x</span><span class="p">)</span>
+
+<span class="n">trt_model</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span>
+    <span class="n">model</span><span class="p">,</span> <span class="n">ir</span><span class="o">=</span><span class="s2">&quot;dynamo&quot;</span><span class="p">,</span> <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">,</span>
+    <span class="n">min_block_size</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p>If you want to explicitly list ops that should always fall back to PyTorch (to prevent
+them from being incorrectly converted), use <code class="docutils literal notranslate"><span class="pre">torch_executed_ops</span></code>:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">trt_model</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span>
+    <span class="n">model</span><span class="p">,</span> <span class="n">ir</span><span class="o">=</span><span class="s2">&quot;dynamo&quot;</span><span class="p">,</span> <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">,</span>
+    <span class="n">torch_executed_ops</span><span class="o">=</span><span class="p">{</span>
+        <span class="s2">&quot;torch.ops.flash_attn.flash_attn_func&quot;</span><span class="p">,</span>
+    <span class="p">},</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<hr class="docutils" />
+<section id="option-2-write-a-custom-converter">
+<h2>Option 2: Write a Custom Converter<a class="headerlink" href="#option-2-write-a-custom-converter" title="Link to this heading">#</a></h2>
+<p>If the op falls back but you want TRT to run it (for performance or to avoid a graph
+break), you can register a custom converter that maps the op to TRT layers.</p>
+<p><strong>Automatic converter generation</strong> — Torch-TensorRT can generate a converter template
+from a PyTorch op registration:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">torch_tensorrt</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.conversion.converter_utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">auto_generate_converter</span>
+
+<span class="c1"># Automatically creates a converter using TRT&#39;s standard layer set</span>
+<span class="nd">@torch_tensorrt</span><span class="o">.</span><span class="n">dynamo</span><span class="o">.</span><span class="n">conversion</span><span class="o">.</span><span class="n">dynamo_tensorrt_converter</span><span class="p">(</span>
+    <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">my_package</span><span class="o">.</span><span class="n">my_op</span><span class="o">.</span><span class="n">default</span>
+<span class="p">)</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">my_op_converter</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="n">target</span><span class="p">,</span> <span class="n">args</span><span class="p">,</span> <span class="n">kwargs</span><span class="p">,</span> <span class="n">name</span><span class="p">):</span>
+    <span class="n">input_tensor</span> <span class="o">=</span> <span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="c1"># map to TRT layers</span>
+    <span class="n">layer</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">net</span><span class="o">.</span><span class="n">add_activation</span><span class="p">(</span><span class="n">input_tensor</span><span class="p">,</span> <span class="n">trt</span><span class="o">.</span><span class="n">ActivationType</span><span class="o">.</span><span class="n">RELU</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">layer</span><span class="o">.</span><span class="n">get_output</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>See the <span class="xref std std-ref">auto_generate_converters</span> example for a complete walkthrough.</p>
+</section>
+<hr class="docutils" />
+<section id="option-3-use-a-custom-tensorrt-plugin">
+<h2>Option 3: Use a Custom TensorRT Plugin<a class="headerlink" href="#option-3-use-a-custom-tensorrt-plugin" title="Link to this heading">#</a></h2>
+<p>For ops that cannot be expressed as a composition of TRT layers (custom CUDA kernels,
+Triton kernels, architecture-specific ops), register a TRT plugin.</p>
+<p>Torch-TensorRT provides two plugin mechanisms:</p>
+<p><strong>Python-based plugins</strong> (simpler, Python runtime only):</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.conversion</span><span class="w"> </span><span class="kn">import</span> <span class="n">TRTInterpreter</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">tensorrt</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">trt</span>
+
+<span class="c1"># Register a custom TRT plugin for a Triton kernel</span>
+<span class="c1"># See the custom_kernel_plugins example for the full pattern</span>
+</pre></div>
+</div>
+<p><strong>AOT (ahead-of-time) compiled plugins</strong> (supports C++ runtime and serialized engines):</p>
+<p>AOT plugins compile the kernel to a shared library at build time. This is the only way
+to include a custom kernel in a serialized engine that runs in C++ without Python.</p>
+<p>See the <span class="xref std std-ref">aot_plugin</span> and <span class="xref std std-ref">nvrtc_aot_plugin</span> examples for complete code.</p>
+</section>
+<hr class="docutils" />
+<section id="option-4-restructure-the-model">
+<h2>Option 4: Restructure the Model<a class="headerlink" href="#option-4-restructure-the-model" title="Link to this heading">#</a></h2>
+<p>Sometimes an unsupported op can be replaced with an equivalent supported op.</p>
+<p><strong>Scaled Dot-Product Attention (SDPA)</strong></p>
+<p><code class="docutils literal notranslate"><span class="pre">torch.nn.functional.scaled_dot_product_attention</span></code> has a TRT converter. However,
+PyTorch often dispatches SDPA to backend-specific implementations such as
+<code class="docutils literal notranslate"><span class="pre">_scaled_dot_product_flash_attention</span></code> or <code class="docutils literal notranslate"><span class="pre">_scaled_dot_product_efficient_attention</span></code>
+that appear as separate ops in the exported graph and have no TRT converter.</p>
+<p>There are two scenarios:</p>
+<p><em>Scenario A — your own model code calls a third-party flash_attn package:</em></p>
+<p>Replace the direct <code class="docutils literal notranslate"><span class="pre">flash_attn_func</span></code> call with <code class="docutils literal notranslate"><span class="pre">F.scaled_dot_product_attention</span></code>:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">torch.nn.functional</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">F</span>
+
+<span class="c1"># Before (unsupported in TRT):</span>
+<span class="c1"># from flash_attn import flash_attn_func</span>
+<span class="c1"># attn_out = flash_attn_func(q, k, v)</span>
+
+<span class="c1"># After (TRT-compatible):</span>
+<span class="n">attn_out</span> <span class="o">=</span> <span class="n">F</span><span class="o">.</span><span class="n">scaled_dot_product_attention</span><span class="p">(</span><span class="n">q</span><span class="p">,</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span><span class="p">,</span> <span class="n">is_causal</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><em>Scenario B — a HuggingFace model internally selects a backend-specific SDPA kernel:</em></p>
+<p>Load the model with <code class="docutils literal notranslate"><span class="pre">attn_implementation=&quot;sdpa&quot;</span></code> and register an FX lowering pass
+that rewrites the backend-specific ops back to the generic
+<code class="docutils literal notranslate"><span class="pre">F.scaled_dot_product_attention</span></code> before TRT compilation. This is the pattern used
+in <code class="docutils literal notranslate"><span class="pre">tools/llm/run_llm.py</span></code>:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">transformers</span><span class="w"> </span><span class="kn">import</span> <span class="n">AutoModelForCausalLM</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.lowering</span><span class="w"> </span><span class="kn">import</span> <span class="n">TORCH_TRT_DECOMPOSITIONS</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.lowering.passes._aten_lowering_pass</span><span class="w"> </span><span class="kn">import</span> <span class="n">_aten_lowering_pass</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo._settings</span><span class="w"> </span><span class="kn">import</span> <span class="n">CompilationSettings</span>
+
+<span class="c1"># 1. Load the model using PyTorch&#39;s built-in SDPA (not flash_attn)</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">AutoModelForCausalLM</span><span class="o">.</span><span class="n">from_pretrained</span><span class="p">(</span>
+    <span class="s2">&quot;meta-llama/Llama-3.2-1B-Instruct&quot;</span><span class="p">,</span>
+    <span class="n">attn_implementation</span><span class="o">=</span><span class="s2">&quot;sdpa&quot;</span><span class="p">,</span>
+<span class="p">)</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
+
+<span class="c1"># 2. Remove Torch-TensorRT&#39;s SDPA decompositions so the op reaches the converter</span>
+<span class="n">_SDPA_VARIANTS</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">aten</span><span class="o">.</span><span class="n">_scaled_dot_product_flash_attention</span><span class="o">.</span><span class="n">default</span><span class="p">,</span>
+    <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">aten</span><span class="o">.</span><span class="n">_scaled_dot_product_efficient_attention</span><span class="o">.</span><span class="n">default</span><span class="p">,</span>
+    <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">aten</span><span class="o">.</span><span class="n">_scaled_dot_product_cudnn_attention</span><span class="o">.</span><span class="n">default</span><span class="p">,</span>
+<span class="p">]</span>
+<span class="k">for</span> <span class="n">op</span> <span class="ow">in</span> <span class="n">_SDPA_VARIANTS</span><span class="p">:</span>
+    <span class="n">TORCH_TRT_DECOMPOSITIONS</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">op</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+
+<span class="c1"># 3. Register a lowering pass to rewrite backend-specific SDPA to the generic form</span>
+<span class="nd">@_aten_lowering_pass</span><span class="p">(</span><span class="n">index</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">sdpa_rewrite_pass</span><span class="p">(</span>
+    <span class="n">gm</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">,</span> <span class="n">settings</span><span class="p">:</span> <span class="n">CompilationSettings</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">fx</span><span class="o">.</span><span class="n">GraphModule</span><span class="p">:</span>
+    <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="nb">list</span><span class="p">(</span><span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">nodes</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">node</span><span class="o">.</span><span class="n">op</span> <span class="o">==</span> <span class="s2">&quot;call_function&quot;</span> <span class="ow">and</span> <span class="n">node</span><span class="o">.</span><span class="n">target</span> <span class="ow">in</span> <span class="n">_SDPA_VARIANTS</span><span class="p">:</span>
+            <span class="n">q</span><span class="p">,</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="o">=</span> <span class="n">node</span><span class="o">.</span><span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">node</span><span class="o">.</span><span class="n">args</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">node</span><span class="o">.</span><span class="n">args</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span>
+            <span class="k">with</span> <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">inserting_after</span><span class="p">(</span><span class="n">node</span><span class="p">):</span>
+                <span class="n">new_node</span> <span class="o">=</span> <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">call_function</span><span class="p">(</span>
+                    <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">functional</span><span class="o">.</span><span class="n">scaled_dot_product_attention</span><span class="p">,</span>
+                    <span class="n">args</span><span class="o">=</span><span class="p">(</span><span class="n">q</span><span class="p">,</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span><span class="p">),</span>
+                    <span class="n">kwargs</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;is_causal&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">},</span>
+                <span class="p">)</span>
+            <span class="n">node</span><span class="o">.</span><span class="n">replace_all_uses_with</span><span class="p">(</span><span class="n">new_node</span><span class="p">)</span>
+            <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">erase_node</span><span class="p">(</span><span class="n">node</span><span class="p">)</span>
+    <span class="n">gm</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">lint</span><span class="p">()</span>
+    <span class="n">gm</span><span class="o">.</span><span class="n">recompile</span><span class="p">()</span>
+    <span class="k">return</span> <span class="n">gm</span>
+
+<span class="c1"># 4. Compile as normal</span>
+<span class="n">trt_model</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">,</span> <span class="n">use_explicit_typing</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>For a complete, production-ready implementation of this pattern across LLaMA, Qwen,
+and Gemma3 models (including sliding-window attention), see
+<code class="docutils literal notranslate"><span class="pre">tools/llm/torchtrt_ext/register_sdpa.py</span></code>.</p>
+<p><strong>Other common restructuring patterns</strong></p>
+<ul class="simple">
+<li><p>Custom <code class="docutils literal notranslate"><span class="pre">LayerNorm</span></code> implementations — TRT has a native group norm / layer norm op.
+Replacing a hand-written <code class="docutils literal notranslate"><span class="pre">(x</span> <span class="pre">-</span> <span class="pre">mean)</span> <span class="pre">/</span> <span class="pre">(std</span> <span class="pre">+</span> <span class="pre">eps)</span></code> with <code class="docutils literal notranslate"><span class="pre">torch.nn.LayerNorm</span></code>
+typically produces a single fused TRT layer.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">torch.einsum</span></code> — TRT supports a limited subset of einsum patterns. If your einsum
+pattern is unsupported, expand it into <code class="docutils literal notranslate"><span class="pre">matmul</span></code> + <code class="docutils literal notranslate"><span class="pre">transpose</span></code> + <code class="docutils literal notranslate"><span class="pre">sum</span></code> ops which
+all have converters.</p></li>
+</ul>
+</section>
+<hr class="docutils" />
+<section id="checking-coverage-before-compilation">
+<h2>Checking Coverage Before Compilation<a class="headerlink" href="#checking-coverage-before-compilation" title="Link to this heading">#</a></h2>
+<p>Use <code class="docutils literal notranslate"><span class="pre">dryrun=True</span></code> to see a report of what will fall back without triggering a full TRT
+engine build:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">ir</span><span class="o">=</span><span class="s2">&quot;dynamo&quot;</span><span class="p">,</span> <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">,</span> <span class="n">dryrun</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Use <a class="reference internal" href="../../indices/supported_ops.html#supported-ops"><span class="std std-ref">Operators Supported</span></a> for a full list of ATen ops with TRT converters.</p>
+<p>To query programmatically whether a specific op has a converter:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.conversion</span><span class="w"> </span><span class="kn">import</span> <span class="n">DYNAMO_CONVERTERS</span>
+
+<span class="n">op</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">aten</span><span class="o">.</span><span class="n">gelu</span><span class="o">.</span><span class="n">default</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">op</span> <span class="ow">in</span> <span class="n">DYNAMO_CONVERTERS</span><span class="p">)</span>  <span class="c1"># True/False</span>
+</pre></div>
+</div>
+</section>
+<hr class="docutils" />
+<section id="faq">
+<h2>FAQ<a class="headerlink" href="#faq" title="Link to this heading">#</a></h2>
+<p><strong>“My model has a custom C++/CUDA extension. Will it work?”</strong></p>
+<blockquote>
+<div><p>Custom C++ extensions registered via <code class="docutils literal notranslate"><span class="pre">torch.library</span></code> or <code class="docutils literal notranslate"><span class="pre">TORCH_LIBRARY</span></code> are
+opaque to TRT — they fall back to PyTorch automatically. If the extension is
+performance-critical, write an AOT plugin (see <span class="xref std std-ref">aot_plugin</span>).</p>
+</div></blockquote>
+<p><strong>“FlashAttention makes my model fail export entirely”</strong></p>
+<blockquote>
+<div><p><code class="docutils literal notranslate"><span class="pre">torch.export.export</span></code> in strict mode traces through Python-level control flow but
+needs to trace through all ops. Try:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">strict=False</span></code> in <code class="docutils literal notranslate"><span class="pre">torch.export.export</span></code> (non-strict tracing).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">torch_tensorrt.dynamo.trace(model,</span> <span class="pre">inputs,</span> <span class="pre">strict=False)</span></code>.</p></li>
+</ul>
+<p>If the export still fails, the FlashAttention op may register custom autograd
+functions that can’t be traced. Use the <code class="docutils literal notranslate"><span class="pre">torch.nn.functional.scaled_dot_product_attention</span></code>
+(SDPA) path instead — it is supported by both <code class="docutils literal notranslate"><span class="pre">torch.export</span></code> and Torch-TensorRT.</p>
+</div></blockquote>
+<p><strong>“I have a Triton kernel. Can I use it in a serialized TRT engine?”</strong></p>
+<blockquote>
+<div><p>Triton kernels can be wrapped as TRT plugins via the AOT plugin path. See
+<span class="xref std std-ref">aot_plugin</span> for an end-to-end example of compiling a Triton kernel as a
+TRT plugin for use in a serialized engine.</p>
+</div></blockquote>
+<p><strong>“Operator X is listed as supported but my model still falls back”</strong></p>
+<blockquote>
+<div><p>The converter may only support specific overloads or dtype combinations. Check:</p>
+<ul class="simple">
+<li><p>The exact overload name in the dryrun output (e.g. <code class="docutils literal notranslate"><span class="pre">aten::add.Tensor</span></code> vs
+<code class="docutils literal notranslate"><span class="pre">aten::add.Scalar</span></code>).</p></li>
+<li><p>The input dtype — some converters only handle <code class="docutils literal notranslate"><span class="pre">float16</span></code> or <code class="docutils literal notranslate"><span class="pre">float32</span></code>.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">min_block_size</span></code> — if the only unsupported op is surrounded by very few
+supported ops, TRT may choose to keep the whole small subgraph in PyTorch.</p></li>
+</ul>
+<p>File a bug at <a class="github reference external" href="https://github.com/pytorch/TensorRT/issues">pytorch/TensorRT#issues</a> with the dryrun output
+and model snippet.</p>
+</div></blockquote>
+</section>
+</section>
+
+
+                </article>
+              
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="../../tutorials/_rendered_examples/dynamo/compile_with_dynamic_inputs.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">Compiling Models with Dynamic Input Shapes</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="../shapes_precision/index.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">Precision &amp; Quantization</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <div class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+<div
+    id="pst-page-navigation-heading-2"
+    class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> On this page
+  </div>
+  <nav class="bd-toc-nav page-toc" aria-labelledby="pst-page-navigation-heading-2">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#what-happens-by-default">What Happens by Default</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#option-1-accept-the-fallback-most-common">Option 1: Accept the Fallback (Most Common)</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#option-2-write-a-custom-converter">Option 2: Write a Custom Converter</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#option-3-use-a-custom-tensorrt-plugin">Option 3: Use a Custom TensorRT Plugin</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#option-4-restructure-the-model">Option 4: Restructure the Model</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#checking-coverage-before-compilation">Checking Coverage Before Compilation</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#faq">FAQ</a></li>
+</ul>
+  </nav></div>
+
+  <div class="sidebar-secondary-item">
+
+  
+  <div class="tocsection editthispage">
+    <a href="https://github.com/pytorch/TensorRT/edit/main/docsrc/user_guide/compilation/unsupported_ops.rst">
+      <i class="fa-solid fa-pencil"></i>
+      
+      
+        
+          Edit on GitHub
+        
+      
+    </a>
+  </div>
+</div>
+
+  <div class="sidebar-secondary-item">
+
+  <div class="tocsection sourcelink">
+    <a href="../../_sources/user_guide/compilation/unsupported_ops.rst.txt">
+      <i class="fa-solid fa-file-lines"></i> Show Source
+    </a>
+  </div>
+</div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+          </footer>
+        
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script src="../../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b"></script>
+<script src="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+  
+    <div class="footer-items__start">
+      
+        <div class="footer-item">
+
+  <p class="copyright">
+    
+      © Copyright 2024, NVIDIA Corporation.
+      <br/>
+    
+  </p>
+</div>
+      
+    </div>
+  
+  
+  
+</div>
+
+  </footer>
+  </body>
+</html>

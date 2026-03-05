@@ -1,0 +1,870 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Quantization (INT8 / FP8 / FP4) &#8212; Torch-TensorRT</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../../_static/styles/theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../../_static/styles/bootstrap.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../../_static/styles/pydata-sphinx-theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+
+  
+  <link href="../../_static/vendor/fontawesome/6.5.2/css/all.min.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+  <link rel="preload" as="font" type="font/woff2" crossorigin href="../../_static/vendor/fontawesome/6.5.2/webfonts/fa-solid-900.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../../_static/vendor/fontawesome/6.5.2/webfonts/fa-brands-400.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../../_static/vendor/fontawesome/6.5.2/webfonts/fa-regular-400.woff2" />
+
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=72e443bf" />
+    <link rel="stylesheet" type="text/css" href="../../_static/sg_gallery.css?v=61a4c737" />
+    <link rel="stylesheet" type="text/css" href="../../_static/sg_gallery-binder.css?v=f4aeca0c" />
+    <link rel="stylesheet" type="text/css" href="../../_static/sg_gallery-dataframe.css?v=e5fbc548" />
+    <link rel="stylesheet" type="text/css" href="../../_static/sg_gallery-rendered-html.css?v=1277b6f3" />
+    <link rel="stylesheet" type="text/css" href="../../_static/collapsible-lists/css/tree_view.css?v=a885cde7" />
+    <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/katex@0.10.0-beta/dist/katex.min.css" />
+    <link rel="stylesheet" type="text/css" href="../../_static/css/custom.css?v=0cb2b9ef" />
+  
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b" />
+<link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
+  <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+    <script src="../../_static/documentation_options.js?v=9e89f000"></script>
+    <script src="../../_static/doctools.js?v=888ff710"></script>
+    <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
+    <script src="../../_static/collapsible-lists/js/apply-collapsible-lists.js?v=660e4f45"></script>
+    <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'user_guide/shapes_precision/quantization';</script>
+    <script>
+        DOCUMENTATION_OPTIONS.theme_version = '0.15.4';
+        DOCUMENTATION_OPTIONS.theme_switcher_json_url = 'https://raw.githubusercontent.com/pytorch/TensorRT/refs/heads/main/docs/versions.json';
+        DOCUMENTATION_OPTIONS.theme_switcher_version_match = 'main';
+        DOCUMENTATION_OPTIONS.show_version_warning_banner = false;
+        </script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="Deploy Quantized Models using Torch-TensorRT" href="../../tutorials/_rendered_examples/dynamo/vgg16_ptq.html" />
+    <link rel="prev" title="An example of using Torch-TensorRT Autocast" href="../../tutorials/_rendered_examples/dynamo/autocast_example.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-primary-sidebar-checkbox"/>
+  <label class="overlay overlay-primary" for="pst-primary-sidebar-checkbox"></label>
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-secondary-sidebar-checkbox"/>
+  <label class="overlay overlay-secondary" for="pst-secondary-sidebar-checkbox"></label>
+  
+  <div class="search-button__wrapper">
+    <div class="search-button__overlay"></div>
+    <div class="search-button__search-container">
+<form class="bd-search d-flex align-items-center"
+      action="../../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         id="search-input"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form></div>
+  </div>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+<div class="bd-header__inner bd-page-width">
+  <button class="pst-navbar-icon sidebar-toggle primary-toggle" aria-label="Site navigation">
+    <span class="fa-solid fa-bars"></span>
+  </button>
+  
+  
+  <div class=" navbar-header-items__start">
+    
+      <div class="navbar-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../../index.html">
+  
+  
+  
+  
+  
+  
+    <p class="title logo__title">Torch-TensorRT</p>
+  
+</a></div>
+    
+      <div class="navbar-item">
+<script>
+document.write(`
+  <div class="version-switcher__container dropdown">
+    <button id="pst-version-switcher-button-2"
+      type="button"
+      class="version-switcher__button btn btn-sm dropdown-toggle"
+      data-bs-toggle="dropdown"
+      aria-haspopup="listbox"
+      aria-controls="pst-version-switcher-list-2"
+      aria-label="Version switcher list"
+    >
+      Choose version  <!-- this text may get changed later by javascript -->
+      <span class="caret"></span>
+    </button>
+    <div id="pst-version-switcher-list-2"
+      class="version-switcher__menu dropdown-menu list-group-flush py-0"
+      role="listbox" aria-labelledby="pst-version-switcher-button-2">
+      <!-- dropdown will be populated by javascript on page load -->
+    </div>
+  </div>
+`);
+</script></div>
+    
+  </div>
+  
+  <div class=" navbar-header-items">
+    
+    <div class="me-auto navbar-header-items__center">
+      
+        <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../getting_started/installation.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="../index.html">
+    User Guide
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../tutorials/advanced_usage.html">
+    Advanced Usage
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../tutorials/model_zoo.html">
+    Model Zoo
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../api_reference.html">
+    API Reference
+  </a>
+</li>
+
+            <li class="nav-item dropdown">
+                <button class="btn dropdown-toggle nav-item" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-controls="pst-nav-more-links">
+                    More
+                </button>
+                <ul id="pst-nav-more-links" class="dropdown-menu">
+                    
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../debugging/index.html">
+    Debugging
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../contributing.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../legacy.html">
+    Legacy Frontends
+  </a>
+</li>
+
+                </ul>
+            </li>
+            
+  </ul>
+</nav></div>
+      
+    </div>
+    
+    
+    <div class="navbar-header-items__end">
+      
+      
+        <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm pst-navbar-icon search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+  </button>
+`);
+</script></div>
+      
+        <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="theme-switch fa-solid fa-sun fa-lg" data-mode="light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg" data-mode="dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"></i>
+  </button>
+`);
+</script></div>
+      
+        <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/pytorch/TensorRT/" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+</ul></div>
+      
+    </div>
+    
+  </div>
+  
+  
+
+  
+    <button class="pst-navbar-icon sidebar-toggle secondary-toggle" aria-label="On this page">
+      <span class="fa-solid fa-outdent"></span>
+    </button>
+  
+</div>
+
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <div class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+      <div class="sidebar-header-items__center">
+        
+          
+          
+            <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../getting_started/installation.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="../index.html">
+    User Guide
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../tutorials/advanced_usage.html">
+    Advanced Usage
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../tutorials/model_zoo.html">
+    Model Zoo
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../api_reference.html">
+    API Reference
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../debugging/index.html">
+    Debugging
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../contributing.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../legacy.html">
+    Legacy Frontends
+  </a>
+</li>
+
+  </ul>
+</nav></div>
+          
+        
+      </div>
+    
+    
+    
+      <div class="sidebar-header-items__end">
+        
+          <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm pst-navbar-icon search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+  </button>
+`);
+</script></div>
+        
+          <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="theme-switch fa-solid fa-sun fa-lg" data-mode="light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg" data-mode="dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"></i>
+  </button>
+`);
+</script></div>
+        
+          <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/pytorch/TensorRT/" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+</ul></div>
+        
+      </div>
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+<nav class="bd-docs-nav bd-links"
+     aria-label="Section Navigation">
+  <p class="bd-links__title" role="heading" aria-level="1">Section Navigation</p>
+  <div class="bd-toc-item navbar-nav"><ul class="current nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../torch_tensorrt_explained.html">Torch-TensorRT Explained</a></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../compilation/index.html">Compilation</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../compilation/torch_compile.html">TensorRT Backend for <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/torch_compile_advanced_usage.html">Example: Torch Compile Advanced Usage</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../compilation/dynamo_export.html">Compiling Exported Programs with Torch-TensorRT</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../compilation/compilation_settings.html">CompilationSettings Reference</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../compilation/dynamic_shapes.html">Dynamic shapes with Torch-TensorRT</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/compile_with_dynamic_inputs.html">Example: Compiling Models with Dynamic Input Shapes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../compilation/unsupported_ops.html">Handling Unsupported Operators</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 current active has-children"><a class="reference internal" href="index.html">Precision &amp; Quantization</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="mixed_precision.html">Compile Mixed Precision models with Torch-TensorRT</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/autocast_example.html">An example of using Torch-TensorRT Autocast</a></li>
+<li class="toctree-l2 current active"><a class="current reference internal" href="#">Quantization (INT8 / FP8 / FP4)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/vgg16_ptq.html">Deploy Quantized Models using Torch-TensorRT</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../runtime_performance/index.html">Runtime &amp; Serialization</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../runtime_performance/runtime.html">Deploying Torch-TensorRT Programs</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../runtime_performance/runtime_api.html">Runtime API</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../runtime_performance/using_dla.html">DLA</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../runtime_performance/saving_models.html">Saving models compiled with Torch-TensorRT</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../runtime_performance/serialized_engine.html">Extracting a Raw TensorRT Engine</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../runtime_performance/aot_inductor.html">AOTInductor Deployment</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../runtime_performance/mutable_module.html">MutableTorchTensorRTModule</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/save_dynamic_shapes_example.html">Example: Saving and Loading Models with Dynamic Shapes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/save_dynamic_shapes_both_methods.html">Example: Saving Models with Dynamic Shapes - Both Methods</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1"><a class="reference internal" href="../performance_tuning.html">Performance Tuning Guide</a></li>
+</ul>
+</div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+  
+  <div id="rtd-footer-container"></div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item">
+
+
+
+<nav aria-label="Breadcrumb" class="d-print-none">
+  <ul class="bd-breadcrumbs">
+    
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="../../index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+    
+    <li class="breadcrumb-item"><a href="../index.html" class="nav-link">User Guide</a></li>
+    
+    
+    <li class="breadcrumb-item"><a href="index.html" class="nav-link">Precision &amp; Quantization</a></li>
+    
+    <li class="breadcrumb-item active" aria-current="page">Quantization...</li>
+  </ul>
+</nav>
+</div>
+      
+    </div>
+  
+  
+</div>
+</div>
+              
+              
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section id="quantization-int8-fp8-fp4">
+<span id="quantization"></span><h1>Quantization (INT8 / FP8 / FP4)<a class="headerlink" href="#quantization-int8-fp8-fp4" title="Link to this heading">#</a></h1>
+<p>Torch-TensorRT supports post-training quantization (PTQ) with <strong>INT8</strong>, <strong>FP8</strong>, and
+<strong>FP4</strong> precisions via NVIDIA’s
+<a class="reference external" href="https://github.com/NVIDIA/TensorRT-Model-Optimizer">ModelOpt</a> library. ModelOpt
+inserts quantize/dequantize (QDQ) nodes into the model graph; Torch-TensorRT then
+converts those nodes into TRT quantization layers and sets the appropriate builder flags.</p>
+<hr class="docutils" />
+<section id="prerequisites">
+<h2>Prerequisites<a class="headerlink" href="#prerequisites" title="Link to this heading">#</a></h2>
+<p>Install ModelOpt (requires <code class="docutils literal notranslate"><span class="pre">nvidia-modelopt</span></code>):</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>nvidia-modelopt
+</pre></div>
+</div>
+<p>Hardware requirements:</p>
+<ul class="simple">
+<li><p><strong>INT8</strong>: Any NVIDIA GPU with TensorRT support.</p></li>
+<li><p><strong>FP8</strong>: NVIDIA Hopper (H100) or newer.</p></li>
+<li><p><strong>FP4 (NVFP4)</strong>: NVIDIA Blackwell (B100/B200) or newer; requires TensorRT ≥ 10.8.</p></li>
+</ul>
+</section>
+<hr class="docutils" />
+<section id="int8-fp8-ptq-workflow">
+<h2>INT8 / FP8 PTQ Workflow<a class="headerlink" href="#int8-fp8-ptq-workflow" title="Link to this heading">#</a></h2>
+<p><strong>Step 1 — Calibrate the model with ModelOpt</strong></p>
+<p>ModelOpt’s <code class="docutils literal notranslate"><span class="pre">mtq.quantize</span></code> replaces eligible layers with QDQ wrappers and calibrates
+the quantization scales using a small calibration dataset:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">modelopt.torch.quantization</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">mtq</span>
+
+<span class="n">model</span> <span class="o">=</span> <span class="n">MyModel</span><span class="p">()</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
+
+<span class="c1"># Define a calibration loop (no gradient needed)</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">calibration_loop</span><span class="p">(</span><span class="n">model</span><span class="p">):</span>
+    <span class="k">for</span> <span class="n">batch</span> <span class="ow">in</span> <span class="n">calibration_dataloader</span><span class="p">:</span>
+        <span class="n">model</span><span class="p">(</span><span class="n">batch</span><span class="o">.</span><span class="n">cuda</span><span class="p">())</span>
+
+<span class="c1"># INT8 configuration (per-tensor activations, per-channel weights)</span>
+<span class="n">quant_cfg</span> <span class="o">=</span> <span class="n">mtq</span><span class="o">.</span><span class="n">INT8_DEFAULT_CFG</span>
+<span class="c1"># or FP8: quant_cfg = mtq.FP8_DEFAULT_CFG</span>
+
+<span class="n">mtq</span><span class="o">.</span><span class="n">quantize</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">quant_cfg</span><span class="p">,</span> <span class="n">forward_loop</span><span class="o">=</span><span class="n">calibration_loop</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><strong>Step 2 — Compile with Torch-TensorRT</strong></p>
+<p>Pass the quantized model (with QDQ nodes) to the Torch-TensorRT compiler together with
+the matching precision in <code class="docutils literal notranslate"><span class="pre">enabled_precisions</span></code>:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">torch_tensorrt</span>
+
+<span class="n">inputs</span> <span class="o">=</span> <span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">)</span><span class="o">.</span><span class="n">cuda</span><span class="p">()]</span>
+
+<span class="c1"># INT8</span>
+<span class="n">trt_model</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span>
+    <span class="n">model</span><span class="p">,</span>
+    <span class="n">ir</span><span class="o">=</span><span class="s2">&quot;dynamo&quot;</span><span class="p">,</span>
+    <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">,</span>
+    <span class="n">enabled_precisions</span><span class="o">=</span><span class="p">{</span><span class="n">torch</span><span class="o">.</span><span class="n">int8</span><span class="p">},</span>
+    <span class="n">min_block_size</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="c1"># FP8</span>
+<span class="n">trt_model</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span>
+    <span class="n">model</span><span class="p">,</span>
+    <span class="n">ir</span><span class="o">=</span><span class="s2">&quot;dynamo&quot;</span><span class="p">,</span>
+    <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">,</span>
+    <span class="n">enabled_precisions</span><span class="o">=</span><span class="p">{</span><span class="n">torch</span><span class="o">.</span><span class="n">float8_e4m3fn</span><span class="p">},</span>
+    <span class="n">min_block_size</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="n">output</span> <span class="o">=</span> <span class="n">trt_model</span><span class="p">(</span><span class="o">*</span><span class="n">inputs</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<hr class="docutils" />
+<section id="fp4-nvfp4-workflow">
+<h2>FP4 (NVFP4) Workflow<a class="headerlink" href="#fp4-nvfp4-workflow" title="Link to this heading">#</a></h2>
+<p>FP4 uses <strong>dynamic block quantization</strong> — weights are quantized offline to a block-scaled
+4-bit format; activations are dynamically quantized at runtime. This path requires
+TensorRT ≥ 10.8 and a Blackwell GPU.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">modelopt.torch.quantization</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">mtq</span>
+
+<span class="c1"># FP4 config (uses block quantization for weights)</span>
+<span class="n">quant_cfg</span> <span class="o">=</span> <span class="n">mtq</span><span class="o">.</span><span class="n">NVFP4_DEFAULT_CFG</span>
+
+<span class="n">mtq</span><span class="o">.</span><span class="n">quantize</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">quant_cfg</span><span class="p">,</span> <span class="n">forward_loop</span><span class="o">=</span><span class="n">calibration_loop</span><span class="p">)</span>
+
+<span class="n">trt_model</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span>
+    <span class="n">model</span><span class="p">,</span>
+    <span class="n">ir</span><span class="o">=</span><span class="s2">&quot;dynamo&quot;</span><span class="p">,</span>
+    <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">,</span>
+    <span class="n">enabled_precisions</span><span class="o">=</span><span class="p">{</span><span class="n">torch</span><span class="o">.</span><span class="n">float4_e2m1fn_x2</span><span class="p">},</span>
+    <span class="n">min_block_size</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<hr class="docutils" />
+<section id="using-exportedprogram-dynamo-compile">
+<h2>Using <code class="docutils literal notranslate"><span class="pre">ExportedProgram</span></code> (<code class="docutils literal notranslate"><span class="pre">dynamo.compile</span></code>)<a class="headerlink" href="#using-exportedprogram-dynamo-compile" title="Link to this heading">#</a></h2>
+<p>When using the <code class="docutils literal notranslate"><span class="pre">torch.export</span></code> → <code class="docutils literal notranslate"><span class="pre">dynamo.compile</span></code> path, wrap the export step in
+<code class="docutils literal notranslate"><span class="pre">export_torch_mode</span></code> from ModelOpt so the QDQ custom ops are properly traced:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">modelopt.torch.quantization.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">export_torch_mode</span>
+
+<span class="k">with</span> <span class="n">export_torch_mode</span><span class="p">():</span>
+    <span class="n">exp_program</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">export</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">inputs</span><span class="p">))</span>
+
+<span class="n">trt_gm</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">dynamo</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span>
+    <span class="n">exp_program</span><span class="p">,</span>
+    <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">,</span>
+    <span class="n">enabled_precisions</span><span class="o">=</span><span class="p">{</span><span class="n">torch</span><span class="o">.</span><span class="n">int8</span><span class="p">},</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">MutableTorchTensorRTModule</span></code> handles the <code class="docutils literal notranslate"><span class="pre">export_torch_mode</span></code> context automatically
+when quantization precisions are detected — no manual wrapping required. See
+<a class="reference internal" href="../runtime_performance/mutable_module.html#mutable-module"><span class="std std-ref">MutableTorchTensorRTModule</span></a>.</p>
+</section>
+<hr class="docutils" />
+<section id="torch-compile-path">
+<h2><code class="docutils literal notranslate"><span class="pre">torch.compile</span></code> Path<a class="headerlink" href="#torch-compile-path" title="Link to this heading">#</a></h2>
+<p>Quantization also works with <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code>:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">trt_model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span>
+    <span class="n">model</span><span class="p">,</span>  <span class="c1"># already quantized with ModelOpt</span>
+    <span class="n">backend</span><span class="o">=</span><span class="s2">&quot;torch_tensorrt&quot;</span><span class="p">,</span>
+    <span class="n">options</span><span class="o">=</span><span class="p">{</span>
+        <span class="s2">&quot;enabled_precisions&quot;</span><span class="p">:</span> <span class="p">{</span><span class="n">torch</span><span class="o">.</span><span class="n">int8</span><span class="p">},</span>
+        <span class="s2">&quot;min_block_size&quot;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span>
+    <span class="p">},</span>
+<span class="p">)</span>
+
+<span class="n">output</span> <span class="o">=</span> <span class="n">trt_model</span><span class="p">(</span><span class="o">*</span><span class="n">inputs</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<hr class="docutils" />
+<section id="how-qdq-nodes-are-converted">
+<h2>How QDQ Nodes Are Converted<a class="headerlink" href="#how-qdq-nodes-are-converted" title="Link to this heading">#</a></h2>
+<p>When Torch-TensorRT encounters <code class="docutils literal notranslate"><span class="pre">torch.ops.tensorrt.quantize_op.default</span></code> nodes in the
+graph (inserted by ModelOpt), the
+<code class="docutils literal notranslate"><span class="pre">aten_ops_quantize_op</span></code> converter maps them to TRT <code class="docutils literal notranslate"><span class="pre">IQuantizeLayer</span></code> /
+<code class="docutils literal notranslate"><span class="pre">IDequantizeLayer</span></code> pairs. The TRT builder then fuses these with adjacent compute layers
+(e.g. Conv, Linear) to produce INT8 or FP8 kernel variants.</p>
+<p>For FP4, <code class="docutils literal notranslate"><span class="pre">torch.ops.tensorrt.dynamic_block_quantize_op.default</span></code> nodes are converted
+via the dynamic block quantize converter, which uses TRT’s
+<code class="docutils literal notranslate"><span class="pre">add_dynamic_quantize</span></code> API (TRT ≥ 10.8).</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">constant_folding</span></code> lowering pass explicitly marks quantization ops as <em>impure</em> to
+prevent their scales from being folded away before the TRT conversion step.</p>
+</section>
+<hr class="docutils" />
+<section id="verifying-quantized-layers">
+<h2>Verifying Quantized Layers<a class="headerlink" href="#verifying-quantized-layers" title="Link to this heading">#</a></h2>
+<p>Use <a class="reference internal" href="../../tutorials/compilation_analysis/dryrun.html#dryrun"><span class="std std-ref">Dryrun Mode</span></a> to check how many ops were partitioned into TRT blocks and whether the
+quantized layers were included:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">trt_gm</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">dynamo</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span>
+    <span class="n">exp_program</span><span class="p">,</span>
+    <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">,</span>
+    <span class="n">enabled_precisions</span><span class="o">=</span><span class="p">{</span><span class="n">torch</span><span class="o">.</span><span class="n">int8</span><span class="p">},</span>
+    <span class="n">dryrun</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<hr class="docutils" />
+<section id="supported-precision-hardware-matrix">
+<h2>Supported Precision / Hardware Matrix<a class="headerlink" href="#supported-precision-hardware-matrix" title="Link to this heading">#</a></h2>
+<div class="pst-scrollable-table-container"><table class="table">
+<colgroup>
+<col style="width: 15.0%" />
+<col style="width: 30.0%" />
+<col style="width: 30.0%" />
+<col style="width: 25.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Precision</p></th>
+<th class="head"><p><code class="docutils literal notranslate"><span class="pre">enabled_precisions</span></code> value</p></th>
+<th class="head"><p>Minimum GPU</p></th>
+<th class="head"><p>TRT requirement</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>INT8</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">torch.int8</span></code> or <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.dtype.int8</span></code></p></td>
+<td><p>Any TRT-capable GPU</p></td>
+<td><p>Any supported TRT version</p></td>
+</tr>
+<tr class="row-odd"><td><p>FP8</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">torch.float8_e4m3fn</span></code> or <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.dtype.fp8</span></code></p></td>
+<td><p>NVIDIA Hopper (H100+)</p></td>
+<td><p>TRT ≥ 8.6</p></td>
+</tr>
+<tr class="row-even"><td><p>FP4 (NVFP4)</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">torch.float4_e2m1fn_x2</span></code> or <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.dtype.fp4</span></code></p></td>
+<td><p>NVIDIA Blackwell (B100+)</p></td>
+<td><p>TRT ≥ 10.8</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+<hr class="docutils" />
+<section id="troubleshooting">
+<h2>Troubleshooting<a class="headerlink" href="#troubleshooting" title="Link to this heading">#</a></h2>
+<dl class="simple">
+<dt><strong>“Unable to import quantization op”</strong></dt><dd><p>ModelOpt is not installed or <code class="docutils literal notranslate"><span class="pre">torch.ops.tensorrt.quantize_op</span></code> was not registered.
+Run <code class="docutils literal notranslate"><span class="pre">pip</span> <span class="pre">install</span> <span class="pre">nvidia-modelopt</span></code> and ensure the Torch-TensorRT package is imported
+before calling <code class="docutils literal notranslate"><span class="pre">mtq.quantize</span></code>.</p>
+</dd>
+<dt><strong>QDQ nodes fall back to PyTorch (not TRT)</strong></dt><dd><p>Check that <code class="docutils literal notranslate"><span class="pre">enabled_precisions</span></code> includes the matching dtype. Also verify
+<code class="docutils literal notranslate"><span class="pre">min_block_size</span></code> is not too large — use <code class="docutils literal notranslate"><span class="pre">dryrun=True</span></code> to inspect coverage.</p>
+</dd>
+<dt><strong>“TensorRT-RTX does not support int8 activation quantization”</strong></dt><dd><p>INT8 activation quantization (<code class="docutils literal notranslate"><span class="pre">input_quantizer</span></code> nodes) is not supported by
+<strong>TensorRT-RTX</strong> — the Windows-native RTX inference library. INT8 weight
+quantization still works. Use a weight-only INT8 ModelOpt config, or compile on
+Linux with standard TensorRT instead of TensorRT-RTX.</p>
+</dd>
+<dt><strong>FP4 “requires TRT ≥ 10.8” error</strong></dt><dd><p>Upgrade TensorRT. FP4 uses <code class="docutils literal notranslate"><span class="pre">add_dynamic_quantize</span></code> which is only available in
+TRT 10.8 and newer.</p>
+</dd>
+</dl>
+</section>
+</section>
+
+
+                </article>
+              
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="../../tutorials/_rendered_examples/dynamo/autocast_example.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">An example of using Torch-TensorRT Autocast</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="../../tutorials/_rendered_examples/dynamo/vgg16_ptq.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">Deploy Quantized Models using Torch-TensorRT</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <div class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+<div
+    id="pst-page-navigation-heading-2"
+    class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> On this page
+  </div>
+  <nav class="bd-toc-nav page-toc" aria-labelledby="pst-page-navigation-heading-2">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#prerequisites">Prerequisites</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#int8-fp8-ptq-workflow">INT8 / FP8 PTQ Workflow</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#fp4-nvfp4-workflow">FP4 (NVFP4) Workflow</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#using-exportedprogram-dynamo-compile">Using <code class="docutils literal notranslate"><span class="pre">ExportedProgram</span></code> (<code class="docutils literal notranslate"><span class="pre">dynamo.compile</span></code>)</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#torch-compile-path"><code class="docutils literal notranslate"><span class="pre">torch.compile</span></code> Path</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#how-qdq-nodes-are-converted">How QDQ Nodes Are Converted</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#verifying-quantized-layers">Verifying Quantized Layers</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#supported-precision-hardware-matrix">Supported Precision / Hardware Matrix</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#troubleshooting">Troubleshooting</a></li>
+</ul>
+  </nav></div>
+
+  <div class="sidebar-secondary-item">
+
+  
+  <div class="tocsection editthispage">
+    <a href="https://github.com/pytorch/TensorRT/edit/main/docsrc/user_guide/shapes_precision/quantization.rst">
+      <i class="fa-solid fa-pencil"></i>
+      
+      
+        
+          Edit on GitHub
+        
+      
+    </a>
+  </div>
+</div>
+
+  <div class="sidebar-secondary-item">
+
+  <div class="tocsection sourcelink">
+    <a href="../../_sources/user_guide/shapes_precision/quantization.rst.txt">
+      <i class="fa-solid fa-file-lines"></i> Show Source
+    </a>
+  </div>
+</div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+          </footer>
+        
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script src="../../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b"></script>
+<script src="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+  
+    <div class="footer-items__start">
+      
+        <div class="footer-item">
+
+  <p class="copyright">
+    
+      © Copyright 2024, NVIDIA Corporation.
+      <br/>
+    
+  </p>
+</div>
+      
+    </div>
+  
+  
+  
+</div>
+
+  </footer>
+  </body>
+</html>

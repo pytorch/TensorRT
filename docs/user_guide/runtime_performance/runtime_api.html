@@ -1,0 +1,773 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Runtime API &#8212; Torch-TensorRT</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../../_static/styles/theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../../_static/styles/bootstrap.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../../_static/styles/pydata-sphinx-theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+
+  
+  <link href="../../_static/vendor/fontawesome/6.5.2/css/all.min.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+  <link rel="preload" as="font" type="font/woff2" crossorigin href="../../_static/vendor/fontawesome/6.5.2/webfonts/fa-solid-900.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../../_static/vendor/fontawesome/6.5.2/webfonts/fa-brands-400.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../../_static/vendor/fontawesome/6.5.2/webfonts/fa-regular-400.woff2" />
+
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=72e443bf" />
+    <link rel="stylesheet" type="text/css" href="../../_static/sg_gallery.css?v=61a4c737" />
+    <link rel="stylesheet" type="text/css" href="../../_static/sg_gallery-binder.css?v=f4aeca0c" />
+    <link rel="stylesheet" type="text/css" href="../../_static/sg_gallery-dataframe.css?v=e5fbc548" />
+    <link rel="stylesheet" type="text/css" href="../../_static/sg_gallery-rendered-html.css?v=1277b6f3" />
+    <link rel="stylesheet" type="text/css" href="../../_static/collapsible-lists/css/tree_view.css?v=a885cde7" />
+    <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/katex@0.10.0-beta/dist/katex.min.css" />
+    <link rel="stylesheet" type="text/css" href="../../_static/css/custom.css?v=0cb2b9ef" />
+  
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b" />
+<link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
+  <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+    <script src="../../_static/documentation_options.js?v=9e89f000"></script>
+    <script src="../../_static/doctools.js?v=888ff710"></script>
+    <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
+    <script src="../../_static/collapsible-lists/js/apply-collapsible-lists.js?v=660e4f45"></script>
+    <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'user_guide/runtime_performance/runtime_api';</script>
+    <script>
+        DOCUMENTATION_OPTIONS.theme_version = '0.15.4';
+        DOCUMENTATION_OPTIONS.theme_switcher_json_url = 'https://raw.githubusercontent.com/pytorch/TensorRT/refs/heads/main/docs/versions.json';
+        DOCUMENTATION_OPTIONS.theme_switcher_version_match = 'main';
+        DOCUMENTATION_OPTIONS.show_version_warning_banner = false;
+        </script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="DLA" href="using_dla.html" />
+    <link rel="prev" title="Deploying Torch-TensorRT Programs" href="runtime.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-primary-sidebar-checkbox"/>
+  <label class="overlay overlay-primary" for="pst-primary-sidebar-checkbox"></label>
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-secondary-sidebar-checkbox"/>
+  <label class="overlay overlay-secondary" for="pst-secondary-sidebar-checkbox"></label>
+  
+  <div class="search-button__wrapper">
+    <div class="search-button__overlay"></div>
+    <div class="search-button__search-container">
+<form class="bd-search d-flex align-items-center"
+      action="../../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         id="search-input"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form></div>
+  </div>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+<div class="bd-header__inner bd-page-width">
+  <button class="pst-navbar-icon sidebar-toggle primary-toggle" aria-label="Site navigation">
+    <span class="fa-solid fa-bars"></span>
+  </button>
+  
+  
+  <div class=" navbar-header-items__start">
+    
+      <div class="navbar-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../../index.html">
+  
+  
+  
+  
+  
+  
+    <p class="title logo__title">Torch-TensorRT</p>
+  
+</a></div>
+    
+      <div class="navbar-item">
+<script>
+document.write(`
+  <div class="version-switcher__container dropdown">
+    <button id="pst-version-switcher-button-2"
+      type="button"
+      class="version-switcher__button btn btn-sm dropdown-toggle"
+      data-bs-toggle="dropdown"
+      aria-haspopup="listbox"
+      aria-controls="pst-version-switcher-list-2"
+      aria-label="Version switcher list"
+    >
+      Choose version  <!-- this text may get changed later by javascript -->
+      <span class="caret"></span>
+    </button>
+    <div id="pst-version-switcher-list-2"
+      class="version-switcher__menu dropdown-menu list-group-flush py-0"
+      role="listbox" aria-labelledby="pst-version-switcher-button-2">
+      <!-- dropdown will be populated by javascript on page load -->
+    </div>
+  </div>
+`);
+</script></div>
+    
+  </div>
+  
+  <div class=" navbar-header-items">
+    
+    <div class="me-auto navbar-header-items__center">
+      
+        <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../getting_started/installation.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="../index.html">
+    User Guide
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../tutorials/advanced_usage.html">
+    Advanced Usage
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../tutorials/model_zoo.html">
+    Model Zoo
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../api_reference.html">
+    API Reference
+  </a>
+</li>
+
+            <li class="nav-item dropdown">
+                <button class="btn dropdown-toggle nav-item" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-controls="pst-nav-more-links">
+                    More
+                </button>
+                <ul id="pst-nav-more-links" class="dropdown-menu">
+                    
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../debugging/index.html">
+    Debugging
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../contributing.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../legacy.html">
+    Legacy Frontends
+  </a>
+</li>
+
+                </ul>
+            </li>
+            
+  </ul>
+</nav></div>
+      
+    </div>
+    
+    
+    <div class="navbar-header-items__end">
+      
+      
+        <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm pst-navbar-icon search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+  </button>
+`);
+</script></div>
+      
+        <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="theme-switch fa-solid fa-sun fa-lg" data-mode="light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg" data-mode="dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"></i>
+  </button>
+`);
+</script></div>
+      
+        <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/pytorch/TensorRT/" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+</ul></div>
+      
+    </div>
+    
+  </div>
+  
+  
+
+  
+    <button class="pst-navbar-icon sidebar-toggle secondary-toggle" aria-label="On this page">
+      <span class="fa-solid fa-outdent"></span>
+    </button>
+  
+</div>
+
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <div class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+      <div class="sidebar-header-items__center">
+        
+          
+          
+            <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../getting_started/installation.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="../index.html">
+    User Guide
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../tutorials/advanced_usage.html">
+    Advanced Usage
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../tutorials/model_zoo.html">
+    Model Zoo
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../api_reference.html">
+    API Reference
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../debugging/index.html">
+    Debugging
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../contributing.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../legacy.html">
+    Legacy Frontends
+  </a>
+</li>
+
+  </ul>
+</nav></div>
+          
+        
+      </div>
+    
+    
+    
+      <div class="sidebar-header-items__end">
+        
+          <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm pst-navbar-icon search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+  </button>
+`);
+</script></div>
+        
+          <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="theme-switch fa-solid fa-sun fa-lg" data-mode="light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg" data-mode="dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"></i>
+  </button>
+`);
+</script></div>
+        
+          <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/pytorch/TensorRT/" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+</ul></div>
+        
+      </div>
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+<nav class="bd-docs-nav bd-links"
+     aria-label="Section Navigation">
+  <p class="bd-links__title" role="heading" aria-level="1">Section Navigation</p>
+  <div class="bd-toc-item navbar-nav"><ul class="current nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../torch_tensorrt_explained.html">Torch-TensorRT Explained</a></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../compilation/index.html">Compilation</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../compilation/torch_compile.html">TensorRT Backend for <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/torch_compile_advanced_usage.html">Example: Torch Compile Advanced Usage</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../compilation/dynamo_export.html">Compiling Exported Programs with Torch-TensorRT</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../compilation/compilation_settings.html">CompilationSettings Reference</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../compilation/dynamic_shapes.html">Dynamic shapes with Torch-TensorRT</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/compile_with_dynamic_inputs.html">Example: Compiling Models with Dynamic Input Shapes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../compilation/unsupported_ops.html">Handling Unsupported Operators</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../shapes_precision/index.html">Precision &amp; Quantization</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../shapes_precision/mixed_precision.html">Compile Mixed Precision models with Torch-TensorRT</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/autocast_example.html">An example of using Torch-TensorRT Autocast</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../shapes_precision/quantization.html">Quantization (INT8 / FP8 / FP4)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/vgg16_ptq.html">Deploy Quantized Models using Torch-TensorRT</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 current active has-children"><a class="reference internal" href="index.html">Runtime &amp; Serialization</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="runtime.html">Deploying Torch-TensorRT Programs</a></li>
+<li class="toctree-l2 current active"><a class="current reference internal" href="#">Runtime API</a></li>
+<li class="toctree-l2"><a class="reference internal" href="using_dla.html">DLA</a></li>
+<li class="toctree-l2"><a class="reference internal" href="saving_models.html">Saving models compiled with Torch-TensorRT</a></li>
+<li class="toctree-l2"><a class="reference internal" href="serialized_engine.html">Extracting a Raw TensorRT Engine</a></li>
+<li class="toctree-l2"><a class="reference internal" href="aot_inductor.html">AOTInductor Deployment</a></li>
+<li class="toctree-l2"><a class="reference internal" href="mutable_module.html">MutableTorchTensorRTModule</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/save_dynamic_shapes_example.html">Example: Saving and Loading Models with Dynamic Shapes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/save_dynamic_shapes_both_methods.html">Example: Saving Models with Dynamic Shapes - Both Methods</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1"><a class="reference internal" href="../performance_tuning.html">Performance Tuning Guide</a></li>
+</ul>
+</div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+  
+  <div id="rtd-footer-container"></div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item">
+
+
+
+<nav aria-label="Breadcrumb" class="d-print-none">
+  <ul class="bd-breadcrumbs">
+    
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="../../index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+    
+    <li class="breadcrumb-item"><a href="../index.html" class="nav-link">User Guide</a></li>
+    
+    
+    <li class="breadcrumb-item"><a href="index.html" class="nav-link">Runtime &amp; Serialization</a></li>
+    
+    <li class="breadcrumb-item active" aria-current="page">Runtime API</li>
+  </ul>
+</nav>
+</div>
+      
+    </div>
+  
+  
+</div>
+</div>
+              
+              
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section id="runtime-api">
+<span id="id1"></span><h1>Runtime API<a class="headerlink" href="#runtime-api" title="Link to this heading">#</a></h1>
+<p><code class="docutils literal notranslate"><span class="pre">torch_tensorrt.runtime</span></code> exposes a set of context managers and utility functions for
+controlling TRT engine execution behavior <strong>after</strong> compilation. These APIs let you
+opt in to CUDA graph capture, pre-allocated output buffers, and weight streaming
+without recompiling the engine.</p>
+<hr class="docutils" />
+<section id="enable-cudagraphs">
+<h2><code class="docutils literal notranslate"><span class="pre">enable_cudagraphs</span></code><a class="headerlink" href="#enable-cudagraphs" title="Link to this heading">#</a></h2>
+<p>Wraps a compiled <code class="docutils literal notranslate"><span class="pre">torch.fx.GraphModule</span></code> so that forward calls are captured and
+replayed as a CUDA graph. See <a class="reference internal" href="../../tutorials/runtime_opt/cuda_graphs.html#cuda-graphs"><span class="std std-ref">CUDAGraphs and the Output Allocator</span></a> for a full explanation of the two
+modes (whole-graph vs per-subgraph).</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">torch_tensorrt</span>
+
+<span class="n">trt_model</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">ir</span><span class="o">=</span><span class="s2">&quot;dynamo&quot;</span><span class="p">,</span> <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">)</span>
+
+<span class="k">with</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">runtime</span><span class="o">.</span><span class="n">enable_cudagraphs</span><span class="p">(</span><span class="n">trt_model</span><span class="p">)</span> <span class="k">as</span> <span class="n">cg_model</span><span class="p">:</span>
+    <span class="c1"># First call records the graph; subsequent calls replay it</span>
+    <span class="n">output</span> <span class="o">=</span> <span class="n">cg_model</span><span class="p">(</span><span class="o">*</span><span class="n">inputs</span><span class="p">)</span>
+    <span class="n">output</span> <span class="o">=</span> <span class="n">cg_model</span><span class="p">(</span><span class="o">*</span><span class="n">inputs</span><span class="p">)</span>  <span class="c1"># fast replay</span>
+<span class="c1"># CUDA graph recording is torn down on exit; trt_model is restored</span>
+</pre></div>
+</div>
+<p><strong>Mode selection</strong> is automatic: if the model contains PyTorch fallback subgraphs,
+the whole graph is captured using <code class="docutils literal notranslate"><span class="pre">CudaGraphsTorchTensorRTModule</span></code> (whole-graph mode);
+if the model is pure TRT, per-subgraph CUDA graph capture is used.</p>
+<p>Whole-graph CUDA graph capture requires fixed input shapes. If your model uses
+data-dependent-shape ops, use <code class="docutils literal notranslate"><span class="pre">enable_output_allocator</span></code> instead (incompatible with
+CUDA graphs).</p>
+</section>
+<hr class="docutils" />
+<section id="enable-pre-allocated-outputs">
+<h2><code class="docutils literal notranslate"><span class="pre">enable_pre_allocated_outputs</span></code><a class="headerlink" href="#enable-pre-allocated-outputs" title="Link to this heading">#</a></h2>
+<p>Allocates output tensors <strong>once</strong> at the start of the context and reuses them for
+every subsequent forward call. This eliminates the overhead of output buffer allocation
+on the critical path and is useful for latency-sensitive inference loops.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">with</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">runtime</span><span class="o">.</span><span class="n">enable_pre_allocated_outputs</span><span class="p">(</span><span class="n">trt_model</span><span class="p">)</span> <span class="k">as</span> <span class="n">pre_model</span><span class="p">:</span>
+    <span class="k">for</span> <span class="n">batch</span> <span class="ow">in</span> <span class="n">dataloader</span><span class="p">:</span>
+        <span class="n">output</span> <span class="o">=</span> <span class="n">pre_model</span><span class="p">(</span><span class="n">batch</span><span class="o">.</span><span class="n">cuda</span><span class="p">())</span>
+        <span class="c1"># output is valid until the next call</span>
+<span class="c1"># Output pre-allocation is released on exit</span>
+</pre></div>
+</div>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>The output tensors are <strong>overwritten in-place</strong> on each call. Copy them before the
+next forward pass if you need to retain the values:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">with</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">runtime</span><span class="o">.</span><span class="n">enable_pre_allocated_outputs</span><span class="p">(</span><span class="n">trt_model</span><span class="p">)</span> <span class="k">as</span> <span class="n">pre_model</span><span class="p">:</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">pre_model</span><span class="p">(</span><span class="o">*</span><span class="n">inputs</span><span class="p">)</span><span class="o">.</span><span class="n">clone</span><span class="p">()</span>  <span class="c1"># clone before next call</span>
+</pre></div>
+</div>
+</div>
+</section>
+<hr class="docutils" />
+<section id="enable-output-allocator">
+<h2><code class="docutils literal notranslate"><span class="pre">enable_output_allocator</span></code><a class="headerlink" href="#enable-output-allocator" title="Link to this heading">#</a></h2>
+<p>Activates TRT’s dynamic output allocator for models with <strong>data-dependent output
+shapes</strong> — ops like <code class="docutils literal notranslate"><span class="pre">nonzero</span></code>, <code class="docutils literal notranslate"><span class="pre">unique</span></code>, <code class="docutils literal notranslate"><span class="pre">masked_select</span></code>, or <code class="docutils literal notranslate"><span class="pre">nms</span></code> whose
+output size is not known at compile time.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">with</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">runtime</span><span class="o">.</span><span class="n">enable_output_allocator</span><span class="p">(</span><span class="n">trt_model</span><span class="p">)</span> <span class="k">as</span> <span class="n">dds_model</span><span class="p">:</span>
+    <span class="c1"># Works with variable-length outputs</span>
+    <span class="n">indices</span> <span class="o">=</span> <span class="n">dds_model</span><span class="p">(</span><span class="n">mask_tensor</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>On entry, <code class="docutils literal notranslate"><span class="pre">use_output_allocator</span></code> is enabled on each TRT submodule; on exit it is
+disabled and the module reverts to standard static-allocation execution.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p><code class="docutils literal notranslate"><span class="pre">enable_output_allocator</span></code> is <strong>incompatible with CUDA graphs</strong> — do not nest
+it inside <code class="docutils literal notranslate"><span class="pre">enable_cudagraphs</span></code>.</p>
+</div>
+</section>
+<hr class="docutils" />
+<section id="weight-streaming">
+<h2><code class="docutils literal notranslate"><span class="pre">weight_streaming</span></code><a class="headerlink" href="#weight-streaming" title="Link to this heading">#</a></h2>
+<p>See <a class="reference internal" href="../../tutorials/resource_memory/resource_management.html#resource-management"><span class="std std-ref">Resource Management</span></a> for a complete guide. In brief:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">with</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">runtime</span><span class="o">.</span><span class="n">weight_streaming</span><span class="p">(</span><span class="n">trt_model</span><span class="p">)</span> <span class="k">as</span> <span class="n">ctx</span><span class="p">:</span>
+    <span class="c1"># Limit GPU memory used for weights to 1 GiB</span>
+    <span class="n">ctx</span><span class="o">.</span><span class="n">device_budget</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">*</span> <span class="mi">1024</span><span class="o">**</span><span class="mi">3</span>
+    <span class="n">output</span> <span class="o">=</span> <span class="n">trt_model</span><span class="p">(</span><span class="o">*</span><span class="n">inputs</span><span class="p">)</span>
+<span class="c1"># Budget is restored to the original value on exit</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">weight_streaming</span></code> requires the model to be compiled with
+<code class="docutils literal notranslate"><span class="pre">enable_weight_streaming=True</span></code> and <code class="docutils literal notranslate"><span class="pre">use_explicit_typing=True</span></code>.</p>
+</section>
+<hr class="docutils" />
+<section id="set-cudagraphs-mode-get-cudagraphs-mode">
+<h2><code class="docutils literal notranslate"><span class="pre">set_cudagraphs_mode</span></code> / <code class="docutils literal notranslate"><span class="pre">get_cudagraphs_mode</span></code><a class="headerlink" href="#set-cudagraphs-mode-get-cudagraphs-mode" title="Link to this heading">#</a></h2>
+<p>Low-level global CUDA graph mode control (useful for testing or profiling):</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.runtime</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">set_cudagraphs_mode</span><span class="p">,</span>
+    <span class="n">get_cudagraphs_mode</span><span class="p">,</span>
+    <span class="n">get_whole_cudagraphs_mode</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="c1"># Enable per-subgraph CUDA graphs globally</span>
+<span class="n">set_cudagraphs_mode</span><span class="p">(</span><span class="kc">True</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">get_cudagraphs_mode</span><span class="p">())</span>       <span class="c1"># True</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">get_whole_cudagraphs_mode</span><span class="p">())</span> <span class="c1"># False</span>
+
+<span class="c1"># Enable whole-graph CUDA graphs via the context manager</span>
+<span class="k">with</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">runtime</span><span class="o">.</span><span class="n">enable_cudagraphs</span><span class="p">(</span><span class="n">trt_model</span><span class="p">)</span> <span class="k">as</span> <span class="n">cg_model</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">get_whole_cudagraphs_mode</span><span class="p">())</span>  <span class="c1"># True (if model has fallback subgraphs)</span>
+</pre></div>
+</div>
+<p>Prefer <code class="docutils literal notranslate"><span class="pre">enable_cudagraphs</span></code> over manual <code class="docutils literal notranslate"><span class="pre">set_cudagraphs_mode</span></code> calls — the context
+manager handles mode restoration on exit automatically.</p>
+</section>
+<hr class="docutils" />
+<section id="set-multi-device-safe-mode">
+<h2><code class="docutils literal notranslate"><span class="pre">set_multi_device_safe_mode</span></code><a class="headerlink" href="#set-multi-device-safe-mode" title="Link to this heading">#</a></h2>
+<p>Enables a thread-safe mode for running the same compiled TRT module on multiple CUDA
+devices concurrently. When enabled, the runtime serializes device context switches
+before each engine execution:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">runtime</span><span class="o">.</span><span class="n">set_multi_device_safe_mode</span><span class="p">(</span><span class="kc">True</span><span class="p">)</span>
+
+<span class="c1"># Now safe to call trt_model from multiple threads on different devices</span>
+<span class="n">output</span> <span class="o">=</span> <span class="n">trt_model</span><span class="p">(</span><span class="o">*</span><span class="n">inputs</span><span class="p">)</span>
+
+<span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">runtime</span><span class="o">.</span><span class="n">set_multi_device_safe_mode</span><span class="p">(</span><span class="kc">False</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>This incurs a small overhead per forward call. Only enable it when genuinely running
+across multiple devices from the same Python process.</p>
+</section>
+</section>
+
+
+                </article>
+              
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="runtime.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">Deploying Torch-TensorRT Programs</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="using_dla.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">DLA</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <div class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+<div
+    id="pst-page-navigation-heading-2"
+    class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> On this page
+  </div>
+  <nav class="bd-toc-nav page-toc" aria-labelledby="pst-page-navigation-heading-2">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#enable-cudagraphs"><code class="docutils literal notranslate"><span class="pre">enable_cudagraphs</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#enable-pre-allocated-outputs"><code class="docutils literal notranslate"><span class="pre">enable_pre_allocated_outputs</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#enable-output-allocator"><code class="docutils literal notranslate"><span class="pre">enable_output_allocator</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#weight-streaming"><code class="docutils literal notranslate"><span class="pre">weight_streaming</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#set-cudagraphs-mode-get-cudagraphs-mode"><code class="docutils literal notranslate"><span class="pre">set_cudagraphs_mode</span></code> / <code class="docutils literal notranslate"><span class="pre">get_cudagraphs_mode</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#set-multi-device-safe-mode"><code class="docutils literal notranslate"><span class="pre">set_multi_device_safe_mode</span></code></a></li>
+</ul>
+  </nav></div>
+
+  <div class="sidebar-secondary-item">
+
+  
+  <div class="tocsection editthispage">
+    <a href="https://github.com/pytorch/TensorRT/edit/main/docsrc/user_guide/runtime_performance/runtime_api.rst">
+      <i class="fa-solid fa-pencil"></i>
+      
+      
+        
+          Edit on GitHub
+        
+      
+    </a>
+  </div>
+</div>
+
+  <div class="sidebar-secondary-item">
+
+  <div class="tocsection sourcelink">
+    <a href="../../_sources/user_guide/runtime_performance/runtime_api.rst.txt">
+      <i class="fa-solid fa-file-lines"></i> Show Source
+    </a>
+  </div>
+</div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+          </footer>
+        
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script src="../../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b"></script>
+<script src="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+  
+    <div class="footer-items__start">
+      
+        <div class="footer-item">
+
+  <p class="copyright">
+    
+      © Copyright 2024, NVIDIA Corporation.
+      <br/>
+    
+  </p>
+</div>
+      
+    </div>
+  
+  
+  
+</div>
+
+  </footer>
+  </body>
+</html>

@@ -1,0 +1,817 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>TensorRT Backend for torch.compile &#8212; Torch-TensorRT</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../../_static/styles/theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../../_static/styles/bootstrap.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../../_static/styles/pydata-sphinx-theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+
+  
+  <link href="../../_static/vendor/fontawesome/6.5.2/css/all.min.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+  <link rel="preload" as="font" type="font/woff2" crossorigin href="../../_static/vendor/fontawesome/6.5.2/webfonts/fa-solid-900.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../../_static/vendor/fontawesome/6.5.2/webfonts/fa-brands-400.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../../_static/vendor/fontawesome/6.5.2/webfonts/fa-regular-400.woff2" />
+
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=72e443bf" />
+    <link rel="stylesheet" type="text/css" href="../../_static/sg_gallery.css?v=61a4c737" />
+    <link rel="stylesheet" type="text/css" href="../../_static/sg_gallery-binder.css?v=f4aeca0c" />
+    <link rel="stylesheet" type="text/css" href="../../_static/sg_gallery-dataframe.css?v=e5fbc548" />
+    <link rel="stylesheet" type="text/css" href="../../_static/sg_gallery-rendered-html.css?v=1277b6f3" />
+    <link rel="stylesheet" type="text/css" href="../../_static/collapsible-lists/css/tree_view.css?v=a885cde7" />
+    <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/katex@0.10.0-beta/dist/katex.min.css" />
+    <link rel="stylesheet" type="text/css" href="../../_static/css/custom.css?v=0cb2b9ef" />
+  
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b" />
+<link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
+  <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+    <script src="../../_static/documentation_options.js?v=9e89f000"></script>
+    <script src="../../_static/doctools.js?v=888ff710"></script>
+    <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
+    <script src="../../_static/collapsible-lists/js/apply-collapsible-lists.js?v=660e4f45"></script>
+    <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'user_guide/compilation/torch_compile';</script>
+    <script>
+        DOCUMENTATION_OPTIONS.theme_version = '0.15.4';
+        DOCUMENTATION_OPTIONS.theme_switcher_json_url = 'https://raw.githubusercontent.com/pytorch/TensorRT/refs/heads/main/docs/versions.json';
+        DOCUMENTATION_OPTIONS.theme_switcher_version_match = 'main';
+        DOCUMENTATION_OPTIONS.show_version_warning_banner = false;
+        </script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="Torch Compile Advanced Usage" href="../../tutorials/_rendered_examples/dynamo/torch_compile_advanced_usage.html" />
+    <link rel="prev" title="Compilation" href="index.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-primary-sidebar-checkbox"/>
+  <label class="overlay overlay-primary" for="pst-primary-sidebar-checkbox"></label>
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-secondary-sidebar-checkbox"/>
+  <label class="overlay overlay-secondary" for="pst-secondary-sidebar-checkbox"></label>
+  
+  <div class="search-button__wrapper">
+    <div class="search-button__overlay"></div>
+    <div class="search-button__search-container">
+<form class="bd-search d-flex align-items-center"
+      action="../../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         id="search-input"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form></div>
+  </div>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+<div class="bd-header__inner bd-page-width">
+  <button class="pst-navbar-icon sidebar-toggle primary-toggle" aria-label="Site navigation">
+    <span class="fa-solid fa-bars"></span>
+  </button>
+  
+  
+  <div class=" navbar-header-items__start">
+    
+      <div class="navbar-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../../index.html">
+  
+  
+  
+  
+  
+  
+    <p class="title logo__title">Torch-TensorRT</p>
+  
+</a></div>
+    
+      <div class="navbar-item">
+<script>
+document.write(`
+  <div class="version-switcher__container dropdown">
+    <button id="pst-version-switcher-button-2"
+      type="button"
+      class="version-switcher__button btn btn-sm dropdown-toggle"
+      data-bs-toggle="dropdown"
+      aria-haspopup="listbox"
+      aria-controls="pst-version-switcher-list-2"
+      aria-label="Version switcher list"
+    >
+      Choose version  <!-- this text may get changed later by javascript -->
+      <span class="caret"></span>
+    </button>
+    <div id="pst-version-switcher-list-2"
+      class="version-switcher__menu dropdown-menu list-group-flush py-0"
+      role="listbox" aria-labelledby="pst-version-switcher-button-2">
+      <!-- dropdown will be populated by javascript on page load -->
+    </div>
+  </div>
+`);
+</script></div>
+    
+  </div>
+  
+  <div class=" navbar-header-items">
+    
+    <div class="me-auto navbar-header-items__center">
+      
+        <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../getting_started/installation.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="../index.html">
+    User Guide
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../tutorials/advanced_usage.html">
+    Advanced Usage
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../tutorials/model_zoo.html">
+    Model Zoo
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../api_reference.html">
+    API Reference
+  </a>
+</li>
+
+            <li class="nav-item dropdown">
+                <button class="btn dropdown-toggle nav-item" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-controls="pst-nav-more-links">
+                    More
+                </button>
+                <ul id="pst-nav-more-links" class="dropdown-menu">
+                    
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../debugging/index.html">
+    Debugging
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../contributing.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../legacy.html">
+    Legacy Frontends
+  </a>
+</li>
+
+                </ul>
+            </li>
+            
+  </ul>
+</nav></div>
+      
+    </div>
+    
+    
+    <div class="navbar-header-items__end">
+      
+      
+        <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm pst-navbar-icon search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+  </button>
+`);
+</script></div>
+      
+        <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="theme-switch fa-solid fa-sun fa-lg" data-mode="light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg" data-mode="dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"></i>
+  </button>
+`);
+</script></div>
+      
+        <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/pytorch/TensorRT/" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+</ul></div>
+      
+    </div>
+    
+  </div>
+  
+  
+
+  
+    <button class="pst-navbar-icon sidebar-toggle secondary-toggle" aria-label="On this page">
+      <span class="fa-solid fa-outdent"></span>
+    </button>
+  
+</div>
+
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <div class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+      <div class="sidebar-header-items__center">
+        
+          
+          
+            <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../getting_started/installation.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="../index.html">
+    User Guide
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../tutorials/advanced_usage.html">
+    Advanced Usage
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../tutorials/model_zoo.html">
+    Model Zoo
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../api_reference.html">
+    API Reference
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../debugging/index.html">
+    Debugging
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../contributing.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../legacy.html">
+    Legacy Frontends
+  </a>
+</li>
+
+  </ul>
+</nav></div>
+          
+        
+      </div>
+    
+    
+    
+      <div class="sidebar-header-items__end">
+        
+          <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm pst-navbar-icon search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+  </button>
+`);
+</script></div>
+        
+          <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="theme-switch fa-solid fa-sun fa-lg" data-mode="light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg" data-mode="dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"></i>
+  </button>
+`);
+</script></div>
+        
+          <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/pytorch/TensorRT/" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+</ul></div>
+        
+      </div>
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+<nav class="bd-docs-nav bd-links"
+     aria-label="Section Navigation">
+  <p class="bd-links__title" role="heading" aria-level="1">Section Navigation</p>
+  <div class="bd-toc-item navbar-nav"><ul class="current nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../torch_tensorrt_explained.html">Torch-TensorRT Explained</a></li>
+<li class="toctree-l1 current active has-children"><a class="reference internal" href="index.html">Compilation</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l2 current active"><a class="current reference internal" href="#">TensorRT Backend for <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/torch_compile_advanced_usage.html">Example: Torch Compile Advanced Usage</a></li>
+<li class="toctree-l2"><a class="reference internal" href="dynamo_export.html">Compiling Exported Programs with Torch-TensorRT</a></li>
+<li class="toctree-l2"><a class="reference internal" href="compilation_settings.html">CompilationSettings Reference</a></li>
+<li class="toctree-l2"><a class="reference internal" href="dynamic_shapes.html">Dynamic shapes with Torch-TensorRT</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/compile_with_dynamic_inputs.html">Example: Compiling Models with Dynamic Input Shapes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="unsupported_ops.html">Handling Unsupported Operators</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../shapes_precision/index.html">Precision &amp; Quantization</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../shapes_precision/mixed_precision.html">Compile Mixed Precision models with Torch-TensorRT</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/autocast_example.html">An example of using Torch-TensorRT Autocast</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../shapes_precision/quantization.html">Quantization (INT8 / FP8 / FP4)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/vgg16_ptq.html">Deploy Quantized Models using Torch-TensorRT</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../runtime_performance/index.html">Runtime &amp; Serialization</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../runtime_performance/runtime.html">Deploying Torch-TensorRT Programs</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../runtime_performance/runtime_api.html">Runtime API</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../runtime_performance/using_dla.html">DLA</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../runtime_performance/saving_models.html">Saving models compiled with Torch-TensorRT</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../runtime_performance/serialized_engine.html">Extracting a Raw TensorRT Engine</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../runtime_performance/aot_inductor.html">AOTInductor Deployment</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../runtime_performance/mutable_module.html">MutableTorchTensorRTModule</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/save_dynamic_shapes_example.html">Example: Saving and Loading Models with Dynamic Shapes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/save_dynamic_shapes_both_methods.html">Example: Saving Models with Dynamic Shapes - Both Methods</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1"><a class="reference internal" href="../performance_tuning.html">Performance Tuning Guide</a></li>
+</ul>
+</div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+  
+  <div id="rtd-footer-container"></div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item">
+
+
+
+<nav aria-label="Breadcrumb" class="d-print-none">
+  <ul class="bd-breadcrumbs">
+    
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="../../index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+    
+    <li class="breadcrumb-item"><a href="../index.html" class="nav-link">User Guide</a></li>
+    
+    
+    <li class="breadcrumb-item"><a href="index.html" class="nav-link">Compilation</a></li>
+    
+    <li class="breadcrumb-item active" aria-current="page">TensorRT...</li>
+  </ul>
+</nav>
+</div>
+      
+    </div>
+  
+  
+</div>
+</div>
+              
+              
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section id="tensorrt-backend-for-torch-compile">
+<span id="torch-compile"></span><h1>TensorRT Backend for <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code><a class="headerlink" href="#tensorrt-backend-for-torch-compile" title="Link to this heading">#</a></h1>
+<p id="module-torch_tensorrt.dynamo">This guide presents the Torch-TensorRT <cite>torch.compile</cite> backend: a deep learning compiler which uses TensorRT to accelerate JIT-style workflows across a wide variety of models.</p>
+<section id="key-features">
+<h2>Key Features<a class="headerlink" href="#key-features" title="Link to this heading">#</a></h2>
+<p>The primary goal of the Torch-TensorRT <cite>torch.compile</cite> backend is to enable Just-In-Time compilation workflows by combining the simplicity of <cite>torch.compile</cite> API with the performance of TensorRT. Invoking the <cite>torch.compile</cite> backend is as simple as importing the <cite>torch_tensorrt</cite> package and specifying the backend:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">torch_tensorrt</span>
+<span class="o">...</span>
+<span class="n">optimized_model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">backend</span><span class="o">=</span><span class="s2">&quot;torch_tensorrt&quot;</span><span class="p">,</span> <span class="n">dynamic</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Many additional customization options are available to the user. These will be discussed in further depth in this guide.</p>
+</div>
+<p>The backend can handle a variety of challenging model structures and offers a simple-to-use interface for effective acceleration of models. Additionally, it has many customization options to ensure the compilation process is fitting to the specific use case.</p>
+</section>
+<section id="customizable-settings">
+<h2>Customizable Settings<a class="headerlink" href="#customizable-settings" title="Link to this heading">#</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="torch_tensorrt.dynamo.CompilationSettings">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">torch_tensorrt.dynamo.</span></span><span class="sig-name descname"><span class="pre">CompilationSettings</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="pre">enabled_precisions:</span> <span class="pre">~typing.Set[~torch_tensorrt._enums.dtype]</span> <span class="pre">=</span> <span class="pre">&lt;factory&gt;,</span> <span class="pre">workspace_size:</span> <span class="pre">int</span> <span class="pre">=</span> <span class="pre">0,</span> <span class="pre">min_block_size:</span> <span class="pre">int</span> <span class="pre">=</span> <span class="pre">5,</span> <span class="pre">torch_executed_ops:</span> <span class="pre">~typing.Collection[~collections.abc.Callable[[...],</span> <span class="pre">~typing.Any]</span> <span class="pre">|</span> <span class="pre">str]</span> <span class="pre">=</span> <span class="pre">&lt;factory&gt;,</span> <span class="pre">pass_through_build_failures:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">False,</span> <span class="pre">max_aux_streams:</span> <span class="pre">int</span> <span class="pre">|</span> <span class="pre">None</span> <span class="pre">=</span> <span class="pre">None,</span> <span class="pre">version_compatible:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">False,</span> <span class="pre">optimization_level:</span> <span class="pre">int</span> <span class="pre">|</span> <span class="pre">None</span> <span class="pre">=</span> <span class="pre">None,</span> <span class="pre">use_python_runtime:</span> <span class="pre">bool</span> <span class="pre">|</span> <span class="pre">None</span> <span class="pre">=</span> <span class="pre">False,</span> <span class="pre">truncate_double:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">False,</span> <span class="pre">use_fast_partitioner:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">True,</span> <span class="pre">enable_experimental_decompositions:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">False,</span> <span class="pre">device:</span> <span class="pre">~torch_tensorrt._Device.Device</span> <span class="pre">=</span> <span class="pre">&lt;factory&gt;,</span> <span class="pre">require_full_compilation:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">False,</span> <span class="pre">disable_tf32:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">False,</span> <span class="pre">assume_dynamic_shape_support:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">False,</span> <span class="pre">sparse_weights:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">False,</span> <span class="pre">engine_capability:</span> <span class="pre">~torch_tensorrt._enums.EngineCapability</span> <span class="pre">=</span> <span class="pre">&lt;factory&gt;,</span> <span class="pre">num_avg_timing_iters:</span> <span class="pre">int</span> <span class="pre">=</span> <span class="pre">1,</span> <span class="pre">dla_sram_size:</span> <span class="pre">int</span> <span class="pre">=</span> <span class="pre">1048576,</span> <span class="pre">dla_local_dram_size:</span> <span class="pre">int</span> <span class="pre">=</span> <span class="pre">1073741824,</span> <span class="pre">dla_global_dram_size:</span> <span class="pre">int</span> <span class="pre">=</span> <span class="pre">536870912,</span> <span class="pre">dryrun:</span> <span class="pre">bool</span> <span class="pre">|</span> <span class="pre">str</span> <span class="pre">=</span> <span class="pre">False,</span> <span class="pre">hardware_compatible:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">False,</span> <span class="pre">timing_cache_path:</span> <span class="pre">str</span> <span class="pre">=</span> <span class="pre">'/tmp/torch_tensorrt_engine_cache/timing_cache.bin',</span> <span class="pre">lazy_engine_init:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">False,</span> <span class="pre">cache_built_engines:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">False,</span> <span class="pre">reuse_cached_engines:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">False,</span> <span class="pre">use_explicit_typing:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">True,</span> <span class="pre">use_fp32_acc:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">False,</span> <span class="pre">refit_identical_engine_weights:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">False,</span> <span class="pre">strip_engine_weights:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">False,</span> <span class="pre">immutable_weights:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">True,</span> <span class="pre">enable_weight_streaming:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">False,</span> <span class="pre">enable_cross_compile_for_windows:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">False,</span> <span class="pre">tiling_optimization_level:</span> <span class="pre">str</span> <span class="pre">=</span> <span class="pre">'none',</span> <span class="pre">l2_limit_for_tiling:</span> <span class="pre">int</span> <span class="pre">=</span> <span class="pre">-1,</span> <span class="pre">use_distributed_mode_trace:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">False,</span> <span class="pre">offload_module_to_cpu:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">False,</span> <span class="pre">enable_autocast:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">False,</span> <span class="pre">autocast_low_precision_type:</span> <span class="pre">~torch_tensorrt._enums.dtype</span> <span class="pre">|</span> <span class="pre">None</span> <span class="pre">=</span> <span class="pre">None,</span> <span class="pre">autocast_excluded_nodes:</span> <span class="pre">~typing.Collection[str]</span> <span class="pre">=</span> <span class="pre">&lt;factory&gt;,</span> <span class="pre">autocast_excluded_ops:</span> <span class="pre">~typing.Collection[~collections.abc.Callable[[...],</span> <span class="pre">~typing.Any]</span> <span class="pre">|</span> <span class="pre">str]</span> <span class="pre">=</span> <span class="pre">&lt;factory&gt;,</span> <span class="pre">autocast_max_output_threshold:</span> <span class="pre">float</span> <span class="pre">=</span> <span class="pre">512,</span> <span class="pre">autocast_max_depth_of_reduction:</span> <span class="pre">int</span> <span class="pre">|</span> <span class="pre">None</span> <span class="pre">=</span> <span class="pre">None,</span> <span class="pre">autocast_calibration_dataloader:</span> <span class="pre">~torch.utils.data.dataloader.DataLoader</span> <span class="pre">|</span> <span class="pre">None</span> <span class="pre">=</span> <span class="pre">None,</span> <span class="pre">enable_resource_partitioning:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">False,</span> <span class="pre">cpu_memory_budget:</span> <span class="pre">int</span> <span class="pre">=</span> <span class="pre">None,</span> <span class="pre">dynamically_allocate_resources:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">False</span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/torch_tensorrt/dynamo/_settings.html#CompilationSettings"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.dynamo.CompilationSettings" title="Link to this definition">#</a></dt>
+<dd><p>Compilation settings for Torch-TensorRT Dynamo Paths</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>enabled_precisions</strong> (<em>Set</em><em>[</em><em>dpython:type</em><em>]</em>) – Available kernel dtype precisions</p></li>
+<li><p><strong>debug</strong> (<em>bool</em>) – Whether to print out verbose debugging information</p></li>
+<li><p><strong>workspace_size</strong> (<em>python:int</em>) – Workspace TRT is allowed to use for the module (0 is default)</p></li>
+<li><p><strong>min_block_size</strong> (<em>python:int</em>) – Minimum number of operators per TRT-Engine Block</p></li>
+<li><p><strong>torch_executed_ops</strong> (<em>Collection</em><em>[</em><em>Target</em><em>]</em>) – Collection of operations to run in Torch, regardless of converter coverage</p></li>
+<li><p><strong>pass_through_build_failures</strong> (<em>bool</em>) – Whether to fail on TRT engine build errors (True) or not (False)</p></li>
+<li><p><strong>max_aux_streams</strong> (<em>Optional</em><em>[</em><em>python:int</em><em>]</em>) – Maximum number of allowed auxiliary TRT streams for each engine</p></li>
+<li><p><strong>version_compatible</strong> (<em>bool</em>) – Provide version forward-compatibility for engine plan files</p></li>
+<li><p><strong>optimization_level</strong> (<em>Optional</em><em>[</em><em>python:int</em><em>]</em>) – Builder optimization 0-5, higher levels imply longer build time,
+searching for more optimization options. TRT defaults to 3</p></li>
+<li><p><strong>use_python_runtime</strong> (<em>Optional</em><em>[</em><em>bool</em><em>]</em>) – Whether to strictly use Python runtime or C++ runtime. To auto-select a runtime
+based on C++ dependency presence (preferentially choosing C++ runtime if available), leave the
+argument as None</p></li>
+<li><p><strong>truncate_double</strong> (<em>bool</em>) – Whether to truncate float64 TRT engine inputs or weights to float32</p></li>
+<li><p><strong>use_fast_partitioner</strong> (<em>bool</em>) – Whether to use the fast or global graph partitioning system</p></li>
+<li><p><strong>enable_experimental_decompositions</strong> (<em>bool</em>) – Whether to enable all core aten decompositions
+or only a selected subset of them</p></li>
+<li><p><strong>device</strong> (<a class="reference internal" href="../../py_api/torch_tensorrt.html#torch_tensorrt.Device" title="torch_tensorrt.Device"><em>Device</em></a>) – GPU to compile the model on</p></li>
+<li><p><strong>require_full_compilation</strong> (<em>bool</em>) – Whether to require the graph is fully compiled in TensorRT.
+Only applicable for <cite>ir=”dynamo”</cite>; has no effect for <cite>torch.compile</cite> path</p></li>
+<li><p><strong>assume_dynamic_shape_support</strong> (<em>bool</em>) – Setting this to true enables the converters work for both dynamic and static shapes. Default: False</p></li>
+<li><p><strong>disable_tf32</strong> (<em>bool</em>) – Whether to disable TF32 computation for TRT layers</p></li>
+<li><p><strong>sparse_weights</strong> (<em>bool</em>) – Whether to allow the builder to use sparse weights</p></li>
+<li><p><strong>engine_capability</strong> (<em>trt.EngineCapability</em>) – Restrict kernel selection to safe gpu kernels or safe dla kernels</p></li>
+<li><p><strong>num_avg_timing_iters</strong> (<em>python:int</em>) – Number of averaging timing iterations used to select kernels</p></li>
+<li><p><strong>dla_sram_size</strong> (<em>python:int</em>) – Fast software managed RAM used by DLA to communicate within a layer.</p></li>
+<li><p><strong>dla_local_dram_size</strong> (<em>python:int</em>) – Host RAM used by DLA to share intermediate tensor data across operations</p></li>
+<li><p><strong>dla_global_dram_size</strong> (<em>python:int</em>) – Host RAM used by DLA to store weights and metadata for execution</p></li>
+<li><p><strong>dryrun</strong> (<em>Union</em><em>[</em><em>bool</em><em>, </em><em>str</em><em>]</em>) – Toggle “Dryrun” mode, which runs everything through partitioning, short of conversion to
+TRT Engines. Prints detailed logs of the graph structure and nature of partitioning. Optionally saves the
+output to a file if a string path is specified</p></li>
+<li><p><strong>hardware_compatible</strong> (<em>bool</em>) – Build the TensorRT engines compatible with GPU architectures other than that of the GPU on which the engine was built (currently works for NVIDIA Ampere and newer)</p></li>
+<li><p><strong>timing_cache_path</strong> (<em>str</em>) – Path to the timing cache if it exists (or) where it will be saved after compilation</p></li>
+<li><p><strong>cache_built_engines</strong> (<em>bool</em>) – Whether to save the compiled TRT engines to storage</p></li>
+<li><p><strong>reuse_cached_engines</strong> (<em>bool</em>) – Whether to load the compiled TRT engines from storage</p></li>
+<li><p><strong>use_strong_typing</strong> (<em>bool</em>) – This flag enables strong typing in TensorRT compilation which respects the precisions set in the Pytorch model. This is useful when users have mixed precision graphs.</p></li>
+<li><p><strong>use_fp32_acc</strong> (<em>bool</em>) – This option inserts cast to FP32 nodes around matmul layers and TensorRT ensures the accumulation of matmul happens in FP32. Use this only when FP16 precision is configured in enabled_precisions.</p></li>
+<li><p><strong>refit_identical_engine_weights</strong> (<em>bool</em>) – Whether to refit the engine with identical weights</p></li>
+<li><p><strong>strip_engine_weights</strong> (<em>bool</em>) – Whether to strip the engine weights</p></li>
+<li><p><strong>immutable_weights</strong> (<em>bool</em>) – Build non-refittable engines. This is useful for some layers that are not refittable. If this argument is set to true, <cite>strip_engine_weights</cite> and <cite>refit_identical_engine_weights</cite> will be ignored</p></li>
+<li><p><strong>enable_weight_streaming</strong> (<em>bool</em>) – Enable weight streaming.</p></li>
+<li><p><strong>enable_cross_compile_for_windows</strong> (<em>bool</em>) – By default this is False means TensorRT engines can only be executed on the same platform where they were built.
+True will enable cross-platform compatibility which allows the engine to be built on Linux and run on Windows</p></li>
+<li><p><strong>tiling_optimization_level</strong> (<em>str</em>) – The optimization level of tiling strategies. A higher level allows TensorRT to spend more time searching for better tiling strategy. We currently support [“none”, “fast”, “moderate”, “full”].</p></li>
+<li><p><strong>l2_limit_for_tiling</strong> (<em>python:int</em>) – The target L2 cache usage limit (in bytes) for tiling optimization (default is -1 which means no limit).</p></li>
+<li><p><strong>use_distributed_mode_trace</strong> (<em>bool</em>) – Using aot_autograd to trace the graph. This is enabled when DTensors or distributed tensors are present in distributed model</p></li>
+<li><p><strong>enable_autocast</strong> (<em>bool</em>) – Whether to enable autocast. If enabled, use_explicit_typing will be set to True.</p></li>
+<li><p><strong>autocast_low_precision_type</strong> (<em>Optional</em><em>[</em><em>Union</em><em>[</em><em>torch.dpython:type</em><em>, </em><em>dpython:type</em><em>]</em><em>]</em>) – The precision to reduce to. We currently support torch.float16 and torch.bfloat16. Default is None, which means no low precision is used.</p></li>
+<li><p><strong>autocast_excluded_nodes</strong> (<em>Collection</em><em>[</em><em>str</em><em>]</em>) – The set of regex patterns to match user-specified node names that should remain in FP32. Default is [].</p></li>
+<li><p><strong>autocast_excluded_ops</strong> (<em>Collection</em><em>[</em><em>Target</em><em>]</em>) – The set of targets (ATen ops) that should remain in FP32. Default is [].</p></li>
+<li><p><strong>autocast_max_output_threshold</strong> (<em>python:float</em>) – Maximum absolute value for node outputs, nodes with outputs greater than this value will remain in FP32. Default is 512.</p></li>
+<li><p><strong>autocast_max_depth_of_reduction</strong> (<em>Optional</em><em>[</em><em>python:int</em><em>]</em>) – Maximum depth of reduction allowed in low precision. Nodes with higher reduction depths will remain in FP32. This helps prevent excessive accuracy loss in operations particularly sensitive to reduced precision, as higher-depth reductions may amplify computation errors in low precision formats. If not provided, infinity will be used. Default is None.</p></li>
+<li><p><strong>autocast_calibration_dataloader</strong> (<em>Optional</em><em>[</em><em>torch.utils.data.DataLoader</em><em>]</em>) – The dataloader to use for autocast calibration. Default is None.</p></li>
+<li><p><strong>offload_module_to_cpu</strong> (<em>bool</em>) – Offload the model to CPU to reduce memory footprint during compilation</p></li>
+<li><p><strong>dynamically_allocate_resources</strong> (<em>bool</em>) – Dynamically allocate resources for TensorRT engines</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<section id="custom-setting-usage">
+<h3>Custom Setting Usage<a class="headerlink" href="#custom-setting-usage" title="Link to this heading">#</a></h3>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">torch_tensorrt</span>
+<span class="o">...</span>
+<span class="n">optimized_model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">backend</span><span class="o">=</span><span class="s2">&quot;torch_tensorrt&quot;</span><span class="p">,</span> <span class="n">dynamic</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                                <span class="n">options</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;truncate_long_and_double&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+                                         <span class="s2">&quot;enabled_precisions&quot;</span><span class="p">:</span> <span class="p">{</span><span class="n">torch</span><span class="o">.</span><span class="n">float</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">half</span><span class="p">},</span>
+                                         <span class="s2">&quot;debug&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+                                         <span class="s2">&quot;min_block_size&quot;</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span>
+                                         <span class="s2">&quot;torch_executed_ops&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;torch.ops.aten.sub.Tensor&quot;</span><span class="p">},</span>
+                                         <span class="s2">&quot;optimization_level&quot;</span><span class="p">:</span> <span class="mi">4</span><span class="p">,</span>
+                                         <span class="s2">&quot;use_python_runtime&quot;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,})</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Supported precisions include FP32, FP16, BF16, INT8, FP8, and FP4. INT8/FP8 quantization requires the <a class="reference external" href="https://github.com/NVIDIA/TensorRT-Model-Optimizer">ModelOpt</a> library and a quantized model. FP4 requires TensorRT &gt;= 10.8.0.</p>
+</div>
+</section>
+</section>
+<section id="compilation">
+<h2>Compilation<a class="headerlink" href="#compilation" title="Link to this heading">#</a></h2>
+<p>Compilation is triggered by passing inputs to the model, as so:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">torch_tensorrt</span>
+<span class="o">...</span>
+<span class="c1"># Causes model compilation to occur</span>
+<span class="n">first_outputs</span> <span class="o">=</span> <span class="n">optimized_model</span><span class="p">(</span><span class="o">*</span><span class="n">inputs</span><span class="p">)</span>
+
+<span class="c1"># Subsequent inference runs with the same, or similar inputs will not cause recompilation</span>
+<span class="c1"># For a full discussion of this, see &quot;Recompilation Conditions&quot; below</span>
+<span class="n">second_outputs</span> <span class="o">=</span> <span class="n">optimized_model</span><span class="p">(</span><span class="o">*</span><span class="n">inputs</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="after-compilation">
+<h2>After Compilation<a class="headerlink" href="#after-compilation" title="Link to this heading">#</a></h2>
+<p>The compilation object can be used for inference within the Python session, and will recompile according to the recompilation conditions detailed below. In addition to general inference, the compilation process can be a helpful tool in determining model performance, current operator coverage, and feasibility of serialization. Each of these points will be covered in detail below.</p>
+<section id="model-performance">
+<h3>Model Performance<a class="headerlink" href="#model-performance" title="Link to this heading">#</a></h3>
+<p>The optimized model returned from <cite>torch.compile</cite> is useful for model benchmarking since it can automatically handle changes in the compilation context, or differing inputs that could require recompilation. When benchmarking inputs of varying distributions, batch sizes, or other criteria, this can save time.</p>
+</section>
+<section id="operator-coverage">
+<h3>Operator Coverage<a class="headerlink" href="#operator-coverage" title="Link to this heading">#</a></h3>
+<p>Compilation is also a useful tool in determining operator coverage for a particular model. For instance, the following compilation command will display the operator coverage for each graph, but will not compile the model - effectively providing a “dryrun” mechanism:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">torch_tensorrt</span>
+<span class="o">...</span>
+<span class="n">optimized_model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">backend</span><span class="o">=</span><span class="s2">&quot;torch_tensorrt&quot;</span><span class="p">,</span> <span class="n">dynamic</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                                <span class="n">options</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;debug&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+                                         <span class="s2">&quot;min_block_size&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="s2">&quot;inf&quot;</span><span class="p">),})</span>
+</pre></div>
+</div>
+<p>If key operators for your model are unsupported, see <span class="xref std std-ref">dynamo_conversion</span> to contribute your own converters, or file an issue here: <a class="github reference external" href="https://github.com/pytorch/TensorRT/issues">pytorch/TensorRT#issues</a>.</p>
+</section>
+<section id="feasibility-of-serialization">
+<h3>Feasibility of Serialization<a class="headerlink" href="#feasibility-of-serialization" title="Link to this heading">#</a></h3>
+<p>Compilation can also be helpful in demonstrating graph breaks and the feasibility of serialization of a particular model. For instance, if a model has no graph breaks and compiles successfully with the Torch-TensorRT backend, then that model should be compilable and serializeable via the <cite>torch_tensorrt</cite> Dynamo IR, as discussed in <a class="reference internal" href="dynamic_shapes.html#dynamic-shapes"><span class="std std-ref">Dynamic shapes with Torch-TensorRT</span></a>. To determine the number of graph breaks in a model, the <cite>torch._dynamo.explain</cite> function is very useful:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch_tensorrt</span>
+<span class="o">...</span>
+<span class="n">explanation</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">_dynamo</span><span class="o">.</span><span class="n">explain</span><span class="p">(</span><span class="n">model</span><span class="p">)(</span><span class="o">*</span><span class="n">inputs</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Graph breaks: </span><span class="si">{</span><span class="n">explanation</span><span class="o">.</span><span class="n">graph_break_count</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="n">optimized_model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">backend</span><span class="o">=</span><span class="s2">&quot;torch_tensorrt&quot;</span><span class="p">,</span> <span class="n">dynamic</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">options</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;truncate_long_and_double&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">})</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="dynamic-shape-support">
+<h2>Dynamic Shape Support<a class="headerlink" href="#dynamic-shape-support" title="Link to this heading">#</a></h2>
+<p>The Torch-TensorRT <cite>torch.compile</cite> backend will currently require recompilation for each new batch size encountered, and it is preferred to use the <cite>dynamic=False</cite> argument when compiling with this backend. Full dynamic shape support is planned for a future release.</p>
+</section>
+<section id="recompilation-conditions">
+<h2>Recompilation Conditions<a class="headerlink" href="#recompilation-conditions" title="Link to this heading">#</a></h2>
+<p>Once the model has been compiled, subsequent inference inputs with the same shape and data type, which traverse the graph in the same way will not require recompilation. Furthermore, each new recompilation will be cached for the duration of the Python session. For instance, if inputs of batch size 4 and 8 are provided to the model, causing two recompilations, no further recompilation would be necessary for future inputs with those batch sizes during inference within the same session. Support for engine cache serialization is planned for a future release.</p>
+<p>Recompilation is generally triggered by one of two events: encountering inputs of different sizes or inputs which traverse the model code differently. The latter scenario can occur when the model code includes conditional logic, complex loops, or data-dependent-shapes. <cite>torch.compile</cite> handles guarding in both of these scenario and determines when recompilation is necessary.</p>
+</section>
+</section>
+
+
+                </article>
+              
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="index.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">Compilation</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="../../tutorials/_rendered_examples/dynamo/torch_compile_advanced_usage.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">Torch Compile Advanced Usage</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <div class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+<div
+    id="pst-page-navigation-heading-2"
+    class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> On this page
+  </div>
+  <nav class="bd-toc-nav page-toc" aria-labelledby="pst-page-navigation-heading-2">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#key-features">Key Features</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#customizable-settings">Customizable Settings</a><ul class="visible nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#torch_tensorrt.dynamo.CompilationSettings"><code class="docutils literal notranslate"><span class="pre">CompilationSettings</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#custom-setting-usage">Custom Setting Usage</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#compilation">Compilation</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#after-compilation">After Compilation</a><ul class="visible nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#model-performance">Model Performance</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#operator-coverage">Operator Coverage</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#feasibility-of-serialization">Feasibility of Serialization</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#dynamic-shape-support">Dynamic Shape Support</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#recompilation-conditions">Recompilation Conditions</a></li>
+</ul>
+  </nav></div>
+
+  <div class="sidebar-secondary-item">
+
+  
+  <div class="tocsection editthispage">
+    <a href="https://github.com/pytorch/TensorRT/edit/main/docsrc/user_guide/compilation/torch_compile.rst">
+      <i class="fa-solid fa-pencil"></i>
+      
+      
+        
+          Edit on GitHub
+        
+      
+    </a>
+  </div>
+</div>
+
+  <div class="sidebar-secondary-item">
+
+  <div class="tocsection sourcelink">
+    <a href="../../_sources/user_guide/compilation/torch_compile.rst.txt">
+      <i class="fa-solid fa-file-lines"></i> Show Source
+    </a>
+  </div>
+</div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+          </footer>
+        
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script src="../../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b"></script>
+<script src="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+  
+    <div class="footer-items__start">
+      
+        <div class="footer-item">
+
+  <p class="copyright">
+    
+      © Copyright 2024, NVIDIA Corporation.
+      <br/>
+    
+  </p>
+</div>
+      
+    </div>
+  
+  
+  
+</div>
+
+  </footer>
+  </body>
+</html>

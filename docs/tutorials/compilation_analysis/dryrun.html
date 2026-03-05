@@ -1,0 +1,864 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Dryrun Mode &#8212; Torch-TensorRT</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../../_static/styles/theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../../_static/styles/bootstrap.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../../_static/styles/pydata-sphinx-theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+
+  
+  <link href="../../_static/vendor/fontawesome/6.5.2/css/all.min.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+  <link rel="preload" as="font" type="font/woff2" crossorigin href="../../_static/vendor/fontawesome/6.5.2/webfonts/fa-solid-900.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../../_static/vendor/fontawesome/6.5.2/webfonts/fa-brands-400.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../../_static/vendor/fontawesome/6.5.2/webfonts/fa-regular-400.woff2" />
+
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=72e443bf" />
+    <link rel="stylesheet" type="text/css" href="../../_static/sg_gallery.css?v=61a4c737" />
+    <link rel="stylesheet" type="text/css" href="../../_static/sg_gallery-binder.css?v=f4aeca0c" />
+    <link rel="stylesheet" type="text/css" href="../../_static/sg_gallery-dataframe.css?v=e5fbc548" />
+    <link rel="stylesheet" type="text/css" href="../../_static/sg_gallery-rendered-html.css?v=1277b6f3" />
+    <link rel="stylesheet" type="text/css" href="../../_static/collapsible-lists/css/tree_view.css?v=a885cde7" />
+    <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/katex@0.10.0-beta/dist/katex.min.css" />
+    <link rel="stylesheet" type="text/css" href="../../_static/css/custom.css?v=0cb2b9ef" />
+  
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b" />
+<link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
+  <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+    <script src="../../_static/documentation_options.js?v=9e89f000"></script>
+    <script src="../../_static/doctools.js?v=888ff710"></script>
+    <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
+    <script src="../../_static/collapsible-lists/js/apply-collapsible-lists.js?v=660e4f45"></script>
+    <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'tutorials/compilation_analysis/dryrun';</script>
+    <script>
+        DOCUMENTATION_OPTIONS.theme_version = '0.15.4';
+        DOCUMENTATION_OPTIONS.theme_switcher_json_url = 'https://raw.githubusercontent.com/pytorch/TensorRT/refs/heads/main/docs/versions.json';
+        DOCUMENTATION_OPTIONS.theme_switcher_version_match = 'main';
+        DOCUMENTATION_OPTIONS.show_version_warning_banner = false;
+        </script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="Hierarchical Partitioner Example" href="../_rendered_examples/dynamo/hierarchical_partitioner_example.html" />
+    <link rel="prev" title="Tracing Models with torch_tensorrt.dynamo.trace" href="trace.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-primary-sidebar-checkbox"/>
+  <label class="overlay overlay-primary" for="pst-primary-sidebar-checkbox"></label>
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-secondary-sidebar-checkbox"/>
+  <label class="overlay overlay-secondary" for="pst-secondary-sidebar-checkbox"></label>
+  
+  <div class="search-button__wrapper">
+    <div class="search-button__overlay"></div>
+    <div class="search-button__search-container">
+<form class="bd-search d-flex align-items-center"
+      action="../../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         id="search-input"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form></div>
+  </div>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+<div class="bd-header__inner bd-page-width">
+  <button class="pst-navbar-icon sidebar-toggle primary-toggle" aria-label="Site navigation">
+    <span class="fa-solid fa-bars"></span>
+  </button>
+  
+  
+  <div class=" navbar-header-items__start">
+    
+      <div class="navbar-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../../index.html">
+  
+  
+  
+  
+  
+  
+    <p class="title logo__title">Torch-TensorRT</p>
+  
+</a></div>
+    
+      <div class="navbar-item">
+<script>
+document.write(`
+  <div class="version-switcher__container dropdown">
+    <button id="pst-version-switcher-button-2"
+      type="button"
+      class="version-switcher__button btn btn-sm dropdown-toggle"
+      data-bs-toggle="dropdown"
+      aria-haspopup="listbox"
+      aria-controls="pst-version-switcher-list-2"
+      aria-label="Version switcher list"
+    >
+      Choose version  <!-- this text may get changed later by javascript -->
+      <span class="caret"></span>
+    </button>
+    <div id="pst-version-switcher-list-2"
+      class="version-switcher__menu dropdown-menu list-group-flush py-0"
+      role="listbox" aria-labelledby="pst-version-switcher-button-2">
+      <!-- dropdown will be populated by javascript on page load -->
+    </div>
+  </div>
+`);
+</script></div>
+    
+  </div>
+  
+  <div class=" navbar-header-items">
+    
+    <div class="me-auto navbar-header-items__center">
+      
+        <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../getting_started/installation.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../user_guide/index.html">
+    User Guide
+  </a>
+</li>
+
+
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="../advanced_usage.html">
+    Advanced Usage
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../model_zoo.html">
+    Model Zoo
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../api_reference.html">
+    API Reference
+  </a>
+</li>
+
+            <li class="nav-item dropdown">
+                <button class="btn dropdown-toggle nav-item" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-controls="pst-nav-more-links">
+                    More
+                </button>
+                <ul id="pst-nav-more-links" class="dropdown-menu">
+                    
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../debugging/index.html">
+    Debugging
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../contributing.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../legacy.html">
+    Legacy Frontends
+  </a>
+</li>
+
+                </ul>
+            </li>
+            
+  </ul>
+</nav></div>
+      
+    </div>
+    
+    
+    <div class="navbar-header-items__end">
+      
+      
+        <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm pst-navbar-icon search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+  </button>
+`);
+</script></div>
+      
+        <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="theme-switch fa-solid fa-sun fa-lg" data-mode="light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg" data-mode="dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"></i>
+  </button>
+`);
+</script></div>
+      
+        <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/pytorch/TensorRT/" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+</ul></div>
+      
+    </div>
+    
+  </div>
+  
+  
+
+  
+    <button class="pst-navbar-icon sidebar-toggle secondary-toggle" aria-label="On this page">
+      <span class="fa-solid fa-outdent"></span>
+    </button>
+  
+</div>
+
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <div class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+      <div class="sidebar-header-items__center">
+        
+          
+          
+            <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../getting_started/installation.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../user_guide/index.html">
+    User Guide
+  </a>
+</li>
+
+
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="../advanced_usage.html">
+    Advanced Usage
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../model_zoo.html">
+    Model Zoo
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../api_reference.html">
+    API Reference
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../debugging/index.html">
+    Debugging
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../contributing.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../legacy.html">
+    Legacy Frontends
+  </a>
+</li>
+
+  </ul>
+</nav></div>
+          
+        
+      </div>
+    
+    
+    
+      <div class="sidebar-header-items__end">
+        
+          <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm pst-navbar-icon search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+  </button>
+`);
+</script></div>
+        
+          <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="theme-switch fa-solid fa-sun fa-lg" data-mode="light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg" data-mode="dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"></i>
+  </button>
+`);
+</script></div>
+        
+          <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/pytorch/TensorRT/" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+</ul></div>
+        
+      </div>
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+<nav class="bd-docs-nav bd-links"
+     aria-label="Section Navigation">
+  <p class="bd-links__title" role="heading" aria-level="1">Section Navigation</p>
+  <div class="bd-toc-item navbar-nav"><ul class="current nav bd-sidenav">
+<li class="toctree-l1 has-children"><a class="reference internal" href="../huggingface/index.html">HuggingFace Models</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../huggingface/compile_hf_models.html">Compiling LLM models from Huggingface</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../_rendered_examples/dynamo/torch_compile_stable_diffusion.html">Example: Compiling Stable Diffusion with torch.compile</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../_rendered_examples/dynamo/torch_export_flux_dev.html">Example: Compiling FLUX.1-dev with the dynamo backend</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../_rendered_examples/dynamo/mutable_torchtrt_module_example.html">Example: Mutable Torch TensorRT Module</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../extensibility/index.html">Extensibility</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../extensibility/converters/index.html">Converters</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../extensibility/converters/dynamo_converters.html">Writing Dynamo Converters</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../extensibility/converters/converter_registry.html">Converter Registry Internals</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../extensibility/converters/impl_subpackage.html">The <code class="docutils literal notranslate"><span class="pre">impl/</span></code> Building-Block Library</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../_rendered_examples/dynamo/auto_generate_converters.html">Example: Auto-generate a Converter for a Custom Kernel</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../_rendered_examples/dynamo/converter_overloading.html">Example: Overloading Converters with Custom Converters</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../extensibility/lowering/index.html">Lowering Passes</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../extensibility/lowering/writing_dynamo_aten_lowering_passes.html">Writing Dynamo ATen Lowering Passes</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../extensibility/plugins/index.html">Plugins</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../extensibility/plugins/plugins.html">Plugin System</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../_rendered_examples/dynamo/auto_generate_plugins.html">Example: Auto-generate a Plugin for a Custom Kernel</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../_rendered_examples/dynamo/custom_kernel_plugins.html">Example: Using Custom Kernels within TensorRT Engines</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../_rendered_examples/dynamo/aot_plugin.html">Automatically Generate a TensorRT AOT Plugin</a></li>
+
+
+
+
+
+
+<li class="toctree-l3"><a class="reference internal" href="../_rendered_examples/dynamo/nvrtc_aot_plugin.html">Example: Custom Kernels with NVRTC in TensorRT AOT Plugins</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../resource_memory/index.html">Resource &amp; Memory Management</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../resource_memory/resource_management.html">Resource Management</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../resource_memory/engine_cache.html">Engine Caching</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../_rendered_examples/dynamo/engine_caching_example.html">Example: Engine Caching</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../_rendered_examples/dynamo/engine_caching_bert_example.html">Example: Engine Caching (BERT)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../_rendered_examples/dynamo/weight_streaming_example.html">Example: Weight Streaming</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../_rendered_examples/dynamo/dynamic_memory_allocation.html">Example: Dynamic Memory Allocation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../_rendered_examples/dynamo/low_cpu_memory_compilation.html">Example: Low CPU Memory Compilation</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 current active has-children"><a class="reference internal" href="index.html">Compilation &amp; Graph Analysis</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="trace.html">Tracing Models with <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.dynamo.trace</span></code></a></li>
+<li class="toctree-l2 current active"><a class="current reference internal" href="#">Dryrun Mode</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../_rendered_examples/dynamo/hierarchical_partitioner_example.html">Example: Hierarchical Partitioner</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../weight_refit/index.html">Weight Refitting &amp; LoRA</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../weight_refit/refit.html">Refitting TensorRT Engines with Updated Weights</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../_rendered_examples/dynamo/refit_engine_example.html">Example: Refitting Programs with New Weights</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../runtime_opt/index.html">Runtime Optimization</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../runtime_opt/cuda_graphs.html">CUDAGraphs and the Output Allocator</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../_rendered_examples/dynamo/torch_export_cudagraphs.html">Example: Torch Export with Cudagraphs</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../_rendered_examples/dynamo/pre_allocated_output_example.html">Example: Pre-allocated output buffer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../runtime_opt/python_runtime.html">Python Runtime</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../deployment/index.html">Deployment</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../deployment/serving_torch_tensorrt_with_triton.html">Serving a Torch-TensorRT model with Triton</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../deployment/cross_compile_windows.html">Cross-Compiling for Windows</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../_rendered_examples/dynamo/cross_runtime_compilation_for_windows.html">Example: Cross-runtime Compilation for Windows</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../deployment/distributed_inference.html">Distributed Inference</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../deployment/complex_tensors.html">Complex Tensor Support</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../_rendered_examples/distributed_inference/index.html">Example: Distributed Inference</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../_rendered_examples/distributed_inference/data_parallel_stable_diffusion.html">Torch-TensorRT Distributed Inference</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../_rendered_examples/distributed_inference/data_parallel_gpt2.html">Torch-TensorRT Distributed Inference</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../_rendered_examples/distributed_inference/tensor_parallel_simple_example.html">Tensor Parallel Distributed Inference with Torch-TensorRT</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1"><a class="reference internal" href="../../indices/supported_ops.html">Operators Supported</a></li>
+</ul>
+</div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+  
+  <div id="rtd-footer-container"></div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item">
+
+
+
+<nav aria-label="Breadcrumb" class="d-print-none">
+  <ul class="bd-breadcrumbs">
+    
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="../../index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+    
+    <li class="breadcrumb-item"><a href="../advanced_usage.html" class="nav-link">Advanced Usage</a></li>
+    
+    
+    <li class="breadcrumb-item"><a href="index.html" class="nav-link">Compilation &amp; Graph Analysis</a></li>
+    
+    <li class="breadcrumb-item active" aria-current="page">Dryrun Mode</li>
+  </ul>
+</nav>
+</div>
+      
+    </div>
+  
+  
+</div>
+</div>
+              
+              
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section id="dryrun-mode">
+<span id="dryrun"></span><h1>Dryrun Mode<a class="headerlink" href="#dryrun-mode" title="Link to this heading">#</a></h1>
+<p>Dryrun mode runs the full Torch-TensorRT partitioning pipeline — lowering, capability
+checking, graph splitting — but stops <strong>before</strong> building any TRT engines. It prints a
+detailed report describing exactly how the graph will be partitioned and which operators
+will run in TRT vs. PyTorch.</p>
+<p>Use dryrun to:</p>
+<ul class="simple">
+<li><p>Understand TRT operator coverage for a new model without waiting for compilation.</p></li>
+<li><p>Tune <code class="docutils literal notranslate"><span class="pre">min_block_size</span></code> before committing to a full compile.</p></li>
+<li><p>Debug why an op is falling back to PyTorch.</p></li>
+<li><p>Compare the partitioning effect of different <code class="docutils literal notranslate"><span class="pre">CompilationSettings</span></code>.</p></li>
+</ul>
+<hr class="docutils" />
+<section id="enabling-dryrun">
+<h2>Enabling Dryrun<a class="headerlink" href="#enabling-dryrun" title="Link to this heading">#</a></h2>
+<p>Set <code class="docutils literal notranslate"><span class="pre">dryrun=True</span></code> to print the report to stdout:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch_tensorrt</span>
+
+<span class="n">exp_program</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">export</span><span class="o">.</span><span class="n">export</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">inputs</span><span class="p">))</span>
+<span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">dynamo</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span>
+    <span class="n">exp_program</span><span class="p">,</span>
+    <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">,</span>
+    <span class="n">dryrun</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p>Set <code class="docutils literal notranslate"><span class="pre">dryrun</span></code> to a file path to also save the report:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">dynamo</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span>
+    <span class="n">exp_program</span><span class="p">,</span>
+    <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">,</span>
+    <span class="n">dryrun</span><span class="o">=</span><span class="s2">&quot;/tmp/partition_report.txt&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">dryrun</span></code> is a <code class="xref cpp cpp-class docutils literal notranslate"><span class="pre">torch_tensorrt.dynamo.CompilationSettings</span></code> parameter and can
+also be passed via <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code>:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">trt_model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">backend</span><span class="o">=</span><span class="s2">&quot;tensorrt&quot;</span><span class="p">,</span> <span class="n">options</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;dryrun&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">})</span>
+<span class="n">trt_model</span><span class="p">(</span><span class="o">*</span><span class="n">inputs</span><span class="p">)</span>  <span class="c1"># report printed on first forward pass</span>
+</pre></div>
+</div>
+</section>
+<hr class="docutils" />
+<section id="reading-the-report">
+<h2>Reading the Report<a class="headerlink" href="#reading-the-report" title="Link to this heading">#</a></h2>
+<p>A typical dryrun report looks like this:</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="o">++++++++++++++++++++++++++</span><span class="w"> </span><span class="n">Dry</span><span class="o">-</span><span class="n">Run</span><span class="w"> </span><span class="n">Results</span><span class="w"> </span><span class="k">for</span><span class="w"> </span><span class="n">Graph</span><span class="w"> </span><span class="o">++++++++++++++++++++++++++</span>
+
+<span class="n">The</span><span class="w"> </span><span class="n">graph</span><span class="w"> </span><span class="n">consists</span><span class="w"> </span><span class="n">of</span><span class="w"> </span><span class="mi">142</span><span class="w"> </span><span class="n">Total</span><span class="w"> </span><span class="n">Operators</span><span class="p">,</span><span class="w"> </span><span class="n">of</span><span class="w"> </span><span class="n">which</span><span class="w"> </span><span class="mi">138</span><span class="w"> </span><span class="n">operators</span><span class="w"> </span><span class="n">are</span><span class="w"> </span><span class="n">supported</span><span class="p">,</span><span class="w"> </span><span class="mf">97.18</span><span class="o">%</span><span class="w"> </span><span class="n">coverage</span>
+
+<span class="n">The</span><span class="w"> </span><span class="n">following</span><span class="w"> </span><span class="n">ops</span><span class="w"> </span><span class="n">are</span><span class="w"> </span><span class="n">currently</span><span class="w"> </span><span class="n">unsupported</span><span class="w"> </span><span class="k">or</span><span class="w"> </span><span class="n">excluded</span><span class="w"> </span><span class="n">from</span><span class="w"> </span><span class="n">conversion</span><span class="p">,</span><span class="w"> </span><span class="k">and</span><span class="w"> </span><span class="n">are</span><span class="w"> </span><span class="n">listed</span><span class="w"> </span><span class="n">with</span><span class="w"> </span><span class="n">their</span><span class="w"> </span><span class="n">op</span><span class="o">-</span><span class="n">count</span><span class="w"> </span><span class="n">in</span><span class="w"> </span><span class="n">the</span><span class="w"> </span><span class="n">graph</span><span class="o">:</span>
+<span class="w"> </span><span class="n">torch</span><span class="p">.</span><span class="n">ops</span><span class="p">.</span><span class="n">aten</span><span class="p">.</span><span class="n">embedding</span><span class="p">.</span><span class="k">default</span><span class="o">:</span><span class="w"> </span><span class="mi">1</span>
+<span class="w"> </span><span class="n">torch</span><span class="p">.</span><span class="n">ops</span><span class="p">.</span><span class="n">aten</span><span class="p">.</span><span class="n">index</span><span class="p">.</span><span class="n">Tensor</span><span class="o">:</span><span class="w"> </span><span class="mi">3</span>
+
+<span class="n">Compiled</span><span class="w"> </span><span class="n">with</span><span class="o">:</span><span class="w"> </span><span class="n">CompilationSettings</span><span class="p">(</span><span class="n">enabled_precisions</span><span class="o">=</span><span class="p">{</span><span class="n">dtype</span><span class="p">.</span><span class="n">f32</span><span class="p">},</span><span class="w"> </span><span class="n">min_block_size</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span><span class="w"> </span><span class="p">...)</span>
+
+<span class="w">  </span><span class="n">Graph</span><span class="w"> </span><span class="n">Structure</span><span class="o">:</span>
+
+<span class="w">   </span><span class="nl">Inputs</span><span class="p">:</span><span class="w"> </span><span class="n">List</span><span class="p">[</span><span class="n">Tensor</span><span class="o">:</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">512</span><span class="p">)</span><span class="err">@</span><span class="n">int64</span><span class="p">]</span>
+<span class="w">    </span><span class="p">...</span>
+<span class="w">      </span><span class="n">TRT</span><span class="w"> </span><span class="n">Engine</span><span class="w"> </span><span class="err">#</span><span class="mi">1</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">Submodule</span><span class="w"> </span><span class="n">name</span><span class="o">:</span><span class="w"> </span><span class="n">_run_on_acc_0</span>
+<span class="w">       </span><span class="n">Engine</span><span class="w"> </span><span class="n">Inputs</span><span class="o">:</span><span class="w"> </span><span class="n">List</span><span class="p">[</span><span class="n">Tensor</span><span class="o">:</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">512</span><span class="p">,</span><span class="w"> </span><span class="mi">768</span><span class="p">)</span><span class="err">@</span><span class="n">float32</span><span class="p">]</span>
+<span class="w">       </span><span class="n">Number</span><span class="w"> </span><span class="n">of</span><span class="w"> </span><span class="n">Operators</span><span class="w"> </span><span class="n">in</span><span class="w"> </span><span class="n">Engine</span><span class="o">:</span><span class="w"> </span><span class="mi">135</span>
+<span class="w">       </span><span class="n">Engine</span><span class="w"> </span><span class="n">Outputs</span><span class="o">:</span><span class="w"> </span><span class="n">Tensor</span><span class="o">:</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">512</span><span class="p">,</span><span class="w"> </span><span class="mi">30522</span><span class="p">)</span><span class="err">@</span><span class="n">float32</span>
+<span class="w">    </span><span class="p">...</span>
+<span class="w">   </span><span class="nl">Outputs</span><span class="p">:</span><span class="w"> </span><span class="n">List</span><span class="p">[</span><span class="n">Tensor</span><span class="o">:</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">512</span><span class="p">,</span><span class="w"> </span><span class="mi">30522</span><span class="p">)</span><span class="err">@</span><span class="n">float32</span><span class="p">]</span>
+
+<span class="w">  </span><span class="o">-------------------------</span><span class="w"> </span><span class="n">Aggregate</span><span class="w"> </span><span class="n">Stats</span><span class="w"> </span><span class="o">-------------------------</span>
+
+<span class="w">   </span><span class="n">Average</span><span class="w"> </span><span class="n">Number</span><span class="w"> </span><span class="n">of</span><span class="w"> </span><span class="n">Operators</span><span class="w"> </span><span class="n">per</span><span class="w"> </span><span class="n">TRT</span><span class="w"> </span><span class="n">Engine</span><span class="o">:</span><span class="w"> </span><span class="mf">135.0</span>
+<span class="w">   </span><span class="n">Most</span><span class="w"> </span><span class="n">Operators</span><span class="w"> </span><span class="n">in</span><span class="w"> </span><span class="n">a</span><span class="w"> </span><span class="n">TRT</span><span class="w"> </span><span class="n">Engine</span><span class="o">:</span><span class="w"> </span><span class="mi">135</span>
+
+<span class="w">   </span><span class="o">**********</span><span class="w"> </span><span class="n">Recommendations</span><span class="w"> </span><span class="o">**********</span>
+
+<span class="w">   </span><span class="o">-</span><span class="w"> </span><span class="n">For</span><span class="w"> </span><span class="n">minimal</span><span class="w"> </span><span class="n">graph</span><span class="w"> </span><span class="n">segmentation</span><span class="p">,</span><span class="w"> </span><span class="n">select</span><span class="w"> </span><span class="n">min_block_size</span><span class="o">=</span><span class="mi">135</span><span class="w"> </span><span class="n">which</span><span class="w"> </span><span class="n">would</span><span class="w"> </span><span class="n">generate</span><span class="w"> </span><span class="mi">1</span><span class="w"> </span><span class="n">TRT</span><span class="w"> </span><span class="n">engine</span><span class="p">(</span><span class="n">s</span><span class="p">)</span>
+<span class="w">   </span><span class="o">-</span><span class="w"> </span><span class="n">The</span><span class="w"> </span><span class="n">current</span><span class="w"> </span><span class="n">level</span><span class="w"> </span><span class="n">of</span><span class="w"> </span><span class="n">graph</span><span class="w"> </span><span class="n">segmentation</span><span class="w"> </span><span class="n">is</span><span class="w"> </span><span class="n">equivalent</span><span class="w"> </span><span class="n">to</span><span class="w"> </span><span class="n">selecting</span><span class="w"> </span><span class="n">min_block_size</span><span class="o">=</span><span class="mi">5</span><span class="w"> </span><span class="n">which</span><span class="w"> </span><span class="n">generates</span><span class="w"> </span><span class="mi">1</span><span class="w"> </span><span class="n">TRT</span><span class="w"> </span><span class="n">engine</span><span class="p">(</span><span class="n">s</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><strong>Sections explained:</strong></p>
+<dl>
+<dt>Coverage summary</dt><dd><p>Total operators, TRT-supported operators, and coverage percentage. “Supported” here
+means the operator has a converter registered <strong>and</strong> its capability validator
+passes for this specific node.</p>
+</dd>
+<dt>Unsupported ops</dt><dd><p>Operators that will fall back to PyTorch, with their occurrence count. Check these
+against the converter registry or your <code class="docutils literal notranslate"><span class="pre">torch_executed_ops</span></code> setting.</p>
+</dd>
+<dt>Nodes set to run in Torch</dt><dd><p>Specific nodes excluded from TRT blocks. A node may appear here even if it has a
+converter, if it was not included in any TRT block by the partitioner (e.g., it was
+below <code class="docutils literal notranslate"><span class="pre">min_block_size</span></code>).</p>
+</dd>
+<dt>Graph structure</dt><dd><p>ASCII schematic of input tensors → TRT engine blocks → output tensors. Each TRT
+engine block shows its input/output shapes and operator count. Use this to see
+where PyTorch↔TRT transitions occur.</p>
+</dd>
+<dt>Aggregate stats</dt><dd><p>Min, max, and average operator counts per engine. More engines with fewer operators
+each means more context-switch overhead.</p>
+</dd>
+<dt>Recommendations</dt><dd><p>Suggested <code class="docutils literal notranslate"><span class="pre">min_block_size</span></code> values and the resulting engine counts:</p>
+<ul class="simple">
+<li><p><strong>Minimal segmentation</strong> — the largest block absorbs the most operators; generates
+the fewest engines.</p></li>
+<li><p><strong>Current setting</strong> — what your current <code class="docutils literal notranslate"><span class="pre">min_block_size</span></code> produces.</p></li>
+</ul>
+<p>For models where TRT coverage is close to 100%, a single large engine is usually
+optimal. For mixed models, the recommendation helps you balance coverage vs. overhead.</p>
+</dd>
+</dl>
+</section>
+<hr class="docutils" />
+<section id="workflow-tuning-min-block-size">
+<h2>Workflow: Tuning min_block_size<a class="headerlink" href="#workflow-tuning-min-block-size" title="Link to this heading">#</a></h2>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Step 1: run dryrun with a loose min_block_size to see the full partition map</span>
+<span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">dynamo</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span>
+    <span class="n">exp_program</span><span class="p">,</span> <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">,</span>
+    <span class="n">dryrun</span><span class="o">=</span><span class="s2">&quot;/tmp/report_loose.txt&quot;</span><span class="p">,</span>
+    <span class="n">min_block_size</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="c1"># Step 2: read recommendations in the report, pick an appropriate value</span>
+<span class="c1"># Step 3: compile for real</span>
+<span class="n">trt_gm</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">dynamo</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span>
+    <span class="n">exp_program</span><span class="p">,</span> <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">,</span>
+    <span class="n">min_block_size</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<hr class="docutils" />
+<section id="debugging-fallback-ops">
+<h2>Debugging Fallback Ops<a class="headerlink" href="#debugging-fallback-ops" title="Link to this heading">#</a></h2>
+<p>If an op you expect to be TRT-supported appears in the unsupported list:</p>
+<ol class="arabic">
+<li><p>Check that a converter is registered:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.conversion._ConverterRegistry</span><span class="w"> </span><span class="kn">import</span> <span class="n">DYNAMO_CONVERTERS</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">aten</span><span class="o">.</span><span class="n">embedding</span><span class="o">.</span><span class="n">default</span> <span class="ow">in</span> <span class="n">DYNAMO_CONVERTERS</span><span class="p">)</span>
+</pre></div>
+</div>
+</li>
+<li><p>Check the converter’s capability validator:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.partitioning</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_graph_converter_support</span>
+<span class="n">n_supported</span><span class="p">,</span> <span class="n">n_total</span> <span class="o">=</span> <span class="n">get_graph_converter_support</span><span class="p">(</span><span class="n">gm</span><span class="p">,</span> <span class="n">torch_executed_ops</span><span class="o">=</span><span class="nb">set</span><span class="p">())</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">n_supported</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">n_total</span><span class="si">}</span><span class="s2"> ops supported&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</li>
+<li><p>Check <code class="docutils literal notranslate"><span class="pre">torch_executed_ops</span></code> — the op may be explicitly forced to PyTorch.</p></li>
+<li><p>Check <code class="docutils literal notranslate"><span class="pre">min_block_size</span></code> — the block containing the op may have been merged back into
+PyTorch because it had too few operators. Reduce <code class="docutils literal notranslate"><span class="pre">min_block_size</span></code> in dryrun to
+confirm.</p></li>
+</ol>
+</section>
+<hr class="docutils" />
+<section id="saving-the-report">
+<h2>Saving the Report<a class="headerlink" href="#saving-the-report" title="Link to this heading">#</a></h2>
+<p>Pass a string path to <code class="docutils literal notranslate"><span class="pre">dryrun</span></code> to persist the report:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">dynamo</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span>
+    <span class="n">exp_program</span><span class="p">,</span> <span class="n">arg_inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">,</span> <span class="n">dryrun</span><span class="o">=</span><span class="s2">&quot;/tmp/report.txt&quot;</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p>If the file already exists, a warning is logged and the file is <strong>not</strong> overwritten.
+Remove the old file manually before rerunning.</p>
+<p>The dryrun output is also available at <code class="docutils literal notranslate"><span class="pre">DEBUG</span></code> log level even when <code class="docutils literal notranslate"><span class="pre">dryrun=False</span></code>:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+<span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="s2">&quot;torch_tensorrt&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">setLevel</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+</section>
+
+
+                </article>
+              
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="trace.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">Tracing Models with <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.dynamo.trace</span></code></p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="../_rendered_examples/dynamo/hierarchical_partitioner_example.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">Hierarchical Partitioner Example</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <div class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+<div
+    id="pst-page-navigation-heading-2"
+    class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> On this page
+  </div>
+  <nav class="bd-toc-nav page-toc" aria-labelledby="pst-page-navigation-heading-2">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#enabling-dryrun">Enabling Dryrun</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#reading-the-report">Reading the Report</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#workflow-tuning-min-block-size">Workflow: Tuning min_block_size</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#debugging-fallback-ops">Debugging Fallback Ops</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#saving-the-report">Saving the Report</a></li>
+</ul>
+  </nav></div>
+
+  <div class="sidebar-secondary-item">
+
+  
+  <div class="tocsection editthispage">
+    <a href="https://github.com/pytorch/TensorRT/edit/main/docsrc/tutorials/compilation_analysis/dryrun.rst">
+      <i class="fa-solid fa-pencil"></i>
+      
+      
+        
+          Edit on GitHub
+        
+      
+    </a>
+  </div>
+</div>
+
+  <div class="sidebar-secondary-item">
+
+  <div class="tocsection sourcelink">
+    <a href="../../_sources/tutorials/compilation_analysis/dryrun.rst.txt">
+      <i class="fa-solid fa-file-lines"></i> Show Source
+    </a>
+  </div>
+</div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+          </footer>
+        
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script src="../../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b"></script>
+<script src="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+  
+    <div class="footer-items__start">
+      
+        <div class="footer-item">
+
+  <p class="copyright">
+    
+      © Copyright 2024, NVIDIA Corporation.
+      <br/>
+    
+  </p>
+</div>
+      
+    </div>
+  
+  
+  
+</div>
+
+  </footer>
+  </body>
+</html>

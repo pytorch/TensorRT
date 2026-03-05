@@ -1,0 +1,876 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Deploying Torch-TensorRT Programs &#8212; Torch-TensorRT</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../../_static/styles/theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../../_static/styles/bootstrap.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+<link href="../../_static/styles/pydata-sphinx-theme.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+
+  
+  <link href="../../_static/vendor/fontawesome/6.5.2/css/all.min.css?digest=dfe6caa3a7d634c4db9b" rel="stylesheet" />
+  <link rel="preload" as="font" type="font/woff2" crossorigin href="../../_static/vendor/fontawesome/6.5.2/webfonts/fa-solid-900.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../../_static/vendor/fontawesome/6.5.2/webfonts/fa-brands-400.woff2" />
+<link rel="preload" as="font" type="font/woff2" crossorigin href="../../_static/vendor/fontawesome/6.5.2/webfonts/fa-regular-400.woff2" />
+
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=72e443bf" />
+    <link rel="stylesheet" type="text/css" href="../../_static/sg_gallery.css?v=61a4c737" />
+    <link rel="stylesheet" type="text/css" href="../../_static/sg_gallery-binder.css?v=f4aeca0c" />
+    <link rel="stylesheet" type="text/css" href="../../_static/sg_gallery-dataframe.css?v=e5fbc548" />
+    <link rel="stylesheet" type="text/css" href="../../_static/sg_gallery-rendered-html.css?v=1277b6f3" />
+    <link rel="stylesheet" type="text/css" href="../../_static/collapsible-lists/css/tree_view.css?v=a885cde7" />
+    <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/katex@0.10.0-beta/dist/katex.min.css" />
+    <link rel="stylesheet" type="text/css" href="../../_static/css/custom.css?v=0cb2b9ef" />
+  
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b" />
+<link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
+  <script src="../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+    <script src="../../_static/documentation_options.js?v=9e89f000"></script>
+    <script src="../../_static/doctools.js?v=888ff710"></script>
+    <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
+    <script src="../../_static/collapsible-lists/js/apply-collapsible-lists.js?v=660e4f45"></script>
+    <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'user_guide/runtime_performance/runtime';</script>
+    <script>
+        DOCUMENTATION_OPTIONS.theme_version = '0.15.4';
+        DOCUMENTATION_OPTIONS.theme_switcher_json_url = 'https://raw.githubusercontent.com/pytorch/TensorRT/refs/heads/main/docs/versions.json';
+        DOCUMENTATION_OPTIONS.theme_switcher_version_match = 'main';
+        DOCUMENTATION_OPTIONS.show_version_warning_banner = false;
+        </script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="Runtime API" href="runtime_api.html" />
+    <link rel="prev" title="Runtime &amp; Serialization" href="index.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-primary-sidebar-checkbox"/>
+  <label class="overlay overlay-primary" for="pst-primary-sidebar-checkbox"></label>
+  
+  <input type="checkbox"
+          class="sidebar-toggle"
+          id="pst-secondary-sidebar-checkbox"/>
+  <label class="overlay overlay-secondary" for="pst-secondary-sidebar-checkbox"></label>
+  
+  <div class="search-button__wrapper">
+    <div class="search-button__overlay"></div>
+    <div class="search-button__search-container">
+<form class="bd-search d-flex align-items-center"
+      action="../../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         id="search-input"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form></div>
+  </div>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+<div class="bd-header__inner bd-page-width">
+  <button class="pst-navbar-icon sidebar-toggle primary-toggle" aria-label="Site navigation">
+    <span class="fa-solid fa-bars"></span>
+  </button>
+  
+  
+  <div class=" navbar-header-items__start">
+    
+      <div class="navbar-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../../index.html">
+  
+  
+  
+  
+  
+  
+    <p class="title logo__title">Torch-TensorRT</p>
+  
+</a></div>
+    
+      <div class="navbar-item">
+<script>
+document.write(`
+  <div class="version-switcher__container dropdown">
+    <button id="pst-version-switcher-button-2"
+      type="button"
+      class="version-switcher__button btn btn-sm dropdown-toggle"
+      data-bs-toggle="dropdown"
+      aria-haspopup="listbox"
+      aria-controls="pst-version-switcher-list-2"
+      aria-label="Version switcher list"
+    >
+      Choose version  <!-- this text may get changed later by javascript -->
+      <span class="caret"></span>
+    </button>
+    <div id="pst-version-switcher-list-2"
+      class="version-switcher__menu dropdown-menu list-group-flush py-0"
+      role="listbox" aria-labelledby="pst-version-switcher-button-2">
+      <!-- dropdown will be populated by javascript on page load -->
+    </div>
+  </div>
+`);
+</script></div>
+    
+  </div>
+  
+  <div class=" navbar-header-items">
+    
+    <div class="me-auto navbar-header-items__center">
+      
+        <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../getting_started/installation.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="../index.html">
+    User Guide
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../tutorials/advanced_usage.html">
+    Advanced Usage
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../tutorials/model_zoo.html">
+    Model Zoo
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../api_reference.html">
+    API Reference
+  </a>
+</li>
+
+            <li class="nav-item dropdown">
+                <button class="btn dropdown-toggle nav-item" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-controls="pst-nav-more-links">
+                    More
+                </button>
+                <ul id="pst-nav-more-links" class="dropdown-menu">
+                    
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../debugging/index.html">
+    Debugging
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../contributing.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../legacy.html">
+    Legacy Frontends
+  </a>
+</li>
+
+                </ul>
+            </li>
+            
+  </ul>
+</nav></div>
+      
+    </div>
+    
+    
+    <div class="navbar-header-items__end">
+      
+      
+        <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm pst-navbar-icon search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+  </button>
+`);
+</script></div>
+      
+        <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="theme-switch fa-solid fa-sun fa-lg" data-mode="light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg" data-mode="dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"></i>
+  </button>
+`);
+</script></div>
+      
+        <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/pytorch/TensorRT/" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+</ul></div>
+      
+    </div>
+    
+  </div>
+  
+  
+
+  
+    <button class="pst-navbar-icon sidebar-toggle secondary-toggle" aria-label="On this page">
+      <span class="fa-solid fa-outdent"></span>
+    </button>
+  
+</div>
+
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <div class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+      <div class="sidebar-header-items__center">
+        
+          
+          
+            <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../getting_started/installation.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="../index.html">
+    User Guide
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../tutorials/advanced_usage.html">
+    Advanced Usage
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../tutorials/model_zoo.html">
+    Model Zoo
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../api_reference.html">
+    API Reference
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../debugging/index.html">
+    Debugging
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../contributing.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../legacy.html">
+    Legacy Frontends
+  </a>
+</li>
+
+  </ul>
+</nav></div>
+          
+        
+      </div>
+    
+    
+    
+      <div class="sidebar-header-items__end">
+        
+          <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm pst-navbar-icon search-button search-button__button" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+  </button>
+`);
+</script></div>
+        
+          <div class="navbar-item">
+
+<script>
+document.write(`
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button" title="light/dark" aria-label="light/dark" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="theme-switch fa-solid fa-sun fa-lg" data-mode="light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg" data-mode="dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"></i>
+  </button>
+`);
+</script></div>
+        
+          <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/pytorch/TensorRT/" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+</ul></div>
+        
+      </div>
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+<nav class="bd-docs-nav bd-links"
+     aria-label="Section Navigation">
+  <p class="bd-links__title" role="heading" aria-level="1">Section Navigation</p>
+  <div class="bd-toc-item navbar-nav"><ul class="current nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../torch_tensorrt_explained.html">Torch-TensorRT Explained</a></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../compilation/index.html">Compilation</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../compilation/torch_compile.html">TensorRT Backend for <code class="docutils literal notranslate"><span class="pre">torch.compile</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/torch_compile_advanced_usage.html">Example: Torch Compile Advanced Usage</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../compilation/dynamo_export.html">Compiling Exported Programs with Torch-TensorRT</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../compilation/compilation_settings.html">CompilationSettings Reference</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../compilation/dynamic_shapes.html">Dynamic shapes with Torch-TensorRT</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/compile_with_dynamic_inputs.html">Example: Compiling Models with Dynamic Input Shapes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../compilation/unsupported_ops.html">Handling Unsupported Operators</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../shapes_precision/index.html">Precision &amp; Quantization</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../shapes_precision/mixed_precision.html">Compile Mixed Precision models with Torch-TensorRT</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/autocast_example.html">An example of using Torch-TensorRT Autocast</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../shapes_precision/quantization.html">Quantization (INT8 / FP8 / FP4)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/vgg16_ptq.html">Deploy Quantized Models using Torch-TensorRT</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 current active has-children"><a class="reference internal" href="index.html">Runtime &amp; Serialization</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l2 current active"><a class="current reference internal" href="#">Deploying Torch-TensorRT Programs</a></li>
+<li class="toctree-l2"><a class="reference internal" href="runtime_api.html">Runtime API</a></li>
+<li class="toctree-l2"><a class="reference internal" href="using_dla.html">DLA</a></li>
+<li class="toctree-l2"><a class="reference internal" href="saving_models.html">Saving models compiled with Torch-TensorRT</a></li>
+<li class="toctree-l2"><a class="reference internal" href="serialized_engine.html">Extracting a Raw TensorRT Engine</a></li>
+<li class="toctree-l2"><a class="reference internal" href="aot_inductor.html">AOTInductor Deployment</a></li>
+<li class="toctree-l2"><a class="reference internal" href="mutable_module.html">MutableTorchTensorRTModule</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/save_dynamic_shapes_example.html">Example: Saving and Loading Models with Dynamic Shapes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../tutorials/_rendered_examples/dynamo/save_dynamic_shapes_both_methods.html">Example: Saving Models with Dynamic Shapes - Both Methods</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1"><a class="reference internal" href="../performance_tuning.html">Performance Tuning Guide</a></li>
+</ul>
+</div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+  
+  <div id="rtd-footer-container"></div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item">
+
+
+
+<nav aria-label="Breadcrumb" class="d-print-none">
+  <ul class="bd-breadcrumbs">
+    
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="../../index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+    
+    <li class="breadcrumb-item"><a href="../index.html" class="nav-link">User Guide</a></li>
+    
+    
+    <li class="breadcrumb-item"><a href="index.html" class="nav-link">Runtime &amp; Serialization</a></li>
+    
+    <li class="breadcrumb-item active" aria-current="page">Deploying...</li>
+  </ul>
+</nav>
+</div>
+      
+    </div>
+  
+  
+</div>
+</div>
+              
+              
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section id="deploying-torch-tensorrt-programs">
+<span id="runtime"></span><h1>Deploying Torch-TensorRT Programs<a class="headerlink" href="#deploying-torch-tensorrt-programs" title="Link to this heading">#</a></h1>
+<p>After compiling and saving Torch-TensorRT programs there is no longer a strict dependency on the full
+Torch-TensorRT library. All that is required to run a compiled program is the runtime. There are therefore a couple
+options to deploy your programs other than shipping the full Torch-TensorRT compiler with your applications.</p>
+<section id="torch-tensorrt-package-libtorchtrt-so">
+<h2>Torch-TensorRT package / libtorchtrt.so<a class="headerlink" href="#torch-tensorrt-package-libtorchtrt-so" title="Link to this heading">#</a></h2>
+<p>Once a program is compiled, you run it using the standard PyTorch APIs. All that is required is that the package
+must be imported in python or linked in C++.</p>
+</section>
+<section id="runtime-library">
+<h2>Runtime Library<a class="headerlink" href="#runtime-library" title="Link to this heading">#</a></h2>
+<p>Distributed with the C++ distribution is <code class="docutils literal notranslate"><span class="pre">libtorchtrt_runtime.so</span></code>. This library only contains the components
+necessary to run Torch-TensorRT programs. Instead of linking <code class="docutils literal notranslate"><span class="pre">libtorchtrt.so</span></code> or importing <code class="docutils literal notranslate"><span class="pre">torch_tensorrt</span></code> you can
+link <code class="docutils literal notranslate"><span class="pre">libtorchtrt_runtime.so</span></code> in your deployment programs or use <code class="docutils literal notranslate"><span class="pre">DL_OPEN</span></code> or <code class="docutils literal notranslate"><span class="pre">LD_PRELOAD</span></code>. For python
+you can load the runtime with <code class="docutils literal notranslate"><span class="pre">torch.ops.load_library(&quot;libtorchtrt_runtime.so&quot;)</span></code>. You can then continue to use
+programs just as you would otherwise via PyTorch API.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>If you are linking <code class="docutils literal notranslate"><span class="pre">libtorchtrt_runtime.so</span></code>, likely using the following flags will help <code class="docutils literal notranslate"><span class="pre">-Wl,--no-as-needed</span> <span class="pre">-ltorchtrt</span> <span class="pre">-Wl,--as-needed</span></code> as there’s no direct symbol dependency to anything in the Torch-TensorRT runtime for most Torch-TensorRT runtime applications</p>
+</div>
+<p>An example of how to use <code class="docutils literal notranslate"><span class="pre">libtorchtrt_runtime.so</span></code> can be found here: <a class="github reference external" href="https://github.com/pytorch/TensorRT/tree/master/examples/torchtrt_aoti_example">pytorch/TensorRT</a></p>
+</section>
+<section id="plugin-library">
+<h2>Plugin Library<a class="headerlink" href="#plugin-library" title="Link to this heading">#</a></h2>
+<p>In the case you use Torch-TensorRT as a converter to a TensorRT engine and your engine uses plugins provided by Torch-TensorRT, Torch-TensorRT
+ships the library <code class="docutils literal notranslate"><span class="pre">libtorchtrt_plugins.so</span></code> which contains the implementation of the TensorRT plugins used by Torch-TensorRT during
+compilation. This library can be <code class="docutils literal notranslate"><span class="pre">DL_OPEN</span></code> or <code class="docutils literal notranslate"><span class="pre">LD_PRELOAD</span></code> similarly to other TensorRT plugin libraries.</p>
+</section>
+<section id="multi-device-safe-mode">
+<h2>Multi Device Safe Mode<a class="headerlink" href="#multi-device-safe-mode" title="Link to this heading">#</a></h2>
+<p>Multi-device safe mode is a setting in Torch-TensorRT which allows the user to determine whether
+the runtime checks for device consistency prior to every inference call.</p>
+<p>There is a non-negligible, fixed cost per-inference call when multi-device safe mode is enabled, which is why
+it is now disabled by default. It can be controlled via the following convenience function which
+doubles as a context manager.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Enables Multi Device Safe Mode</span>
+<span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">runtime</span><span class="o">.</span><span class="n">set_multi_device_safe_mode</span><span class="p">(</span><span class="kc">True</span><span class="p">)</span>
+
+<span class="c1"># Disables Multi Device Safe Mode [Default Behavior]</span>
+<span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">runtime</span><span class="o">.</span><span class="n">set_multi_device_safe_mode</span><span class="p">(</span><span class="kc">False</span><span class="p">)</span>
+
+<span class="c1"># Enables Multi Device Safe Mode, then resets the safe mode to its prior setting</span>
+<span class="k">with</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">runtime</span><span class="o">.</span><span class="n">set_multi_device_safe_mode</span><span class="p">(</span><span class="kc">True</span><span class="p">):</span>
+    <span class="o">...</span>
+</pre></div>
+</div>
+<p>TensorRT requires that each engine be associated with the CUDA context in the active thread from which it is invoked.
+Therefore, if the device were to change in the active thread, which may be the case when invoking
+engines on multiple GPUs from the same Python process, safe mode will cause Torch-TensorRT to display
+an alert and switch GPUs accordingly. If safe mode is not enabled, there could be a mismatch in the engine
+device and CUDA context device, which could lead the program to crash.</p>
+<p>One technique for managing multiple TRT engines on different GPUs while not sacrificing performance for
+multi-device safe mode is to use Python threads. Each thread is responsible for all of the TRT engines
+on a single GPU, and the default CUDA device on each thread corresponds to the GPU for which it is
+responsible (can be set via <code class="docutils literal notranslate"><span class="pre">torch.cuda.set_device(...)</span></code>). In this way, multiple threads can be used in the same
+Python script without needing to switch CUDA contexts and incur performance overhead.</p>
+</section>
+<section id="cudagraphs-mode">
+<h2>Cudagraphs Mode<a class="headerlink" href="#cudagraphs-mode" title="Link to this heading">#</a></h2>
+<p>Cudagraphs mode is a setting in Torch-TensorRT which allows the user to determine whether
+the runtime uses cudagraphs to accelerate inference in certain cases.</p>
+<p>Cudagraphs can accelerate certain models by reducing kernel overheads, as documented further [here](<a class="reference external" href="https://pytorch.org/blog/accelerating-pytorch-with-cuda-graphs/">https://pytorch.org/blog/accelerating-pytorch-with-cuda-graphs/</a>).</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Enables Cudagraphs Mode</span>
+<span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">runtime</span><span class="o">.</span><span class="n">set_cudagraphs_mode</span><span class="p">(</span><span class="kc">True</span><span class="p">)</span>
+
+<span class="c1"># Disables Cudagraphs Mode [Default Behavior]</span>
+<span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">runtime</span><span class="o">.</span><span class="n">set_cudagraphs_mode</span><span class="p">(</span><span class="kc">False</span><span class="p">)</span>
+
+<span class="c1"># Enables Cudagraphs Mode, then resets the mode to its prior setting</span>
+<span class="k">with</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">runtime</span><span class="o">.</span><span class="n">enable_cudagraphs</span><span class="p">(</span><span class="n">trt_module</span><span class="p">):</span>
+    <span class="o">...</span>
+</pre></div>
+</div>
+<p>In the current implementation, use of a new input shape (for instance in dynamic shape
+cases), will cause the cudagraph to be re-recorded. Cudagraph recording is generally
+not latency intensive, and future improvements include caching cudagraphs for multiple input shapes.</p>
+</section>
+<section id="dynamic-output-allocation-mode">
+<h2>Dynamic Output Allocation Mode<a class="headerlink" href="#dynamic-output-allocation-mode" title="Link to this heading">#</a></h2>
+<p>Dynamic output allocation is a feature in Torch-TensorRT which allows the output buffer of TensorRT engines to be
+dynamically allocated. This is useful for models with dynamic output shapes, especially ops with data-dependent shapes.
+Dynamic output allocation mode cannot be used in conjunction with CUDA Graphs nor pre-allocated outputs feature.
+Without dynamic output allocation, the output buffer is allocated based on the inferred output shape based on input size.</p>
+<p>There are two scenarios in which dynamic output allocation is enabled:</p>
+<p>1. The model has been identified at compile time to require dynamic output allocation for at least one TensorRT subgraph.
+These models will engage the runtime mode automatically (with logging) and are incompatible with other runtime modes
+such as CUDA Graphs.</p>
+<p>Converters can declare that subgraphs that they produce will require the output allocator using <cite>requires_output_allocator=True</cite>
+there by forcing any model which utilizes the converter to automatically use the output allocator runtime mode. e.g.,</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="nd">@dynamo_tensorrt_converter</span><span class="p">(</span>
+    <span class="n">torch</span><span class="o">.</span><span class="n">ops</span><span class="o">.</span><span class="n">aten</span><span class="o">.</span><span class="n">nonzero</span><span class="o">.</span><span class="n">default</span><span class="p">,</span>
+    <span class="n">supports_dynamic_shapes</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">requires_output_allocator</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">aten_ops_nonzero</span><span class="p">(</span>
+    <span class="n">ctx</span><span class="p">:</span> <span class="n">ConversionContext</span><span class="p">,</span>
+    <span class="n">target</span><span class="p">:</span> <span class="n">Target</span><span class="p">,</span>
+    <span class="n">args</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Argument</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span>
+    <span class="n">kwargs</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Argument</span><span class="p">],</span>
+    <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Union</span><span class="p">[</span><span class="n">TRTTensor</span><span class="p">,</span> <span class="n">Sequence</span><span class="p">[</span><span class="n">TRTTensor</span><span class="p">]]:</span>
+    <span class="o">...</span>
+</pre></div>
+</div>
+<ol class="arabic simple" start="2">
+<li><p>Users may manually enable dynamic output allocation mode via the <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.runtime.enable_output_allocator</span></code> context manager.</p></li>
+</ol>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Enables Dynamic Output Allocation Mode, then resets the mode to its prior setting</span>
+<span class="k">with</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">runtime</span><span class="o">.</span><span class="n">enable_output_allocator</span><span class="p">(</span><span class="n">trt_module</span><span class="p">):</span>
+    <span class="o">...</span>
+</pre></div>
+</div>
+</section>
+<section id="deploying-torch-tensorrt-programs-without-python">
+<h2>Deploying Torch-TensorRT Programs without Python<a class="headerlink" href="#deploying-torch-tensorrt-programs-without-python" title="Link to this heading">#</a></h2>
+<section id="aot-inductor">
+<h3>AOT-Inductor<a class="headerlink" href="#aot-inductor" title="Link to this heading">#</a></h3>
+<p>AOTInductor is a specialized version of TorchInductor, designed to process exported PyTorch models, optimize them, and produce shared
+libraries as well as other relevant artifacts. These compiled artifacts are specifically crafted for deployment in non-Python environments,
+which are frequently employed for inference deployments on the server side.</p>
+<p>Torch-TensorRT is able to accelerate subgraphs within AOTInductor exports in the same way it does in Python.</p>
+<div class="highlight-py notranslate"><div class="highlight"><pre><span></span><span class="n">dynamo_model</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">ir</span><span class="o">=</span><span class="s2">&quot;dynamo&quot;</span><span class="p">,</span> <span class="n">arg_inputs</span><span class="o">=</span><span class="p">[</span><span class="o">...</span><span class="p">])</span>
+<span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">save</span><span class="p">(</span>
+    <span class="n">dynamo_model</span><span class="p">,</span>
+    <span class="n">file_path</span><span class="o">=</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">getcwd</span><span class="p">(),</span> <span class="s2">&quot;model.pt2&quot;</span><span class="p">),</span>
+    <span class="n">output_format</span><span class="o">=</span><span class="s2">&quot;aot_inductor&quot;</span><span class="p">,</span>
+    <span class="n">retrace</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">arg_inputs</span><span class="o">=</span><span class="p">[</span><span class="o">...</span><span class="p">],</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p>This artifact then can be loaded in a C++ application to be executed with out a Python dependency.</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;iostream&gt;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;vector&gt;</span>
+
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;torch/torch.h&quot;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;torch/csrc/inductor/aoti_package/model_package_loader.h&quot;</span>
+
+<span class="kt">int</span><span class="w"> </span><span class="nf">main</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">argc</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="o">*</span><span class="w"> </span><span class="n">argv</span><span class="p">[])</span><span class="w"> </span><span class="p">{</span>
+<span class="c1">// Check for correct number of command-line arguments</span>
+<span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="w"> </span><span class="n">trt_aoti_module_path</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;model.pt2&quot;</span><span class="p">;</span>
+
+<span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">argc</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">2</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">trt_aoti_module_path</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">argv</span><span class="p">[</span><span class="mi">1</span><span class="p">];</span>
+<span class="p">}</span>
+
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">trt_aoti_module_path</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
+
+<span class="w">    </span><span class="c1">// Get the path to the TRT AOTI model package from the command line</span>
+<span class="w">    </span><span class="n">c10</span><span class="o">::</span><span class="n">InferenceMode</span><span class="w"> </span><span class="n">mode</span><span class="p">;</span>
+
+<span class="w">    </span><span class="n">torch</span><span class="o">::</span><span class="n">inductor</span><span class="o">::</span><span class="n">AOTIModelPackageLoader</span><span class="w"> </span><span class="n">loader</span><span class="p">(</span><span class="n">trt_aoti_module_path</span><span class="p">);</span>
+<span class="w">    </span><span class="c1">// Assume running on CUDA</span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">torch</span><span class="o">::</span><span class="n">Tensor</span><span class="o">&gt;</span><span class="w"> </span><span class="n">inputs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="n">torch</span><span class="o">::</span><span class="n">randn</span><span class="p">({</span><span class="mi">8</span><span class="p">,</span><span class="w"> </span><span class="mi">10</span><span class="p">},</span><span class="w"> </span><span class="n">at</span><span class="o">::</span><span class="n">kCUDA</span><span class="p">)};</span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">torch</span><span class="o">::</span><span class="n">Tensor</span><span class="o">&gt;</span><span class="w"> </span><span class="n">outputs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">loader</span><span class="p">.</span><span class="n">run</span><span class="p">(</span><span class="n">inputs</span><span class="p">);</span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;Result from the first inference:&quot;</span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">outputs</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
+
+<span class="w">    </span><span class="c1">// The second inference uses a different batch size and it works because we</span>
+<span class="w">    </span><span class="c1">// specified that dimension as dynamic when compiling model.pt2.</span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;Result from the second inference:&quot;</span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
+<span class="w">    </span><span class="c1">// Assume running on CUDA</span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">loader</span><span class="p">.</span><span class="n">run</span><span class="p">({</span><span class="n">torch</span><span class="o">::</span><span class="n">randn</span><span class="p">({</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">10</span><span class="p">},</span><span class="w"> </span><span class="n">at</span><span class="o">::</span><span class="n">kCUDA</span><span class="p">)})</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
+
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>Note: Similar to Python, at runtime, no Torch-TensorRT APIs are used to operate the model. Therefore typically additional
+flags are needed to make sure that <code class="docutils literal notranslate"><span class="pre">libtorchtrt_runtime.so</span></code> gets optimized out (see above).</p>
+<p>See: <code class="docutils literal notranslate"><span class="pre">//examples/torchtrt_aoti_example</span></code> for a full end to end demo of this workflow</p>
+</section>
+<section id="torchscript">
+<h3>TorchScript<a class="headerlink" href="#torchscript" title="Link to this heading">#</a></h3>
+<p>TorchScript is a legacy compiler stack for PyTorch that includes a Python-less interpreter for TorchScript programs.
+It has historically been used by Torch-TensorRT to execute models without Python. Even after the transition to TorchDynamo,
+the TorchScript interpreter can continue to be used to run PyTorch models with TensorRT engines outside of Python.</p>
+<div class="highlight-py notranslate"><div class="highlight"><pre><span></span><span class="n">dynamo_model</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">ir</span><span class="o">=</span><span class="s2">&quot;dynamo&quot;</span><span class="p">,</span> <span class="n">arg_inputs</span><span class="o">=</span><span class="p">[</span><span class="o">...</span><span class="p">])</span>
+<span class="n">ts_model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">trace</span><span class="p">(</span><span class="n">dynamo_model</span><span class="p">,</span> <span class="n">inputs</span><span class="o">=</span><span class="p">[</span><span class="o">...</span><span class="p">])</span>
+<span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">ts_model</span><span class="p">,</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">getcwd</span><span class="p">(),</span> <span class="s2">&quot;model.ts&quot;</span><span class="p">),)</span>
+</pre></div>
+</div>
+<p>This artifact then can be loaded in a C++ application to be executed with out a Python dependency.</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;fstream&gt;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;iostream&gt;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;memory&gt;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;sstream&gt;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;vector&gt;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;torch/script.h&quot;</span>
+
+<span class="kt">int</span><span class="w"> </span><span class="nf">main</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">argc</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="o">*</span><span class="w"> </span><span class="n">argv</span><span class="p">[])</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">argc</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="mi">2</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">std</span><span class="o">::</span><span class="n">cerr</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;usage: samplertapp &lt;path-to-pre-built-trt-ts module&gt;</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">;</span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="mi">-1</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="w"> </span><span class="n">trt_ts_module_path</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">argv</span><span class="p">[</span><span class="mi">1</span><span class="p">];</span>
+
+<span class="w">    </span><span class="n">torch</span><span class="o">::</span><span class="n">jit</span><span class="o">::</span><span class="n">Module</span><span class="w"> </span><span class="n">trt_ts_mod</span><span class="p">;</span>
+<span class="w">    </span><span class="k">try</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="c1">// Deserialize the ScriptModule from a file using torch::jit::load().</span>
+<span class="w">        </span><span class="n">trt_ts_mod</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">torch</span><span class="o">::</span><span class="n">jit</span><span class="o">::</span><span class="n">load</span><span class="p">(</span><span class="n">trt_ts_module_path</span><span class="p">);</span>
+<span class="w">    </span><span class="p">}</span><span class="w"> </span><span class="k">catch</span><span class="w"> </span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">c10</span><span class="o">::</span><span class="n">Error</span><span class="o">&amp;</span><span class="w"> </span><span class="n">e</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">std</span><span class="o">::</span><span class="n">cerr</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;error loading the model from : &quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">trt_ts_module_path</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="mi">-1</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;Running TRT engine&quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">torch</span><span class="o">::</span><span class="n">jit</span><span class="o">::</span><span class="n">IValue</span><span class="o">&gt;</span><span class="w"> </span><span class="n">trt_inputs_ivalues</span><span class="p">;</span>
+<span class="w">    </span><span class="n">trt_inputs_ivalues</span><span class="p">.</span><span class="n">push_back</span><span class="p">(</span><span class="n">at</span><span class="o">::</span><span class="n">randint</span><span class="p">(</span><span class="mi">-5</span><span class="p">,</span><span class="w"> </span><span class="mi">5</span><span class="p">,</span><span class="w"> </span><span class="p">{</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="mi">5</span><span class="p">,</span><span class="w"> </span><span class="mi">5</span><span class="p">},</span><span class="w"> </span><span class="p">{</span><span class="n">at</span><span class="o">::</span><span class="n">kCUDA</span><span class="p">}).</span><span class="n">to</span><span class="p">(</span><span class="n">torch</span><span class="o">::</span><span class="n">kFloat32</span><span class="p">));</span>
+<span class="w">    </span><span class="n">torch</span><span class="o">::</span><span class="n">jit</span><span class="o">::</span><span class="n">IValue</span><span class="w"> </span><span class="n">trt_results_ivalues</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">trt_ts_mod</span><span class="p">.</span><span class="n">forward</span><span class="p">(</span><span class="n">trt_inputs_ivalues</span><span class="p">);</span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;==================TRT outputs================&quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">trt_results_ivalues</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;=============================================&quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;TRT engine execution completed. &quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>Note: Similar to Python, at runtime, no Torch-TensorRT APIs are used to operate the model. Therefore typically additional
+flags are needed to make sure that <code class="docutils literal notranslate"><span class="pre">libtorchtrt_runtime.so</span></code> gets optimized out (see above).</p>
+<p>See: <code class="docutils literal notranslate"><span class="pre">//examples/torchtrt_runtime_example</span></code> for a full end to end demo of this workflow</p>
+</section>
+</section>
+</section>
+
+
+                </article>
+              
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="index.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">Runtime &amp; Serialization</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="runtime_api.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">Runtime API</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <div class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+<div
+    id="pst-page-navigation-heading-2"
+    class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> On this page
+  </div>
+  <nav class="bd-toc-nav page-toc" aria-labelledby="pst-page-navigation-heading-2">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#torch-tensorrt-package-libtorchtrt-so">Torch-TensorRT package / libtorchtrt.so</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#runtime-library">Runtime Library</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#plugin-library">Plugin Library</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#multi-device-safe-mode">Multi Device Safe Mode</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#cudagraphs-mode">Cudagraphs Mode</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#dynamic-output-allocation-mode">Dynamic Output Allocation Mode</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#deploying-torch-tensorrt-programs-without-python">Deploying Torch-TensorRT Programs without Python</a><ul class="visible nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#aot-inductor">AOT-Inductor</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#torchscript">TorchScript</a></li>
+</ul>
+</li>
+</ul>
+  </nav></div>
+
+  <div class="sidebar-secondary-item">
+
+  
+  <div class="tocsection editthispage">
+    <a href="https://github.com/pytorch/TensorRT/edit/main/docsrc/user_guide/runtime_performance/runtime.rst">
+      <i class="fa-solid fa-pencil"></i>
+      
+      
+        
+          Edit on GitHub
+        
+      
+    </a>
+  </div>
+</div>
+
+  <div class="sidebar-secondary-item">
+
+  <div class="tocsection sourcelink">
+    <a href="../../_sources/user_guide/runtime_performance/runtime.rst.txt">
+      <i class="fa-solid fa-file-lines"></i> Show Source
+    </a>
+  </div>
+</div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+          </footer>
+        
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script src="../../_static/scripts/bootstrap.js?digest=dfe6caa3a7d634c4db9b"></script>
+<script src="../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b"></script>
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+  
+    <div class="footer-items__start">
+      
+        <div class="footer-item">
+
+  <p class="copyright">
+    
+      © Copyright 2024, NVIDIA Corporation.
+      <br/>
+    
+  </p>
+</div>
+      
+    </div>
+  
+  
+  
+</div>
+
+  </footer>
+  </body>
+</html>
