@@ -53,10 +53,14 @@ keywords = [
 dynamic = ["version", "dependencies", "optional-dependencies"]
 
 [dependency-groups]
-dev = [
-    "pre-commit>=2.20.0",
-    "black>=22.6.0",
+lint = [
+    "black>=24.0.0",
     "clang-format==14.0.6",
+]
+
+dev = [
+    {include-group = "lint"},
+    "pre-commit>=2.20.0",
     "typos",
     "mypy",
     "isort",
@@ -363,6 +367,9 @@ skip = ["py/torch_tensorrt/fx"]
 target-version = ["py38", "py39", "py310", "py311", "py312"]
 force-exclude = """
 elu_converter/setup.py
+| docs/
+| examples/fx/
+| py/torch_tensorrt/fx
 """
 
 [tool.mypy]
