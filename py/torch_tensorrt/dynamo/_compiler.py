@@ -111,6 +111,7 @@ def cross_compile_for_windows(
     enable_resource_partitioning: bool = _defaults.ENABLE_RESOURCE_PARTITIONING,
     cpu_memory_budget: Optional[int] = _defaults.CPU_MEMORY_BUDGET,
     dynamically_allocate_resources: bool = _defaults.DYNAMICALLY_ALLOCATE_RESOURCES,
+    decompose_attention: bool = _defaults.DECOMPOSE_ATTENTION,
     **kwargs: Any,
 ) -> torch.fx.GraphModule:
     """Compile an ExportedProgram module using TensorRT in Linux for Inference in Windows
@@ -188,6 +189,7 @@ def cross_compile_for_windows(
         enable_resource_partitioning (bool): Enable resource-aware partitioning. This is useful when the model is large and the CPU memory is limited.
         cpu_memory_budget (Optional[int]): The maximum amount of CPU memory to use for the compilation. If the compilation requires more memory than this budget, the compilation will fail.
         dynamically_allocate_resources (bool): Dynamically allocate resources during engine execution.
+        decompose_attention (bool): Whether to decompose attention layers. We have converters for handling attention ops, but if you want to decompose them into smaller ops, you can set this to True.
         **kwargs: Any,
     Returns:
         torch.fx.GraphModule: Compiled FX Module, when run it will execute via TensorRT
@@ -346,6 +348,7 @@ def cross_compile_for_windows(
         "enable_resource_partitioning": enable_resource_partitioning,
         "cpu_memory_budget": cpu_memory_budget,
         "dynamically_allocate_resources": dynamically_allocate_resources,
+        "decompose_attention": decompose_attention,
     }
 
     # disable the following settings is not supported for cross compilation for windows feature
@@ -367,7 +370,7 @@ def cross_compile_for_windows(
     logger.info("Compilation Settings: %s\n", settings)
     exported_program = pre_export_lowering(exported_program, settings)
     exported_program = exported_program.run_decompositions(
-        get_decompositions(enable_experimental_decompositions)
+        get_decompositions(enable_experimental_decompositions, decompose_attention)
     )
 
     gm = exported_program.module()
@@ -467,6 +470,7 @@ def compile(
     cpu_memory_budget: Optional[int] = _defaults.CPU_MEMORY_BUDGET,
     enable_resource_partitioning: bool = _defaults.ENABLE_RESOURCE_PARTITIONING,
     dynamically_allocate_resources: bool = _defaults.DYNAMICALLY_ALLOCATE_RESOURCES,
+    decompose_attention: bool = _defaults.DECOMPOSE_ATTENTION,
     **kwargs: Any,
 ) -> torch.fx.GraphModule:
     """Compile an ExportedProgram module for NVIDIA GPUs using TensorRT
@@ -554,6 +558,7 @@ def compile(
         enable_resource_partitioning (bool): Enable resource-aware partitioning. This is useful when the model is large and the CPU memory is limited.
         cpu_memory_budget (Optional[int]): The maximum amount of CPU memory to use for the compilation. If the compilation requires more memory than this budget, the compilation will fail.
         dynamically_allocate_resources (bool): Dynamically allocate resources during engine execution.
+        decompose_attention (bool): Whether to decompose attention layers. We have converters for handling attention ops, but if you want to decompose them into smaller ops, you can set this to True.
         **kwargs: Any,
     Returns:
         torch.fx.GraphModule: Compiled FX Module, when run it will execute via TensorRT
@@ -757,13 +762,14 @@ def compile(
         "enable_resource_partitioning": enable_resource_partitioning,
         "cpu_memory_budget": cpu_memory_budget,
         "dynamically_allocate_resources": dynamically_allocate_resources,
+        "decompose_attention": decompose_attention,
     }
     logger.debug(f"CPU memory usage before lowering: {get_cpu_memory_usage()} MB")
     settings = CompilationSettings(**compilation_options)
     logger.info("Compilation Settings: %s\n", settings)
     exported_program = pre_export_lowering(exported_program, settings)
     exported_program = exported_program.run_decompositions(
-        get_decompositions(enable_experimental_decompositions)
+        get_decompositions(enable_experimental_decompositions, decompose_attention)
     )
 
     gm = exported_program.module()
@@ -1160,6 +1166,7 @@ def convert_exported_program_to_serialized_trt_engine(
     l2_limit_for_tiling: int = _defaults.L2_LIMIT_FOR_TILING,
     offload_module_to_cpu: bool = _defaults.OFFLOAD_MODULE_TO_CPU,
     use_distributed_mode_trace: bool = _defaults.USE_DISTRIBUTED_MODE_TRACE,
+    decompose_attention: bool = _defaults.DECOMPOSE_ATTENTION,
     **kwargs: Any,
 ) -> bytes:
     """Convert an ExportedProgram to a serialized TensorRT engine
@@ -1234,6 +1241,7 @@ def convert_exported_program_to_serialized_trt_engine(
         l2_limit_for_tiling (int): The target L2 cache usage limit (in bytes) for tiling optimization (default is -1 which means no limit).
         offload_module_to_cpu (bool): Offload the module to CPU. This is useful when we need to minimize GPU memory usage.
         use_distributed_mode_trace (bool):  Using aot_autograd to trace the graph. This is enabled when DTensors or distributed tensors are present in distributed model.
+        decompose_attention (bool): Whether to decompose attention layers. We have converters for handling attention ops, but if you want to decompose them into smaller ops, you can set this to True.
         **kwargs: Any,
     Returns:
         bytes: Serialized TensorRT engine, can either be saved to a file or deserialized via TensorRT APIs
@@ -1403,13 +1411,14 @@ def convert_exported_program_to_serialized_trt_engine(
         "l2_limit_for_tiling": l2_limit_for_tiling,
         "offload_module_to_cpu": offload_module_to_cpu,
         "use_distributed_mode_trace": use_distributed_mode_trace,
+        "decompose_attention": decompose_attention,
     }
 
     settings = CompilationSettings(**compilation_options)
     logger.info("Compilation Settings: %s\n", settings)
     exported_program = pre_export_lowering(exported_program, settings)
     exported_program = exported_program.run_decompositions(
-        get_decompositions(enable_experimental_decompositions)
+        get_decompositions(enable_experimental_decompositions, decompose_attention)
     )
 
     gm = exported_program.module()

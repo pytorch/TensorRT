@@ -51,11 +51,11 @@ def insert_into_generate_versions(gen_versions: Path, version: str) -> None:
         return
 
     new_entry = (
-        f'    {{\n'
+        f"    {{\n"
         f'        "name": "{version}",\n'
         f'        "version": "{version}",\n'
         f'        "url": "https://pytorch.org/TensorRT/{version}/",\n'
-        f'    }},\n'
+        f"    }},\n"
     )
 
     new_ver = ver_tuple(version)
@@ -72,7 +72,10 @@ def insert_into_generate_versions(gen_versions: Path, version: str) -> None:
         # All existing entries are >= new version; append before closing bracket
         insert_pos = src.rfind("]")
         if insert_pos == -1:
-            print("Error: could not find insertion point in generate_versions.py", file=sys.stderr)
+            print(
+                "Error: could not find insertion point in generate_versions.py",
+                file=sys.stderr,
+            )
             sys.exit(1)
 
     gen_versions.write_text(src[:insert_pos] + new_entry + src[insert_pos:])
@@ -90,10 +93,13 @@ def regenerate_versions_json(docsrc: Path) -> None:
 
 def stage(repo_root: Path, version: str, docsrc: Path) -> None:
     subprocess.run(
-        ["git", "add",
-         f"docs/{version}",
-         "docs/versions.json",
-         str(docsrc / "generate_versions.py")],
+        [
+            "git",
+            "add",
+            f"docs/{version}",
+            "docs/versions.json",
+            str(docsrc / "generate_versions.py"),
+        ],
         cwd=repo_root,
         check=True,
     )

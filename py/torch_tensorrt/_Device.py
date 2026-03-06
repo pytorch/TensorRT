@@ -62,7 +62,7 @@ class Device(object):
                     "When specifying Device through positional argument, argument must be str"
                 )
             else:
-                (self.device_type, id) = Device._parse_device_str(args[0])
+                self.device_type, id = Device._parse_device_str(args[0])
                 if self.device_type == DeviceType.DLA:
                     self.dla_core = id
                     self.gpu_id = 0
