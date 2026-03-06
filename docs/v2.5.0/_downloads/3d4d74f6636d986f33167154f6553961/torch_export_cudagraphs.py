@@ -4,16 +4,16 @@
 Torch Export with Cudagraphs
 ======================================================
 
-This interactive script is intended as an overview of the process by which the Torch-TensorRT Cudagraphs integration can be used in the `ir="dynamo"` path. The functionality works similarly in the `torch.compile` path as well."""
+This interactive script is intended as an overview of the process by which the Torch-TensorRT Cudagraphs integration can be used in the `ir="dynamo"` path. The functionality works similarly in the `torch.compile` path as well.
+"""
 
 # %%
 # Imports and Model Definition
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 import torch
-import torchvision.models as models
-
 import torch_tensorrt
+import torchvision.models as models
 
 # %%
 # Compilation with `torch_tensorrt.compile` Using Default Settings

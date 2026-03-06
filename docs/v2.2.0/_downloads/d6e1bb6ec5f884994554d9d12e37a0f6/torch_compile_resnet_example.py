@@ -4,7 +4,8 @@
 Compiling ResNet using the Torch-TensorRT `torch.compile` Backend
 ==========================================================
 
-This interactive script is intended as a sample of the Torch-TensorRT workflow with `torch.compile` on a ResNet model."""
+This interactive script is intended as a sample of the Torch-TensorRT workflow with `torch.compile` on a ResNet model.
+"""
 
 # %%
 # Imports and Model Definition
