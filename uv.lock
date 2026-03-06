@@ -4060,6 +4060,10 @@ docs = [
     { name = "sphinx", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
     { name = "sphinx-gallery", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
 ]
+lint = [
+    { name = "black", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
+    { name = "clang-format", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
+]
 quantization = [
     { name = "nvidia-modelopt", extra = ["all"], marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
 ]
@@ -4099,7 +4103,7 @@ debug = [
     { name = "tabulate", specifier = ">=0.8.10" },
 ]
 dev = [
-    { name = "black", specifier = ">=22.6.0" },
+    { name = "black", specifier = ">=24.0.0" },
     { name = "clang-format", specifier = "==14.0.6" },
     { name = "isort" },
     { name = "mypy" },
@@ -4117,6 +4121,10 @@ docs = [
     { name = "pytorch-sphinx-theme2", specifier = "==0.4.4" },
     { name = "sphinx", specifier = "==7.2.6" },
     { name = "sphinx-gallery", specifier = "==0.13.0" },
+]
+lint = [
+    { name = "black", specifier = ">=24.0.0" },
+    { name = "clang-format", specifier = "==14.0.6" },
 ]
 quantization = [{ name = "nvidia-modelopt", extras = ["all"], specifier = ">=0.27.1" }]
 test = [
