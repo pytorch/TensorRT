@@ -237,10 +237,6 @@ class TestBinaryOpConverters(DispatchTestCase):
             if op[0].__name__ not in ["pow.Tensor_Tensor", "fmod.Tensor"]
         ]
     )
-    @unittest.skipIf(
-        torch_tensorrt.ENABLED_FEATURES.tensorrt_rtx,
-        "bf16 is not supported for tensorrt_rtx",
-    )
     def test_elementwise_ops_bf16(self, _, orig_op):
         class TestModule(nn.Module):
             def __init__(self, orig_op):
