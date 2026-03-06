@@ -1,6 +1,6 @@
 import logging
 import math
-from typing import Callable, List, Optional, Set, Tuple
+from typing import Callable, List, Optional, Tuple
 
 import torch
 from torch._subclasses.fake_tensor import FakeTensorMode
@@ -37,11 +37,18 @@ _ELEMENTWISE_SAFE: frozenset = frozenset(
         torch.ops.aten.clone.default,
         torch.ops.aten.detach.default,
         torch.ops.aten.alias.default,
-        torch.ops.aten.expand.default,
-        torch.ops.aten.t.default,
-        # Construction — producing zero/one tensors of the same shape is layout-neutral
+        # NOTE: expand.default is NOT here — it takes a shape arg that must
+        # include the trailing real/imag dim.  It has an explicit handler below.
+        # NOTE: t.default is NOT here — it requires an explicit handler since t()
+        # raises on tensors with more than 2 dimensions (which the [..., 2] real
+        # layout always is).
+        # squeeze.default (no dim arg) squeezes all size-1 dims; the trailing
+        # real/imag dim is always size 2 so it is never accidentally squeezed.
+        torch.ops.aten.squeeze.default,
+        # Construction — zeros_like is layout-neutral (zeros everywhere = 0+0i).
+        # ones_like is NOT here: ones([a, b]) in real layout = [1, 1] per element
+        # = 1+1i, but we want 1+0i.  It has an explicit handler below.
         torch.ops.aten.zeros_like.default,
-        torch.ops.aten.ones_like.default,
         # Conditional selection — correct on the real layout when mask broadcasts
         torch.ops.aten.where.self,
         # Rounding — applies to each float independently; complex rounding is
@@ -302,6 +309,7 @@ class ComplexGraphRewriter:
                     input_node.target + "_unpacked_complex"
                 )
             new_node.meta["val"] = fake_tensor
+            new_node.meta["is_complex_layout"] = True
             logger.debug(
                 "  unpack placeholder  %s%s  ->  %s%s",
                 input_node.name,
@@ -323,6 +331,21 @@ class ComplexGraphRewriter:
                 self.gm.register_buffer(new_attr_name, stacked_tensor)
             with self.gm.graph.inserting_after(input_node):
                 new_node = self.gm.graph.get_attr(new_attr_name)
+            # Set fake-tensor metadata on the new node so that _is_complex_layout_node
+            # can identify it as a complex-layout [..., 2] tensor later when
+            # processing ops that use this buffer.
+            if fake_mode is not None:
+                try:
+                    with unset_fake_temporarily():
+                        real_tensor = torch.empty(
+                            stacked_tensor.shape,
+                            dtype=stacked_tensor.dtype,
+                            device=stacked_tensor.device,
+                        )
+                    new_node.meta["val"] = fake_mode.from_tensor(real_tensor)
+                except Exception:
+                    pass  # best-effort
+            new_node.meta["is_complex_layout"] = True
             logger.debug(
                 "  unpack get_attr  %s%s  ->  %s%s",
                 input_node.target,
@@ -356,7 +379,9 @@ class ComplexGraphRewriter:
         """Rebuild a [..., 2] complex-layout tensor from re and im nodes."""
         re_u = b(torch.ops.aten.unsqueeze.default, out_re, -1)
         im_u = b(torch.ops.aten.unsqueeze.default, out_im, -1)
-        return b(torch.ops.aten.cat.default, [re_u, im_u], -1)
+        out = b(torch.ops.aten.cat.default, [re_u, im_u], -1)
+        out.meta["is_complex_layout"] = True
+        return out
 
     @staticmethod
     def _inline_complex_log(
@@ -444,13 +469,15 @@ class ComplexGraphRewriter:
     def _rewrite_view_as_complex(self, node: Node) -> bool:
         node.replace_all_uses_with(node.args[0])
         self.gm.graph.erase_node(node)
-        return False  # bypass only, no structural change that needs propagation
+        # Return True so the caller triggers propagate_metadata + gm.recompile().
+        # Without recompile the compiled forward still calls the erased node.
+        return True
 
     @_complex_unpacker(torch.ops.aten.view_as_real.default)
     def _rewrite_view_as_real(self, node: Node) -> bool:
         node.replace_all_uses_with(node.args[0])
         self.gm.graph.erase_node(node)
-        return False
+        return True  # triggers recompile, same reason as above
 
     @_complex_unpacker(torch.ops.aten.permute.default)
     def _rewrite_permute(self, node: Node) -> bool:
@@ -464,6 +491,7 @@ class ComplexGraphRewriter:
         with SubgraphBuilder(self.gm.graph, node) as b:
             out = b(torch.ops.aten.permute.default, inp, new_dims)
             node.replace_all_uses_with(out)
+            out.meta["is_complex_layout"] = True
             self.gm.graph.erase_node(node)
             return True
 
@@ -505,24 +533,15 @@ class ComplexGraphRewriter:
 
         # Both args are Nodes from here on.
         if node.target == torch.ops.aten.div.Tensor:
-            detector = ComplexOpDetector()
-
-            def _is_complex_layout(n: Node) -> bool:
-                if detector.is_complex_dtype(n):
-                    return True
-                val = n.meta.get("val", None)
-                if val is not None and hasattr(val, "shape"):
-                    return len(val.shape) >= 1 and val.shape[-1] == 2
-                return False
-
-            arg0_layout = _is_complex_layout(node.args[0])
-            arg1_layout = _is_complex_layout(node.args[1])
+            arg0_layout = self._is_complex_layout_node(node.args[0])
+            arg1_layout = self._is_complex_layout_node(node.args[1])
 
             if arg0_layout and not arg1_layout:
                 # complex_layout / real — unsqueeze denom for correct broadcast
                 with SubgraphBuilder(self.gm.graph, node) as b:
                     denom_unsq = b(torch.ops.aten.unsqueeze.default, node.args[1], -1)
                     out = b(torch.ops.aten.div.Tensor, node.args[0], denom_unsq)
+                    out.meta["is_complex_layout"] = True
                     node.replace_all_uses_with(out)
                     self.gm.graph.erase_node(node)
                     return True
@@ -555,15 +574,41 @@ class ComplexGraphRewriter:
                 )
                 return True
 
-        # mul.Tensor, both nodes — complex × complex
+        # mul.Tensor, both nodes
         # Use SubgraphBuilder directly rather than replace_pattern_with_filters so
         # that self-multiplication (mul(x, x)) is handled correctly.
         # replace_pattern_with_filters requires distinct placeholder nodes for x and y,
         # so it silently produces no matches when both args are the same node.
-        if node in self._originally_complex:
+        if node.meta.get("is_complex_layout", False):
             x, y = node.args[0], node.args[1]
             x_is_get_attr = x.op == "get_attr"
             y_is_get_attr = y.op == "get_attr"
+            x_is_complex = self._is_complex_layout_node(x)
+            y_is_complex = self._is_complex_layout_node(y)
+
+            # complex × real (or real × complex): just scale both components
+            if x_is_complex and not y_is_complex and not x_is_get_attr:
+                with SubgraphBuilder(self.gm.graph, node) as b:
+                    x_re = b(torch.ops.aten.select.int, x, -1, 0)
+                    x_im = b(torch.ops.aten.select.int, x, -1, 1)
+                    out_re = b(torch.ops.aten.mul.Tensor, x_re, y)
+                    out_im = b(torch.ops.aten.mul.Tensor, x_im, y)
+                    out = self._inline_cat_re_im(b, out_re, out_im)
+                    node.replace_all_uses_with(out)
+                    out.meta["is_complex_layout"] = True
+                    self.gm.graph.erase_node(node)
+                return True
+            if not x_is_complex and y_is_complex and not y_is_get_attr:
+                with SubgraphBuilder(self.gm.graph, node) as b:
+                    y_re = b(torch.ops.aten.select.int, y, -1, 0)
+                    y_im = b(torch.ops.aten.select.int, y, -1, 1)
+                    out_re = b(torch.ops.aten.mul.Tensor, x, y_re)
+                    out_im = b(torch.ops.aten.mul.Tensor, x, y_im)
+                    out = self._inline_cat_re_im(b, out_re, out_im)
+                    node.replace_all_uses_with(out)
+                    out.meta["is_complex_layout"] = True
+                    self.gm.graph.erase_node(node)
+                return True
 
             if not x_is_get_attr and not y_is_get_attr:
                 # Both are ITensors — use select.int (TRT-compatible)
@@ -580,6 +625,7 @@ class ComplexGraphRewriter:
                     out_im = b(torch.ops.aten.add.Tensor, ad, bc)
                     out = self._inline_cat_re_im(b, out_re, out_im)
                     node.replace_all_uses_with(out)
+                    out.meta["is_complex_layout"] = True
                     self.gm.graph.erase_node(node)
                 return True
             else:
@@ -623,6 +669,148 @@ class ComplexGraphRewriter:
             new_re = b(node.target, re, scalar)
             out = self._inline_cat_re_im(b, new_re, im)
             node.replace_all_uses_with(out)
+            out.meta["is_complex_layout"] = True
+            self.gm.graph.erase_node(node)
+            return True
+
+    @_complex_unpacker(torch.ops.aten.ones_like.default)
+    def _rewrite_ones_like(self, node: Node) -> bool:
+        # ones_like in [..., 2] layout produces [1, 1] = 1+1i.  We want 1+0i.
+        inp = node.args[0]
+        with SubgraphBuilder(self.gm.graph, node) as b:
+            re_slice = b(torch.ops.aten.select.int, inp, -1, 0)
+            out_re = b(torch.ops.aten.ones_like.default, re_slice)
+            out_im = b(torch.ops.aten.zeros_like.default, re_slice)
+            out = self._inline_cat_re_im(b, out_re, out_im)
+            node.replace_all_uses_with(out)
+            out.meta["is_complex_layout"] = True
+            self.gm.graph.erase_node(node)
+            return True
+
+    @_complex_unpacker(torch.ops.aten.full_like.default)
+    def _rewrite_full_like(self, node: Node) -> bool:
+        # full_like(z, fill_value) in [..., 2] layout fills both re and im with
+        # fill_value → fill_value + fill_value*i.  We want fill_value + 0i.
+        inp = node.args[0]
+        fill_value = node.args[1]
+        with SubgraphBuilder(self.gm.graph, node) as b:
+            re_slice = b(torch.ops.aten.select.int, inp, -1, 0)
+            out_re = b(torch.ops.aten.full_like.default, re_slice, fill_value)
+            out_im = b(torch.ops.aten.zeros_like.default, re_slice)
+            out = self._inline_cat_re_im(b, out_re, out_im)
+            node.replace_all_uses_with(out)
+            out.meta["is_complex_layout"] = True
+            self.gm.graph.erase_node(node)
+            return True
+
+    @_complex_unpacker(torch.ops.aten.sum.dim_IntList)
+    def _rewrite_sum_dim(self, node: Node) -> bool:
+        # sum.dim_IntList(inp, dim_list, keepdim=False, dtype=None)
+        # Negative dims must be shifted by -1 to skip the trailing real/imag dim.
+        inp = node.args[0]
+        dims = list(node.args[1])
+        new_dims = [d - 1 if d < 0 else d for d in dims]
+        if new_dims == dims:
+            return False  # all positive — pass-through is correct
+        keepdim = node.args[2] if len(node.args) > 2 else False
+        extra = list(node.args[3:])
+        with SubgraphBuilder(self.gm.graph, node) as b:
+            out = b(torch.ops.aten.sum.dim_IntList, inp, new_dims, keepdim, *extra)
+            node.replace_all_uses_with(out)
+            out.meta["is_complex_layout"] = True
+            self.gm.graph.erase_node(node)
+            return True
+
+    @_complex_unpacker(torch.ops.aten.mean.dim)
+    def _rewrite_mean_dim(self, node: Node) -> bool:
+        # mean.dim(inp, dim_list, keepdim=False, dtype=None)
+        inp = node.args[0]
+        dims = list(node.args[1])
+        new_dims = [d - 1 if d < 0 else d for d in dims]
+        if new_dims == dims:
+            return False  # all positive — pass-through is correct
+        keepdim = node.args[2] if len(node.args) > 2 else False
+        extra = list(node.args[3:])
+        with SubgraphBuilder(self.gm.graph, node) as b:
+            out = b(torch.ops.aten.mean.dim, inp, new_dims, keepdim, *extra)
+            node.replace_all_uses_with(out)
+            out.meta["is_complex_layout"] = True
+            self.gm.graph.erase_node(node)
+            return True
+
+    @_complex_unpacker(torch.ops.aten.prod.dim_int)
+    def _rewrite_prod_dim(self, node: Node) -> bool:
+        # prod.dim_int(inp, dim, keepdim=False, dtype=None)
+        inp = node.args[0]
+        dim = node.args[1]
+        if dim >= 0:
+            return False  # positive dim — pass-through is correct
+        new_dim = dim - 1
+        keepdim = node.args[2] if len(node.args) > 2 else False
+        extra = list(node.args[3:])
+        with SubgraphBuilder(self.gm.graph, node) as b:
+            out = b(torch.ops.aten.prod.dim_int, inp, new_dim, keepdim, *extra)
+            node.replace_all_uses_with(out)
+            out.meta["is_complex_layout"] = True
+            self.gm.graph.erase_node(node)
+            return True
+
+    @_complex_unpacker(torch.ops.aten.narrow.default)
+    def _rewrite_narrow(self, node: Node) -> bool:
+        # narrow(inp, dim, start, length) — shift negative dim by -1
+        inp, dim, start, length = node.args
+        if dim >= 0:
+            return False
+        new_dim = dim - 1
+        with SubgraphBuilder(self.gm.graph, node) as b:
+            out = b(torch.ops.aten.narrow.default, inp, new_dim, start, length)
+            node.replace_all_uses_with(out)
+            out.meta["is_complex_layout"] = True
+            self.gm.graph.erase_node(node)
+            return True
+
+    @_complex_unpacker(torch.ops.aten.roll.default)
+    def _rewrite_roll(self, node: Node) -> bool:
+        # roll(inp, shifts, dims) — shift negative dims by -1
+        inp = node.args[0]
+        shifts = node.args[1]
+        dims = list(node.args[2]) if len(node.args) > 2 else []
+        new_dims = [d - 1 if d < 0 else d for d in dims]
+        if new_dims == dims:
+            return False
+        with SubgraphBuilder(self.gm.graph, node) as b:
+            out = b(torch.ops.aten.roll.default, inp, shifts, new_dims)
+            node.replace_all_uses_with(out)
+            out.meta["is_complex_layout"] = True
+            self.gm.graph.erase_node(node)
+            return True
+
+    @_complex_unpacker(torch.ops.aten.flip.default)
+    def _rewrite_flip(self, node: Node) -> bool:
+        # flip(inp, dims) — shift negative dims by -1
+        inp = node.args[0]
+        dims = list(node.args[1])
+        new_dims = [d - 1 if d < 0 else d for d in dims]
+        if new_dims == dims:
+            return False
+        with SubgraphBuilder(self.gm.graph, node) as b:
+            out = b(torch.ops.aten.flip.default, inp, new_dims)
+            node.replace_all_uses_with(out)
+            out.meta["is_complex_layout"] = True
+            self.gm.graph.erase_node(node)
+            return True
+
+    @_complex_unpacker(torch.ops.aten.repeat.default)
+    def _rewrite_repeat(self, node: Node) -> bool:
+        # repeat(inp, repeats) — repeats must include a trailing 1 for the
+        # real/imag dim so the layout is not disrupted.
+        inp = node.args[0]
+        repeats = list(node.args[1])
+        new_repeats = repeats + [1]
+        with SubgraphBuilder(self.gm.graph, node) as b:
+            out = b(torch.ops.aten.repeat.default, inp, new_repeats)
+            node.replace_all_uses_with(out)
+            out.meta["is_complex_layout"] = True
             self.gm.graph.erase_node(node)
             return True
 
@@ -636,6 +824,26 @@ class ComplexGraphRewriter:
             neg_im = b(torch.ops.aten.neg.default, im)
             out = self._inline_cat_re_im(b, re, neg_im)
             node.replace_all_uses_with(out)
+            out.meta["is_complex_layout"] = True
+            self.gm.graph.erase_node(node)
+            return True
+
+    @_complex_unpacker(torch.ops.aten.reciprocal.default)
+    def _rewrite_reciprocal(self, node: Node) -> bool:
+        # 1/(a+bi) = a/(a²+b²) - ib/(a²+b²)
+        inp = node.args[0]
+        with SubgraphBuilder(self.gm.graph, node) as b:
+            re = b(torch.ops.aten.select.int, inp, -1, 0)
+            im = b(torch.ops.aten.select.int, inp, -1, 1)
+            re2 = b(torch.ops.aten.mul.Tensor, re, re)
+            im2 = b(torch.ops.aten.mul.Tensor, im, im)
+            denom = b(torch.ops.aten.add.Tensor, re2, im2)
+            out_re = b(torch.ops.aten.div.Tensor, re, denom)
+            neg_im = b(torch.ops.aten.neg.default, im)
+            out_im = b(torch.ops.aten.div.Tensor, neg_im, denom)
+            out = self._inline_cat_re_im(b, out_re, out_im)
+            node.replace_all_uses_with(out)
+            out.meta["is_complex_layout"] = True
             self.gm.graph.erase_node(node)
             return True
 
@@ -1103,6 +1311,337 @@ class ComplexGraphRewriter:
             self.gm.graph.erase_node(node)
             return True
 
+    # ------------------------------------------------------------------
+    # Shape-manipulation handlers
+    #
+    # All of these work on the same principle: in the [..., 2] real layout
+    # the trailing dimension stores real/imag.  Dimension indices that refer
+    # to the *last* complex dimension (dim=-1) must be shifted by -1 to
+    # avoid touching or conflating with the trailing 2 dim.
+    #
+    # Rule: new_dim = dim - 1  if  dim < 0  else  dim
+    # ------------------------------------------------------------------
+
+    @_complex_unpacker(
+        torch.ops.aten.reshape.default,
+        torch.ops.aten.view.default,
+        torch.ops.aten._unsafe_view.default,
+    )
+    def _rewrite_reshape_view(self, node: Node) -> bool:
+        # Append 2 to the target shape so the trailing real/imag dim is
+        # preserved after the reshape.  E.g. complex [a,b] reshaped to [c]
+        # becomes float [a,b,2] reshaped to [c,2].
+        inp = node.args[0]
+        new_shape = list(node.args[1]) + [2]
+        with SubgraphBuilder(self.gm.graph, node) as b:
+            out = b(node.target, inp, new_shape)
+            out.meta["is_complex_layout"] = True
+            node.replace_all_uses_with(out)
+            self.gm.graph.erase_node(node)
+            return True
+
+    @_complex_unpacker(torch.ops.aten.flatten.using_ints)
+    def _rewrite_flatten(self, node: Node) -> bool:
+        inp = node.args[0]
+        start_dim = node.args[1] if len(node.args) > 1 else 0
+        end_dim = node.args[2] if len(node.args) > 2 else -1
+        # Shift negative dims by -1 so end_dim=-1 (last complex dim) maps to
+        # the second-to-last dim in the real layout, keeping the trailing 2 intact.
+        new_start = start_dim - 1 if start_dim < 0 else start_dim
+        new_end = end_dim - 1 if end_dim < 0 else end_dim
+        with SubgraphBuilder(self.gm.graph, node) as b:
+            out = b(torch.ops.aten.flatten.using_ints, inp, new_start, new_end)
+            out.meta["is_complex_layout"] = True
+            node.replace_all_uses_with(out)
+            self.gm.graph.erase_node(node)
+            return True
+
+    @_complex_unpacker(torch.ops.aten.unsqueeze.default)
+    def _rewrite_unsqueeze(self, node: Node) -> bool:
+        inp = node.args[0]
+        dim = node.args[1]
+        # Negative dims: shift by -1 so dim=-1 inserts *before* the trailing
+        # real/imag dim rather than *after* it.
+        new_dim = dim - 1 if dim < 0 else dim
+        with SubgraphBuilder(self.gm.graph, node) as b:
+            out = b(torch.ops.aten.unsqueeze.default, inp, new_dim)
+            out.meta["is_complex_layout"] = True
+            node.replace_all_uses_with(out)
+            self.gm.graph.erase_node(node)
+            return True
+
+    @_complex_unpacker(torch.ops.aten.squeeze.dim, torch.ops.aten.squeeze.dims)
+    def _rewrite_squeeze_dim(self, node: Node) -> bool:
+        inp = node.args[0]
+        # squeeze.dim(inp, int) vs squeeze.dims(inp, List[int])
+        is_multi = node.target == torch.ops.aten.squeeze.dims
+        raw_dim = node.args[1]
+        dims_list = list(raw_dim) if is_multi else [raw_dim]
+        # Shift negative dims so that complex dim=-1 (last complex dim) maps to
+        # real-layout dim=-2 (second-to-last), keeping the trailing real/imag dim.
+        # A squeeze on a valid complex dim can never accidentally hit the trailing
+        # 2 dim: for rank-n complex, valid dims are [-n, n-1]; after the shift
+        # they land in [-n-1, n-1], all safely before the trailing dim at index n.
+        new_dims = [d - 1 if d < 0 else d for d in dims_list]
+        with SubgraphBuilder(self.gm.graph, node) as b:
+            if is_multi:
+                out = b(torch.ops.aten.squeeze.dims, inp, new_dims)
+            else:
+                out = b(torch.ops.aten.squeeze.dim, inp, new_dims[0])
+            out.meta["is_complex_layout"] = True
+            node.replace_all_uses_with(out)
+            self.gm.graph.erase_node(node)
+            return True
+
+    @_complex_unpacker(torch.ops.aten.cat.default)
+    def _rewrite_cat(self, node: Node) -> bool:
+        tensors = node.args[0]
+        dim = node.args[1] if len(node.args) > 1 else 0
+        # Negative dims: shift by -1 to avoid concatenating into the trailing
+        # real/imag dim.  E.g. cat(tensors, dim=-1) on complex tensors should
+        # concat along the last *complex* dimension, not the trailing 2.
+        new_dim = dim - 1 if dim < 0 else dim
+        with SubgraphBuilder(self.gm.graph, node) as b:
+            out = b(torch.ops.aten.cat.default, list(tensors), new_dim)
+            out.meta["is_complex_layout"] = True
+            node.replace_all_uses_with(out)
+            self.gm.graph.erase_node(node)
+            return True
+
+    @_complex_unpacker(torch.ops.aten.stack.default)
+    def _rewrite_stack(self, node: Node) -> bool:
+        tensors = node.args[0]
+        dim = node.args[1] if len(node.args) > 1 else 0
+        # Negative dims: shift by -1 so a new dim inserted at position -1 lands
+        # before the trailing real/imag dim, not after it.
+        new_dim = dim - 1 if dim < 0 else dim
+        with SubgraphBuilder(self.gm.graph, node) as b:
+            out = b(torch.ops.aten.stack.default, list(tensors), new_dim)
+            out.meta["is_complex_layout"] = True
+            node.replace_all_uses_with(out)
+            self.gm.graph.erase_node(node)
+            return True
+
+    @_complex_unpacker(torch.ops.aten.t.default)
+    def _rewrite_t(self, node: Node) -> bool:
+        # t() is the 2-D transpose shorthand.  After unpacking, the tensor is
+        # 3-D ([..., 2]) so t() would raise.  Replace with transpose(0, 1).
+        inp = node.args[0]
+        with SubgraphBuilder(self.gm.graph, node) as b:
+            out = b(torch.ops.aten.transpose.int, inp, 0, 1)
+            node.replace_all_uses_with(out)
+            out.meta["is_complex_layout"] = True
+            self.gm.graph.erase_node(node)
+            return True
+
+    @_complex_unpacker(torch.ops.aten.transpose.int)
+    def _rewrite_transpose(self, node: Node) -> bool:
+        inp = node.args[0]
+        dim0, dim1 = node.args[1], node.args[2]
+        # Get the original complex rank from node metadata (not yet re-propagated).
+        node_val = node.meta.get("val", None)
+        if node_val is None or not hasattr(node_val, "shape"):
+            logger.warning(
+                "transpose on complex tensor '%s': no metadata, skipping rewrite. "
+                "This may produce incorrect results or fail TRT compilation.",
+                node.name,
+            )
+            return False
+        n = len(node_val.shape)  # original complex rank
+        # Normalize dims to absolute indices in [0, n-1]: same indices are valid
+        # in the real layout too (both are before the trailing 2).
+        abs0 = dim0 % n if dim0 < 0 else dim0
+        abs1 = dim1 % n if dim1 < 0 else dim1
+        with SubgraphBuilder(self.gm.graph, node) as b:
+            out = b(torch.ops.aten.transpose.int, inp, abs0, abs1)
+            node.replace_all_uses_with(out)
+            out.meta["is_complex_layout"] = True
+            self.gm.graph.erase_node(node)
+            return True
+
+    @_complex_unpacker(torch.ops.aten.select.int)
+    def _rewrite_select(self, node: Node) -> bool:
+        # select.int on a complex tensor selects along a batch/sequence dim.
+        # In the real layout the trailing dim encodes real/imag, so negative
+        # dim indices must be shifted by -1 to avoid selecting from that dim.
+        inp = node.args[0]
+        dim = node.args[1]
+        idx = node.args[2]
+        if dim >= 0:
+            return False  # non-negative dims are unchanged in real layout
+        new_dim = dim - 1
+        with SubgraphBuilder(self.gm.graph, node) as b:
+            out = b(torch.ops.aten.select.int, inp, new_dim, idx)
+            out.meta["is_complex_layout"] = True
+            node.replace_all_uses_with(out)
+            self.gm.graph.erase_node(node)
+            return True
+
+    @_complex_unpacker(torch.ops.aten.slice.Tensor)
+    def _rewrite_slice(self, node: Node) -> bool:
+        inp = node.args[0]
+        dim = node.args[1] if len(node.args) > 1 else 0
+        start = node.args[2] if len(node.args) > 2 else None
+        end = node.args[3] if len(node.args) > 3 else None
+        step = node.args[4] if len(node.args) > 4 else 1
+        if dim >= 0:
+            return False  # non-negative dims are safe in real layout
+        new_dim = dim - 1
+        with SubgraphBuilder(self.gm.graph, node) as b:
+            out = b(torch.ops.aten.slice.Tensor, inp, new_dim, start, end, step)
+            out.meta["is_complex_layout"] = True
+            node.replace_all_uses_with(out)
+            self.gm.graph.erase_node(node)
+            return True
+
+    @_complex_unpacker(
+        torch.ops.aten.split.Tensor,
+        torch.ops.aten.split_with_sizes.default,
+    )
+    def _rewrite_split(self, node: Node) -> bool:
+        inp = node.args[0]
+        size_or_sizes = node.args[1]
+        dim = node.args[2] if len(node.args) > 2 else 0
+        new_dim = dim - 1 if dim < 0 else dim
+        with SubgraphBuilder(self.gm.graph, node) as b:
+            out = b(node.target, inp, size_or_sizes, new_dim)
+            out.meta["is_complex_layout"] = True
+            node.replace_all_uses_with(out)
+            self.gm.graph.erase_node(node)
+            return True
+
+    @_complex_unpacker(torch.ops.aten.chunk.default)
+    def _rewrite_chunk(self, node: Node) -> bool:
+        inp = node.args[0]
+        chunks = node.args[1]
+        dim = node.args[2] if len(node.args) > 2 else 0
+        new_dim = dim - 1 if dim < 0 else dim
+        with SubgraphBuilder(self.gm.graph, node) as b:
+            out = b(torch.ops.aten.chunk.default, inp, chunks, new_dim)
+            out.meta["is_complex_layout"] = True
+            node.replace_all_uses_with(out)
+            self.gm.graph.erase_node(node)
+            return True
+
+    @_complex_unpacker(torch.ops.aten.expand.default)
+    def _rewrite_expand(self, node: Node) -> bool:
+        # expand(input, size) — size must include the trailing real/imag dim.
+        # Append 2 to the size list.  Negative sizes (-1 = keep dim) are left as-is;
+        # only the trailing 2 is appended for the real/imag encoding dim.
+        inp = node.args[0]
+        size = list(node.args[1])
+        new_size = size + [2]
+        with SubgraphBuilder(self.gm.graph, node) as b:
+            out = b(torch.ops.aten.expand.default, inp, new_size)
+            out.meta["is_complex_layout"] = True
+            node.replace_all_uses_with(out)
+            self.gm.graph.erase_node(node)
+            return True
+
+    # ------------------------------------------------------------------
+    # Matrix-multiplication handlers
+    #
+    # Complex mm: (A+iB)(C+iD) = (AC-BD) + i(AD+BC)  — 4 real matmuls.
+    # ------------------------------------------------------------------
+
+    def _inline_complex_mm_op(
+        self,
+        b: "SubgraphBuilder",
+        matmul_op: object,
+        x: Node,
+        y: Node,
+        x_was_complex: bool,
+        y_was_complex: bool,
+    ) -> "Tuple[Node, Node]":
+        """Emit real/imag components of a complex matmul using *matmul_op*."""
+        if x_was_complex and y_was_complex:
+            x_re = b(torch.ops.aten.select.int, x, -1, 0)
+            x_im = b(torch.ops.aten.select.int, x, -1, 1)
+            y_re = b(torch.ops.aten.select.int, y, -1, 0)
+            y_im = b(torch.ops.aten.select.int, y, -1, 1)
+            ac = b(matmul_op, x_re, y_re)
+            bd = b(matmul_op, x_im, y_im)
+            ad = b(matmul_op, x_re, y_im)
+            bc = b(matmul_op, x_im, y_re)
+            out_re = b(torch.ops.aten.sub.Tensor, ac, bd)
+            out_im = b(torch.ops.aten.add.Tensor, ad, bc)
+        elif x_was_complex:
+            # x is complex, y is real: (A+iB)*C = AC + iBC
+            x_re = b(torch.ops.aten.select.int, x, -1, 0)
+            x_im = b(torch.ops.aten.select.int, x, -1, 1)
+            out_re = b(matmul_op, x_re, y)
+            out_im = b(matmul_op, x_im, y)
+        else:
+            # x is real, y is complex: A*(C+iD) = AC + iAD
+            y_re = b(torch.ops.aten.select.int, y, -1, 0)
+            y_im = b(torch.ops.aten.select.int, y, -1, 1)
+            out_re = b(matmul_op, x, y_re)
+            out_im = b(matmul_op, x, y_im)
+        return out_re, out_im
+
+    def _is_complex_layout_node(self, n: Node) -> bool:
+        """True if *n* is in real [..., 2] layout representing a complex tensor.
+
+        All complex nodes are annotated with node.meta["is_complex_layout"] = True
+        during the detection phase (or by each rewrite handler as it emits new
+        nodes), so this is a direct metadata lookup — no shape heuristics needed.
+        """
+        return n.meta.get("is_complex_layout", False)
+
+    @_complex_unpacker(torch.ops.aten.mm.default)
+    def _rewrite_mm(self, node: Node) -> bool:
+        if not node.meta.get("is_complex_layout", False):
+            return False
+        x, y = node.args[0], node.args[1]
+        x_c = self._is_complex_layout_node(x)
+        y_c = self._is_complex_layout_node(y)
+        if not x_c and not y_c:
+            return False
+        with SubgraphBuilder(self.gm.graph, node) as b:
+            out_re, out_im = self._inline_complex_mm_op(
+                b, torch.ops.aten.mm.default, x, y, x_c, y_c
+            )
+            out = self._inline_cat_re_im(b, out_re, out_im)
+            node.replace_all_uses_with(out)
+            self.gm.graph.erase_node(node)
+            return True
+
+    @_complex_unpacker(torch.ops.aten.bmm.default)
+    def _rewrite_bmm(self, node: Node) -> bool:
+        if not node.meta.get("is_complex_layout", False):
+            return False
+        x, y = node.args[0], node.args[1]
+        x_c = self._is_complex_layout_node(x)
+        y_c = self._is_complex_layout_node(y)
+        if not x_c and not y_c:
+            return False
+        with SubgraphBuilder(self.gm.graph, node) as b:
+            out_re, out_im = self._inline_complex_mm_op(
+                b, torch.ops.aten.bmm.default, x, y, x_c, y_c
+            )
+            out = self._inline_cat_re_im(b, out_re, out_im)
+            node.replace_all_uses_with(out)
+            self.gm.graph.erase_node(node)
+            return True
+
+    @_complex_unpacker(torch.ops.aten.matmul.default)
+    def _rewrite_matmul(self, node: Node) -> bool:
+        if not node.meta.get("is_complex_layout", False):
+            return False
+        x, y = node.args[0], node.args[1]
+        x_c = self._is_complex_layout_node(x)
+        y_c = self._is_complex_layout_node(y)
+        if not x_c and not y_c:
+            return False
+        with SubgraphBuilder(self.gm.graph, node) as b:
+            out_re, out_im = self._inline_complex_mm_op(
+                b, torch.ops.aten.matmul.default, x, y, x_c, y_c
+            )
+            out = self._inline_cat_re_im(b, out_re, out_im)
+            node.replace_all_uses_with(out)
+            self.gm.graph.erase_node(node)
+            return True
+
     @_complex_unpacker(torch.ops.aten.where.self)
     def _rewrite_where(self, node: Node) -> bool:
         # where.self: unsqueeze mask and optionally expand true-branch for complex layout.
@@ -1127,6 +1666,7 @@ class ComplexGraphRewriter:
                 ):
                     true_arg = b(torch.ops.aten.expand.default, true_node, target_shape)
             out = b(torch.ops.aten.where.self, mask_unsq, true_arg, other_node)
+            out.meta["is_complex_layout"] = True
             node.replace_all_uses_with(out)
             self.gm.graph.erase_node(node)
             return True
@@ -1141,20 +1681,20 @@ class ComplexGraphRewriter:
         # active) and would lose SymInt information for torch.export graphs.
         detected_fake_mode = torch._export.utils._detect_fake_mode_from_gm(self.gm)
 
-        # Record the set of all nodes that have complex dtype BEFORE any rewriting.
-        # This is needed because after replace_input_node (which changes dtype from
-        # complex to float32), is_complex_dtype() would return False for those nodes —
-        # but we still need to know they were originally complex when we later decide
-        # whether a mul.Tensor operand should be treated as complex-layout.
+        # Annotate all nodes that have complex dtype BEFORE any rewriting.
+        # We stamp node.meta["is_complex_layout"] = True on every complex-dtype node
+        # so that later passes can reliably distinguish real [..., 2] layout tensors
+        # (created by this rewriter) from coincidentally-shaped real tensors.
+        # This is stable across rewrites: after replace_input_node changes dtype to
+        # float32, is_complex_dtype() would return False, but the metadata flag persists.
         detector = ComplexOpDetector()
-        self._originally_complex: Set[Node] = set()
         for subgraph in subgraphs:
             for node in subgraph.input_nodes:
                 if detector.is_complex_dtype(node):
-                    self._originally_complex.add(node)
+                    node.meta["is_complex_layout"] = True
             for node in subgraph.subgraph_nodes:
                 if detector.is_complex_dtype(node):
-                    self._originally_complex.add(node)
+                    node.meta["is_complex_layout"] = True
 
         # _DISPATCH maps op -> unbound method; bind self here once per call.
         dispatch = {op: method.__get__(self) for op, method in self._DISPATCH.items()}
