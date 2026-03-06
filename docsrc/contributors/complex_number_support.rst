@@ -135,10 +135,15 @@ runtime modules handle the conversion:
 Key Implementation Invariants
 -------------------------------
 
-* **``originally_complex`` set** — the set of nodes that were complex-dtype
-  *before* any rewrites. After ``replace_input_node``, complex placeholders become
-  ``float32`` so ``is_complex_dtype()`` returns ``False``. The ``originally_complex``
-  set is used to decide which ``mul.Tensor`` nodes need the complex mul rewrite.
+* **``node.meta["is_complex_layout"]``** — every node that represents a complex
+  quantity (either originally complex-dtype, or a real ``(..., 2)`` tensor produced
+  by the rewriter) is annotated with ``node.meta["is_complex_layout"] = True``.
+  This annotation is set during the detection phase (before any rewrites begin) and
+  propagated by every rewrite handler as it emits new nodes.  It survives dtype
+  changes: after ``replace_input_node`` converts a ``placeholder`` from complex to
+  ``float32``, the dtype-based check ``is_complex_dtype()`` would return ``False``,
+  but the metadata flag remains.  ``_is_complex_layout_node(n)`` is simply
+  ``n.meta.get("is_complex_layout", False)`` — no shape heuristics or recursion.
 * **FakeTensorMode reuse** — ``propagate_metadata`` must use the ``FakeTensorMode``
   from existing placeholder fake tensors (not a fresh mode) to avoid mode-mismatch
   errors under ``torch.compile`` and to preserve SymInt for dynamic shapes.
@@ -272,18 +277,28 @@ original ``mul`` node is then replaced and erased.
 See :ref:`subgraph_builder` for more on how ``SubgraphBuilder`` manages
 cursor-based insertion.
 
-The ``originally_complex`` Invariant
-"""""""""""""""""""""""""""""""""""""
+The ``is_complex_layout`` Metadata Invariant
+"""""""""""""""""""""""""""""""""""""""""""""
 
 Input replacement (Stage 2) converts complex ``placeholder`` nodes to
 ``float32``.  After that, ``is_complex_dtype(node)`` returns ``False`` for those
 nodes even though they logically represent complex quantities.
 
-To avoid missed rewrites, the rewriter records the set of nodes that were complex
-*before any rewrites* in ``originally_complex``.  The ``mul.Tensor`` dispatch
-handler only triggers the full complex-multiply decomposition when the ``mul``
-node appears in ``originally_complex``; real multiplies that happen to follow a
-complex input (e.g. an ``abs`` followed by a real-valued scale) are left alone.
+To avoid missed rewrites, every node that represents a complex quantity is
+annotated with ``node.meta["is_complex_layout"] = True`` during the detection
+phase (lines in ``rewrite_subgraph_nodes`` before any rewrites begin).  The
+annotation is then propagated forward by every rewrite handler:
+
+* ``replace_input_node`` stamps it on the new placeholder and ``get_attr`` nodes.
+* ``_inline_cat_re_im`` stamps it on every ``[re_u, im_u]`` concatenation node,
+  covering all math handlers (``exp``, ``log``, ``sin``, ``mul``, etc.) at once.
+* Each shape-manipulation handler (``reshape``, ``permute``, ``unsqueeze``,
+  ``cat``, ``stack``, etc.) stamps it on its output node explicitly.
+
+``_is_complex_layout_node(n)`` is therefore a direct metadata lookup — no shape
+heuristics (``val.shape[-1] == 2``), no recursive ``_SHAPE_TRANSPARENT_OPS``
+propagation.  This also eliminates false-positives on real parameters that
+coincidentally have a trailing dimension of size 2.
 
 FakeTensorMode Reuse for Dynamic Shapes
 """""""""""""""""""""""""""""""""""""""""
@@ -336,18 +351,18 @@ To teach the rewriter about a new complex op, add a method to
 .. code-block:: python
 
     @_complex_unpacker(torch.ops.aten.my_new_op.default)
-    def _rewrite_my_new_op(
-        self,
-        node: Node,
-        originally_complex: set,
-    ) -> None:
+    def _rewrite_my_new_op(self, node: Node) -> bool:
         inp = node.args[0]
         with SubgraphBuilder(self.gm.graph, node) as b:
             re = b(torch.ops.aten.select.int, inp, -1, 0)
             im = b(torch.ops.aten.select.int, inp, -1, 1)
-            result = b(my_real_impl, re, im)
-        node.replace_all_uses_with(result)
-        self.gm.graph.erase_node(node)
+            out = b(my_real_impl, re, im)
+            # If the output is still a complex-layout [..., 2] tensor, annotate it.
+            # (Not needed if using _inline_cat_re_im, which sets the flag automatically.)
+            out.meta["is_complex_layout"] = True
+            node.replace_all_uses_with(out)
+            self.gm.graph.erase_node(node)
+        return True
 
 ``@_register_unpackers`` (applied to the class) picks up the new entry
 automatically at import time — no other registration is required.
