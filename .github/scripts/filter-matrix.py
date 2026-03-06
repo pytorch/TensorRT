@@ -13,10 +13,11 @@ disabled_cuda_versions: List[str] = []
 # jetpack 6.2 only officially supports python 3.10 and cu126
 jetpack_python_versions: List[str] = ["3.10"]
 jetpack_cuda_versions: List[str] = ["cu126"]
-# rtx 1.2 currently only supports cu129 and cu130
+# rtx 1.3 currently only supports cu129 and cu130
 rtx_cuda_versions: List[str] = ["cu129", "cu130"]
-# trt 10.14.1 currently only supports cu129 and cu130
-trt_cuda_versions: List[str] = ["cu126", "cu128", "cu129", "cu130"]
+# CUDA versions for TensorRT: aarch64 only supports cu130, x86 supports cu126/128/129/130
+trt_cuda_versions_x86: List[str] = ["cu126", "cu128", "cu129", "cu130"]
+trt_cuda_versions_aarch64: List[str] = ["cu130"]
 
 jetpack_container_image: str = "nvcr.io/nvidia/l4t-jetpack:r36.4.0"
 sbsa_container_image: str = "quay.io/pypa/manylinux_2_39_aarch64"
@@ -60,6 +61,11 @@ def filter_matrix_item(
             if item["desired_cuda"] not in rtx_cuda_versions:
                 return False
         else:
+            # Select CUDA versions based on architecture
+            if item["gpu_arch_type"] == "cuda-aarch64":
+                trt_cuda_versions = trt_cuda_versions_aarch64
+            else:
+                trt_cuda_versions = trt_cuda_versions_x86
             if item["desired_cuda"] not in trt_cuda_versions:
                 return False
         if item["gpu_arch_type"] == "cuda-aarch64":
