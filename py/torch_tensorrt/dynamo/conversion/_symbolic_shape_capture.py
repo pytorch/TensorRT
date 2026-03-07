@@ -50,29 +50,38 @@ def extract_symbolic_shape_expressions(
             return None
 
         input_val = input_node.meta["val"]
-        if not isinstance(input_val, torch.Tensor):
+        logger.debug(
+            f"Input node '{input_node.name}': type={type(input_val)}, val={input_val}"
+        )
+        if isinstance(input_val, torch.Tensor):
+            shape_exprs = []
+            for dim_size in input_val.shape:
+                if isinstance(dim_size, torch.SymInt):
+                    shape_exprs.append(dim_size.node.expr)
+                else:
+                    shape_exprs.append(int(dim_size))
+
+            input_info.append(
+                {
+                    "shape_exprs": shape_exprs,
+                    "dtype": input_val.dtype,
+                    "name": input_node.name,
+                }
+            )
+        elif isinstance(input_val, (torch.SymInt, torch.SymFloat, int, float, bool)):
+            input_info.append(
+                {
+                    "shape_exprs": [],
+                    "dtype": None,
+                    "name": input_node.name,
+                    "is_scalar": True,
+                }
+            )
+        else:
             logger.warning(
-                "When processing symbolic shapes for TensorRT engine, input is not a tensor"
+                f"When processing symbolic shapes for TensorRT engine, unsupported input type: {type(input_val)}"
             )
             return None
-
-        # Extract shape as sympy expressions (can be pickled)
-        shape_exprs = []
-        for dim_size in input_val.shape:
-            if isinstance(dim_size, torch.SymInt):
-                # Store the sympy expression, which can be pickled
-                shape_exprs.append(dim_size.node.expr)
-            else:
-                # Store concrete integer
-                shape_exprs.append(int(dim_size))
-
-        input_info.append(
-            {
-                "shape_exprs": shape_exprs,
-                "dtype": input_val.dtype,
-                "name": input_node.name,
-            }
-        )
 
     # Extract output values from output node
     output_args = output_node.args[0]
@@ -89,28 +98,33 @@ def extract_symbolic_shape_expressions(
             return None
 
         out_val = out_arg.meta["val"]
-        if not isinstance(out_val, torch.Tensor):
+        if isinstance(out_val, torch.Tensor):
+            shape_exprs = []
+            for dim_size in out_val.shape:
+                if isinstance(dim_size, torch.SymInt):
+                    shape_exprs.append(dim_size.node.expr)
+                else:
+                    shape_exprs.append(int(dim_size))
+
+            output_info.append(
+                {
+                    "shape_exprs": shape_exprs,
+                    "dtype": out_val.dtype,
+                }
+            )
+        elif isinstance(out_val, (torch.SymInt, torch.SymFloat, int, float, bool)):
+            output_info.append(
+                {
+                    "shape_exprs": [],
+                    "dtype": None,
+                    "is_scalar": True,
+                }
+            )
+        else:
             logger.warning(
-                "When processing symbolic shapes for TensorRT engine, output is not a tensor"
+                f"When processing symbolic shapes for TensorRT engine, unsupported output type: {type(out_val)}"
             )
             return None
-
-        # Extract shape as sympy expressions (can be pickled)
-        shape_exprs = []
-        for dim_size in out_val.shape:
-            if isinstance(dim_size, torch.SymInt):
-                # Store the sympy expression, which can be pickled
-                shape_exprs.append(dim_size.node.expr)
-            else:
-                # Store concrete integer
-                shape_exprs.append(int(dim_size))
-
-        output_info.append(
-            {
-                "shape_exprs": shape_exprs,
-                "dtype": out_val.dtype,
-            }
-        )
 
     if not output_info:
         return None
