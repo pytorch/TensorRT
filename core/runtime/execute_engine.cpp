@@ -118,6 +118,9 @@ void setup_input_tensors(
     LOG_DEBUG("Input Name: " << name << " Shape: " << dims << " isShapeInferenceIO: " << is_shape_tensor);
 
     if (is_shape_tensor) {
+      // Shape tensor inputs are casted to int64 explicitly.
+      // Refer to
+      // https://github.com/NVIDIA/TensorRT/blob/d2f4ef789a9a6ffdf37b55c3f81b486225f6b380/samples/common/sampleInference.cpp#L435
       auto input_cpu = inputs[i].clone().contiguous().cpu().to(torch::kInt64);
       std::vector<int64_t> inputs_cpu_vec(
           input_cpu.data_ptr<int64_t>(), input_cpu.data_ptr<int64_t>() + input_cpu.numel());
