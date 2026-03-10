@@ -69,10 +69,16 @@ def extract_symbolic_shape_expressions(
                 }
             )
         elif isinstance(input_val, (torch.SymInt, torch.SymFloat, int, float, bool)):
+            if isinstance(input_val, (torch.SymInt, int)):
+                scalar_dtype = torch.int64
+            elif isinstance(input_val, (torch.SymFloat, float)):
+                scalar_dtype = torch.float64
+            else:
+                scalar_dtype = torch.bool
             input_info.append(
                 {
                     "shape_exprs": [],
-                    "dtype": None,
+                    "dtype": scalar_dtype,
                     "name": input_node.name,
                     "is_scalar": True,
                 }
@@ -113,10 +119,16 @@ def extract_symbolic_shape_expressions(
                 }
             )
         elif isinstance(out_val, (torch.SymInt, torch.SymFloat, int, float, bool)):
+            if isinstance(out_val, (torch.SymInt, int)):
+                scalar_dtype = torch.int64
+            elif isinstance(out_val, (torch.SymFloat, float)):
+                scalar_dtype = torch.float64
+            else:
+                scalar_dtype = torch.bool
             output_info.append(
                 {
                     "shape_exprs": [],
-                    "dtype": None,
+                    "dtype": scalar_dtype,
                     "is_scalar": True,
                 }
             )

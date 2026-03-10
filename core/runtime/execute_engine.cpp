@@ -96,9 +96,8 @@ void setup_input_tensors(
     std::vector<at::Tensor> inputs,
     c10::intrusive_ptr<TRTEngine> compiled_engine,
     bool cudagraphs_enabled,
-    bool need_cudagraphs_record) {
-  // this is a buffer to store shape tensor input addresses throughout the runtime scope
-  std::list<std::vector<int64_t>> inputShapeTensorValues;
+    bool need_cudagraphs_record,
+    std::list<std::vector<int64_t>>& inputShapeTensorValues) {
   std::list<at::Tensor> formatted_inputs(compiled_engine->num_io.first);
 
   for (size_t i = 0; i < inputs.size(); i++) {
@@ -115,12 +114,10 @@ void setup_input_tensors(
 
     auto dims = core::util::toDims(inputs[i].sizes());
     auto shape = core::util::toVec(dims);
-    LOG_DEBUG("Input Name: " << name << " Shape: " << dims);
+    bool is_shape_tensor = compiled_engine->cuda_engine->isShapeInferenceIO(name.c_str());
+    LOG_DEBUG("Input Name: " << name << " Shape: " << dims << " isShapeInferenceIO: " << is_shape_tensor);
 
-    if (compiled_engine->cuda_engine->isShapeInferenceIO(name.c_str())) {
-      // Shape tensor inputs are casted to int64 explicitly.
-      // Refer to
-      // https://github.com/NVIDIA/TensorRT/blob/d2f4ef789a9a6ffdf37b55c3f81b486225f6b380/samples/common/sampleInference.cpp#L435
+    if (is_shape_tensor) {
       auto input_cpu = inputs[i].clone().contiguous().cpu().to(torch::kInt64);
       std::vector<int64_t> inputs_cpu_vec(
           input_cpu.data_ptr<int64_t>(), input_cpu.data_ptr<int64_t>() + input_cpu.numel());
@@ -233,6 +230,9 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
 
     std::vector<at::Tensor> outputs(compiled_engine->num_io.second);
 
+    // Shape tensor CPU buffers must outlive inferShapes() and enqueueV3()
+    std::list<std::vector<int64_t>> inputShapeTensorValues;
+
     // Intialize inputs and outputs to be available throughout the succeeding scopes
     { // Input Setup
       std::unique_ptr<torch::autograd::profiler::RecordProfile> input_profiler_guard;
@@ -241,7 +241,7 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
             std::make_unique<torch::autograd::profiler::RecordProfile>(compiled_engine->input_profile_path);
       }
 
-      setup_input_tensors(inputs, compiled_engine, cudagraphs_enabled, need_cudagraphs_record);
+      setup_input_tensors(inputs, compiled_engine, cudagraphs_enabled, need_cudagraphs_record, inputShapeTensorValues);
       // Check if input shapes can be inferred.
       int32_t const io_size{compiled_engine->cuda_engine->getNbIOTensors()};
       std::vector<char const*> names(io_size);
@@ -364,6 +364,9 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
   };
 
   auto run_output_allocator = [&]() {
+    // Shape tensor CPU buffers must outlive inferShapes() and enqueueV3()
+    std::list<std::vector<int64_t>> inputShapeTensorValues;
+
     { // Input Setup
       std::unique_ptr<torch::autograd::profiler::RecordProfile> input_profiler_guard;
       if (compiled_engine->profile_execution) {
@@ -371,7 +374,7 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
             std::make_unique<torch::autograd::profiler::RecordProfile>(compiled_engine->input_profile_path);
       }
 
-      setup_input_tensors(inputs, compiled_engine, false, false);
+      setup_input_tensors(inputs, compiled_engine, false, false, inputShapeTensorValues);
       // Check if input shapes can be inferred.
       int32_t const io_size{compiled_engine->cuda_engine->getNbIOTensors()};
       std::vector<char const*> names(io_size);
