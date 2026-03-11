@@ -195,9 +195,6 @@ def test_resnet18_torch_exec_ops(ir):
     "torchvision is not installed",
 )
 def test_mobilenet_v2(ir, dtype):
-    if torchtrt.ENABLED_FEATURES.tensorrt_rtx and dtype == torch.bfloat16:
-        pytest.skip("TensorRT-RTX does not support bfloat16")
-
     model = models.mobilenet_v2(pretrained=True).eval().to("cuda").to(dtype)
     input = torch.randn((1, 3, 224, 224)).to("cuda").to(dtype)
 
@@ -237,9 +234,6 @@ def test_mobilenet_v2(ir, dtype):
     "timm or torchvision not installed",
 )
 def test_efficientnet_b0(ir, dtype):
-    if torchtrt.ENABLED_FEATURES.tensorrt_rtx and dtype == torch.bfloat16:
-        pytest.skip("TensorRT-RTX does not support bfloat16")
-
     model = (
         timm.create_model("efficientnet_b0", pretrained=True)
         .eval()
@@ -284,9 +278,6 @@ def test_efficientnet_b0(ir, dtype):
     "transformers is required to run this test",
 )
 def test_bert_base_uncased(ir, dtype):
-    if torchtrt.ENABLED_FEATURES.tensorrt_rtx and dtype == torch.bfloat16:
-        pytest.skip("TensorRT-RTX does not support bfloat16")
-
     from transformers import BertModel
 
     model = BertModel.from_pretrained("bert-base-uncased").cuda().eval().to(dtype)
@@ -425,10 +416,6 @@ def test_resnet18_half(ir):
 
 
 @pytest.mark.unit
-@unittest.skipIf(
-    torchtrt.ENABLED_FEATURES.tensorrt_rtx,
-    "tensorrt_rtx does not support bfloat16",
-)
 def test_cosmos_true_div(ir):
     class CosmosLearnablePositionalEmbed(torch.nn.Module):
         def __init__(
@@ -527,10 +514,6 @@ def test_cosmos_true_div(ir):
 
 
 @pytest.mark.unit
-@unittest.skipIf(
-    torchtrt.ENABLED_FEATURES.tensorrt_rtx,
-    "bf16 is not supported for tensorrt_rtx",
-)
 @pytest.mark.critical
 def test_bf16_model(ir):
     class MyModule(torch.nn.Module):
@@ -576,10 +559,6 @@ def test_bf16_model(ir):
 
 
 @pytest.mark.unit
-@unittest.skipIf(
-    torchtrt.ENABLED_FEATURES.tensorrt_rtx,
-    "bf16 is not supported for tensorrt_rtx",
-)
 @pytest.mark.critical
 def test_bf16_fallback_model(ir):
     class MyModule(torch.nn.Module):
