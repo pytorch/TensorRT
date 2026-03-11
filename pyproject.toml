@@ -60,6 +60,7 @@ lint = [
 
 dev = [
     {include-group = "lint"},
+    {include-group = "test"},
     "pre-commit>=2.20.0",
     "typos",
     "mypy",
@@ -77,6 +78,7 @@ debug = [
 test = [
     "pytest",
     "pytest-xdist",
+    "pytest-forked>=1.6.0",
     "parameterized>=0.2.0",
     "expecttest==0.1.6",
 ]
@@ -117,6 +119,7 @@ include-package-data = false
 
 [tool.pytest.ini_options]
 testpaths = ["tests/py"]
+addopts = "-n auto --dist=loadfile"
 norecursedirs = [
     "bazel-*",
     ".venv",

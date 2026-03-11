@@ -1,5 +1,6 @@
 import logging
 import math
+import operator
 from typing import Callable, List, Optional, Tuple
 
 import torch
@@ -57,6 +58,16 @@ _ELEMENTWISE_SAFE: frozenset = frozenset(
         torch.ops.aten.floor.default,
         torch.ops.aten.round.default,
         torch.ops.aten.trunc.default,
+        # Structural list indexing — extracts one element from a split/chunk output.
+        # The element is still in real [..., 2] complex layout; the flag is already
+        # set by the pre-rewrite annotation loop.  No view_as_complex wrapping needed.
+        operator.getitem,
+        # Shape queries — sym_size.int reads a tensor's dimension value, which is not
+        # affected by the complex [..., 2] layout.  Without this entry the fallback
+        # wrapper inserts view_as_complex before the sym_size node, causing the shape
+        # to be computed from a complex tensor in the PyTorch fallback and returning
+        # a raw SymInt backing value (garbage) to TRT for reshape dims.
+        torch.ops.aten.sym_size.int,
     }
 )
 
@@ -467,7 +478,14 @@ class ComplexGraphRewriter:
 
     @_complex_unpacker(torch.ops.aten.view_as_complex.default)
     def _rewrite_view_as_complex(self, node: Node) -> bool:
-        node.replace_all_uses_with(node.args[0])
+        inp = node.args[0]
+        # The input to view_as_complex is a (..., 2) real-layout tensor that
+        # represents a complex tensor.  After erasing view_as_complex, downstream
+        # consumers (e.g. mul.Tensor) need to know that this node is in complex
+        # layout so the correct rewrite branch is chosen.
+        if isinstance(inp, torch.fx.Node):
+            inp.meta["is_complex_layout"] = True
+        node.replace_all_uses_with(inp)
         self.gm.graph.erase_node(node)
         # Return True so the caller triggers propagate_metadata + gm.recompile().
         # Without recompile the compiled forward still calls the erased node.
@@ -1727,11 +1745,58 @@ class ComplexGraphRewriter:
                 else:
                     logger.warning(
                         "Complex op '%s' has no explicit rewrite rule. "
-                        "It will be passed through as-is on the real [..., 2] layout, "
-                        "which may produce incorrect results or fail TRT compilation. "
-                        "Consider adding a rewrite in complex_graph_rewrite.py.",
+                        "Wrapping with view_as_complex/view_as_real so the op "
+                        "receives genuine complex tensors and TRT graph-breaks "
+                        "around it into a PyTorch fallback block.",
                         node.target,
                     )
+                    # Generic fallback: for each arg that is a real-layout
+                    # complex node, insert view_as_complex before the node so
+                    # the op sees genuine complex-dtype tensors (correct
+                    # semantics); then, if the node itself originally produced
+                    # a complex-layout output, wrap it with view_as_real and
+                    # redirect all users back onto the real [..., 2] path.
+                    # TRT has no complex-dtype support so it will refuse to
+                    # compile the view_as_complex/op/view_as_real cluster,
+                    # causing the partitioner to create a PyTorch fallback
+                    # block around it — exactly the graph break we want.
+                    new_args = list(node.args)
+                    any_complexified = False
+                    for i, arg in enumerate(node.args):
+                        if not isinstance(arg, torch.fx.Node):
+                            continue
+                        if not arg.meta.get("is_complex_layout", False):
+                            continue
+                        # Skip when val is a list/tuple (e.g. a residual split
+                        # output that wasn't caught by the getitem pass-through).
+                        # Allow None (newly created node without metadata yet).
+                        arg_val = arg.meta.get("val")
+                        if isinstance(arg_val, (list, tuple)):
+                            continue
+                        with self.gm.graph.inserting_before(node):
+                            vc = self.gm.graph.call_function(
+                                torch.ops.aten.view_as_complex.default,
+                                (arg,),
+                            )
+                            # view_as_complex produces a genuine complex node —
+                            # do NOT set is_complex_layout; it is not a
+                            # real-layout stand-in.
+                        new_args[i] = vc
+                        any_complexified = True
+                    if any_complexified:
+                        node.args = tuple(new_args)
+                    if any_complexified and node.meta.get("is_complex_layout", False):
+                        with self.gm.graph.inserting_after(node):
+                            vr = self.gm.graph.call_function(
+                                torch.ops.aten.view_as_real.default,
+                                (node,),
+                            )
+                            vr.meta["is_complex_layout"] = True
+                        node.replace_all_uses_with(
+                            vr,
+                            delete_user_cb=lambda user: user is not vr,
+                        )
+                        modified = True
         if modified:
             # After rewriting complex ops, any view_as_real node that now receives a
             # real tensor must be erased. The subgraph_rewriter replaces the original
