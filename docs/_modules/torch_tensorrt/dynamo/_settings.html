@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=9e89f000"></script>
+    <script src="../../../_static/documentation_options.js?v=2d416d50"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -492,12 +492,13 @@ document.write(`
     <span class="n">AUTOCAST_MAX_OUTPUT_THRESHOLD</span><span class="p">,</span>
     <span class="n">CACHE_BUILT_ENGINES</span><span class="p">,</span>
     <span class="n">CPU_MEMORY_BUDGET</span><span class="p">,</span>
+    <span class="n">DECOMPOSE_ATTENTION</span><span class="p">,</span>
     <span class="n">DISABLE_TF32</span><span class="p">,</span>
     <span class="n">DLA_GLOBAL_DRAM_SIZE</span><span class="p">,</span>
     <span class="n">DLA_LOCAL_DRAM_SIZE</span><span class="p">,</span>
     <span class="n">DLA_SRAM_SIZE</span><span class="p">,</span>
-    <span class="n">DYNAMICALLY_ALLOCATE_RESOURCES</span><span class="p">,</span>
     <span class="n">DRYRUN</span><span class="p">,</span>
+    <span class="n">DYNAMICALLY_ALLOCATE_RESOURCES</span><span class="p">,</span>
     <span class="n">ENABLE_AUTOCAST</span><span class="p">,</span>
     <span class="n">ENABLE_CROSS_COMPILE_FOR_WINDOWS</span><span class="p">,</span>
     <span class="n">ENABLE_EXPERIMENTAL_DECOMPOSITIONS</span><span class="p">,</span>
@@ -596,6 +597,7 @@ document.write(`
 <span class="sd">        autocast_calibration_dataloader (Optional[torch.utils.data.DataLoader]): The dataloader to use for autocast calibration. Default is None.</span>
 <span class="sd">        offload_module_to_cpu (bool): Offload the model to CPU to reduce memory footprint during compilation</span>
 <span class="sd">        dynamically_allocate_resources (bool): Dynamically allocate resources for TensorRT engines</span>
+<span class="sd">        decompose_attention (bool): Whether to decompose attention layers. We have converters for handling attention ops, but if you want to decompose them into smaller ops, you can set this to True.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">enabled_precisions</span><span class="p">:</span> <span class="n">Set</span><span class="p">[</span><span class="n">dtype</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="k">lambda</span><span class="p">:</span> <span class="n">ENABLED_PRECISIONS</span><span class="p">)</span>
@@ -653,8 +655,9 @@ document.write(`
         <span class="n">AUTOCAST_CALIBRATION_DATALOADER</span>
     <span class="p">)</span>
     <span class="n">enable_resource_partitioning</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">ENABLE_RESOURCE_PARTITIONING</span>
-    <span class="n">cpu_memory_budget</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">CPU_MEMORY_BUDGET</span>
+    <span class="n">cpu_memory_budget</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="n">CPU_MEMORY_BUDGET</span>
     <span class="n">dynamically_allocate_resources</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">DYNAMICALLY_ALLOCATE_RESOURCES</span>
+    <span class="n">decompose_attention</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">DECOMPOSE_ATTENTION</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">__getstate__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
         <span class="kn">from</span><span class="w"> </span><span class="nn">torch_tensorrt.dynamo.conversion._ConverterRegistry</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
@@ -695,6 +698,7 @@ document.write(`
     <span class="s2">&quot;autocast_max_output_threshold&quot;</span><span class="p">,</span>
     <span class="s2">&quot;autocast_max_depth_of_reduction&quot;</span><span class="p">,</span>
     <span class="s2">&quot;autocast_calibration_dataloader&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;decompose_attention&quot;</span><span class="p">,</span>
 <span class="p">}</span>
 
 
