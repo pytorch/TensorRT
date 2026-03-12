@@ -8,3 +8,4 @@ rewrite ATen ops before TensorRT compilation.
    :maxdepth: 1
 
    writing_dynamo_aten_lowering_passes
+   subgraph_builder

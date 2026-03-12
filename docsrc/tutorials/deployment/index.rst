@@ -12,4 +12,3 @@ complex-valued model support.
    cross_compile_windows
    Example: Cross-runtime Compilation for Windows <../_rendered_examples/dynamo/cross_runtime_compilation_for_windows>
    distributed_inference
-   complex_tensors
