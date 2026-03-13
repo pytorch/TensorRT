@@ -4,7 +4,8 @@
 Compiling Llama2 using the Torch-TensorRT with dynamo backend
 ==========================================================
 
-This interactive script is intended as a sample of the Torch-TensorRT workflow with dynamo backend on a Llama2 model."""
+This interactive script is intended as a sample of the Torch-TensorRT workflow with dynamo backend on a Llama2 model.
+"""
 
 # %%
 # Imports and Model Definition

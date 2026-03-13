@@ -1,4 +1,4 @@
-name: Release x86_64 Linux wheels and tarball artifacts
+name: RTX Release x86_64 Linux wheels and tarball artifacts
 
 on:
   push:

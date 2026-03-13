@@ -4,7 +4,8 @@
 Compiling ResNet using the Torch-TensorRT Dyanmo Frontend
 ==========================================================
 
-This interactive script is intended as a sample of the `torch_tensorrt.dynamo.compile` workflow on a ResNet model."""
+This interactive script is intended as a sample of the `torch_tensorrt.dynamo.compile` workflow on a ResNet model.
+"""
 
 # %%
 # Imports and Model Definition
