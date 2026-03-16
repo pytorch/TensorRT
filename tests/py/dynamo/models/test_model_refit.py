@@ -3,7 +3,6 @@ import os
 import unittest
 
 import pytest
-import tensorrt as trt
 import torch
 import torch.nn.functional as F
 import torch_tensorrt as torchtrt
@@ -20,6 +19,8 @@ from torch_tensorrt.dynamo.lowering import (
     pre_export_lowering,
 )
 from torch_tensorrt.logging import TRT_LOGGER
+
+import tensorrt as trt
 
 assertions = unittest.TestCase()
 
@@ -529,6 +530,10 @@ def test_refit_one_engine_bert_with_weightmap():
     not torch_trt.ENABLED_FEATURES.refit,
     "Refit feature is not supported in Python 3.13 or higher",
 )
+@unittest.skipIf(
+    not importlib.util.find_spec("torchvision"),
+    "torchvision is not installed",
+)
 @pytest.mark.unit
 def test_refit_one_engine_inline_runtime_with_weightmap(tmpdir):
 
@@ -580,6 +585,10 @@ def test_refit_one_engine_inline_runtime_with_weightmap(tmpdir):
 @unittest.skipIf(
     not torch_trt.ENABLED_FEATURES.refit,
     "Refit feature is not supported in Python 3.13 or higher",
+)
+@unittest.skipIf(
+    not importlib.util.find_spec("torchvision"),
+    "torchvision is not installed",
 )
 @pytest.mark.unit
 def test_refit_one_engine_python_runtime_with_weightmap():
@@ -772,6 +781,10 @@ def test_refit_multiple_engine_with_weightmap_cpu_offload():
     not torch_trt.ENABLED_FEATURES.refit,
     "Refit feature is not supported in Python 3.13 or higher",
 )
+@unittest.skipIf(
+    not importlib.util.find_spec("torchvision"),
+    "torchvision is not installed",
+)
 @pytest.mark.unit
 def test_refit_one_engine_without_weightmap():
     model = models.resnet18(pretrained=True).eval().to("cuda")
@@ -887,6 +900,10 @@ def test_refit_one_engine_bert_without_weightmap():
     not torch_trt.ENABLED_FEATURES.refit,
     "Refit feature is not supported in Python 3.13 or higher",
 )
+@unittest.skipIf(
+    not importlib.util.find_spec("torchvision"),
+    "torchvision is not installed",
+)
 @pytest.mark.unit
 def test_refit_one_engine_inline_runtime_without_weightmap(tmpdir):
     trt_ep_path = os.path.join(tmpdir, "compiled.ep")
@@ -935,6 +952,10 @@ def test_refit_one_engine_inline_runtime_without_weightmap(tmpdir):
 @unittest.skipIf(
     not torch_trt.ENABLED_FEATURES.refit,
     "Refit feature is not supported in Python 3.13 or higher",
+)
+@unittest.skipIf(
+    not importlib.util.find_spec("torchvision"),
+    "torchvision is not installed",
 )
 @pytest.mark.unit
 def test_refit_one_engine_python_runtime_without_weightmap():

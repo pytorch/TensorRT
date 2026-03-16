@@ -20,6 +20,8 @@ if importlib.util.find_spec("torchvision"):
     import torchvision.models as models
 if importlib.util.find_spec("timm"):
     import timm
+if importlib.util.find_spec("transformers"):
+    import transformers
 
 
 @pytest.mark.unit
@@ -334,6 +336,9 @@ def test_bert_base_uncased(ir, dtype):
     torch._dynamo.reset()
 
 
+@unittest.skipIf(
+    not importlib.util.find_spec("transformers"), "torchvision not installed"
+)
 @pytest.mark.unit
 def test_bert_base_uncased_cpu_offload(ir):
     from transformers import BertModel

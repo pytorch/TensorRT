@@ -6,7 +6,9 @@ import unittest
 import pytest
 import torch
 import torch_tensorrt
-from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
+
+if importlib.util.find_spec("transformers"):
+    from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
 
 sys.path.append(os.path.join(os.path.dirname(__file__), "../../../../tools/llm"))
 import argparse
@@ -17,6 +19,10 @@ import argparse
 @unittest.skipIf(
     not importlib.util.find_spec("modelopt"),
     "ModelOpt is required to run this test",
+)
+@unittest.skipIf(
+    not importlib.util.find_spec("transformers"),
+    "transformers is not installed",
 )
 def test_llm_decoder_layer(precision):
     from run_llm import compile_torchtrt
