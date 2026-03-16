@@ -82,7 +82,7 @@ def get_model(args):
     with torch.no_grad():
         # For plugin backend, we don't set attn_implementation
         attn_impl_kwargs = {}
-        if args.backend != "plugin":
+        if args.backend in ("sdpa", "iattention"):
             attn_impl_kwargs["attn_implementation"] = "sdpa"
 
         model = (
@@ -95,8 +95,10 @@ def get_model(args):
             .eval()
             .cuda()
         )
-        # register SDPA variant for the model (only for sdpa backend)
-        if args.backend != "plugin":
+        # Register SDPA lowering pass only for sdpa backend.
+        # For iattention backend, the core TRT IAttention converters handle SDPA ops
+        # directly without needing the custom lowering pass.
+        if args.backend == "sdpa":
             register_sdpa.enable_sdpa_converter(args.model, model.config)
 
     if QUANTIZATION_AVAILABLE:
@@ -255,7 +257,10 @@ if __name__ == "__main__":
         "--backend",
         type=str,
         default="sdpa",
-        help="Backend to use. Options: sdpa, plugin",
+        help="Backend to use. Options: sdpa, iattention, plugin. "
+        "'sdpa' uses custom SDPA lowering pass + converter (matmul+softmax+matmul). "
+        "'iattention' uses TensorRT native IAttention layer (no KV cache support yet). "
+        "'plugin' uses TensorRT Edge-LLM attention plugin with built-in KV cache.",
     )
     arg_parser.add_argument(
         "--iterations", type=int, default=5, help="no. of iterations to run"
@@ -316,12 +321,23 @@ if __name__ == "__main__":
     args = arg_parser.parse_args()
 
     # Validate arguments
+    if args.backend not in ("sdpa", "iattention", "plugin"):
+        raise ValueError(
+            f"Unknown backend '{args.backend}'. Options: sdpa, iattention, plugin"
+        )
     if args.backend == "plugin" and not PLUGIN_AVAILABLE:
         raise RuntimeError(
             "Plugin backend requested but plugin utilities are not available."
         )
     if args.cache and args.backend == "plugin":
         print("Warning: --cache is only applicable with 'sdpa' backend. Ignoring.")
+        args.cache = ""
+    if args.cache and args.backend == "iattention":
+        print(
+            "Warning: --cache is not supported with 'iattention' backend "
+            "(static_cache passes are incompatible with native IAttention converters). "
+            "Ignoring --cache."
+        )
         args.cache = ""
 
     with torch.inference_mode():
@@ -375,7 +391,7 @@ if __name__ == "__main__":
                     compile_time_s=None,
                 )
 
-        # Backend selection: sdpa or plugin
+        # Backend selection: sdpa, iattention, or plugin
         if args.backend == "plugin":
             # Plugin backend
             if not PLUGIN_AVAILABLE:
@@ -436,7 +452,8 @@ if __name__ == "__main__":
                     )
                     trt_timings.append(elapsed_ms / 1000.0)
         else:
-            # SDPA backend (default)
+            # SDPA or IAttention backend
+            # For iattention, args.cache is already cleared by validation above.
             if args.cache == "static_v1":
                 # This import is required to register static v1 KV cache transformations as lowering passes
                 import static_cache_v1

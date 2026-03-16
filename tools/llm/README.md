@@ -8,11 +8,12 @@ This directory provides utilities and scripts for compiling, optimizing, and ben
 - **VLM Support:** Supports Visual Language Models like Qwen2.5-VL and Eagle2.
 - **Precision Modes:** Supports FP16, BF16, and FP32.
 - **Multiple Backends:**
-  - **SDPA Backend** (default): Registers custom lowering pass for SDPA operations, enabling TensorRT conversion with optional static KV cache support
-  - **Plugin Backend**: Uses TensorRT Edge-LLM attention plugin for optimized inference with built-in KV cache management
-- **KV Cache:** Supports static and dynamic KV cache for efficient autoregressive decoding.
+  - **SDPA Backend** (`--backend sdpa`, default): Registers custom lowering pass for SDPA operations, converting attention to matmul+softmax+matmul with optional static KV cache support (`--cache static_v1`/`static_v2`)
+  - **IAttention Backend** (`--backend iattention`): Uses TensorRT's native `IAttention` layer for attention conversion. Single-pass inference only (KV cache not yet supported with this backend)
+  - **Plugin Backend** (`--backend plugin`): Uses TensorRT Edge-LLM attention plugin for optimized inference with built-in KV cache management
+- **KV Cache:** Supports static KV cache for efficient autoregressive decoding (SDPA and Plugin backends).
+- **Quantization:** Supports FP8 and NVFP4 quantization formats for reduced memory usage and improved inference speed.
 - **Benchmarking:** Measures and compares throughput and latency for PyTorch and TensorRT backends.
-- **Custom Attention:** Registers and converts custom scaled dot-product attention (SDPA) for compatibility with TensorRT.
 
 
 ### Supported Models
@@ -62,6 +63,12 @@ TensorRT model generated text:  What is parallel programming? Parallel programmi
 PyTorch and TensorRT outputs match: True
 ```
 </details>
+
+*IAttention Backend (native TRT IAttention layer, no KV cache):*
+```bash
+python run_llm.py --model meta-llama/Llama-3.2-1B-Instruct --backend iattention \
+  --prompt "What is parallel programming?" --model_precision FP16 --num_tokens 30 --enable_pytorch_run
+```
 
 *Plugin Backend:*
 ```bash
@@ -115,7 +122,10 @@ python run_vlm.py --model nvidia/Eagle2-2B --precision FP16 --cache static_v1 --
 **Model Configuration:**
 - `--model`: Name or path of the HuggingFace LLM/VLM.
 - `--tokenizer`: (Optional) Tokenizer name; defaults to model.
-- `--backend`: Backend to use (`sdpa` or `plugin`). Default is `sdpa`. Only applicable for LLM models.
+- `--backend`: Backend to use (`sdpa`, `iattention`, or `plugin`). Default is `sdpa`. Only applicable for LLM models.
+  - `sdpa`: Custom SDPA lowering pass + converter. Supports `--cache static_v1`/`static_v2` for KV caching.
+  - `iattention`: TensorRT native IAttention layer. No KV cache support yet (single-pass inference only).
+  - `plugin`: TensorRT Edge-LLM attention plugin. KV cache managed internally by the plugin.
 
 **Generation Settings:**
 - `--prompt`: Input prompt for generation (generation mode only, ignored in benchmark mode).
@@ -178,13 +188,16 @@ python run_llm.py --model meta-llama/Llama-3.1-8B --quant_format fp8 --prompt "W
 
 ### Caching Strategies
 
-#### SDPA Backend
+#### SDPA Backend (`--backend sdpa`)
 - **Static Cache v1/v2:** Adds static KV cache tensors as model inputs/outputs for efficient reuse.
 - **No Cache:** Standard autoregressive decoding.
 
 Please read our tutorial on how static cache is implemented.
 
-#### Plugin Backend
+#### IAttention Backend (`--backend iattention`)
+The IAttention backend uses TensorRT's native `IAttention` layer for attention conversion. KV cache is **not yet supported** with this backend because the static cache FX passes (`static_cache_v1`/`v2`) look for `torch.nn.functional.scaled_dot_product_attention` nodes, which are only present after the SDPA lowering pass (used by the `sdpa` backend). The `--cache` option will be ignored if specified with `--backend iattention`.
+
+#### Plugin Backend (`--backend plugin`)
 The plugin backend uses the TensorRT Edge-LLM AttentionPlugin which manages KV cache internally. The `--cache` option is not applicable and will be ignored if specified with `--backend plugin`.
 
 ## Plugin Backend Setup
@@ -227,22 +240,14 @@ After building, the plugin path defaults to `<TensorRT_repo>/TensorRT-Edge-LLM/b
 
 ### Performance
 
-The plugin backend provides significant speedups over both PyTorch eager execution and the SDPA backend. The following results were measured with:
+In our internal testing on NVIDIA A100 (FP16), the backends show roughly the following speedup over PyTorch eager inference:
 
-- **GPU:** NVIDIA A100 80GB PCIe (SM 8.0)
-- **Precision:** FP16
-- **TensorRT:** 10.15.1
-- **TensorRT-Edge-LLM:** 0.4.0 ([feature/torch-tensorrt-python-runtime](https://github.com/chohk88/TensorRT-Edge-LLM/tree/feature/torch-tensorrt-python-runtime))
+- **SDPA backend (no cache):** ~1.3–1.7x faster than PyTorch
+- **SDPA backend (static_v1 cache):** ~4–5x faster than PyTorch
+- **Plugin backend:** ~11–15x faster than PyTorch, ~3x faster than SDPA with static cache
+- **IAttention backend (no cache):** Currently slower than PyTorch for autoregressive generation since KV cache is not yet supported
 
-| Model | PyTorch (ms) | TRT-SDPA (ms) | TRT-Plugin (ms) | Plugin vs PyTorch | Plugin vs SDPA |
-|-------|-------------|---------------|-----------------|-------------------|----------------|
-| Qwen2.5-0.5B | ~3985 | ~629 | **~351** | **~11x faster** | **~1.8x faster** |
-| Qwen3-0.6B | ~5196 | ~787 | **~466** | **~11x faster** | **~1.7x faster** |
-| Llama-3.2-1B | ~3027 | ~595 | **~391** | **~7.7x faster** | **~1.5x faster** |
-
-> ISL=128, OSL=128, Batch=1. TRT-SDPA uses static_v1 cache. Numbers are median latency.
->
-> The plugin backend achieves approximately **1.5x–1.8x speedup over the SDPA backend** and **~8x–11x over PyTorch eager** for the tested models, with exact token output matching PyTorch for Qwen models.
+> Exact speedup depends on model size, sequence length, and hardware. The plugin backend achieves the highest throughput thanks to its fused attention+RoPE+KV-cache kernel. All backends produce outputs that match PyTorch for the tested models.
 
 ### Additional Examples
 
@@ -271,4 +276,4 @@ This codebase can be extended to
   - `pip install qwen-vl-utils` (for Qwen2.5-VL-3B-Instruct model)
   - **Flash Attention**: For models using flash attention operations (e.g., Eagle2-2B), install one of the following:
     - **Fast installation (recommended)**: `pip install flash-attn==2.8.1` (pre-built wheel, should work)
-    - **Source build (slow)**: `pip install flash-attn --no-build-isolation -v` (fallback if pre-built wheels fail)
+    - **Source build (slow)**: `MAX_JOBS=8 pip install flash-attn --no-build-isolation -v` (fallback if pre-built wheels fail)
