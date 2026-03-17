@@ -838,9 +838,9 @@ def copy_metadata(match_and_replacements: List[Any]) -> None:
     """
     for match_and_replacement in match_and_replacements:
         anchor_node = match_and_replacement.nodes_map[match_and_replacement.anchor]
-        assert len(match_and_replacement.replacements) == 1, (
-            "Found more than 1 replacements for the anchor node."
-        )
+        assert (
+            len(match_and_replacement.replacements) == 1
+        ), "Found more than 1 replacements for the anchor node."
         replacement_node = match_and_replacement.replacements[0]
         replacement_node.meta = anchor_node.meta
 

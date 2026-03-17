@@ -123,44 +123,45 @@ def test_unsupported_op_gets_complexify_wrap() -> None:
         nodes_by_target.setdefault(n.target, []).append(n)
 
     # view_as_complex must be present (inserted by the fallback wrapper)
-    assert torch.ops.aten.view_as_complex.default in nodes_by_target, (
-        "Expected view_as_complex to be inserted before cumsum, but it was not found"
-    )
+    assert (
+        torch.ops.aten.view_as_complex.default in nodes_by_target
+    ), "Expected view_as_complex to be inserted before cumsum, but it was not found"
 
     # cumsum must still be present (it was NOT removed)
-    assert torch.ops.aten.cumsum.default in nodes_by_target, (
-        "cumsum should remain in the graph (runs as PyTorch fallback)"
-    )
+    assert (
+        torch.ops.aten.cumsum.default in nodes_by_target
+    ), "cumsum should remain in the graph (runs as PyTorch fallback)"
 
     # The view_as_complex output feeds directly into cumsum
     vc_node = nodes_by_target[torch.ops.aten.view_as_complex.default][0]
     cumsum_node = nodes_by_target[torch.ops.aten.cumsum.default][0]
-    assert cumsum_node.args[0] is vc_node, (
-        f"cumsum's first arg should be the view_as_complex node, got {cumsum_node.args[0]}"
-    )
+    assert (
+        cumsum_node.args[0] is vc_node
+    ), f"cumsum's first arg should be the view_as_complex node, got {cumsum_node.args[0]}"
 
     # The view_as_complex input is a real-layout (is_complex_layout) node
     vc_input = vc_node.args[0]
     assert isinstance(vc_input, torch.fx.Node), "view_as_complex input must be a Node"
-    assert vc_input.meta.get("is_complex_layout", False), (
-        "view_as_complex input should be a real-layout complex node (is_complex_layout=True)"
-    )
+    assert vc_input.meta.get(
+        "is_complex_layout", False
+    ), "view_as_complex input should be a real-layout complex node (is_complex_layout=True)"
 
     # view_as_real must follow cumsum
-    assert torch.ops.aten.view_as_real.default in nodes_by_target, (
-        "Expected view_as_real to be inserted after cumsum, but it was not found"
-    )
+    assert (
+        torch.ops.aten.view_as_real.default in nodes_by_target
+    ), "Expected view_as_real to be inserted after cumsum, but it was not found"
     vr_node = nodes_by_target[torch.ops.aten.view_as_real.default][0]
-    assert vr_node.args[0] is cumsum_node, (
-        f"view_as_real's arg should be the cumsum node, got {vr_node.args[0]}"
-    )
+    assert (
+        vr_node.args[0] is cumsum_node
+    ), f"view_as_real's arg should be the cumsum node, got {vr_node.args[0]}"
 
     # After metadata propagation, cumsum receives a complex-dtype tensor
     vc_val = vc_node.meta.get("val")
     if vc_val is not None:
-        assert vc_val.dtype in (torch.complex64, torch.complex128), (
-            f"view_as_complex output should be complex, got {vc_val.dtype}"
-        )
+        assert vc_val.dtype in (
+            torch.complex64,
+            torch.complex128,
+        ), f"view_as_complex output should be complex, got {vc_val.dtype}"
 
 
 # ===========================================================================
@@ -221,9 +222,10 @@ def test_complex_partial_lowering_with_graph_break() -> None:
         if n.target == torch.ops.aten.cumsum.default:
             vc_val = n.args[0].meta.get("val")
             if vc_val is not None:
-                assert vc_val.dtype in (torch.complex64, torch.complex128), (
-                    f"cumsum should receive a complex tensor, got {vc_val.dtype}"
-                )
+                assert vc_val.dtype in (
+                    torch.complex64,
+                    torch.complex128,
+                ), f"cumsum should receive a complex tensor, got {vc_val.dtype}"
             break
 
     # End-to-end: compile and verify numerical correctness
