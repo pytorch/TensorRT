@@ -62,8 +62,11 @@ def _export_and_lower(
 def _real_inputs(inputs: Tuple[Any, ...]) -> Tuple[Any, ...]:
     """Convert complex tensors to [..., 2] real layout."""
     return tuple(
-        torch.view_as_real(x).contiguous() if isinstance(x, torch.Tensor) and x.is_complex()
-        else x
+        (
+            torch.view_as_real(x).contiguous()
+            if isinstance(x, torch.Tensor) and x.is_complex()
+            else x
+        )
         for x in inputs
     )
 
