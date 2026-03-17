@@ -6,7 +6,18 @@ import logging
 import platform
 import warnings
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Sequence, Set, Tuple, Union
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    List,
+    Optional,
+    Sequence,
+    Set,
+    Tuple,
+    Union,
+    cast,
+)
 
 import torch
 from torch_tensorrt._enums import dtype
@@ -545,12 +556,15 @@ def convert_method_to_trt_engine(
             module, torchtrt_arg_inputs, kwarg_inputs=torchtrt_kwarg_inputs, **kwargs
         )
 
-        return dynamo_convert_exported_program_to_serialized_trt_engine(
-            exp_program,
-            arg_inputs=tuple(arg_inputs),
-            kwarg_inputs=torchtrt_kwarg_inputs,
-            enabled_precisions=enabled_precisions_set,
-            **kwargs,
+        return cast(
+            bytes,
+            dynamo_convert_exported_program_to_serialized_trt_engine(
+                exp_program,
+                arg_inputs=tuple(arg_inputs),
+                kwarg_inputs=torchtrt_kwarg_inputs,
+                enabled_precisions=enabled_precisions_set,
+                **kwargs,
+            ),
         )
     elif target_ir == _IRType.torch_compile:
         raise RuntimeError(
@@ -653,7 +667,8 @@ def save(
         inputs (Union[torch.Tensor, torch_tensorrt.Input]): Torch input tensors or Input specifications
         arg_inputs (Tuple[Union[torch.Tensor, torch_tensorrt.Input], ...]): Same as inputs. Alias for better understanding with kwarg_inputs.
         kwarg_inputs (dict[str, Union[torch.Tensor, torch_tensorrt.Input]]): Optional, kwarg inputs to the module forward function.
-        output_format (str): Format to save the model. Options include exported_program | torchscript | aot_inductor.
+        output_format (str): Format to save the model. Options include exported_program | torchscript | aot_inductor | executorch.
+        Use executorch to save a .pte file loadable by the ExecuTorch runtime (requires executorch). For GraphModule, arg_inputs is required when output_format is executorch.
         retrace (bool): When the module type is a fx.GraphModule, this option re-exports the graph using torch.export.export(strict=False) to save it.
 
                 For TRT-compiled modules with dynamic shapes, both retrace=True and retrace=False are supported:
@@ -726,7 +741,7 @@ def save(
     if isinstance(module, CudaGraphsTorchTensorRTModule):
         module = module.compiled_module
     module_type = _parse_module_type(module)
-    accepted_formats = {"exported_program", "torchscript", "aot_inductor"}
+    accepted_formats = {"exported_program", "torchscript", "aot_inductor", "executorch"}
     if arg_inputs is not None and not all(
         isinstance(input, (torch.Tensor, Input)) for input in arg_inputs
     ):
@@ -805,8 +820,8 @@ def save(
                     f"Inferred dynamic_shapes from torch_tensorrt.Input objects with min/opt/max specifications: {dynamic_shapes}"
                 )
 
-        arg_tensors = tuple(get_torch_inputs(arg_inputs, default_device()))  # type: ignore
-        kwarg_tensors = get_torch_inputs(kwarg_inputs, default_device())  # type: ignore
+        arg_tensors = tuple(get_torch_inputs(arg_inputs, default_device()))
+        kwarg_tensors = get_torch_inputs(kwarg_inputs, default_device())
 
     else:
         # Mixed case: some inputs are Tensors, some are Input objects
@@ -847,7 +862,19 @@ def save(
 
     if output_format not in accepted_formats:
         raise ValueError(
-            f"Provided output_format {output_format} is not supported. Supported options are exported_program | torchscript"
+            f"Provided output_format {output_format} is not supported. "
+            "Supported options are exported_program | torchscript | aot_inductor | executorch"
+        )
+    if (
+        output_format == "executorch"
+        and module_type == _ModuleType.fx
+        and (
+            arg_inputs is None
+            or (isinstance(arg_inputs, (list, tuple)) and len(arg_inputs) == 0)
+        )
+    ):
+        raise ValueError(
+            "output_format='executorch' with a GraphModule requires arg_inputs (example inputs) to export the module."
         )
     if output_format == "aot_inductor" and platform.system() != "Linux":
         raise ValueError(
@@ -906,9 +933,15 @@ def save(
                     inductor_configs=inductor_configs,
                     package_path=file_path,
                 )
+            elif output_format == "executorch":
+                from torch_tensorrt.dynamo._executorch_export import (
+                    export_to_executorch,
+                )
+
+                export_to_executorch(module, file_path)
             else:
                 raise RuntimeError(
-                    "Attempted to serialize an exported program with an unsupported format. Exported programs support exported_program and aot_inductor"
+                    "Attempted to serialize an exported program with an unsupported format. Exported programs support exported_program, aot_inductor, and executorch"
                 )
     elif module_type == _ModuleType.fx:
         # The module type is torch.fx.GraphModule
@@ -963,9 +996,15 @@ def save(
                         inductor_configs=inductor_configs,
                         package_path=file_path,
                     )
+                elif output_format == "executorch":
+                    from torch_tensorrt.dynamo._executorch_export import (
+                        export_to_executorch,
+                    )
+
+                    export_to_executorch(exp_program, file_path)
                 else:
                     raise RuntimeError(
-                        "Attempted to serialize an exported program with an unsupported format. Exported programs support exported_program and aot_inductor"
+                        "Attempted to serialize an exported program with an unsupported format. Exported programs support exported_program, aot_inductor, and executorch"
                     )
             else:
                 # When retrace=True with a TRT-compiled GraphModule that has dynamic shapes,
@@ -1042,9 +1081,15 @@ def save(
                         inductor_configs=inductor_configs,
                         package_path=file_path,
                     )
+                elif output_format == "executorch":
+                    from torch_tensorrt.dynamo._executorch_export import (
+                        export_to_executorch,
+                    )
+
+                    export_to_executorch(exp_program, file_path)
                 else:
                     raise RuntimeError(
-                        "Attempted to serialize an exported program with an unsupported format. Exported programs support exported_program and aot_inductor"
+                        "Attempted to serialize an exported program with an unsupported format. Exported programs support exported_program, aot_inductor, and executorch"
                     )
 
 

@@ -199,6 +199,10 @@ def fake_tensorrt_execute_engine(
     Uses symbolic shape expressions captured at compile time to correctly infer
     output shapes while preserving symbolic SymInt relationships.
     """
+    if type(fake_trt_engine).__name__ == "CustomObjArgument":
+        if inputs and len(inputs) > 0 and hasattr(inputs[0], "device"):
+            return [torch.empty_like(inputs[0], device=inputs[0].device)]
+        return [torch.empty(1)]
 
     metadata = None
     if hasattr(fake_trt_engine, "real_obj"):
