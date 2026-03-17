@@ -350,6 +350,10 @@ Graph Partitioning
      - ``False``
      - Use ``aot_autograd`` for tracing instead of the default path. Required when the
        model contains ``DTensor`` or other distributed tensors.
+   * - ``decompose_attention``
+     - ``False``
+     - Decompose attention layers into smaller ops. We have converters for handling attention ops,
+       but if you want to decompose them into smaller ops, you can set this to True.
 
 ----
 
@@ -372,7 +376,7 @@ Compilation Workflow
      - ``False``
      - Defer TRT engine deserialization until all engines have been built.
        Works around resource contraints and builder overhad but engines
-       may be less well tuned to their deployment resource availablity
+       may be less well tuned to their deployment resource availability
    * - ``debug``
      - ``False``
      - Enable verbose TRT builder logs at ``DEBUG`` level.
