@@ -34,14 +34,20 @@ cc_library(
     hdrs = glob(
         [
             "include/torch/**/*.h",
+            "include/torch/**/*.hpp",
         ],
         allow_empty = True,
         exclude = [
             "include/torch/csrc/api/include/**/*.h",
+            "include/torch/csrc/api/include/**/*.hpp",
         ],
-    ) + glob([
-        "include/torch/csrc/api/include/**/*.h",
-    ]),
+    ) + glob(
+        [
+            "include/torch/csrc/api/include/**/*.h",
+            "include/torch/csrc/api/include/**/*.hpp",
+        ],
+        allow_empty = True,
+    ),
     includes = [
         "include",
         "include/torch/csrc/api/include/",
@@ -85,6 +91,25 @@ cc_library(
         "include/ATen/**/*.h",
     ]),
     strip_include_prefix = "include",
+)
+
+# Header-only target: all torch headers without linking any .so.
+# Use this when you only need to compile against torch headers (e.g. tests that
+# check constexpr values or #ifdef guards) and do not need the runtime library.
+cc_library(
+    name = "torch_headers",
+    hdrs = glob(
+        [
+            "include/torch/**/*.h",
+            "include/torch/**/*.hpp",
+        ],
+        allow_empty = True,
+    ),
+    includes = [
+        "include",
+        "include/torch/csrc/api/include",
+    ],
+    deps = [":ATen"],
 )
 
 cc_library(

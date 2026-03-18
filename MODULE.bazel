@@ -4,6 +4,7 @@ module(
     repo_name = "org_pytorch_tensorrt",
 )
 
+bazel_dep(name = "bazel_skylib", version = "1.7.1")
 bazel_dep(name = "googletest", version = "1.16.0")
 bazel_dep(name = "platforms", version = "0.0.11")
 bazel_dep(name = "rules_cc", version = "0.1.1")
@@ -25,6 +26,8 @@ git_override(
 new_local_repository = use_repo_rule("@bazel_tools//tools/build_defs/repo:local.bzl", "new_local_repository")
 
 local_torch = use_repo_rule("//toolchains:local_torch.bzl", "local_torch")
+torch_nccl_detect = use_repo_rule("//toolchains/torch_nccl:defs.bzl", "torch_nccl_detect")
+torch_nccl_detect(name = "torch_nccl")
 
 # External dependency for torch_tensorrt if you already have precompiled binaries.
 new_local_repository(
