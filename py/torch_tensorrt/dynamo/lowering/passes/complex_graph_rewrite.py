@@ -147,66 +147,10 @@ class ComplexOpDetector:
             return False
         return self.is_complex_dtype(node) or self.has_complex_input(node)
 
-    def subgraph_from_anchor(self, anchor_node: Node) -> ComplexSubGraphInfo:
-        subgraph_nodes: Set[Node] = set()
-        input_nodes: Set[Node] = set()
-        stack = [anchor_node]
-        while stack:
-            n = stack.pop()
-            if n in subgraph_nodes:
-                continue
-            subgraph_nodes.add(n)
-            for inp in n.all_input_nodes:
-                if self.node_include_in_subgraph(inp):
-                    stack.append(inp)
-                else:
-                    input_nodes.add(inp)
-        # Sort subgraph_nodes in topological (graph) order so the rewriter
-        # processes producers before consumers.  The set has no stable order,
-        # which caused bugs when e.g. mul(sin, sin) was processed before sin
-        # was rewritten (sin still had complex dtype, so the mul pattern ran
-        # against the original complex node and produced wrong results).
-        node_order = {n: i for i, n in enumerate(anchor_node.graph.nodes)}
-        ordered_subgraph = sorted(subgraph_nodes, key=lambda n: node_order.get(n, 0))
-        return ComplexSubGraphInfo([anchor_node], ordered_subgraph, list(input_nodes))
-
-    def find_complex_op_subgraphs(
-        self, gm: GraphModule, anchor_target: str
-    ) -> List[ComplexSubGraphInfo]:
-        complex_op_subgraphs: List[ComplexSubGraphInfo] = []
-        for node in gm.graph.nodes:
-            if node.target == anchor_target:
-                new_sub = self.subgraph_from_anchor(node)
-                # if any intersecting nodes between seen and sub.subgraph_nodes they should be merged
-                merged = False
-                for existing_sub in complex_op_subgraphs:
-                    if set(existing_sub.subgraph_nodes) & set(new_sub.subgraph_nodes):
-                        logger.debug(f"merging subgraphs {existing_sub} {new_sub}")
-                        # merge the two subgraphs, preserving topological order
-                        merged_nodes = set(existing_sub.subgraph_nodes) | set(
-                            new_sub.subgraph_nodes
-                        )
-                        node_order = {n: i for i, n in enumerate(gm.graph.nodes)}
-                        existing_sub.subgraph_nodes = sorted(
-                            merged_nodes, key=lambda n: node_order.get(n, 0)
-                        )
-                        existing_sub.input_nodes = list(
-                            set(existing_sub.input_nodes) | set(new_sub.input_nodes)
-                        )
-                        existing_sub.anchor_nodes = list(
-                            set(existing_sub.anchor_nodes) | set(new_sub.anchor_nodes)
-                        )
-                        merged = True
-                        break
-                if not merged:
-                    complex_op_subgraphs.append(new_sub)
-        return complex_op_subgraphs
-
     def find_all_complex_subgraphs(self, gm: GraphModule) -> List[ComplexSubGraphInfo]:
         """Forward scan: collect all complex-dtype call_function nodes as one subgraph.
 
-        Unlike find_complex_op_subgraphs (which walks backwards from a single anchor),
-        this scans forward over every node and collects all call_function nodes whose
+        Scans forward over every node and collects all call_function nodes whose
         output is complex — regardless of whether they are bounded by view_as_real.
         This ensures complex ops that feed directly into graph outputs (no view_as_real)
         are still rewritten to real arithmetic.
