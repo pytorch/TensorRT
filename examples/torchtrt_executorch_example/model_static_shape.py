@@ -54,8 +54,14 @@ with torch.no_grad():
     # The TensorRT engine is serialized inside the .pte using the same blob format
     # as the Torch-TensorRT runtime (vector of strings), so one engine format for
     # both ExecuTorch and non-ExecuTorch deployment.
+    # Use retrace=False so the legacy exporter is used; the engine is then available
+    # when ExecuTorch's partitioner runs the graph.
     torch_tensorrt.save(
-        trt_gm, "model.pte", output_format="executorch", arg_inputs=example_input
+        trt_gm,
+        "model.pte",
+        output_format="executorch",
+        arg_inputs=example_input,
+        retrace=False,
     )
 
     print("Saved model.pte successfully.")

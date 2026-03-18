@@ -1022,7 +1022,6 @@ def save(
                             "Provided model is a torch.fx.GraphModule without existing shape metadata and retrace is True, however no inputs specs were provided. "
                             "Please provide valid torch.Tensors or torch_tensorrt.Input objects as inputs to retrace and save the model"
                         )
-                    breakpoint()
                     exp_program = torch.export.export(
                         module,
                         args=tuple(arg_tensors),
@@ -1078,9 +1077,11 @@ def _save_as_executorch(exp_program: Any, file_path: str) -> None:
             "ExecuTorch is not installed. Please install it to use output_format='executorch'. "
             "See https://pytorch.org/executorch/stable/getting-started-setup.html"
         )
+    # Ensure execute_engine fake kernel is registered so partitioner can run
+    # when the engine is a CustomObjArgument (export placeholder).
+    import torch_tensorrt.dynamo.runtime.meta_ops.register_meta_ops  # noqa: F401
     from torch_tensorrt.executorch import TensorRTPartitioner
 
-    breakpoint()
     edge_program = to_edge_transform_and_lower(
         exp_program,
         partitioner=[TensorRTPartitioner()],

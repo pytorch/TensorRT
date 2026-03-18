@@ -189,6 +189,22 @@ def fake_aten_cudnn_grid_sampler(
     return torch.empty(out_shape, dtype=input.dtype, device=input.device)
 
 
+def _is_placeholder_engine(engine: Any) -> bool:
+    """True if engine is a placeholder (CustomObjArgument/FakeScriptObject) from export."""
+    if engine is None:
+        return True
+    type_name = type(engine).__name__
+    if type_name == "CustomObjArgument":
+        return True
+    if type_name == "FakeScriptObject":
+        return True
+    if hasattr(engine, "fake_val") and engine.fake_val is not None:
+        return True
+    if not hasattr(engine, "get_serialized_metadata"):
+        return True
+    return False
+
+
 @torch.library.register_fake("tensorrt::execute_engine")  # type: ignore
 def fake_tensorrt_execute_engine(
     inputs: List[torch.Tensor], fake_trt_engine: Any
@@ -196,13 +212,23 @@ def fake_tensorrt_execute_engine(
     """
     Meta kernel for TensorRT engine execution.
 
-    Uses symbolic shape expressions captured at compile time to correctly infer
-    output shapes while preserving symbolic SymInt relationships.
+    When the engine is a placeholder (CustomObjArgument/FakeScriptObject from
+    torch.export/ExecuTorch), returns one fake output per input (same shape/dtype)
+    so partitioners can run without a real engine. Otherwise uses symbolic shape
+    expressions from metadata to infer output shapes.
     """
+    if _is_placeholder_engine(fake_trt_engine):
+        from torch._guards import detect_fake_mode
+
+        fake_mode = detect_fake_mode(inputs) if inputs else None
+        if not inputs:
+            return [torch.empty(())]
+        if fake_mode is not None:
+            return [fake_mode.from_tensor(inputs[0])]
+        return [torch.empty_like(inputs[0])]
 
     metadata = None
     if hasattr(fake_trt_engine, "real_obj"):
-        # Wrapped C++ engine with real_obj
         trt_engine = fake_trt_engine.real_obj
         metadata = TorchTensorRTModule.decode_metadata(
             trt_engine.get_serialized_metadata()
@@ -215,8 +241,6 @@ def fake_tensorrt_execute_engine(
     shape_info = metadata.get("inout_symexprs") if metadata else None
 
     if shape_info:
-        # Apply the symbolic shape expressions to create output fake tensors
-        # shape_info now contains both 'inputs' and 'outputs' keys
         return _apply_symbolic_shape_expressions(inputs, shape_info)
     else:
         raise RuntimeError(
