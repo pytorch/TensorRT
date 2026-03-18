@@ -9,7 +9,7 @@ import json
 import logging
 import struct
 from dataclasses import asdict, dataclass, field
-from typing import Any, Dict, List, Optional, Tuple, cast
+from typing import Any, Dict, List, Optional, Tuple
 
 import torch
 
@@ -36,12 +36,73 @@ class _IOBinding:
         return asdict(self)
 
 
+def _get_tensorrt_serialization_indices() -> Optional[Dict[str, int]]:
+    """Return dict of torch.ops.tensorrt serialization index names to values when runtime is loaded."""
+    if not hasattr(torch.ops, "tensorrt"):
+        return None
+    trt = torch.ops.tensorrt
+    for attr in (
+        "ABI_TARGET_IDX",
+        "NAME_IDX",
+        "ENGINE_IDX",
+        "SERIALIZED_METADATA_IDX",
+    ):
+        if not hasattr(trt, attr):
+            return None
+    return {
+        "ABI_TARGET_IDX": trt.ABI_TARGET_IDX(),
+        "NAME_IDX": trt.NAME_IDX(),
+        "DEVICE_IDX": trt.DEVICE_IDX(),
+        "ENGINE_IDX": trt.ENGINE_IDX(),
+        "INPUT_BINDING_NAMES_IDX": trt.INPUT_BINDING_NAMES_IDX(),
+        "OUTPUT_BINDING_NAMES_IDX": trt.OUTPUT_BINDING_NAMES_IDX(),
+        "HW_COMPATIBLE_IDX": trt.HW_COMPATIBLE_IDX(),
+        "SERIALIZED_METADATA_IDX": trt.SERIALIZED_METADATA_IDX(),
+        "TARGET_PLATFORM_IDX": trt.TARGET_PLATFORM_IDX(),
+        "REQUIRES_OUTPUT_ALLOCATOR_IDX": trt.REQUIRES_OUTPUT_ALLOCATOR_IDX(),
+        "RESOURCE_ALLOCATION_STRATEGY_IDX": trt.RESOURCE_ALLOCATION_STRATEGY_IDX(),
+        "SERIALIZATION_LEN": trt.SERIALIZATION_LEN(),
+    }
+
+
 @dataclass
 class _TensorRTBlobMetadata:
+    """Metadata for TR01 blob; aligns with torch.ops.tensorrt engine_info indices."""
+
     io_bindings: List[_IOBinding] = field(default_factory=list)
+    abi_target: Optional[str] = None
+    name: Optional[str] = None
+    device: Optional[str] = None
+    input_binding_names: Optional[str] = None
+    output_binding_names: Optional[str] = None
+    hw_compatible: Optional[str] = None
+    serialized_metadata: Optional[str] = None
+    target_platform: Optional[str] = None
+    requires_output_allocator: Optional[str] = None
+    resource_allocation_strategy: Optional[str] = None
 
     def to_json(self) -> bytes:
-        data = {"io_bindings": [b.to_dict() for b in self.io_bindings]}
+        data: Dict[str, Any] = {"io_bindings": [b.to_dict() for b in self.io_bindings]}
+        if self.abi_target is not None:
+            data["abi_target"] = self.abi_target
+        if self.name is not None:
+            data["name"] = self.name
+        if self.device is not None:
+            data["device"] = self.device
+        if self.input_binding_names is not None:
+            data["input_binding_names"] = self.input_binding_names
+        if self.output_binding_names is not None:
+            data["output_binding_names"] = self.output_binding_names
+        if self.hw_compatible is not None:
+            data["hw_compatible"] = self.hw_compatible
+        if self.serialized_metadata is not None:
+            data["serialized_metadata"] = self.serialized_metadata
+        if self.target_platform is not None:
+            data["target_platform"] = self.target_platform
+        if self.requires_output_allocator is not None:
+            data["requires_output_allocator"] = self.requires_output_allocator
+        if self.resource_allocation_strategy is not None:
+            data["resource_allocation_strategy"] = self.resource_allocation_strategy
         return json.dumps(data, separators=(",", ":")).encode("utf-8")
 
 
@@ -88,20 +149,9 @@ def _get_execute_engine_default_op() -> Optional[Any]:
     return op
 
 
-def _get_engine_idx() -> Optional[int]:
-    try:
-        from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import ENGINE_IDX
-
-        return cast(int, ENGINE_IDX)
-    except Exception:
-        return None
-
-
-def _extract_engine_bytes_from_partition(exported_program: Any) -> Optional[bytes]:
+def _get_engine_obj_from_partition(exported_program: Any) -> Any:
+    """Return the engine object (C++ Engine or wrapper with .engine) from the partition, or None."""
     gm = exported_program.graph_module
-    engine_idx = _get_engine_idx()
-    if engine_idx is None:
-        return None
     op = _get_execute_engine_default_op()
     if op is None:
         return None
@@ -111,26 +161,55 @@ def _extract_engine_bytes_from_partition(exported_program: Any) -> Optional[byte
         if len(node.args) < 2:
             continue
         engine_arg = node.args[1]
-        engine_obj = None
-        if engine_arg.op == "get_attr":
-            try:
-                engine_obj = getattr(gm, engine_arg.target)
-            except AttributeError:
-                pass
-        if engine_obj is None:
+        if engine_arg.op != "get_attr":
+            continue
+        try:
+            engine_obj = getattr(gm, engine_arg.target)
+        except AttributeError:
             continue
         if hasattr(engine_obj, "engine"):
             engine_obj = engine_obj.engine
-        if hasattr(engine_obj, "__getstate__"):
-            state = engine_obj.__getstate__()
-            if isinstance(state, (list, tuple)) and len(state) > engine_idx:
-                raw = state[engine_idx]
-                if isinstance(raw, bytes):
-                    return raw
+        return engine_obj
     return None
 
 
-def _build_metadata_from_partition(exported_program: Any) -> _TensorRTBlobMetadata:
+def _extract_engine_info_from_partition(
+    exported_program: Any,
+) -> Optional[List[Any]]:
+    """Return full engine_info list (from engine __getstate__) when runtime is loaded."""
+    indices = _get_tensorrt_serialization_indices()
+    if indices is None:
+        return None
+    serialization_len = indices["SERIALIZATION_LEN"]
+    engine_obj = _get_engine_obj_from_partition(exported_program)
+    if engine_obj is None or not hasattr(engine_obj, "__getstate__"):
+        return None
+    state = engine_obj.__getstate__()
+    if not isinstance(state, (list, tuple)) or len(state) < serialization_len:
+        return None
+    return list(state)
+
+
+def _extract_engine_bytes_from_partition(exported_program: Any) -> Optional[bytes]:
+    engine_info = _extract_engine_info_from_partition(exported_program)
+    if engine_info is None:
+        return None
+    indices = _get_tensorrt_serialization_indices()
+    if indices is None:
+        return None
+    engine_idx = indices["ENGINE_IDX"]
+    if engine_idx >= len(engine_info):
+        return None
+    raw = engine_info[engine_idx]
+    if isinstance(raw, bytes):
+        return raw
+    return None
+
+
+def _build_metadata_from_partition(
+    exported_program: Any,
+    engine_info: Optional[List[Any]] = None,
+) -> _TensorRTBlobMetadata:
     bindings = []
     gm = exported_program.graph_module
     for node in gm.graph.nodes:
@@ -164,7 +243,41 @@ def _build_metadata_from_partition(exported_program: Any) -> _TensorRTBlobMetada
                             is_input=False,
                         )
                     )
-    return _TensorRTBlobMetadata(io_bindings=bindings)
+    meta = _TensorRTBlobMetadata(io_bindings=bindings)
+    if engine_info is not None:
+        idx = _get_tensorrt_serialization_indices()
+        if idx is not None:
+            if idx["ABI_TARGET_IDX"] < len(engine_info):
+                v = engine_info[idx["ABI_TARGET_IDX"]]
+                meta.abi_target = str(v) if v is not None else None
+            if idx["NAME_IDX"] < len(engine_info):
+                v = engine_info[idx["NAME_IDX"]]
+                meta.name = str(v) if v is not None else None
+            if idx["DEVICE_IDX"] < len(engine_info):
+                v = engine_info[idx["DEVICE_IDX"]]
+                meta.device = str(v) if v is not None else None
+            if idx["INPUT_BINDING_NAMES_IDX"] < len(engine_info):
+                v = engine_info[idx["INPUT_BINDING_NAMES_IDX"]]
+                meta.input_binding_names = str(v) if v is not None else None
+            if idx["OUTPUT_BINDING_NAMES_IDX"] < len(engine_info):
+                v = engine_info[idx["OUTPUT_BINDING_NAMES_IDX"]]
+                meta.output_binding_names = str(v) if v is not None else None
+            if idx["HW_COMPATIBLE_IDX"] < len(engine_info):
+                v = engine_info[idx["HW_COMPATIBLE_IDX"]]
+                meta.hw_compatible = str(v) if v is not None else None
+            if idx["SERIALIZED_METADATA_IDX"] < len(engine_info):
+                v = engine_info[idx["SERIALIZED_METADATA_IDX"]]
+                meta.serialized_metadata = str(v) if v is not None else None
+            if idx["TARGET_PLATFORM_IDX"] < len(engine_info):
+                v = engine_info[idx["TARGET_PLATFORM_IDX"]]
+                meta.target_platform = str(v) if v is not None else None
+            if idx["REQUIRES_OUTPUT_ALLOCATOR_IDX"] < len(engine_info):
+                v = engine_info[idx["REQUIRES_OUTPUT_ALLOCATOR_IDX"]]
+                meta.requires_output_allocator = str(v) if v is not None else None
+            if idx["RESOURCE_ALLOCATION_STRATEGY_IDX"] < len(engine_info):
+                v = engine_info[idx["RESOURCE_ALLOCATION_STRATEGY_IDX"]]
+                meta.resource_allocation_strategy = str(v) if v is not None else None
+    return meta
 
 
 def _import_executorch() -> Tuple[Any, ...]:
@@ -221,13 +334,24 @@ def _get_backend_and_partitioner_classes() -> Tuple[Any, Any, Any]:
             edge_program: Any,
             compile_specs: List[Any],
         ) -> Any:
-            engine_bytes = _extract_engine_bytes_from_partition(edge_program)
+            engine_info = _extract_engine_info_from_partition(edge_program)
+            engine_bytes = None
+            if engine_info is not None:
+                idx = _get_tensorrt_serialization_indices()
+                if idx is not None:
+                    ei = idx["ENGINE_IDX"]
+                    if ei < len(engine_info) and isinstance(engine_info[ei], bytes):
+                        engine_bytes = engine_info[ei]
+            if engine_bytes is None:
+                engine_bytes = _extract_engine_bytes_from_partition(edge_program)
             if engine_bytes is None:
                 raise RuntimeError(
                     "Could not extract TensorRT engine from partition. "
                     "The graph must contain torch.ops.tensorrt.execute_engine."
                 )
-            metadata = _build_metadata_from_partition(edge_program)
+            metadata = _build_metadata_from_partition(
+                edge_program, engine_info=engine_info
+            )
             blob = _serialize_tr01_blob(engine_bytes, metadata=metadata)
             return PreprocessResult(processed_bytes=blob)
 
@@ -286,22 +410,35 @@ def _get_backend_and_partitioner_classes() -> Tuple[Any, Any, Any]:
     return TensorRTBackend, TorchTensorRTPartitioner, to_edge_transform_and_lower
 
 
+def _is_engine_placeholder(engine_arg: Any) -> bool:
+    """True if engine_arg is a placeholder (CustomObjArgument) that cannot be passed to C++."""
+    if engine_arg is None:
+        return False
+    name = type(engine_arg).__name__
+    if name == "CustomObjArgument":
+        return True
+    if name == "FakeScriptObject":
+        return True
+    return False
+
+
 def _execute_engine_fake_for_export(
     args: Tuple[Any, ...], kwargs: Dict[str, Any]
 ) -> Optional[List[torch.Tensor]]:
-    """Return fake outputs when execute_engine is called with CustomObjArgument (engine placeholder)."""
-    if len(args) >= 2 and type(args[1]).__name__ == "CustomObjArgument":
-        input_tensors = args[0]
-        if (
-            input_tensors
-            and isinstance(input_tensors, (list, tuple))
-            and len(input_tensors) > 0
-        ):
-            t = input_tensors[0]
-            if hasattr(t, "device"):
-                return [torch.empty_like(t, device=t.device)]
-        return [torch.empty(1)]
-    return None
+    """Return fake outputs when execute_engine is called with engine placeholder (CustomObjArgument)."""
+    engine_arg = args[1] if len(args) >= 2 else kwargs.get("engine")
+    if not _is_engine_placeholder(engine_arg):
+        return None
+    input_tensors = args[0] if len(args) >= 1 else kwargs.get("input_tensors")
+    if (
+        input_tensors
+        and isinstance(input_tensors, (list, tuple))
+        and len(input_tensors) > 0
+    ):
+        t = input_tensors[0]
+        if hasattr(t, "device"):
+            return [torch.empty_like(t, device=t.device)]
+    return [torch.empty(1)]
 
 
 def export_to_executorch(exported_program: Any, file_path: str) -> None:
@@ -318,6 +455,7 @@ def export_to_executorch(exported_program: Any, file_path: str) -> None:
     )
     partitioner = TorchTensorRTPartitioner()
     orig_call = op_default.__call__
+    orig_op = getattr(op_default, "_op", None)
 
     def patched_call(*args: Any, **kwargs: Any) -> Any:
         fake = _execute_engine_fake_for_export(args, kwargs)
@@ -327,6 +465,13 @@ def export_to_executorch(exported_program: Any, file_path: str) -> None:
 
     patched_call.__name__ = getattr(orig_call, "__name__", "execute_engine")
     op_default.__call__ = patched_call
+    _op_patched = False
+    if orig_op is not None:
+        try:
+            op_default._op = orig_op
+            _op_patched = True
+        except (AttributeError, TypeError):
+            pass
     try:
         edge_program = to_edge_transform_and_lower(
             exported_program,
@@ -337,3 +482,8 @@ def export_to_executorch(exported_program: Any, file_path: str) -> None:
             exec_prog.write_to_file(f)
     finally:
         op_default.__call__ = orig_call
+        if _op_patched and orig_op is not None:
+            try:
+                op_default._op = orig_op
+            except (AttributeError, TypeError):
+                pass

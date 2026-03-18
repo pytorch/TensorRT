@@ -14,6 +14,7 @@ set(CXX_SRCS
 
 set(HEADER_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/RTDevice.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/TensorRTBackend.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/TRTEngine.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/TRTEngineProfiler.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/runtime.h"
