@@ -55,6 +55,9 @@ def test_resnet18(ir):
     torch._dynamo.reset()
 
 
+@unittest.skipIf(
+    not importlib.util.find_spec("torchvision"), "torchvision not installed"
+)
 @pytest.mark.unit
 def test_mobilenet_v2(ir):
     model = models.mobilenet_v2(pretrained=True).eval().to("cuda")
@@ -178,6 +181,9 @@ def test_bert_base_uncased(ir):
     torch._dynamo.reset()
 
 
+@unittest.skipIf(
+    not importlib.util.find_spec("torchvision"), "torchvision not installed"
+)
 @pytest.mark.unit
 def test_resnet18_half(ir):
     model = models.resnet18(pretrained=True).eval().to("cuda").half()

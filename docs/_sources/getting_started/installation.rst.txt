@@ -92,10 +92,32 @@ Dependencies
     * Specify your CUDA version here if not the version used in the branch being built: https://github.com/pytorch/TensorRT/blob/4e5b0f6e860910eb510fa70a76ee3eb9825e7a4d/WORKSPACE#L46
 
 
-* The correct **LibTorch** and **TensorRT** versions will be pulled down for you by bazel.
+* **LibTorch** — by default Bazel automatically detects the PyTorch installation from your active environment and compiles against it. This ensures the C++ headers always match the runtime ``libtorch_cuda.so``, avoiding ABI mismatches.
 
-    NOTE: By default bazel will pull the latest nightly from pytorch.org. For building main, this is usually sufficient however if there is a specific PyTorch you are targeting,
-    edit these locations with updated URLs/paths:
+    Detection order:
+
+    1. ``TORCH_PATH`` environment variable — absolute path to the torch package directory.
+    2. ``VIRTUAL_ENV`` — used when a virtualenv or ``uv`` venv is activated (``source .venv/bin/activate``).
+    3. ``CONDA_PREFIX`` — used when a conda environment is activated (``conda activate myenv``).
+    4. ``.venv/bin/python3`` relative to the repository root
+    5. ``python3`` / ``python`` on ``PATH`` — system Python fallback.
+
+    If auto-detection fails, set ``TORCH_PATH`` explicitly:
+
+    .. code-block:: sh
+
+        TORCH_PATH=$(python3 -c "import torch, os; print(os.path.dirname(torch.__file__))") \
+            bazelisk build //:libtorchtrt -c opt
+
+    **Pinning to a specific nightly (frozen deps)**
+
+    If you prefer reproducible builds against a fixed PyTorch nightly, ``MODULE.bazel`` contains
+    a commented-out ``http_archive`` block for ``libtorch``. Comment out the ``local_torch`` line
+    and uncomment the ``http_archive`` block. The pinned version **must** match the PyTorch
+    installed in your Python environment — a mismatch between compiled headers and the runtime
+    ``libtorch_cuda.so`` can cause ABI breakage. To pin to a specific build rather than
+    ``latest``, replace the URL with a dated nightly, e.g.:
+    ``libtorch-shared-with-deps-2.6.0.dev20250101%2Bcu130.zip``
 
     * https://github.com/pytorch/TensorRT/blob/4e5b0f6e860910eb510fa70a76ee3eb9825e7a4d/WORKSPACE#L53C1-L53C1
 
@@ -208,9 +230,9 @@ A tarball with the include files and library can then be found in ``bazel-bin``
 Choosing the Right ABI
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
-For the old versions, there were two ABI options to compile Torch-TensorRT which were incompatible with each other, 
-pre-cxx11-abi and cxx11-abi. The complexity came from the different distributions of PyTorch. Fortunately, PyTorch 
-has switched to cxx11-abi for all distributions. Below is a table with general pairings of PyTorch distribution 
+For the old versions, there were two ABI options to compile Torch-TensorRT which were incompatible with each other,
+pre-cxx11-abi and cxx11-abi. The complexity came from the different distributions of PyTorch. Fortunately, PyTorch
+has switched to cxx11-abi for all distributions. Below is a table with general pairings of PyTorch distribution
 sources and the recommended commands:
 
 +-------------------------------------------------------------+----------------------------------------------------------+--------------------------------------------------------------------+

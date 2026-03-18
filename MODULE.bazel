@@ -24,6 +24,8 @@ git_override(
 
 new_local_repository = use_repo_rule("@bazel_tools//tools/build_defs/repo:local.bzl", "new_local_repository")
 
+local_torch = use_repo_rule("//toolchains:local_torch.bzl", "local_torch")
+
 # External dependency for torch_tensorrt if you already have precompiled binaries.
 new_local_repository(
     name = "torch_tensorrt",
@@ -56,17 +58,45 @@ new_local_repository(
 
 http_archive = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 
+####################################################################################
+# Locally installed dependencies (use in cases of custom dependencies or aarch64)
+####################################################################################
+
+# Detect the locally installed PyTorch at build time so the headers always match
+# the runtime libtorch_cuda.so, avoiding ABI mismatches (e.g. CUDAGraph layout).
+# Works with uv (.venv/), virtualenv (VIRTUAL_ENV), and conda (CONDA_PREFIX).
+# Override with TORCH_PATH env var if auto-detection fails.
+local_torch(name = "libtorch")
+
+# NOTE: If you are using a local archive build of torch, just point the Libtorch dep to that path.
+
+#new_local_repository(
+#    name = "libtorch",
+# please modify this path according to your local python wheel path
+#    path = "/usr/local/lib/python3.11/dist-packages/torch",
+#    build_file = "third_party/libtorch/BUILD"
+#)
+
+#new_local_repository(
+#   name = "tensorrt",
+#   path = "/usr/",
+#   build_file = "@//third_party/tensorrt/local:BUILD"
+#)
+
 #############################################################################################################
 # Tarballs and fetched dependencies (default - use in cases when building from precompiled bin and tarballs)
 #############################################################################################################
 
-# this is used for linux x86_64
-http_archive(
-    name = "libtorch",
-    build_file = "@//third_party/libtorch:BUILD",
-    strip_prefix = "libtorch",
-    urls = ["https://download.pytorch.org/libtorch/nightly/cu130/libtorch-shared-with-deps-latest.zip"],
-)
+# Alternatively, pin to a specific nightly for reproducible/frozen builds.
+# Uncomment this block and comment out local_torch above.
+# NOTE: The pinned version must match the PyTorch installed in your Python
+# environment — a mismatch causes ABI breakage (see installation docs).
+#http_archive(
+#    name = "libtorch",
+#    build_file = "@//third_party/libtorch:BUILD",
+#    strip_prefix = "libtorch",
+#    urls = ["https://download.pytorch.org/libtorch/nightly/cu130/libtorch-shared-with-deps-latest.zip"],
+#)
 
 # in aarch64 platform you can get libtorch via either local or wheel file
 # It is possible to specify a wheel file to use as the libtorch source by providing the URL below and
@@ -151,21 +181,3 @@ http_archive(
         "https://developer.nvidia.com/downloads/trt/rtx_sdk/secure/1.3/tensorrt-rtx-1.3.0.35-win10-amd64-cuda-13.1-release-external.zip",
     ],
 )
-####################################################################################
-# Locally installed dependencies (use in cases of custom dependencies or aarch64)
-####################################################################################
-
-# NOTE: If you are using a local build of torch, just point the Libtorch dep to that path.
-
-#new_local_repository(
-#    name = "libtorch",
-# please modify this path according to your local python wheel path
-#    path = "/usr/local/lib/python3.11/dist-packages/torch",
-#    build_file = "third_party/libtorch/BUILD"
-#)
-
-#new_local_repository(
-#   name = "tensorrt",
-#   path = "/usr/",
-#   build_file = "@//third_party/tensorrt/local:BUILD"
-#)

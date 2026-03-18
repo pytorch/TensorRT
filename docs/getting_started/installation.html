@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../_static/documentation_options.js?v=2d416d50"></script>
+    <script src="../_static/documentation_options.js?v=d3fd56a4"></script>
     <script src="../_static/doctools.js?v=888ff710"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -563,10 +563,29 @@ cp<span class="w"> </span>output/bazel<span class="w"> </span>/usr/local/bin/
 </ul>
 </div></blockquote>
 </li>
-<li><p>The correct <strong>LibTorch</strong> and <strong>TensorRT</strong> versions will be pulled down for you by bazel.</p>
+<li><p><strong>LibTorch</strong> — by default Bazel automatically detects the PyTorch installation from your active environment and compiles against it. This ensures the C++ headers always match the runtime <code class="docutils literal notranslate"><span class="pre">libtorch_cuda.so</span></code>, avoiding ABI mismatches.</p>
 <blockquote>
-<div><p>NOTE: By default bazel will pull the latest nightly from pytorch.org. For building main, this is usually sufficient however if there is a specific PyTorch you are targeting,
-edit these locations with updated URLs/paths:</p>
+<div><p>Detection order:</p>
+<ol class="arabic simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">TORCH_PATH</span></code> environment variable — absolute path to the torch package directory.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">VIRTUAL_ENV</span></code> — used when a virtualenv or <code class="docutils literal notranslate"><span class="pre">uv</span></code> venv is activated (<code class="docutils literal notranslate"><span class="pre">source</span> <span class="pre">.venv/bin/activate</span></code>).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">CONDA_PREFIX</span></code> — used when a conda environment is activated (<code class="docutils literal notranslate"><span class="pre">conda</span> <span class="pre">activate</span> <span class="pre">myenv</span></code>).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">.venv/bin/python3</span></code> relative to the repository root</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">python3</span></code> / <code class="docutils literal notranslate"><span class="pre">python</span></code> on <code class="docutils literal notranslate"><span class="pre">PATH</span></code> — system Python fallback.</p></li>
+</ol>
+<p>If auto-detection fails, set <code class="docutils literal notranslate"><span class="pre">TORCH_PATH</span></code> explicitly:</p>
+<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span><span class="nv">TORCH_PATH</span><span class="o">=</span><span class="k">$(</span>python3<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;import torch, os; print(os.path.dirname(torch.__file__))&quot;</span><span class="k">)</span><span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>bazelisk<span class="w"> </span>build<span class="w"> </span>//:libtorchtrt<span class="w"> </span>-c<span class="w"> </span>opt
+</pre></div>
+</div>
+<p><strong>Pinning to a specific nightly (frozen deps)</strong></p>
+<p>If you prefer reproducible builds against a fixed PyTorch nightly, <code class="docutils literal notranslate"><span class="pre">MODULE.bazel</span></code> contains
+a commented-out <code class="docutils literal notranslate"><span class="pre">http_archive</span></code> block for <code class="docutils literal notranslate"><span class="pre">libtorch</span></code>. Comment out the <code class="docutils literal notranslate"><span class="pre">local_torch</span></code> line
+and uncomment the <code class="docutils literal notranslate"><span class="pre">http_archive</span></code> block. The pinned version <strong>must</strong> match the PyTorch
+installed in your Python environment — a mismatch between compiled headers and the runtime
+<code class="docutils literal notranslate"><span class="pre">libtorch_cuda.so</span></code> can cause ABI breakage. To pin to a specific build rather than
+<code class="docutils literal notranslate"><span class="pre">latest</span></code>, replace the URL with a dated nightly, e.g.:
+<code class="docutils literal notranslate"><span class="pre">libtorch-shared-with-deps-2.6.0.dev20250101%2Bcu130.zip</span></code></p>
 <ul class="simple">
 <li><p><a class="github reference external" href="https://github.com/pytorch/TensorRT/blob/4e5b0f6e860910eb510fa70a76ee3eb9825e7a4d/WORKSPACE#L53C1-L53C1">pytorch/TensorRT</a></p></li>
 </ul>

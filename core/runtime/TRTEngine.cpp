@@ -264,6 +264,7 @@ TRTEngine::TRTEngine(
 }
 
 TRTEngine::~TRTEngine() {
+  torch::cuda::synchronize(device_info.id);
   trt_engine_profiler.reset();
   exec_ctx.reset();
   cuda_engine.reset();
