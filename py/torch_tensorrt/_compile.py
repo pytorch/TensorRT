@@ -653,7 +653,7 @@ def save(
         inputs (Union[torch.Tensor, torch_tensorrt.Input]): Torch input tensors or Input specifications
         arg_inputs (Tuple[Union[torch.Tensor, torch_tensorrt.Input], ...]): Same as inputs. Alias for better understanding with kwarg_inputs.
         kwarg_inputs (dict[str, Union[torch.Tensor, torch_tensorrt.Input]]): Optional, kwarg inputs to the module forward function.
-        output_format (str): Format to save the model. Options include exported_program | torchscript | aot_inductor.
+        output_format (str): Format to save the model. Options include exported_program | torchscript | aot_inductor | executorch.
         retrace (bool): When the module type is a fx.GraphModule, this option re-exports the graph using torch.export.export(strict=False) to save it.
 
                 For TRT-compiled modules with dynamic shapes, both retrace=True and retrace=False are supported:
@@ -726,7 +726,7 @@ def save(
     if isinstance(module, CudaGraphsTorchTensorRTModule):
         module = module.compiled_module
     module_type = _parse_module_type(module)
-    accepted_formats = {"exported_program", "torchscript", "aot_inductor"}
+    accepted_formats = {"exported_program", "torchscript", "aot_inductor", "executorch"}
     if arg_inputs is not None and not all(
         isinstance(input, (torch.Tensor, Input)) for input in arg_inputs
     ):
@@ -847,11 +847,15 @@ def save(
 
     if output_format not in accepted_formats:
         raise ValueError(
-            f"Provided output_format {output_format} is not supported. Supported options are exported_program | torchscript"
+            f"Provided output_format {output_format} is not supported. Supported options are exported_program | torchscript | aot_inductor | executorch"
         )
     if output_format == "aot_inductor" and platform.system() != "Linux":
         raise ValueError(
             f"The AOT Inductor format is only supported on Linux, {platform.system()} is not a supported platform for this format"
+        )
+    if output_format == "executorch" and platform.system() != "Linux":
+        raise ValueError(
+            f"The executorch format is only supported on Linux, {platform.system()} is not a supported platform for this format"
         )
     if not file_path:
         raise ValueError("File path cannot be empty. Please provide a valid file path")
@@ -906,6 +910,8 @@ def save(
                     inductor_configs=inductor_configs,
                     package_path=file_path,
                 )
+            elif output_format == "executorch":
+                _save_as_executorch(module, file_path)
             else:
                 raise RuntimeError(
                     "Attempted to serialize an exported program with an unsupported format. Exported programs support exported_program and aot_inductor"
@@ -963,6 +969,8 @@ def save(
                         inductor_configs=inductor_configs,
                         package_path=file_path,
                     )
+                elif output_format == "executorch":
+                    _save_as_executorch(exp_program, file_path)
                 else:
                     raise RuntimeError(
                         "Attempted to serialize an exported program with an unsupported format. Exported programs support exported_program and aot_inductor"
@@ -1014,7 +1022,7 @@ def save(
                             "Provided model is a torch.fx.GraphModule without existing shape metadata and retrace is True, however no inputs specs were provided. "
                             "Please provide valid torch.Tensors or torch_tensorrt.Input objects as inputs to retrace and save the model"
                         )
-
+                    breakpoint()
                     exp_program = torch.export.export(
                         module,
                         args=tuple(arg_tensors),
@@ -1042,10 +1050,44 @@ def save(
                         inductor_configs=inductor_configs,
                         package_path=file_path,
                     )
+                elif output_format == "executorch":
+                    _save_as_executorch(exp_program, file_path)
                 else:
                     raise RuntimeError(
                         "Attempted to serialize an exported program with an unsupported format. Exported programs support exported_program and aot_inductor"
                     )
+
+
+def _save_as_executorch(exp_program: Any, file_path: str) -> None:
+    """Save an ExportedProgram (with TensorRT execute_engine nodes) as an ExecuTorch .pte file.
+
+    Partitions the graph by torch.ops.tensorrt.execute_engine, serializes each engine
+    to the same blob format as the TRT runtime (vector of strings), and embeds it
+    in the .pte. Requires the ``executorch`` package and torch_tensorrt_runtime. See
+    https://pytorch.org/executorch/stable/getting-started-setup.html
+    """
+    if not ENABLED_FEATURES.torch_tensorrt_runtime:
+        raise RuntimeError(
+            "output_format='executorch' requires the Torch-TensorRT runtime "
+            "(torch_tensorrt_runtime). Reinstall torch_tensorrt with the runtime extension."
+        )
+    try:
+        from executorch.exir import to_edge_transform_and_lower
+    except ImportError:
+        raise ImportError(
+            "ExecuTorch is not installed. Please install it to use output_format='executorch'. "
+            "See https://pytorch.org/executorch/stable/getting-started-setup.html"
+        )
+    from torch_tensorrt.executorch import TensorRTPartitioner
+
+    breakpoint()
+    edge_program = to_edge_transform_and_lower(
+        exp_program,
+        partitioner=[TensorRTPartitioner()],
+    )
+    executorch_program = edge_program.to_executorch()
+    with open(file_path, "wb") as f:
+        executorch_program.write_to_file(f)
 
 
 def function_overload_with_kwargs(
