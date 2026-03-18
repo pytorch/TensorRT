@@ -6,7 +6,6 @@ from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 import numpy as np
 import torch
-from tensorrt import ITensor as TRTTensor
 from torch.fx.node import Argument, Node, Target
 from torch_tensorrt import ENABLED_FEATURES
 from torch_tensorrt._features import needs_not_tensorrt_rtx
@@ -27,6 +26,8 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
     is_only_operator_on_placeholder,
 )
 from torch_tensorrt.dynamo.utils import DYNAMIC_DIM
+
+from tensorrt import ITensor as TRTTensor
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -577,6 +578,16 @@ def index_has_bool_indices(
     for ind in index:
         if ind is not None:
             val = ind.meta.get("val")
+            if val is None and ind.op == "get_attr":
+                # fx.symbolic_trace embeds constant tensors as get_attr nodes
+                # without meta["val"]; fetch the actual tensor from the module.
+                try:
+                    attr = ind.graph.owning_module
+                    for part in ind.target.split("."):
+                        attr = getattr(attr, part)
+                    val = attr
+                except AttributeError:
+                    pass
             if val is not None and val.dtype == torch.bool:
                 return True
     return False
