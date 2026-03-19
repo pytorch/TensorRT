@@ -1,6 +1,10 @@
 from torch_tensorrt.dynamo.runtime import (  # noqa: F401
-    PythonTorchTensorRTModule,
     TorchTensorRTModule,
+)
+from torch_tensorrt.dynamo.runtime._RuntimeBackendSelection import (
+    RuntimeBackend,
+    get_runtime_backend,
+    set_runtime_backend,
 )
 from torch_tensorrt.runtime._cudagraphs import (
     enable_cudagraphs,

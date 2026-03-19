@@ -31,19 +31,19 @@ pipe = pipe.to(distributed_state.device)
 backend = "torch_tensorrt"
 
 # Optimize the UNet portion with Torch-TensorRT
-pipe.unet = torch.compile(  # %%
-    # Inference
-    # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    # Assume there are 2 processes (2 devices)
-    pipe.unet,
-    backend=backend,
-    options={
-        "truncate_long_and_double": True,
-        "precision": torch.float16,
-        "use_python_runtime": True,
-    },
-    dynamic=False,
-)
+with torch_tensorrt.runtime.set_runtime_backend("python"):
+    pipe.unet = torch.compile(  # %%
+        # Inference
+        # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        # Assume there are 2 processes (2 devices)
+        pipe.unet,
+        backend=backend,
+        options={
+            "truncate_long_and_double": True,
+            "precision": torch.float16,
+        },
+        dynamic=False,
+    )
 torch_tensorrt.runtime.set_multi_device_safe_mode(True)
 
 

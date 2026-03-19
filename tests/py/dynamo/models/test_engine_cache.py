@@ -234,7 +234,6 @@ class TestEngineCache(TestCase):
             trt_gm = torch_trt.dynamo.compile(
                 exp_program,
                 tuple(inputs),
-                use_python_runtime=True,
                 enabled_precisions={torch.float},
                 min_block_size=1,
                 immutable_weights=False,
@@ -309,7 +308,6 @@ class TestEngineCache(TestCase):
             trt_gm = torch_trt.dynamo.compile(
                 exp_program,
                 tuple(inputs),
-                use_python_runtime=True,
                 use_explicit_typing=False,
                 enabled_precisions={torch.float},
                 min_block_size=1,
@@ -368,7 +366,6 @@ class TestEngineCache(TestCase):
             trt_gm = torch_trt.dynamo.compile(
                 torch.export.export(model, args=inputs),
                 inputs=inputs,
-                use_python_runtime=False,
                 enabled_precisions={torch.float},
                 min_block_size=1,
                 immutable_weights=False,
@@ -429,7 +426,6 @@ class TestEngineCache(TestCase):
                 model,
                 backend="tensorrt",
                 options={
-                    "use_python_runtime": False,
                     "use_explicit_typing": False,
                     "enabled_precisions": {torch.float},
                     "min_block_size": 1,
@@ -495,7 +491,6 @@ class TestEngineCache(TestCase):
                 model,
                 backend="tensorrt",
                 options={
-                    "use_python_runtime": False,
                     "use_explicit_typing": False,
                     "enabled_precisions": {torch.float},
                     "min_block_size": 1,
@@ -552,7 +547,6 @@ class TestEngineCache(TestCase):
                 model,
                 inputs=inputs,
                 **{
-                    "use_python_runtime": True,
                     "use_explicit_typing": False,
                     "enabled_precisions": {torch.float},
                     "min_block_size": 1,
@@ -595,7 +589,6 @@ class TestEngineCache(TestCase):
                 model,
                 backend="tensorrt",
                 options={
-                    "use_python_runtime": True,
                     "use_explicit_typing": False,
                     "enabled_precisions": {torch.float},
                     "min_block_size": 1,
@@ -696,7 +689,6 @@ class TestEngineCache(TestCase):
         trt_gm = torch_trt.dynamo.compile(
             exp_program,
             inputs,
-            use_python_runtime=True,
             enabled_precisions={torch.float},
             min_block_size=1,
             immutable_weights=False,
@@ -748,7 +740,6 @@ class TestEngineCache(TestCase):
             trt_gm = torch_trt.dynamo.compile(
                 exp_program,
                 tuple(inputs),
-                use_python_runtime=True,
                 enabled_precisions={torch.float},
                 min_block_size=1,
                 cache_built_engines=cache_built_engines,
@@ -925,7 +916,6 @@ class TestEngineCache(TestCase):
         trt_gm = torch_trt.dynamo.compile(
             llama2_ep,
             inputs=[input_ids],
-            use_python_runtime=True,
             enabled_precisions={torch.float32},
             min_block_size=1,
             immutable_weights=False,
@@ -978,7 +968,6 @@ class TestEngineCache(TestCase):
             trt_gm = torch_trt.dynamo.compile(
                 llama2_ep,
                 inputs=[input_ids],
-                use_python_runtime=True,
                 enabled_precisions={torch.float32},
                 min_block_size=1,
                 truncate_double=True,

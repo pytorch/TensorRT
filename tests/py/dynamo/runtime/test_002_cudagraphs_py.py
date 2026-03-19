@@ -37,7 +37,6 @@ class TestCudagraphsPython(TestCase):
             "torch_compile",
             inputs,
             min_block_size=1,
-            use_python_runtime=True,
         )
         with torch_tensorrt.runtime.enable_cudagraphs(optimized_model) as _:
             self.assertTrue(torch_tensorrt.runtime.get_cudagraphs_mode())
@@ -60,7 +59,6 @@ class TestCudagraphsPython(TestCase):
             inputs[0],
             min_block_size=1,
             pass_through_build_failures=True,
-            use_python_runtime=True,
         )
 
         result_samples = []
@@ -104,7 +102,6 @@ class TestCudagraphsPython(TestCase):
             inputs[0],
             min_block_size=1,
             pass_through_build_failures=True,
-            use_python_runtime=True,
             offload_module_to_cpu=True,
         )
         optimized_model.cuda()
@@ -150,7 +147,6 @@ class TestCudagraphsPython(TestCase):
             min_block_size=1,
             pass_through_build_failures=True,
             torch_executed_ops={"torch.ops.aten.mul.Tensor"},
-            use_python_runtime=True,
         )
 
         result_samples = []
@@ -194,7 +190,6 @@ class TestCudagraphsPython(TestCase):
             min_block_size=1,
             pass_through_build_failures=True,
             torch_executed_ops={"torch.ops.aten.mul.Tensor"},
-            use_python_runtime=True,
             offload_module_to_cpu=True,
         )
         optimized_model.cuda()
@@ -246,7 +241,6 @@ class TestCudagraphsPython(TestCase):
             min_block_size=1,
             pass_through_build_failures=True,
             torch_executed_ops={"torch.ops.aten.mul.Tensor"},
-            use_python_runtime=True,
         )
 
         result_samples = []

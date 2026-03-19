@@ -43,6 +43,10 @@ from torch_tensorrt.dynamo.lowering import (
 from torch_tensorrt.dynamo.partitioning._resource_partitioner import (
     resource_partition,
 )
+from torch_tensorrt.dynamo.runtime._RuntimeBackendSelection import (
+    RuntimeBackend,
+    get_runtime_backend,
+)
 from torch_tensorrt.dynamo.utils import (
     deallocate_module,
     get_cpu_memory_usage,
@@ -86,7 +90,7 @@ def cross_compile_for_windows(
     max_aux_streams: Optional[int] = _defaults.MAX_AUX_STREAMS,
     version_compatible: bool = _defaults.VERSION_COMPATIBLE,
     optimization_level: Optional[int] = _defaults.OPTIMIZATION_LEVEL,
-    use_python_runtime: bool = _defaults.USE_PYTHON_RUNTIME,
+    use_python_runtime: bool = False,  # Does nothing. Kept for backward compatibility; use ``with torch_tensorrt.runtime.set_runtime_backend(backend=...):`` instead.
     use_fast_partitioner: bool = _defaults.USE_FAST_PARTITIONER,
     enable_experimental_decompositions: bool = _defaults.ENABLE_EXPERIMENTAL_DECOMPOSITIONS,
     dryrun: bool = _defaults.DRYRUN,
@@ -165,7 +169,7 @@ def cross_compile_for_windows(
         max_aux_stream (Optional[int]): Maximum streams in the engine
         version_compatible (bool): Build the TensorRT engines compatible with future versions of TensorRT (Restrict to lean runtime operators to provide version forward compatibility for the engines)
         optimization_level: (Optional[int]): Setting a higher optimization level allows TensorRT to spend longer engine building time searching for more optimization options. The resulting engine may have better performance compared to an engine built with a lower optimization level. The default optimization level is 3. Valid values include integers from 0 to the maximum optimization level, which is currently 5. Setting it to be greater than the maximum level results in identical behavior to the maximum level.
-        use_python_runtime: (bool): Return a graph using a pure Python runtime, reduces options for serialization
+        use_python_runtime: (bool): Does nothing. Kept for backward compatibility; use ``with torch_tensorrt.runtime.set_runtime_backend(backend=...):`` instead.
         use_fast_partitioner: (bool): Use the adjacency based partitioning scheme instead of the global partitioner. Adjacency partitioning is faster but may not be optimal. Use the global paritioner (``False``) if looking for best performance
         enable_experimental_decompositions (bool): Use the full set of operator decompositions. These decompositions may not be tested but serve to make the graph easier to convert to TensorRT, potentially increasing the amount of graphs run in TensorRT.
         dryrun (bool): Toggle for "Dryrun" mode, running everything except conversion to TRT and logging outputs
@@ -319,7 +323,6 @@ def cross_compile_for_windows(
         "max_aux_streams": max_aux_streams,
         "version_compatible": version_compatible,
         "optimization_level": optimization_level,
-        "use_python_runtime": False,
         "truncate_double": truncate_double,
         "use_fast_partitioner": use_fast_partitioner,
         "num_avg_timing_iters": num_avg_timing_iters,
@@ -353,7 +356,6 @@ def cross_compile_for_windows(
 
     # disable the following settings is not supported for cross compilation for windows feature
     unsupported_settings = (
-        "use_python_runtime",
         "lazy_engine_init",
         "cache_built_engines",
         "reuse_cached_engines",
@@ -432,7 +434,7 @@ def compile(
     max_aux_streams: Optional[int] = _defaults.MAX_AUX_STREAMS,
     version_compatible: bool = _defaults.VERSION_COMPATIBLE,
     optimization_level: Optional[int] = _defaults.OPTIMIZATION_LEVEL,
-    use_python_runtime: bool = _defaults.USE_PYTHON_RUNTIME,
+    use_python_runtime: bool = False,  # Does nothing. Kept for backward compatibility; use ``with torch_tensorrt.runtime.set_runtime_backend(backend=...):`` instead.
     use_fast_partitioner: bool = _defaults.USE_FAST_PARTITIONER,
     enable_experimental_decompositions: bool = _defaults.ENABLE_EXPERIMENTAL_DECOMPOSITIONS,
     dryrun: bool = _defaults.DRYRUN,
@@ -526,7 +528,7 @@ def compile(
         max_aux_streams (Optional[int]): Maximum streams in the engine
         version_compatible (bool): Build the TensorRT engines compatible with future versions of TensorRT (Restrict to lean runtime operators to provide version forward compatibility for the engines)
         optimization_level: (Optional[int]): Setting a higher optimization level allows TensorRT to spend longer engine building time searching for more optimization options. The resulting engine may have better performance compared to an engine built with a lower optimization level. The default optimization level is 3. Valid values include integers from 0 to the maximum optimization level, which is currently 5. Setting it to be greater than the maximum level results in identical behavior to the maximum level.
-        use_python_runtime: (bool): Return a graph using a pure Python runtime, reduces options for serialization
+        use_python_runtime: (bool): Does nothing. Kept for backward compatibility; use ``with torch_tensorrt.runtime.set_runtime_backend(backend=...):`` instead.
         use_fast_partitioner: (bool): Use the adjacency based partitioning scheme instead of the global partitioner. Adjacency partitioning is faster but may not be optimal. Use the global paritioner (``False``) if looking for best performance
         enable_experimental_decompositions (bool): Use the full set of operator decompositions. These decompositions may not be tested but serve to make the graph easier to convert to TensorRT, potentially increasing the amount of graphs run in TensorRT.
         dryrun (bool): Toggle for "Dryrun" mode, running everything except conversion to TRT and logging outputs
@@ -723,7 +725,6 @@ def compile(
         "max_aux_streams": max_aux_streams,
         "version_compatible": version_compatible,
         "optimization_level": optimization_level,
-        "use_python_runtime": use_python_runtime,
         "truncate_double": truncate_double,
         "use_fast_partitioner": use_fast_partitioner,
         "num_avg_timing_iters": num_avg_timing_iters,
@@ -1053,7 +1054,7 @@ def compile_module(
 
             if _debugger_config:
                 if _debugger_config.save_engine_profile:
-                    if settings.use_python_runtime:
+                    if get_runtime_backend() is RuntimeBackend.PYTHON:
                         if _debugger_config.profile_format != "cudagraph":
                             raise ValueError(
                                 "Profiling with TREX can only be enabled when using the C++ runtime. Python runtime profiling only support cudagraph visualization."
@@ -1144,7 +1145,7 @@ def convert_exported_program_to_serialized_trt_engine(
     max_aux_streams: Optional[int] = _defaults.MAX_AUX_STREAMS,
     version_compatible: bool = _defaults.VERSION_COMPATIBLE,
     optimization_level: Optional[int] = _defaults.OPTIMIZATION_LEVEL,
-    use_python_runtime: bool = _defaults.USE_PYTHON_RUNTIME,
+    use_python_runtime: bool = False,  # Does nothing. Kept for backward compatibility; use ``with torch_tensorrt.runtime.set_runtime_backend(backend=...):`` instead.
     use_fast_partitioner: bool = _defaults.USE_FAST_PARTITIONER,
     enable_experimental_decompositions: bool = _defaults.ENABLE_EXPERIMENTAL_DECOMPOSITIONS,
     dryrun: bool = _defaults.DRYRUN,
@@ -1219,7 +1220,7 @@ def convert_exported_program_to_serialized_trt_engine(
         max_aux_streams (Optional[int]): Maximum streams in the engine
         version_compatible (bool): Build the TensorRT engines compatible with future versions of TensorRT (Restrict to lean runtime operators to provide version forward compatibility for the engines)
         optimization_level: (Optional[int]): Setting a higher optimization level allows TensorRT to spend longer engine building time searching for more optimization options. The resulting engine may have better performance compared to an engine built with a lower optimization level. The default optimization level is 3. Valid values include integers from 0 to the maximum optimization level, which is currently 5. Setting it to be greater than the maximum level results in identical behavior to the maximum level.
-        use_python_runtime: (bool): Return a graph using a pure Python runtime, reduces options for serialization
+        use_python_runtime: (bool): Does nothing. Kept for backward compatibility; use ``with torch_tensorrt.runtime.set_runtime_backend(backend=...):`` instead.
         use_fast_partitioner: (bool): Use the adjacency based partitioning scheme instead of the global partitioner. Adjacency partitioning is faster but may not be optimal. Use the global paritioner (``False``) if looking for best performance
         enable_experimental_decompositions (bool): Use the full set of operator decompositions. These decompositions may not be tested but serve to make the graph easier to convert to TensorRT, potentially increasing the amount of graphs run in TensorRT.
         dryrun (bool): Toggle for "Dryrun" mode, running everything except conversion to TRT and logging outputs
@@ -1382,7 +1383,6 @@ def convert_exported_program_to_serialized_trt_engine(
         "max_aux_streams": max_aux_streams,
         "version_compatible": version_compatible,
         "optimization_level": optimization_level,
-        "use_python_runtime": use_python_runtime,
         "truncate_double": truncate_double,
         "use_fast_partitioner": use_fast_partitioner,
         "num_avg_timing_iters": num_avg_timing_iters,

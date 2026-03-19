@@ -58,12 +58,9 @@ class TestResourcePartitioning(TestCase):
         inputs = [torch.randn((1, 1024, 224, 224)).to("cuda")]
 
         enabled_precisions = {torch.float}
-        use_python_runtime = False
-
         exp_program = torch.export.export(model, tuple(inputs))
 
         compilation_options = {
-            "use_python_runtime": use_python_runtime,
             "enabled_precisions": enabled_precisions,
             "min_block_size": 1,
             "immutable_weights": True,
@@ -144,12 +141,9 @@ class TestResourcePartitioning(TestCase):
         inputs = [torch.randn((1, 1024, 224, 224)).to("cuda")]
 
         enabled_precisions = {torch.float}
-        use_python_runtime = False
-
         exp_program = torch.export.export(model, tuple(inputs))
 
         compilation_options = {
-            "use_python_runtime": use_python_runtime,
             "enabled_precisions": enabled_precisions,
             "min_block_size": 1,
             "immutable_weights": True,
@@ -281,12 +275,9 @@ class TestResourcePartitioning(TestCase):
         inputs = [torch.randn((1, 1024, 224, 224)).to("cuda")]
 
         enabled_precisions = {torch.float}
-        use_python_runtime = False
-
         exp_program = torch.export.export(model, tuple(inputs))
 
         compilation_options = {
-            "use_python_runtime": use_python_runtime,
             "enabled_precisions": enabled_precisions,
             "min_block_size": 1,
             "immutable_weights": True,
@@ -385,12 +376,9 @@ class TestResourcePartitioning(TestCase):
         inputs = [torch.randn((1, 1024, 224, 224)).to("cuda")]
 
         enabled_precisions = {torch.float}
-        use_python_runtime = False
-
         exp_program = torch.export.export(model, tuple(inputs))
 
         compilation_options = {
-            "use_python_runtime": use_python_runtime,
             "enabled_precisions": enabled_precisions,
             "min_block_size": 1,
             "immutable_weights": True,

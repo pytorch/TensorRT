@@ -128,9 +128,8 @@ runtime modules handle the conversion:
 * ``prepare_inputs`` (``dynamo/utils.py``) — builds the ``Input`` spec with the
   ``view_as_real`` shape/dtype but retains the original complex tensor in
   ``inp.torch_tensor`` for tracing.
-* ``_PythonTorchTensorRTModule.forward`` — applies ``torch.view_as_real(i).contiguous()``
-  for each complex input before feeding it to the engine.
-* ``_TorchTensorRTModule.forward`` — same ``view_as_real`` conversion.
+* ``TorchTensorRTModule.forward`` — applies ``torch.view_as_real(i).contiguous()``
+  for each complex input before feeding tensors to ``execute_engine`` / ``execute_engine_python``.
 
 Key Implementation Invariants
 -------------------------------

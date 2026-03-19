@@ -36,7 +36,6 @@ exp_program = torch.export.export(model, tuple(inputs))
 enabled_precisions = {torch.float}
 workspace_size = 20 << 30
 min_block_size = 0
-use_python_runtime = False
 torch_executed_ops = {}
 
 with torch_trt.dynamo.Debugger(
@@ -53,7 +52,6 @@ with torch_trt.dynamo.Debugger(
     trt_gm = torch_trt.dynamo.compile(
         exp_program,
         tuple(inputs),
-        use_python_runtime=use_python_runtime,
         enabled_precisions=enabled_precisions,
         min_block_size=min_block_size,
         torch_executed_ops=torch_executed_ops,

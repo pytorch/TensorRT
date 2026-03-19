@@ -49,7 +49,6 @@ class TestTRTModuleNextCompilation(TestCase):
             min_block_size=1,
             pass_through_build_failures=True,
             torch_executed_ops={"torch.ops.aten.add.Tensor"},
-            use_python_runtime=False,
         )
         optimized_model_results = optimized_model(*inputs).detach().cpu()
         torch_model_results = fx_graph(*inputs).detach().cpu()
@@ -129,7 +128,6 @@ class TestTRTModuleNextCompilation(TestCase):
             min_block_size=1,
             pass_through_build_failures=True,
             torch_executed_ops={"torch.ops.aten.add.Tensor"},
-            use_python_runtime=False,
         )
         optimized_model_results = optimized_model(*inputs).detach().cpu()
         torch_model_results = model(*inputs).detach().cpu()
@@ -170,7 +168,6 @@ class TestCompilationOptions(TestCase):
             inputs,
             min_block_size=1,
             pass_through_build_failures=True,
-            use_python_runtime=False,
             optimization_level=4,
             version_compatible=True,
             max_aux_streams=5,

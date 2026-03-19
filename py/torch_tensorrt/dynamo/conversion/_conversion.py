@@ -4,6 +4,7 @@ import io
 import logging
 from typing import Any, Dict, List, NamedTuple, Optional, Sequence
 
+import tensorrt as trt
 import torch
 from torch_tensorrt._enums import dtype
 from torch_tensorrt._features import ENABLED_FEATURES
@@ -17,15 +18,13 @@ from torch_tensorrt.dynamo.conversion._TRTInterpreter import (
     TRTInterpreter,
     TRTInterpreterResult,
 )
-from torch_tensorrt.dynamo.runtime import PythonTorchTensorRTModule, TorchTensorRTModule
+from torch_tensorrt.dynamo.runtime import TorchTensorRTModule
 from torch_tensorrt.dynamo.utils import (
     get_cpu_memory_usage,
     get_output_dtypes,
     release_host_and_device_memory,
 )
 from torch_tensorrt.logging import TRT_LOGGER
-
-import tensorrt as trt
 
 logger = logging.getLogger(__name__)
 
@@ -329,7 +328,7 @@ def convert_module(
     settings: CompilationSettings = CompilationSettings(),
     name: str = "",
     engine_cache: Optional[BaseEngineCache] = None,
-) -> PythonTorchTensorRTModule | TorchTensorRTModule:
+) -> TorchTensorRTModule:
     """Convert an FX module to a TRT module
     Args:
         module: FX GraphModule to convert
@@ -338,27 +337,18 @@ def convert_module(
         name: TRT engine name
         engine_cache: Engine cache instance
     Returns:
-        PythonTorchTensorRTModule or TorchTensorRTModule
+        TorchTensorRTModule
     """
     serialized_interpreter_result = interpret_module_to_result(
         module, inputs, settings, engine_cache=engine_cache
     )
 
-    rt_cls = PythonTorchTensorRTModule
-
-    if ENABLED_FEATURES.torch_tensorrt_runtime and not settings.use_python_runtime:
-        from torch_tensorrt.dynamo.runtime import TorchTensorRTModule
-
-        rt_cls = TorchTensorRTModule
-
-    elif (
-        not ENABLED_FEATURES.torch_tensorrt_runtime and not settings.use_python_runtime
-    ):
+    if not ENABLED_FEATURES.torch_tensorrt_runtime:
         logger.info(
             "Since Torch-TensorRT runtime is not available, using Python Runtime, some features may not be available"
         )
 
-    return rt_cls(
+    return TorchTensorRTModule(
         serialized_engine=serialized_interpreter_result.serialized_engine,
         input_binding_names=list(serialized_interpreter_result.input_names),
         output_binding_names=list(serialized_interpreter_result.output_names),

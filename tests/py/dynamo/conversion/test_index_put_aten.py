@@ -353,7 +353,6 @@ class TestIndexPutConverter(DispatchTestCase):
             use_explicit_typing=False,
             use_fp32_acc=False,
             disable_tf32=True,
-            use_python_runtime=True,
         )
         result = trt_engine(source_tensor, indices_tensor, value_tensor)
 

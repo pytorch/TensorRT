@@ -125,7 +125,6 @@ def compile_model(
         "enabled_precisions": enabled_precisions,
         "truncate_double": True,
         "min_block_size": 1,
-        "use_python_runtime": True,
         "immutable_weights": False,
         "offload_module_to_cpu": args.low_vram_mode,
         "use_explicit_typing": use_explicit_typing,
@@ -136,7 +135,8 @@ def compile_model(
         remove_hook_from_module(pipe.transformer, recurse=True)
         pipe.transformer.to(DEVICE)
 
-    trt_gm = torch_tensorrt.MutableTorchTensorRTModule(backbone, **settings)
+    with torch_tensorrt.runtime.set_runtime_backend("python"):
+        trt_gm = torch_tensorrt.MutableTorchTensorRTModule(backbone, **settings)
     if dynamic_shapes:
         trt_gm.set_expected_dynamic_shape_range((), dynamic_shapes)
     pipe.transformer = trt_gm

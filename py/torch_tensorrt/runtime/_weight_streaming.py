@@ -2,7 +2,7 @@ import logging
 from typing import Any, Union
 
 import torch
-from torch_tensorrt.dynamo.runtime import PythonTorchTensorRTModule, TorchTensorRTModule
+from torch_tensorrt.dynamo.runtime import TorchTensorRTModule
 from torch_tensorrt.dynamo.runtime._CudaGraphsTorchTensorRTModule import (
     CudaGraphsTorchTensorRTModule,
 )
@@ -26,9 +26,7 @@ class _WeightStreamingContextManager(object):
             self.cuda_graphs_module = module
             module = module.compiled_module
         for name, rt_mod in module.named_children():
-            if "_run_on_acc" in name and isinstance(
-                rt_mod, (PythonTorchTensorRTModule, TorchTensorRTModule)
-            ):
+            if "_run_on_acc" in name and isinstance(rt_mod, TorchTensorRTModule):
                 rt_mods.append((name, rt_mod))
                 self.current_device_budget += rt_mod.get_device_memory_budget()
         self.streamable_budget = [

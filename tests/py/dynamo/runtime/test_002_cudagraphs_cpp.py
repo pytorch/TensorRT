@@ -61,7 +61,6 @@ class TestCudagraphsCPP(TestCase):
             inputs[0],
             min_block_size=1,
             pass_through_build_failures=True,
-            use_python_runtime=False,
         )
 
         result_samples = []
@@ -103,7 +102,6 @@ class TestCudagraphsCPP(TestCase):
             inputs[0],
             min_block_size=1,
             pass_through_build_failures=True,
-            use_python_runtime=False,
             offload_module_to_cpu=True,
         )
         optimized_model.cuda()
@@ -148,7 +146,6 @@ class TestCudagraphsCPP(TestCase):
             min_block_size=1,
             pass_through_build_failures=True,
             torch_executed_ops={"torch.ops.aten.mul.Tensor"},
-            use_python_runtime=False,
         )
 
         result_samples = []
@@ -191,7 +188,6 @@ class TestCudagraphsCPP(TestCase):
             min_block_size=1,
             pass_through_build_failures=True,
             torch_executed_ops={"torch.ops.aten.mul.Tensor"},
-            use_python_runtime=False,
             offload_module_to_cpu=True,
         )
         optimized_model.cuda()
@@ -244,7 +240,6 @@ class TestCudagraphsCPP(TestCase):
             min_block_size=1,
             pass_through_build_failures=True,
             torch_executed_ops={"torch.ops.aten.mul.Tensor"},
-            use_python_runtime=False,
         )
 
         result_samples = []

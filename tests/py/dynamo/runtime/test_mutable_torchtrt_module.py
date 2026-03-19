@@ -221,7 +221,6 @@ def test_resnet18():
     inputs = [torch.rand((1, 3, 224, 224)).to("cuda")]
 
     compile_spec = {
-        "use_python_runtime": False,
         "enabled_precisions": {torch.float32},
         "immutable_weights": False,
     }
@@ -268,7 +267,6 @@ def test_save():
     # Compile the module for the first time and save it.
     # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     compile_spec = {
-        "use_python_runtime": False,
         "enabled_precisions": {torch.float32},
         "immutable_weights": False,
     }
@@ -308,7 +306,6 @@ def test_resnet18_modify_attribute():
     inputs = [torch.rand((1, 3, 224, 224)).to("cuda")]
 
     compile_spec = {
-        "use_python_runtime": False,
         "enabled_precisions": {torch.float32},
         "immutable_weights": False,
     }
@@ -353,7 +350,6 @@ def test_resnet18_modify_attribute_no_refit():
     inputs = [torch.rand((1, 3, 224, 224)).to("cuda")]
 
     compile_spec = {
-        "use_python_runtime": False,
         "enabled_precisions": {torch.float32},
         "immutable_weights": False,
     }

@@ -2,7 +2,7 @@ import logging
 from typing import Any, Union
 
 import torch
-from torch_tensorrt.dynamo.runtime import PythonTorchTensorRTModule, TorchTensorRTModule
+from torch_tensorrt.dynamo.runtime import TorchTensorRTModule
 from torch_tensorrt.dynamo.runtime._CudaGraphsTorchTensorRTModule import (
     CudaGraphsTorchTensorRTModule,
 )
@@ -24,9 +24,7 @@ class _OutputAllocatorContextManager(object):
             rt_mods = []
 
             for name, rt_mod in module.named_children():
-                if "_run_on_acc" in name and isinstance(
-                    rt_mod, (PythonTorchTensorRTModule, TorchTensorRTModule)
-                ):
+                if "_run_on_acc" in name and isinstance(rt_mod, TorchTensorRTModule):
                     rt_mods.append(rt_mod)
 
         self.rt_mods = rt_mods

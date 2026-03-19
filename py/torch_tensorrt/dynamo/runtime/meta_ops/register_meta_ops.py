@@ -3,9 +3,55 @@ import logging
 from typing import Any, Dict, List
 
 import torch
+from torch_tensorrt.dynamo.runtime._serialized_engine_layout import (
+    SERIALIZED_METADATA_IDX,
+)
 from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import TorchTensorRTModule
 
 logger = logging.getLogger(__name__)
+
+
+def _trt_metadata_blob(engine: Any) -> Any:
+    """Base64 pickle blob from engine metadata (fake/meta execution).
+
+    1) Call ``get_serialized_metadata()`` on the wrapper, then on ``real_obj``.
+    2) If missing (some C++ engines in tracing), read the same field from pickle state.
+    """
+    unwrapped = getattr(engine, "real_obj", None)
+
+    for obj in (engine, unwrapped):
+        if obj is None:
+            continue
+        get_meta = getattr(obj, "get_serialized_metadata", None)
+        if callable(get_meta):
+            return get_meta()
+
+    # C++ torch.classes.tensorrt.Engine: metadata lives in __getstate__()[0][SERIALIZED_METADATA_IDX]
+    for obj in (unwrapped, engine):
+        if obj is None:
+            continue
+        getstate = getattr(obj, "__getstate__", None)
+        if not callable(getstate):
+            continue
+        try:
+            outer = getstate()
+            packed = outer[0] if outer else None
+            if (
+                isinstance(packed, (list, tuple))
+                and len(packed) > SERIALIZED_METADATA_IDX
+            ):
+                blob = packed[SERIALIZED_METADATA_IDX]
+                if blob:
+                    return blob
+        except (TypeError, IndexError, AttributeError):
+            continue
+
+    raise RuntimeError("TensorRT meta kernel: could not read engine metadata")
+
+
+def _shape_info_from_trt_engine(engine: Any) -> Any:
+    metadata = TorchTensorRTModule.decode_metadata(_trt_metadata_blob(engine))
+    return metadata.get("inout_symexprs") if metadata else None
 
 
 def _apply_symbolic_shape_expressions(
@@ -200,19 +246,7 @@ def fake_tensorrt_execute_engine(
     output shapes while preserving symbolic SymInt relationships.
     """
 
-    metadata = None
-    if hasattr(fake_trt_engine, "real_obj"):
-        # Wrapped C++ engine with real_obj
-        trt_engine = fake_trt_engine.real_obj
-        metadata = TorchTensorRTModule.decode_metadata(
-            trt_engine.get_serialized_metadata()
-        )
-    else:
-        metadata = TorchTensorRTModule.decode_metadata(
-            fake_trt_engine.get_serialized_metadata()
-        )
-
-    shape_info = metadata.get("inout_symexprs") if metadata else None
+    shape_info = _shape_info_from_trt_engine(fake_trt_engine)
 
     if shape_info:
         # Apply the symbolic shape expressions to create output fake tensors
@@ -224,6 +258,31 @@ def fake_tensorrt_execute_engine(
             "This engine may have been compiled with an older version of Torch-TensorRT. "
             "Please recompile your model."
         )
+
+
+@torch.library.register_fake("tensorrt::execute_engine_python")  # type: ignore
+def fake_tensorrt_execute_engine_python(inputs: List[torch.Tensor], engine: Any) -> Any:
+    shape_info = _shape_info_from_trt_engine(engine)
+
+    if shape_info:
+        return _apply_symbolic_shape_expressions(inputs, shape_info)
+
+    real = getattr(engine, "real_obj", None)
+    for o in (engine, real):
+        if o is None:
+            continue
+        shapes, dtypes = getattr(o, "output_shapes", None), getattr(
+            o, "output_dtypes", None
+        )
+        if shapes and dtypes:
+            return [
+                torch.empty(s, dtype=d, device=inputs[0].device)
+                for s, d in zip(shapes, dtypes)
+            ]
+
+    raise RuntimeError(
+        "No output shape information found for tensorrt::execute_engine_python."
+    )
 
 
 @torch._library.register_fake_class("tensorrt::Engine")
