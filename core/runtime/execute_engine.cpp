@@ -2,6 +2,7 @@
 #include "c10/cuda/CUDAGuard.h"
 #include "c10/cuda/CUDAStream.h"
 
+#include "ATen/record_function.h"
 #include "torch/csrc/jit/runtime/custom_operator.h"
 #include "torch/torch.h"
 
@@ -238,12 +239,7 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
 
     // Intialize inputs and outputs to be available throughout the succeeding scopes
     { // Input Setup
-      std::unique_ptr<torch::autograd::profiler::RecordProfile> input_profiler_guard;
-      if (compiled_engine->profile_execution) {
-        input_profiler_guard =
-            std::make_unique<torch::autograd::profiler::RecordProfile>(compiled_engine->input_profile_path);
-      }
-
+      RECORD_USER_SCOPE("torch_tensorrt_execute_engine::InputSetup");
       setup_input_tensors(inputs, compiled_engine, cudagraphs_enabled, need_cudagraphs_record, inputShapeTensorValues);
       // Check if input shapes can be inferred.
       int32_t const io_size{compiled_engine->cuda_engine->getNbIOTensors()};
@@ -257,11 +253,7 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
     }
 
     { // Output Setup
-      std::unique_ptr<torch::autograd::profiler::RecordProfile> output_profiler_guard;
-      if (compiled_engine->profile_execution) {
-        output_profiler_guard =
-            std::make_unique<torch::autograd::profiler::RecordProfile>(compiled_engine->output_profile_path);
-      }
+      RECORD_USER_SCOPE("torch_tensorrt_execute_engine::OutputSetup");
       if (can_use_pre_allocated_outputs) {
         outputs = compiled_engine->pre_allocated_outputs;
       } else {
@@ -303,13 +295,8 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
     }
 
     { // Engine Execution (execute on engine stream)
+      RECORD_USER_SCOPE("torch_tensorrt_execute_engine::Enqueue");
       c10::cuda::CUDAStreamGuard stream_guard(compiled_engine->engine_stream);
-
-      std::unique_ptr<torch::autograd::profiler::RecordProfile> enqueue_profiler_guard;
-      if (compiled_engine->profile_execution) {
-        enqueue_profiler_guard =
-            std::make_unique<torch::autograd::profiler::RecordProfile>(compiled_engine->enqueue_profile_path);
-      }
 
       // Block engine stream until results are available on caller stream
       at::cuda::CUDAEvent caller_exec_complete;
@@ -371,12 +358,7 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
     std::list<std::vector<int64_t>> inputShapeTensorValues;
 
     { // Input Setup
-      std::unique_ptr<torch::autograd::profiler::RecordProfile> input_profiler_guard;
-      if (compiled_engine->profile_execution) {
-        input_profiler_guard =
-            std::make_unique<torch::autograd::profiler::RecordProfile>(compiled_engine->input_profile_path);
-      }
-
+      RECORD_USER_SCOPE("torch_tensorrt_execute_engine::InputSetup");
       setup_input_tensors(inputs, compiled_engine, false, false, inputShapeTensorValues);
       // Check if input shapes can be inferred.
       int32_t const io_size{compiled_engine->cuda_engine->getNbIOTensors()};
@@ -390,11 +372,7 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
     }
 
     { // OutputAllocator Setup
-      std::unique_ptr<torch::autograd::profiler::RecordProfile> output_allocator_profiler_guard;
-      if (compiled_engine->profile_execution) {
-        output_allocator_profiler_guard =
-            std::make_unique<torch::autograd::profiler::RecordProfile>(compiled_engine->output_profile_path);
-      }
+      RECORD_USER_SCOPE("torch_tensorrt_execute_engine::OutputAllocatorSetup");
       create_output_allocator(compiled_engine);
     }
 
@@ -412,13 +390,8 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
     }
 
     { // Engine Execution (execute on engine stream)
+      RECORD_USER_SCOPE("torch_tensorrt_execute_engine::Enqueue");
       c10::cuda::CUDAStreamGuard stream_guard(compiled_engine->engine_stream);
-
-      std::unique_ptr<torch::autograd::profiler::RecordProfile> enqueue_profiler_guard;
-      if (compiled_engine->profile_execution) {
-        enqueue_profiler_guard =
-            std::make_unique<torch::autograd::profiler::RecordProfile>(compiled_engine->enqueue_profile_path);
-      }
 
       // Block engine stream until results are available on caller stream
       at::cuda::CUDAEvent caller_exec_complete;
@@ -435,13 +408,10 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
     trt_exec_complete.record(compiled_engine->engine_stream);
     trt_exec_complete.block(compiled_engine->caller_stream);
 
-    std::unique_ptr<torch::autograd::profiler::RecordProfile> output_profiler_guard;
-    if (compiled_engine->profile_execution) {
-      output_profiler_guard =
-          std::make_unique<torch::autograd::profiler::RecordProfile>(compiled_engine->output_profile_path);
-    }
     std::vector<at::Tensor> outputs;
-    for (size_t i = 0; i < compiled_engine->out_binding_names.size(); i++) {
+    { // Output Collection
+      RECORD_USER_SCOPE("torch_tensorrt_execute_engine::OutputCollection");
+      for (size_t i = 0; i < compiled_engine->out_binding_names.size(); i++) {
       auto name = compiled_engine->out_binding_names[i];
       auto dims = compiled_engine->output_allocator->getShapes().at(name);
       auto dtype =
@@ -460,6 +430,7 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
       output = output.reshape(-1).view(dtype).slice(0, 0, prod).reshape(shape);
       outputs.push_back(output);
     }
+    } // End Output Collection
 
     if (compiled_engine->profile_execution) {
       LOG_INFO(std::endl << *compiled_engine->trt_engine_profiler);
@@ -493,12 +464,7 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
   bool cudagraphs_enabled = (CUDAGRAPHS_MODE == SUBGRAPH_CUDAGRAPHS);
 
   if (MULTI_DEVICE_SAFE_MODE) {
-    std::unique_ptr<torch::autograd::profiler::RecordProfile> device_profiler_guard;
-    if (compiled_engine->profile_execution) {
-      device_profiler_guard =
-          std::make_unique<torch::autograd::profiler::RecordProfile>(compiled_engine->device_profile_path);
-    }
-
+    RECORD_USER_SCOPE("torch_tensorrt_execute_engine::DeviceSelection");
     RTDevice curr_device = get_current_device();
     LOG_DEBUG("Current Device: " << curr_device);
 

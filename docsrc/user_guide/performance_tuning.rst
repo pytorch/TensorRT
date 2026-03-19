@@ -302,6 +302,75 @@ workspace lets TRT pick faster algorithms. Reduce it to cut peak memory if OOM:
 
 ----
 
+Profiling with torch.profiler
+------------------------------
+
+``torch.profiler`` is the recommended way to profile Torch-TensorRT models from
+Python. The C++ runtime annotates its execution phases using
+``RECORD_USER_SCOPE`` (``ATen/record_function.h``), so they appear in the
+profiler trace under the prefix ``torch_tensorrt_execute_engine::`` alongside
+normal PyTorch operators.
+
+**Basic CPU+CUDA trace**
+
+.. code-block:: python
+
+    import torch
+    import torch_tensorrt
+    from torch.profiler import profile, record_function, ProfilerActivity
+
+    # ... compile your model ...
+    # trt_model = torch_tensorrt.compile(model, ...)
+
+    inputs = [torch.randn(4, 80, 500, device="cuda", dtype=torch.float16)]
+
+    # Warm up — always warm up before profiling
+    for _ in range(5):
+        trt_model(*inputs)
+    torch.cuda.synchronize()
+
+    with profile(
+        activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA],
+        record_shapes=True,
+    ) as prof:
+        with record_function("inference"):
+            for _ in range(10):
+                trt_model(*inputs)
+        torch.cuda.synchronize()
+
+    # Print a summary table sorted by total CUDA time
+    print(prof.key_averages().table(sort_by="cuda_time_total", row_limit=20))
+
+    # Export a Chrome trace you can open in chrome://tracing or Perfetto
+    prof.export_chrome_trace("/tmp/trt_trace.json")
+
+The trace will contain ``torch_tensorrt_execute_engine::InputSetup``,
+``torch_tensorrt_execute_engine::OutputSetup``,
+``torch_tensorrt_execute_engine::Enqueue``, and (when the dynamic output
+allocator is used) ``torch_tensorrt_execute_engine::OutputAllocatorSetup`` /
+``torch_tensorrt_execute_engine::OutputCollection``.  Each scope nests inside
+the ``inference`` annotation so you can see exactly where time is spent relative
+to Python overhead.
+
+**Annotating your own code alongside TRT scopes**
+
+.. code-block:: python
+
+    from torch.profiler import record_function
+
+    with profile(activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA]) as prof:
+        with record_function("preprocess"):
+            x = preprocess(raw_audio)
+        with record_function("encoder"):
+            enc_out = trt_encoder(x)
+        with record_function("decoder_step"):
+            logits = trt_decoder(tokens, enc_out, kv_caches, cache_length)
+        torch.cuda.synchronize()
+
+    print(prof.key_averages().table(sort_by="cuda_time_total", row_limit=30))
+
+----
+
 Profiling with Nsight
 ---------------------
 
