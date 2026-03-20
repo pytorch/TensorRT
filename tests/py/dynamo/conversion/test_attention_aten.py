@@ -336,6 +336,98 @@ class TestScaledDotProductEfficientAttention(DispatchTestCase):
         value = torch.rand(v_shape, dtype=dtype)
         inputs.extend([query, key, value])
         if attn_bias_shape is not None:
+            # create a lower triangular mask that is 0 for lower and -inf for upper
+            attn_bias = torch.zeros(attn_bias_shape, dtype=dtype)
+            upper = torch.triu(
+                torch.ones(attn_bias_shape, dtype=torch.bool), diagonal=1
+            )
+            attn_bias = attn_bias.masked_fill(upper, float("-inf"))
+            inputs.append(attn_bias)
+        self.run_test(
+            EfficientSDPA(),
+            inputs,
+            rtol=1e-2,
+            atol=1e-2,
+            precision=dtype,
+            enable_passes=True,
+            use_explicit_typing=True,
+        )
+
+    @parameterized.expand(
+        [
+            (
+                (4, 8, 32, 16),
+                (4, 8, 32, 16),
+                (4, 8, 32, 16),
+                (4, 8, 32, 32),
+                False,
+                None,
+                torch.float16,
+                0.0,
+            ),
+            (
+                (4, 8, 32, 16),
+                (4, 8, 32, 16),
+                (4, 8, 32, 16),
+                (4, 8, 32, 32),
+                True,
+                None,
+                torch.float16,
+                0.0,
+            ),
+            (
+                (4, 8, 32, 16),
+                (4, 8, 32, 16),
+                (4, 8, 32, 16),
+                (4, 8, 32, 32),
+                True,
+                2.0,
+                torch.float32,
+                0.0,
+            ),
+            (
+                (4, 8, 32, 16),
+                (4, 8, 32, 16),
+                (4, 8, 32, 16),
+                (4, 8, 32, 32),
+                False,
+                2.0,
+                torch.float32,
+                0.0,
+            ),
+        ]
+    )
+    def test_efficient_sdpa_random_attn_bias(
+        self,
+        q_shape,
+        k_shape,
+        v_shape,
+        attn_bias_shape,
+        is_causal,
+        scale,
+        dtype,
+        dropout_p=0.0,
+    ):
+        class EfficientSDPA(nn.Module):
+            def forward(self, query, key, value, attn_bias=None):
+                attn = torch.ops.aten._scaled_dot_product_efficient_attention.default(
+                    query,
+                    key,
+                    value,
+                    attn_bias,
+                    False,
+                    dropout_p,
+                    is_causal,
+                    scale=scale,
+                )
+                return attn[0]
+
+        inputs = []
+        query = torch.randn(q_shape, dtype=dtype)
+        key = torch.rand(k_shape, dtype=dtype)
+        value = torch.rand(v_shape, dtype=dtype)
+        inputs.extend([query, key, value])
+        if attn_bias_shape is not None:
             attn_bias = torch.randn(attn_bias_shape, dtype=dtype)
             inputs.append(attn_bias)
         self.run_test(
