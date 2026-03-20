@@ -202,6 +202,13 @@ class TestIndexPutConverter(DispatchTestCase):
             #     value_tensor=torch.randn([2, 3, 3], dtype=torch.float32),
             # ),
             param(
+                test_name="trailing_none_after_tensor",
+                # K=1: indexed dim first, trailing free dims as None
+                source_tensor=torch.zeros([4, 3, 2], dtype=torch.float32),
+                indices_tensor=(torch.tensor([1, 3], dtype=torch.int64), None, None),
+                value_tensor=torch.ones([2, 3, 2], dtype=torch.float32),
+            ),
+            param(
                 test_name="discontinuous_test",
                 source_tensor=torch.zeros([2, 4, 4], dtype=torch.float32),
                 indices_tensor=(
@@ -358,6 +365,110 @@ class TestIndexPutConverter(DispatchTestCase):
         result = trt_engine(source_tensor, indices_tensor, value_tensor)
 
         torch.allclose(result, torch_output, atol=1e-4, rtol=1e-4)
+
+    def test_index_put_dynamic_index_length(self):
+        """index_put where the index tensor itself has a dynamic length (N dynamic).
+
+        Pattern: src[idx] = values  — no free dims, K=rank=1, index length dynamic.
+        """
+
+        class IndexPutDynN(torch.nn.Module):
+            def forward(self, src, values, idx):
+                return torch.ops.aten.index_put.default(src, [idx], values)
+
+        src = torch.zeros(16, dtype=torch.float32, device="cuda")
+        n_dim = torch.export.Dim("n", min=1, max=16)
+
+        model = IndexPutDynN().eval().cuda()
+        # concrete inputs for reference
+        idx = torch.tensor([0, 2, 4], dtype=torch.int32, device="cuda")
+        values = torch.ones(3, dtype=torch.float32, device="cuda")
+        torch_output = model(src.clone(), values, idx)
+
+        ep = torch.export.export(
+            model,
+            args=(src, values, idx),
+            dynamic_shapes={"src": {}, "values": {0: n_dim}, "idx": {0: n_dim}},
+        )
+        trt_mod = torchtrt.dynamo.compile(
+            ep,
+            arg_inputs=[
+                torchtrt.Input(shape=(16,), dtype=torch.float32),
+                torchtrt.Input(min_shape=(1,), opt_shape=(3,), max_shape=(16,), dtype=torch.float32),
+                torchtrt.Input(min_shape=(1,), opt_shape=(3,), max_shape=(16,), dtype=torch.int32),
+            ],
+            min_block_size=1,
+        )
+        result = trt_mod(src.clone(), values, idx)
+        assert torch.allclose(
+            result, torch_output, atol=1e-4, rtol=1e-4
+        ), f"Dynamic index length mismatch: max diff = {(result - torch_output).abs().max()}"
+
+    def test_kv_cache_dynamic_batch(self):
+        """index_put with a dynamic free dimension (batch) — issue #4139.
+
+        Pattern: cache[..., idx, :] = values  where dim-1 (batch) is dynamic
+        and dim-2 (cache/time) is the indexed static dimension.
+        """
+
+        class KVCacheModel(torch.nn.Module):
+            def forward(self, cache, values, idx):
+                cache[..., idx, :] = values
+                return cache
+
+        N = 4
+        max_ctx = 256
+        L = 1
+        H = 512
+
+        cache = torch.zeros(2, N, max_ctx, H, dtype=torch.float16, device="cuda")
+        values = torch.randn(2, N, L, H, dtype=torch.float16, device="cuda")
+        idx = torch.tensor([3], dtype=torch.long, device="cuda")
+
+        model = KVCacheModel().eval().cuda()
+        torch_output = model(cache.clone(), values, idx)
+
+        batch_dim = torch.export.Dim("batch", min=1, max=64)
+        ep = torch.export.export(
+            model,
+            args=(cache, values, idx),
+            dynamic_shapes={
+                "cache": {1: batch_dim},
+                "values": {1: batch_dim},
+                "idx": {},
+            },
+        )
+
+        trt_mod = torchtrt.dynamo.compile(
+            ep,
+            arg_inputs=[
+                torchtrt.Input(
+                    min_shape=(2, 1, max_ctx, H),
+                    opt_shape=(2, N, max_ctx, H),
+                    max_shape=(2, 64, max_ctx, H),
+                    dtype=torch.float16,
+                ),
+                torchtrt.Input(
+                    min_shape=(2, 1, L, H),
+                    opt_shape=(2, N, L, H),
+                    max_shape=(2, 64, L, H),
+                    dtype=torch.float16,
+                ),
+                torchtrt.Input(
+                    min_shape=(L,),
+                    opt_shape=(L,),
+                    max_shape=(L,),
+                    dtype=torch.long,
+                ),
+            ],
+            use_explicit_typing=True,
+            min_block_size=1,
+        )
+
+        result = trt_mod(cache.clone(), values, idx)
+        assert torch.allclose(
+            result, torch_output, atol=1e-3, rtol=1e-3
+        ), f"KV-cache index_put mismatch: max diff = {(result - torch_output).abs().max()}"
 
 
 if __name__ == "__main__":

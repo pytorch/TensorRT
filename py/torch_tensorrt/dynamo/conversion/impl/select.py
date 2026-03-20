@@ -2,9 +2,7 @@ import logging
 from typing import List, Optional, Sequence, Union
 
 import numpy as np
-import tensorrt as trt
 import torch
-from tensorrt import ITensor as TRTTensor
 from torch.fx.node import Target
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion import impl
@@ -21,6 +19,9 @@ from torch_tensorrt.dynamo.conversion.converter_utils import (
 from torch_tensorrt.dynamo.conversion.impl.elementwise import convert_binary_elementwise
 from torch_tensorrt.dynamo.conversion.impl.shape import shape as get_shape
 from torch_tensorrt.dynamo.utils import DYNAMIC_DIM
+
+import tensorrt as trt
+from tensorrt import ITensor as TRTTensor
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -614,10 +615,37 @@ def index_put_converter(
     else:
         N = 1
 
-    # Compute shapes and volume for the free dimensions
+    # Compute shapes and volume for the free dimensions.
+    # F_shapes: static ints (-1 for dynamic dims), used where static ints are required.
+    # F_shape_values: per-free-dim size as int (static) or TRTTensor (dynamic).
+    # F_volume: product of F_shape_values, int if all static else TRTTensor.
     F_shapes = [input_tensor.shape[i] for i in F]
-    assert -1 not in F_shapes, "Dynamic shape in free dimensions is not supported"
-    F_volume = trt.volume(F_shapes) if F_shapes else 1
+    F_shape_values: List[Union[int, TRTTensor]] = []
+    for _fi, _fdim in enumerate(F):
+        _s = input_tensor.shape[_fdim]
+        if _s == DYNAMIC_DIM:
+            F_shape_values.append(
+                get_shape(
+                    ctx,
+                    target,
+                    source_ir,
+                    f"{name}_fshape_{_fdim}",
+                    input_tensor,
+                    _fdim,
+                )
+            )
+        else:
+            F_shape_values.append(_s)
+    _has_dynamic_f = any(isinstance(_s, TRTTensor) for _s in F_shape_values)
+    if _has_dynamic_f:
+        _fvol: Union[int, TRTTensor] = 1
+        for _i, _s in enumerate(F_shape_values):
+            _fvol = impl.elementwise.mul(
+                ctx, target, source_ir, f"{name}_fvol_{_i}", _fvol, _s
+            )
+        F_volume: Union[int, TRTTensor] = _fvol
+    else:
+        F_volume = trt.volume(F_shapes) if F_shapes else 1
 
     # Process indexed dimensions (I)
     I_tensors = []
@@ -640,8 +668,8 @@ def index_put_converter(
     # Create a meshgrid for free dimensions (F)
     if len(F) > 0:
         arange_tensors = []
-        for dim in F:
-            dim_size = input_tensor.shape[dim]
+        for _fi2, dim in enumerate(F):
+            dim_size = F_shape_values[_fi2]  # int or TRTTensor
             arange_tensor = impl.arange.arange(
                 ctx, target, source_ir, f"{name}_arange_{dim}", 0, dim_size, 1
             )
@@ -653,8 +681,8 @@ def index_put_converter(
         else:
             meshgrid_tensors = []
             for i, arange in enumerate(arange_tensors):
-                reshape_shape = [1] * len(F)
-                reshape_shape[i] = F_shapes[i]
+                reshape_shape: List[Union[int, TRTTensor]] = [1] * len(F)
+                reshape_shape[i] = F_shape_values[i]
                 arange_reshaped = impl.shuffle.reshape(
                     ctx,
                     target,
@@ -669,7 +697,7 @@ def index_put_converter(
                     source_ir,
                     f"{name}_expand_arange_F_{F[i]}",
                     arange_reshaped,
-                    tuple(F_shapes),
+                    tuple(F_shape_values),
                 )
                 meshgrid_tensors.append(expanded_arange)
 
@@ -685,7 +713,7 @@ def index_put_converter(
                         source_ir,
                         f"{name}_reshape_mesh_{i}",
                         t,
-                        (*F_shapes, 1),
+                        (*F_shape_values, 1),
                     )
                     for i, t in enumerate(meshgrid_tensors)
                 ],
@@ -736,19 +764,27 @@ def index_put_converter(
             ii_list.append(idx_tensor)
             i_idx += 1
         else:
-            start = [0, 0, f_idx]
-            shape = [-1, F_volume, 1] if isinstance(N, TRTTensor) else [N, F_volume, 1]
-            stride = [1, 1, 1]
-            mesh_tensor = impl.slice.slice(
+            # Extract the f_idx-th column along the last dim (static len(F)) of
+            # meshgrid_expanded (shape: N×F_volume×len(F)).  Using gather+unsqueeze
+            # avoids passing F_volume (potentially a TRTTensor) as a slice shape.
+            f_idx_t = get_trt_tensor(
+                ctx,
+                np.array(f_idx, dtype=np.int32),
+                f"{name}_f_idx_t_{unique_suffix}",
+            )
+            gather_l = ctx.net.add_gather(meshgrid_expanded, f_idx_t, axis=2)
+            set_layer_name(
+                gather_l, target, f"{name}_gather_mesh_{unique_suffix}", source_ir
+            )
+            mesh_tensor = gather_l.get_output(0)  # (N, F_volume)
+            mesh_tensor = impl.unsqueeze.unsqueeze(
                 ctx,
                 target,
                 source_ir,
-                f"{name}_slice_F_dim_{unique_suffix}",
-                meshgrid_expanded,
-                start,
-                shape,
-                stride,
-            )
+                f"{name}_unsq_mesh_{unique_suffix}",
+                mesh_tensor,
+                2,
+            )  # (N, F_volume, 1)
             ii_list.append(mesh_tensor)
             f_idx += 1
 
@@ -770,9 +806,12 @@ def index_put_converter(
     if not isinstance(values, TRTTensor):
         values = get_trt_tensor(ctx, values, f"{name}_values", min_rank=0)
 
-    # Define the expected shape based on (N,) + F_shapes
+    # Define the expected shape based on (N,) + F_shape_values.
+    # Use -1 for N if N is a TRTTensor (will be resolved dynamically).
     expected_shape = (
-        (-1,) + tuple(F_shapes) if isinstance(N, TRTTensor) else (N,) + tuple(F_shapes)
+        (-1,) + tuple(F_shape_values)
+        if isinstance(N, TRTTensor)
+        else (N,) + tuple(F_shape_values)
     )
 
     # Broadcast 'values' to match the expected shape
@@ -790,12 +829,33 @@ def index_put_converter(
         )
     else:  # Non-scalar case
         values_shape = list(values.shape)
-        if (
+        if K == 1 and len(values.shape) == rank:
+            # For a single indexed dimension where values has the same rank as
+            # the input, permute values from input layout
+            # (dim0, ..., I[0], ..., dimN-1) → (I[0], F[0], ..., F[k-1]).
+            # This gives expected_shape = (N, *F_shape_values) directly and
+            # correctly handles non-contiguous free dims and dynamic batch dims.
+            # When values has fewer dims than rank it is being broadcast, so
+            # fall through to the discontinuous path which handles that via padding.
+            perm_order = I + F
+            values_permuted = impl.permutation.permute(
+                ctx, target, source_ir, f"{name}_permute_values", values, perm_order
+            )
+            # Expand any size-1 dims to match expected_shape (handles broadcasting).
+            values_expanded = impl.slice.expand(
+                ctx,
+                target,
+                source_ir,
+                f"{name}_expand_values",
+                values_permuted,
+                expected_shape,
+            )
+        elif (
             K > 0
             and N in values_shape
             and (len(F) > 1 and max(F) - min(F) + 1 == len(F))
         ):
-            # Continuous case
+            # Continuous case (K > 1, F dims contiguous)
             n_idx = values_shape.index(N)
             permute_order = [n_idx] + [
                 i for i in range(len(values_shape)) if i != n_idx
@@ -841,7 +901,7 @@ def index_put_converter(
                 tuple(broadcast_shape),
             )
         else:
-            # Discontinuous case
+            # Discontinuous case (K > 1 or K == 0)
             values_shape_padded = [1] * (
                 len(expected_shape) - len(values.shape)
             ) + list(values.shape)
