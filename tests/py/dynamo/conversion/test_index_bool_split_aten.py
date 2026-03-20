@@ -6,6 +6,7 @@ Verifies that:
 3. Boolean-indexed `aten.index.Tensor` routes to the converter WITH output allocator.
 4. Both paths produce correct results.
 """
+
 import unittest
 from unittest.mock import MagicMock
 
@@ -60,9 +61,7 @@ class TestIndexHasBoolIndicesValidator(unittest.TestCase):
 
     def test_mixed_int_and_bool_returns_true(self):
         """If any index is bool, the function should return True."""
-        node = _make_index_node(
-            [torch.tensor([0, 1]), torch.tensor([True, False])]
-        )
+        node = _make_index_node([torch.tensor([0, 1]), torch.tensor([True, False])])
         self.assertTrue(index_has_bool_indices(node))
 
     def test_all_none_returns_false(self):
