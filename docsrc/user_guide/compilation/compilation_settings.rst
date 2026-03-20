@@ -123,6 +123,11 @@ Optimization Tuning
      - Disable TensorFloat-32 (TF32) accumulation. TF32 is enabled by default on
        Ampere and newer GPUs and provides FP32-range with FP16-speed for matmul/conv.
        Disable only when you need strict IEEE FP32 semantics.
+   * - ``attn_bias_is_causal``
+     - ``True``
+     - Whether the attn_bias in efficient SDPA is causal. Default is True. This can 
+       accelerate models from HF because attn_bias is always a causal mask in HF. 
+       If you want to use non-causal attn_bias, you can set this to False.
 
 ----
 
@@ -448,7 +453,7 @@ rebuilt from scratch:
 ``l2_limit_for_tiling``, ``enable_autocast``, ``autocast_low_precision_type``,
 ``autocast_excluded_nodes``, ``autocast_excluded_ops``,
 ``autocast_max_output_threshold``, ``autocast_max_depth_of_reduction``,
-``autocast_calibration_dataloader``.
+``autocast_calibration_dataloader``, ``decompose_attention``, ``attn_bias_is_causal``.
 
 Settings not in this list (e.g., ``debug``, ``dryrun``, ``pass_through_build_failures``)
 can be changed without invalidating the cache.

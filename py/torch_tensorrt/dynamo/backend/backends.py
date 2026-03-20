@@ -21,6 +21,9 @@ from torch_tensorrt.dynamo.lowering import (
     remove_sym_nodes,
     repair_input_aliasing,
 )
+from torch_tensorrt.dynamo.lowering.passes.force_causal_efficient_attention import (
+    force_causal_efficient_attention,
+)
 from torch_tensorrt.dynamo.utils import (
     parse_dynamo_kwargs,
     prepare_inputs,
@@ -148,6 +151,8 @@ def _pretraced_backend(
 
             logger.debug("Post-AOT Autograd graph:\n" + str(gm.graph))
 
+            # Keep the behavior of efficient attention consistent with pre_export_lowering path.
+            gm = force_causal_efficient_attention(gm, settings)
             gm = post_lowering(gm, settings)
 
             logger.debug("Lowered Input graph:\n " + str(gm.graph))

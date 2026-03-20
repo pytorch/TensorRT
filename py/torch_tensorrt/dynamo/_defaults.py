@@ -68,6 +68,7 @@ ENABLE_RESOURCE_PARTITIONING = False
 CPU_MEMORY_BUDGET = None
 DYNAMICALLY_ALLOCATE_RESOURCES = False
 DECOMPOSE_ATTENTION = False
+ATTN_BIAS_IS_CAUSAL = True
 
 if platform.system() == "Linux":
     import pwd

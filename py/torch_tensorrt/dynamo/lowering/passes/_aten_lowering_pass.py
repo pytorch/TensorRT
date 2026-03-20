@@ -12,6 +12,7 @@ from torch_tensorrt.dynamo.lowering.passes.pass_utils import (
 
 from .complex_graph_rewrite import complex_graph_detection
 from .constant_folding import constant_fold
+from .force_causal_efficient_attention import force_causal_efficient_attention
 from .fuse_prims_broadcast import fuse_prims_broadcast
 from .pass_manager import DynamoPassManager
 from .remove_assert_nodes import remove_assert_nodes
@@ -27,6 +28,7 @@ pre_lowering_pass_list = [
     remove_detach,
     remove_assert_nodes,
     rule_based_autocast,
+    force_causal_efficient_attention,
 ]
 
 post_lowering_pass_list = [
