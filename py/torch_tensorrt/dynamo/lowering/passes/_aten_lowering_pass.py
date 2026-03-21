@@ -28,7 +28,6 @@ pre_lowering_pass_list = [
     remove_detach,
     remove_assert_nodes,
     rule_based_autocast,
-    force_causal_efficient_attention,
 ]
 
 post_lowering_pass_list = [
@@ -41,6 +40,7 @@ post_lowering_pass_list = [
     remove_assert_nodes,
     remove_num_users_is_0_nodes,
     complex_graph_detection,
+    force_causal_efficient_attention,
 ]
 
 if not is_tegra_platform():
