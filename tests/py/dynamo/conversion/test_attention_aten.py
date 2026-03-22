@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
+from torch_tensorrt import Input
 
 from .harness import DispatchTestCase
 
@@ -258,6 +259,110 @@ class TestScaledDotProductAttention(DispatchTestCase):
             enable_passes=True,
             use_explicit_typing=True,
         )
+
+    @parameterized.expand(
+        [
+            (
+                [(2, 8, 32, 16), (4, 8, 32, 16), (16, 8, 32, 16)],
+                [(2, 8, 32, 16), (4, 8, 32, 16), (16, 8, 32, 16)],
+                [(2, 8, 32, 16), (4, 8, 32, 16), (16, 8, 32, 16)],
+                None,
+                False,
+                None,
+                torch.float16,
+                0.0,
+                False,
+            ),
+            (
+                [(2, 8, 32, 16), (4, 8, 32, 16), (16, 8, 32, 16)],
+                [(2, 8, 32, 16), (4, 8, 32, 16), (16, 8, 32, 16)],
+                [(2, 8, 32, 16), (4, 8, 32, 16), (16, 8, 32, 16)],
+                None,
+                True,
+                None,
+                torch.float32,
+                0.0,
+                False,
+            ),
+            (
+                [(2, 8, 32, 16), (4, 8, 32, 16), (16, 8, 32, 16)],
+                [(2, 8, 32, 16), (4, 8, 32, 16), (16, 8, 32, 16)],
+                [(2, 8, 32, 16), (4, 8, 32, 16), (16, 8, 32, 16)],
+                [(2, 8, 32, 32), (4, 8, 32, 32), (16, 8, 32, 32)],
+                False,
+                None,
+                torch.float16,
+                0.0,
+                False,
+            ),
+            (
+                [(2, 4, 128, 64), (4, 4, 128, 64), (8, 4, 128, 64)],
+                [(2, 4, 128, 64), (4, 4, 128, 64), (8, 4, 128, 64)],
+                [(2, 4, 128, 64), (4, 4, 128, 64), (8, 4, 128, 64)],
+                [(2, 4, 128, 128), (4, 4, 128, 128), (8, 4, 128, 128)],
+                True,
+                2.0,
+                torch.float32,
+                0.0,
+                False,
+            ),
+        ]
+    )
+    def test_dynamic_sdpa_fp_mask(
+        self,
+        q_shape,
+        k_shape,
+        v_shape,
+        attn_mask_shape,
+        is_causal,
+        scale,
+        dtype,
+        dropout_p=0.0,
+        enable_gqa=False,
+    ):
+        class SDPA(nn.Module):
+            def forward(self, query, key, value, attn_mask=None):
+                return torch.ops.aten.scaled_dot_product_attention.default(
+                    query,
+                    key,
+                    value,
+                    attn_mask,
+                    dropout_p,
+                    is_causal,
+                    scale=scale,
+                    enable_gqa=enable_gqa,
+                )
+
+        input_specs = [
+            Input(
+                min_shape=q_shape[0],
+                opt_shape=q_shape[1],
+                max_shape=q_shape[2],
+                dtype=dtype,
+            ),
+            Input(
+                min_shape=k_shape[0],
+                opt_shape=k_shape[1],
+                max_shape=k_shape[2],
+                dtype=dtype,
+            ),
+            Input(
+                min_shape=v_shape[0],
+                opt_shape=v_shape[1],
+                max_shape=v_shape[2],
+                dtype=dtype,
+            ),
+        ]
+        if attn_mask_shape is not None:
+            input_specs.append(
+                Input(
+                    min_shape=attn_mask_shape[0],
+                    opt_shape=attn_mask_shape[1],
+                    max_shape=attn_mask_shape[2],
+                    dtype=dtype,
+                ),
+            )
+        self.run_test_with_dynamic_shape(SDPA(), input_specs, output_dtypes=[dtype])
 
 
 class TestScaledDotProductEfficientAttention(DispatchTestCase):
