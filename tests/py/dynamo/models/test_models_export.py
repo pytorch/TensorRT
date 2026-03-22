@@ -160,6 +160,7 @@ def test_bert_base_uncased(ir):
         "min_block_size": 10,
         "cache_built_engines": False,
         "reuse_cached_engines": False,
+        "attn_bias_is_causal": False,  # BERT uses bidirectional self-attention instead of causal
     }
     trt_mod = torchtrt.compile(model, **compile_spec)
     model_outputs = model(input, input2)

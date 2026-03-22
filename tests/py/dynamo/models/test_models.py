@@ -308,6 +308,7 @@ def test_bert_base_uncased(ir, dtype):
         "cache_built_engines": False,
         "reuse_cached_engines": False,
         "use_explicit_typing": True,
+        "attn_bias_is_causal": False,  # BERT uses bidirectional self-attention instead of causal
     }
     trt_mod = torchtrt.compile(model, **compile_spec)
 
@@ -361,6 +362,7 @@ def test_bert_base_uncased_cpu_offload(ir):
         "cache_built_engines": False,
         "reuse_cached_engines": False,
         "offload_module_to_cpu": True,
+        "attn_bias_is_causal": False,  # BERT uses bidirectional self-attention instead of causal
     }
     trt_mod = torchtrt.compile(model, **compile_spec)
     if ir == "dynamo":
