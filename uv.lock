@@ -32,6 +32,9 @@ required-markers = [
     "python_full_version < '3.14' and platform_machine == 'AMD64' and sys_platform == 'win32'",
 ]
 
+[options]
+prerelease-mode = "allow"
+
 [[package]]
 name = "accelerate"
 version = "1.12.0"
@@ -222,7 +225,7 @@ name = "apache-tvm-ffi"
 version = "0.1.9rc1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "typing-extensions", marker = "(python_full_version < '3.13' and platform_machine != 'AMD64' and sys_platform == 'win32') or (python_full_version < '3.13' and sys_platform == 'linux')" },
+    { name = "typing-extensions", marker = "python_full_version < '3.13' and sys_platform == 'linux'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/a0/32/0f420f46cb0be8a087d804ed69f845ad39425503a18beee7183afa2379e7/apache_tvm_ffi-0.1.9rc1.tar.gz", hash = "sha256:2668a50df6ffe0557f6dec417cf687c34a61d3799803991f7be8be814164fada", size = 2506764, upload-time = "2026-02-20T16:49:45.141Z" }
 wheels = [
@@ -230,22 +233,18 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/c8/15/9c85f29bb02c5327985ca84723a6226bc84b88377bf017f5850c295877ce/apache_tvm_ffi-0.1.9rc1-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:0089a263cb1e3b6cb475a722fca0d36c33450484d9134ad376ecdc8d26eee2d2", size = 2322596, upload-time = "2026-02-20T16:48:40.976Z" },
     { url = "https://files.pythonhosted.org/packages/7b/03/481caee70dfb3430d77ad1b2dbc3f866dd74c94882462e26aef3157eebd9/apache_tvm_ffi-0.1.9rc1-cp310-cp310-manylinux_2_24_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:80a72f06df6c80a1261992a67c64bc8ec6418c9e9f1257b074460aabb267e8f8", size = 2159648, upload-time = "2026-02-20T16:48:42.92Z" },
     { url = "https://files.pythonhosted.org/packages/77/6e/baa118118d0c147c4d70af9e58bd31aa9f97d84c46fc0b00637ff0d3196f/apache_tvm_ffi-0.1.9rc1-cp310-cp310-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:a1253cae30410cc9112fb304fa92497c934399b4695c9edb5d7edcb986425db7", size = 2306155, upload-time = "2026-02-20T16:48:45.075Z" },
-    { url = "https://files.pythonhosted.org/packages/dd/a4/fc9bd1ace5f477ece038a58242c8c7f35b796a8e3387444025971f1fdeb4/apache_tvm_ffi-0.1.9rc1-cp310-cp310-win_amd64.whl", hash = "sha256:93b59c08e05615948eca7522953a7dec7f2fdd2d421f4fad8cca6dc219ac779d", size = 1991707, upload-time = "2026-02-20T16:48:47.31Z" },
     { url = "https://files.pythonhosted.org/packages/9a/ef/aa426d9c833846603189a9e4231074cada1ee9158157600c793ed25a7dcd/apache_tvm_ffi-0.1.9rc1-cp311-cp311-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:a0d6c2a4822a178bbd98211cec5220f6781e5e65cd9a34c8855c5422dea4322f", size = 2230020, upload-time = "2026-02-20T16:48:50.897Z" },
     { url = "https://files.pythonhosted.org/packages/c8/61/b835f48f8fad3082eb68fb6b5ea6597d3aa893099ea5f0c92fcba6d8645e/apache_tvm_ffi-0.1.9rc1-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:ca56cac25fc75bd42e9046a0459febe904ede4967373cfd39fc136f9cf4e53a9", size = 2321927, upload-time = "2026-02-20T16:48:52.888Z" },
     { url = "https://files.pythonhosted.org/packages/ff/4e/75c42276159f11e946cc12f623bdce9af022f85d00b8517db8685deb4fa0/apache_tvm_ffi-0.1.9rc1-cp311-cp311-manylinux_2_24_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:1a14ccb777c36e29dee0f8058999b28600a025c559ee08d5bd165dcd13e69b8e", size = 2158999, upload-time = "2026-02-20T16:48:55.141Z" },
     { url = "https://files.pythonhosted.org/packages/a1/a7/151c911ab2054775bd3adeee5ddb1e3f1d62d29694a93296efa8deb1a1a0/apache_tvm_ffi-0.1.9rc1-cp311-cp311-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:3c993c5a819aedc626aba446177c2c73db1d730d5cacb2689f278322ad18f32c", size = 2305985, upload-time = "2026-02-20T16:48:57.439Z" },
-    { url = "https://files.pythonhosted.org/packages/ba/02/32b2f02410c924d4bf83aeed3d62b705f5cd1dad32dfddda2af63bb45e15/apache_tvm_ffi-0.1.9rc1-cp311-cp311-win_amd64.whl", hash = "sha256:9609295349cb94044cb58a4a147c676a49e6d5e84fd08fb3a970b41324fc88f3", size = 1991689, upload-time = "2026-02-20T16:48:59.166Z" },
     { url = "https://files.pythonhosted.org/packages/97/05/5bd7c5c647c3fb60e6f1f70a63d445c7d3a77c3baf556308ca70477234b7/apache_tvm_ffi-0.1.9rc1-cp312-abi3-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:2ac6b825ff5d2f78ac218c2975f517a1c0606ea4b7455c7299a6c7f60de1da4f", size = 2202514, upload-time = "2026-02-20T16:49:02.727Z" },
     { url = "https://files.pythonhosted.org/packages/1f/f5/98abcbff40bda9b9e82081cd0a6e20a8477d5da92d19ccc34803c9810632/apache_tvm_ffi-0.1.9rc1-cp312-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:a02dec4e3e9d2297b822c5f4da62f9c257871791d790e04dc2e3b86c376e8c14", size = 2298582, upload-time = "2026-02-20T16:49:04.422Z" },
     { url = "https://files.pythonhosted.org/packages/25/ba/152ca5d2dfc29f14bdc34246927f29c54a1cd9b4f334497c8aaf827c0daf/apache_tvm_ffi-0.1.9rc1-cp312-abi3-manylinux_2_24_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:cf1884134fd893755f3fe2a9805353e1110386fd88745781ba7beef64ce93ece", size = 2130721, upload-time = "2026-02-20T16:49:06.312Z" },
     { url = "https://files.pythonhosted.org/packages/e8/db/348b3ddbd6af3c087247abf68d2e8259393a0e9805561819f0481d5ba630/apache_tvm_ffi-0.1.9rc1-cp312-abi3-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:ebe5656c6698de0fd32c798287a209fcc6fd2f8771cb294ecd71090d1ec602fd", size = 2278418, upload-time = "2026-02-20T16:49:07.98Z" },
-    { url = "https://files.pythonhosted.org/packages/54/1b/409ca21eb3a286535baddcb03cc676ec31c42c25dcfc52272be161b4230e/apache_tvm_ffi-0.1.9rc1-cp312-abi3-win_amd64.whl", hash = "sha256:15a268ec597700c93f2117eaa42b238d89a6c65603e95e05ef52d15941402630", size = 1972021, upload-time = "2026-02-20T16:49:10.016Z" },
     { url = "https://files.pythonhosted.org/packages/6b/3f/5714359ae04624b033f37ee66e81e060b5eb087ce141223c94993b0afca9/apache_tvm_ffi-0.1.9rc1-cp314-cp314t-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:893fe0aa90a47439d88af2093e90c8cb62a8551dca447daa5afb5e90ad82f576", size = 2214539, upload-time = "2026-02-20T16:49:13.684Z" },
     { url = "https://files.pythonhosted.org/packages/a2/e3/ffab0681fe720a32ae0afc168f0daba9de569a9ac5dbff57415c53000152/apache_tvm_ffi-0.1.9rc1-cp314-cp314t-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:3b5ec16049559d70520af24f3a9a94df6c4dbae6a4e472bc6bae3166ce961300", size = 2306206, upload-time = "2026-02-20T16:49:15.625Z" },
     { url = "https://files.pythonhosted.org/packages/5d/a6/2f157b4cd24618ce3276c6ea0c21be5b2f727f73e3e853341ffb05fa2c8b/apache_tvm_ffi-0.1.9rc1-cp314-cp314t-manylinux_2_24_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:4c8f4acd5d11c0e544eabed5a1ca9d15ff74f99c3f52c195b5f5a88d44e9ecbe", size = 2142591, upload-time = "2026-02-20T16:49:17.385Z" },
     { url = "https://files.pythonhosted.org/packages/03/5a/efee53ffd01e06d1603034c514b04fdc466d8600d0eb0eb65bedc4b5d41d/apache_tvm_ffi-0.1.9rc1-cp314-cp314t-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:1d5ce77eb0dee32c3902f3e109ed26eb50c7839177da27b4e3a05c610c8f8fb5", size = 2287901, upload-time = "2026-02-20T16:49:19.479Z" },
-    { url = "https://files.pythonhosted.org/packages/6a/73/fd1bab98e8ece54e5a181e20583011af901512675eeeb04bac4cc1fc7528/apache_tvm_ffi-0.1.9rc1-cp314-cp314t-win_amd64.whl", hash = "sha256:63bf96a536f0265dece63007019bbcde5fb700dcb0ea24b7d611af99421d33db", size = 2037153, upload-time = "2026-02-20T16:49:21.544Z" },
 ]
 
 [[package]]
@@ -565,30 +564,23 @@ name = "cuda-bindings"
 version = "13.0.3"
 source = { registry = "https://download.pytorch.org/whl/nightly/cu130" }
 dependencies = [
-    { name = "cuda-pathfinder", marker = "(python_full_version < '3.13' and platform_machine != 'AMD64' and sys_platform == 'win32') or sys_platform == 'linux'" },
+    { name = "cuda-pathfinder", marker = "sys_platform == 'linux'" },
 ]
 wheels = [
     { url = "https://download.pytorch.org/whl/nightly/cu130/cuda_bindings-13.0.3-cp310-cp310-manylinux_2_24_aarch64.manylinux_2_28_aarch64.whl" },
     { url = "https://download.pytorch.org/whl/nightly/cu130/cuda_bindings-13.0.3-cp310-cp310-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl" },
-    { url = "https://download.pytorch.org/whl/nightly/cu130/cuda_bindings-13.0.3-cp310-cp310-win_amd64.whl" },
     { url = "https://download.pytorch.org/whl/nightly/cu130/cuda_bindings-13.0.3-cp311-cp311-manylinux_2_24_aarch64.manylinux_2_28_aarch64.whl" },
     { url = "https://download.pytorch.org/whl/nightly/cu130/cuda_bindings-13.0.3-cp311-cp311-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl" },
-    { url = "https://download.pytorch.org/whl/nightly/cu130/cuda_bindings-13.0.3-cp311-cp311-win_amd64.whl" },
     { url = "https://download.pytorch.org/whl/nightly/cu130/cuda_bindings-13.0.3-cp312-cp312-manylinux_2_24_aarch64.manylinux_2_28_aarch64.whl" },
     { url = "https://download.pytorch.org/whl/nightly/cu130/cuda_bindings-13.0.3-cp312-cp312-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl" },
-    { url = "https://download.pytorch.org/whl/nightly/cu130/cuda_bindings-13.0.3-cp312-cp312-win_amd64.whl" },
     { url = "https://download.pytorch.org/whl/nightly/cu130/cuda_bindings-13.0.3-cp313-cp313-manylinux_2_24_aarch64.manylinux_2_28_aarch64.whl" },
     { url = "https://download.pytorch.org/whl/nightly/cu130/cuda_bindings-13.0.3-cp313-cp313-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl" },
-    { url = "https://download.pytorch.org/whl/nightly/cu130/cuda_bindings-13.0.3-cp313-cp313-win_amd64.whl" },
     { url = "https://download.pytorch.org/whl/nightly/cu130/cuda_bindings-13.0.3-cp313-cp313t-manylinux_2_24_aarch64.manylinux_2_28_aarch64.whl" },
     { url = "https://download.pytorch.org/whl/nightly/cu130/cuda_bindings-13.0.3-cp313-cp313t-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl" },
-    { url = "https://download.pytorch.org/whl/nightly/cu130/cuda_bindings-13.0.3-cp313-cp313t-win_amd64.whl" },
     { url = "https://download.pytorch.org/whl/nightly/cu130/cuda_bindings-13.0.3-cp314-cp314-manylinux_2_24_aarch64.manylinux_2_28_aarch64.whl" },
     { url = "https://download.pytorch.org/whl/nightly/cu130/cuda_bindings-13.0.3-cp314-cp314-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl" },
-    { url = "https://download.pytorch.org/whl/nightly/cu130/cuda_bindings-13.0.3-cp314-cp314-win_amd64.whl" },
     { url = "https://download.pytorch.org/whl/nightly/cu130/cuda_bindings-13.0.3-cp314-cp314t-manylinux_2_24_aarch64.manylinux_2_28_aarch64.whl" },
     { url = "https://download.pytorch.org/whl/nightly/cu130/cuda_bindings-13.0.3-cp314-cp314t-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl" },
-    { url = "https://download.pytorch.org/whl/nightly/cu130/cuda_bindings-13.0.3-cp314-cp314t-win_amd64.whl" },
 ]
 
 [[package]]
@@ -604,8 +596,8 @@ name = "cuda-python"
 version = "13.0.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "cuda-bindings", marker = "(python_full_version < '3.13' and platform_machine != 'AMD64' and sys_platform == 'win32') or (python_full_version < '3.13' and sys_platform == 'linux')" },
-    { name = "cuda-pathfinder", marker = "(python_full_version < '3.13' and platform_machine != 'AMD64' and sys_platform == 'win32') or (python_full_version < '3.13' and sys_platform == 'linux')" },
+    { name = "cuda-bindings", marker = "python_full_version < '3.13' and sys_platform == 'linux'" },
+    { name = "cuda-pathfinder", marker = "python_full_version < '3.13' and sys_platform == 'linux'" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/31/5f/beaa12a11b051027eec0b041df01c6690db4f02e3b2e8fadd5a0eeb4df52/cuda_python-13.0.3-py3-none-any.whl", hash = "sha256:914cd7e2dd075bd06a2d5121c1d9ccdd3d0c94b03ea5a44dbd98d24d8ed93bab", size = 7605, upload-time = "2025-10-21T15:48:59.222Z" },
@@ -889,23 +881,26 @@ name = "flashinfer-python"
 version = "0.4.0rc3"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
+    "python_full_version == '3.12.*' and platform_machine != 'AMD64' and sys_platform == 'win32'",
     "python_full_version == '3.12.*' and platform_machine == 'AMD64' and sys_platform == 'win32'",
+    "python_full_version == '3.11.*' and platform_machine != 'AMD64' and sys_platform == 'win32'",
     "python_full_version == '3.11.*' and platform_machine == 'AMD64' and sys_platform == 'win32'",
+    "python_full_version < '3.11' and platform_machine != 'AMD64' and sys_platform == 'win32'",
     "python_full_version < '3.11' and platform_machine == 'AMD64' and sys_platform == 'win32'",
 ]
 dependencies = [
-    { name = "click", marker = "python_full_version < '3.13' and platform_machine == 'AMD64' and sys_platform == 'win32'" },
-    { name = "einops", marker = "python_full_version < '3.13' and platform_machine == 'AMD64' and sys_platform == 'win32'" },
-    { name = "ninja", marker = "python_full_version < '3.13' and platform_machine == 'AMD64' and sys_platform == 'win32'" },
-    { name = "numpy", version = "2.2.6", source = { registry = "https://download.pytorch.org/whl/nightly/cu130" }, marker = "python_full_version < '3.11' and platform_machine == 'AMD64' and sys_platform == 'win32'" },
-    { name = "numpy", version = "2.3.5", source = { registry = "https://download.pytorch.org/whl/nightly/cu130" }, marker = "python_full_version >= '3.11' and python_full_version < '3.13' and platform_machine == 'AMD64' and sys_platform == 'win32'" },
-    { name = "nvidia-cudnn-frontend", marker = "python_full_version < '3.13' and platform_machine == 'AMD64' and sys_platform == 'win32'" },
-    { name = "nvidia-ml-py", marker = "python_full_version < '3.13' and platform_machine == 'AMD64' and sys_platform == 'win32'" },
-    { name = "packaging", marker = "python_full_version < '3.13' and platform_machine == 'AMD64' and sys_platform == 'win32'" },
-    { name = "requests", marker = "python_full_version < '3.13' and platform_machine == 'AMD64' and sys_platform == 'win32'" },
-    { name = "tabulate", marker = "python_full_version < '3.13' and platform_machine == 'AMD64' and sys_platform == 'win32'" },
-    { name = "torch", marker = "python_full_version < '3.13' and platform_machine == 'AMD64' and sys_platform == 'win32'" },
-    { name = "tqdm", marker = "python_full_version < '3.13' and platform_machine == 'AMD64' and sys_platform == 'win32'" },
+    { name = "click", marker = "python_full_version < '3.13' and sys_platform == 'win32'" },
+    { name = "einops", marker = "python_full_version < '3.13' and sys_platform == 'win32'" },
+    { name = "ninja", marker = "python_full_version < '3.13' and sys_platform == 'win32'" },
+    { name = "numpy", version = "2.2.6", source = { registry = "https://download.pytorch.org/whl/nightly/cu130" }, marker = "python_full_version < '3.11' and sys_platform == 'win32'" },
+    { name = "numpy", version = "2.3.5", source = { registry = "https://download.pytorch.org/whl/nightly/cu130" }, marker = "python_full_version >= '3.11' and python_full_version < '3.13' and sys_platform == 'win32'" },
+    { name = "nvidia-cudnn-frontend", marker = "python_full_version < '3.13' and sys_platform == 'win32'" },
+    { name = "nvidia-ml-py", marker = "python_full_version < '3.13' and sys_platform == 'win32'" },
+    { name = "packaging", marker = "python_full_version < '3.13' and sys_platform == 'win32'" },
+    { name = "requests", marker = "python_full_version < '3.13' and sys_platform == 'win32'" },
+    { name = "tabulate", marker = "python_full_version < '3.13' and sys_platform == 'win32'" },
+    { name = "torch", marker = "python_full_version < '3.13' and sys_platform == 'win32'" },
+    { name = "tqdm", marker = "python_full_version < '3.13' and sys_platform == 'win32'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/65/91/cf9e3a0a2626711bfab18ea4a4c739e0eb823e9513addc0e9e1b8f929538/flashinfer_python-0.4.0rc3.tar.gz", hash = "sha256:a2b54132d8ef5866611e534f0cc437caf6c8dd182698e9059c0ff2c479fb4451", size = 3887662, upload-time = "2025-09-24T23:32:38.214Z" }
 
@@ -923,25 +918,22 @@ resolution-markers = [
     "(python_full_version < '3.11' and platform_machine != 'aarch64' and platform_machine != 'x86_64' and sys_platform == 'linux') or (python_full_version < '3.11' and platform_machine == 'aarch64' and platform_python_implementation != 'CPython' and sys_platform == 'linux')",
     "python_full_version < '3.11' and platform_machine == 'x86_64' and sys_platform == 'linux'",
     "python_full_version < '3.11' and platform_machine == 'aarch64' and platform_python_implementation == 'CPython' and sys_platform == 'linux'",
-    "python_full_version == '3.12.*' and platform_machine != 'AMD64' and sys_platform == 'win32'",
-    "python_full_version == '3.11.*' and platform_machine != 'AMD64' and sys_platform == 'win32'",
-    "python_full_version < '3.11' and platform_machine != 'AMD64' and sys_platform == 'win32'",
 ]
 dependencies = [
-    { name = "apache-tvm-ffi", marker = "(python_full_version < '3.13' and platform_machine != 'AMD64' and sys_platform == 'win32') or (python_full_version < '3.13' and sys_platform == 'linux')" },
-    { name = "click", marker = "(python_full_version < '3.13' and platform_machine != 'AMD64' and sys_platform == 'win32') or (python_full_version < '3.13' and sys_platform == 'linux')" },
-    { name = "einops", marker = "(python_full_version < '3.13' and platform_machine != 'AMD64' and sys_platform == 'win32') or (python_full_version < '3.13' and sys_platform == 'linux')" },
-    { name = "ninja", marker = "(python_full_version < '3.13' and platform_machine != 'AMD64' and sys_platform == 'win32') or (python_full_version < '3.13' and sys_platform == 'linux')" },
-    { name = "numpy", version = "2.2.6", source = { registry = "https://download.pytorch.org/whl/nightly/cu130" }, marker = "(python_full_version < '3.11' and platform_machine != 'AMD64' and sys_platform == 'win32') or (python_full_version < '3.11' and sys_platform == 'linux')" },
-    { name = "numpy", version = "2.3.5", source = { registry = "https://download.pytorch.org/whl/nightly/cu130" }, marker = "(python_full_version >= '3.11' and python_full_version < '3.13' and platform_machine != 'AMD64' and sys_platform == 'win32') or (python_full_version >= '3.11' and python_full_version < '3.13' and sys_platform == 'linux')" },
-    { name = "nvidia-cudnn-frontend", marker = "(python_full_version < '3.13' and platform_machine != 'AMD64' and sys_platform == 'win32') or (python_full_version < '3.13' and sys_platform == 'linux')" },
-    { name = "nvidia-cutlass-dsl", marker = "(python_full_version < '3.13' and platform_machine != 'AMD64' and sys_platform == 'win32') or (python_full_version < '3.13' and sys_platform == 'linux')" },
-    { name = "nvidia-ml-py", marker = "(python_full_version < '3.13' and platform_machine != 'AMD64' and sys_platform == 'win32') or (python_full_version < '3.13' and sys_platform == 'linux')" },
-    { name = "packaging", marker = "(python_full_version < '3.13' and platform_machine != 'AMD64' and sys_platform == 'win32') or (python_full_version < '3.13' and sys_platform == 'linux')" },
-    { name = "requests", marker = "(python_full_version < '3.13' and platform_machine != 'AMD64' and sys_platform == 'win32') or (python_full_version < '3.13' and sys_platform == 'linux')" },
-    { name = "tabulate", marker = "(python_full_version < '3.13' and platform_machine != 'AMD64' and sys_platform == 'win32') or (python_full_version < '3.13' and sys_platform == 'linux')" },
-    { name = "torch", marker = "(python_full_version < '3.13' and platform_machine != 'AMD64' and sys_platform == 'win32') or (python_full_version < '3.13' and sys_platform == 'linux')" },
-    { name = "tqdm", marker = "(python_full_version < '3.13' and platform_machine != 'AMD64' and sys_platform == 'win32') or (python_full_version < '3.13' and sys_platform == 'linux')" },
+    { name = "apache-tvm-ffi", marker = "python_full_version < '3.13' and sys_platform == 'linux'" },
+    { name = "click", marker = "python_full_version < '3.13' and sys_platform == 'linux'" },
+    { name = "einops", marker = "python_full_version < '3.13' and sys_platform == 'linux'" },
+    { name = "ninja", marker = "python_full_version < '3.13' and sys_platform == 'linux'" },
+    { name = "numpy", version = "2.2.6", source = { registry = "https://download.pytorch.org/whl/nightly/cu130" }, marker = "python_full_version < '3.11' and sys_platform == 'linux'" },
+    { name = "numpy", version = "2.3.5", source = { registry = "https://download.pytorch.org/whl/nightly/cu130" }, marker = "python_full_version >= '3.11' and python_full_version < '3.13' and sys_platform == 'linux'" },
+    { name = "nvidia-cudnn-frontend", marker = "python_full_version < '3.13' and sys_platform == 'linux'" },
+    { name = "nvidia-cutlass-dsl", marker = "python_full_version < '3.13' and sys_platform == 'linux'" },
+    { name = "nvidia-ml-py", marker = "python_full_version < '3.13' and sys_platform == 'linux'" },
+    { name = "packaging", marker = "python_full_version < '3.13' and sys_platform == 'linux'" },
+    { name = "requests", marker = "python_full_version < '3.13' and sys_platform == 'linux'" },
+    { name = "tabulate", marker = "python_full_version < '3.13' and sys_platform == 'linux'" },
+    { name = "torch", marker = "python_full_version < '3.13' and sys_platform == 'linux'" },
+    { name = "tqdm", marker = "python_full_version < '3.13' and sys_platform == 'linux'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/77/45/15645d2a4ee81d08206f3e132a77323e48312f510462415d7cd1122eba43/flashinfer_python-0.6.4.tar.gz", hash = "sha256:e6ab798bd1030e5ff7a3bc6952f36386c406928f60b79cf964a6db7aa7ccde75", size = 5337134, upload-time = "2026-02-19T07:33:36.647Z" }
 wheels = [
@@ -2234,7 +2226,7 @@ name = "nvidia-cutlass-dsl"
 version = "4.4.0"
 source = { registry = "https://pypi.nvidia.com/" }
 dependencies = [
-    { name = "nvidia-cutlass-dsl-libs-base", marker = "(python_full_version < '3.13' and platform_machine != 'AMD64' and sys_platform == 'win32') or (python_full_version < '3.13' and sys_platform == 'linux')" },
+    { name = "nvidia-cutlass-dsl-libs-base", marker = "python_full_version < '3.13' and sys_platform == 'linux'" },
 ]
 wheels = [
     { url = "https://pypi.nvidia.com/nvidia-cutlass-dsl/nvidia_cutlass_dsl-4.4.0-py3-none-any.whl", hash = "sha256:2d1f34333e4d774002d44b53262d71aaf738700fcf3858290629f9a7b374c61c" },
@@ -2245,10 +2237,10 @@ name = "nvidia-cutlass-dsl-libs-base"
 version = "4.4.0"
 source = { registry = "https://pypi.nvidia.com/" }
 dependencies = [
-    { name = "cuda-python", marker = "(python_full_version < '3.13' and platform_machine != 'AMD64' and sys_platform == 'win32') or (python_full_version < '3.13' and sys_platform == 'linux')" },
-    { name = "numpy", version = "2.2.6", source = { registry = "https://download.pytorch.org/whl/nightly/cu130" }, marker = "(python_full_version < '3.11' and platform_machine != 'AMD64' and sys_platform == 'win32') or (python_full_version < '3.11' and sys_platform == 'linux')" },
-    { name = "numpy", version = "2.3.5", source = { registry = "https://download.pytorch.org/whl/nightly/cu130" }, marker = "(python_full_version >= '3.11' and python_full_version < '3.13' and platform_machine != 'AMD64' and sys_platform == 'win32') or (python_full_version >= '3.11' and python_full_version < '3.13' and sys_platform == 'linux')" },
-    { name = "typing-extensions", marker = "(python_full_version < '3.13' and platform_machine != 'AMD64' and sys_platform == 'win32') or (python_full_version < '3.13' and sys_platform == 'linux')" },
+    { name = "cuda-python", marker = "python_full_version < '3.13' and sys_platform == 'linux'" },
+    { name = "numpy", version = "2.2.6", source = { registry = "https://download.pytorch.org/whl/nightly/cu130" }, marker = "python_full_version < '3.11' and sys_platform == 'linux'" },
+    { name = "numpy", version = "2.3.5", source = { registry = "https://download.pytorch.org/whl/nightly/cu130" }, marker = "python_full_version >= '3.11' and python_full_version < '3.13' and sys_platform == 'linux'" },
+    { name = "typing-extensions", marker = "python_full_version < '3.13' and sys_platform == 'linux'" },
 ]
 wheels = [
     { url = "https://pypi.nvidia.com/nvidia-cutlass-dsl-libs-base/nvidia_cutlass_dsl_libs_base-4.4.0-cp310-cp310-manylinux_2_28_aarch64.whl", hash = "sha256:703169d0843ad7e310b397aa95128e3fa983571a9a488f826c2968f3e71df2b8" },
@@ -4074,8 +4066,8 @@ test = [
     { name = "pytest-xdist", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
 ]
 test-ext = [
-    { name = "flashinfer-python", version = "0.4.0rc3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.13' and platform_machine == 'AMD64' and sys_platform == 'win32'" },
-    { name = "flashinfer-python", version = "0.6.4", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version < '3.13' and platform_machine != 'AMD64' and sys_platform == 'win32') or (python_full_version < '3.13' and sys_platform == 'linux')" },
+    { name = "flashinfer-python", version = "0.4.0rc3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.13' and sys_platform == 'win32'" },
+    { name = "flashinfer-python", version = "0.6.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.13' and sys_platform == 'linux'" },
     { name = "nvidia-modelopt", extra = ["all"], marker = "(python_full_version < '3.13' and sys_platform == 'linux') or (python_full_version < '3.13' and sys_platform == 'win32')" },
     { name = "timm", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
     { name = "torchvision", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
