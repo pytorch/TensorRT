@@ -4,6 +4,7 @@ from typing import List, Optional, Sequence, Union
 import numpy as np
 import torch
 from torch.fx.node import Target
+from torch_tensorrt._enums import dtype
 from torch_tensorrt.dynamo._SourceIR import SourceIR
 from torch_tensorrt.dynamo.conversion import impl
 from torch_tensorrt.dynamo.conversion._ConversionContext import ConversionContext
@@ -21,7 +22,7 @@ from torch_tensorrt.dynamo.conversion.impl.shape import shape as get_shape
 from torch_tensorrt.dynamo.utils import DYNAMIC_DIM
 
 import tensorrt as trt
-from tensorrt import ITensor as TRTTensor
+from tensorrt import ITensor
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -31,11 +32,11 @@ def select(
     target: Target,
     source_ir: Optional[SourceIR],
     name: str,
-    input: TRTTensor,
+    input: ITensor,
     dim: int,
     index: int,
-) -> TRTTensor:
-    if not isinstance(input, TRTTensor):
+) -> ITensor:
+    if not isinstance(input, ITensor):
         raise RuntimeError(
             f"slice_tensor received input {input} that is not part "
             "of the TensorRT region!"
@@ -53,13 +54,13 @@ def select(
 
 
 def is_boolean_tensor(
-    tensor: Union[TRTTensor, np.ndarray, torch.Tensor, torch.fx.Node],
+    tensor: Union[ITensor, np.ndarray, torch.Tensor, torch.fx.Node],
 ) -> bool:
     if isinstance(tensor, torch.Tensor):
         return bool(tensor.dtype == torch.bool)
     elif isinstance(tensor, np.ndarray):
         return bool(tensor.dtype == np.bool_)
-    elif isinstance(tensor, TRTTensor):
+    elif isinstance(tensor, ITensor):
         return bool(tensor.dtype == trt.DataType.BOOL)
     # when index is a node
     else:
@@ -75,9 +76,9 @@ def expand_boolean_indices(
     target: Target,
     source_ir: Optional[SourceIR],
     name: str,
-    input: TRTTensor,
-    indices: Sequence[Union[TRTTensor, np.ndarray, torch.Tensor]],
-) -> Sequence[Union[TRTTensor, np.ndarray, torch.Tensor]]:
+    input: ITensor,
+    indices: Sequence[Union[ITensor, np.ndarray, torch.Tensor]],
+) -> Sequence[Union[ITensor, np.ndarray, torch.Tensor]]:
     new_indices = []
     for i, ind in enumerate(indices):
         if ind is not None and is_boolean_tensor(ind):
@@ -90,24 +91,53 @@ def expand_boolean_indices(
             set_layer_name(
                 nonzero_layer, target, name + f"_bool_nonzero_{i}", source_ir
             )
-            nonzero_indices = nonzero_layer.get_output(0)
+            # TRT add_non_zero returns shape (ndim, N): row d holds the d-th
+            # coordinate of every nonzero element.  This is the transpose of
+            # PyTorch's nonzero() which returns (N, ndim).
+            # Ref: https://docs.nvidia.com/deeplearning/tensorrt/latest/reference/python-api/infer/Graph/Layers.html#tensorrt.INetworkDefinition.add_non_zero
+            nonzero_indices = nonzero_layer.get_output(0)  # (mask_ndim, N)
 
-            # nonzero returns shape [N, dims], we need to extract dim i
-            if len(indices) == 1:
-                # x[mask] — 1D mask
+            mask_ndim = len(ind.shape) if hasattr(ind, "shape") else 1
+
+            if len(indices) == 1 and mask_ndim > 1:
+                # x[bool_nd] = v — single N-D boolean mask.
+                # Extract row d (axis=0) from (mask_ndim, N) → (N,) per dim.
+                for d in range(mask_ndim):
+                    gather_layer = ctx.net.add_gather(
+                        nonzero_indices,
+                        get_trt_tensor(ctx, d, name + f"_bool_nz_dim_{i}_{d}"),
+                        axis=0,
+                    )
+                    set_layer_name(
+                        gather_layer,
+                        target,
+                        name + f"_bool_nonzero_row_{i}_{d}",
+                        source_ir,
+                    )
+                    row = gather_layer.get_output(0)  # (N,)
+                    sq = ctx.net.add_shuffle(row)
+                    sq.reshape_dims = (-1,)
+                    set_layer_name(
+                        sq, target, name + f"_bool_row_sq_{i}_{d}", source_ir
+                    )
+                    new_indices.append(sq.get_output(0))
+                continue  # already appended all per-dim indices; skip append below
+            elif len(indices) == 1:
+                # x[bool_1d] = v — 1D mask: nonzero → (1, N), flatten to (N,).
                 to_squeeze = nonzero_indices
             else:
-                # Advanced multi-axis mask: extract index i from shape [N, D]
-                gather_axis = 1  # dim index
+                # Multi-index bool (1-D bool at position i): extract row i from
+                # (1, N) — i.e. gather row 0 along axis=0.
                 gather_layer = ctx.net.add_gather(
                     nonzero_indices,
-                    get_trt_tensor(ctx, i, name + f"_dim_index_{i}"),
-                    gather_axis,
+                    get_trt_tensor(ctx, 0, name + f"_dim_index_{i}"),
+                    axis=0,
                 )
                 set_layer_name(
                     gather_layer, target, name + f"_bool_nonzero_extract_{i}", source_ir
                 )
                 to_squeeze = gather_layer.get_output(0)
+
             squeeze_layer = ctx.net.add_shuffle(to_squeeze)
             squeeze_layer.reshape_dims = (-1,)
             set_layer_name(
@@ -128,9 +158,9 @@ def index(
     target: Target,
     source_ir: Optional[SourceIR],
     name: str,
-    input: TRTTensor,
-    indices: Sequence[Union[TRTTensor, np.ndarray, torch.Tensor]],
-) -> TRTTensor:
+    input: ITensor,
+    indices: Sequence[Union[ITensor, np.ndarray, torch.Tensor]],
+) -> ITensor:
     adv_indx_indices = []
     tensor_indices = []
     # is_numpy is a flag to specify if all the indices are numpy or torchTensor.
@@ -153,20 +183,24 @@ def index(
             adv_indx_indices.append(i)
             # torch.nn.parameter.Parameter=> numpy array
             # numpy array is kept as numpy
-            # other cases are kept as TRTTensor
+            # other cases are kept as ITensor
             if is_numpy:
                 ind = to_numpy(ind)
             else:
                 ind = get_trt_tensor(ctx, ind, name + f"_parameter_to_fp32_tensor_{i}")
             if last_index is not None:
-                assert broadcastable(
-                    ind, last_index
-                ), "The indices should be broadcastable!"
+                assert broadcastable(ind, last_index), (
+                    f"Index tensors must be broadcastable with each other, but index {i} "
+                    f"has shape {tuple(ind.shape)} which is not broadcastable with the "
+                    f"previous index shape {tuple(last_index.shape)}. "
+                    "All advanced (integer/boolean) indices must follow NumPy style broadcasting rules. "
+                    "See https://numpy.org/doc/stable/user/basics.broadcasting.html"
+                )
             last_index = ind
             tensor_indices.append(ind)
 
     if not tensor_indices:
-        cast_layer = ctx.net.add_cast(input, trt.int32)
+        cast_layer = ctx.net.add_cast(input, dtype.i32.to(trt.DataType))
         set_layer_name(cast_layer, target, name + "_index_casted", source_ir)
         return cast_layer.get_output(0)
     elif len(tensor_indices) == 1:
@@ -470,10 +504,10 @@ def index_select(
     target: Target,
     source_ir: Optional[SourceIR],
     name: str,
-    input: TRTTensor,
+    input: ITensor,
     dim: int,
-    index: TRTTensor,
-) -> TRTTensor:
+    index: ITensor,
+) -> ITensor:
     # The axis parameter specifies the dimension along which to index.
     dim = get_positive_dim(dim, len(input.shape))
     gather_layer = ctx.net.add_gather(input, index, axis=dim)
@@ -488,11 +522,11 @@ def scatter(
     target: Target,
     source_ir: Optional[SourceIR],
     name: str,
-    input: TRTTensor,
+    input: ITensor,
     dim: int,
-    index: Union[TRTTensor, np.ndarray, torch.Tensor],
-    src: Union[TRTTensor, int, float],
-) -> TRTTensor:
+    index: Union[ITensor, np.ndarray, torch.Tensor],
+    src: Union[ITensor, int, float],
+) -> ITensor:
     input_shape = input.shape
     index_shape = index.shape
     index_shape_list = list(index_shape)
@@ -525,7 +559,7 @@ def scatter(
                 ctx, src_tensor, input.dtype, name + "_cast_value_tensor"
             )
     # scatter.src
-    elif not (isinstance(src, TRTTensor)):
+    elif not (isinstance(src, ITensor)):
         src_tensor = get_trt_tensor(ctx, src, name + "_src_tensor")
 
     scatter_layer = ctx.net.add_scatter(
@@ -542,10 +576,10 @@ def gather(
     target: Target,
     source_ir: Optional[SourceIR],
     name: str,
-    input: TRTTensor,
+    input: ITensor,
     dim: int,
-    index: Union[TRTTensor, np.ndarray, torch.Tensor],
-) -> TRTTensor:
+    index: Union[ITensor, np.ndarray, torch.Tensor],
+) -> ITensor:
     input_shape = input.shape
     dim = get_positive_dim(dim, len(input_shape))
     index = cast_trt_tensor(ctx, index, trt.int32, name + "_cast_index_tensor")
@@ -556,32 +590,280 @@ def gather(
     return out
 
 
+def _index_put_scatter_add(
+    ctx: ConversionContext,
+    target: Target,
+    source_ir: Optional[SourceIR],
+    name: str,
+    input_tensor: ITensor,
+    indices_cat: ITensor,
+    flattened_values: ITensor,
+) -> ITensor:
+    """Scatter-add via indicator-matrix matmul.
+
+    Correctly accumulates into duplicate index positions, unlike
+    ``ScatterMode.ND`` which overwrites on collision.
+
+    Algorithm
+    ---------
+    Given ``P`` scatter positions and ``M`` total elements in ``input_tensor``:
+
+    1. Linearise the ND indices (shape ``(P, rank)``) to flat indices (shape
+       ``(P,)``) using the row-major strides of ``input_tensor``.
+    2. Build a boolean indicator matrix of shape ``(M, P)`` where entry
+       ``[i, j]`` is True iff ``flat_idx[j] == i``.
+    3. Compute ``delta = indicator @ values``  (shape ``(M,)``).  Because the
+       matmul sums over ``j``, duplicate positions are accumulated exactly.
+    4. Return ``flatten(input) + delta`` reshaped to ``input_tensor.shape``.
+
+    Memory cost: O(M * P). Suitable for inference use-cases where both M and P
+    are small (e.g. KV-cache updates, small buffer writes).
+    """
+    rank = len(input_tensor.shape)
+
+    # ------------------------------------------------------------------
+    # Step 1: per-dimension sizes (int when static, ITensor when dynamic)
+    # ------------------------------------------------------------------
+    dims: List[Union[int, ITensor]] = []
+    for i in range(rank):
+        s = input_tensor.shape[i]
+        if s == DYNAMIC_DIM:
+            dims.append(
+                get_shape(ctx, target, source_ir, f"{name}_dim_{i}", input_tensor, i)
+            )
+        else:
+            dims.append(s)
+
+    # ------------------------------------------------------------------
+    # Step 2: row-major strides  (stride[k] = product(dims[k+1:]))
+    # ------------------------------------------------------------------
+    strides: List[Union[int, ITensor]] = [1] * rank
+    for k in range(rank - 2, -1, -1):
+        d = dims[k + 1]
+        prev = strides[k + 1]
+        if isinstance(d, ITensor) or isinstance(prev, ITensor):
+            strides[k] = impl.elementwise.mul(
+                ctx, target, source_ir, f"{name}_stride_{k}", prev, d
+            )
+        else:
+            strides[k] = prev * d
+
+    # ------------------------------------------------------------------
+    # Step 3: M = total number of elements
+    # ------------------------------------------------------------------
+    M: Union[int, ITensor] = dims[0]
+    for i in range(1, rank):
+        d = dims[i]
+        if isinstance(M, ITensor) or isinstance(d, ITensor):
+            M = impl.elementwise.mul(ctx, target, source_ir, f"{name}_M_{i}", M, d)
+        else:
+            M = M * d
+
+    # ------------------------------------------------------------------
+    # Step 4: linearise indices_cat (P, rank) -> flat_idx (P,)
+    #   flat_idx = sum_k( indices_cat[:, k] * strides[k] )
+    # ------------------------------------------------------------------
+    flat_idx: Optional[ITensor] = None
+    for k in range(rank):
+        # Extract column k from indices_cat via a gather on axis=1
+        k_t = get_trt_tensor(ctx, k, f"{name}_col_idx_{k}", min_rank=0)
+        gather_l = ctx.net.add_gather(indices_cat, k_t, axis=1)
+        set_layer_name(gather_l, target, f"{name}_gather_col_{k}", source_ir)
+        col_k = gather_l.get_output(0)  # shape (P,)
+
+        # Normalize negative indices: idx < 0  →  idx + dim_size
+        dim_k = dims[k]
+        if isinstance(dim_k, ITensor):
+            dim_k_t = dim_k
+        else:
+            dim_k_t = get_trt_tensor(ctx, dim_k, f"{name}_dim_val_{k}", min_rank=0)
+        zero_k = get_trt_tensor(ctx, 0, f"{name}_zero_{k}", min_rank=0)
+        is_neg = impl.elementwise.lt(
+            ctx, target, source_ir, f"{name}_is_neg_{k}", col_k, zero_k
+        )
+        col_k_shifted = impl.elementwise.add(
+            ctx, target, source_ir, f"{name}_col_shifted_{k}", col_k, dim_k_t
+        )
+        sel_l = ctx.net.add_select(is_neg, col_k_shifted, col_k)
+        set_layer_name(sel_l, target, f"{name}_sel_neg_{k}", source_ir)
+        col_k = sel_l.get_output(0)
+
+        stride_k = strides[k]
+        if isinstance(stride_k, ITensor):
+            contrib = impl.elementwise.mul(
+                ctx, target, source_ir, f"{name}_contrib_{k}", col_k, stride_k
+            )
+        elif stride_k == 1:
+            contrib = col_k
+        else:
+            stride_t = get_trt_tensor(
+                ctx,
+                stride_k,
+                f"{name}_stride_val_{k}",
+                min_rank=0,
+            )
+            contrib = impl.elementwise.mul(
+                ctx, target, source_ir, f"{name}_contrib_{k}", col_k, stride_t
+            )
+
+        flat_idx = (
+            contrib
+            if flat_idx is None
+            else impl.elementwise.add(
+                ctx, target, source_ir, f"{name}_flat_idx_{k}", flat_idx, contrib
+            )
+        )
+
+    # ------------------------------------------------------------------
+    # Step 5: indicator matrix  (M, P) = (arange(M)[:,None] == flat_idx[None,:])
+    # ------------------------------------------------------------------
+    arange_M = impl.arange.arange(
+        ctx, target, source_ir, f"{name}_arange_M", 0, M, 1
+    )  # (M,) int32
+    arange_M = cast_trt_tensor(ctx, arange_M, dtype.i32, f"{name}_arange_int32")
+
+    # Reshape for broadcast: (M, 1) and (1, P)
+    arange_col = impl.unsqueeze.unsqueeze(
+        ctx, target, source_ir, f"{name}_arange_col", arange_M, 1
+    )  # (M, 1)
+    flat_idx_row = impl.unsqueeze.unsqueeze(
+        ctx, target, source_ir, f"{name}_flat_idx_row", flat_idx, 0
+    )  # (1, P)
+
+    indicator = impl.elementwise.eq(
+        ctx, target, source_ir, f"{name}_indicator", arange_col, flat_idx_row
+    )  # (M, P) bool
+
+    # ------------------------------------------------------------------
+    # Step 6: delta = indicator @ values  (M,)
+    # ------------------------------------------------------------------
+    # TRT matmul requires a floating-point dtype.  Use the input's own dtype
+    # when it is already a float type so precision is preserved natively
+    # (matrix_multiply handles the fp16 fp32-acc path internally).
+    # Fall back to float32 only for non-floating-point inputs (e.g. int32).
+    _float_dtypes = (trt.float32, trt.float16, trt.bfloat16)
+    compute_dtype = (
+        input_tensor.dtype if input_tensor.dtype in _float_dtypes else trt.float32
+    )
+
+    indicator_f = cast_trt_tensor(
+        ctx, indicator, compute_dtype, f"{name}_indicator_cast"
+    )  # (M, P)
+    values_f = cast_trt_tensor(
+        ctx, flattened_values, compute_dtype, f"{name}_values_cast"
+    )  # (P,)
+
+    # matrix_multiply treats the 1-D `values_f` as a column vector (VECTOR
+    # mode) and returns shape (M,).
+    delta = impl.matmul.matrix_multiply(
+        ctx, target, source_ir, f"{name}_delta", indicator_f, values_f
+    )  # (M,)
+
+    # Cast delta back to the original input dtype (no-op for float inputs)
+    delta = cast_trt_tensor(ctx, delta, input_tensor.dtype, f"{name}_delta_cast")
+
+    # ------------------------------------------------------------------
+    # Step 7: flatten input, add delta, reshape back
+    # ------------------------------------------------------------------
+    src_flat = impl.shuffle.reshape(
+        ctx, target, source_ir, f"{name}_src_flat", input_tensor, (-1,)
+    )
+    result_flat = impl.elementwise.add(
+        ctx, target, source_ir, f"{name}_result_flat", src_flat, delta
+    )
+
+    # Rebuild the output shape (may contain dynamic dims)
+    out_shape = tuple(
+        (
+            get_shape(ctx, target, source_ir, f"{name}_oshape_{i}", input_tensor, i)
+            if input_tensor.shape[i] == DYNAMIC_DIM
+            else input_tensor.shape[i]
+        )
+        for i in range(rank)
+    )
+    return impl.shuffle.reshape(
+        ctx, target, source_ir, f"{name}_result", result_flat, out_shape
+    )
+
+
 def index_put_converter(
     ctx: ConversionContext,
     target: Target,
     source_ir: Optional[SourceIR],
     name: str,
-    input_tensor: TRTTensor,
-    input_indices: Sequence[Union[TRTTensor, torch.Tensor, np.ndarray, int, None]],
-    values: TRTTensor,
+    input_tensor: ITensor,
+    input_indices: Sequence[Union[ITensor, torch.Tensor, np.ndarray, int, None]],
+    values: ITensor,
     accumulate: bool = False,
-) -> TRTTensor:
+) -> ITensor:
     # Convert 'input_indices' to TRT tensors (or keep None as is)
     input_indices = expand_boolean_indices(
         ctx, target, source_ir, name, input_tensor, input_indices
     )
-    indices: List[Optional[Union[TRTTensor, None]]] = []
+    indices: List[Optional[Union[ITensor, None]]] = []
     for i, idx in enumerate(input_indices):
         if idx is None:
             indices.append(None)
         else:
-            if not isinstance(idx, TRTTensor):
+            if not isinstance(idx, ITensor):
                 idx = get_trt_tensor(ctx, idx, f"{name}_index_{i}", min_rank=1)
             if len(idx.shape) == 0 or not idx.shape:  # Reshape a scalar to (1,)
                 idx = impl.shuffle.reshape(
                     ctx, target, source_ir, f"{name}_reshape_idx_{i}", idx, (1,)
                 )
             indices.append(idx)
+
+    # Normalize multi-dimensional index tensors.
+    # PyTorch allows mesh-style indices like [arange(3)[:,None], arange(2)[None,:]]
+    # which broadcast together before scattering.  The rest of the converter
+    # pipeline assumes every non-None index is 1-D, so we broadcast all
+    # non-None indices to their common shape and flatten each to (N,) here.
+    _non_none_idx = [(pos, idx) for pos, idx in enumerate(indices) if idx is not None]
+    if _non_none_idx and any(len(idx.shape) > 1 for _, idx in _non_none_idx):
+        _max_ndim = max(len(idx.shape) for _, idx in _non_none_idx)
+        # Compute the static broadcast shape (dynamic mesh indices unsupported).
+        _bcast: List[int] = [1] * _max_ndim
+        for _, idx in _non_none_idx:
+            _padded = (1,) * (_max_ndim - len(idx.shape)) + tuple(
+                int(s) for s in idx.shape
+            )
+            for j, (a, b) in enumerate(zip(_bcast, _padded)):
+                if a == 1:
+                    _bcast[j] = b
+                elif b != 1 and b != a:
+                    raise ValueError(
+                        f"index_put: cannot broadcast index shapes {[idx.shape for _, idx in _non_none_idx]}"
+                    )
+        # Expand each non-None index to _bcast then flatten to 1-D.
+        for pos, idx in _non_none_idx:
+            if len(idx.shape) < _max_ndim:
+                for _d in range(_max_ndim - len(idx.shape)):
+                    idx = impl.unsqueeze.unsqueeze(
+                        ctx, target, source_ir, f"{name}_idx_ndpad_{pos}_{_d}", idx, 0
+                    )
+            idx = impl.slice.expand(
+                ctx, target, source_ir, f"{name}_idx_ndbcast_{pos}", idx, tuple(_bcast)
+            )
+            idx = impl.shuffle.reshape(
+                ctx, target, source_ir, f"{name}_idx_ndflat_{pos}", idx, (-1,)
+            )
+            indices[pos] = idx
+
+        # Also pre-broadcast values to the mesh shape and flatten so they match N.
+        # e.g. values (2,) + mesh (3,2) → expand to (3,2) → flatten to (6,).
+        if not isinstance(values, ITensor):
+            values = get_trt_tensor(ctx, values, f"{name}_values_nd", min_rank=0)
+        if len(values.shape) < _max_ndim:
+            for _d in range(_max_ndim - len(values.shape)):
+                values = impl.unsqueeze.unsqueeze(
+                    ctx, target, source_ir, f"{name}_val_ndpad_{_d}", values, 0
+                )
+        values = impl.slice.expand(
+            ctx, target, source_ir, f"{name}_val_ndbcast", values, tuple(_bcast)
+        )
+        values = impl.shuffle.reshape(
+            ctx, target, source_ir, f"{name}_val_ndflat", values, (-1,)
+        )
 
     rank = len(input_tensor.shape)
     # Pad the 'indices' list with None for remaining dimensions
@@ -596,7 +878,7 @@ def index_put_converter(
         index_shapes = (
             []
         )  # [tensor.shape[0] for tensor in indices if tensor is not None]
-        for idx_tensor in indices:
+        for _ni, idx_tensor in enumerate(indices):
             if idx_tensor is not None:
                 if idx_tensor.shape[0] != DYNAMIC_DIM:
                     index_shapes.append(idx_tensor.shape[0])
@@ -606,21 +888,27 @@ def index_put_converter(
                             ctx,
                             target,
                             source_ir,
-                            name + "idx_shape_dim_0",
+                            name + f"idx_shape_dim_0_{_ni}",
                             idx_tensor,
                             0,
                         )
                     )
-        N = max(index_shapes) if index_shapes else 1
+        # When any index has a dynamic size, use the first dynamic value
+        # (all valid indices are guaranteed to have the same N after broadcasting).
+        # Python's max() cannot compare ITensors, so we avoid it when dynamic.
+        if any(isinstance(s, ITensor) for s in index_shapes):
+            N = next(s for s in index_shapes if isinstance(s, ITensor))
+        else:
+            N = max(index_shapes) if index_shapes else 1
     else:
         N = 1
 
     # Compute shapes and volume for the free dimensions.
     # F_shapes: static ints (-1 for dynamic dims), used where static ints are required.
-    # F_shape_values: per-free-dim size as int (static) or TRTTensor (dynamic).
-    # F_volume: product of F_shape_values, int if all static else TRTTensor.
+    # F_shape_values: per-free-dim size as int (static) or ITensor (dynamic).
+    # F_volume: product of F_shape_values, int if all static else ITensor.
     F_shapes = [input_tensor.shape[i] for i in F]
-    F_shape_values: List[Union[int, TRTTensor]] = []
+    F_shape_values: List[Union[int, ITensor]] = []
     for _fi, _fdim in enumerate(F):
         _s = input_tensor.shape[_fdim]
         if _s == DYNAMIC_DIM:
@@ -636,14 +924,15 @@ def index_put_converter(
             )
         else:
             F_shape_values.append(_s)
-    _has_dynamic_f = any(isinstance(_s, TRTTensor) for _s in F_shape_values)
+    _has_dynamic_f = any(isinstance(_s, ITensor) for _s in F_shape_values)
+    # Can't figure out a better way to calculate the volume at runtime
     if _has_dynamic_f:
-        _fvol: Union[int, TRTTensor] = 1
+        _fvol: Union[int, ITensor] = 1
         for _i, _s in enumerate(F_shape_values):
             _fvol = impl.elementwise.mul(
                 ctx, target, source_ir, f"{name}_fvol_{_i}", _fvol, _s
             )
-        F_volume: Union[int, TRTTensor] = _fvol
+        F_volume: Union[int, ITensor] = _fvol
     else:
         F_volume = trt.volume(F_shapes) if F_shapes else 1
 
@@ -669,7 +958,7 @@ def index_put_converter(
     if len(F) > 0:
         arange_tensors = []
         for _fi2, dim in enumerate(F):
-            dim_size = F_shape_values[_fi2]  # int or TRTTensor
+            dim_size = F_shape_values[_fi2]  # int or ITensor
             arange_tensor = impl.arange.arange(
                 ctx, target, source_ir, f"{name}_arange_{dim}", 0, dim_size, 1
             )
@@ -681,7 +970,7 @@ def index_put_converter(
         else:
             meshgrid_tensors = []
             for i, arange in enumerate(arange_tensors):
-                reshape_shape: List[Union[int, TRTTensor]] = [1] * len(F)
+                reshape_shape: List[Union[int, ITensor]] = [1] * len(F)
                 reshape_shape[i] = F_shape_values[i]
                 arange_reshaped = impl.shuffle.reshape(
                     ctx,
@@ -743,7 +1032,6 @@ def index_put_converter(
 
     # Combine all indexed dimensions (I)
     if K > 0:
-
         I_combined = [
             impl.shuffle.reshape(
                 ctx, target, source_ir, f"{name}_reshape_I_{i}", t, (N, F_volume, 1)
@@ -766,7 +1054,7 @@ def index_put_converter(
         else:
             # Extract the f_idx-th column along the last dim (static len(F)) of
             # meshgrid_expanded (shape: N×F_volume×len(F)).  Using gather+unsqueeze
-            # avoids passing F_volume (potentially a TRTTensor) as a slice shape.
+            # avoids passing F_volume (potentially a ITensor) as a slice shape.
             f_idx_t = get_trt_tensor(
                 ctx,
                 np.array(f_idx, dtype=np.int32),
@@ -803,16 +1091,14 @@ def index_put_converter(
         (-1, rank),
     )
 
-    if not isinstance(values, TRTTensor):
+    if not isinstance(values, ITensor):
         values = get_trt_tensor(ctx, values, f"{name}_values", min_rank=0)
 
     # Define the expected shape based on (N,) + F_shape_values.
-    # Use -1 for N if N is a TRTTensor (will be resolved dynamically).
-    expected_shape = (
-        (-1,) + tuple(F_shape_values)
-        if isinstance(N, TRTTensor)
-        else (N,) + tuple(F_shape_values)
-    )
+    # N may be a ITensor when it comes from a dynamic source (e.g. nonzero).
+    # Pass it directly — impl.slice.expand handles ITensor shape elements and
+    # will emit a stride-0 broadcast when expanding a size-1 dim to a dynamic N.
+    expected_shape = (N,) + tuple(F_shape_values)
 
     # Broadcast 'values' to match the expected shape
     if len(values.shape) == 0 or values.shape == (1,):  # Scalar case
@@ -936,40 +1222,12 @@ def index_put_converter(
     )
     indices_cat = cast_trt_tensor(ctx, indices_cat, trt.int32, f"{name}_idx_int32")
     if accumulate:
-        zero_tensor = impl.full.full(
-            ctx,
-            target,
-            source_ir,
-            f"{name}_zero_tensor",
-            [
-                get_shape(
-                    ctx,
-                    target,
-                    source_ir,
-                    name + f"input_tensor_shape_dim_{i}",
-                    input_tensor,
-                    i,
-                )
-                for i in range(len(input_tensor.shape))
-            ],
-            0.0,
-            dtype=input_tensor.dtype,
+        # Use indicator-matrix matmul for correct scatter-add semantics.
+        # ScatterMode.ND overwrites on duplicate indices; _index_put_scatter_add
+        # accumulates them via (M, P) @ (P,) matmul.
+        return _index_put_scatter_add(
+            ctx, target, source_ir, name, input_tensor, indices_cat, flattened_values
         )
-        # Perform Scatter ND operation
-        scatter_layer = ctx.net.add_scatter(
-            zero_tensor,
-            indices_cat,
-            flattened_values,
-            trt.ScatterMode.ND,
-        )
-        set_layer_name(scatter_layer, target, f"{name}_scatter", source_ir)
-
-        scatter_out = scatter_layer.get_output(0)
-        result = impl.elementwise.add(
-            ctx, target, source_ir, f"{name}_add", scatter_out, input_tensor
-        )
-        return result
-
     else:
         scatter_layer = ctx.net.add_scatter(
             input_tensor,

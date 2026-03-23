@@ -5,6 +5,11 @@ from torch.testing._internal.common_utils import run_tests
 
 from .harness import DispatchTestCase
 
+# NOTE: accumulate=True with *duplicate* indices is NOT supported in TRT.
+# TensorRT's ScatterMode.ND overwrites on collision — there is no scatter_add
+# reduction mode. The current implementation (scatter into zeros + elementwise
+# add) only gives correct results when every scattered index is unique.
+
 
 class TestIndexPutConverter(DispatchTestCase):
     @parameterized.expand(
@@ -240,27 +245,165 @@ class TestIndexPutConverter(DispatchTestCase):
                 ),
                 value_tensor=torch.tensor([2, 3, 3, 4], dtype=torch.float32),
             ),
-            # param(
-            #     test_name="2d_indices_accumulate_True",
-            #     source_tensor=torch.zeros([5, 5], dtype=torch.int32),
-            #     indices_tensor=(torch.tensor([0, 0], dtype=torch.int32), torch.tensor([1, 1], dtype=torch.int32)),
-            #     value_tensor=torch.tensor([1, 2], dtype=torch.int32),
-            #     accumulate=True,
-            # ),
-            # param(
-            #     test_name="3d_indices_accumulate_True",
-            #     source_tensor=torch.zeros([3, 3, 3], dtype=torch.int32),
-            #     indices_tensor=(torch.tensor([0, 0], dtype=torch.int32), torch.tensor([1, 1], dtype=torch.int32), torch.tensor([2, 2], dtype=torch.int32)),
-            #     value_tensor=torch.tensor([1, 2], dtype=torch.int32),
-            #     accumulate=True,
-            # ),
-            # param(
-            #     test_name="4d_indices_accumulate_True",
-            #     source_tensor=torch.zeros([2, 2, 2, 2], dtype=torch.int32),
-            #     indices_tensor=(torch.tensor([0, 0], dtype=torch.int32), torch.tensor([1, 1], dtype=torch.int32), torch.tensor([0, 0], dtype=torch.int32), torch.tensor([1, 1], dtype=torch.int32)),
-            #     value_tensor=torch.tensor([1, 2], dtype=torch.int32),
-            #     accumulate=True,
-            # ),
+            # --- dtype coverage (mirrors PyTorch's test_index_put_src_datatype) ---
+            param(
+                test_name="bfloat16_1d_single",
+                source_tensor=torch.zeros([5], dtype=torch.bfloat16),
+                indices_tensor=(torch.tensor([0, 3], dtype=torch.int32),),
+                value_tensor=torch.tensor([1.5, 3.5], dtype=torch.bfloat16),
+            ),
+            param(
+                test_name="bfloat16_2d_multiple",
+                source_tensor=torch.zeros([5, 5], dtype=torch.bfloat16),
+                indices_tensor=(
+                    torch.tensor([0, 2], dtype=torch.int32),
+                    torch.tensor([2, 0], dtype=torch.int32),
+                ),
+                value_tensor=torch.tensor([1.5, 3.5], dtype=torch.bfloat16),
+            ),
+            param(
+                test_name="float16_1d_single",
+                source_tensor=torch.zeros([5], dtype=torch.float16),
+                indices_tensor=(torch.tensor([1, 4], dtype=torch.int32),),
+                value_tensor=torch.tensor([2.0, 4.0], dtype=torch.float16),
+            ),
+            param(
+                test_name="float16_2d_multiple",
+                source_tensor=torch.zeros([4, 4], dtype=torch.float16),
+                indices_tensor=(
+                    torch.tensor([0, 3], dtype=torch.int32),
+                    torch.tensor([1, 2], dtype=torch.int32),
+                ),
+                value_tensor=torch.tensor([1.0, 2.0], dtype=torch.float16),
+            ),
+            # --- index dtype: int64 (mirrors PyTorch's test_index_ind_dtype) ---
+            param(
+                test_name="int64_indices_2d",
+                source_tensor=torch.zeros([4, 4], dtype=torch.float32),
+                indices_tensor=(
+                    torch.tensor([0, 1, 2, 3], dtype=torch.int64),
+                    torch.tensor([0, 1, 2, 3], dtype=torch.int64),
+                ),
+                value_tensor=torch.tensor([1.0, 2.0, 3.0, 4.0], dtype=torch.float32),
+            ),
+            # --- accumulate=True, unique indices (safe for TRT scatter) ---
+            # Mirrors PyTorch's test_index_put_accumulate_expanded_values (no duplicates).
+            param(
+                test_name="accumulate_true_unique_indices_1d",
+                source_tensor=torch.ones([6], dtype=torch.float32),
+                indices_tensor=(torch.tensor([0, 2, 4], dtype=torch.int64),),
+                value_tensor=torch.tensor([10.0, 20.0, 30.0], dtype=torch.float32),
+                accumulate=True,
+            ),
+            param(
+                test_name="accumulate_true_unique_indices_2d",
+                source_tensor=torch.ones([4, 3], dtype=torch.float32),
+                indices_tensor=(
+                    torch.tensor([0, 2], dtype=torch.int64),
+                    torch.tensor([1, 2], dtype=torch.int64),
+                ),
+                value_tensor=torch.tensor([5.0, 7.0], dtype=torch.float32),
+                accumulate=True,
+            ),
+            # Broadcast: single value written to multiple unique positions.
+            param(
+                test_name="accumulate_true_broadcast_scalar_value",
+                source_tensor=torch.zeros([5, 2], dtype=torch.float32),
+                indices_tensor=(
+                    torch.tensor([0, 1, 3], dtype=torch.int64),
+                    torch.tensor([0, 1, 0], dtype=torch.int64),
+                ),
+                value_tensor=torch.tensor([1.0], dtype=torch.float32),
+                accumulate=True,
+            ),
+            # --- accumulate=True with duplicate indices (uses _index_put_scatter_add) ---
+            # These exercise the matmul-based scatter_add path which handles
+            # duplicate positions correctly (mirrors test_index_put_accumulate_duplicate_indices).
+            param(
+                test_name="1d_duplicate_indices_accumulate",
+                source_tensor=torch.zeros([6], dtype=torch.float32),
+                indices_tensor=(torch.tensor([0, 0, 2, 2, 2], dtype=torch.int64),),
+                value_tensor=torch.tensor(
+                    [1.0, 2.0, 3.0, 4.0, 5.0], dtype=torch.float32
+                ),
+                accumulate=True,
+            ),
+            param(
+                test_name="2d_indices_accumulate_True",
+                source_tensor=torch.zeros([5, 5], dtype=torch.float32),
+                indices_tensor=(
+                    torch.tensor([0, 0], dtype=torch.int32),
+                    torch.tensor([1, 1], dtype=torch.int32),
+                ),
+                value_tensor=torch.tensor([1.0, 2.0], dtype=torch.float32),
+                accumulate=True,
+            ),
+            param(
+                test_name="3d_indices_accumulate_True",
+                source_tensor=torch.zeros([3, 3, 3], dtype=torch.float32),
+                indices_tensor=(
+                    torch.tensor([0, 0], dtype=torch.int32),
+                    torch.tensor([1, 1], dtype=torch.int32),
+                    torch.tensor([2, 2], dtype=torch.int32),
+                ),
+                value_tensor=torch.tensor([1.0, 2.0], dtype=torch.float32),
+                accumulate=True,
+            ),
+            param(
+                test_name="4d_indices_accumulate_True",
+                source_tensor=torch.zeros([2, 2, 2, 2], dtype=torch.float32),
+                indices_tensor=(
+                    torch.tensor([0, 0], dtype=torch.int32),
+                    torch.tensor([1, 1], dtype=torch.int32),
+                    torch.tensor([0, 0], dtype=torch.int32),
+                    torch.tensor([1, 1], dtype=torch.int32),
+                ),
+                value_tensor=torch.tensor([1.0, 2.0], dtype=torch.float32),
+                accumulate=True,
+            ),
+            # Negative indices with accumulate (mirrors test_index_put_accumulate_large_tensor).
+            param(
+                test_name="accumulate_negative_indices",
+                source_tensor=torch.zeros([6], dtype=torch.float32),
+                indices_tensor=(torch.tensor([-1, -1, -3], dtype=torch.int64),),
+                value_tensor=torch.tensor([5.0, 7.0, 3.0], dtype=torch.float32),
+                accumulate=True,
+            ),
+            # bfloat16 + duplicate indices: computation stays in bfloat16 (no forced fp32 cast).
+            param(
+                test_name="accumulate_bfloat16_duplicate",
+                source_tensor=torch.zeros([4, 4], dtype=torch.bfloat16),
+                indices_tensor=(
+                    torch.tensor([0, 0, 2], dtype=torch.int64),
+                    torch.tensor([1, 1, 3], dtype=torch.int64),
+                ),
+                value_tensor=torch.tensor([1.0, 2.0, 4.0], dtype=torch.bfloat16),
+                accumulate=True,
+            ),
+            # float16 + duplicate indices.
+            param(
+                test_name="accumulate_float16_duplicate",
+                source_tensor=torch.zeros([4, 4], dtype=torch.float16),
+                indices_tensor=(
+                    torch.tensor([1, 1, 3], dtype=torch.int64),
+                    torch.tensor([0, 0, 2], dtype=torch.int64),
+                ),
+                value_tensor=torch.tensor([2.0, 3.0, 5.0], dtype=torch.float16),
+                accumulate=True,
+            ),
+            # Partial broadcast: one index covers a single position on dim-1 while
+            # dim-0 has multiple positions — mirrors test_index_put_accumulate_expanded_values
+            # (t[tensor([0,1,2,3]), tensor([1])] += 1.0).
+            param(
+                test_name="accumulate_partial_dim1_broadcast",
+                source_tensor=torch.zeros([5, 2], dtype=torch.float32),
+                indices_tensor=(
+                    torch.tensor([0, 1, 2, 3], dtype=torch.int64),
+                    torch.tensor([1], dtype=torch.int64),
+                ),
+                value_tensor=torch.tensor([1.0], dtype=torch.float32),
+                accumulate=True,
+            ),
         ]
     )
     def test_index_put(
@@ -394,8 +537,12 @@ class TestIndexPutConverter(DispatchTestCase):
             ep,
             arg_inputs=[
                 torchtrt.Input(shape=(16,), dtype=torch.float32),
-                torchtrt.Input(min_shape=(1,), opt_shape=(3,), max_shape=(16,), dtype=torch.float32),
-                torchtrt.Input(min_shape=(1,), opt_shape=(3,), max_shape=(16,), dtype=torch.int32),
+                torchtrt.Input(
+                    min_shape=(1,), opt_shape=(3,), max_shape=(16,), dtype=torch.float32
+                ),
+                torchtrt.Input(
+                    min_shape=(1,), opt_shape=(3,), max_shape=(16,), dtype=torch.int32
+                ),
             ],
             min_block_size=1,
         )
@@ -469,6 +616,250 @@ class TestIndexPutConverter(DispatchTestCase):
         assert torch.allclose(
             result, torch_output, atol=1e-3, rtol=1e-3
         ), f"KV-cache index_put mismatch: max diff = {(result - torch_output).abs().max()}"
+
+    def test_accumulate_random_walk_duplicate_indices(self):
+        """accumulate=True on 1-D input where indices are generated by a random walk
+        (many duplicates interleaved).  Mirrors PyTorch's
+        test_index_put_accumulate_duplicate_indices, scaled to a TRT-friendly size.
+        """
+        import random
+
+        torch.manual_seed(42)
+        random.seed(42)
+
+        class AccumDup(torch.nn.Module):
+            def forward(self, src, values, idx):
+                return torch.ops.aten.index_put.default(src, [idx], values, True)
+
+        for trial in range(5):
+            n = random.randint(8, 32)
+            delta = torch.empty(n, dtype=torch.float32).uniform_(-1, 1)
+            idx = delta.cumsum(0).long()
+            src_size = int(idx.abs().max().item()) + 1
+            src = torch.randn(src_size, dtype=torch.float32, device="cuda")
+            values = torch.randn(n, dtype=torch.float32, device="cuda")
+            idx_cuda = idx.cuda()
+
+            model = AccumDup().eval().cuda()
+            torch_output = model(src.clone(), values, idx_cuda)
+
+            ep = torch.export.export(model, args=(src, values, idx_cuda))
+            trt_mod = torchtrt.dynamo.compile(
+                ep,
+                arg_inputs=[
+                    torchtrt.Input(shape=(src_size,), dtype=torch.float32),
+                    torchtrt.Input(shape=(n,), dtype=torch.float32),
+                    torchtrt.Input(shape=(n,), dtype=torch.int64),
+                ],
+                min_block_size=1,
+            )
+            result = trt_mod(src.clone(), values, idx_cuda)
+            assert torch.allclose(result, torch_output, atol=1e-4, rtol=1e-4), (
+                f"Trial {trial}: random-walk accumulate mismatch, "
+                f"max diff = {(result - torch_output).abs().max()}"
+            )
+
+    def test_accumulate_expanded_values_3d(self):
+        """accumulate=True with 3-D source and broadcast mesh indices — mirrors the
+        second half of PyTorch's test_index_put_accumulate_expanded_values.
+
+        Pattern: t[tensor([0]), arange(3)[:,None], arange(2)[None,:]] += values
+        """
+
+        class AccumMesh(torch.nn.Module):
+            def forward(self, src, values, i0, i1, i2):
+                return torch.ops.aten.index_put.default(src, [i0, i1, i2], values, True)
+
+        src = torch.zeros(4, 3, 2, dtype=torch.float32, device="cuda")
+        i0 = torch.tensor([0], dtype=torch.int64, device="cuda")
+        i1 = torch.arange(3, dtype=torch.int64, device="cuda").view(3, 1)
+        i2 = torch.arange(2, dtype=torch.int64, device="cuda").view(1, 2)
+        values = torch.tensor([-1.0, -2.0], dtype=torch.float32, device="cuda")
+
+        model = AccumMesh().eval().cuda()
+        torch_output = model(src.clone(), values, i0, i1, i2)
+
+        ep = torch.export.export(model, args=(src, values, i0, i1, i2))
+        trt_mod = torchtrt.dynamo.compile(
+            ep,
+            arg_inputs=[
+                torchtrt.Input(shape=(4, 3, 2), dtype=torch.float32),
+                torchtrt.Input(shape=(2,), dtype=torch.float32),
+                torchtrt.Input(shape=(1,), dtype=torch.int64),
+                torchtrt.Input(shape=(3, 1), dtype=torch.int64),
+                torchtrt.Input(shape=(1, 2), dtype=torch.int64),
+            ],
+            min_block_size=1,
+        )
+        result = trt_mod(src.clone(), values, i0, i1, i2)
+        assert torch.allclose(
+            result, torch_output, atol=1e-4, rtol=1e-4
+        ), f"3D expand accumulate mismatch: max diff = {(result - torch_output).abs().max()}"
+
+    def test_empty_index_no_op(self):
+        """index_put with an empty index tensor is a no-op — output equals input.
+
+        Mirrors PyTorch's test_empty_index: x[empty_idx] = values leaves x unchanged.
+        Uses static shapes (torch.export rejects Dim(min=0) with a concrete 0-size tensor).
+        """
+
+        class EmptyIndexPut(torch.nn.Module):
+            def forward(self, src, values, idx):
+                return torch.ops.aten.index_put.default(src, [idx], values)
+
+        src = torch.arange(8, dtype=torch.float32, device="cuda")
+        idx = torch.tensor([], dtype=torch.int64, device="cuda")
+        values = torch.tensor([], dtype=torch.float32, device="cuda")
+
+        model = EmptyIndexPut().eval().cuda()
+        torch_output = model(src.clone(), values, idx)
+
+        ep = torch.export.export(model, args=(src, values, idx))
+        trt_mod = torchtrt.dynamo.compile(
+            ep,
+            arg_inputs=[
+                torchtrt.Input(shape=(8,), dtype=torch.float32),
+                torchtrt.Input(shape=(0,), dtype=torch.float32),
+                torchtrt.Input(shape=(0,), dtype=torch.int64),
+            ],
+            min_block_size=1,
+        )
+        result = trt_mod(src.clone(), values, idx)
+        assert torch.allclose(
+            result, torch_output, atol=1e-4, rtol=1e-4
+        ), f"Empty-index no-op mismatch: {result} vs {torch_output}"
+
+    def test_index_ind_dtype_int_vs_long(self):
+        """int32 and int64 index tensors must produce identical results.
+
+        Mirrors PyTorch's test_index_ind_dtype.
+        """
+
+        class IndexPutIntIdx(torch.nn.Module):
+            def forward(self, src, values, idx):
+                return torch.ops.aten.index_put.default(src, [idx], values)
+
+        src = torch.zeros(4, 4, dtype=torch.float32, device="cuda")
+        values = torch.tensor([1.0, 2.0, 3.0, 4.0], device="cuda")
+
+        idx_long = torch.arange(4, dtype=torch.int64, device="cuda")
+        idx_int = idx_long.to(torch.int32)
+
+        model = IndexPutIntIdx().eval().cuda()
+        ref_long = model(src.clone(), values, idx_long)
+        ref_int = model(src.clone(), values, idx_int)
+        assert torch.allclose(ref_long, ref_int), "CPU int32 vs int64 mismatch"
+
+        ep_long = torch.export.export(model, args=(src, values, idx_long))
+        ep_int = torch.export.export(model, args=(src, values, idx_int))
+
+        trt_long = torchtrt.dynamo.compile(
+            ep_long,
+            arg_inputs=[
+                torchtrt.Input(shape=(4, 4), dtype=torch.float32),
+                torchtrt.Input(shape=(4,), dtype=torch.float32),
+                torchtrt.Input(shape=(4,), dtype=torch.int64),
+            ],
+            min_block_size=1,
+        )
+        trt_int = torchtrt.dynamo.compile(
+            ep_int,
+            arg_inputs=[
+                torchtrt.Input(shape=(4, 4), dtype=torch.float32),
+                torchtrt.Input(shape=(4,), dtype=torch.float32),
+                torchtrt.Input(shape=(4,), dtype=torch.int32),
+            ],
+            min_block_size=1,
+        )
+
+        out_long = trt_long(src.clone(), values, idx_long)
+        out_int = trt_int(src.clone(), values, idx_int)
+
+        assert torch.allclose(
+            out_long, ref_long, atol=1e-4, rtol=1e-4
+        ), "TRT int64 mismatch"
+        assert torch.allclose(
+            out_int, ref_int, atol=1e-4, rtol=1e-4
+        ), "TRT int32 mismatch"
+        assert torch.allclose(
+            out_long, out_int, atol=1e-4, rtol=1e-4
+        ), "TRT int32 vs int64 inconsistency"
+
+    def test_accumulate_non_contiguous_source(self):
+        """accumulate=True on a non-contiguous (sliced) source tensor.
+
+        Mirrors PyTorch's test_index_put_accumulate_non_contiguous.
+        Uses unique indices so TRT scatter is correct.
+        """
+
+        class AccumNonContig(torch.nn.Module):
+            def forward(self, src, values, idx):
+                # src is already a non-contiguous slice passed in
+                return torch.ops.aten.index_put.default(src, [idx], values, True)
+
+        base = torch.zeros(5, 2, 2, dtype=torch.float32, device="cuda")
+        # take a non-contiguous slice: shape (5, 2), stride (4, 1)
+        src_slice = base[:, 0, :]
+        assert not src_slice.is_contiguous()
+
+        idx = torch.tensor([0, 2], dtype=torch.int64, device="cuda")
+        values = torch.ones(2, 2, dtype=torch.float32, device="cuda")
+
+        model = AccumNonContig().eval().cuda()
+        torch_output = model(src_slice.clone(), values, idx)
+
+        ep = torch.export.export(
+            model,
+            args=(src_slice.contiguous(), values, idx),
+        )
+        trt_mod = torchtrt.dynamo.compile(
+            ep,
+            arg_inputs=[
+                torchtrt.Input(shape=(5, 2), dtype=torch.float32),
+                torchtrt.Input(shape=(2, 2), dtype=torch.float32),
+                torchtrt.Input(shape=(2,), dtype=torch.int64),
+            ],
+            min_block_size=1,
+        )
+        result = trt_mod(src_slice.contiguous(), values, idx)
+        assert torch.allclose(
+            result, torch_output, atol=1e-4, rtol=1e-4
+        ), f"Non-contiguous accumulate mismatch: max diff = {(result - torch_output).abs().max()}"
+
+    def test_accumulate_expanded_values_broadcast(self):
+        """accumulate=True with value broadcasting — 0D scalar and 1D values
+        broadcast across unique indexed positions.
+
+        Mirrors PyTorch's test_index_put_accumulate_expanded_values (unique indices only).
+        """
+
+        class AccumBroadcast(torch.nn.Module):
+            def forward(self, src, values, idx0, idx1):
+                return torch.ops.aten.index_put.default(src, [idx0, idx1], values, True)
+
+        src = torch.zeros(5, 2, dtype=torch.float32, device="cuda")
+        idx0 = torch.tensor([0, 1, 2, 3], dtype=torch.int64, device="cuda")
+        idx1 = torch.tensor([0, 1, 0, 1], dtype=torch.int64, device="cuda")
+        values_1d = torch.tensor([1.0], dtype=torch.float32, device="cuda")
+
+        model = AccumBroadcast().eval().cuda()
+        torch_output = model(src.clone(), values_1d, idx0, idx1)
+
+        ep = torch.export.export(model, args=(src, values_1d, idx0, idx1))
+        trt_mod = torchtrt.dynamo.compile(
+            ep,
+            arg_inputs=[
+                torchtrt.Input(shape=(5, 2), dtype=torch.float32),
+                torchtrt.Input(shape=(1,), dtype=torch.float32),
+                torchtrt.Input(shape=(4,), dtype=torch.int64),
+                torchtrt.Input(shape=(4,), dtype=torch.int64),
+            ],
+            min_block_size=1,
+        )
+        result = trt_mod(src.clone(), values_1d, idx0, idx1)
+        assert torch.allclose(
+            result, torch_output, atol=1e-4, rtol=1e-4
+        ), f"Accumulate broadcast mismatch: max diff = {(result - torch_output).abs().max()}"
 
 
 if __name__ == "__main__":
