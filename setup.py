@@ -794,7 +794,7 @@ def get_x86_64_requirements(base_requirements):
             ]
         else:
             requirements = requirements + [
-                "tensorrt>=10.15.1,<10.16.0",
+                "tensorrt>=10.16.0,<10.17.0",
             ]
             cuda_version = torch.version.cuda
             if cuda_version.startswith("12"):
