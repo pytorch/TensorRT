@@ -1057,13 +1057,95 @@ def save(
                     )
 
 
+def _replace_execute_engine_with_no_op(exp_program: Any) -> Any:
+    """Replace execute_engine nodes with no_op_placeholder_for_execute_engine.
+
+    ExecuTorch's edge-lowering passes symbolically execute every node before
+    partitioning runs.  The execute_engine schema requires a
+    ``__torch__.torch.classes.tensorrt.Engine`` argument, but after export the
+    engine is represented as a ``CustomObjArgument`` — causing a schema type
+    error inside the pass interpreter.
+
+    The no_op_placeholder op uses flat string arguments instead of a custom
+    class, so it passes through the edge passes without issue.  The
+    TensorRTPartitioner and TensorRTBackend are updated to work with the
+    no-op form.
+    """
+    import base64
+
+    import torch_tensorrt.dynamo.runtime.meta_ops.register_meta_ops  # noqa: F401
+
+    gm = exp_program.graph_module
+    execute_engine_op = torch.ops.tensorrt.execute_engine.default
+    no_op = torch.ops.tensorrt.no_op_placeholder_for_execute_engine.default
+
+    nodes_to_replace = [
+        n
+        for n in gm.graph.nodes
+        if n.op == "call_function" and n.target is execute_engine_op
+    ]
+    for node in nodes_to_replace:
+        inputs_arg = node.args[0]
+        engine_node = node.args[1]
+
+        if engine_node.op == "get_attr":
+            engine_obj = getattr(gm, engine_node.target, None)
+            if engine_obj is None:
+                raise RuntimeError(
+                    f"execute_engine node '{node.name}': get_attr target "
+                    f"'{engine_node.target}' not found on graph module"
+                )
+        elif engine_node.op == "placeholder":
+            # After torch.export, get_attr nodes for custom objects are lifted
+            # into placeholder inputs; the actual object lives in exp_program.constants.
+            constants = getattr(exp_program, "constants", {})
+            engine_obj = constants.get(engine_node.name) or constants.get(
+                engine_node.target
+            )
+            if engine_obj is None:
+                raise RuntimeError(
+                    f"execute_engine node '{node.name}': placeholder engine node "
+                    f"'{engine_node.name}' not found in exp_program.constants"
+                )
+        else:
+            raise RuntimeError(
+                f"execute_engine node '{node.name}': expected engine arg to be "
+                f"a get_attr or placeholder node, got op='{engine_node.op}'"
+            )
+        # Get engine info list via __getstate__ (same format as _pack_engine_info())
+        from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import ENGINE_IDX
+
+        engine_info = list(engine_obj.__getstate__())
+        engine_info = engine_info[0]
+        # Base64-encode the engine bytes, matching the reference cross-compile path
+        engine_bytes = engine_info[ENGINE_IDX]
+        if isinstance(engine_bytes, (bytes, bytearray)):
+            engine_info[ENGINE_IDX] = base64.b64encode(engine_bytes).decode("utf-8")
+
+        with gm.graph.inserting_before(node):
+            no_op_node = gm.graph.call_function(no_op, (inputs_arg, *engine_info))
+        no_op_node.meta = dict(node.meta)
+        node.replace_all_uses_with(no_op_node)
+        gm.graph.erase_node(node)
+        # Only erase get_attr engine nodes; placeholder nodes belong to the
+        # exported program's input signature and must not be removed here.
+        if engine_node.op == "get_attr":
+            gm.graph.erase_node(engine_node)
+
+    gm.graph.eliminate_dead_code()
+    gm.graph.lint()
+    gm.recompile()
+    return exp_program
+
+
 def _save_as_executorch(exp_program: Any, file_path: str) -> None:
     """Save an ExportedProgram (with TensorRT execute_engine nodes) as an ExecuTorch .pte file.
 
-    Partitions the graph by torch.ops.tensorrt.execute_engine, serializes each engine
-    to the same blob format as the TRT runtime (vector of strings), and embeds it
-    in the .pte. Requires the ``executorch`` package and torch_tensorrt_runtime. See
-    https://pytorch.org/executorch/stable/getting-started-setup.html
+    Partitions the graph by torch.ops.tensorrt.no_op_placeholder_for_execute_engine
+    (execute_engine is pre-converted to avoid schema type errors in edge passes),
+    serializes each engine to the same blob format as the TRT runtime (vector of
+    strings), and embeds it in the .pte. Requires the ``executorch`` package and
+    torch_tensorrt_runtime. See https://pytorch.org/executorch/stable/getting-started-setup.html
     """
     if not ENABLED_FEATURES.torch_tensorrt_runtime:
         raise RuntimeError(
@@ -1077,11 +1159,14 @@ def _save_as_executorch(exp_program: Any, file_path: str) -> None:
             "ExecuTorch is not installed. Please install it to use output_format='executorch'. "
             "See https://pytorch.org/executorch/stable/getting-started-setup.html"
         )
-    # Ensure execute_engine fake kernel is registered so partitioner can run
-    # when the engine is a CustomObjArgument (export placeholder).
     import torch_tensorrt.dynamo.runtime.meta_ops.register_meta_ops  # noqa: F401
     from torch_tensorrt.executorch import TensorRTPartitioner
 
+    # Replace execute_engine with no_op_placeholder before edge lowering so that
+    # ExecuTorch's symbolic-execution passes don't trip on the Engine custom-class
+    # schema check.
+    exp_program = _replace_execute_engine_with_no_op(exp_program)
+    breakpoint()
     edge_program = to_edge_transform_and_lower(
         exp_program,
         partitioner=[TensorRTPartitioner()],
