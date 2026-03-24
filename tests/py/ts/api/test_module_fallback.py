@@ -1,21 +1,22 @@
-import importlib.util
 import unittest
 
 import torch
 import torch_tensorrt as torchtrt
 from utils import COSINE_THRESHOLD, cosine_similarity
 
-if importlib.util.find_spec("torchvision"):
+try:
     import torchvision.models as models
+
+    HAS_TORCHVISION = True
+except (ImportError, RuntimeError):
+    HAS_TORCHVISION = False
 
 
 @unittest.skipIf(
     torchtrt.ENABLED_FEATURES.tensorrt_rtx,
     "aten::adaptive_avg_pool2d is implemented via plugins which is not supported for tensorrt_rtx",
 )
-@unittest.skipIf(
-    not importlib.util.find_spec("torchvision"), "torchvision not installed"
-)
+@unittest.skipIf(not HAS_TORCHVISION, "torchvision not available")
 class TestModuleFallback(unittest.TestCase):
     def test_fallback_resnet18(self):
         self.model = models.resnet18(pretrained=True).eval().to("cuda")
