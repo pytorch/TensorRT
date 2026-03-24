@@ -2904,7 +2904,6 @@ def sort_validator(node: Node, settings: Optional[CompilationSettings] = None) -
 
 
 def topk_sort_validator(k: int) -> bool:
-
     # topk layer supports dynamic k value but we cannot determine supported dynamic topk value at
     # compile time.
     if k == DYNAMIC_DIM or not isinstance(k, int):
