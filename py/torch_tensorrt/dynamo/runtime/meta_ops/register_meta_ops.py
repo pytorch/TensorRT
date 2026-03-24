@@ -217,15 +217,6 @@ def fake_tensorrt_execute_engine(
     so partitioners can run without a real engine. Otherwise uses symbolic shape
     expressions from metadata to infer output shapes.
     """
-    if _is_placeholder_engine(fake_trt_engine):
-        from torch._guards import detect_fake_mode
-
-        fake_mode = detect_fake_mode(inputs) if inputs else None
-        if not inputs:
-            return [torch.empty(())]
-        if fake_mode is not None:
-            return [fake_mode.from_tensor(inputs[0])]
-        return [torch.empty_like(inputs[0])]
 
     metadata = None
     if hasattr(fake_trt_engine, "real_obj"):
@@ -239,7 +230,6 @@ def fake_tensorrt_execute_engine(
         )
 
     shape_info = metadata.get("inout_symexprs") if metadata else None
-
     if shape_info:
         return _apply_symbolic_shape_expressions(inputs, shape_info)
     else:
@@ -349,43 +339,3 @@ def no_op_placeholder_for_execute_engine(
     raise RuntimeError(
         "The saved model is cross compiled for windows in Linux, should only be loadded in Windows via torch_tensorrt.load_cross_compiled_exported_program() api."
     )
-
-
-@no_op_placeholder_for_execute_engine.register_fake  # type: ignore
-def fake_no_op_placeholder_for_execute_engine(
-    inputs: List[torch.Tensor],
-    abi_version: str,
-    name: str,
-    serialized_device_info: str,
-    serialized_engine: str,
-    serialized_in_binding_names: str,
-    serialized_out_binding_names: str,
-    serialized_hardware_compatible: str,
-    serialized_metadata: str,
-    serialized_target_platform: str,
-    serialized_require_output_allocator: str,
-    serialized_require_output_alocator_idx: str,
-) -> List[torch.Tensor]:
-    """Fake kernel for no_op_placeholder_for_execute_engine.
-
-    Parses serialized_metadata to derive output shapes, mirroring the
-    execute_engine fake kernel logic.
-    """
-    if serialized_metadata:
-        try:
-            metadata = TorchTensorRTModule.decode_metadata(serialized_metadata)
-            shape_info = metadata.get("inout_symexprs") if metadata else None
-            if shape_info:
-                return _apply_symbolic_shape_expressions(inputs, shape_info)
-        except Exception:
-            pass
-
-    # Fallback: return one tensor with same shape/dtype as the first input
-    from torch._guards import detect_fake_mode
-
-    fake_mode = detect_fake_mode(inputs) if inputs else None
-    if not inputs:
-        return [torch.empty(())]
-    if fake_mode is not None:
-        return [fake_mode.from_tensor(inputs[0])]
-    return [torch.empty_like(inputs[0])]

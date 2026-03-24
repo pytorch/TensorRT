@@ -7,22 +7,20 @@ from torch.fx.passes.operator_support import OperatorSupportBase
 
 
 class TensorRTOperatorSupport(OperatorSupportBase):  # type: ignore[misc]
-    """Supports torch.ops.tensorrt.no_op_placeholder_for_execute_engine for partitioning.
+    """Supports only torch.ops.tensorrt.execute_engine for partitioning.
 
-    Prior to calling to_edge_transform_and_lower, _save_as_executorch replaces
-    execute_engine nodes with no_op_placeholder_for_execute_engine so that
-    ExecuTorch's edge-lowering passes (which symbolically execute every node) do
-    not trip on the Engine custom-class schema check.  The partitioner therefore
-    targets the no-op placeholder instead of execute_engine directly.
+    Used so that TRT-compiled graphs (which already contain execute_engine nodes)
+    are partitioned per engine; each partition is then lowered to TensorRTBackend
+    which serializes the engine to the same blob format as the TRT runtime.
     """
 
     def __init__(self) -> None:
         super().__init__()
-        self._no_op = torch.ops.tensorrt.no_op_placeholder_for_execute_engine.default
+        self._execute_engine_op = torch.ops.tensorrt.execute_engine.default
 
     def is_node_supported(
         self, submodules: Dict[str, torch.nn.Module], node: torch.fx.Node
     ) -> bool:
         if node.op != "call_function":
             return False
-        return node.target is self._no_op
+        return node.target is self._execute_engine_op

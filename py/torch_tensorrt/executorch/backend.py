@@ -10,45 +10,54 @@ from executorch.exir.backend.backend_details import (
     PreprocessResult,
 )
 from torch.export.exported_program import ExportedProgram
-from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import (
-    ENGINE_IDX,
-    SERIALIZATION_LEN,
-)
+from torch_tensorrt.dynamo.runtime._TorchTensorRTModule import ENGINE_IDX
 from torch_tensorrt.executorch.serialization import serialize_engine_info
 
 
 def _get_engine_info_from_edge_program(edge_program: ExportedProgram) -> List[Any]:
-    """Extract engine info (list of strings/bytes) from the partition's no_op_placeholder node.
+    """Extract engine info (list of strings/bytes) from the partition's execute_engine node.
 
-    Before calling to_edge_transform_and_lower, _save_as_executorch replaces
-    execute_engine nodes with no_op_placeholder_for_execute_engine whose args are
-    (inputs_tuple, abi_version, name, device, engine_b64, in_names, out_names,
-    hw_compat, metadata, platform, requires_oa).  This function reads those flat
-    args back out and returns them as a list indexed by SerializedInfoIndex.
+    The partition contains a single execute_engine node whose second argument is
+    either a get_attr node (engine on the graph module) or a placeholder node
+    (engine lifted into edge_program.constants by torch.export).  Either way,
+    the engine object's __getstate__() returns the SERIALIZATION_LEN-item list
+    used by the TRT runtime blob format.
     """
     gm = edge_program.graph_module
-    no_op = torch.ops.tensorrt.no_op_placeholder_for_execute_engine.default
+    execute_engine_op = torch.ops.tensorrt.execute_engine.default
 
     for node in gm.graph.nodes:
-        if node.op != "call_function" or node.target is not no_op:
+        if node.op != "call_function" or node.target is not execute_engine_op:
             continue
-        # args layout: (inputs_tuple, *engine_info_strings)
-        # engine_info_strings has SERIALIZATION_LEN - 1 entries (no RESOURCE_ALLOCATION_STRATEGY)
-        if len(node.args) < 2:
-            raise RuntimeError(
-                f"no_op_placeholder node '{node.name}' has too few args: {len(node.args)}"
+
+        engine_node = node.args[1]
+        if engine_node.op == "get_attr":
+            engine_obj = getattr(gm, engine_node.target, None)
+            if engine_obj is None:
+                raise RuntimeError(
+                    f"execute_engine node '{node.name}': get_attr target "
+                    f"'{engine_node.target}' not found on graph module"
+                )
+        elif engine_node.op == "placeholder":
+            constants = getattr(edge_program, "constants", {})
+            engine_obj = constants.get(engine_node.name) or constants.get(
+                engine_node.target
             )
-        engine_info = list(node.args[1:])
-        if len(engine_info) < SERIALIZATION_LEN - 1:
+            if engine_obj is None:
+                raise RuntimeError(
+                    f"execute_engine node '{node.name}': placeholder engine "
+                    f"'{engine_node.name}' not found in edge_program.constants"
+                )
+        else:
             raise RuntimeError(
-                f"no_op_placeholder node '{node.name}' has {len(engine_info)} engine "
-                f"info args, expected at least {SERIALIZATION_LEN - 1}"
+                f"execute_engine node '{node.name}': unexpected engine arg op "
+                f"'{engine_node.op}'"
             )
-        return engine_info
+
+        return list(engine_obj.__getstate__())
 
     raise RuntimeError(
-        "TensorRT ExecuTorch backend: no no_op_placeholder_for_execute_engine "
-        "node found in partition."
+        "TensorRT ExecuTorch backend: no execute_engine node found in partition."
     )
 
 
