@@ -338,7 +338,6 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
         Returns:
             torch.Tensor or Tuple(torch.Tensor): Result of the engine computation
         """
-
         if self.engine is None:
             raise RuntimeError("Engine has not been setup yet.")
 
@@ -355,6 +354,7 @@ class TorchTensorRTModule(torch.nn.Module):  # type: ignore[misc]
             (i if isinstance(i, torch.Tensor) else torch.tensor(i).cuda())
             for i in inputs
         ]
+
         outputs: List[torch.Tensor] = torch.ops.tensorrt.execute_engine(
             list(input_tensors), self.engine
         )

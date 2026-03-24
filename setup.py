@@ -35,7 +35,9 @@ __tensorrt_llm_version__: str = "0.0"
 LEGACY_BASE_VERSION_SUFFIX_PATTERN = re.compile("a0$")
 # CI_PIPELINE_ID is the environment variable set by DLFW ci build
 IS_DLFW_CI = os.environ.get("CI_PIPELINE_ID") is not None
+# TODO: remove this in future, this is just for test executorch which try to use whatever torch version executorch uses
 IS_DLFW_CI = True
+
 
 def get_root_dir() -> Path:
     return Path(__file__).parent.absolute()
@@ -787,7 +789,7 @@ def get_x86_64_requirements(base_requirements):
     if IS_DLFW_CI:
         return requirements
     else:
-        requirements = requirements + ["torch>=2.11.0,<2.12.0"]
+        requirements = requirements + ["torch>=2.12.0.dev,<2.13.0"]
         if USE_TRT_RTX:
             return requirements + [
                 "tensorrt_rtx>=1.3.0.35",

@@ -189,22 +189,6 @@ def fake_aten_cudnn_grid_sampler(
     return torch.empty(out_shape, dtype=input.dtype, device=input.device)
 
 
-def _is_placeholder_engine(engine: Any) -> bool:
-    """True if engine is a placeholder (CustomObjArgument/FakeScriptObject) from export."""
-    if engine is None:
-        return True
-    type_name = type(engine).__name__
-    if type_name == "CustomObjArgument":
-        return True
-    if type_name == "FakeScriptObject":
-        return True
-    if hasattr(engine, "fake_val") and engine.fake_val is not None:
-        return True
-    if not hasattr(engine, "get_serialized_metadata"):
-        return True
-    return False
-
-
 @torch.library.register_fake("tensorrt::execute_engine")  # type: ignore
 def fake_tensorrt_execute_engine(
     inputs: List[torch.Tensor], fake_trt_engine: Any
@@ -212,14 +196,13 @@ def fake_tensorrt_execute_engine(
     """
     Meta kernel for TensorRT engine execution.
 
-    When the engine is a placeholder (CustomObjArgument/FakeScriptObject from
-    torch.export/ExecuTorch), returns one fake output per input (same shape/dtype)
-    so partitioners can run without a real engine. Otherwise uses symbolic shape
-    expressions from metadata to infer output shapes.
+    Uses symbolic shape expressions captured at compile time to correctly infer
+    output shapes while preserving symbolic SymInt relationships.
     """
 
     metadata = None
     if hasattr(fake_trt_engine, "real_obj"):
+        # Wrapped C++ engine with real_obj
         trt_engine = fake_trt_engine.real_obj
         metadata = TorchTensorRTModule.decode_metadata(
             trt_engine.get_serialized_metadata()
@@ -230,7 +213,10 @@ def fake_tensorrt_execute_engine(
         )
 
     shape_info = metadata.get("inout_symexprs") if metadata else None
+
     if shape_info:
+        # Apply the symbolic shape expressions to create output fake tensors
+        # shape_info now contains both 'inputs' and 'outputs' keys
         return _apply_symbolic_shape_expressions(inputs, shape_info)
     else:
         raise RuntimeError(
@@ -334,7 +320,6 @@ def no_op_placeholder_for_execute_engine(
     serialized_metadata: str,
     serialized_target_platform: str,
     serialized_require_output_allocator: str,
-    serialized_require_output_alocator_idx: str,
 ) -> List[torch.Tensor]:
     raise RuntimeError(
         "The saved model is cross compiled for windows in Linux, should only be loadded in Windows via torch_tensorrt.load_cross_compiled_exported_program() api."

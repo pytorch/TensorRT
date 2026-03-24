@@ -9,6 +9,9 @@ from typing import Any, Collection, List, Optional, Sequence, Set, Tuple, Union
 
 import torch
 from torch.export import ExportedProgram
+
+# TODO: remove this in future, this is just for test executorch which uses torch 2.11 which has a bug in the leaf spec compat
+# the bug has been fixed in the torch 2.12 in the upstream.
 from torch_tensorrt.dynamo._leaf_spec_compat import _apply_leaf_spec_patch
 
 _apply_leaf_spec_patch()
