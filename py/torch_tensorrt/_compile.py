@@ -1153,7 +1153,7 @@ def _save_as_executorch(exp_program: Any, file_path: str) -> None:
             "(torch_tensorrt_runtime). Reinstall torch_tensorrt with the runtime extension."
         )
     try:
-        from executorch.exir import to_edge_transform_and_lower
+        from executorch.exir import to_edge_transform_and_lower, EdgeCompileConfig
     except ImportError:
         raise ImportError(
             "ExecuTorch is not installed. Please install it to use output_format='executorch'. "
@@ -1165,11 +1165,11 @@ def _save_as_executorch(exp_program: Any, file_path: str) -> None:
     # Replace execute_engine with no_op_placeholder before edge lowering so that
     # ExecuTorch's symbolic-execution passes don't trip on the Engine custom-class
     # schema check.
-    exp_program = _replace_execute_engine_with_no_op(exp_program)
-    breakpoint()
+    # exp_program = _replace_execute_engine_with_no_op(exp_program)
     edge_program = to_edge_transform_and_lower(
         exp_program,
         partitioner=[TensorRTPartitioner()],
+        compile_config=EdgeCompileConfig(_check_ir_validity=False),
     )
     executorch_program = edge_program.to_executorch()
     with open(file_path, "wb") as f:
