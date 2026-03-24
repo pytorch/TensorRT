@@ -1138,7 +1138,7 @@ def _replace_execute_engine_with_no_op(exp_program: Any) -> Any:
     return exp_program
 
 
-def _save_as_executorch(exp_program: Any, file_path: str) -> None:
+def _save_as_executorch(exp_program: Any, file_path: str, **kwargs) -> None:
     """Save an ExportedProgram (with TensorRT execute_engine nodes) as an ExecuTorch .pte file.
 
     Partitions the graph by torch.ops.tensorrt.no_op_placeholder_for_execute_engine
@@ -1161,14 +1161,18 @@ def _save_as_executorch(exp_program: Any, file_path: str) -> None:
         )
     import torch_tensorrt.dynamo.runtime.meta_ops.register_meta_ops  # noqa: F401
     from torch_tensorrt.executorch import TensorRTPartitioner
+    extra_partitioners = kwargs.get("partitioners", [])
+    partitioners = [TensorRTPartitioner()] + extra_partitioners
 
+    # DO I NEED THIS?
     # Replace execute_engine with no_op_placeholder before edge lowering so that
     # ExecuTorch's symbolic-execution passes don't trip on the Engine custom-class
     # schema check.
     # exp_program = _replace_execute_engine_with_no_op(exp_program)
+
     edge_program = to_edge_transform_and_lower(
         exp_program,
-        partitioner=[TensorRTPartitioner()],
+        partitioner=partitioners,
         compile_config=EdgeCompileConfig(_check_ir_validity=False),
     )
     executorch_program = edge_program.to_executorch()
