@@ -329,6 +329,19 @@ def scaled_dot_product_efficient_attention(
             source_ir,
         )
 
+    if (
+        isinstance(scaled_query.shape[1], int)
+        and scaled_query.shape[1] < 0
+        and isinstance(key.shape[1], int)
+        and key.shape[1] > 0
+    ):
+        shape_layer = ctx.net.add_shape(key)
+        shape_layer.name = name + "_key_shape"
+        shuffle = ctx.net.add_shuffle(scaled_query)
+        shuffle.set_input(1, shape_layer.get_output(0))
+        shuffle.name = name + "_fix_head_dim"
+        scaled_query = shuffle.get_output(0)
+
     mask_tensor = None
     if attn_bias is not None:
         if attn_bias.dtype == trt.DataType.BOOL:
