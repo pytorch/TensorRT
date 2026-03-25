@@ -42,7 +42,7 @@
 <link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../../../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../../../_static/documentation_options.js?v=56ca1d0c"></script>
+    <script src="../../../_static/documentation_options.js?v=dae753c2"></script>
     <script src="../../../_static/doctools.js?v=888ff710"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -641,7 +641,6 @@ document.write(`
         <span class="n">sparse_weights</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
         <span class="n">force_fp32_output</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
         <span class="n">strict_type_constraints</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
-        <span class="n">algorithm_selector</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
         <span class="n">timing_cache</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
         <span class="n">profiling_verbosity</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
         <span class="n">tactic_sources</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
@@ -655,7 +654,6 @@ document.write(`
 <span class="sd">            sparse_weights: allow the builder to examine weights and use optimized functions when weights have suitable sparsity</span>
 <span class="sd">            force_fp32_output: force output to be fp32</span>
 <span class="sd">            strict_type_constraints: Usually we should set it to False unless we want to control the precision of certain layer for numeric reasons.</span>
-<span class="sd">            algorithm_selector: set up algorithm selection for certain layer</span>
 <span class="sd">            timing_cache: enable timing cache for TensorRT</span>
 <span class="sd">            profiling_verbosity: TensorRT logging level</span>
 <span class="sd">        Return:</span>
@@ -727,10 +725,6 @@ document.write(`
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">optimization_profiles</span><span class="p">:</span>
             <span class="k">for</span> <span class="n">optimization_profile</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">optimization_profiles</span><span class="p">:</span>
                 <span class="n">builder_config</span><span class="o">.</span><span class="n">add_optimization_profile</span><span class="p">(</span><span class="n">optimization_profile</span><span class="p">)</span>
-
-        <span class="k">if</span> <span class="n">algorithm_selector</span><span class="p">:</span>
-            <span class="n">builder_config</span><span class="o">.</span><span class="n">set_flag</span><span class="p">(</span><span class="n">trt</span><span class="o">.</span><span class="n">BuilderFlag</span><span class="o">.</span><span class="n">DISABLE_TIMING_CACHE</span><span class="p">)</span>
-            <span class="n">builder_config</span><span class="o">.</span><span class="n">algorithm_selector</span> <span class="o">=</span> <span class="n">algorithm_selector</span>
 
         <span class="k">if</span> <span class="n">tactic_sources</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
             <span class="n">builder_config</span><span class="o">.</span><span class="n">set_tactic_sources</span><span class="p">(</span><span class="n">tactic_sources</span><span class="o">=</span><span class="n">tactic_sources</span><span class="p">)</span>

@@ -43,7 +43,7 @@
 <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=dfe6caa3a7d634c4db9b" />
   <script src="../_static/vendor/fontawesome/6.5.2/js/all.min.js?digest=dfe6caa3a7d634c4db9b"></script>
 
-    <script src="../_static/documentation_options.js?v=56ca1d0c"></script>
+    <script src="../_static/documentation_options.js?v=dae753c2"></script>
     <script src="../_static/doctools.js?v=888ff710"></script>
     <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js?v=73120307"></script>
@@ -563,11 +563,12 @@ pip<span class="w"> </span>install<span class="w"> </span>setuptools
 
 <span class="c1"># Install PyTorch</span>
 <span class="c1"># Note: If you are building Torch-TensorRT at tip-of-tree, you need to install the latest PyTorch nightly build rather than the stable release. See below for details.</span>
-pip<span class="w"> </span>install<span class="w"> </span>torch<span class="w"> </span>torchvision
+<span class="c1"># Do not &#39;pip install torch torchvision&#39; which will install the stable release of PyTorch, only install the nightly build.</span>
+<span class="c1"># See below for details.</span>
 
 <span class="c1"># Install PyTorch nightly build (check CUDA version in MODULE.bazel)</span>
 <span class="c1"># Replace cuXXX with your CUDA version (e.g., cu130 for CUDA 13.0)</span>
-<span class="c1"># pip install --pre torch torchvision --index-url https://download.pytorch.org/whl/nightly/cuXXX</span>
+pip<span class="w"> </span>install<span class="w"> </span>--pre<span class="w"> </span>torch<span class="w"> </span>torchvision<span class="w"> </span>--index-url<span class="w"> </span>https://download.pytorch.org/whl/nightly/cuXXX
 
 <span class="c1"># Install additional build dependencies</span>
 pip<span class="w"> </span>install<span class="w"> </span>pyyaml<span class="w"> </span>numpy
@@ -600,31 +601,28 @@ pip<span class="w"> </span>install<span class="w"> </span>pyyaml<span class="w">
 <section id="install-tensorrt-rtx-tarball">
 <h3>Install TensorRT-RTX Tarball<a class="headerlink" href="#install-tensorrt-rtx-tarball" title="Link to this heading">#</a></h3>
 <p>TensorRT-RTX tarball can be downloaded from <a class="reference external" href="https://developer.nvidia.com/tensorrt-rtx">https://developer.nvidia.com/tensorrt-rtx</a>.
-Currently, Torch-TensorRT uses TensorRT-RTX version <strong>1.2.0.54</strong>.</p>
+Currently, Torch-TensorRT uses TensorRT-RTX version <strong>1.4.0.76</strong>.</p>
 <p>Once downloaded:</p>
 <p><strong>In Linux:</strong></p>
 <p>Make sure you add the lib path to the <code class="docutils literal notranslate"><span class="pre">LD_LIBRARY_PATH</span></code> environment variable.</p>
-<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span><span class="c1"># If TensorRT-RTX is downloaded in /your_local_download_path/TensorRT-RTX-1.2.0.54</span>
-<span class="nb">export</span><span class="w"> </span><span class="nv">LD_LIBRARY_PATH</span><span class="o">=</span>/your_local_download_path/TensorRT-RTX-1.2.0.54/lib:<span class="nv">$LD_LIBRARY_PATH</span>
+<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span><span class="c1"># If TensorRT-RTX is downloaded in /your_local_download_path/TensorRT-RTX-1.4.0.76</span>
+<span class="nb">export</span><span class="w"> </span><span class="nv">LD_LIBRARY_PATH</span><span class="o">=</span>/your_local_download_path/TensorRT-RTX-1.4.0.76/lib:<span class="nv">$LD_LIBRARY_PATH</span>
 <span class="nb">echo</span><span class="w"> </span><span class="nv">$LD_LIBRARY_PATH</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>TensorRT-RTX
 </pre></div>
 </div>
 <p><strong>In Windows:</strong></p>
 <p>Make sure you add the lib path to the Windows system variable <code class="docutils literal notranslate"><span class="pre">PATH</span></code>.</p>
-<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span><span class="c1"># If TensorRT-RTX is downloaded in C:\your_local_download_path\TensorRT-RTX-1.2.0.54</span>
-<span class="nb">set</span><span class="w"> </span><span class="nv">PATH</span><span class="o">=</span><span class="s2">&quot;%PATH%;C:\your_local_download_path\TensorRT-RTX-1.2.0.54\lib&quot;</span>
+<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span><span class="c1"># If TensorRT-RTX is downloaded in C:\your_local_download_path\TensorRT-RTX-1.4.0.76</span>
+<span class="nb">set</span><span class="w"> </span><span class="nv">PATH</span><span class="o">=</span><span class="s2">&quot;%PATH%;C:\your_local_download_path\TensorRT-RTX-1.4.0.76\lib&quot;</span>
 <span class="nb">echo</span><span class="w"> </span>%PATH%<span class="w"> </span><span class="p">|</span><span class="w"> </span>findstr<span class="w"> </span>TensorRT-RTX
 </pre></div>
 </div>
 </section>
 <section id="install-tensorrt-rtx-wheel">
 <h3>Install TensorRT-RTX Wheel<a class="headerlink" href="#install-tensorrt-rtx-wheel" title="Link to this heading">#</a></h3>
-<p>Currently, the <cite>tensorrt_rtx</cite> wheel is not published on PyPI.
-You must install it manually from the downloaded tarball.</p>
-<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span><span class="c1"># If the tarball is downloaded in /your_local_download_path/TensorRT-RTX-1.2.0.54</span>
-python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>/your_local_download_path/TensorRT-RTX-1.2.0.54/python/tensorrt_rtx-1.2.0.54-cp39-none-linux_x86_64.whl
-</pre></div>
-</div>
+<p><cite>tensorrt_rtx</cite> wheel is published on PyPI.
+During <cite>torch_tensorrt_rtx</cite> wheel installation,
+it will automatically install the <cite>tensorrt_rtx</cite> wheel.</p>
 </section>
 </section>
 <section id="build-torch-tensorrt-with-tensorrt-rtx">
@@ -651,16 +649,15 @@ rm<span class="w"> </span>-rf<span class="w"> </span>build/*
 <span class="c1"># Build wheel with TensorRT-RTX</span>
 python<span class="w"> </span>setup.py<span class="w"> </span>bdist_wheel<span class="w"> </span>--use-rtx
 
-<span class="c1"># Install the wheel (note: the wheel filename uses underscores, not hyphens)</span>
-python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>dist/torch_tensorrt-*.whl
+<span class="c1"># Install the wheel (note: the wheel filename uses underscores, not hyphens, and should contain the word &#39;rtx&#39;)</span>
+python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>dist/torch_tensorrt_rtx-*.whl
 </pre></div>
 </div>
 </section>
 </section>
 <section id="quick-start">
 <h2>Quick Start<a class="headerlink" href="#quick-start" title="Link to this heading">#</a></h2>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># You must set USE_TRT_RTX=true to use TensorRT-RTX</span>
-<span class="n">USE_TRT_RTX</span><span class="o">=</span><span class="n">true</span> <span class="n">python</span> <span class="n">examples</span><span class="o">/</span><span class="n">dynamo</span><span class="o">/</span><span class="n">torch_compile_resnet_example</span><span class="o">.</span><span class="n">py</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">python</span> <span class="n">examples</span><span class="o">/</span><span class="n">dynamo</span><span class="o">/</span><span class="n">torch_compile_resnet_example</span><span class="o">.</span><span class="n">py</span>
 </pre></div>
 </div>
 </section>
@@ -688,9 +685,9 @@ python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </sp
 <p><strong>PyTorch version mismatch</strong></p>
 <p>If you encounter an error like <code class="docutils literal notranslate"><span class="pre">ERROR:</span> <span class="pre">No</span> <span class="pre">matching</span> <span class="pre">distribution</span> <span class="pre">found</span> <span class="pre">for</span> <span class="pre">torch&lt;X.Y.Z,&gt;=X.Y.Z.dev</span></code> (for example, <code class="docutils literal notranslate"><span class="pre">torch&lt;2.11.0,&gt;=2.10.0.dev</span></code>), you need to install a compatible PyTorch nightly version.</p>
 <p>First, check the exact version constraint in <a class="reference external" href="https://github.com/pytorch/TensorRT/blob/main/pyproject.toml">pyproject.toml</a>, then install with that constraint:</p>
-<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span><span class="c1"># Example: if pyproject.toml requires torch&gt;=2.10.0.dev,&lt;2.11.0</span>
+<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span><span class="c1"># Example: if pyproject.toml requires torch&gt;=2.12.0.dev,&lt;2.13.0</span>
 <span class="c1"># and MODULE.bazel specifies CUDA 13.0 (cu130):</span>
-pip<span class="w"> </span>install<span class="w"> </span>--pre<span class="w"> </span><span class="s2">&quot;torch&gt;=2.10.0.dev,&lt;2.11.0&quot;</span><span class="w"> </span>torchvision<span class="w"> </span>--index-url<span class="w"> </span>https://download.pytorch.org/whl/nightly/cu130
+pip<span class="w"> </span>install<span class="w"> </span>--pre<span class="w"> </span><span class="s2">&quot;torch&gt;=2.12.0.dev,&lt;2.13.0&quot;</span><span class="w"> </span>torchvision<span class="w"> </span>--index-url<span class="w"> </span>https://download.pytorch.org/whl/nightly/cu130
 </pre></div>
 </div>
 <p>Replace the version constraint and CUDA version (cuXXX) according to your project’s requirements.</p>

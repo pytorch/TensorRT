@@ -221,7 +221,6 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
     def _populate_trt_builder_config(
         self,
         strict_type_constraints: bool = False,
-        algorithm_selector: Optional[trt.IAlgorithmSelector] = None,
         tactic_sources: Optional[int] = None,
     ) -> trt.IBuilderConfig:
         builder_config = self.builder.create_builder_config()
@@ -337,10 +336,6 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             if len(self.optimization_profiles) > 0:
                 for optimization_profile in self.optimization_profiles:
                     builder_config.add_optimization_profile(optimization_profile)
-
-        if algorithm_selector:
-            builder_config.set_flag(trt.BuilderFlag.DISABLE_TIMING_CACHE)
-            builder_config.algorithm_selector = algorithm_selector
 
         if tactic_sources is not None:
             builder_config.set_tactic_sources(tactic_sources=tactic_sources)
@@ -597,14 +592,12 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
     def run(
         self,
         strict_type_constraints: bool = False,
-        algorithm_selector: Optional[trt.IAlgorithmSelector] = None,
         tactic_sources: Optional[int] = None,
     ) -> TRTInterpreterResult:
         """
         Build TensorRT engine with some configs.
         Args:
             strict_type_constraints: Usually we should set it to False unless we want to control the precision of certain layer for numeric reasons.
-            algorithm_selector: set up algorithm selection for certain layer
             tactic_sources: set up tactic sources for certain layer
         Return:
             TRTInterpreterResult
@@ -624,7 +617,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
         _LOGGER.info("Not found cached TRT engines. Start building engine.")
 
         builder_config = self._populate_trt_builder_config(
-            strict_type_constraints, algorithm_selector, tactic_sources
+            strict_type_constraints, tactic_sources
         )
 
         self._create_timing_cache(

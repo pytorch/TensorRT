@@ -92,11 +92,12 @@ Before building, install the required Python packages:
 
    # Install PyTorch
    # Note: If you are building Torch-TensorRT at tip-of-tree, you need to install the latest PyTorch nightly build rather than the stable release. See below for details.
-   pip install torch torchvision
+   # Do not 'pip install torch torchvision' which will install the stable release of PyTorch, only install the nightly build.
+   # See below for details.
 
    # Install PyTorch nightly build (check CUDA version in MODULE.bazel)
    # Replace cuXXX with your CUDA version (e.g., cu130 for CUDA 13.0)
-   # pip install --pre torch torchvision --index-url https://download.pytorch.org/whl/nightly/cuXXX
+   pip install --pre torch torchvision --index-url https://download.pytorch.org/whl/nightly/cuXXX
 
    # Install additional build dependencies
    pip install pyyaml numpy
@@ -133,7 +134,7 @@ Install TensorRT-RTX Tarball
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 TensorRT-RTX tarball can be downloaded from https://developer.nvidia.com/tensorrt-rtx.
-Currently, Torch-TensorRT uses TensorRT-RTX version **1.2.0.54**.
+Currently, Torch-TensorRT uses TensorRT-RTX version **1.4.0.76**.
 
 Once downloaded:
 
@@ -143,8 +144,8 @@ Make sure you add the lib path to the ``LD_LIBRARY_PATH`` environment variable.
 
 .. code-block:: sh
 
-    # If TensorRT-RTX is downloaded in /your_local_download_path/TensorRT-RTX-1.2.0.54
-    export LD_LIBRARY_PATH=/your_local_download_path/TensorRT-RTX-1.2.0.54/lib:$LD_LIBRARY_PATH
+    # If TensorRT-RTX is downloaded in /your_local_download_path/TensorRT-RTX-1.4.0.76
+    export LD_LIBRARY_PATH=/your_local_download_path/TensorRT-RTX-1.4.0.76/lib:$LD_LIBRARY_PATH
     echo $LD_LIBRARY_PATH | grep TensorRT-RTX
 
 **In Windows:**
@@ -153,20 +154,16 @@ Make sure you add the lib path to the Windows system variable ``PATH``.
 
 .. code-block:: sh
 
-    # If TensorRT-RTX is downloaded in C:\your_local_download_path\TensorRT-RTX-1.2.0.54
-    set PATH="%PATH%;C:\your_local_download_path\TensorRT-RTX-1.2.0.54\lib"
+    # If TensorRT-RTX is downloaded in C:\your_local_download_path\TensorRT-RTX-1.4.0.76
+    set PATH="%PATH%;C:\your_local_download_path\TensorRT-RTX-1.4.0.76\lib"
     echo %PATH% | findstr TensorRT-RTX
 
 Install TensorRT-RTX Wheel
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Currently, the `tensorrt_rtx` wheel is not published on PyPI.
-You must install it manually from the downloaded tarball.
-
-.. code-block:: sh
-
-   # If the tarball is downloaded in /your_local_download_path/TensorRT-RTX-1.2.0.54
-   python -m pip install /your_local_download_path/TensorRT-RTX-1.2.0.54/python/tensorrt_rtx-1.2.0.54-cp39-none-linux_x86_64.whl
+`tensorrt_rtx` wheel is published on PyPI.
+During `torch_tensorrt_rtx` wheel installation, 
+it will automatically install the `tensorrt_rtx` wheel.
 
 Build Torch-TensorRT with TensorRT-RTX
 --------------------------------------
@@ -197,16 +194,15 @@ Then build the wheel:
     # Build wheel with TensorRT-RTX
     python setup.py bdist_wheel --use-rtx
 
-    # Install the wheel (note: the wheel filename uses underscores, not hyphens)
-    python -m pip install dist/torch_tensorrt-*.whl
+    # Install the wheel (note: the wheel filename uses underscores, not hyphens, and should contain the word 'rtx')
+    python -m pip install dist/torch_tensorrt_rtx-*.whl
 
 Quick Start
 -----------
 
 .. code-block:: python
 
-    # You must set USE_TRT_RTX=true to use TensorRT-RTX
-    USE_TRT_RTX=true python examples/dynamo/torch_compile_resnet_example.py
+    python examples/dynamo/torch_compile_resnet_example.py
 
 Troubleshooting
 ---------------
@@ -246,9 +242,9 @@ First, check the exact version constraint in `pyproject.toml <https://github.com
 
 .. code-block:: sh
 
-    # Example: if pyproject.toml requires torch>=2.10.0.dev,<2.11.0
+    # Example: if pyproject.toml requires torch>=2.12.0.dev,<2.13.0
     # and MODULE.bazel specifies CUDA 13.0 (cu130):
-    pip install --pre "torch>=2.10.0.dev,<2.11.0" torchvision --index-url https://download.pytorch.org/whl/nightly/cu130
+    pip install --pre "torch>=2.12.0.dev,<2.13.0" torchvision --index-url https://download.pytorch.org/whl/nightly/cu130
 
 Replace the version constraint and CUDA version (cuXXX) according to your project's requirements.
 

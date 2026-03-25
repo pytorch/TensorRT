@@ -59,11 +59,11 @@ fi
 export TORCH_BUILD_NUMBER=$(python -c "import torch, urllib.parse as ul; print(ul.quote_plus(torch.__version__))")
 export TORCH_INSTALL_PATH=$(python -c "import torch, os; print(os.path.dirname(torch.__file__))")
 
-# CU_UPPERBOUND eg:13.1 or 12.9
+# CU_UPPERBOUND eg:13.2 or 12.9
 # tensorrt tar for linux and windows are different across cuda version
 # for sbsa it is the same tar across cuda version
 if [[ ${CU_VERSION:2:2} == "13" ]]; then
-    export CU_UPPERBOUND="13.1"
+    export CU_UPPERBOUND="13.2"
 else
     export CU_UPPERBOUND="12.9"
 fi
@@ -77,9 +77,3 @@ fi
 
 cat MODULE.bazel
 export CI_BUILD=1
-
-if [[ ${USE_TRT_RTX} == true ]]; then
-    source .github/scripts/install-tensorrt-rtx.sh
-    install_wheel_or_not=true
-    install_tensorrt_rtx ${install_wheel_or_not}
-fi
