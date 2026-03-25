@@ -22,6 +22,9 @@ def force_causal_efficient_attention(
             node.target
             == torch.ops.aten._scaled_dot_product_efficient_attention.default
         ):
+            attn_bias = node.args[3] if len(node.args) > 3 else None
+            if attn_bias is None:
+                continue
             node.args = (
                 node.args[0],
                 node.args[1],
