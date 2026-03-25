@@ -88,6 +88,40 @@ class TestPrepareInputs(unittest.TestCase):
             same_output_format(inputs, prepared_inputs_trt, enforce_tensor_type=False)
         )
 
+    def test_prepare_tensor_does_not_copy_data(self):
+        """Verify that prepare_inputs does not duplicate GPU tensor data.
+
+        When torch.compile lifts model parameters as graph inputs,
+        prepare_inputs receives every weight tensor. Previously,
+        torch.tensor(t) created a full copy of each tensor, doubling GPU
+        memory usage. Input.from_tensor only needs shape/dtype metadata,
+        so no copy is necessary.
+        """
+        original = torch.randn(1024, 1024, device="cuda")
+        before = torch.cuda.memory_allocated()
+        result = prepare_inputs([original])
+        after = torch.cuda.memory_allocated()
+        # No significant new allocation (allow small overhead, but not a full copy)
+        self.assertLess(
+            after - before,
+            original.nelement() * original.element_size(),
+            "prepare_inputs should not allocate a full copy of the input tensor",
+        )
+        # Result should preserve shape and dtype
+        self.assertEqual(result[0].shape, original.shape)
+        self.assertEqual(result[0].dtype, original.dtype)
+
+    def test_prepare_scalar_inputs(self):
+        """Verify that scalar inputs are still converted to tensors."""
+        int_result = prepare_inputs(42)
+        self.assertIsInstance(int_result, torch_tensorrt.Input)
+
+        float_result = prepare_inputs(3.14)
+        self.assertIsInstance(float_result, torch_tensorrt.Input)
+
+        bool_result = prepare_inputs(True)
+        self.assertIsInstance(bool_result, torch_tensorrt.Input)
+
 
 if __name__ == "__main__":
     unittest.main()
