@@ -1,5 +1,3 @@
-import unittest
-
 import torch
 import torch.nn as nn
 from parameterized import parameterized
@@ -372,7 +370,17 @@ class TestScaledDotProductEfficientAttention(DispatchTestCase):
                 (4, 8, 32, 16),
                 (4, 8, 32, 16),
                 (4, 8, 32, 16),
-                (4, 8, 32, 32),
+                None,
+                True,
+                1.0,
+                torch.float16,
+                0.0,
+            ),
+            (
+                (4, 8, 32, 16),
+                (4, 8, 32, 16),
+                (4, 8, 32, 16),
+                None,
                 False,
                 None,
                 torch.float16,
@@ -384,7 +392,7 @@ class TestScaledDotProductEfficientAttention(DispatchTestCase):
                 (4, 8, 32, 16),
                 (4, 8, 32, 32),
                 True,
-                None,
+                0.5,
                 torch.float16,
                 0.0,
             ),
@@ -464,7 +472,17 @@ class TestScaledDotProductEfficientAttention(DispatchTestCase):
                 (4, 8, 32, 16),
                 (4, 8, 32, 16),
                 (4, 8, 32, 16),
-                (4, 8, 32, 32),
+                None,
+                True,
+                1.0,
+                torch.float16,
+                0.0,
+            ),
+            (
+                (4, 8, 32, 16),
+                (4, 8, 32, 16),
+                (4, 8, 32, 16),
+                None,
                 False,
                 None,
                 torch.float16,
@@ -476,7 +494,7 @@ class TestScaledDotProductEfficientAttention(DispatchTestCase):
                 (4, 8, 32, 16),
                 (4, 8, 32, 32),
                 True,
-                None,
+                0.5,
                 torch.float16,
                 0.0,
             ),
