@@ -278,5 +278,109 @@ class TestRemoveSymIntNodes(TestCase):
         self.assertTrue(True)
 
 
+class TestRewriteEfficientAttention(TestCase):
+    def test_force_causal_efficient_attention(self):
+        class RewriteEfficientAttention(torch.nn.Module):
+            def forward(
+                self,
+                query,
+                key,
+                value,
+                attn_bias=None,
+                compute_log_sumexp=False,
+                dropout_p=0.0,
+                is_causal=False,
+                scale=None,
+            ):
+                out = torch.ops.aten._scaled_dot_product_efficient_attention.default(
+                    query,
+                    key,
+                    value,
+                    attn_bias,
+                    compute_log_sumexp,
+                    dropout_p,
+                    is_causal,
+                    scale=scale,
+                )
+                return out[0]
+
+        attn_bias = torch.zeros(4, 8, 32, 32, device="cuda")
+        upper = torch.triu(
+            torch.ones((32, 32), dtype=torch.bool, device="cuda"), diagonal=1
+        )
+        attn_bias = attn_bias.masked_fill(upper, float("-inf"))
+
+        inputs = [
+            torch.randn(4, 8, 32, 16).cuda(),
+            torch.randn(4, 8, 32, 16).cuda(),
+            torch.randn(4, 8, 32, 16).cuda(),
+            attn_bias,
+            True,
+            0.0,
+            True,
+        ]
+        model = RewriteEfficientAttention().cuda()
+        pytorch_out = model(*inputs)
+        ep = torch.export.export(model, tuple(inputs))
+        trt_module = torch_tensorrt.dynamo.compile(
+            ep,
+            inputs,
+            min_block_size=1,
+            decompose_attention=False,
+            attn_bias_is_causal=True,
+        )
+        trt_out = trt_module(*inputs)
+        torch.testing.assert_close(pytorch_out, trt_out, rtol=1e-2, atol=1e-2)
+
+    def test_force_causal_efficient_attention_with_non_causal_attn_bias(self):
+        class RewriteEfficientAttention(torch.nn.Module):
+            def forward(
+                self,
+                query,
+                key,
+                value,
+                attn_bias=None,
+                compute_log_sumexp=False,
+                dropout_p=0.0,
+                is_causal=False,
+                scale=None,
+            ):
+                out = torch.ops.aten._scaled_dot_product_efficient_attention.default(
+                    query,
+                    key,
+                    value,
+                    attn_bias,
+                    compute_log_sumexp,
+                    dropout_p,
+                    is_causal,
+                    scale=scale,
+                )
+                return out[0]
+
+        attn_bias = torch.randn(4, 8, 32, 32).cuda()
+
+        inputs = [
+            torch.randn(4, 8, 32, 16).cuda(),
+            torch.randn(4, 8, 32, 16).cuda(),
+            torch.randn(4, 8, 32, 16).cuda(),
+            attn_bias,
+            True,
+            0.0,
+            False,
+        ]
+        model = RewriteEfficientAttention().cuda()
+        pytorch_out = model(*inputs)
+        ep = torch.export.export(model, tuple(inputs))
+        trt_module = torch_tensorrt.dynamo.compile(
+            ep,
+            inputs,
+            min_block_size=1,
+            decompose_attention=False,
+            attn_bias_is_causal=False,
+        )
+        trt_out = trt_module(*inputs)
+        torch.testing.assert_close(pytorch_out, trt_out, rtol=1e-2, atol=1e-2)
+
+
 if __name__ == "__main__":
     run_tests()
