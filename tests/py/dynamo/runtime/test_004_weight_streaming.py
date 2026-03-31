@@ -293,9 +293,6 @@ class TestWeightStreamingPython(TestCase):
         ]
     )
     @unittest.skipIf(
-        torchtrt.ENABLED_FEATURES.tensorrt_rtx, "TensorRT-RTX has bug on cudagraphs"
-    )
-    @unittest.skipIf(
         is_orin(), "There is a bug on Orin platform, skip for now until bug is fixed"
     )
     def test_runtime_state_change(self, _, use_python_runtime):
