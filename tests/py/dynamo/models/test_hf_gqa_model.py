@@ -1,3 +1,5 @@
+import unittest
+
 import pytest
 import torch
 import torch_tensorrt
@@ -6,6 +8,10 @@ from transformers import AutoModelForCausalLM
 
 @pytest.mark.unit
 @pytest.mark.critical
+@unittest.skipIf(
+    torch_tensorrt.ENABLED_FEATURES.tensorrt_rtx,
+    "skip test for tensorrt_rtx due to known issues",
+)
 def test_dynamic_head_dim_with_hf_model():
     model_name = "Qwen/Qwen2.5-0.5B-Instruct"
 
