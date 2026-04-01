@@ -6,7 +6,8 @@ from transformers import AutoModelForCausalLM
 
 @pytest.mark.unit
 @pytest.mark.critical
-def test_dynamic_head_dim_with_hf_model():
+@pytest.mark.parametrize("decompose_attention", [True, False])
+def test_dynamic_head_dim_with_hf_model(decompose_attention):
     model_name = "Qwen/Qwen2.5-0.5B-Instruct"
 
     model = (
@@ -43,11 +44,11 @@ def test_dynamic_head_dim_with_hf_model():
     trt_model = torch_tensorrt.dynamo.compile(
         ep,
         inputs=[input_ids, position_ids],
-        enabled_precisions={torch.float32},
         use_explicit_typing=True,
         use_fp32_acc=True,
         device=torch.device("cuda:0"),
         min_block_size=1,
+        decompose_attention=decompose_attention,
     )
 
     with torch.no_grad():
@@ -60,7 +61,6 @@ def test_dynamic_head_dim_with_hf_model():
             out = out[0]
 
     torch.testing.assert_close(ref, out, rtol=1e-1, atol=2e-1)
-    print("PASSED: dynamic head dim test with HF model")
 
 
 if __name__ == "__main__":
