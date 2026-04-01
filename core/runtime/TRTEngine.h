@@ -9,11 +9,28 @@
 #include "ATen/core/function_schema.h"
 #include "ATen/cuda/CUDAGraph.h"
 #include "NvInfer.h"
+#include "NvInferVersion.h"
 #include "c10/cuda/CUDAStream.h"
 #include "torch/custom_class.h"
 
 #include "core/runtime/TRTEngineProfiler.h"
 #include "core/util/prelude.h"
+
+// TensorRT 10.16+ has native NCCL collective support via IExecutionContext::setCommunicator()
+#if NV_TENSORRT_MAJOR > 10 || (NV_TENSORRT_MAJOR == 10 && NV_TENSORRT_MINOR >= 16)
+#define TRT_HAS_NATIVE_NCCL 1
+#endif
+
+// Full TRT NCCL collectives support requires both:
+// 1. PyTorch built with NCCL (USE_C10D_NCCL defined via Bazel)
+// 2. TensorRT 10.16+ (TRT_HAS_NATIVE_NCCL defined above)
+#if defined(USE_C10D_NCCL) && defined(TRT_HAS_NATIVE_NCCL)
+#define ENABLE_TRT_NCCL_COLLECTIVES 1
+#endif
+
+#ifdef ENABLE_TRT_NCCL_COLLECTIVES
+#include <nccl.h>
+#endif
 
 namespace torch_tensorrt {
 namespace core {
@@ -195,6 +212,22 @@ struct TRTEngine : torch::CustomClassHolder {
   bool requires_output_allocator = false; // engine requires output allocator
   bool use_output_allocator_outputs = false; // users specify to use output allocator
   std::shared_ptr<DynamicOutputAllocator> output_allocator;
+
+  // Member variables for distributed inference (-1 indicates non-distributed mode)
+  int64_t rank = -1;
+  int64_t world_size = -1;
+
+  // Set rank and world_size for distributed inference
+  void set_rank(int64_t rank_val);
+  void set_world_size(int64_t world_size_val);
+
+#ifdef ENABLE_TRT_NCCL_COLLECTIVES
+  ncclComm_t nccl_comm = nullptr;
+  void set_nccl_comm(int64_t comm_ptr);
+  void init_nccl_comm(const std::string& group_name = "default");
+  bool set_process_group_from_registry(const std::string& group_name = "default");
+  bool set_nccl_communicator_to_trt_context();
+#endif
 
   // TODO: Implement a call method
   // c10::List<at::Tensor> Run(c10::List<at::Tensor> inputs);

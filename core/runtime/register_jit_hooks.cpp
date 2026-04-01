@@ -108,6 +108,18 @@ static auto TORCHTRT_UNUSED TRTEngineTSRegistrtion =
             &TRTEngine::set_device_memory_budget)
         .def_property("streamable_device_memory_budget", &TRTEngine::get_streamable_device_memory_budget)
         .def_property("automatic_device_memory_budget", &TRTEngine::get_automatic_device_memory_budget)
+        .def_readonly("rank", &TRTEngine::rank)
+        .def_readonly("world_size", &TRTEngine::world_size)
+        .def("set_rank", &TRTEngine::set_rank)
+        .def("set_world_size", &TRTEngine::set_world_size)
+#ifdef ENABLE_TRT_NCCL_COLLECTIVES
+        .def("set_nccl_comm", &TRTEngine::set_nccl_comm)
+        .def(
+            "init_nccl_comm",
+            [](c10::intrusive_ptr<TRTEngine> self, std::string group_name = "default") {
+              self->init_nccl_comm(group_name);
+            })
+#endif
         .def_pickle(
             [](const c10::intrusive_ptr<TRTEngine>& self) -> std::vector<std::string> { return self->serialize(); },
             [](std::vector<std::string> serialized_info) -> c10::intrusive_ptr<TRTEngine> {
@@ -150,6 +162,15 @@ TORCH_LIBRARY(tensorrt, m) {
   m.def("REQUIRES_OUTPUT_ALLOCATOR_IDX", []() -> int64_t { return REQUIRES_OUTPUT_ALLOCATOR_IDX; });
   m.def("SERIALIZATION_LEN", []() -> int64_t { return SERIALIZATION_LEN; });
   m.def("RESOURCE_ALLOCATION_STRATEGY_IDX", []() -> int64_t { return RESOURCE_ALLOCATION_STRATEGY_IDX; });
+  m.def("RANK_IDX", []() -> int64_t { return RANK_IDX; });
+  m.def("WORLD_SIZE_IDX", []() -> int64_t { return WORLD_SIZE_IDX; });
+  m.def("NATIVE_TRT_COLLECTIVES_AVAIL", []() -> bool {
+#ifdef ENABLE_TRT_NCCL_COLLECTIVES
+    return true;
+#else
+    return false;
+#endif
+  });
   m.def("_platform_linux_x86_64", []() -> std::string {
     auto it = get_platform_name_map().find(Platform::PlatformEnum::kLINUX_X86_64);
     return it->second;

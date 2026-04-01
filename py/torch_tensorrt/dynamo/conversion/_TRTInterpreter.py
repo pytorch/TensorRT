@@ -225,6 +225,12 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
     ) -> trt.IBuilderConfig:
         builder_config = self.builder.create_builder_config()
 
+        if ENABLED_FEATURES.native_trt_collectives:
+            _LOGGER.info("Using native TRT collectives")
+            builder_config.set_preview_feature(
+                trt.PreviewFeature.MULTIDEVICE_RUNTIME_10_16, True
+            )
+
         if self._debugger_config and self._debugger_config.engine_builder_monitor:
             builder_config.progress_monitor = TRTBulderMonitor()
 
@@ -453,7 +459,7 @@ class TRTInterpreter(torch.fx.Interpreter):  # type: ignore[misc]
             except Exception:
                 return torch.all(sd_weight == network_weight)
 
-    @needs_refit  # type: ignore[misc]
+    @needs_refit
     def _save_weight_mapping(self) -> None:
         """
         Construct the weight name mapping from engine weight name to state_dict weight name.

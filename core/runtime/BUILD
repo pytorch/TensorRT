@@ -1,6 +1,8 @@
 load("@rules_cc//cc:defs.bzl", "cc_library")
 load("@rules_pkg//:pkg.bzl", "pkg_tar")
 load("@rules_pkg//pkg:mappings.bzl", "pkg_files")
+load("//toolchains/torch_nccl:defs.bzl", "if_torch_nccl")
+
 package(default_visibility = ["//visibility:public"])
 
 config_setting(
@@ -77,6 +79,7 @@ cc_library(
         "TRTEngineProfiler.h",
         "runtime.h",
     ],
+    copts = if_torch_nccl(["-DUSE_C10D_NCCL"]),
     linkopts = [
         "-lstdc++fs",
     ],
@@ -121,6 +124,6 @@ pkg_tar(
 pkg_files(
     name = "include_pkg_files",
     srcs = [":include_files"],
-    visibility = ["//visibility:public"],
     prefix = "include/torch_tensorrt/core/runtime/",
+    visibility = ["//visibility:public"],
 )

@@ -4,15 +4,18 @@ import logging
 from contextlib import nullcontext
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
+import tensorrt as trt
 import torch
 import torch_tensorrt
 from torch.nn import Module
 from torch_tensorrt._Device import Device
 from torch_tensorrt._enums import Platform, dtype
+from torch_tensorrt._features import ENABLED_FEATURES
 from torch_tensorrt.dynamo._defaults import DEBUG_LOGGING_DIR
 from torch_tensorrt.dynamo._settings import CompilationSettings
 from torch_tensorrt.dynamo.debug._DebuggerConfig import DebuggerConfig
 from torch_tensorrt.dynamo.debug._supports_debugger import cls_supports_debugger
+from torch_tensorrt.dynamo.runtime._nccl_utils import setup_nccl_library
 from torch_tensorrt.dynamo.utils import DYNAMIC_DIM
 from torch_tensorrt.logging import TRT_LOGGER
 from torch_tensorrt.runtime._utils import (
@@ -20,8 +23,6 @@ from torch_tensorrt.runtime._utils import (
     _select_rt_device,
     multi_gpu_device_check,
 )
-
-import tensorrt as trt
 
 logger = logging.getLogger(__name__)
 
@@ -134,6 +135,8 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         requires_output_allocator: bool = False,
         symbolic_shape_expressions: Optional[Dict[str, List[Dict[str, Any]]]] = None,
         _debugger_config: Optional[DebuggerConfig] = None,
+        rank: int = -1,
+        world_size: int = 1,
     ):
         """Takes a name, target device, serialized TensorRT engine, and binding names / order and constructs
         a PyTorch ``torch.nn.Module`` around it. Uses TensorRT Python APIs to run the engine
@@ -149,7 +152,8 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
             weight_name_map (dict): Mapping of engine weight name to state_dict weight name
             requires_output_allocator (bool): Boolean flag indicating if the converter creates operators which require an Output Allocator to run (e.g. data dependent operators)
             symbolic_shape_expressions (List[str]): List of symbolic shape expressions for each output binding
-
+            rank (int): Rank of the current process, applicable for distributed inference
+            world_size (int): World size of the distributed process, applicable for distributed inference
         Example:
 
             .. code-block:: py
@@ -229,6 +233,10 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         if self.serialized_engine is not None and not self.settings.lazy_engine_init:
             self.setup_engine()
 
+        self.rank = rank
+        self.world_size = world_size
+        self._nccl_comm: Optional[Any] = None
+
     def set_output_tensors_as_unowned(self, enabled: bool) -> None:
         """
         Flag to set if the output tensors of this engine are solely owned by the Torch-TensorRT Runtime or if they might be shared with a user.
@@ -279,6 +287,222 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         # Set automatic weight streaming budget as default when context is created
         logger.debug(f"Weight streaming budget set to {budget_bytes}B")
         return self._set_device_memory_budget(budget_bytes)
+
+    # Distributed functions
+    @property
+    def is_distributed(self) -> bool:
+        """Check if this module is configured for distributed execution."""
+        return self.rank >= 0 and self.world_size > 1
+
+    @property
+    def has_native_trt_collectives(self) -> bool:
+        """Check if native TRT collectives are available (TRT 10.16+ with NCCL)."""
+        return bool(ENABLED_FEATURES.native_trt_collectives)
+
+    def get_rank(self) -> int:
+        """Get the rank of this process in distributed execution."""
+        return self.rank
+
+    def get_world_size(self) -> int:
+        """Get the total number of processes in distributed execution."""
+        return self.world_size
+
+    def set_nccl_communicator(self, comm: Any) -> None:
+        if not self.is_distributed:
+            logger.warning(
+                "Setting NCCL communicator on non-distributed module "
+                f"(rank={self.rank}, world_size={self.world_size})"
+            )
+        self._nccl_comm = comm
+        # Only set communicator on context if native TRT collectives are available (TRT 10.16+)
+        if not self.has_native_trt_collectives:
+            logger.debug(
+                "Native TRT collectives not available, skipping set_communicator on TensorRT context"
+            )
+            return
+
+        if self.context is not None:
+            try:
+                # TensorRT's set_communicator expects a PyCapsule, not an integer pointer
+                # Convert integer pointer to PyCapsule if needed
+                comm_to_pass = comm
+                if isinstance(comm, int):
+                    import ctypes
+
+                    # Create a PyCapsule from the pointer value
+                    ctypes.pythonapi.PyCapsule_New.restype = ctypes.py_object
+                    ctypes.pythonapi.PyCapsule_New.argtypes = [
+                        ctypes.c_void_p,
+                        ctypes.c_char_p,
+                        ctypes.c_void_p,
+                    ]
+                    comm_to_pass = ctypes.pythonapi.PyCapsule_New(comm, None, None)
+                    logger.debug(
+                        f"Converted integer pointer {comm} to PyCapsule for TensorRT"
+                    )
+
+                success = self.context.set_communicator(comm_to_pass)
+                if success:
+                    logger.debug(
+                        f"NCCL communicator set on TensorRT context (rank={self.rank})"
+                    )
+                else:
+                    logger.warning(
+                        f"set_communicator returned False (rank={self.rank})"
+                    )
+            except AttributeError:
+                logger.warning("TensorRT context does not support set_communicator")
+            except TypeError as e:
+                logger.error(f"Failed to set NCCL communicator: {e}")
+                raise
+
+    def get_nccl_communicator(self) -> Optional[Any]:
+        """Get the NCCL communicator if set."""
+        return self._nccl_comm
+
+    def setup_nccl(self, use_pytorch_comm: bool = True) -> None:
+        # to check if we need try block for this
+        # Ensure NCCL library path is configured for TensorRT
+        # This handles the case where pip-installed PyTorch has NCCL in a non-standard location
+        setup_nccl_library()
+        try:
+            import torch.distributed as dist
+        except ImportError as e:
+            raise RuntimeError(
+                "torch.distributed is required for setup_nccl(). " f"Import error: {e}"
+            )
+        if not dist.is_initialized():
+            raise RuntimeError(
+                "torch.distributed must be initialized before calling setup_nccl(). "
+                "Call dist.init_process_group('nccl') first."
+            )
+
+        if not self.is_distributed:
+            raise RuntimeError(
+                f"Module is not configured for distributed execution "
+                f"(rank={self.rank}, world_size={self.world_size}). "
+                "Pass rank and world_size to constructor."
+            )
+
+        # Check if native TRT collectives are available
+        if self.has_native_trt_collectives:
+            logger.info(
+                f"Using native TRT collectives (TRT 10.16+) for distributed execution (rank={self.rank})"
+            )
+        elif ENABLED_FEATURES.trtllm_for_nccl:
+            logger.info(f"Using TRT-LLM plugins for NCCL backend (rank={self.rank})")
+        else:
+            logger.warning(
+                "Neither native TRT collectives nor TRT-LLM NCCL plugins are available. "
+                "Distributed execution may not work correctly. "
+                "For native TRT collectives, ensure TensorRT 10.16+ is installed and "
+                "torch_tensorrt was built with NCCL support. "
+                "For TRT-LLM fallback, set TRTLLM_PLUGINS_PATH or USE_TRTLLM_PLUGINS=1."
+            )
+
+        # Try to get communicator from PyTorch's ProcessGroupNCCL which is preferred
+        nccl_comm = self._get_nccl_comm_from_process_group()
+
+        # Fall back to creating via NCCL library if process group method fails
+        # Note: this is fallback mechanism which is to be tested
+        if nccl_comm is None:
+            logger.debug("Falling back to creating NCCL communicator via nccl library")
+            nccl_comm = self._create_nccl_comm_via_nccl_lib()
+
+        # Set the communicator
+        self.set_nccl_communicator(nccl_comm)
+
+    def _get_nccl_comm_from_process_group(self) -> Optional[Any]:
+        # expectation is that dist.init_process_group has been called
+        # In there, Rank 0 generated ncclUniqueId
+        # Broadcasted it to all ranks via the store
+        # Each rank called ncclCommInitRank()
+        import torch.distributed as dist
+
+        pg = dist.group.WORLD
+        if pg is None:
+            logger.debug("No default process group available")
+            return None
+
+        # Check if backend is NCCL
+        if dist.get_backend(pg) != "nccl":
+            logger.debug("ProcessGroup backend is not NCCL, cannot reuse communicator")
+            return None
+
+        # Get the NCCL backend object via _get_backend (internal API)
+        if not hasattr(pg, "_get_backend"):
+            logger.debug("ProcessGroup does not have _get_backend method")
+            return None
+
+        try:
+            backend = pg._get_backend(torch.device("cuda"))
+        except Exception as e:
+            logger.debug(f"Failed to get NCCL backend: {e}")
+            return None
+
+        # now we have the backend
+        # Get comm pointer from the backend (internal API)
+        if not hasattr(backend, "_comm_ptr"):
+            logger.debug("NCCL backend does not have _comm_ptr method")
+            return None
+
+        # Force NCCL communicator initialization with a dummy collective.
+        # PyTorch's ProcessGroupNCCL uses lazy initialization - the NCCL
+        # communicator is only created when the first collective operation
+        # is performed. Without this, _comm_ptr() returns 0.
+        try:
+            dummy = torch.zeros(1, device="cuda")
+            dist.all_reduce(dummy)
+            logger.debug("Forced NCCL initialization with dummy all_reduce")
+        except Exception as e:
+            logger.debug(f"Failed to force NCCL initialization: {e}")
+            return None
+
+        try:
+            comm_ptr = backend._comm_ptr()
+        except Exception as e:
+            logger.debug(f"Failed to call _comm_ptr: {e}")
+            return None
+
+        if comm_ptr is None or comm_ptr == 0:
+            logger.debug("_comm_ptr returned None or 0")
+            return None
+
+        logger.info(
+            f"Reusing PyTorch's NCCL communicator (ptr={comm_ptr}, rank={self.rank})"
+        )
+        return comm_ptr
+
+    def _create_nccl_comm_via_nccl_lib(self) -> Any:
+        import nccl.core as nccl
+        import torch.distributed as dist
+
+        rank = self.rank
+        world_size = self.world_size
+
+        # Generate unique ID on rank 0 and broadcast as a tensor
+        if rank == 0:
+            uid = nccl.get_unique_id()
+            uid_bytes = uid.as_bytes
+            uid_tensor = torch.frombuffer(
+                bytearray(uid_bytes), dtype=torch.uint8
+            ).cuda()
+            logger.debug(f"Rank {rank} created NCCL unique ID ({len(uid_bytes)} bytes)")
+        else:
+            uid_tensor = torch.zeros(128, dtype=torch.uint8, device="cuda")
+
+        dist.broadcast(uid_tensor, src=0)
+        logger.debug(f"Rank {rank} received NCCL unique ID")
+
+        uid = nccl.UniqueId.from_bytes(bytes(uid_tensor.cpu().numpy()))
+
+        comm = nccl.Communicator.init(world_size, rank, uid)
+        logger.info(
+            f"Created new NCCL communicator via nccl library (rank={rank}, world_size={world_size})"
+        )
+
+        self._nccl_comm_handle = comm
+        return comm.ptr
 
     def setup_engine(self) -> None:
         assert (
@@ -333,6 +557,9 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         state_dict[prefix + "input_names"] = self.input_names
         state_dict[prefix + "output_names"] = self.output_names
         state_dict[prefix + "platform"] = self.target_platform
+        # Distributed info (always saved, -1 indicates non-distributed)
+        state_dict[prefix + "rank"] = self.rank
+        state_dict[prefix + "world_size"] = self.world_size
 
     def _load_from_state_dict(
         self,
@@ -348,6 +575,9 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         self.input_names = state_dict[prefix + "input_names"]
         self.output_names = state_dict[prefix + "output_names"]
         self.target_platform = state_dict[prefix + "platform"]
+        # Distributed info (optional, backward compatible with non-distributed models)
+        self.rank = state_dict.get(prefix + "rank", -1)
+        self.world_size = state_dict.get(prefix + "world_size", -1)
 
         # Run multi-gpu device check to validate engine instantiation
         multi_gpu_device_check()
@@ -357,10 +587,14 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
         state = self.__dict__.copy()
         state.pop("engine", None)
         state.pop("context", None)
+        # NCCLcomm cannot be pickled
+        state.pop("_nccl_comm", None)
         return state
 
     def __setstate__(self, state: Dict[str, Any]) -> None:
         self.__dict__.update(state)
+        # reset after unpickling, apbose: is this required though?
+        self._nccl_comm = None
         self.setup_engine()
 
     def __deepcopy__(self, memo: Any) -> PythonTorchTensorRTModule:
@@ -698,6 +932,23 @@ class PythonTorchTensorRTModule(Module):  # type: ignore[misc]
             else nullcontext()
         ):
             self._check_initialized()
+
+            if self.is_distributed and self._nccl_comm is None:
+                nccl_type = (
+                    "native TRT collectives"
+                    if self.has_native_trt_collectives
+                    else (
+                        "TRT-LLM NCCL plugins"
+                        if ENABLED_FEATURES.trtllm_for_nccl
+                        else "unknown backend"
+                    )
+                )
+                logger.info(
+                    f"Setting up NCCL for distributed execution using {nccl_type} "
+                    f"(rank={self.rank}, world_size={self.world_size})"
+                )
+                self.setup_nccl()
+                logger.info(f"NCCL setup complete, comm={self._nccl_comm}")
 
             # If in safe mode, check at each iteration for whether a switch is required
             if (
