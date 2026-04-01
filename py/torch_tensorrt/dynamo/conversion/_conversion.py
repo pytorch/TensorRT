@@ -4,6 +4,7 @@ import io
 import logging
 from typing import Any, Dict, List, NamedTuple, Optional, Sequence
 
+import tensorrt as trt
 import torch
 from torch_tensorrt._enums import dtype
 from torch_tensorrt._features import ENABLED_FEATURES
@@ -24,8 +25,6 @@ from torch_tensorrt.dynamo.utils import (
     release_host_and_device_memory,
 )
 from torch_tensorrt.logging import TRT_LOGGER
-
-import tensorrt as trt
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +48,7 @@ def infer_module_output_dtypes(
     """
     outputs = [node for node in module.graph.nodes if node.op == "output"]
     outputs = outputs[0].args
-    return get_output_dtypes(outputs, truncate_double)
+    return list(get_output_dtypes(outputs, truncate_double))
 
 
 def insert_engine_to_cache(
@@ -358,6 +357,41 @@ def convert_module(
             "Since Torch-TensorRT runtime is not available, using Python Runtime, some features may not be available"
         )
 
+    rank = -1
+    world_size = -1
+    if settings.use_distributed_mode_trace:
+        import os
+
+        import torch.distributed as dist
+
+        # Check if distributed backends are available
+        if ENABLED_FEATURES.native_trt_collectives:
+            logger.info(
+                "Native TRT collectives available (TRT 10.16+) for distributed execution"
+            )
+        elif ENABLED_FEATURES.trtllm_for_nccl:
+            logger.info("TRT-LLM NCCL plugins available for distributed execution")
+        else:
+            logger.warning(
+                "Distributed mode requested but neither native TRT collectives nor TRT-LLM NCCL plugins are available. "
+                "Distributed execution may not work correctly. "
+                "For native TRT collectives, ensure TensorRT 10.16+ and torch_tensorrt built with NCCL support. "
+                "For TRT-LLM fallback, set TRTLLM_PLUGINS_PATH or USE_TRTLLM_PLUGINS=1."
+            )
+
+        if dist.is_initialized():
+            rank = dist.get_rank()
+            world_size = dist.get_world_size()
+        else:
+            # Fallback to environment variables
+            rank = int(os.environ.get("RANK", -1))
+            world_size = int(os.environ.get("WORLD_SIZE", -1))
+
+        if rank >= 0 and world_size > 0:
+            logger.info(
+                f"Creating TRT module for distributed execution: rank={rank}, world_size={world_size}"
+            )
+
     return rt_cls(
         serialized_engine=serialized_interpreter_result.serialized_engine,
         input_binding_names=list(serialized_interpreter_result.input_names),
@@ -367,4 +401,6 @@ def convert_module(
         weight_name_map=serialized_interpreter_result.weight_name_map,
         requires_output_allocator=serialized_interpreter_result.requires_output_allocator,
         symbolic_shape_expressions=serialized_interpreter_result.symbolic_shape_expressions,
+        rank=rank,
+        world_size=world_size,
     )
