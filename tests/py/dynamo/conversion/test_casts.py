@@ -83,7 +83,6 @@ class TestToCopyConverter(DispatchTestCase):
             ToCopyBFloat16(),
             inputs,
             precision=torch.float,
-            use_explicit_typing=True,
         )
 
     def test_to_copy_i64b(self):
