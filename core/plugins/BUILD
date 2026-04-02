@@ -1,6 +1,7 @@
 load("@rules_cc//cc:defs.bzl", "cc_library")
 load("@rules_pkg//:pkg.bzl", "pkg_tar")
 load("@rules_pkg//pkg:mappings.bzl", "pkg_files")
+
 package(default_visibility = ["//visibility:public"])
 
 config_setting(
@@ -66,6 +67,7 @@ cc_library(
         "//conditions:default": [
             "impl/interpolate_plugin.cpp",
             "impl/normalize_plugin.cpp",
+            "impl/scatter_add_plugin.cpp",
             "register_plugins.cpp",
         ],
     }),
@@ -75,6 +77,7 @@ cc_library(
         "//conditions:default": [
             "impl/interpolate_plugin.h",
             "impl/normalize_plugin.h",
+            "impl/scatter_add_plugin.h",
             "plugins.h",
         ],
     }),
@@ -132,6 +135,7 @@ filegroup(
     srcs = [
         "impl/interpolate_plugin.h",
         "impl/normalize_plugin.h",
+        "impl/scatter_add_plugin.h",
     ],
     visibility = ["//visibility:public"],
 )
@@ -139,8 +143,8 @@ filegroup(
 pkg_files(
     name = "impl_include_pkg_files",
     srcs = [":impl_include_files"],
-    visibility = ["//visibility:public"],
     prefix = "include/torch_tensorrt/core/plugins/impl",
+    visibility = ["//visibility:public"],
 )
 
 pkg_tar(

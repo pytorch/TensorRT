@@ -590,200 +590,70 @@ def gather(
     return out
 
 
-def _index_put_scatter_add(
+def index_put_scatter_add_plugin(
     ctx: ConversionContext,
     target: Target,
     source_ir: Optional[SourceIR],
     name: str,
     input_tensor: ITensor,
-    indices_cat: ITensor,
-    flattened_values: ITensor,
+    input_indices: Sequence[Union[ITensor, torch.Tensor, np.ndarray, int, None]],
+    values: ITensor,
 ) -> ITensor:
-    """Scatter-add via indicator-matrix matmul.
+    """Insert a ScatterAdd IPluginV3 layer for index_put(accumulate=True).
 
-    Correctly accumulates into duplicate index positions, unlike
-    ``ScatterMode.ND`` which overwrites on collision.
+    Calls ``at::index_put(..., accumulate=True)`` directly inside the TRT
+    engine via the C++ ScatterAddPlugin — same atomicAdd CUDA kernel as
+    PyTorch eager, O(P) with no indicator-matrix overhead.
 
-    Algorithm
-    ---------
-    Given ``P`` scatter positions and ``M`` total elements in ``input_tensor``:
-
-    1. Linearise the ND indices (shape ``(P, rank)``) to flat indices (shape
-       ``(P,)``) using the row-major strides of ``input_tensor``.
-    2. Build a boolean indicator matrix of shape ``(M, P)`` where entry
-       ``[i, j]`` is True iff ``flat_idx[j] == i``.
-    3. Compute ``delta = indicator @ values``  (shape ``(M,)``).  Because the
-       matmul sums over ``j``, duplicate positions are accumulated exactly.
-    4. Return ``flatten(input) + delta`` reshaped to ``input_tensor.shape``.
-
-    Memory cost: O(M * P). Suitable for inference use-cases where both M and P
-    are small (e.g. KV-cache updates, small buffer writes).
+    Supports any number of non-None index tensors (N >= 1).  The plugin
+    inputs are laid out as: [src, idx_0, ..., idx_{N-1}, values].
     """
-    rank = len(input_tensor.shape)
+    non_none_indices = [x for x in input_indices if x is not None]
+    assert (
+        len(non_none_indices) >= 1
+    ), "ScatterAdd plugin requires at least one non-None index tensor"
 
-    # ------------------------------------------------------------------
-    # Step 1: per-dimension sizes (int when static, ITensor when dynamic)
-    # ------------------------------------------------------------------
-    dims: List[Union[int, ITensor]] = []
-    for i in range(rank):
-        s = input_tensor.shape[i]
-        if s == DYNAMIC_DIM:
-            dims.append(
-                get_shape(ctx, target, source_ir, f"{name}_dim_{i}", input_tensor, i)
-            )
-        else:
-            dims.append(s)
-
-    # ------------------------------------------------------------------
-    # Step 2: row-major strides  (stride[k] = product(dims[k+1:]))
-    # ------------------------------------------------------------------
-    strides: List[Union[int, ITensor]] = [1] * rank
-    for k in range(rank - 2, -1, -1):
-        d = dims[k + 1]
-        prev = strides[k + 1]
-        if isinstance(d, ITensor) or isinstance(prev, ITensor):
-            strides[k] = impl.elementwise.mul(
-                ctx, target, source_ir, f"{name}_stride_{k}", prev, d
-            )
-        else:
-            strides[k] = prev * d
-
-    # ------------------------------------------------------------------
-    # Step 3: M = total number of elements
-    # ------------------------------------------------------------------
-    M: Union[int, ITensor] = dims[0]
-    for i in range(1, rank):
-        d = dims[i]
-        if isinstance(M, ITensor) or isinstance(d, ITensor):
-            M = impl.elementwise.mul(ctx, target, source_ir, f"{name}_M_{i}", M, d)
-        else:
-            M = M * d
-
-    # ------------------------------------------------------------------
-    # Step 4: linearise indices_cat (P, rank) -> flat_idx (P,)
-    #   flat_idx = sum_k( indices_cat[:, k] * strides[k] )
-    # ------------------------------------------------------------------
-    flat_idx: Optional[ITensor] = None
-    for k in range(rank):
-        # Extract column k from indices_cat via a gather on axis=1
-        k_t = get_trt_tensor(ctx, k, f"{name}_col_idx_{k}", min_rank=0)
-        gather_l = ctx.net.add_gather(indices_cat, k_t, axis=1)
-        set_layer_name(gather_l, target, f"{name}_gather_col_{k}", source_ir)
-        col_k = gather_l.get_output(0)  # shape (P,)
-
-        # Normalize negative indices: idx < 0  →  idx + dim_size
-        dim_k = dims[k]
-        if isinstance(dim_k, ITensor):
-            dim_k_t = dim_k
-        else:
-            dim_k_t = get_trt_tensor(ctx, dim_k, f"{name}_dim_val_{k}", min_rank=0)
-        zero_k = get_trt_tensor(ctx, 0, f"{name}_zero_{k}", min_rank=0)
-        is_neg = impl.elementwise.lt(
-            ctx, target, source_ir, f"{name}_is_neg_{k}", col_k, zero_k
-        )
-        col_k_shifted = impl.elementwise.add(
-            ctx, target, source_ir, f"{name}_col_shifted_{k}", col_k, dim_k_t
-        )
-        sel_l = ctx.net.add_select(is_neg, col_k_shifted, col_k)
-        set_layer_name(sel_l, target, f"{name}_sel_neg_{k}", source_ir)
-        col_k = sel_l.get_output(0)
-
-        stride_k = strides[k]
-        if isinstance(stride_k, ITensor):
-            contrib = impl.elementwise.mul(
-                ctx, target, source_ir, f"{name}_contrib_{k}", col_k, stride_k
-            )
-        elif stride_k == 1:
-            contrib = col_k
-        else:
-            stride_t = get_trt_tensor(
-                ctx,
-                stride_k,
-                f"{name}_stride_val_{k}",
-                min_rank=0,
-            )
-            contrib = impl.elementwise.mul(
-                ctx, target, source_ir, f"{name}_contrib_{k}", col_k, stride_t
-            )
-
-        flat_idx = (
-            contrib
-            if flat_idx is None
-            else impl.elementwise.add(
-                ctx, target, source_ir, f"{name}_flat_idx_{k}", flat_idx, contrib
-            )
+    # Plugin supports float32/float16/bfloat16; cast other types through float32.
+    _supported_float_dtypes = (trt.float32, trt.float16, trt.bfloat16)
+    original_dtype = input_tensor.dtype
+    if original_dtype not in _supported_float_dtypes:
+        input_tensor = cast_trt_tensor(
+            ctx, input_tensor, trt.float32, f"{name}_src_cast"
         )
 
-    # ------------------------------------------------------------------
-    # Step 5: indicator matrix  (M, P) = (arange(M)[:,None] == flat_idx[None,:])
-    # ------------------------------------------------------------------
-    arange_M = impl.arange.arange(
-        ctx, target, source_ir, f"{name}_arange_M", 0, M, 1
-    )  # (M,) int32
-    arange_M = cast_trt_tensor(ctx, arange_M, dtype.i32, f"{name}_arange_int32")
+    # Ensure index tensors are TRT tensors with int32 or int64 dtype.
+    _supported_idx_dtypes = (trt.int32, trt.int64)
+    idx_tensors = []
+    for i, idx in enumerate(non_none_indices):
+        if not isinstance(idx, ITensor):
+            idx = get_trt_tensor(ctx, idx, f"{name}_idx_{i}", min_rank=1)
+        if idx.dtype not in _supported_idx_dtypes:
+            idx = cast_trt_tensor(ctx, idx, trt.int32, f"{name}_idx_{i}_cast")
+        idx_tensors.append(idx)
 
-    # Reshape for broadcast: (M, 1) and (1, P)
-    arange_col = impl.unsqueeze.unsqueeze(
-        ctx, target, source_ir, f"{name}_arange_col", arange_M, 1
-    )  # (M, 1)
-    flat_idx_row = impl.unsqueeze.unsqueeze(
-        ctx, target, source_ir, f"{name}_flat_idx_row", flat_idx, 0
-    )  # (1, P)
+    if not isinstance(values, ITensor):
+        values = get_trt_tensor(ctx, values, f"{name}_values", min_rank=1)
 
-    indicator = impl.elementwise.eq(
-        ctx, target, source_ir, f"{name}_indicator", arange_col, flat_idx_row
-    )  # (M, P) bool
+    # Values must match src dtype after any cast above.
+    if values.dtype != input_tensor.dtype:
+        values = cast_trt_tensor(ctx, values, input_tensor.dtype, f"{name}_values_cast")
 
-    # ------------------------------------------------------------------
-    # Step 6: delta = indicator @ values  (M,)
-    # ------------------------------------------------------------------
-    # TRT matmul requires a floating-point dtype.  Use the input's own dtype
-    # when it is already a float type so precision is preserved natively
-    # (matrix_multiply handles the fp16 fp32-acc path internally).
-    # Fall back to float32 only for non-floating-point inputs (e.g. int32).
-    _float_dtypes = (trt.float32, trt.float16, trt.bfloat16)
-    compute_dtype = (
-        input_tensor.dtype if input_tensor.dtype in _float_dtypes else trt.float32
-    )
+    creator = trt.get_plugin_registry().get_creator("ScatterAdd", "1", "torch_tensorrt")
+    assert (
+        creator is not None
+    ), "ScatterAdd plugin creator not found — is torch_tensorrt_runtime loaded?"
 
-    indicator_f = cast_trt_tensor(
-        ctx, indicator, compute_dtype, f"{name}_indicator_cast"
-    )  # (M, P)
-    values_f = cast_trt_tensor(
-        ctx, flattened_values, compute_dtype, f"{name}_values_cast"
-    )  # (P,)
+    pfc = trt.PluginFieldCollection([])
+    plugin = creator.create_plugin("ScatterAdd", pfc, trt.TensorRTPhase.BUILD)
+    assert plugin is not None, "Failed to create ScatterAdd plugin instance"
 
-    # matrix_multiply treats the 1-D `values_f` as a column vector (VECTOR
-    # mode) and returns shape (M,).
-    delta = impl.matmul.matrix_multiply(
-        ctx, target, source_ir, f"{name}_delta", indicator_f, values_f
-    )  # (M,)
-
-    # Cast delta back to the original input dtype (no-op for float inputs)
-    delta = cast_trt_tensor(ctx, delta, input_tensor.dtype, f"{name}_delta_cast")
-
-    # ------------------------------------------------------------------
-    # Step 7: flatten input, add delta, reshape back
-    # ------------------------------------------------------------------
-    src_flat = impl.shuffle.reshape(
-        ctx, target, source_ir, f"{name}_src_flat", input_tensor, (-1,)
-    )
-    result_flat = impl.elementwise.add(
-        ctx, target, source_ir, f"{name}_result_flat", src_flat, delta
-    )
-
-    # Rebuild the output shape (may contain dynamic dims)
-    out_shape = tuple(
-        (
-            get_shape(ctx, target, source_ir, f"{name}_oshape_{i}", input_tensor, i)
-            if input_tensor.shape[i] == DYNAMIC_DIM
-            else input_tensor.shape[i]
-        )
-        for i in range(rank)
-    )
-    return impl.shuffle.reshape(
-        ctx, target, source_ir, f"{name}_result", result_flat, out_shape
-    )
+    plugin_inputs = [input_tensor] + idx_tensors + [values]
+    layer = ctx.net.add_plugin_v3(plugin_inputs, [], plugin)
+    set_layer_name(layer, target, name, source_ir)
+    out = layer.get_output(0)
+    if original_dtype not in _supported_float_dtypes:
+        out = cast_trt_tensor(ctx, out, original_dtype, f"{name}_out_cast")
+    return out
 
 
 def index_put_converter(
@@ -794,7 +664,6 @@ def index_put_converter(
     input_tensor: ITensor,
     input_indices: Sequence[Union[ITensor, torch.Tensor, np.ndarray, int, None]],
     values: ITensor,
-    accumulate: bool = False,
 ) -> ITensor:
     # Convert 'input_indices' to TRT tensors (or keep None as is)
     input_indices = expand_boolean_indices(
@@ -1221,20 +1090,11 @@ def index_put_converter(
         (-1,),
     )
     indices_cat = cast_trt_tensor(ctx, indices_cat, trt.int32, f"{name}_idx_int32")
-    if accumulate:
-        # Use indicator-matrix matmul for correct scatter-add semantics.
-        # ScatterMode.ND overwrites on duplicate indices; _index_put_scatter_add
-        # accumulates them via (M, P) @ (P,) matmul.
-        return _index_put_scatter_add(
-            ctx, target, source_ir, name, input_tensor, indices_cat, flattened_values
-        )
-    else:
-        scatter_layer = ctx.net.add_scatter(
-            input_tensor,
-            indices_cat,
-            flattened_values,
-            trt.ScatterMode.ND,
-        )
-        set_layer_name(scatter_layer, target, f"{name}_scatter", source_ir)
-        scatter_out = scatter_layer.get_output(0)
-        return scatter_out
+    scatter_layer = ctx.net.add_scatter(
+        input_tensor,
+        indices_cat,
+        flattened_values,
+        trt.ScatterMode.ND,
+    )
+    set_layer_name(scatter_layer, target, f"{name}_scatter", source_ir)
+    return scatter_layer.get_output(0)

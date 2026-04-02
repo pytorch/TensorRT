@@ -2,6 +2,7 @@
 #include "NvInferPluginUtils.h"
 #include "core/plugins/impl/interpolate_plugin.h"
 #include "core/plugins/impl/normalize_plugin.h"
+#include "core/plugins/impl/scatter_add_plugin.h"
 #include "core/plugins/plugins.h"
 #include "core/util/prelude.h"
 
