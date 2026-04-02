@@ -13,6 +13,53 @@ Prerequisites
 Quick start: Capture
 --------------------
 
+Example ``test.py``:
+
+.. code-block:: python
+
+    import torch
+    import torch_tensorrt as torchtrt
+    import torchvision.models as models
+    class MyModule(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.conv = torch.nn.Conv1d(3, 3, 3, padding=1, stride=1, bias=True)
+
+        def forward(self, x):
+            return self.conv(x)
+
+    model = MyModule().eval().to("cuda")
+    input = torch.randn((1, 3, 3)).to("cuda").to(torch.float32)
+
+    compile_spec = {
+        "inputs": [
+            torchtrt.Input(
+                min_shape=(1, 3, 3),
+                opt_shape=(2, 3, 3),
+                max_shape=(3, 3, 3),
+                dtype=torch.float32,
+            )
+        ],
+        "min_block_size": 1,
+        "cache_built_engines": False,
+        "reuse_cached_engines": False,
+        "use_python_runtime": True,
+    }
+
+    try:
+        with torchtrt.dynamo.Debugger(
+            "graphs",
+            logging_dir="debuglogs",
+            capture_tensorrt_api_recording=True,
+            capture_tensorrt_api_recording_json_file="/tmp/capturelanlan.json",
+        ):
+            trt_mod = torchtrt.compile(model, **compile_spec)
+
+    except Exception as e:
+        raise e
+
+    print("done.....")
+
 .. code-block:: bash
 
     TORCHTRT_ENABLE_TENSORRT_API_CAPTURE=1 python test.py
