@@ -861,6 +861,130 @@ class TestIndexPutConverter(DispatchTestCase):
             result, torch_output, atol=1e-4, rtol=1e-4
         ), f"Accumulate broadcast mismatch: max diff = {(result - torch_output).abs().max()}"
 
+    # ------------------------------------------------------------------
+    # Duplicate-index tests for realistic use-case models
+    # These mirror the scenarios in experiments/bench_index_put_scatter_add.py
+    # and verify that _index_put_scatter_add correctly accumulates into
+    # duplicate positions when index_put is embedded in a larger graph.
+    # ------------------------------------------------------------------
+
+    def test_kv_cache_duplicate_slot_writes(self):
+        """KV-cache style: linear projection → index_put(accumulate=True) into
+        a flat cache with duplicate slot indices → output projection.
+
+        Multiple writes to the same cache slot must sum, not overwrite.
+        """
+        N, S, D = 6, 16, 32
+
+        # Positions with duplicates: slots 2 and 5 are written twice
+        positions = torch.tensor([0, 2, 2, 5, 5, 7], dtype=torch.int64)
+
+        @torch._dynamo.assume_constant_result
+        def get_positions():
+            return positions
+
+        class KVCacheDupWrites(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.proj_in = torch.nn.Linear(D, D, bias=False)
+                self.proj_out = torch.nn.Linear(D, D, bias=False)
+
+            def forward(self, tokens, cache):
+                # tokens: (N, D), cache: (S, D)
+                feats = self.proj_in(tokens)
+                cache = cache.index_put((get_positions(),), feats, accumulate=True)
+                return self.proj_out(cache)
+
+        tokens = torch.randn(N, D)
+        cache = torch.zeros(S, D)
+
+        self.run_test(
+            KVCacheDupWrites().cuda(),
+            inputs=[tokens, cache],
+            use_dynamo_tracer=True,
+            enable_passes=True,
+        )
+
+    def test_sparse_embedding_duplicate_seq_ids(self):
+        """Sparse embedding accumulation: embedding lookup → index_put(accumulate=True)
+        into per-sequence accumulators where many tokens map to the same sequence → ReLU.
+
+        Multiple tokens per sequence must be summed, not overwritten.
+        """
+        B, N = 4, 20
+
+        # Many tokens map to the same sequence: each seq gets ~5 tokens
+        seq_ids = torch.tensor(
+            [0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3],
+            dtype=torch.int64,
+        )
+
+        @torch._dynamo.assume_constant_result
+        def get_seq_ids():
+            return seq_ids
+
+        class SparseEmbedAccum(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.embedding = torch.nn.Embedding(64, 16)
+                self.head = torch.nn.Linear(16, 8, bias=False)
+
+            def forward(self, token_ids, accum):
+                # token_ids: (N,) int64, accum: (B, 16)
+                embs = self.embedding(token_ids)
+                accum = accum.index_put((get_seq_ids(),), embs, accumulate=True)
+                return self.head(torch.relu(accum))
+
+        token_ids = torch.randint(0, 64, (N,))
+        accum = torch.zeros(B, 16)
+
+        self.run_test(
+            SparseEmbedAccum().cuda(),
+            inputs=[token_ids, accum],
+            use_dynamo_tracer=True,
+            enable_passes=True,
+        )
+
+    def test_histogram_conv_duplicate_bin_ids(self):
+        """Histogram accumulation: Conv1d → index_put(accumulate=True) into histogram
+        bins where many frames land in the same bin → mean pool → linear.
+
+        Multiple frames writing to the same bin must accumulate, not overwrite.
+        """
+        C, L, n_bins = 4, 12, 6
+
+        # Skewed bin assignment: bins 0 and 1 receive many frames
+        bin_ids = torch.tensor(
+            [0, 0, 0, 1, 1, 1, 2, 2, 3, 3, 4, 5],
+            dtype=torch.int64,
+        )
+
+        @torch._dynamo.assume_constant_result
+        def get_bin_ids():
+            return bin_ids
+
+        class HistConvAccum(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.conv = torch.nn.Conv1d(C, 8, kernel_size=3, padding=1)
+                self.head = torch.nn.Linear(8, 4, bias=False)
+
+            def forward(self, signal, hist):
+                # signal: (1, C, L), hist: (n_bins, 8)
+                feat = self.conv(signal).squeeze(0).T  # (L, 8)
+                hist = hist.index_put((get_bin_ids(),), feat, accumulate=True)
+                return self.head(hist.mean(dim=0))
+
+        signal = torch.randn(1, C, L)
+        hist = torch.zeros(n_bins, 8)
+
+        self.run_test(
+            HistConvAccum().cuda(),
+            inputs=[signal, hist],
+            use_dynamo_tracer=True,
+            enable_passes=True,
+        )
+
 
 if __name__ == "__main__":
     run_tests()
