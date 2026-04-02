@@ -34,7 +34,7 @@ __tensorrt_llm_version__: str = "0.0"
 
 LEGACY_BASE_VERSION_SUFFIX_PATTERN = re.compile("a0$")
 # CI_PIPELINE_ID is the environment variable set by DLFW ci build
-IS_DLFW_CI = True  # os.environ.get("CI_PIPELINE_ID") is not None
+IS_DLFW_CI = os.environ.get("CI_PIPELINE_ID") is not None
 
 
 def get_root_dir() -> Path:
