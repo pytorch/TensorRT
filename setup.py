@@ -96,7 +96,7 @@ PY_ONLY = False
 NO_TS = False
 LEGACY = False
 RELEASE = False
-CI_BUILD = True  # False
+CI_BUILD = False
 USE_TRT_RTX = False
 
 if "--use-rtx" in sys.argv:
